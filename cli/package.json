@@ -1,0 +1,51 @@
+{
+  "name": "validate-cli",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "./dist/main.js.js",
+  "module": "./dist/main.js",
+  "bin": {
+    "validate": "./dist/bin/entrypoint.js",
+    "hello": "./dist/bin/hello.js"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=8"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "*.d.ts",
+    "*.mjs"
+  ],
+  "scripts": {
+    "fmt": "biome format .",
+    "fmt:fix": "biome format . --fix",
+    "lint": "pnpm biome lint ./src",
+    "lint:fix": "pnpm biome lint ./src --apply",
+    "start": "tsx src/bin/entrypoint.ts",
+    "build": "tsup src --format esm --no-splitting --sourcemap ",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "moonsong-labs",
+  "license": "GPL-3.0-only",
+  "devDependencies": {
+    "@biomejs/biome": "1.6.4",
+    "@types/node": "^20.12.6",
+    "typescript": "^5.4.4"
+  },
+  "dependencies": {
+    "@types/inquirer": "^9.0.7",
+    "@types/yargs": "^17.0.32",
+    "cfonts": "^3.2.0",
+    "inquirer": "^9.2.17",
+    "tsup": "^8.0.2",
+    "tsx": "^4.7.2",
+    "viem": "^2.9.15",
+    "vitest": "^1.4.0",
+    "yargs": "^17.7.2",
+    "zod": "^3.22.4"
+  }
+}

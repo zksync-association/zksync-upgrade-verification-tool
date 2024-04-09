@@ -1,0 +1,41 @@
+{
+  "name": "validate-test",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "./dist/main.js.js",
+  "module": "./dist/main.js",
+  "bin": {
+    "validate": "./dist/bin/entrypoint.js",
+    "hello": "./bin/hello.js"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=8"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "*.d.ts",
+    "*.mjs"
+  ],
+  "scripts": {
+    "fmt": "biome format .",
+    "fmt:fix": "biome format . --fix",
+    "lint": "pnpm biome lint .",
+    "lint:fix": "pnpm biome lint . --apply",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "moonsong-labs",
+  "license": "GPL-3.0-only",
+  "devDependencies": {
+    "@biomejs/biome": "1.6.4",
+    "@types/node": "^20.12.6",
+    "typescript": "^5.4.4"
+  },
+  "dependencies": {
+    "validate-cli": "workspace:*",
+    "vitest": "^1.4.0"
+  }
+}

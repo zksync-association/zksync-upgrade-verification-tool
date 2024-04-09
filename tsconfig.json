@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "incremental": true,
+
+    // Enable latest features
+    "lib": ["ESNext"],
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "allowJs": true,
+    "outDir": "dist",
+
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+
+    "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["cli/**/*.ts"],
+  "exclude": ["**/dist/**"]
+}
