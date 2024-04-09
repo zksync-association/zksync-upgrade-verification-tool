@@ -1,4 +1,4 @@
 #!/usr/bin/env -S node
-import { cli } from "../module";
+import { cli } from "../lib";
 
 await cli();

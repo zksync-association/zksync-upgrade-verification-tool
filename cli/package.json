@@ -38,9 +38,13 @@
   },
   "dependencies": {
     "@types/inquirer": "^9.0.7",
+    "@types/lodash": "^4.17.0",
+    "@types/semver": "^7.5.8",
     "@types/yargs": "^17.0.32",
     "cfonts": "^3.2.0",
     "inquirer": "^9.2.17",
+    "lodash": "^4.17.21",
+    "semver": "^7.6.0",
     "tsup": "^8.0.2",
     "tsx": "^4.7.2",
     "viem": "^2.9.15",
