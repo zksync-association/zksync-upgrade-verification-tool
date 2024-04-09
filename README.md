@@ -37,6 +37,9 @@ pnpm build
 pnpm validate
 ```
 
+> [!TIP]  
+> If you are feeling lazy, you can run `pnpm dev` to run the CLI without building.
+
 ### Running Tests
 
 ```sh

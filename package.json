@@ -14,6 +14,7 @@
     "*.mjs"
   ],
   "scripts": {
+    "dev": "pnpm -r --filter='./cli' run start",
     "build": "pnpm -r --filter='./cli' run build",
     "test": "pnpm -r --filter='./test' run test",
     "fmt":  "pnpm -r --filter='*' run fmt",

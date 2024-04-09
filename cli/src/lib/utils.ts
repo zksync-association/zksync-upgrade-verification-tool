@@ -1,15 +1,6 @@
-import inquirer from "inquirer";
 import cfonts from "cfonts";
 
-const greeter = (name: string) => {
-  console.log(`👋 Welcome ${name}! `);
-};
-
-interface UsernameResponse {
-  username: string;
-}
-
-export const cli = async () => {
+export const printIntro = () => {
   cfonts.say("zkSync Era\n Validator Tool", {
     colors: ["red", "gray"],
     font: "block",
@@ -24,11 +15,4 @@ export const cli = async () => {
     // transitionGradient: false,  // define if this is a transition between colors directly
     // env: 'node'
   });
-
-  const response = await inquirer.prompt<UsernameResponse>({
-    type: "input",
-    name: "username",
-    message: "What is your username?",
-  });
-  greeter(response.username);
 };
