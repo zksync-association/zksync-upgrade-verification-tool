@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "fmt": "biome format .",
-    "fmt:fix": "biome format . --fix",
+    "fmt:fix": "biome format . --write",
     "lint": "pnpm biome lint .",
     "lint:fix": "pnpm biome lint . --apply",
     "test": "vitest run"
