@@ -73,5 +73,6 @@ export const cli = async () => {
     )
     .demandCommand(1, "You need to specify a command")
     .help()
+    .strict()
     .parseAsync();
 };
