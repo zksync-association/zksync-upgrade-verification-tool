@@ -26,6 +26,7 @@
     "lint:fix": "pnpm biome lint ./src --apply",
     "start": "tsx src/bin/entrypoint.ts",
     "build": "tsup src --format esm --no-splitting --sourcemap ",
+    "watch":"tsup src --format esm --no-splitting --watch",
     "test": "vitest run"
   },
   "keywords": [],
