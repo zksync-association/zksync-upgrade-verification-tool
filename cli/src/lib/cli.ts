@@ -10,11 +10,21 @@ export const cli = async () => {
     .command(
       "list",
       "List Upgrades",
-      (yargs) => {
-        // Add options or arguments for the 'list' command if needed
-      },
+      (yargs) =>
+        yargs.option("directory", {
+          describe: "Directory to list upgrades from",
+          alias: "d",
+          type: "string",
+          // array: false,
+          // conflicts: "directory",
+          nargs: 1,
+          demandOption: false,
+        }),
       async (yargs) => {
-        await listCommand();
+        const directory = Array.isArray(yargs.directory) ? yargs.directory[0] : yargs.directory;
+        Array.isArray(yargs.directory) &&
+          console.log(`⚠️ Warning: Only the first directory will be used: ${directory}`);
+        await listCommand(directory);
       }
     )
     .command(
@@ -63,5 +73,6 @@ export const cli = async () => {
     )
     .demandCommand(1, "You need to specify a command")
     .help()
+    .strict()
     .parseAsync();
 };

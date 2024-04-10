@@ -39,6 +39,9 @@ importers:
       cfonts:
         specifier: ^3.2.0
         version: 3.2.0
+      cli-table3:
+        specifier: ^0.6.4
+        version: 0.6.4
       inquirer:
         specifier: ^9.2.17
         version: 9.2.17
@@ -188,6 +191,13 @@ packages:
     os: [win32]
     requiresBuild: true
     dev: true
+    optional: true
+
+  /@colors/colors@1.5.0:
+    resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
+    engines: {node: '>=0.1.90'}
+    requiresBuild: true
+    dev: false
     optional: true
 
   /@esbuild/aix-ppc64@0.19.12:
@@ -1139,6 +1149,15 @@ packages:
   /cli-spinners@2.9.2:
     resolution: {integrity: sha512-ywqV+5MmyL4E7ybXgKys4DugZbX0FC6LnwrhjuykIjnK9k8OQacQ7axGKnjDXWNhns0xot3bZI5h55H8yo9cJg==}
     engines: {node: '>=6'}
+    dev: false
+
+  /cli-table3@0.6.4:
+    resolution: {integrity: sha512-Lm3L0p+/npIQWNIiyF/nAn7T5dnOwR3xNTHXYEBFBFVPXzCVNZ5lqEC/1eo/EVfpDsQ1I+TX4ORPQgp+UI0CRw==}
+    engines: {node: 10.* || >= 12.*}
+    dependencies:
+      string-width: 4.2.3
+    optionalDependencies:
+      '@colors/colors': 1.5.0
     dev: false
 
   /cli-width@4.1.0:
