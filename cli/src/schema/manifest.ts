@@ -11,3 +11,5 @@ export const commonJsonSchema = z.object({
   creationTimestamp: z.number(),
   protocolVersion: numberString,
 });
+
+export type UpgradeManifest = z.infer<typeof commonJsonSchema>;
