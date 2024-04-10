@@ -60,7 +60,7 @@ describe("CLI Output Test Suite", () => {
       expect(stdout).toContain("N/A");
     });
 
-    it("should match snapshot", async () => {
+    it("should match snapshot", async ({ expect }) => {
       const { stdout } = await execAsync("pnpm validate list --directory reference");
       expect(stdout).toMatchSnapshot();
     });
