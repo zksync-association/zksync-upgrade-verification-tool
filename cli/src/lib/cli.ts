@@ -7,19 +7,19 @@ export const cli = async () => {
   printIntro();
 
   await yargs(hideBin(process.argv))
+    .option("directory", {
+      describe: "Directory to list upgrades from",
+      alias: "d",
+      type: "string",
+      // array: false,
+      // conflicts: "directory",
+      nargs: 1,
+      demandOption: false,
+    })
     .command(
       "list",
       "List Upgrades",
-      (yargs) =>
-        yargs.option("directory", {
-          describe: "Directory to list upgrades from",
-          alias: "d",
-          type: "string",
-          // array: false,
-          // conflicts: "directory",
-          nargs: 1,
-          demandOption: false,
-        }),
+      (yargs) => {},
       async (yargs) => {
         const directory = Array.isArray(yargs.directory) ? yargs.directory[0] : yargs.directory;
         Array.isArray(yargs.directory) &&
@@ -28,16 +28,16 @@ export const cli = async () => {
       }
     )
     .command(
-      "verify <upgradeId>",
+      "verify <upgradeDirectory>",
       "Check upgrade is well formed",
       (yargs) =>
-        yargs.positional("upgradeId", {
+        yargs.positional("upgradeDirectory", {
           describe: "FolderName of the upgrade to verify",
           type: "string",
           demandOption: true,
         }),
       async (yargs) => {
-        verifyCommand(yargs.upgradeId);
+        verifyCommand(yargs.upgradeDirectory);
       }
     )
     .command(
