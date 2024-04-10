@@ -1,8 +1,8 @@
 import { z } from "zod";
 export const hashString = z.string().regex(/^0x[a-fA-F0-9]$/, "Invalid hex encoded hash");
 
-export const account20String = hashString.length(40, "Invalid Ethereum address");
-export const bytes32Hash = hashString.length(64, "Invalid Ethereum word");
+export const account20String = hashString.length(42, "Invalid Ethereum address");
+export const bytes32Hash = hashString.length(66, "Invalid Ethereum word");
 export const selectorhash = hashString.length(10, "Invalid Selector hash");
 
 export const transactionSchema = z.object({

@@ -19,7 +19,8 @@ export const cli = async () => {
     .command(
       "list",
       "List Upgrades",
-      (yargs) => {},
+      // TODO: Add option to hide non-upgrade directories
+      () => {},
       async (yargs) => {
         const directory = Array.isArray(yargs.directory) ? yargs.directory[0] : yargs.directory;
         Array.isArray(yargs.directory) &&
@@ -37,7 +38,7 @@ export const cli = async () => {
           demandOption: true,
         }),
       async (yargs) => {
-        verifyCommand(yargs.upgradeDirectory);
+        verifyCommand(yargs.upgradeDirectory, yargs.directory);
       }
     )
     .command(
