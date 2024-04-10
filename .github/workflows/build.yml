@@ -18,4 +18,5 @@ jobs:
           cache: "pnpm"
       - run: pnpm install
       - run: pnpm run build
-      - run: pnpm run test
+      - name: Link Binary & Test
+        run: pnpm i && pnpm run test
