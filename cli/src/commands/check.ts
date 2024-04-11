@@ -1,8 +1,12 @@
-import { lookupAndParse } from "../lib";
+import { fetchAbi, lookupAndParse, type Network } from "../lib";
 import clitable from "cli-table3";
 import path from "node:path";
 
-export const checkCommand = async (upgradeDirectory: string, parentDirectory?: string) => {
+export const checkCommand = async (
+  upgradeDirectory: string,
+  network: Network,
+  parentDirectory?: string
+) => {
   console.log(`🔦 Checking upgrade with id: ${upgradeDirectory}`);
 
   const basePath = path.resolve(process.cwd(), parentDirectory || "", upgradeDirectory);
@@ -33,4 +37,8 @@ export const checkCommand = async (upgradeDirectory: string, parentDirectory?: s
   }
 
   console.log(table.toString());
+
+  const abi = await fetchAbi(network, "");
+
+  console.log(abi);
 };

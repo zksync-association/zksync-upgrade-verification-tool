@@ -1,7 +1,10 @@
 import { z } from "zod";
 export const hashString = z.string().regex(/^0x[a-fA-F0-9]*$/, "Invalid hex encoded hash");
+export type HashString = z.infer<typeof hashString>;
 
 export const account20String = hashString.length(42, "Invalid Ethereum address");
+export type Account20String = z.infer<typeof account20String>;
+
 export const bytes32Hash = hashString.length(66, "Invalid Ethereum word");
 export const selectorhash = hashString.length(10, "Invalid Selector hash");
 

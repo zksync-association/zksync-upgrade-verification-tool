@@ -1,7 +1,7 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { diffCommand, greetCommand, listCommand, checkCommand } from "../commands";
-import { printIntro } from ".";
+import { NetworkSchema, printIntro } from ".";
 
 export const cli = async () => {
   printIntro();
@@ -11,9 +11,14 @@ export const cli = async () => {
       describe: "Directory to list upgrades from",
       alias: "d",
       type: "string",
-      nargs: 1,
       demandOption: false,
       default: ".",
+    })
+    .option("network", {
+      describe: "Network to use",
+      alias: "n",
+      type: "string",
+      default: "mainnet",
     })
     .command(
       "list",
@@ -42,7 +47,11 @@ export const cli = async () => {
           demandOption: true,
         }),
       async (yargs) => {
-        checkCommand(yargs.upgradeDirectory, yargs.directory);
+        await checkCommand(
+          yargs.upgradeDirectory,
+          NetworkSchema.parse(yargs.network),
+          yargs.directory
+        );
       }
     )
     .command(
