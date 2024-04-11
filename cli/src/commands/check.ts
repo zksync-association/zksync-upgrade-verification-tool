@@ -5,7 +5,7 @@ import path from "node:path";
 export const checkCommand = async (upgradeDirectory: string, parentDirectory?: string) => {
   console.log(`🔦 Checking upgrade with id: ${upgradeDirectory}`);
 
-  const basePath = path.join(process.cwd(), parentDirectory || "", upgradeDirectory);
+  const basePath = path.resolve(process.cwd(), parentDirectory || "", upgradeDirectory);
 
   const { fileStatuses } = await lookupAndParse(basePath);
 

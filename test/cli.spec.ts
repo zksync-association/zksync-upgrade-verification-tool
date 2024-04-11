@@ -73,6 +73,13 @@ describe("CLI Output Test Suite", () => {
       const { stdout } = await execAsync("pnpm validate list --directory reference");
       expect(stdout).toMatchSnapshot();
     });
+
+    it("should support absolute paths", async ({ expect }) => {
+      const { stdout: realpath } = await execAsync("realpath reference");
+      const { stdout } = await execAsync(`pnpm validate list --directory ${realpath}`);
+      expect(stdout).toContain("1709067445-protodanksharding");
+      expect(stdout).toMatchSnapshot();
+    });
   });
 
   describe("Command: <check>", () => {
@@ -95,6 +102,16 @@ describe("CLI Output Test Suite", () => {
       const { stdout } = await execAsync(
         "pnpm validate check 1709067445-protodanksharding --directory reference"
       );
+      expect(stdout).toMatchSnapshot();
+    });
+
+    it("should support absolute paths", async ({ expect }) => {
+      const { stdout: realpath } = await execAsync("realpath reference");
+      const { stdout } = await execAsync(
+        `pnpm validate check test-upgrade-mini --directory ${realpath}`
+      );
+      expect(stdout).toContain("✅");
+      expect(stdout).not.toContain("❌");
       expect(stdout).toMatchSnapshot();
     });
   });
