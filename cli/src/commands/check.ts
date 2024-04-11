@@ -2,8 +2,8 @@ import { lookupAndParse } from "../lib";
 import clitable from "cli-table3";
 import path from "node:path";
 
-export const verifyCommand = async (upgradeDirectory: string, parentDirectory?: string) => {
-  console.log(`🔦 Verifying upgrade with id: ${upgradeDirectory}`);
+export const checkCommand = async (upgradeDirectory: string, parentDirectory?: string) => {
+  console.log(`🔦 Checking upgrade with id: ${upgradeDirectory}`);
 
   const basePath = path.join(process.cwd(), parentDirectory || "", upgradeDirectory);
 
