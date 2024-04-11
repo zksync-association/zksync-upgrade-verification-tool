@@ -2,8 +2,8 @@ import { retrieveDirNames } from "../lib";
 import path from "node:path";
 import Table from "cli-table3";
 
-export const listCommand = async (directory?: string, hideNonUpgrades = false) => {
-  console.log(`🔎 Checking directories in ${directory ?? process.cwd()} for upgrades...`);
+export const listCommand = async (directory: string, hideNonUpgrades = false) => {
+  console.log(`🔎 Checking directories in ${path.dirname(directory)} for upgrades...`);
   const cwd = process.cwd();
   const targetDir = directory ? path.resolve(cwd, directory) : cwd;
   const dirs = await retrieveDirNames(targetDir, true);

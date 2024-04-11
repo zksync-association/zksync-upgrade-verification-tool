@@ -13,6 +13,7 @@ export const cli = async () => {
       type: "string",
       nargs: 1,
       demandOption: false,
+      default: ".",
     })
     .command(
       "list",
