@@ -1,41 +1,20 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import Table from "cli-table3";
-import { commonJsonSchema, type UpgradeManifest } from "../schema";
+import { commonJsonSchema, type AllSchemas, type UpgradeManifest } from "../schema";
 import { ZodError } from "zod";
+import { SCHEMAS, knownFileNames } from "./parser";
 
 export const retrieveDirNames = async (targetDir: string, verbose = true) => {
   const items = await fs.readdir(targetDir, { withFileTypes: true });
   const directories = items.filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
-  const blobs = await Promise.all(
+  const dirs = await Promise.all(
     directories.map(async (dir) => ({
       name: dir,
       parsed: await isUpgradeBlob(path.join(targetDir, dir)),
     }))
   );
 
-  if (verbose) {
-    const table = new Table({
-      head: ["Name", "Is Upgrade?", "Protocol Version", "Created at", "Directory"],
-      // , colWidths: [100, 200]
-    });
-
-    for (const { name, parsed } of blobs) {
-      const row = [
-        parsed.parsed?.name ?? "N/A",
-        parsed.valid ? "Yes" : "No",
-        parsed.parsed?.protocolVersion ?? "N/A",
-        parsed.parsed
-          ? new Date(parsed.parsed.creationTimestamp * 1000).toISOString().slice(0, 10)
-          : "N/A",
-        name,
-      ];
-      table.push(row);
-    }
-
-    console.log(table.toString());
-  }
-  return directories;
+  return dirs;
 };
 
 const isUpgradeBlob = async (
@@ -54,11 +33,47 @@ const isUpgradeBlob = async (
     return { valid: true, parsed };
   } catch (e) {
     if (e instanceof ZodError) {
-      console.error(e.message);
+      process.env.DEBUG === "1" && console.error(e.message);
     } else {
       console.error(e);
     }
     // TODO: Add a logging system and add debug logs for parse failure
     return { valid: false };
   }
+};
+
+export type FileStatus = {
+  filePath: string;
+  isValid: boolean;
+};
+
+export const lookupAndParse = async (targetDir: string) => {
+  const parsedData: any = {};
+  const fileStatuses: FileStatus[] = [];
+
+  const traverseDirectory = async (currentPath: string) => {
+    const entries = await fs.readdir(currentPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const entryPath = path.join(currentPath, entry.name);
+
+      if (entry.isDirectory()) {
+        await traverseDirectory(entryPath);
+      } else {
+        const fileName = knownFileNames.parse(entry.name);
+        const parser = SCHEMAS[fileName];
+        try {
+          const fileContents = await fs.readFile(entryPath, "utf8");
+          const parsed = parser.parse(JSON.parse(fileContents));
+          parsedData[entryPath] = parsed;
+          fileStatuses.push({ filePath: entryPath, isValid: true });
+        } catch (error) {
+          // process.env.DEBUG === "1" && console.error(`Error parsing ${entryPath}:`, error);
+          fileStatuses.push({ filePath: entryPath, isValid: false });
+        }
+      }
+    }
+  };
+  await traverseDirectory(targetDir);
+
+  return { parsedData, fileStatuses };
 };

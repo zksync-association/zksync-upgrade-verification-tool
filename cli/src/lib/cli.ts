@@ -1,43 +1,48 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { diffCommand, greetCommand, listCommand, verifyCommand } from "../commands";
+import { diffCommand, greetCommand, listCommand, checkCommand } from "../commands";
 import { printIntro } from ".";
 
 export const cli = async () => {
   printIntro();
 
   await yargs(hideBin(process.argv))
+    .option("directory", {
+      describe: "Directory to list upgrades from",
+      alias: "d",
+      type: "string",
+      nargs: 1,
+      demandOption: false,
+      default: ".",
+    })
     .command(
       "list",
       "List Upgrades",
       (yargs) =>
-        yargs.option("directory", {
-          describe: "Directory to list upgrades from",
-          alias: "d",
-          type: "string",
-          // array: false,
-          // conflicts: "directory",
-          nargs: 1,
-          demandOption: false,
+        yargs.option("hide-non-upgrades", {
+          type: "boolean",
+          default: true,
+          describe: "Hide directories that do not contain upgrades",
+          alias: "hide",
         }),
-      async (yargs) => {
-        const directory = Array.isArray(yargs.directory) ? yargs.directory[0] : yargs.directory;
-        Array.isArray(yargs.directory) &&
-          console.log(`⚠️ Warning: Only the first directory will be used: ${directory}`);
-        await listCommand(directory);
+      async ({ directory, hideNonUpgrades }) => {
+        const dir = Array.isArray(directory) ? directory[0] : directory;
+        Array.isArray(directory) &&
+          console.log(`⚠️ Warning: Only the first directory will be used: ${dir}`);
+        await listCommand(directory, hideNonUpgrades);
       }
     )
     .command(
-      "verify <upgradeId>",
+      "check <upgradeDirectory>",
       "Check upgrade is well formed",
       (yargs) =>
-        yargs.positional("upgradeId", {
-          describe: "FolderName of the upgrade to verify",
+        yargs.positional("upgradeDirectory", {
+          describe: "FolderName of the upgrade to check",
           type: "string",
           demandOption: true,
         }),
       async (yargs) => {
-        verifyCommand(yargs.upgradeId);
+        checkCommand(yargs.upgradeDirectory, yargs.directory);
       }
     )
     .command(
@@ -46,7 +51,7 @@ export const cli = async () => {
       (yargs) =>
         yargs
           .positional("upgradeId", {
-            describe: "FolderName of the upgrade to verify",
+            describe: "FolderName of the upgrade to compare",
             type: "string",
             demandOption: true,
           })

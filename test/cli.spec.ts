@@ -36,9 +36,8 @@ describe("CLI Output Test Suite", () => {
 
   describe("Command: <list>", () => {
     it("should print current directory", async () => {
-      const currentDir = process.cwd();
       const { stdout } = await execAsync("pnpm validate list");
-      expect(stdout).toContain(currentDir);
+      expect(stdout).toContain("./");
     });
 
     it("should support passing dir option", async () => {
@@ -52,16 +51,66 @@ describe("CLI Output Test Suite", () => {
       expect(stdout).toContain("1709067445-protodanksharding");
       expect(stdout).toContain("v1.4.2-enchancement");
     });
+    it("should hide failing upgrades by default", async () => {
+      const { stdout } = await execAsync("pnpm validate list --directory reference ");
+      expect(stdout).not.toContain("failing-case");
+      expect(stdout).not.toContain("N/A");
+    });
 
     it("should list failing upgrades", async () => {
-      const { stdout } = await execAsync("pnpm validate list --directory reference");
-      expect(stdout).toContain("🔎 Checking directories in reference for upgrades...");
-      expect(stdout).toContain("1709067445-protodanksharding-fail");
+      const { stdout } = await execAsync("pnpm validate list --directory reference --hide false");
+      expect(stdout).toContain("failing-case");
       expect(stdout).toContain("N/A");
+    });
+
+    it("should not display table when no upgrades found", async ({ expect }) => {
+      const { stdout } = await execAsync("pnpm validate list");
+      expect(stdout).toMatchSnapshot();
     });
 
     it("should match snapshot", async ({ expect }) => {
       const { stdout } = await execAsync("pnpm validate list --directory reference");
+      expect(stdout).toMatchSnapshot();
+    });
+
+    it("should support absolute paths", async ({ expect }) => {
+      const { stdout: realpath } = await execAsync("realpath reference");
+      const { stdout } = await execAsync(`pnpm validate list --directory ${realpath}`);
+      expect(stdout).toContain("1709067445-protodanksharding");
+      expect(stdout).toMatchSnapshot();
+    });
+  });
+
+  describe("Command: <check>", () => {
+    it("should validate an upgrade", async () => {
+      const { stdout } = await execAsync(
+        "pnpm validate check test-upgrade-mini --directory reference"
+      );
+      expect(stdout).toContain("🔦 Checking upgrade with id: test-upgrade-mini");
+      expect(stdout).toContain("✅ ");
+    });
+
+    it("should not contain failures", async () => {
+      const { stdout } = await execAsync(
+        "pnpm validate check test-upgrade-mini --directory reference"
+      );
+      expect(stdout).not.toContain("❌");
+    });
+
+    it("should match snapshot", async ({ expect }) => {
+      const { stdout } = await execAsync(
+        "pnpm validate check 1709067445-protodanksharding --directory reference"
+      );
+      expect(stdout).toMatchSnapshot();
+    });
+
+    it("should support absolute paths", async ({ expect }) => {
+      const { stdout: realpath } = await execAsync("realpath reference");
+      const { stdout } = await execAsync(
+        `pnpm validate check test-upgrade-mini --directory ${realpath}`
+      );
+      expect(stdout).toContain("✅");
+      expect(stdout).not.toContain("❌");
       expect(stdout).toMatchSnapshot();
     });
   });
