@@ -229,7 +229,7 @@ exports[`CLI Output Test Suite > Command: <list> > should not display table when
  [90m╚═╝  ╚═╝[39m     [90m   ╚═╝   [39m [90m ╚═════╝ [39m [90m ╚═════╝ [39m [90m╚══════╝[39m
 
 
-🔎 Checking directories in /Users/timbo/workspace/moonsong/era-l1-upgrade-checker/test for upgrades...
+🔎 Checking directories in ./ for upgrades...
 ℹ️  No upgrades found in current directory.
 "
 `;
@@ -266,7 +266,7 @@ exports[`CLI Output Test Suite > Command: <list> > should support absolute paths
  [90m╚═╝  ╚═╝[39m     [90m   ╚═╝   [39m [90m ╚═════╝ [39m [90m ╚═════╝ [39m [90m╚══════╝[39m
 
 
-🔎 Checking directories in /Users/timbo/workspace/moonsong/era-l1-upgrade-checker/test/reference for upgrades...
+🔎 Checking directories in reference for upgrades...
 [90m┌─────────────────────[39m[90m┬─────────────[39m[90m┬──────────────────[39m[90m┬────────────[39m[90m┬────────────────────────────────┐[39m
 [90m│[39m[31m Name                [39m[90m│[39m[31m Is Upgrade? [39m[90m│[39m[31m Protocol Version [39m[90m│[39m[31m Created at [39m[90m│[39m[31m Directory                      [39m[90m│[39m
 [90m├─────────────────────[39m[90m┼─────────────[39m[90m┼──────────────────[39m[90m┼────────────[39m[90m┼────────────────────────────────┤[39m

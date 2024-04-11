@@ -3,9 +3,11 @@ import path from "node:path";
 import Table from "cli-table3";
 
 export const listCommand = async (directory: string, hideNonUpgrades = false) => {
-  console.log(`🔎 Checking directories in ${path.dirname(directory)} for upgrades...`);
   const cwd = process.cwd();
   const targetDir = directory ? path.resolve(cwd, directory) : cwd;
+  console.log(
+    `🔎 Checking directories in ${path.relative(".", targetDir) || "./"} for upgrades...`
+  );
   const dirs = await retrieveDirNames(targetDir, true);
 
   const table = new Table({

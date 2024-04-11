@@ -36,9 +36,8 @@ describe("CLI Output Test Suite", () => {
 
   describe("Command: <list>", () => {
     it("should print current directory", async () => {
-      const currentDir = process.cwd();
       const { stdout } = await execAsync("pnpm validate list");
-      expect(stdout).toContain(currentDir);
+      expect(stdout).toContain("./");
     });
 
     it("should support passing dir option", async () => {
