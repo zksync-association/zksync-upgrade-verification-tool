@@ -56,12 +56,36 @@ describe("CLI Output Test Suite", () => {
     it("should list failing upgrades", async () => {
       const { stdout } = await execAsync("pnpm validate list --directory reference");
       expect(stdout).toContain("🔎 Checking directories in reference for upgrades...");
-      expect(stdout).toContain("1709067445-protodanksharding-fail");
+      expect(stdout).toContain("failing-case");
       expect(stdout).toContain("N/A");
     });
 
     it("should match snapshot", async ({ expect }) => {
       const { stdout } = await execAsync("pnpm validate list --directory reference");
+      expect(stdout).toMatchSnapshot();
+    });
+  });
+
+  describe("Command: <verify>", () => {
+    it("should validate an upgrade", async () => {
+      const { stdout } = await execAsync(
+        "pnpm validate verify test-upgrade-mini --directory reference"
+      );
+      expect(stdout).toContain("🔦 Verifying upgrade with id: test-upgrade-mini");
+      expect(stdout).toContain("✅ ");
+    });
+
+    it("should not contain failures", async () => {
+      const { stdout } = await execAsync(
+        "pnpm validate verify test-upgrade-mini --directory reference"
+      );
+      expect(stdout).not.toContain("❌");
+    });
+
+    it("should match snapshot", async ({ expect }) => {
+      const { stdout } = await execAsync(
+        "pnpm validate verify 1709067445-protodanksharding --directory reference"
+      );
       expect(stdout).toMatchSnapshot();
     });
   });

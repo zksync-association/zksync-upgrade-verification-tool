@@ -6,6 +6,8 @@ import { printIntro } from ".";
 export const cli = async () => {
   printIntro();
 
+  // TODO: add absolute path support
+
   await yargs(hideBin(process.argv))
     .option("directory", {
       describe: "Directory to list upgrades from",

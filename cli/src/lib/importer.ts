@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import Table from "cli-table3";
-import { commonJsonSchema, type UpgradeManifest } from "../schema";
+import { commonJsonSchema, type AllSchemas, type UpgradeManifest } from "../schema";
 import { ZodError } from "zod";
 import { SCHEMAS, knownFileNames } from "./parser";
 
@@ -64,12 +64,14 @@ const isUpgradeBlob = async (
   }
 };
 
-export const lookupAndParse = async (targetDir: string) => {
-  let parsedData = {};
-  let fileStatuses = [];
+export type FileStatus = {
+  filePath: string;
+  isValid: boolean;
+};
 
-  // const items = await fs.readdir(targetDir, { withFileTypes: true });
-  // console.log(items);
+export const lookupAndParse = async (targetDir: string) => {
+  const parsedData: any = {};
+  const fileStatuses: FileStatus[] = [];
 
   const traverseDirectory = async (currentPath: string) => {
     const entries = await fs.readdir(currentPath, { withFileTypes: true });
@@ -84,11 +86,11 @@ export const lookupAndParse = async (targetDir: string) => {
         try {
           const fileContents = await fs.readFile(entryPath, "utf8");
           const parsed = parser.parse(JSON.parse(fileContents));
-          parsedData[entryPath] = parsed; // Example aggregation
-          fileStatuses.push({ path: entryPath, isValid: true });
+          parsedData[entryPath] = parsed;
+          fileStatuses.push({ filePath: entryPath, isValid: true });
         } catch (error) {
           console.error(`Error parsing ${entryPath}:`, error);
-          fileStatuses.push({ path: entryPath, isValid: false });
+          fileStatuses.push({ filePath: entryPath, isValid: false });
         }
       }
     }
@@ -96,9 +98,4 @@ export const lookupAndParse = async (targetDir: string) => {
   await traverseDirectory(targetDir);
 
   return { parsedData, fileStatuses };
-};
-
-const importFile = async (filePath: string) => {
-  const file = await fs.readFile(filePath, "utf-8");
-  return JSON.parse(file);
 };
