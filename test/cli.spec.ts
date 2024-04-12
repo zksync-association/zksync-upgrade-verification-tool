@@ -82,6 +82,7 @@ describe("CLI Output Test Suite", () => {
   });
 
   describe("Command: <check>", () => {
+    
     it("should validate an upgrade", async () => {
       const { stdout } = await execAsync(
         "pnpm validate check test-upgrade-mini --directory reference"
