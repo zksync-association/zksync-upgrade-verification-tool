@@ -65,6 +65,13 @@ const transformData = async (data: Record<string, any>) => {
         );
       }
     }
+
+    Object.defineProperty(
+      data,
+      path.basename(name),
+      Object.getOwnPropertyDescriptor(data, name) || "error"
+    );
+    delete data[name];
   }
 
   return data;
