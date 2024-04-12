@@ -15,7 +15,7 @@ export const fetchAbi = async (network: Network, contractAddress: Account20Strin
   const query = buildQueryString(endpoint, contractAddr, ETHERSCAN_KEY);
   const response = await fetch(query);
 
-  const {message, result} = getAbiSchema.parse(await response.json());
+  const { message, result } = getAbiSchema.parse(await response.json());
 
   if (message !== "OK") {
     throw new Error(`Failed to fetch ABI for ${contractAddress}`);

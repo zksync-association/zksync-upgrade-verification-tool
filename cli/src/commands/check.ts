@@ -6,7 +6,6 @@ import type { Account20String, HashString, SchemaMap } from "../schema";
 
 export const AbiMap = new Map<string, Abi>();
 
-
 export const checkCommand = async (
   upgradeDirectory: string,
   network: Network,
@@ -42,37 +41,40 @@ export const checkCommand = async (
 
   console.log(table.toString());
 
- const transformed = await transformData(parsedData);
+  const transformed = await transformData(parsedData);
 
- console.log(transformed)
+  console.log(transformed);
 };
 
 const transformData = async (data: Record<string, any>) => {
   const keys = Object.keys(data);
 
   for (const name of keys) {
-
     if (path.basename(name) === "transactions.json") {
       const upgradeAddress = data[name].upgradeAddress;
       const l1CallData = data[name].l1upgradeCalldata;
       const decoded = await transformCallData(l1CallData, upgradeAddress, "mainnet");
-      data[name].l1upgradeCalldata = decoded
+      data[name].l1upgradeCalldata = decoded;
 
-
-      if ("transparentUpgrade" in data[name]){
-        const {initAddress, initCalldata} = data[name].transparentUpgrade;
-        data[name].transparentUpgrade.initCalldata = await transformCallData(initCalldata, initAddress, "mainnet")
+      if ("transparentUpgrade" in data[name]) {
+        const { initAddress, initCalldata } = data[name].transparentUpgrade;
+        data[name].transparentUpgrade.initCalldata = await transformCallData(
+          initCalldata,
+          initAddress,
+          "mainnet"
+        );
       }
     }
   }
 
-  
-
-
-return data
+  return data;
 };
 
-const transformCallData = async (callData: HashString, contractAddress: Account20String, network: Network) => {
+const transformCallData = async (
+  callData: HashString,
+  contractAddress: Account20String,
+  network: Network
+) => {
   if (AbiMap.has(contractAddress)) {
     return AbiMap.get(contractAddress);
   }
