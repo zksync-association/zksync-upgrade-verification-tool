@@ -8,6 +8,7 @@ import type { TransactionsJson } from "./transactions";
 export * from "./common";
 export * from "./manifest";
 export * from "./crypto";
+export * from "./etherscan"
 export * from "./facetCuts";
 export * from "./facets";
 export * from "./l2Upgrade";
@@ -20,3 +21,8 @@ export type AllSchemas =
   | l2UpgradeJson
   | UpgradeManifest
   | TransactionsJson;
+
+
+  export type SchemaMap = {
+    [key: string]: AllSchemas
+  }

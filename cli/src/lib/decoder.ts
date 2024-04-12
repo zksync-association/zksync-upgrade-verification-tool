@@ -1,23 +1,27 @@
 import type { Abi } from "viem";
-import { account20String, type Account20String, type HashString } from "../schema";
+import { getAbiSchema, account20String, type Account20String, type HashString } from "../schema";
 import { ETHERSCAN_ENDPOINTS, type Network } from "./constants";
 
 const ETHERSCAN_KEY = process.env.ETHERSCAN_API_KEY;
 
 export const fetchAbi = async (network: Network, contractAddress: Account20String) => {
-  console.log("🔦 Checking upgrade with id: 1234");
+  console.log(`🛬 Fetching contract ${contractAddress} abi from ${network}`);
 
   if (!ETHERSCAN_KEY) {
     throw new Error("No Etherscan API key found in environment variables");
   }
   const endpoint = ETHERSCAN_ENDPOINTS[network];
-  const contractAddr = account20String.parse("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+  const contractAddr = account20String.parse(contractAddress);
   const query = buildQueryString(endpoint, contractAddr, ETHERSCAN_KEY);
   const response = await fetch(query);
 
-  // TODO: Parse this with zod
-  const json = (await response.json()) as any;
-  return json.result as Abi;
+  const {message, result} = getAbiSchema.parse(await response.json());
+
+  if (message !== "OK") {
+    throw new Error(`Failed to fetch ABI for ${contractAddress}`);
+  }
+
+  return JSON.parse(result);
 };
 
 const buildQueryString = (endpoint: HashString, address: Account20String, apiToken: string) => {
