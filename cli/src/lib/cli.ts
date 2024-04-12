@@ -14,12 +14,6 @@ export const cli = async () => {
       demandOption: false,
       default: ".",
     })
-    .option("network", {
-      describe: "Network to use",
-      alias: "n",
-      type: "string",
-      default: "mainnet",
-    })
     .command(
       "list",
       "List Upgrades",
@@ -47,11 +41,7 @@ export const cli = async () => {
           demandOption: true,
         }),
       async (yargs) => {
-        await checkCommand(
-          yargs.upgradeDirectory,
-          NetworkSchema.parse(yargs.network),
-          yargs.directory
-        );
+        await checkCommand(yargs.upgradeDirectory, yargs.directory);
       }
     )
     .command(

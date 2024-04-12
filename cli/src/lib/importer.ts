@@ -53,6 +53,7 @@ export const lookupAndParse = async (targetDir: string) => {
 
   const traverseDirectory = async (currentPath: string) => {
     const entries = await fs.readdir(currentPath, { withFileTypes: true });
+
     for (const entry of entries) {
       const entryPath = path.join(currentPath, entry.name);
 
