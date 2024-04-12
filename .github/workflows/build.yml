@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - "**"
+env:
+  ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
 
 jobs:
   build:
