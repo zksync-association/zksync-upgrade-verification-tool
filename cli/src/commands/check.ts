@@ -3,9 +3,6 @@ import clitable from "cli-table3";
 import path, { parse } from "node:path";
 import { decodeFunctionData, type Abi } from "viem";
 import type { Account20String, HashString } from "../schema";
-import stringifyObject from "stringify-object";
-import asTable from "as-table";
-import tree from "object-treeify";
 import { prettyPrint } from "@base2/pretty-print-object";
 
 export const AbiMap = new Map<string, Abi>();
