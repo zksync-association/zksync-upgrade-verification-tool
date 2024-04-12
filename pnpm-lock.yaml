@@ -24,6 +24,9 @@ importers:
 
   cli:
     dependencies:
+      '@base2/pretty-print-object':
+        specifier: ^1.0.2
+        version: 1.0.2
       '@types/inquirer':
         specifier: ^9.0.7
         version: 9.0.7
@@ -42,6 +45,9 @@ importers:
       cli-table3:
         specifier: ^0.6.4
         version: 0.6.4
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.4.5
       inquirer:
         specifier: ^9.2.17
         version: 9.2.17
@@ -103,6 +109,10 @@ packages:
 
   /@adraffy/ens-normalize@1.10.0:
     resolution: {integrity: sha512-nA9XHtlAkYfJxY7bce8DcN7eKxWWCWkU+1GR9d+U6MbNpfwQp8TI7vqOsBsMcHoT4mBu2kypKoSKnghEzOOq5Q==}
+    dev: false
+
+  /@base2/pretty-print-object@1.0.2:
+    resolution: {integrity: sha512-rBha0UDfV7EmBRjWrGG7Cpwxg8WomPlo0q+R2so47ZFf9wy4YKJzLuHcVa0UGFjdcLZj/4F/1FNC46GIQhe7sA==}
     dev: false
 
   /@biomejs/biome@1.6.4:
@@ -1255,6 +1265,11 @@ packages:
     engines: {node: '>=8'}
     dependencies:
       path-type: 4.0.0
+    dev: false
+
+  /dotenv@16.4.5:
+    resolution: {integrity: sha512-ZmdL2rui+eB2YwhsWzjInR8LldtZHGDoQ1ugH85ppHKwpUHL7j7rN0Ti9NCnGiQbhaZ11FpR+7ao1dNsmduNUg==}
+    engines: {node: '>=12'}
     dev: false
 
   /eastasianwidth@0.2.0:

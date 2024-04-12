@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { commonJsonSchema, type AllSchemas, type UpgradeManifest } from "../schema";
+import { commonJsonSchema, type AllSchemas, type SchemaMap, type UpgradeManifest } from "../schema";
 import { ZodError } from "zod";
 import { SCHEMAS, knownFileNames } from "./parser";
 
@@ -48,11 +48,12 @@ export type FileStatus = {
 };
 
 export const lookupAndParse = async (targetDir: string) => {
-  const parsedData: any = {};
+  const parsedData: SchemaMap = {};
   const fileStatuses: FileStatus[] = [];
 
   const traverseDirectory = async (currentPath: string) => {
     const entries = await fs.readdir(currentPath, { withFileTypes: true });
+
     for (const entry of entries) {
       const entryPath = path.join(currentPath, entry.name);
 
