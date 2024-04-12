@@ -5,7 +5,7 @@ import pkg from "../package.json" assert { type: "json" };
 
 const execAsync = promisify(exec);
 
-describe("CLI Output Test Suite", () => {
+describe.concurrent("CLI Output Test Suite", () => {
   it("should error on invalid option", async () => {
     await expect(execAsync("pnpm validate list --badOption defect")).rejects.toThrowError(
       "Unknown argument: badOption"
