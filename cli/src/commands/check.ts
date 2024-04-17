@@ -1,65 +1,65 @@
-import {fetchAbi, lookupAndParse, type Network, type UpgradeDescriptor} from "../lib";
-import clitable from "cli-table3";
+import {lookupAndParse, type Network} from "../lib";
+// import clitable from "cli-table3";
 import path, { parse } from "node:path";
-import {decodeFunctionData, type Abi, parseAbi, toFunctionSelector, type AbiFunction} from "viem";
-import type {Account20String, FacetCutsJson, FacetsJson, HashString} from "../schema";
-// import { prettyPrint } from "@base2/pretty-print-object";
+import type {Account20String, FacetCutsJson, FacetsJson, HashString, TransactionsJson} from "../schema";
+import {cutAction, DiamondChanges} from "../lib/diamond-changes.js";
+import {AbiSet} from "../lib/abi-set.js";
+import {decodeFunctionData} from "viem";
 
-export const abiMap = new Map<string, Abi>();
-const functionSelectors = new Map<string, AbiFunction>
+type HexString = `0x${string}`
 
-async function printFacetChanges (cuts: FacetCutsJson, facets: FacetsJson, network: Network): Promise<void> {
-  // first I'll load the abis to get the names of the functions
-  let promises = Object.keys(facets).map(async (key): Promise<void> => {
-    const f = facets[key]
-    const abi = await fetchAbi(network, f.address)
-    abiMap.set(f.address, abi)
+async function printFacetChanges (cuts: FacetCutsJson, facets: FacetsJson, network: Network, abiSet: AbiSet): Promise<void> {
+  let promises = Object.keys(facets).map(async (facetName): Promise<any> => {
+    const f = facets[facetName]
+    return abiSet.fetch(f.address, facetName)
   })
+
   await Promise.all(promises)
-
-  // find all selectors
-  cuts.forEach(cut => {
-    if (cut.facet === '0x0000000000000000000000000000000000000000') return
-    let abi = abiMap.get(cut.facet)
-    if (!abi) {
-      throw new Error('no abi')
-    }
-
-    const functions = abi.filter(a => a.type === 'function') as AbiFunction[]
-
-    functions.forEach(fn => {
-      const selector = toFunctionSelector(fn)
-      functionSelectors.set(selector, fn)
-    })
-  })
+  const diamondChanges = new DiamondChanges()
 
   cuts.forEach(cut => {
-    const actions = ['added', 'changed', 'removed']
-    const facetName = Object.keys(facets).find(k => facets[k].address === cut.facet) || 'Unknown facet'
-
-    console.log(`${facetName} (${cut.facet}):`)
+    const action = cutAction(cut.action)
     cut.selectors.forEach(selector => {
-      const name = functionSelectors.get(selector)?.name || 'unknown name'
-      console.log(`  ${name} (${selector}) ${actions[cut.action]}`)
+      diamondChanges.add(selector, action, cut.facet)
     })
-    console.log(`---`)
   })
 
-
+  console.log(diamondChanges.format(abiSet))
 }
 
-export const checkCommand = async (upgradeDirectory: string, parentDirectory?: string, network: string = 'mainnet2') => {
+async function printL1DecodedCallData(transactions: TransactionsJson, abiSet: AbiSet): Promise<void> {
+  const addr = transactions.upgradeAddress
+  const data = transactions.l1upgradeCalldata as HexString
+
+  console.log('addr', addr)
+
+  const abi = await abiSet.fetch(addr)
+  const { args } = decodeFunctionData({
+    abi,
+    data
+  })
+  console.log(args)
+}
+
+
+export const checkCommand = async (upgradeDirectory: string, parentDirectory?: string, network: Network = 'mainnet') => {
   console.log(`🔦 Checking upgrade with id: ${upgradeDirectory}`);
+  const abiSet = new AbiSet(network)
 
   const basePath = path.resolve(process.cwd(), parentDirectory || "", upgradeDirectory);
 
   const upgrade = await lookupAndParse(basePath, network);
 
-
   // Print the names of all the methods being changed
-  if (upgrade.facetCuts && upgrade.facets) {
-    await printFacetChanges(upgrade.facetCuts, upgrade.facets, 'mainnet')
+  // if (upgrade.facetCuts && upgrade.facets) {
+  //   await printFacetChanges(upgrade.facetCuts, upgrade.facets, network, abiSet)
+  // }
+
+  if (upgrade.transactions) {
+    await printL1DecodedCallData(upgrade.transactions, abiSet)
   }
+
+
 
   // console.log(t.commonData)
   // console.log(t.transactions)
@@ -69,7 +69,7 @@ export const checkCommand = async (upgradeDirectory: string, parentDirectory?: s
 
 
   // const fileConsistencyTable = new clitable({
-  //   head: ["Directory", "File Name", "Readable?"],
+  //   head: ["Directory", "Fil0xfd3779e6214eBBd40f5F5890351298e123A46BA6e Name", "Readable?"],
   //   colAligns: ["left", "left", "center"],
   // });
 

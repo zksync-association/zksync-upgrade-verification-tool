@@ -9,6 +9,7 @@ import {
 } from "../schema";
 import { ZodError } from "zod";
 import { SCHEMAS, knownFileNames } from "./parser";
+import type {Network} from "./constants.js";
 
 export const retrieveDirNames = async (targetDir: string, verbose = true) => {
   const items = await fs.readdir(targetDir, { withFileTypes: true });
@@ -62,23 +63,35 @@ export type UpgradeDescriptor = {
   l2Upgrade: L2UpgradeJson | null
 }
 
+function translateNetwork(n: Network) {
+  if (n === 'mainnet') {
+    return 'mainnet2'
+  } else
+  if (n === 'sepolia') {
+    return 'testnet-sepolia'
+  } else {
+    throw new Error(`Unknown network: ${n}`)
+  }
+}
 
-export const lookupAndParse = async (targetDir: string, network: string) : Promise<UpgradeDescriptor> => {
+export const lookupAndParse = async (targetDir: string, network: Network) : Promise<UpgradeDescriptor> => {
+  const networkPath = translateNetwork(network)
+
   const commonPath = path.join(targetDir, 'common.json')
   const commonBuf = await fs.readFile(commonPath)
   const commonParser = SCHEMAS['common.json']
   const commonData = commonParser.parse(JSON.parse(commonBuf.toString()))
 
-  const transactionsPath = path.join(targetDir, network, 'transactions.json')
+  const transactionsPath = path.join(targetDir, networkPath, 'transactions.json')
   const transactionsBuf = await fs.readFile(transactionsPath)
   const transactions = SCHEMAS['transactions.json'].parse(JSON.parse(transactionsBuf.toString()))
 
-  const cryptoPath = path.join(targetDir, network, 'crypto.json')
+  const cryptoPath = path.join(targetDir, networkPath, 'crypto.json')
   const cryptoBuf = await fs.readFile(cryptoPath)
   const crypto = SCHEMAS['crypto.json'].parse(JSON.parse(cryptoBuf.toString()))
 
 
-  const facetCutsPath = path.join(targetDir, network, 'facetCuts.json')
+  const facetCutsPath = path.join(targetDir, networkPath, 'facetCuts.json')
   let facetCuts: FacetCutsJson | null
   try {
     const facetCutsBuf = await fs.readFile(facetCutsPath)
@@ -87,7 +100,7 @@ export const lookupAndParse = async (targetDir: string, network: string) : Promi
     facetCuts = null
   }
 
-  const facetsPath = path.join(targetDir, network, 'facets.json')
+  const facetsPath = path.join(targetDir, networkPath, 'facets.json')
   let facets: FacetsJson | null
   try {
     const facetCutsBuf = await fs.readFile(facetsPath)
@@ -97,7 +110,7 @@ export const lookupAndParse = async (targetDir: string, network: string) : Promi
   }
 
 
-  const l2UpgradePath = path.join(targetDir, network, 'l2Upgrade.json')
+  const l2UpgradePath = path.join(targetDir, networkPath, 'l2Upgrade.json')
   let l2Upgrade: L2UpgradeJson | null
   try {
     const l2UpgradeBuf = await fs.readFile(l2UpgradePath)
@@ -106,8 +119,6 @@ export const lookupAndParse = async (targetDir: string, network: string) : Promi
     // console.log(e)
     l2Upgrade = null
   }
-
-
 
   return {
     commonData,

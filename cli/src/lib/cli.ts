@@ -1,7 +1,7 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { diffCommand, greetCommand, listCommand, checkCommand } from "../commands";
-import { NetworkSchema, printIntro } from ".";
+import {type Network, printIntro} from ".";
 
 export const cli = async () => {
   printIntro();
@@ -43,11 +43,12 @@ export const cli = async () => {
           alias: 'n',
           describe: 'network to check',
           type: 'string',
-          default: 'mainnet2'
+          default: 'mainnet'
         }),
       async (yargs) => {
-        await checkCommand(yargs.upgradeDirectory, yargs.directory, yargs.network);
+        await checkCommand(yargs.upgradeDirectory, yargs.directory, yargs.network as Network);
       }
+
     )
     .command(
       "diff <upgradeId> <previousUpgrade>",
@@ -65,19 +66,7 @@ export const cli = async () => {
             demandOption: true,
           }),
       async (yargs) => {
-        diffCommand(yargs.upgradeId, yargs.previousUpgrade);
-      }
-    )
-    .command(
-      "greet [person]",
-      "Greets the user",
-      async (yargs) =>
-        yargs.positional("person", {
-          describe: "Name of the person to greet",
-          type: "string",
-        }),
-      async (argv) => {
-        greetCommand(argv.person);
+        await diffCommand(yargs.upgradeId, yargs.previousUpgrade);
       }
     )
     .demandCommand(1, "You need to specify a command")
