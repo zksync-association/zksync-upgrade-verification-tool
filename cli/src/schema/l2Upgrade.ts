@@ -65,4 +65,4 @@ export const l2UpgradeSchema = z.object({
   tx: transactionSchema,
 });
 
-export type l2UpgradeJson = z.infer<typeof l2UpgradeSchema>;
+export type L2UpgradeJson = z.infer<typeof l2UpgradeSchema>;

@@ -1,10 +1,10 @@
-import type { Abi } from "viem";
+import {type Abi, parseAbi} from "viem";
 import { getAbiSchema, account20String, type Account20String, type HashString } from "../schema";
 import { ETHERSCAN_ENDPOINTS, type Network } from "./constants";
 
 const ETHERSCAN_KEY = process.env.ETHERSCAN_API_KEY;
 
-export const fetchAbi = async (network: Network, contractAddress: Account20String) => {
+export const fetchAbi = async (network: Network, contractAddress: Account20String): Promise<Abi> => {
   console.log(`🛬 Fetching contract ${contractAddress} abi from ${network}`);
 
   if (!ETHERSCAN_KEY) {

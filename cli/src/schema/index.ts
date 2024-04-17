@@ -2,7 +2,7 @@ import type { CryptoJson } from "./crypto";
 import type { UpgradeManifest } from "./manifest";
 import type { FacetCutsJson } from "./facetCuts";
 import type { FacetsJson } from "./facets";
-import type { l2UpgradeJson } from "./l2Upgrade";
+import type { L2UpgradeJson } from "./l2Upgrade";
 import type { TransactionsJson } from "./transactions";
 
 export * from "./common";
@@ -18,7 +18,7 @@ export type AllSchemas =
   | CryptoJson
   | FacetCutsJson
   | FacetsJson
-  | l2UpgradeJson
+  | L2UpgradeJson
   | UpgradeManifest
   | TransactionsJson;
 

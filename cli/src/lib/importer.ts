@@ -1,6 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { commonJsonSchema, type AllSchemas, type SchemaMap, type UpgradeManifest } from "../schema";
+import {
+  commonJsonSchema,
+  type AllSchemas,
+  type SchemaMap,
+  type UpgradeManifest,
+  type TransactionsJson, type CryptoJson, type FacetCutsJson, type FacetsJson, type L2UpgradeJson
+} from "../schema";
 import { ZodError } from "zod";
 import { SCHEMAS, knownFileNames } from "./parser";
 
@@ -47,34 +53,96 @@ export type FileStatus = {
   isValid: boolean;
 };
 
-export const lookupAndParse = async (targetDir: string) => {
-  const parsedData: SchemaMap = {};
-  const fileStatuses: FileStatus[] = [];
+export type UpgradeDescriptor = {
+  commonData: UpgradeManifest,
+  transactions: TransactionsJson,
+  crypto: CryptoJson,
+  facetCuts: FacetCutsJson | null,
+  facets: FacetsJson | null,
+  l2Upgrade: L2UpgradeJson | null
+}
 
-  const traverseDirectory = async (currentPath: string) => {
-    const entries = await fs.readdir(currentPath, { withFileTypes: true });
 
-    for (const entry of entries) {
-      const entryPath = path.join(currentPath, entry.name);
+export const lookupAndParse = async (targetDir: string, network: string) : Promise<UpgradeDescriptor> => {
+  const commonPath = path.join(targetDir, 'common.json')
+  const commonBuf = await fs.readFile(commonPath)
+  const commonParser = SCHEMAS['common.json']
+  const commonData = commonParser.parse(JSON.parse(commonBuf.toString()))
 
-      if (entry.isDirectory()) {
-        await traverseDirectory(entryPath);
-      } else {
-        const fileName = knownFileNames.parse(entry.name);
-        const parser = SCHEMAS[fileName];
-        try {
-          const fileContents = await fs.readFile(entryPath, "utf8");
-          const parsed = parser.parse(JSON.parse(fileContents));
-          parsedData[entryPath] = parsed;
-          fileStatuses.push({ filePath: entryPath, isValid: true });
-        } catch (error) {
-          // process.env.DEBUG === "1" && console.error(`Error parsing ${entryPath}:`, error);
-          fileStatuses.push({ filePath: entryPath, isValid: false });
-        }
-      }
-    }
-  };
-  await traverseDirectory(targetDir);
+  const transactionsPath = path.join(targetDir, network, 'transactions.json')
+  const transactionsBuf = await fs.readFile(transactionsPath)
+  const transactions = SCHEMAS['transactions.json'].parse(JSON.parse(transactionsBuf.toString()))
 
-  return { parsedData, fileStatuses };
+  const cryptoPath = path.join(targetDir, network, 'crypto.json')
+  const cryptoBuf = await fs.readFile(cryptoPath)
+  const crypto = SCHEMAS['crypto.json'].parse(JSON.parse(cryptoBuf.toString()))
+
+
+  const facetCutsPath = path.join(targetDir, network, 'facetCuts.json')
+  let facetCuts: FacetCutsJson | null
+  try {
+    const facetCutsBuf = await fs.readFile(facetCutsPath)
+    facetCuts = SCHEMAS['facetCuts.json'].parse(JSON.parse(facetCutsBuf.toString()))
+  } catch (e) {
+    facetCuts = null
+  }
+
+  const facetsPath = path.join(targetDir, network, 'facets.json')
+  let facets: FacetsJson | null
+  try {
+    const facetCutsBuf = await fs.readFile(facetsPath)
+    facets = SCHEMAS['facets.json'].parse(JSON.parse(facetCutsBuf.toString()))
+  } catch (e) {
+    facets = null
+  }
+
+
+  const l2UpgradePath = path.join(targetDir, network, 'l2Upgrade.json')
+  let l2Upgrade: L2UpgradeJson | null
+  try {
+    const l2UpgradeBuf = await fs.readFile(l2UpgradePath)
+    l2Upgrade = SCHEMAS['l2Upgrade.json'].parse(JSON.parse(l2UpgradeBuf.toString()))
+  } catch (e) {
+    // console.log(e)
+    l2Upgrade = null
+  }
+
+
+
+  return {
+    commonData,
+    transactions,
+    crypto,
+    facetCuts,
+    facets,
+    l2Upgrade
+  }
+
+
+  // const traverseDirectory = async (currentPath: string) => {
+  //   const entries = await fs.readdir(currentPath, { withFileTypes: true });
+
+    // for (const entry of entries) {
+    //   const entryPath = path.join(currentPath, entry.name);
+    //
+    //   if (entry.isDirectory()) {
+    //     await traverseDirectory(entryPath);
+    //   } else {
+    //     const fileName = knownFileNames.parse(entry.name);
+    //     const parser = SCHEMAS[fileName];
+    //     try {
+    //       const fileContents = await fs.readFile(entryPath, "utf8");
+    //       const parsed = parser.parse(JSON.parse(fileContents));
+    //       parsedData[entryPath] = parsed;
+    //       fileStatuses.push({ filePath: entryPath, isValid: true });
+    //     } catch (error) {
+    //       // process.env.DEBUG === "1" && console.error(`Error parsing ${entryPath}:`, error);
+    //       fileStatuses.push({ filePath: entryPath, isValid: false });
+    //     }
+    //   }
+    // }
+  // };
+  // await traverseDirectory(targetDir);
+
+  // return { parsedData, fileStatuses };
 };

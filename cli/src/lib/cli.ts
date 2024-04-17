@@ -39,9 +39,14 @@ export const cli = async () => {
           describe: "FolderName of the upgrade to check",
           type: "string",
           demandOption: true,
+        }).option("network", {
+          alias: 'n',
+          describe: 'network to check',
+          type: 'string',
+          default: 'mainnet2'
         }),
       async (yargs) => {
-        await checkCommand(yargs.upgradeDirectory, yargs.directory);
+        await checkCommand(yargs.upgradeDirectory, yargs.directory, yargs.network);
       }
     )
     .command(
