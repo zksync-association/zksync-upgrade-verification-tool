@@ -2,26 +2,26 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   commonJsonSchema,
-  type AllSchemas,
-  type SchemaMap,
-  type UpgradeManifest,
-  type TransactionsJson, type CryptoJson, type FacetCutsJson, type FacetsJson, type L2UpgradeJson
+  type CryptoJson,
+  type FacetCutsJson,
+  type FacetsJson,
+  type L2UpgradeJson,
+  type TransactionsJson,
+  type UpgradeManifest
 } from "../schema";
-import { ZodError } from "zod";
-import { SCHEMAS, knownFileNames } from "./parser";
+import {ZodError} from "zod";
+import {SCHEMAS} from "./parser";
 import type {Network} from "./constants.js";
 
 export const retrieveDirNames = async (targetDir: string, verbose = true) => {
   const items = await fs.readdir(targetDir, { withFileTypes: true });
   const directories = items.filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
-  const dirs = await Promise.all(
-    directories.map(async (dir) => ({
-      name: dir,
-      parsed: await isUpgradeBlob(path.join(targetDir, dir)),
-    }))
+  return await Promise.all(
+      directories.map(async (dir) => ({
+        name: dir,
+        parsed: await isUpgradeBlob(path.join(targetDir, dir)),
+      }))
   );
-
-  return dirs;
 };
 
 const isUpgradeBlob = async (
@@ -60,7 +60,7 @@ export type UpgradeDescriptor = {
   crypto: CryptoJson,
   facetCuts: FacetCutsJson | null,
   facets: FacetsJson | null,
-  l2Upgrade: L2UpgradeJson | null
+  l2Upgrade?: L2UpgradeJson
 }
 
 function translateNetwork(n: Network) {
@@ -111,13 +111,13 @@ export const lookupAndParse = async (targetDir: string, network: Network) : Prom
 
 
   const l2UpgradePath = path.join(targetDir, networkPath, 'l2Upgrade.json')
-  let l2Upgrade: L2UpgradeJson | null
+  let l2Upgrade: L2UpgradeJson | undefined
   try {
     const l2UpgradeBuf = await fs.readFile(l2UpgradePath)
     l2Upgrade = SCHEMAS['l2Upgrade.json'].parse(JSON.parse(l2UpgradeBuf.toString()))
   } catch (e) {
     // console.log(e)
-    l2Upgrade = null
+    l2Upgrade = undefined
   }
 
   return {
@@ -128,32 +128,4 @@ export const lookupAndParse = async (targetDir: string, network: Network) : Prom
     facets,
     l2Upgrade
   }
-
-
-  // const traverseDirectory = async (currentPath: string) => {
-  //   const entries = await fs.readdir(currentPath, { withFileTypes: true });
-
-    // for (const entry of entries) {
-    //   const entryPath = path.join(currentPath, entry.name);
-    //
-    //   if (entry.isDirectory()) {
-    //     await traverseDirectory(entryPath);
-    //   } else {
-    //     const fileName = knownFileNames.parse(entry.name);
-    //     const parser = SCHEMAS[fileName];
-    //     try {
-    //       const fileContents = await fs.readFile(entryPath, "utf8");
-    //       const parsed = parser.parse(JSON.parse(fileContents));
-    //       parsedData[entryPath] = parsed;
-    //       fileStatuses.push({ filePath: entryPath, isValid: true });
-    //     } catch (error) {
-    //       // process.env.DEBUG === "1" && console.error(`Error parsing ${entryPath}:`, error);
-    //       fileStatuses.push({ filePath: entryPath, isValid: false });
-    //     }
-    //   }
-    // }
-  // };
-  // await traverseDirectory(targetDir);
-
-  // return { parsedData, fileStatuses };
 };

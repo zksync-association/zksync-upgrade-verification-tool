@@ -4,7 +4,7 @@ import path from "node:path";
 import {
   ALL_VERIFIER_PARAMS,
   type FacetCutsJson,
-  type FacetsJson,
+  type FacetsJson, type L2UpgradeJson,
   type TransactionsJson,
   type UpgradeManifest
 } from "../schema";
@@ -38,19 +38,19 @@ async function printFacetChanges (cuts: FacetCutsJson, facets: FacetsJson, abiSe
   console.log('\n\n')
 }
 
-async function printGobernorActions(transactions: TransactionsJson, abiSet: AbiSet): Promise<void> {
-  // TODO: Get facets dinamically using loupe functionality.
-  const addr = '0x230214F0224C7E0485f348a79512ad00514DB1F7'
-  const data = transactions.governanceOperation.calls[0].data as HexString
-  const abi = await abiSet.fetch(addr)
-
-  const { args } = decodeFunctionData({
-    abi,
-    data
-  })
-
-  console.log(args)
-}
+// async function printGobernorActions(transactions: TransactionsJson, abiSet: AbiSet): Promise<void> {
+//   // TODO: Get facets dinamically using loupe functionality.
+//   const addr = '0x230214F0224C7E0485f348a79512ad00514DB1F7'
+//   const data = transactions.governanceOperation.calls[0].data as HexString
+//   const abi = await abiSet.fetch(addr)
+//
+//   const { args } = decodeFunctionData({
+//     abi,
+//     data
+//   })
+//
+//   console.log(args)
+// }
 
 function printMetadata(data: UpgradeManifest) {
   const title = 'Upgrade metadata'
@@ -69,8 +69,77 @@ function printMetadata(data: UpgradeManifest) {
   console.log('\n\n')
 }
 
-async function printL2Upgrades(txs: TransactionsJson) {
+function printNewSystemContracts(l2: L2UpgradeJson) {
+  console.log('New system contracts')
+  const table = new CliTable({
+    head: ['Name', 'Address', 'Bytecode hashes'],
+    style: { compact: true }
+  })
+  l2.systemContracts.forEach(contract => {
+    const hashes = contract.bytecodeHashes.join(', ');
+    table.push([ contract.name, contract.address, hashes ])
+  })
+  console.log(table.toString())
+  console.log('')
+}
+
+function printGeneralL2Info(txs: TransactionsJson) {
+  console.log('New attributes:')
+
+  const table = new CliTable({
+    head: ['Name', 'Value'],
+    style: { compact: true }
+  })
+
+  table.push(['Bootloader Hash', txs.proposeUpgradeTx.bootloaderHash])
+  table.push(['Default Accont Hash', txs.proposeUpgradeTx.defaultAccountHash])
+  table.push(['Upgrade moment', new Date(Number(txs.proposeUpgradeTx.upgradeTimestamp.hex)).toString()])
+  table.push(['New protocol version', txs.proposeUpgradeTx.newProtocolVersion])
+
+  console.log(table.toString())
+  console.log('')
+}
+
+function printL2TxInfo (proposeUpgradeTx: TransactionsJson ) {
+  const tx = proposeUpgradeTx.proposeUpgradeTx.l2ProtocolUpgradeTx
+
+  const table = new CliTable({
+    head: ['Name', 'Value'],
+    style: { compact: true }
+  })
+
+  table.push(['txType', tx.txType])
+  // table.push(['from', tx.from])
+  const upgraderName = {
+    '0x0000000000000000000000000000000000008007': 'FORCE_DEPLOYER_ADDRESS',
+    '0x0000000000000000000000000000000000008006': 'CONTRACT_DEPLOYER_ADDRESS',
+    '0x000000000000000000000000000000000000800f': 'COMPLEX_UPGRADE_ADDRESS'
+  }[tx.to] || `Custom deployer: ${tx.to}`
+  table.push(['Upgrader:', upgraderName])
+  table.push(['nonce', tx.nonce])
+  // TODO: make shorter string fn or use cli table functionality
+  // table.push(['data', tx.data])
+
+  console.log(table.toString())
+  console.log('')
+}
+
+async function printL2Upgrades(txs: TransactionsJson, l2?: L2UpgradeJson) {
+  const title = 'Layer 2 Changes'
+  console.log(title)
+  console.log('='.repeat(title.length))
+  console.log('')
+
+  printGeneralL2Info(txs)
+
+  printL2TxInfo(txs)
+
   printVerifierInformation(txs)
+
+  if (l2) {
+    printNewSystemContracts(l2)
+  }
+
 }
 
 function printVerifierInformation (txs: TransactionsJson) {
@@ -81,10 +150,7 @@ function printVerifierInformation (txs: TransactionsJson) {
   })
 
   if (newVerifier || newVerifierParams.length > 0) {
-    const title = 'Verifier Changes'
-
-    console.log(title)
-    console.log('='.repeat(title.length))
+    console.log('Verifier Changes:')
 
     const table = new CliTable({
       head: ['Attribute', 'value'],
@@ -118,5 +184,5 @@ export const checkCommand = async (ethscanKey: string, upgradeDirectory: string,
     await printFacetChanges(upgrade.facetCuts, upgrade.facets, abiSet)
   }
 
-  await printL2Upgrades(upgrade.transactions)
+  await printL2Upgrades(upgrade.transactions, upgrade.l2Upgrade)
 };
