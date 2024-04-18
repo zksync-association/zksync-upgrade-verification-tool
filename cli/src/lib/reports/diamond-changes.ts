@@ -120,6 +120,6 @@ export class DiamondChanges {
       tables.push(table)
     }
 
-    return tables.map(t => t.toString()).join('\n\n')
+    return tables.map(t => t.toString()).join('\n')
   }
 }

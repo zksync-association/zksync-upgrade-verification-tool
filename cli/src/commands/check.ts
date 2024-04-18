@@ -31,6 +31,7 @@ async function printFacetChanges (cuts: FacetCutsJson, facets: FacetsJson, abiSe
   })
 
   console.log(diamondChanges.format(abiSet))
+  console.log('\n\n')
 }
 
 async function printGobernorActions(transactions: TransactionsJson, abiSet: AbiSet): Promise<void> {
@@ -48,6 +49,10 @@ async function printGobernorActions(transactions: TransactionsJson, abiSet: AbiS
 }
 
 function printMetadata(data: UpgradeManifest) {
+  const title = 'Upgrade metadata'
+  console.log(title)
+  console.log('='.repeat(title.length))
+
   const table = new CliTable({
     head: ['Key', 'Value']
   })
@@ -56,6 +61,7 @@ function printMetadata(data: UpgradeManifest) {
   table.push(['protocol version', data.protocolVersion])
 
   console.log(table.toString())
+  console.log('\n\n')
 }
 
 async function printL2Upgrades(txs: TransactionsJson) {

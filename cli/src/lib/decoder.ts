@@ -5,7 +5,7 @@ import { ETHERSCAN_ENDPOINTS, type Network } from "./constants";
 const ETHERSCAN_KEY = process.env.ETHERSCAN_API_KEY;
 
 export const fetchAbi = async (network: Network, contractAddress: Account20String): Promise<Abi> => {
-  console.log(`🛬 Fetching contract ${contractAddress} abi from ${network}`);
+  // console.debug(`Fetching contract ${contractAddress} abi from ${network}`);
 
   if (!ETHERSCAN_KEY) {
     throw new Error("No Etherscan API key found in environment variables");
