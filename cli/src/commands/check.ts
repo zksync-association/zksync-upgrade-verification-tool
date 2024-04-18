@@ -36,7 +36,7 @@ async function printFacetChanges (cuts: FacetCutsJson, facets: FacetsJson, abiSe
 }
 
 // async function printGobernorActions(transactions: TransactionsJson, abiSet: AbiSet): Promise<void> {
-//   // TODO: Get facets dinamically using loupe functionality.
+//   // future: Get facets dinamically using loupe functionality.
 //   const addr = '0x230214F0224C7E0485f348a79512ad00514DB1F7'
 //   const data = transactions.governanceOperation.calls[0].data as HexString
 //   const abi = await abiSet.fetch(addr)
@@ -107,15 +107,14 @@ function printL2TxInfo (proposeUpgradeTx: TransactionsJson ) {
 
   table.push(['txType', tx.txType])
   // table.push(['from', tx.from])
-  const upgraderName = {
-    '0x0000000000000000000000000000000000008007': 'FORCE_DEPLOYER_ADDRESS',
-    '0x0000000000000000000000000000000000008006': 'CONTRACT_DEPLOYER_ADDRESS',
-    '0x000000000000000000000000000000000000800f': 'COMPLEX_UPGRADE_ADDRESS'
-  }[tx.to] || `Custom deployer: ${tx.to}`
-  table.push(['Upgrader:', upgraderName])
+  // const upgraderName = {
+  //   '0x0000000000000000000000000000000000008007': 'FORCE_DEPLOYER_ADDRESS',
+  //   '0x0000000000000000000000000000000000008006': 'CONTRACT_DEPLOYER_ADDRESS',
+  //   '0x000000000000000000000000000000000000800f': 'COMPLEX_UPGRADE_ADDRESS'
+  // }[tx.to] || `Custom deployer: ${tx.to}`
+  table.push(['from:', tx.from])
   table.push(['nonce', tx.nonce])
-  // TODO: make shorter string fn or use cli table functionality
-  // table.push(['data', tx.data])
+
 
   console.log(table.toString())
   console.log('')
