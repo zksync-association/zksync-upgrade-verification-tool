@@ -1,14 +1,20 @@
 import {lookupAndParse, type Network} from "../lib";
-// import clitable from "cli-table3";
-import path, { parse } from "node:path";
-import type {Account20String, FacetCutsJson, FacetsJson, HashString, TransactionsJson} from "../schema";
+import CliTable from "cli-table3";
+import path from "node:path";
+import {
+  ALL_VERIFIER_PARAMS,
+  type FacetCutsJson,
+  type FacetsJson, type L2UpgradeJson,
+  type TransactionsJson,
+  type UpgradeManifest
+} from "../schema";
 import {cutAction, DiamondChanges} from "../lib/diamond-changes.js";
 import {AbiSet} from "../lib/abi-set.js";
 import {decodeFunctionData} from "viem";
 
 type HexString = `0x${string}`
 
-async function printFacetChanges (cuts: FacetCutsJson, facets: FacetsJson, network: Network, abiSet: AbiSet): Promise<void> {
+async function printFacetChanges (cuts: FacetCutsJson, facets: FacetsJson, abiSet: AbiSet): Promise<void> {
   let promises = Object.keys(facets).map(async (facetName): Promise<any> => {
     const f = facets[facetName]
     return abiSet.fetch(f.address, facetName)
@@ -24,40 +30,104 @@ async function printFacetChanges (cuts: FacetCutsJson, facets: FacetsJson, netwo
     })
   })
 
+  console.log('Changes in main diamond:')
   console.log(diamondChanges.format(abiSet))
 }
 
-async function printL1DecodedCallData(transactions: TransactionsJson, abiSet: AbiSet): Promise<void> {
-  const addr = transactions.upgradeAddress
-  const data = transactions.l1upgradeCalldata as HexString
-
-  console.log('addr', addr)
-
+async function printGobernorActions(transactions: TransactionsJson, abiSet: AbiSet): Promise<void> {
+  // TODO: Get facets dinamically using loupe functionality.
+  const addr = '0x230214F0224C7E0485f348a79512ad00514DB1F7'
+  const data = transactions.governanceOperation.calls[0].data as HexString
   const abi = await abiSet.fetch(addr)
+  // const fn = abiSet.functionDefForSelector(data.slice(0, 10))
+  // console.log(fn)
+
   const { args } = decodeFunctionData({
     abi,
     data
   })
+
+  // const argsData = args as any
+
   console.log(args)
+
+  // const initAddress = argsData[0].initAddress
+  // const initCallData = argsData[0].initCalldata
+
+  // const abi2 = await abiSet.fetch(initAddress)
+  //
+  // const { args: args2 } = decodeFunctionData({
+  //   abi: abi2,
+  //   data: initCallData
+  // })
+  //
+  // console.log(args2)
 }
 
+function printMetadata(data: UpgradeManifest) {
+  const table = new CliTable({
+    head: ['Key', 'Value']
+  })
+  table.push(['name', data.name])
+  table.push(['creation', new Date(data.creationTimestamp).toISOString()])
+  table.push(['protocol version', data.protocolVersion])
+
+  console.log(table.toString())
+}
+
+async function printL2Upgrades(txs: TransactionsJson) {
+
+}
+
+function printVerifierInformation (txs: TransactionsJson) {
+  const newVerifier = Number(txs.proposeUpgradeTx.verifier) !== 0
+  const newVerifierParams = ALL_VERIFIER_PARAMS.filter(param => {
+    const value = txs.proposeUpgradeTx.verifierParams[param]
+    return Number(value) !== 0
+  })
+
+  if (newVerifier || newVerifierParams.length > 0) {
+    const title = 'Verifier Changes'
+
+    console.log(title)
+    console.log('='.repeat(title.length))
+
+    const table = new CliTable({
+      head: ['Attribute', 'value']
+    })
+    const newAddress = newVerifier
+      ? txs.proposeUpgradeTx.verifier
+      : 'no changes'
+    table.push(['Contract addr', newAddress])
+    ALL_VERIFIER_PARAMS.forEach(param => {
+      const raw = txs.proposeUpgradeTx.verifierParams[param]
+      const newValue = Number(raw) === 0 ? 'no changes' : raw
+      table.push([param, newValue])
+    })
+
+    console.log(table.toString())
+  }
+}
 
 export const checkCommand = async (upgradeDirectory: string, parentDirectory?: string, network: Network = 'mainnet') => {
-  console.log(`🔦 Checking upgrade with id: ${upgradeDirectory}`);
   const abiSet = new AbiSet(network)
 
   const basePath = path.resolve(process.cwd(), parentDirectory || "", upgradeDirectory);
 
   const upgrade = await lookupAndParse(basePath, network);
 
-  // Print the names of all the methods being changed
-  // if (upgrade.facetCuts && upgrade.facets) {
-  //   await printFacetChanges(upgrade.facetCuts, upgrade.facets, network, abiSet)
-  // }
+  printMetadata(upgrade.commonData)
 
-  if (upgrade.transactions) {
-    await printL1DecodedCallData(upgrade.transactions, abiSet)
+  // Print the names of all the methods being changed
+  if (upgrade.facetCuts && upgrade.facets) {
+    await printFacetChanges(upgrade.facetCuts, upgrade.facets, abiSet)
   }
+
+  printVerifierInformation(upgrade.transactions)
+
+  // if (upgrade.transactions) {
+  //   await printGobernorActions(upgrade.transactions, abiSet)
+  // }
 
 
 

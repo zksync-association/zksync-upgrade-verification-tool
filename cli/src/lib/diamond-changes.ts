@@ -31,23 +31,25 @@ export class Change {
   }
 
   format(abiSet: AbiSet) {
+    // const name = abiSet.nameForSelector(this.selector)
+    // if (this.newFacet) {
+    //   const facetName = abiSet.nameForContract(this.newFacet)
+    //   return `${name} (${this.selector}) ${this.actionEffect()} -> ${facetName} (${this.newFacet})`
+    // } else {
+    //   return `${name} (${this.selector}) ${this.actionEffect()}`
+    // }
     const name = abiSet.nameForSelector(this.selector)
-    if (this.newFacet) {
-      const facetName = abiSet.nameForContract(this.newFacet)
-      return `${name} (${this.selector}) ${this.actionEffect()} -> ${facetName} (${this.newFacet})`
-    } else {
-      return `${name} (${this.selector}) ${this.actionEffect()}`
-    }
+    return `${name} (${this.selector}) ${this.actionEffect()}`
   }
 
   actionEffect(): string {
     if (this.action === 'change') {
-      return 'upgraded to'
+      return 'upgraded'
     } else
     if (this.action === 'remove') {
       return 'removed'
     } else {
-      return 'added with'
+      return 'added'
     }
   }
 }
@@ -70,12 +72,45 @@ export class DiamondChanges {
   }
 
   format (abis: AbiSet): string {
-    const lines = []
+    const byFacet = new Map<string, Change[]>()
+    const removes = []
+    // const lines = []
     for (const changes of this.data.values()) {
       const summary = this.summarizeChanges(changes)
-
-      lines.push(summary.format(abis))
+      if (summary.newFacet) {
+        const key = summary.newFacet;
+        let value = byFacet.get(key) || []
+        value.push(summary)
+        byFacet.set(key, value)
+      } else {
+        removes.push(summary)
+      }
     }
+
+    const lines = ['']
+
+
+    if (removes.length !== 0) {
+      lines.push('Operations removed')
+      lines.push('==================')
+      removes.forEach(remove => {
+        remove.format(abis)
+      })
+      lines.push('')
+      lines.push('')
+    }
+
+    for (const [key, value] of byFacet.entries()) {
+      const title = `Updates for facet: ${abis.nameForContract(key)} (${key})`
+      lines.push(title)
+      lines.push('='.repeat(title.length))
+      value.forEach(change => {
+        lines.push(change.format(abis))
+      })
+      lines.push('')
+    }
+
+
     return lines.join('\n')
   }
 

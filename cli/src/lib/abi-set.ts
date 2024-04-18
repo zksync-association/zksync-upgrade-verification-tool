@@ -16,6 +16,9 @@ export class AbiSet {
   }
 
   async fetch(address: string, name?: string): Promise<Abi> {
+    if (this.abis.has(address)) {
+      return this.abis.get(address)!
+    }
     const abi = await fetchAbi(this.network, address)
     this.add(address, name || 'unknown name', abi)
     return abi
@@ -34,6 +37,14 @@ export class AbiSet {
   nameForSelector (selector: string): string {
     return this.selectors.get(selector)?.name || 'unknown'
   }
+
+  // functionDefForSelector (selector: string): AbiFunction {
+  //   const fn = this.selectors.get(selector)
+  //   if (!fn) {
+  //     throw new Error('unknown descriptor')
+  //   }
+  //   return fn
+  // }
 
   nameForContract(address: string): string {
     return this.contractNames.get(address) || 'Unknown Contract'
