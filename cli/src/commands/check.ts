@@ -58,7 +58,8 @@ function printMetadata(data: UpgradeManifest) {
   console.log('='.repeat(title.length))
 
   const table = new CliTable({
-    head: ['Key', 'Value']
+    head: ['Key', 'Value'],
+    style: { compact: true }
   })
   table.push(['name', data.name])
   table.push(['creation', new Date(data.creationTimestamp).toISOString()])
@@ -86,7 +87,8 @@ function printVerifierInformation (txs: TransactionsJson) {
     console.log('='.repeat(title.length))
 
     const table = new CliTable({
-      head: ['Attribute', 'value']
+      head: ['Attribute', 'value'],
+      style: { compact: true }
     })
     const newAddress = newVerifier
       ? txs.proposeUpgradeTx.verifier
