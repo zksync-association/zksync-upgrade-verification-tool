@@ -1,11 +1,14 @@
-import type {AbiSet} from "./abi-set.js";
+import type {AbiSet} from "../abi-set.js";
+import CliTable from "cli-table3";
 
 export type DiamondCutAction = "add" | "change" | "remove"
 
-export function cutAction(n: number): DiamondCutAction {
+export function cutAction (n: number): DiamondCutAction {
   const all = ["add", "change", "remove"] as const;
   const op = all[n]
-  if (!op) { throw new Error(`uknown diamond cut operation: ${n}`)}
+  if (!op) {
+    throw new Error(`uknown diamond cut operation: ${n}`)
+  }
   return op
 }
 
@@ -23,14 +26,14 @@ export class Change {
   }
 
   apply (c2: Change): Change {
-    if(this.action === 'remove' && c2.action === 'add') {
+    if (this.action === 'remove' && c2.action === 'add') {
       return new Change(this.selector, 'change', c2.newFacet!)
     }
 
     return c2
   }
 
-  format(abiSet: AbiSet) {
+  format (abiSet: AbiSet) {
     // const name = abiSet.nameForSelector(this.selector)
     // if (this.newFacet) {
     //   const facetName = abiSet.nameForContract(this.newFacet)
@@ -38,15 +41,14 @@ export class Change {
     // } else {
     //   return `${name} (${this.selector}) ${this.actionEffect()}`
     // }
-    const name = abiSet.nameForSelector(this.selector)
+    const name = abiSet.signatureForSelector(this.selector)
     return `${name} (${this.selector}) ${this.actionEffect()}`
   }
 
-  actionEffect(): string {
+  actionEffect (): string {
     if (this.action === 'change') {
       return 'upgraded'
-    } else
-    if (this.action === 'remove') {
+    } else if (this.action === 'remove') {
       return 'removed'
     } else {
       return 'added'
@@ -55,28 +57,35 @@ export class Change {
 }
 
 export class DiamondChanges {
-  private data: Map<string, Change[]>
+  private data: Map<string, Change>
 
   constructor () {
     this.data = new Map()
   }
 
-  add(selector: string, action: DiamondCutAction, newFacet: string): void {
+  add (selector: string, action: DiamondCutAction, newFacet: string): void {
     const old = this.data.get(selector)
     const change = new Change(selector, action, newFacet)
     if (old) {
-      old.push(change)
+      this.data.set(selector, old.apply(change))
     } else {
-      this.data.set(selector, [change])
+      this.data.set(selector, change)
     }
+  }
+
+  private createTable(title: string): CliTable.Table {
+    return new CliTable({
+      head: [title],
+      style: {compact: true}
+    })
   }
 
   format (abis: AbiSet): string {
     const byFacet = new Map<string, Change[]>()
     const removes = []
     // const lines = []
-    for (const changes of this.data.values()) {
-      const summary = this.summarizeChanges(changes)
+    for (const change of this.data.values()) {
+      const summary = change
       if (summary.newFacet) {
         const key = summary.newFacet;
         let value = byFacet.get(key) || []
@@ -87,35 +96,30 @@ export class DiamondChanges {
       }
     }
 
-    const lines = ['']
+    const tables = []
 
 
     if (removes.length !== 0) {
-      lines.push('Operations removed')
-      lines.push('==================')
+      const removedTable = this.createTable('Operations removed')
+
       removes.forEach(remove => {
-        remove.format(abis)
+        const signature = abis.signatureForSelector(remove.selector)
+        removedTable.push([signature, remove.actionEffect()])
       })
-      lines.push('')
-      lines.push('')
+      tables.push(removedTable)
     }
+
 
     for (const [key, value] of byFacet.entries()) {
-      const title = `Updates for facet: ${abis.nameForContract(key)} (${key})`
-      lines.push(title)
-      lines.push('='.repeat(title.length))
+      const table = this.createTable(`${abis.nameForContract(key)} (${key})`)
+
       value.forEach(change => {
-        lines.push(change.format(abis))
+        const signature = abis.signatureForSelector(change.selector)
+        table.push([signature, change.actionEffect()])
       })
-      lines.push('')
+      tables.push(table)
     }
 
-
-    return lines.join('\n')
-  }
-
-  private summarizeChanges(changes: Change[]): Change {
-    const final = changes.reduce((c1, c2) => c1.apply(c2))
-    return final
+    return tables.map(t => t.toString()).join('\n\n')
   }
 }

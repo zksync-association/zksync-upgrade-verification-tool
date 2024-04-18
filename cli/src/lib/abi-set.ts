@@ -1,6 +1,7 @@
 import {type Abi, type AbiFunction, toFunctionSelector} from "viem";
 import {fetchAbi} from "./decoder.js";
 import type {Network} from "./constants.js";
+import {unknown} from "zod";
 
 export class AbiSet {
   private abis: Map<string, Abi>
@@ -36,6 +37,15 @@ export class AbiSet {
 
   nameForSelector (selector: string): string {
     return this.selectors.get(selector)?.name || 'unknown'
+  }
+
+  signatureForSelector(selector: string): string {
+    const fn = this.selectors.get(selector)
+    if (!fn) {
+      return 'unknown'
+    }
+    const params = fn.inputs.map(i => `${i.type} ${i.name}`)
+    return `${fn.name}(${params.join(', ')})`
   }
 
   // functionDefForSelector (selector: string): AbiFunction {
