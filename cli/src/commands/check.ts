@@ -10,9 +10,6 @@ import {
 } from "../schema";
 import {cutAction, DiamondChanges} from "../lib/reports/diamond-changes.js";
 import {AbiSet} from "../lib/abi-set.js";
-import {decodeFunctionData} from "viem";
-
-type HexString = `0x${string}`
 
 async function printFacetChanges (cuts: FacetCutsJson, facets: FacetsJson, abiSet: AbiSet): Promise<void> {
   const title = 'Diamond Changes'

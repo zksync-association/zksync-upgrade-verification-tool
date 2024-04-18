@@ -13,7 +13,7 @@ import {ZodError} from "zod";
 import {SCHEMAS} from "./parser";
 import type {Network} from "./constants.js";
 
-export const retrieveDirNames = async (targetDir: string, verbose = true) => {
+export const retrieveDirNames = async (targetDir: string) => {
   const items = await fs.readdir(targetDir, { withFileTypes: true });
   const directories = items.filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
   return await Promise.all(
