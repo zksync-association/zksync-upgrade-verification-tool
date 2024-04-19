@@ -6,8 +6,7 @@
   "main": "./dist/main.js.js",
   "module": "./dist/main.js",
   "bin": {
-    "validate": "./dist/bin/entrypoint.js",
-    "hello": "./dist/bin/hello.js"
+    "validate": "./dist/bin/entrypoint.js"
   },
   "engines": {
     "node": ">=20",
