@@ -1,6 +1,6 @@
 import { fetchAbi, lookupAndParse, type Network } from "../lib";
 import clitable from "cli-table3";
-import path, { parse } from "node:path";
+import path from "node:path";
 import { decodeFunctionData, type Abi } from "viem";
 import type { Account20String, HashString } from "../schema";
 import { prettyPrint } from "@base2/pretty-print-object";
@@ -109,9 +109,11 @@ function truncateLongStrings(obj: any): any {
   if (typeof obj === "string") {
     return obj.length > 10 ? `${obj.slice(0, 5)}...${obj.slice(-5)}` : obj;
   }
+
   if (Array.isArray(obj)) {
     return obj.map(truncateLongStrings);
   }
+
   if (typeof obj === "object" && obj !== null) {
     const newObj: any = {};
     for (const key of Object.keys(obj)) {

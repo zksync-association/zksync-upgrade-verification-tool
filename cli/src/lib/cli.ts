@@ -1,7 +1,7 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { diffCommand, greetCommand, listCommand, checkCommand } from "../commands";
-import { NetworkSchema, printIntro } from ".";
+import { listCommand, checkCommand } from "../commands";
+import { printIntro } from ".";
 
 export const cli = async () => {
   printIntro();
@@ -31,6 +31,7 @@ export const cli = async () => {
         await listCommand(directory, hideNonUpgrades);
       }
     )
+    // TODO: Add option to output the parsed data to a file
     .command(
       "check <upgradeDirectory>",
       "Check upgrade is well formed",
@@ -42,37 +43,6 @@ export const cli = async () => {
         }),
       async (yargs) => {
         await checkCommand(yargs.upgradeDirectory, yargs.directory);
-      }
-    )
-    .command(
-      "diff <upgradeId> <previousUpgrade>",
-      "Perform items",
-      (yargs) =>
-        yargs
-          .positional("upgradeId", {
-            describe: "FolderName of the upgrade to compare",
-            type: "string",
-            demandOption: true,
-          })
-          .positional("previousUpgrade", {
-            describe: "FolderName of the previous upgrade to compare with",
-            type: "string",
-            demandOption: true,
-          }),
-      async (yargs) => {
-        diffCommand(yargs.upgradeId, yargs.previousUpgrade);
-      }
-    )
-    .command(
-      "greet [person]",
-      "Greets the user",
-      async (yargs) =>
-        yargs.positional("person", {
-          describe: "Name of the person to greet",
-          type: "string",
-        }),
-      async (argv) => {
-        greetCommand(argv.person);
       }
     )
     .demandCommand(1, "You need to specify a command")
