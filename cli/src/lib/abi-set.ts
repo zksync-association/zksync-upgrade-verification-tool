@@ -1,5 +1,4 @@
-import {type Abi, type AbiFunction, createClient, createPublicClient, http, toFunctionSelector} from "viem";
-import {fetchAbi} from "./decoder.js";
+import {type Abi, type AbiFunction, toFunctionSelector} from "viem";
 import {ETHERSCAN_ENDPOINTS, type Network} from "./constants.js";
 import {type Account20String, account20String, getAbiSchema, type HashString} from "../schema";
 
@@ -10,22 +9,21 @@ const buildQueryString = (endpoint: HashString, address: Account20String, apiTok
 export class AbiSet {
   private abis: Map<string, Abi>
   private selectors: Map<string, AbiFunction>
-  private network: Network
   private contractNames: Map<string, string>
-  private etherscanKey: string;
+  private apiKey: string;
+  private endpoint: string;
 
-  constructor (network: Network, etherscanKey: string) {
+  constructor(endpoint: string, apiKey: string) {
     this.abis = new Map()
     this.selectors = new Map()
     this.contractNames = new Map()
-    this.network = network
-    this.etherscanKey = etherscanKey
+    this.endpoint = endpoint
+    this.apiKey = apiKey
   }
 
   private async fetchAbi(rawAddress: string): Promise<Abi> {
-    const endpoint = ETHERSCAN_ENDPOINTS[this.network];
     const contractAddr = account20String.parse(rawAddress);
-    const query = buildQueryString(endpoint, contractAddr, this.etherscanKey);
+    const query = buildQueryString(this.endpoint, contractAddr, this.apiKey);
     const response = await fetch(query);
     const { message, result } = getAbiSchema.parse(await response.json());
 
@@ -66,5 +64,14 @@ export class AbiSet {
 
   nameForContract(address: string): string {
     return this.contractNames.get(address) || 'Unknown Contract'
+  }
+
+  static forL1(network: Network, apiKey: string): AbiSet {
+    const endpoint = ETHERSCAN_ENDPOINTS[network]
+    return new this(endpoint, apiKey)
+  }
+
+  static forL2(apiKey: string): AbiSet {
+    return new this('https://block-explorer-api.mainnet.zksync.io/api', apiKey)
   }
 }

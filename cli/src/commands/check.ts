@@ -103,7 +103,7 @@ function printVerifierInformation (txs: TransactionsJson) {
 }
 
 export const checkCommand = async (ethscanKey: string, upgradeDirectory: string, parentDirectory?: string, network: Network = 'mainnet') => {
-  const abiSet = new AbiSet(network, ethscanKey)
+  const abiSet = AbiSet.forL1(network, ethscanKey)
 
   const basePath = path.resolve(process.cwd(), parentDirectory || "", upgradeDirectory);
 
