@@ -1,6 +1,6 @@
 import yargs from "yargs";
-import { hideBin } from "yargs/helpers";
-import { diffCommand, greetCommand, listCommand, checkCommand } from "../commands";
+import {hideBin} from "yargs/helpers";
+import {checkCommand, parseFromCalldata, diffCommand, listCommand} from "../commands";
 import {type Network, printIntro} from ".";
 
 export const cli = async () => {
@@ -14,6 +14,12 @@ export const cli = async () => {
       demandOption: false,
       default: ".",
     })
+    .option("ethscankey", {
+      describe: 'Api key for etherscan',
+      type: 'string',
+      demandOption: false,
+      default: process.env.ETHERSCAN_API_KEY
+    })
     .command(
       "list",
       "List Upgrades",
@@ -24,10 +30,10 @@ export const cli = async () => {
           describe: "Hide directories that do not contain upgrades",
           alias: "hide",
         }),
-      async ({ directory, hideNonUpgrades }) => {
+      async ({directory, hideNonUpgrades}) => {
         const dir = Array.isArray(directory) ? directory[0] : directory;
         Array.isArray(directory) &&
-          console.log(`⚠️ Warning: Only the first directory will be used: ${dir}`);
+        console.log(`⚠️ Warning: Only the first directory will be used: ${dir}`);
         await listCommand(directory, hideNonUpgrades);
       }
     )
@@ -46,9 +52,11 @@ export const cli = async () => {
           default: 'mainnet'
         }),
       async (yargs) => {
-        await checkCommand(yargs.upgradeDirectory, yargs.directory, yargs.network as Network);
+        if (!yargs.ethscankey) {
+          throw new Error('Etherscan api key not provided')
+        }
+        await checkCommand(yargs.ethscankey, yargs.upgradeDirectory, yargs.directory, yargs.network as Network);
       }
-
     )
     .command(
       "diff <upgradeId> <previousUpgrade>",
@@ -67,6 +75,27 @@ export const cli = async () => {
           }),
       async (yargs) => {
         await diffCommand(yargs.upgradeId, yargs.previousUpgrade);
+      }
+    )
+    .command(
+      'parse <upgradeDirectory>',
+      'command to test parse all from calldata',
+      (yargs) =>
+        yargs.positional("upgradeDirectory", {
+          describe: "FolderName of the upgrade to check",
+          type: "string",
+          demandOption: true,
+        }).option("network", {
+          alias: 'n',
+          describe: 'network to check',
+          type: 'string',
+          default: 'mainnet'
+        }),
+      async (yargs) => {
+        if (!yargs.ethscankey) {
+          throw new Error('Etherscan api key not provided')
+        }
+        await parseFromCalldata(yargs.ethscankey, yargs.upgradeDirectory, yargs.directory, yargs.network as Network)
       }
     )
     .demandCommand(1, "You need to specify a command")

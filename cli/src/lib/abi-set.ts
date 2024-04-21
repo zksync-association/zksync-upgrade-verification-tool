@@ -1,26 +1,46 @@
-import {type Abi, type AbiFunction, toFunctionSelector} from "viem";
+import {type Abi, type AbiFunction, createClient, createPublicClient, http, toFunctionSelector} from "viem";
 import {fetchAbi} from "./decoder.js";
-import type {Network} from "./constants.js";
-import {unknown} from "zod";
+import {ETHERSCAN_ENDPOINTS, type Network} from "./constants.js";
+import {type Account20String, account20String, getAbiSchema, type HashString} from "../schema";
+
+const buildQueryString = (endpoint: HashString, address: Account20String, apiToken: string) => {
+  return `${endpoint}?module=contract&action=getabi&address=${address}&apikey=${apiToken}`;
+}
 
 export class AbiSet {
   private abis: Map<string, Abi>
   private selectors: Map<string, AbiFunction>
   private network: Network
   private contractNames: Map<string, string>
+  private etherscanKey: string;
 
-  constructor (network: Network) {
+  constructor (network: Network, etherscanKey: string) {
     this.abis = new Map()
     this.selectors = new Map()
     this.contractNames = new Map()
     this.network = network
+    this.etherscanKey = etherscanKey
+  }
+
+  private async fetchAbi(rawAddress: string): Promise<Abi> {
+    const endpoint = ETHERSCAN_ENDPOINTS[this.network];
+    const contractAddr = account20String.parse(rawAddress);
+    const query = buildQueryString(endpoint, contractAddr, this.etherscanKey);
+    const response = await fetch(query);
+    const { message, result } = getAbiSchema.parse(await response.json());
+
+    if (message !== "OK") {
+      throw new Error(`Failed to fetch ABI for ${rawAddress}`);
+    }
+
+    return JSON.parse(result);
   }
 
   async fetch(address: string, name?: string): Promise<Abi> {
     if (this.abis.has(address)) {
       return this.abis.get(address)!
     }
-    const abi = await fetchAbi(this.network, address)
+    const abi = await this.fetchAbi(address)
     this.add(address, name || 'unknown name', abi)
     return abi
   }
@@ -35,10 +55,6 @@ export class AbiSet {
     })
   }
 
-  nameForSelector (selector: string): string {
-    return this.selectors.get(selector)?.name || 'unknown'
-  }
-
   signatureForSelector(selector: string): string {
     const fn = this.selectors.get(selector)
     if (!fn) {
@@ -47,14 +63,6 @@ export class AbiSet {
     const params = fn.inputs.map(i => `${i.type} ${i.name}`)
     return `${fn.name}(${params.join(', ')})`
   }
-
-  // functionDefForSelector (selector: string): AbiFunction {
-  //   const fn = this.selectors.get(selector)
-  //   if (!fn) {
-  //     throw new Error('unknown descriptor')
-  //   }
-  //   return fn
-  // }
 
   nameForContract(address: string): string {
     return this.contractNames.get(address) || 'Unknown Contract'

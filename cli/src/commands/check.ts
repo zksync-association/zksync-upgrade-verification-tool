@@ -15,6 +15,10 @@ import {decodeFunctionData} from "viem";
 type HexString = `0x${string}`
 
 async function printFacetChanges (cuts: FacetCutsJson, facets: FacetsJson, abiSet: AbiSet): Promise<void> {
+  const title = 'Diamond Changes'
+  console.log(title)
+  console.log('='.repeat(title.length))
+  
   let promises = Object.keys(facets).map(async (facetName): Promise<any> => {
     const f = facets[facetName]
     return abiSet.fetch(f.address, facetName)
@@ -98,8 +102,8 @@ function printVerifierInformation (txs: TransactionsJson) {
   }
 }
 
-export const checkCommand = async (upgradeDirectory: string, parentDirectory?: string, network: Network = 'mainnet') => {
-  const abiSet = new AbiSet(network)
+export const checkCommand = async (ethscanKey: string, upgradeDirectory: string, parentDirectory?: string, network: Network = 'mainnet') => {
+  const abiSet = new AbiSet(network, ethscanKey)
 
   const basePath = path.resolve(process.cwd(), parentDirectory || "", upgradeDirectory);
 
@@ -109,10 +113,6 @@ export const checkCommand = async (upgradeDirectory: string, parentDirectory?: s
 
   // Print the names of all the methods being changed
   if (upgrade.facetCuts && upgrade.facets) {
-    const title = 'Diamond Changes'
-    console.log(title)
-    console.log('='.repeat(title.length))
-
     await printFacetChanges(upgrade.facetCuts, upgrade.facets, abiSet)
   }
 
