@@ -1,6 +1,6 @@
 export async function contractRead (target: string, callData: string): Promise<string> {
   const response = await fetch(
-    `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_CODE}`,
+    'https://ethereum-rpc.publicnode.com',
     {
       method: 'POST',
       body: JSON.stringify(
