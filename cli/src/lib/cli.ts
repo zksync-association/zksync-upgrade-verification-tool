@@ -76,10 +76,10 @@ export const cli = async () => {
             type: "string",
             demandOption: true,
           })
-          .option('l1', {
+          .option('facets', {
             describe: 'Filter to this l1 contracts',
-            type: 'array',
-            default: []
+            type: 'string',
+            default: ''
           }).option("network", {
           alias: 'n',
           describe: 'network to check',
@@ -90,10 +90,11 @@ export const cli = async () => {
         if (!yargs.ethscankey) {
           throw new Error('Etherscan api key not provided')
         }
-        downloadCode(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDir, yargs.targetSourceCodeDir)
+        const facets = yargs.facets.split(',').map(f => f.trim()).filter(f => f.length > 0)
+        downloadCode(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDir, yargs.targetSourceCodeDir, facets)
       }
     )
-    .demandCommand(1, "You need to specify a command")
+    .demandCommand(1, "Please specify a command")
     .help()
     .strict()
     .parseAsync();

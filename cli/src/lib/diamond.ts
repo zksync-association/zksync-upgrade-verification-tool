@@ -115,9 +115,13 @@ export class DiamondDiff {
     })
   }
 
-  async writeCodeDiff (baseDirPath: string): Promise<void> {
-    console.log(baseDirPath)
+  async writeCodeDiff (baseDirPath: string, filter: string[]): Promise<void> {
+
     for (const {name, oldData, newData} of this.changes) {
+      if (filter.length > 0 && !filter.includes(name)) {
+        continue
+      }
+
       const dirOld = path.join(baseDirPath, 'old', name)
       const dirNew = path.join(baseDirPath, 'new', name)
 
@@ -138,7 +142,7 @@ export class DiamondDiff {
     }
   }
 
-  async toCliReport (abis: AbiSet): Promise<string> {
+  async toCliReport (abis: AbiSet, upgradeDir: string): Promise<string> {
     const strings = ['Diamond Upgrades: \n']
 
 
@@ -162,8 +166,7 @@ export class DiamondDiff {
       const newFunctions = await Promise.all(newFunctionsPromises)
       table.push(['New Functions', newFunctions.length ? newFunctions.join(', ') : 'None'])
 
-      table.push(['To compare code', `pnpm validate download-diff -l1=${change.name} <path/to/target/folder>`])
-
+      table.push(['To compare code', `pnpm validate download-diff --facets=${change.name} ${upgradeDir} <path/to/target/folder>`])
 
       strings.push(table.toString())
     }
