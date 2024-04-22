@@ -3,52 +3,13 @@ import CliTable from "cli-table3";
 import path from "node:path";
 import {
   ALL_VERIFIER_PARAMS,
-  type FacetCutsJson,
-  type FacetsJson, type L2UpgradeJson,
+  type L2UpgradeJson,
   type TransactionsJson,
   type UpgradeManifest
 } from "../schema";
-import {cutAction, DiamondChanges} from "../lib/reports/diamond-changes.js";
 import {AbiSet} from "../lib/abi-set.js";
-import {EtherscanClient} from "../lib/etherscan-client.js";
+import {BlockExplorerClient} from "../lib/block-explorer-client.js";
 
-async function printFacetChanges (cuts: FacetCutsJson, facets: FacetsJson, abiSet: AbiSet): Promise<void> {
-  const title = 'Diamond Changes'
-  console.log(title)
-  console.log('='.repeat(title.length))
-  
-  let promises = Object.keys(facets).map(async (facetName): Promise<any> => {
-    const f = facets[facetName]
-    return abiSet.fetch(f.address, facetName)
-  })
-
-  await Promise.all(promises)
-  const diamondChanges = new DiamondChanges()
-
-  cuts.forEach(cut => {
-    const action = cutAction(cut.action)
-    cut.selectors.forEach(selector => {
-      diamondChanges.add(selector, action, cut.facet)
-    })
-  })
-
-  console.log(diamondChanges.format(abiSet))
-  console.log('\n\n')
-}
-
-// async function printGobernorActions(transactions: TransactionsJson, abiSet: AbiSet): Promise<void> {
-//   // future: Get facets dinamically using loupe functionality.
-//   const addr = '0x230214F0224C7E0485f348a79512ad00514DB1F7'
-//   const data = transactions.governanceOperation.calls[0].data as HexString
-//   const abi = await abiSet.fetch(addr)
-//
-//   const { args } = decodeFunctionData({
-//     abi,
-//     data
-//   })
-//
-//   console.log(args)
-// }
 
 function printMetadata(data: UpgradeManifest) {
   const title = 'Upgrade metadata'
@@ -73,10 +34,12 @@ function printNewSystemContracts(l2: L2UpgradeJson) {
     head: ['Name', 'Address', 'Bytecode hashes'],
     style: { compact: true }
   })
-  l2.systemContracts.forEach(contract => {
+
+  for (const contract of l2.systemContracts) {
     const hashes = contract.bytecodeHashes.join(', ');
     table.push([ contract.name, contract.address, hashes ])
-  })
+  }
+
   console.log(table.toString())
   console.log('')
 }
@@ -157,18 +120,19 @@ function printVerifierInformation (txs: TransactionsJson) {
       ? txs.proposeUpgradeTx.verifier
       : 'no changes'
     table.push(['Contract addr', newAddress])
-    ALL_VERIFIER_PARAMS.forEach(param => {
+
+    for (const param of ALL_VERIFIER_PARAMS) {
       const raw = txs.proposeUpgradeTx.verifierParams[param]
       const newValue = Number(raw) === 0 ? 'no changes' : raw
       table.push([param, newValue])
-    })
+    }
 
     console.log(table.toString())
   }
 }
 
 export const checkCommand = async (ethscanKey: string, upgradeDirectory: string, parentDirectory?: string, network: Network = 'mainnet') => {
-  const client = new EtherscanClient(ethscanKey, network)
+  const client = new BlockExplorerClient(ethscanKey, network)
   const abiSet = new AbiSet(client)
 
   const basePath = path.resolve(process.cwd(), parentDirectory || "", upgradeDirectory);
@@ -176,11 +140,6 @@ export const checkCommand = async (ethscanKey: string, upgradeDirectory: string,
   const upgrade = await lookupAndParse(basePath, network);
 
   printMetadata(upgrade.commonData)
-
-  // Print the names of all the methods being changed
-  if (upgrade.facetCuts && upgrade.facets) {
-    await printFacetChanges(upgrade.facetCuts, upgrade.facets, abiSet)
-  }
 
   await printL2Upgrades(upgrade.transactions, upgrade.l2Upgrade)
 };

@@ -8,4 +8,4 @@ export const facetsResponseSchema = z.array(
   })
 )
 
-export type NewFacet = z.infer<typeof facetsResponseSchema>
+// export type NewFacet = z.infer<typeof facetsResponseSchema>

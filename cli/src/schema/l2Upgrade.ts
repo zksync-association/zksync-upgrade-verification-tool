@@ -3,7 +3,6 @@ import {
   account20String,
   bytes32Hash,
   hashString,
-  selectorhash,
   transactionSchema,
 } from "../schema";
 

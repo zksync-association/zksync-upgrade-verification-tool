@@ -49,11 +49,6 @@ const isUpgradeBlob = async (
   }
 };
 
-export type FileStatus = {
-  filePath: string;
-  isValid: boolean;
-};
-
 export type UpgradeDescriptor = {
   commonData: UpgradeManifest,
   transactions: TransactionsJson,
@@ -66,12 +61,11 @@ export type UpgradeDescriptor = {
 function translateNetwork(n: Network) {
   if (n === 'mainnet') {
     return 'mainnet2'
-  } else
+  }
   if (n === 'sepolia') {
     return 'testnet-sepolia'
-  } else {
-    throw new Error(`Unknown network: ${n}`)
   }
+  throw new Error(`Unknown network: ${n}`)
 }
 
 export const lookupAndParse = async (targetDir: string, network: Network) : Promise<UpgradeDescriptor> => {

@@ -3,10 +3,11 @@ import {Diamond} from "../lib/diamond.js";
 import path from "node:path";
 import {lookupAndParse, type Network} from "../lib/index.js";
 import {FacetChanges} from "../lib/reports/facet-changes.js";
-import {EtherscanClient} from "../lib/etherscan-client.js";
+import {BlockExplorerClient} from "../lib/block-explorer-client.js";
+import * as console from "node:console";
 
 export async function snapshot (etherscanKey: string, addr: string, network: Network, upgradeDirectory: string): Promise<void> {
-  const client = new EtherscanClient(etherscanKey, network)
+  const client = new BlockExplorerClient(etherscanKey, network)
   const l1Abis = new AbiSet(client)
   const diamond = new Diamond(addr, l1Abis)
 
@@ -15,9 +16,13 @@ export async function snapshot (etherscanKey: string, addr: string, network: Net
   const basePath = path.resolve(process.cwd(), upgradeDirectory,);
   const upgrade = await lookupAndParse(basePath, network);
 
-  const facetChanges = FacetChanges.fromFile(upgrade.facetCuts!, upgrade.facets!)
+  if (!upgrade.facets || !upgrade.facetCuts) {
+    console.log('no diamond upgrades')
+    return
+  }
+
+  const facetChanges = FacetChanges.fromFile(upgrade.facetCuts, upgrade.facets)
 
   const diff = await diamond.calculateDiff(facetChanges, client)
-  // const tempDir = temporaryDirectory({prefix: 'zksync-era-diff'})
-  await diff.writeDiffs('/home/migue/borrar')
+  console.log(diff)
 }

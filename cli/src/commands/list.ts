@@ -8,7 +8,7 @@ export const listCommand = async (directory: string, hideNonUpgrades = false) =>
   console.log(
     `🔎 Checking directories in ${path.relative(".", targetDir) || "./"} for upgrades...`
   );
-  const dirs = await retrieveDirNames(targetDir, true);
+  const dirs = await retrieveDirNames(targetDir);
 
   const table = new Table({
     head: ["Name", "Is Upgrade?", "Protocol Version", "Created at", "Directory"],

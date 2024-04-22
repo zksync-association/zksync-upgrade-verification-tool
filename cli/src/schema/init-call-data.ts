@@ -31,4 +31,4 @@ export const initCallDataSchema = z.object({
   newAllowList: z.string()
 })
 
-export type InitCallData = z.infer<typeof initCallDataSchema>
+// export type InitCallData = z.infer<typeof initCallDataSchema>

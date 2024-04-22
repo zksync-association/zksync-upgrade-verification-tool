@@ -1,21 +1,20 @@
-import {type Abi} from "viem";
+import type {Abi} from "viem";
 import {
-  type EtherscanSourceCode,
   sourceCodeResponseSchema, sourceCodeSchema,
 } from "../schema/source-code-response.js";
 import {account20String, getAbiSchema} from "../schema/index.js";
 import {ETHERSCAN_ENDPOINTS, type Network} from "./constants.js";
 import {ContractData} from "./diamond.js";
 
-export class EtherscanClient {
+export class BlockExplorerClient {
   private apiKey: string
   private baseUri: string
   private abiCache: Map<string, Abi>
   private sourceCache: Map<string, ContractData>
 
-  constructor (apiKey: string, network: Network) {
+  constructor (apiKey: string, baseUri: string) {
     this.apiKey = apiKey
-    this.baseUri = ETHERSCAN_ENDPOINTS[network]
+    this.baseUri = baseUri
     this.abiCache = new Map()
     this.sourceCache = new Map()
   }
@@ -81,5 +80,12 @@ export class EtherscanClient {
     return data;
   }
 
+  static fromNetwork(apiKey: string, network: Network): BlockExplorerClient {
+    const baseUri = ETHERSCAN_ENDPOINTS[network]
+    return new BlockExplorerClient(apiKey, baseUri)
+  }
 
+  static forL2(): BlockExplorerClient {
+    return new BlockExplorerClient('no api key needed', 'https://block-explorer-api.mainnet.zksync.io/api')
+  }
 }

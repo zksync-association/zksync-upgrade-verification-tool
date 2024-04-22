@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { numberString } from "./common";
-import type Abi from "viem";
 
 export const getAbiSchema = z.object({
   status: numberString,
@@ -8,4 +7,3 @@ export const getAbiSchema = z.object({
   result: z.string(),
 });
 
-export type GetAbiSchema = z.infer<typeof getAbiSchema>;

@@ -26,8 +26,4 @@ export const sourceCodeSchema = z.object({
   sources: z.record(z.string(), z.object({ content: z.string() })),
 })
 
-export type EtherscanSourceCode = z.infer<typeof etherscanSourceCodeSchema>
-
-export type SourceCodeResponse = z.infer<typeof sourceCodeResponseSchema>
-
 export type RawSourceCode = z.infer<typeof sourceCodeSchema>

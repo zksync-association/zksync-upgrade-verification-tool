@@ -35,6 +35,6 @@ export class FacetChanges {
       }
     })
 
-    return new this(data)
+    return new FacetChanges(data)
   }
 }

@@ -1,10 +1,10 @@
-import {AbiSet} from "./abi-set.js";
+import type {AbiSet} from "./abi-set.js";
 import {contractRead} from "./contract-read.js";
 import {decodeFunctionResult} from "viem";
 import {facetsResponseSchema} from "../schema/new-facets.js";
-import {type RawSourceCode, sourceCodeResponseSchema, sourceCodeSchema} from "../schema/source-code-response.js";
+import type {RawSourceCode} from "../schema/source-code-response.js";
 import type {FacetChanges} from "./reports/facet-changes.js";
-import type {EtherscanClient} from "./etherscan-client.js";
+import type {BlockExplorerClient} from "./block-explorer-client.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 
@@ -36,7 +36,7 @@ export class Diamond {
   }
 
 
-  async init (client: EtherscanClient) {
+  async init (client: BlockExplorerClient) {
     const data = await contractRead(this.addr, '0xcdffacc67a0ed62700000000000000000000000000000000000000000000000000000000')
     const facetsAddr = `0x${data.substring(26)}`
 
@@ -49,15 +49,14 @@ export class Diamond {
       data: facetsData as `0x${string}`
     })
 
-
     const facets = facetsResponseSchema.parse(rawFacets)
 
-    facets.forEach(facet => {
+    for (const facet of facets) {
       this.facetToSelectors.set(facet.addr, facet.selectors)
-      facet.selectors.forEach(selector => {
+      for (const selector of facet.selectors) {
         this.selectorToFacet.set(selector, facet.addr)
-      })
-    })
+      }
+    }
 
     const promises = facets.map(async facet => {
       const source = await client.getSourceCode(facet.addr)
@@ -66,7 +65,7 @@ export class Diamond {
     await Promise.all(promises)
   }
 
-  async calculateDiff (changes: FacetChanges, client: EtherscanClient): Promise<DiamondDiff> {
+  async calculateDiff (changes: FacetChanges, client: BlockExplorerClient): Promise<DiamondDiff> {
     const diff = new DiamondDiff();
 
     for (const [address, data] of this.facetToContractData.entries()) {
@@ -116,14 +115,14 @@ export class DiamondDiff {
         const {content} = oldData.sources.sources[fileName]
         path.parse(fileName).dir
         const filePath = path.join(dirOld, fileName)
-        await fs.mkdir(path.parse(filePath).dir, { recursive: true })
+        await fs.mkdir(path.parse(filePath).dir, {recursive: true})
         await fs.writeFile(filePath, content)
       }
 
       for (const fileName in newData.sources.sources) {
         const {content} = newData.sources.sources[fileName]
         const filePath = path.join(dirNew, fileName)
-        await fs.mkdir(path.parse(filePath).dir, { recursive: true })
+        await fs.mkdir(path.parse(filePath).dir, {recursive: true})
         await fs.writeFile(filePath, content)
       }
     }

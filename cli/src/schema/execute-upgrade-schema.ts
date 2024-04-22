@@ -14,5 +14,3 @@ export const executeUpgradeSchema = z.object({
     initCalldata: z.string()
   }))
 })
-
-export type ExecuteUpgrade = z.infer<typeof executeUpgradeSchema>
