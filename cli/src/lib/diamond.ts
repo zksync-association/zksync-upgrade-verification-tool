@@ -7,6 +7,7 @@ import type {FacetChanges} from "./reports/facet-changes.js";
 import type {BlockExplorerClient} from "./block-explorer-client.js";
 import path from "node:path";
 import fs from "node:fs/promises";
+import CliTable from "cli-table3";
 
 export class ContractData {
   name: string;
@@ -72,7 +73,10 @@ export class Diamond {
       const change = changes.facetAffected(data.name)
       if (change && change.address !== address) {
         const newContractData = await client.getSourceCode(change.address)
-        diff.add(address, change.address, data.name, data, newContractData)
+        const oldFacets = this.facetToSelectors.get(address)
+        if (!oldFacets) { throw new Error('Inconsistent data')}
+
+        diff.add(address, change.address, data.name, data, newContractData, oldFacets, change.selectors)
       }
     }
 
@@ -87,7 +91,9 @@ export class DiamondDiff {
     newAddress: string,
     name: string,
     oldData: ContractData,
-    newData: ContractData
+    newData: ContractData,
+    oldSelectors: string[]
+    newSelectors: string[]
   }[]
 
 
@@ -95,17 +101,19 @@ export class DiamondDiff {
     this.changes = []
   }
 
-  add (oldAddress: string, newAddress: string, name: string, oldData: ContractData, newData: ContractData): void {
+  add (oldAddress: string, newAddress: string, name: string, oldData: ContractData, newData: ContractData, oldSelectors: string[], newSelectors: string[]): void {
     this.changes.push({
       oldAddress,
       newAddress,
       name,
       oldData,
-      newData
+      newData,
+      oldSelectors,
+      newSelectors
     })
   }
 
-  async writeDiffs (baseDirPath: string): Promise<void> {
+  async writeCodeDiff (baseDirPath: string): Promise<void> {
     console.log(baseDirPath)
     for (const {name, oldAddress, newAddress, oldData, newData} of this.changes) {
       const dirOld = path.join(baseDirPath, 'old', name)
@@ -126,5 +134,32 @@ export class DiamondDiff {
         await fs.writeFile(filePath, content)
       }
     }
+  }
+
+  toCliReport (abis: AbiSet): string {
+    const strings = ['Diamond Upgrades: \n']
+
+
+    for (const change of this.changes) {
+      const table = new CliTable({
+        head: [change.name],
+        style: { compact: true }
+      })
+
+      table.push(['Old address', change.oldAddress])
+      table.push(['New address', change.newAddress])
+      table.push(['New contract verified etherscan', 'Yes'])
+      table.push(['To compare code', `pnpm validate download-diff -l1=${change.name} <path/to/target/folder>`])
+
+      const newFunctions = change.newSelectors
+        .filter(s => !change.oldSelectors.includes(s))
+        .map(s => abis.signatureForSelector(s))
+
+      table.push(['New Functions', newFunctions.length ? newFunctions.join(', ') : 'None'])
+
+      strings.push(table.toString())
+    }
+
+    return strings.join('\n')
   }
 }

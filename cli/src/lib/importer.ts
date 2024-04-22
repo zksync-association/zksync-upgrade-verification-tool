@@ -14,8 +14,9 @@ import {SCHEMAS} from "./parser";
 import type {Network} from "./constants.js";
 
 export const retrieveDirNames = async (targetDir: string) => {
-  const items = await fs.readdir(targetDir, { withFileTypes: true });
+  const items = await fs.readdir(targetDir, {withFileTypes: true});
   const directories = items.filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
+
   return await Promise.all(
       directories.map(async (dir) => ({
         name: dir,
