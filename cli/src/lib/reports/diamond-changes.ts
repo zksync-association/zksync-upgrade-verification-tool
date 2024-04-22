@@ -34,13 +34,6 @@ export class Change {
   }
 
   format (abiSet: AbiSet) {
-    // const name = abiSet.nameForSelector(this.selector)
-    // if (this.newFacet) {
-    //   const facetName = abiSet.nameForContract(this.newFacet)
-    //   return `${name} (${this.selector}) ${this.actionEffect()} -> ${facetName} (${this.newFacet})`
-    // } else {
-    //   return `${name} (${this.selector}) ${this.actionEffect()}`
-    // }
     const name = abiSet.signatureForSelector(this.selector)
     return `${name} (${this.selector}) ${this.actionEffect()}`
   }
