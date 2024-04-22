@@ -2,6 +2,7 @@ import yargs from "yargs";
 import {hideBin} from "yargs/helpers";
 import {checkCommand, parseFromCalldata, diffCommand, listCommand} from "../commands";
 import {type Network, printIntro} from ".";
+import {snapshot} from "../commands/snapshot.js";
 
 export const cli = async () => {
   printIntro();
@@ -96,6 +97,27 @@ export const cli = async () => {
           throw new Error('Etherscan api key not provided')
         }
         await parseFromCalldata(yargs.ethscankey, yargs.upgradeDirectory, yargs.directory, yargs.network as Network)
+      }
+    )
+    .command(
+      'snapshot <upgradeDirectory>',
+      'get current state of contracts',
+      (yargs) =>
+        yargs.positional("upgradeDirectory", {
+          describe: "FolderName of the upgrade to check",
+          type: "string",
+          demandOption: true,
+        }).option("network", {
+          alias: 'n',
+          describe: 'network to check',
+          type: 'string',
+          default: 'mainnet'
+        }),
+      async (yargs) => {
+        if (!yargs.ethscankey) {
+          throw new Error('Etherscan api key not provided')
+        }
+        await snapshot(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDirectory)
       }
     )
     .demandCommand(1, "You need to specify a command")

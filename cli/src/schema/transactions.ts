@@ -29,9 +29,9 @@ export const transactionsSchema = z.object({
   upgradeAddress: account20String,
   protocolVersion: z.string(),
   upgradeTimestamp: z.string(),
-  scheduleTransparentOperation: hashString,
-  executeOperation: hashString,
-  governanceOperation: z.object({
+  scheduleTransparentOperation: z.optional(hashString) ,
+  executeOperation: z.optional(hashString),
+  governanceOperation: z.optional(z.object({
     calls: z.array(
       z.object({
         target: account20String,
@@ -41,7 +41,7 @@ export const transactionsSchema = z.object({
     ),
     predecessor: bytes32Hash,
     salt: bytes32Hash,
-  }),
+  })),
   transparentUpgrade: z.object({
     facetCuts: facetCutsSchema,
     initAddress: account20String,

@@ -10,6 +10,7 @@ import {
 } from "../schema";
 import {cutAction, DiamondChanges} from "../lib/reports/diamond-changes.js";
 import {AbiSet} from "../lib/abi-set.js";
+import {EtherscanClient} from "../lib/etherscan-client.js";
 
 async function printFacetChanges (cuts: FacetCutsJson, facets: FacetsJson, abiSet: AbiSet): Promise<void> {
   const title = 'Diamond Changes'
@@ -167,7 +168,8 @@ function printVerifierInformation (txs: TransactionsJson) {
 }
 
 export const checkCommand = async (ethscanKey: string, upgradeDirectory: string, parentDirectory?: string, network: Network = 'mainnet') => {
-  const abiSet = AbiSet.forL1(network, ethscanKey)
+  const client = new EtherscanClient(ethscanKey, network)
+  const abiSet = new AbiSet(client)
 
   const basePath = path.resolve(process.cwd(), parentDirectory || "", upgradeDirectory);
 

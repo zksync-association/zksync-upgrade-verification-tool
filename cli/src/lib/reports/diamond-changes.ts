@@ -1,5 +1,8 @@
 import type {AbiSet} from "../abi-set.js";
 import CliTable from "cli-table3";
+import path from "node:path";
+import fs from "node:fs/promises";
+import type {FacetCutsJson} from "../../schema/index.js";
 
 export type DiamondCutAction = "add" | "change" | "remove"
 
@@ -64,6 +67,35 @@ export class DiamondChanges {
     } else {
       this.data.set(selector, change)
     }
+  }
+
+  actionForSelector(selector: string): DiamondCutAction | undefined {
+    return this.data.get(selector)?.action
+  }
+
+  // totalSummary (): string[] {
+  //   // const changeSet = [...this.data.values()].reduce((set, change) => {
+  //   //   if (change.newFacet) {
+  //   //     set.add(change.newFacet)
+  //   //   }
+  //   //
+  //   //   return set
+  //   // }, new Set<string>())
+  //   // return [...changeSet]
+  // }
+
+  orphanSelectors (): void {
+    // TODO
+  }
+
+
+  static fromFile(jsonCuts: FacetCutsJson): DiamondChanges {
+    const instance = new this()
+    jsonCuts.forEach(({ facet, selectors, action: actionNumber }) => {
+      const action = cutAction(actionNumber)
+      selectors.forEach((selector) => instance.add(selector, action, facet))
+    })
+    return instance
   }
 
   private createTable(title: string): CliTable.Table {
