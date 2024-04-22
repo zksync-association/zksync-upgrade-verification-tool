@@ -8,7 +8,7 @@ import {initCallDataSchema} from "../schema/init-call-data";
 
 async function simpleRead(target: string, callData: string): Promise<string> {
   const response = await fetch(
-    'https://eth-mainnet.g.alchemy.com/v2/f-Lt_8EsHek4y9P-VwIFD_ACa0ihw1Lm',
+    `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_CODE}`,
     {
       method: 'POST',
       body: JSON.stringify(
