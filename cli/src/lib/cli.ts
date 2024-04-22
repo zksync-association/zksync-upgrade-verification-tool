@@ -1,8 +1,10 @@
 import yargs from "yargs";
 import {hideBin} from "yargs/helpers";
-import {checkCommand, parseFromCalldata, diffCommand, listCommand} from "../commands";
+import {listCommand} from "../commands";
 import {type Network, printIntro} from ".";
 import {snapshot} from "../commands/snapshot.js";
+import * as console from "node:console";
+import {downloadCode} from "../commands/download.js";
 
 export const cli = async () => {
   printIntro();
@@ -39,68 +41,7 @@ export const cli = async () => {
       }
     )
     .command(
-      "check <upgradeDirectory>",
-      "Check upgrade is well formed",
-      (yargs) =>
-        yargs.positional("upgradeDirectory", {
-          describe: "FolderName of the upgrade to check",
-          type: "string",
-          demandOption: true,
-        }).option("network", {
-          alias: 'n',
-          describe: 'network to check',
-          type: 'string',
-          default: 'mainnet'
-        }),
-      async (yargs) => {
-        if (!yargs.ethscankey) {
-          throw new Error('Etherscan api key not provided')
-        }
-        await checkCommand(yargs.ethscankey, yargs.upgradeDirectory, yargs.directory, yargs.network as Network);
-      }
-    )
-    .command(
-      "diff <upgradeId> <previousUpgrade>",
-      "Perform items",
-      (yargs) =>
-        yargs
-          .positional("upgradeId", {
-            describe: "FolderName of the upgrade to compare",
-            type: "string",
-            demandOption: true,
-          })
-          .positional("previousUpgrade", {
-            describe: "FolderName of the previous upgrade to compare with",
-            type: "string",
-            demandOption: true,
-          }),
-      async (yargs) => {
-        await diffCommand(yargs.upgradeId, yargs.previousUpgrade);
-      }
-    )
-    .command(
-      'parse <upgradeDirectory>',
-      'command to test parse all from calldata',
-      (yargs) =>
-        yargs.positional("upgradeDirectory", {
-          describe: "FolderName of the upgrade to check",
-          type: "string",
-          demandOption: true,
-        }).option("network", {
-          alias: 'n',
-          describe: 'network to check',
-          type: 'string',
-          default: 'mainnet'
-        }),
-      async (yargs) => {
-        if (!yargs.ethscankey) {
-          throw new Error('Etherscan api key not provided')
-        }
-        await parseFromCalldata(yargs.ethscankey, yargs.upgradeDirectory, yargs.directory, yargs.network as Network)
-      }
-    )
-    .command(
-      'snapshot <upgradeDirectory>',
+      'check <upgradeDirectory>',
       'get current state of contracts',
       (yargs) =>
         yargs.positional("upgradeDirectory", {
@@ -118,6 +59,38 @@ export const cli = async () => {
           throw new Error('Etherscan api key not provided')
         }
         await snapshot(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDirectory)
+      }
+    )
+    .command(
+      'download-diff <upgradeDir> <targetSourceCodeDir>',
+      'Download source code diff',
+      (yargs) =>
+        yargs
+          .positional("upgradeDir", {
+            describe: "FolderName of the upgrade to check",
+            type: "string",
+            demandOption: true,
+          })
+          .positional("targetSourceCodeDir", {
+            describe: "Directory to save the downloaded source code",
+            type: "string",
+            demandOption: true,
+          })
+          .option('l1', {
+            describe: 'Filter to this l1 contracts',
+            type: 'array',
+            default: []
+          }).option("network", {
+          alias: 'n',
+          describe: 'network to check',
+          type: 'string',
+          default: 'mainnet'
+        }),
+      (yargs) => {
+        if (!yargs.ethscankey) {
+          throw new Error('Etherscan api key not provided')
+        }
+        downloadCode(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDir, yargs.targetSourceCodeDir)
       }
     )
     .demandCommand(1, "You need to specify a command")

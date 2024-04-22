@@ -74,7 +74,9 @@ export class Diamond {
       if (change && change.address !== address) {
         const newContractData = await client.getSourceCode(change.address)
         const oldFacets = this.facetToSelectors.get(address)
-        if (!oldFacets) { throw new Error('Inconsistent data')}
+        if (!oldFacets) {
+          throw new Error('Inconsistent data')
+        }
 
         diff.add(address, change.address, data.name, data, newContractData, oldFacets, change.selectors)
       }
@@ -115,7 +117,7 @@ export class DiamondDiff {
 
   async writeCodeDiff (baseDirPath: string): Promise<void> {
     console.log(baseDirPath)
-    for (const {name, oldAddress, newAddress, oldData, newData} of this.changes) {
+    for (const {name, oldData, newData} of this.changes) {
       const dirOld = path.join(baseDirPath, 'old', name)
       const dirNew = path.join(baseDirPath, 'new', name)
 
@@ -136,26 +138,32 @@ export class DiamondDiff {
     }
   }
 
-  toCliReport (abis: AbiSet): string {
+  async toCliReport (abis: AbiSet): Promise<string> {
     const strings = ['Diamond Upgrades: \n']
 
 
     for (const change of this.changes) {
       const table = new CliTable({
         head: [change.name],
-        style: { compact: true }
+        style: {compact: true}
       })
 
       table.push(['Old address', change.oldAddress])
       table.push(['New address', change.newAddress])
       table.push(['New contract verified etherscan', 'Yes'])
+
+      const newFunctionsPromises = change.newSelectors
+        .filter(s => !change.oldSelectors.includes(s))
+        .map(async s => {
+          await abis.fetch(change.newAddress)
+          return abis.signatureForSelector(s)
+        })
+
+      const newFunctions = await Promise.all(newFunctionsPromises)
+      table.push(['New Functions', newFunctions.length ? newFunctions.join(', ') : 'None'])
+
       table.push(['To compare code', `pnpm validate download-diff -l1=${change.name} <path/to/target/folder>`])
 
-      const newFunctions = change.newSelectors
-        .filter(s => !change.oldSelectors.includes(s))
-        .map(s => abis.signatureForSelector(s))
-
-      table.push(['New Functions', newFunctions.length ? newFunctions.join(', ') : 'None'])
 
       strings.push(table.toString())
     }
