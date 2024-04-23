@@ -2,9 +2,9 @@ import yargs from "yargs";
 import {hideBin} from "yargs/helpers";
 import {listCommand, contractDiff} from "../commands";
 import {type Network, printIntro} from ".";
-import {checkCommand} from "../commands/checkCommand.js";
+import {checkCommand} from "../commands/check-command.js";
 import * as console from "node:console";
-import {downloadCode} from "../commands/download.js";
+import {downloadCode} from "../commands/download-code-command.js";
 import * as process from "node:process";
 
 export const cli = async () => {

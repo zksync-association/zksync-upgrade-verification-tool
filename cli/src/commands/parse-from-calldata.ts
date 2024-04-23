@@ -7,7 +7,6 @@ import {initCallDataSchema} from "../schema/init-call-data";
 import {Diamond} from "../lib/diamond.js";
 import {BlockExplorerClient} from "../lib/block-explorer-client.js";
 
-
 export async function parseFromCalldata(ethscanKey: string, upgradeDirectory: string, parentDirectory: string, network: Network): Promise<void> {
   const l1Client = BlockExplorerClient.fromNetwork(ethscanKey, network)
   const l2Client = BlockExplorerClient.forL2()
@@ -21,12 +20,10 @@ export async function parseFromCalldata(ethscanKey: string, upgradeDirectory: st
   }
 
   const {
-    data,
-    target
+    data
   } = upgrade.transactions.governanceOperation.calls[0]
 
-  const diamond = new Diamond(target, l1Abis)
-  await diamond.init(l1Client)
+  const diamond = await Diamond.create(network, l1Client, l1Abis)
 
   const facetAddr = diamond.selectorToFacet.get(data.substring(0, 10))
 

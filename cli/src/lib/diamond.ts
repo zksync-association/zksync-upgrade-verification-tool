@@ -20,6 +20,16 @@ export class ContractData {
   }
 }
 
+/**
+ * Class to represent the main zkSync diamond contract.
+ * An instance contains the current data of the contract,
+ * including its facets and selectors for each
+ * facet.
+ *
+ * ``` js
+ * const myDiamond = await Diamond.create('mainnet', client, abis)
+ * ```
+ */
 export class Diamond {
   private addr: string;
   private protocolVersion: bigint;
@@ -50,7 +60,7 @@ export class Diamond {
   }
 
 
-  async init (client: BlockExplorerClient) {
+  private async init (client: BlockExplorerClient) {
     const data = await contractRead(this.addr, '0xcdffacc67a0ed62700000000000000000000000000000000000000000000000000000000')
     const facetsAddr = `0x${data.substring(26)}`
 

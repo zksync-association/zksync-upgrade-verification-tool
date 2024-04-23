@@ -1,7 +1,6 @@
 import {type Abi, type AbiFunction, toFunctionSelector} from "viem";
 import type {BlockExplorerClient} from "./block-explorer-client.js";
 
-
 export class AbiSet {
   private abis: Map<string, Abi>
   private selectors: Map<string, AbiFunction>
@@ -42,9 +41,5 @@ export class AbiSet {
     }
     const params = fn.inputs.map(i => `${i.type} ${i.name}`)
     return `${fn.name}(${params.join(', ')})`
-  }
-
-  nameForContract(address: string): string {
-    return this.contractNames.get(address) || 'Unknown Contract'
   }
 }
