@@ -10,7 +10,8 @@ export const contractDiff = async (etherscanKey: string, network: Network, upgra
   await diff.writeCodeDiff(targetDir, [facetName])
 
   await new Promise((resolve, reject) => {
-    const res = exec(`git --no-pager diff --color=always ${targetDir}/old ${targetDir}/new`, (error, stdout, stderr) => {
+    const res = exec(`git --no-pager diff --color=always ${targetDir}/old ${targetDir}/new`, (_error, stdout, stderr) => {
+      // We ignore the error because git diff returns status code 1 when there is a difference.
       if (stderr.length > 0) {
         return reject(new Error('Error generating diff'))
       }
