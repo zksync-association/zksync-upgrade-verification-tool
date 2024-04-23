@@ -3,12 +3,13 @@ import {contractRead} from "./contract-read.js";
 import {decodeFunctionResult} from "viem";
 import {facetsResponseSchema} from "../schema/new-facets.js";
 import type {RawSourceCode} from "../schema/source-code-response.js";
-import type {FacetChanges} from "./reports/facet-changes.js";
+import type {FacetChanges} from "./facet-changes.js";
 import type {BlockExplorerClient} from "./block-explorer-client.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import CliTable from "cli-table3";
 import type {Network} from "./constants.js";
+import * as console from "node:console";
 
 export class ContractData {
   name: string;
@@ -49,7 +50,7 @@ export class Diamond {
     this.protocolVersion = -1n
   }
 
-  static async create(network: Network, client: BlockExplorerClient, abis: AbiSet) {
+  static async create (network: Network, client: BlockExplorerClient, abis: AbiSet) {
     const addresses = {
       mainnet: '0x32400084c286cf3e17e7b677ea9583e60a000324',
       sepolia: '0x9a6de0f62aa270a8bcb1e2610078650d539b1ef9'
@@ -102,7 +103,7 @@ export class Diamond {
   }
 
   async calculateDiff (changes: FacetChanges, client: BlockExplorerClient): Promise<DiamondDiff> {
-    const diff = new DiamondDiff(this.protocolVersion.toString(), changes.newProtocolVersion);
+    const diff = new DiamondDiff(this.protocolVersion.toString(), changes.newProtocolVersion, changes.orphanedSelectors);
 
     for (const [address, data] of this.facetToContractData.entries()) {
       const change = changes.facetAffected(data.name)
@@ -125,6 +126,7 @@ export class Diamond {
 export class DiamondDiff {
   private oldVersion: string;
   private newVersion: string;
+  private orphanedSelectors: string[]
   changes: {
     oldAddress: string,
     newAddress: string,
@@ -136,9 +138,10 @@ export class DiamondDiff {
   }[]
 
 
-  constructor (oldVersion: string, newVersion: string) {
+  constructor (oldVersion: string, newVersion: string, orphanedSelectors: string[]) {
     this.oldVersion = oldVersion
     this.newVersion = newVersion
+    this.orphanedSelectors = orphanedSelectors
     this.changes = []
   }
 
@@ -211,6 +214,15 @@ export class DiamondDiff {
 
       const newFunctions = await Promise.all(newFunctionsPromises)
       table.push(['New Functions', newFunctions.length ? newFunctions.join(', ') : 'None'])
+
+      const removedFunctions = await Promise.all(change.oldSelectors
+        .filter(s => this.orphanedSelectors.includes(s))
+        .map(async selector => {
+          await abis.fetch(change.newAddress)
+          return abis.signatureForSelector(selector)
+        }))
+
+      table.push(['Removed functions', removedFunctions.length ? removedFunctions.join(', ') : 'None'])
       table.push(['To compare code', `pnpm validate show-diff ${upgradeDir} ${change.name}`])
 
       strings.push(table.toString())

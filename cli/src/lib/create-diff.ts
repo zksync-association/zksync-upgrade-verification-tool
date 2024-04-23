@@ -3,7 +3,7 @@ import {AbiSet} from "./abi-set.js";
 import {Diamond, type DiamondDiff} from "./diamond.js";
 import path from "node:path";
 import {lookupAndParse} from "./importer.js";
-import {FacetChanges} from "./reports/facet-changes.js";
+import {FacetChanges} from "./facet-changes.js";
 import type {Network} from "./constants.js";
 
 type CreateDiffResponse = {
