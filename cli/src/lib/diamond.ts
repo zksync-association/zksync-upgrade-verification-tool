@@ -116,7 +116,6 @@ export class DiamondDiff {
   }
 
   async writeCodeDiff (baseDirPath: string, filter: string[]): Promise<void> {
-
     for (const {name, oldData, newData} of this.changes) {
       if (filter.length > 0 && !filter.includes(name)) {
         continue
@@ -165,8 +164,7 @@ export class DiamondDiff {
 
       const newFunctions = await Promise.all(newFunctionsPromises)
       table.push(['New Functions', newFunctions.length ? newFunctions.join(', ') : 'None'])
-
-      table.push(['To compare code', `pnpm validate download-diff --facets=${change.name} ${upgradeDir} <path/to/target/folder>`])
+      table.push(['To compare code', `pnpm validate show-diff ${upgradeDir} ${change.name}`])
 
       strings.push(table.toString())
     }

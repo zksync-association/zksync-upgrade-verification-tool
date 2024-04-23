@@ -1,8 +1,8 @@
 import yargs from "yargs";
 import {hideBin} from "yargs/helpers";
-import {listCommand} from "../commands";
+import {listCommand, showDiff} from "../commands";
 import {type Network, printIntro} from ".";
-import {snapshot} from "../commands/snapshot.js";
+import {checkCommand} from "../commands/checkCommand.js";
 import * as console from "node:console";
 import {downloadCode} from "../commands/download.js";
 
@@ -58,7 +58,35 @@ export const cli = async () => {
         if (!yargs.ethscankey) {
           throw new Error('Etherscan api key not provided')
         }
-        await snapshot(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDirectory)
+        await checkCommand(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDirectory)
+      }
+    )
+    .command(
+      'show-diff <upgradeDir> <facetName>',
+      'Shows the diff for an specific contract',
+      (yargs) =>
+        yargs
+          .positional('upgradeDir', {
+            describe: "FolderName of the upgrade to check",
+            type: "string",
+            demandOption: true,
+          })
+          .positional('facetName', {
+            describe: "Name of the facet to show diff",
+            type: "string",
+            demandOption: true,
+          })
+          .option('network', {
+            alias: 'n',
+            describe: 'network to check',
+            type: 'string',
+            default: 'mainnet'
+          }),
+      (yargs) => {
+        if (!yargs.ethscankey) {
+          throw new Error('Etherscan api key not provided')
+        }
+        showDiff(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDir, yargs.facetName)
       }
     )
     .command(
