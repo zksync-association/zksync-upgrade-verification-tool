@@ -8,6 +8,7 @@ import type {BlockExplorerClient} from "./block-explorer-client.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import CliTable from "cli-table3";
+import type {Network} from "./constants.js";
 
 export class ContractData {
   name: string;
@@ -21,6 +22,7 @@ export class ContractData {
 
 export class Diamond {
   private addr: string;
+  private protocolVersion: bigint;
   private abis: AbiSet
 
   selectorToFacet: Map<string, string>
@@ -28,12 +30,23 @@ export class Diamond {
   facetToContractData: Map<string, ContractData>
 
 
-  constructor (addr: string, abis: AbiSet) {
+  private constructor (addr: string, abis: AbiSet) {
     this.addr = addr
     this.abis = abis
     this.selectorToFacet = new Map()
     this.facetToSelectors = new Map()
     this.facetToContractData = new Map()
+    this.protocolVersion = -1n
+  }
+
+  static async create(network: Network, client: BlockExplorerClient, abis: AbiSet) {
+    const addresses = {
+      mainnet: '0x32400084c286cf3e17e7b677ea9583e60a000324',
+      sepolia: '0x9a6de0f62aa270a8bcb1e2610078650d539b1ef9'
+    }
+    const diamond = new Diamond(addresses[network], abis)
+    await diamond.init(client)
+    return diamond
   }
 
 
@@ -64,10 +77,22 @@ export class Diamond {
       this.facetToContractData.set(facet.addr, source)
     })
     await Promise.all(promises)
+
+    const contractVersionData = await contractRead(this.addr, '0x33ce93fe')
+    const protocolVersion = decodeFunctionResult({
+      abi,
+      functionName: 'getProtocolVersion',
+      data: contractVersionData as `0x${string}`
+    })
+
+    if (typeof protocolVersion !== 'bigint') {
+      throw new Error('Protocol version should be a number')
+    }
+    this.protocolVersion = protocolVersion
   }
 
   async calculateDiff (changes: FacetChanges, client: BlockExplorerClient): Promise<DiamondDiff> {
-    const diff = new DiamondDiff();
+    const diff = new DiamondDiff(this.protocolVersion.toString(), changes.newProtocolVersion);
 
     for (const [address, data] of this.facetToContractData.entries()) {
       const change = changes.facetAffected(data.name)
@@ -88,6 +113,8 @@ export class Diamond {
 
 
 export class DiamondDiff {
+  private oldVersion: string;
+  private newVersion: string;
   changes: {
     oldAddress: string,
     newAddress: string,
@@ -99,7 +126,9 @@ export class DiamondDiff {
   }[]
 
 
-  constructor () {
+  constructor (oldVersion: string, newVersion: string) {
+    this.oldVersion = oldVersion
+    this.newVersion = newVersion
     this.changes = []
   }
 
@@ -142,9 +171,17 @@ export class DiamondDiff {
   }
 
   async toCliReport (abis: AbiSet, upgradeDir: string): Promise<string> {
-    const strings = ['Diamond Upgrades: \n']
+    const strings = ['L1 upgrades: \n']
 
+    const metadataTable = new CliTable({
+      head: ['Metadata'],
+      style: {compact: true}
+    })
+    metadataTable.push(['Old Version', this.oldVersion])
+    metadataTable.push(['New Version', this.newVersion])
+    strings.push(metadataTable.toString())
 
+    strings.push('Diamond upgrades:')
     for (const change of this.changes) {
       const table = new CliTable({
         head: [change.name],

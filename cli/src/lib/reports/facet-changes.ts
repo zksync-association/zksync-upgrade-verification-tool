@@ -1,4 +1,4 @@
-import type {FacetCutsJson, FacetsJson} from "../../schema/index.js";
+import type {FacetCutsJson, FacetsJson, UpgradeManifest} from "../../schema/index.js";
 
 
 export type FacetData = {
@@ -8,16 +8,19 @@ export type FacetData = {
 }
 
 export class FacetChanges {
+  newProtocolVersion: string;
   facets: FacetData[]
-  constructor (facets: FacetData[]) {
+
+  constructor (newProtocolVersion: string, facets: FacetData[]) {
     this.facets = facets
+    this.newProtocolVersion = newProtocolVersion
   }
 
   facetAffected(name: string): FacetData | undefined {
     return this.facets.find(f => f.name === name)
   }
 
-  static fromFile(jsonCuts: FacetCutsJson, facets: FacetsJson): FacetChanges {
+  static fromFile(common: UpgradeManifest, jsonCuts: FacetCutsJson, facets: FacetsJson): FacetChanges {
     const keys = Object.keys(facets);
     const data = keys.map(facetName => {
       const facetDef = facets[facetName]
@@ -35,6 +38,6 @@ export class FacetChanges {
       }
     })
 
-    return new FacetChanges(data)
+    return new FacetChanges(common.protocolVersion.toString(), data)
   }
 }

@@ -61,7 +61,7 @@ export const cli = async () => {
           default: 'mainnet'
         }),
       async (yargs) => {
-        await checkCommand(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDirectory)
+        await checkCommand(yargs.ethscankey, yargs.network as Network, yargs.upgradeDirectory)
       }
     )
     .command(
@@ -86,7 +86,7 @@ export const cli = async () => {
             default: 'mainnet'
           }),
       (yargs) => {
-        contractDiff(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDir, yargs.facetName)
+        contractDiff(yargs.ethscankey, yargs.network as Network, yargs.upgradeDir, yargs.facetName)
       }
     )
     .command(
@@ -116,7 +116,7 @@ export const cli = async () => {
         }),
       (yargs) => {
         const facets = yargs.facets.split(',').map(f => f.trim()).filter(f => f.length > 0)
-        downloadCode(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDir, yargs.targetSourceCodeDir, facets)
+        downloadCode(yargs.ethscankey, yargs.network as Network, yargs.upgradeDir, yargs.targetSourceCodeDir, facets)
       }
     )
     .demandCommand(1, "Please specify a command")
