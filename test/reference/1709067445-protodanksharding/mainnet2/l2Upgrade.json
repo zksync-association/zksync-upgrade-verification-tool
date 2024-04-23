@@ -8,7 +8,7 @@
       "address": "0x0000000000000000000000000000000000008002"
     },
     {
-      "`name": "NonceHolder",
+      "name": "NonceHolder",
       "bytecodeHashes": [
         "0x010000e53b54bc7d1e273de73918fe1b12123c61e0fb0c1ab2ac94839d311029"
       ],
