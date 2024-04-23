@@ -9,7 +9,6 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import CliTable from "cli-table3";
 import type {Network} from "./constants.js";
-import * as console from "node:console";
 
 export class ContractData {
   name: string;
