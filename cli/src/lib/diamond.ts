@@ -62,7 +62,7 @@ export class Diamond {
 
   private async init (client: BlockExplorerClient) {
     const data = await contractRead(this.addr, '0xcdffacc67a0ed62700000000000000000000000000000000000000000000000000000000')
-    const facetsAddr = `0x${data.substring(26)}`
+    const facetsAddr = `0x${(data!).substring(26)}`
 
     const abi = await this.abis.fetch(facetsAddr)
 
@@ -70,7 +70,7 @@ export class Diamond {
     const rawFacets = decodeFunctionResult({
       abi,
       functionName: 'facets',
-      data: facetsData as `0x${string}`
+      data: facetsData
     })
 
     const facets = facetsResponseSchema.parse(rawFacets)
@@ -92,7 +92,7 @@ export class Diamond {
     const protocolVersion = decodeFunctionResult({
       abi,
       functionName: 'getProtocolVersion',
-      data: contractVersionData as `0x${string}`
+      data: contractVersionData
     })
 
     if (typeof protocolVersion !== 'bigint') {
