@@ -1,6 +1,6 @@
 import { retrieveDirNames } from "../lib";
-import path from "node:path";
-import Table from "cli-table3";
+import path from 'node:path';
+import Table from 'cli-table3';
 
 export const listCommand = async (directory: string, hideNonUpgrades = false) => {
   const cwd = process.cwd();

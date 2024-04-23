@@ -1,11 +1,10 @@
-import type {Network} from "../lib/index.js";
-import {createDiff} from "../lib/create-diff.js";
+import type {Network} from '../lib';
+import {compareCurrentStateWith} from '../lib';
 import {temporaryDirectory} from 'tempy'
 import { exec } from 'node:child_process'
-import * as console from "node:console";
 
 export const contractDiff = async (etherscanKey: string, network: Network, upgradeDirectory: string, facetName: string) => {
-  const { diff} = await createDiff(etherscanKey, network, upgradeDirectory)
+  const { diff} = await compareCurrentStateWith(etherscanKey, network, upgradeDirectory)
   const targetDir = temporaryDirectory({ prefix: 'zksync-era-upgrade-check' })
   await diff.writeCodeDiff(targetDir, [facetName])
 

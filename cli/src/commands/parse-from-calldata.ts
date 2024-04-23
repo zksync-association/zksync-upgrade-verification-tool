@@ -1,13 +1,11 @@
-import {lookupAndParse, type Network} from "../lib";
-import {AbiSet} from "../lib/abi-set";
-import path from "node:path";
-import {decodeFunctionData} from "viem";
-import {executeUpgradeSchema} from "../schema/execute-upgrade-schema";
-import {initCallDataSchema} from "../schema/init-call-data";
-import {Diamond} from "../lib/diamond.js";
-import {BlockExplorerClient} from "../lib/block-explorer-client.js";
+import path from 'node:path';
+import {decodeFunctionData} from 'viem';
+import {executeUpgradeSchema} from '../schema/execute-upgrade-schema';
+import {initCallDataSchema} from '../schema/init-call-data';
+import {BlockExplorerClient, Diamond, AbiSet, lookupAndParse, type Network} from '../lib';
 
-export async function parseFromCalldata(ethscanKey: string, upgradeDirectory: string, parentDirectory: string, network: Network): Promise<void> {
+// @ts-ignore
+export async function parseFromCalldata (ethscanKey: string, upgradeDirectory: string, parentDirectory: string, network: Network): Promise<void> {
   const l1Client = BlockExplorerClient.fromNetwork(ethscanKey, network)
   const l2Client = BlockExplorerClient.forL2()
   const l1Abis = new AbiSet(l1Client)
@@ -56,7 +54,7 @@ export async function parseFromCalldata(ethscanKey: string, upgradeDirectory: st
   const deployAddr = `0x${'0'.repeat(40 - hex.length)}${hex}`
   const deploySysContractsAbi = await l2Abis.fetch(deployAddr);
 
-  const { args: l2UpgradeArgs} = decodeFunctionData({
+  const {args: l2UpgradeArgs} = decodeFunctionData({
     abi: deploySysContractsAbi,
     data: parsed2.l2ProtocolUpgradeTx.data as `0x{string}`
   })

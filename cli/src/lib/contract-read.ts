@@ -1,4 +1,4 @@
-import {createPublicClient, type Hex, http} from "viem";
+import {createPublicClient, type Hex, http} from 'viem';
 
 export async function contractRead (target: string, callData: string): Promise<Hex> {
   const client = createPublicClient({

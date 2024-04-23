@@ -1,5 +1,5 @@
-import {type Abi, type AbiFunction, toFunctionSelector} from "viem";
-import type {BlockExplorerClient} from "./block-explorer-client.js";
+import {type Abi, type AbiFunction, toFunctionSelector} from 'viem';
+import type {BlockExplorerClient} from './block-explorer-client.js';
 
 export class AbiSet {
   private abis: Map<string, Abi>

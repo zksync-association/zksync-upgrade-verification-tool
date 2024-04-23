@@ -1,5 +1,5 @@
-import fs from "node:fs/promises";
-import path from "node:path";
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import {
   commonJsonSchema,
   type CryptoJson,
@@ -8,20 +8,20 @@ import {
   type L2UpgradeJson,
   type TransactionsJson,
   type UpgradeManifest
-} from "../schema";
-import {ZodError} from "zod";
-import {SCHEMAS} from "./parser";
-import type {Network} from "./constants.js";
+} from '../schema';
+import {ZodError} from 'zod';
+import {SCHEMAS} from './parser';
+import type {Network} from './constants';
 
 export const retrieveDirNames = async (targetDir: string) => {
   const items = await fs.readdir(targetDir, {withFileTypes: true});
   const directories = items.filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
 
   return await Promise.all(
-      directories.map(async (dir) => ({
-        name: dir,
-        parsed: await isUpgradeBlob(path.join(targetDir, dir)),
-      }))
+    directories.map(async (dir) => ({
+      name: dir,
+      parsed: await isUpgradeBlob(path.join(targetDir, dir)),
+    }))
   );
 };
 
@@ -32,13 +32,13 @@ const isUpgradeBlob = async (
   const files = items.filter((file) => file === "common.json");
 
   if (files.length !== 1) {
-    return { valid: false };
+    return {valid: false};
   }
 
   try {
     const commonJson = JSON.parse(await fs.readFile(`${filePath}/common.json`, "utf-8"));
     const parsed = commonJsonSchema.parse(commonJson);
-    return { valid: true, parsed };
+    return {valid: true, parsed};
   } catch (e) {
     if (e instanceof ZodError) {
       process.env.DEBUG === "1" && console.error(e.message);
@@ -46,7 +46,7 @@ const isUpgradeBlob = async (
       console.error(e);
     }
     // TODO: Add a logging system and add debug logs for parse failure
-    return { valid: false };
+    return {valid: false};
   }
 };
 
@@ -59,7 +59,7 @@ export type UpgradeDescriptor = {
   l2Upgrade?: L2UpgradeJson
 }
 
-function translateNetwork(n: Network) {
+function translateNetwork (n: Network) {
   if (n === 'mainnet') {
     return 'mainnet2'
   }
@@ -69,7 +69,7 @@ function translateNetwork(n: Network) {
   throw new Error(`Unknown network: ${n}`)
 }
 
-export const lookupAndParse = async (targetDir: string, network: Network) : Promise<UpgradeDescriptor> => {
+export const lookupAndParse = async (targetDir: string, network: Network): Promise<UpgradeDescriptor> => {
   const networkPath = translateNetwork(network)
 
   const commonPath = path.join(targetDir, 'common.json')

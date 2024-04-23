@@ -1,4 +1,4 @@
-import type {Abi} from "viem";
+import type {Abi} from 'viem';
 import {
   sourceCodeResponseSchema, sourceCodeSchema,
 } from "../schema/source-code-response.js";

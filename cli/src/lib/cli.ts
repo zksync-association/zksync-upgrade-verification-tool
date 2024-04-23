@@ -1,10 +1,8 @@
 import yargs from "yargs";
 import {hideBin} from "yargs/helpers";
-import {listCommand, contractDiff} from "../commands";
-import {type Network, printIntro} from ".";
-import {checkCommand} from "../commands/check-command.js";
+import {NetworkSchema, printIntro} from ".";
 import * as console from "node:console";
-import {downloadCode} from "../commands/download-code-command.js";
+import {downloadCode, checkCommand, listCommand, contractDiff} from "../commands";
 import * as process from "node:process";
 
 export const cli = async () => {
@@ -61,7 +59,7 @@ export const cli = async () => {
           default: 'mainnet'
         }),
       async (yargs) => {
-        await checkCommand(yargs.ethscankey, yargs.network as Network, yargs.upgradeDirectory)
+        await checkCommand(yargs.ethscankey, NetworkSchema.parse(yargs.network), yargs.upgradeDirectory)
       }
     )
     .command(
@@ -86,7 +84,7 @@ export const cli = async () => {
             default: 'mainnet'
           }),
       (yargs) => {
-        contractDiff(yargs.ethscankey, yargs.network as Network, yargs.upgradeDir, yargs.facetName)
+        contractDiff(yargs.ethscankey, NetworkSchema.parse(yargs.network), yargs.upgradeDir, yargs.facetName)
       }
     )
     .command(
@@ -116,7 +114,7 @@ export const cli = async () => {
         }),
       (yargs) => {
         const facets = yargs.facets.split(',').map(f => f.trim()).filter(f => f.length > 0)
-        downloadCode(yargs.ethscankey, yargs.network as Network, yargs.upgradeDir, yargs.targetSourceCodeDir, facets)
+        downloadCode(yargs.ethscankey, NetworkSchema.parse(yargs.network), yargs.upgradeDir, yargs.targetSourceCodeDir, facets)
       }
     )
     .demandCommand(1, "Please specify a command")

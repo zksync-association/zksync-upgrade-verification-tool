@@ -1,17 +1,20 @@
-import {BlockExplorerClient} from "./block-explorer-client.js";
-import {AbiSet} from "./abi-set.js";
-import {Diamond, type DiamondDiff} from "./diamond.js";
-import path from "node:path";
-import {lookupAndParse} from "./importer.js";
-import {FacetChanges} from "./facet-changes.js";
-import type {Network} from "./constants.js";
+import {
+  AbiSet,
+  BlockExplorerClient,
+  Diamond,
+  FacetChanges,
+  lookupAndParse,
+  type DiamondDiff,
+  type Network
+} from '.';
+import path from 'node:path';
 
 type CreateDiffResponse = {
   diff: DiamondDiff,
   l1Abis: AbiSet
 }
 
-export async function createDiff(etherscanKey: string, network: Network, upgradeDirectory: string): Promise<CreateDiffResponse> {
+export async function compareCurrentStateWith (etherscanKey: string, network: Network, upgradeDirectory: string): Promise<CreateDiffResponse> {
   const client = BlockExplorerClient.fromNetwork(etherscanKey, network)
   const l1Abis = new AbiSet(client)
   const diamond = await Diamond.create(network, client, l1Abis)
