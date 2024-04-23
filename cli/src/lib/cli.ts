@@ -1,10 +1,11 @@
 import yargs from "yargs";
 import {hideBin} from "yargs/helpers";
-import {listCommand, showDiff} from "../commands";
+import {listCommand, contractDiff} from "../commands";
 import {type Network, printIntro} from ".";
 import {checkCommand} from "../commands/checkCommand.js";
 import * as console from "node:console";
 import {downloadCode} from "../commands/download.js";
+import * as process from "node:process";
 
 export const cli = async () => {
   printIntro();
@@ -17,10 +18,15 @@ export const cli = async () => {
       demandOption: false,
       default: ".",
     })
+    .middleware((yargs) => {
+      if (!yargs.ethscankey) {
+        yargs.ethscankey = process.env.ETHERSCAN_API_KEY
+      }
+    }, true)
     .option("ethscankey", {
       describe: 'Api key for etherscan',
       type: 'string',
-      demandOption: false,
+      demandOption: true,
       default: process.env.ETHERSCAN_API_KEY
     })
     .command(
@@ -55,9 +61,6 @@ export const cli = async () => {
           default: 'mainnet'
         }),
       async (yargs) => {
-        if (!yargs.ethscankey) {
-          throw new Error('Etherscan api key not provided')
-        }
         await checkCommand(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDirectory)
       }
     )
@@ -83,10 +86,7 @@ export const cli = async () => {
             default: 'mainnet'
           }),
       (yargs) => {
-        if (!yargs.ethscankey) {
-          throw new Error('Etherscan api key not provided')
-        }
-        showDiff(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDir, yargs.facetName)
+        contractDiff(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDir, yargs.facetName)
       }
     )
     .command(
@@ -115,9 +115,6 @@ export const cli = async () => {
           default: 'mainnet'
         }),
       (yargs) => {
-        if (!yargs.ethscankey) {
-          throw new Error('Etherscan api key not provided')
-        }
         const facets = yargs.facets.split(',').map(f => f.trim()).filter(f => f.length > 0)
         downloadCode(yargs.ethscankey, '0x32400084c286cf3e17e7b677ea9583e60a000324', yargs.network as Network, yargs.upgradeDir, yargs.targetSourceCodeDir, facets)
       }

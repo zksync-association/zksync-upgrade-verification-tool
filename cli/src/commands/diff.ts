@@ -4,7 +4,7 @@ import {temporaryDirectory} from 'tempy'
 import { exec } from 'node:child_process'
 import * as console from "node:console";
 
-export const showDiff = async (etherscanKey: string, addr: string, network: Network, upgradeDirectory: string, facetName: string) => {
+export const contractDiff = async (etherscanKey: string, addr: string, network: Network, upgradeDirectory: string, facetName: string) => {
   const { diff} = await createDiff(addr, etherscanKey, network, upgradeDirectory)
   const targetDir = temporaryDirectory({ prefix: 'zksync-era-upgrade-check' })
   await diff.writeCodeDiff(targetDir, [facetName])
