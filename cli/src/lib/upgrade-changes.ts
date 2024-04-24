@@ -1,5 +1,4 @@
-import type {FacetCutsJson, FacetsJson, TransactionsJson, UpgradeManifest} from "../schema/index.js";
-import {ADDRESS_ZERO} from "./constants.js";
+import type {FacetsJson, TransactionsJson, UpgradeManifest} from "../schema/index.js";
 import {VerifierContract} from "./verifier.js";
 
 
@@ -38,11 +37,6 @@ export class UpgradeChanges {
 
   removeFacet(selectors: string[]) {
     this.orphanedSelectors.push(...selectors)
-  }
-
-
-  addVerifier(addr: string) {
-
   }
 
   static fromFiles(common: UpgradeManifest, txFile: TransactionsJson, facets: FacetsJson): UpgradeChanges {
