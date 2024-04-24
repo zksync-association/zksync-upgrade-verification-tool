@@ -1,5 +1,5 @@
 import {type Abi, createPublicClient, decodeFunctionResult, encodeFunctionData, type Hex, http} from 'viem';
-import {ZodType, z, type TypeOf} from "zod";
+import type {ZodType, TypeOf} from "zod";
 
 export async function contractReadRaw (target: string, callData: string): Promise<Hex> {
   const client = createPublicClient({

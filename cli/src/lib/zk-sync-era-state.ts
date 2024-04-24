@@ -1,5 +1,5 @@
 import type {AbiSet} from "./abi-set.js";
-import {contractRead, contractReadRaw} from "./contract-read-raw.js";
+import {contractRead, contractReadRaw} from "./contract-read.js";
 import {facetsResponseSchema} from "../schema/new-facets.js";
 import type {RawSourceCode} from "../schema/source-code-response.js";
 import type {UpgradeChanges} from "./upgrade-changes.js";
@@ -8,7 +8,7 @@ import type {Network} from "./constants.js";
 import {VerifierContract} from "./verifier.js";
 import {verifierParamsSchema} from "../schema/index.js";
 import {z} from "zod";
-import {type Abi} from "viem";
+import type {Abi} from "viem";
 import {ZkSyncEraDiff} from "./zk-sync-era-diff.js";
 
 const MAIN_CONTRACT_FUNCTIONS = {
