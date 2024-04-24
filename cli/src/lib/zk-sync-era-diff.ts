@@ -10,7 +10,7 @@ export class ZkSyncEraDiff {
   private oldVersion: string;
   private newVersion: string;
   private orphanedSelectors: string[];
-  changes: {
+  facetChanges: {
     oldAddress: string;
     newAddress: string;
     name: string;
@@ -33,7 +33,7 @@ export class ZkSyncEraDiff {
     this.oldVersion = oldVersion;
     this.newVersion = newVersion;
     this.orphanedSelectors = orphanedSelectors;
-    this.changes = [];
+    this.facetChanges = [];
     this.oldVerifier = oldVerifier;
     this.newVerifier = newVerifier;
   }
@@ -47,7 +47,7 @@ export class ZkSyncEraDiff {
     oldSelectors: string[],
     newSelectors: string[]
   ): void {
-    this.changes.push({
+    this.facetChanges.push({
       oldAddress,
       newAddress,
       name,
@@ -63,13 +63,20 @@ export class ZkSyncEraDiff {
     const baseDirNew = path.join(baseDirPath, "new");
 
     await this.writeFacets(filter, baseDirOld, baseDirNew);
+    await this.writeVerifier(baseDirOld, baseDirNew, client);
+  }
 
+  private async writeVerifier (baseDirOld: string, baseDirNew: string, client: BlockExplorerClient) {
+    const oldVerifierPath = path.join(baseDirOld, 'verifier')
     const oldVerifierCode = await this.oldVerifier.getCode(client)
+    await oldVerifierCode.writeSources(oldVerifierPath)
+    const newVerifierPath = path.join(baseDirNew, 'verifier')
     const newVerifierCode = await this.newVerifier.getCode(client)
+    await newVerifierCode.writeSources(newVerifierPath)
   }
 
   private async writeFacets (filter: string[], baseDirOld: string, baseDirNew: string) {
-    for (const {name, oldData, newData} of this.changes) {
+    for (const {name, oldData, newData} of this.facetChanges) {
       if (filter.length > 0 && !filter.includes(name)) {
         continue;
       }
@@ -77,26 +84,14 @@ export class ZkSyncEraDiff {
       const dirOld = path.join(baseDirOld, "facets", name);
       const dirNew = path.join(baseDirNew, "facets", name);
 
-      for (const fileName in oldData.sources.sources) {
-        const {content} = oldData.sources.sources[fileName];
-        path.parse(fileName).dir;
-        const filePath = path.join(dirOld, fileName);
-        await fs.mkdir(path.parse(filePath).dir, {recursive: true});
-        await fs.writeFile(filePath, content);
-      }
-
-      for (const fileName in newData.sources.sources) {
-        const {content} = newData.sources.sources[fileName];
-        const filePath = path.join(dirNew, fileName);
-        await fs.mkdir(path.parse(filePath).dir, {recursive: true});
-        await fs.writeFile(filePath, content);
-      }
+      await oldData.writeSources(dirOld)
+      await newData.writeSources(dirNew)
     }
   }
 
   async toCliReport(abis: AbiSet, upgradeDir: string): Promise<string> {
     const title = "Upgrade report:";
-    const strings = [`${title} \n`, "=".repeat(title.length)];
+    const strings = [`${title}`, "=".repeat(title.length), ''];
 
     const metadataTable = new CliTable({
       head: ["Metadata"],
@@ -107,11 +102,11 @@ export class ZkSyncEraDiff {
     strings.push(metadataTable.toString());
 
     strings.push("L1 Main contract Diamond upgrades:");
-    if (this.changes.length === 0) {
+    if (this.facetChanges.length === 0) {
       strings.push("No diamond changes", "");
     }
 
-    for (const change of this.changes) {
+    for (const change of this.facetChanges) {
       const table = new CliTable({
         head: [change.name],
         style: { compact: true },
