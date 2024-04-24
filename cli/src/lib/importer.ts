@@ -89,21 +89,21 @@ export const lookupAndParse = async (
   const crypto = SCHEMAS["crypto.json"].parse(JSON.parse(cryptoBuf.toString()));
 
   const facetCutsPath = path.join(targetDir, networkPath, "facetCuts.json");
-  let facetCuts: FacetCutsJson | null;
+  let facetCuts: FacetCutsJson | undefined;
   try {
     const facetCutsBuf = await fs.readFile(facetCutsPath);
     facetCuts = SCHEMAS["facetCuts.json"].parse(JSON.parse(facetCutsBuf.toString()));
   } catch (e) {
-    facetCuts = null;
+    facetCuts = undefined;
   }
 
   const facetsPath = path.join(targetDir, networkPath, "facets.json");
-  let facets: FacetsJson | null;
+  let facets: FacetsJson | undefined;
   try {
     const facetCutsBuf = await fs.readFile(facetsPath);
     facets = SCHEMAS["facets.json"].parse(JSON.parse(facetCutsBuf.toString()));
   } catch (e) {
-    facets = null;
+    facets = undefined;
   }
 
   const l2UpgradePath = path.join(targetDir, networkPath, "l2Upgrade.json");
