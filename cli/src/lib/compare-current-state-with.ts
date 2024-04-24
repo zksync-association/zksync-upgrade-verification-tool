@@ -1,23 +1,23 @@
 import {
   AbiSet,
   BlockExplorerClient,
-  Diamond,
-  FacetChanges,
+  ZkSyncEraState,
+  UpgradeChanges,
   lookupAndParse,
-  type DiamondDiff,
+  type ZkSyncEraDiff,
   type Network
 } from '.';
 import path from 'node:path';
 
 type CreateDiffResponse = {
-  diff: DiamondDiff,
+  diff: ZkSyncEraDiff,
   l1Abis: AbiSet
 }
 
 export async function compareCurrentStateWith (etherscanKey: string, network: Network, upgradeDirectory: string): Promise<CreateDiffResponse> {
   const client = BlockExplorerClient.fromNetwork(etherscanKey, network)
   const l1Abis = new AbiSet(client)
-  const diamond = await Diamond.create(network, client, l1Abis)
+  const diamond = await ZkSyncEraState.create(network, client, l1Abis)
 
 
   const basePath = path.resolve(process.cwd(), upgradeDirectory);
@@ -31,7 +31,7 @@ export async function compareCurrentStateWith (etherscanKey: string, network: Ne
     throw new Error('No diamond upgrades')
   }
 
-  const facetChanges = FacetChanges.fromFile(upgrade.commonData, upgrade.facetCuts, upgrade.facets)
+  const facetChanges = UpgradeChanges.fromFiles(upgrade.commonData, upgrade.transactions, upgrade.facets)
 
   return {
     diff: await diamond.calculateDiff(facetChanges, client),

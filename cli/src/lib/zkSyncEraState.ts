@@ -1,22 +1,36 @@
 import type {AbiSet} from "./abi-set.js";
-import {contractRead} from "./contract-read.js";
-import {decodeFunctionResult} from "viem";
+import {contractReadRaw, contractRead} from "./contract-read-raw.js";
 import {facetsResponseSchema} from "../schema/new-facets.js";
 import type {RawSourceCode} from "../schema/source-code-response.js";
-import type {FacetChanges} from "./facet-changes.js";
+import type {UpgradeChanges} from "./upgrade-changes.js";
 import type {BlockExplorerClient} from "./block-explorer-client.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import CliTable from "cli-table3";
 import type {Network} from "./constants.js";
+import {VerifierContract} from "./verifier.js";
+import {verifierParamsSchema} from "../schema/index.js";
+import * as console from "node:console";
+import {z} from "zod";
+import {type Abi, encodeFunctionData} from "viem";
+
+const MAIN_CONTRACT_FUNCTIONS = {
+  facetAddress: 'facetAddress',
+  facets: 'facets',
+  getProtocolVersion: 'getProtocolVersion',
+  getVerifier: 'getVerifier',
+  getVerifierParams: 'getVerifierParams'
+}
 
 export class ContractData {
   name: string;
   sources: RawSourceCode;
+  addr: string;
 
-  constructor (name: string, sources: RawSourceCode) {
+  constructor (name: string, sources: RawSourceCode, addr: string) {
     this.name = name
     this.sources = sources
+    this.addr = addr
   }
 }
 
@@ -30,7 +44,7 @@ export class ContractData {
  * const myDiamond = await Diamond.create('mainnet', client, abis)
  * ```
  */
-export class Diamond {
+export class ZkSyncEraState {
   private addr: string;
   private protocolVersion: bigint;
   private abis: AbiSet
@@ -38,6 +52,8 @@ export class Diamond {
   selectorToFacet: Map<string, string>
   facetToSelectors: Map<string, string[]>
   facetToContractData: Map<string, ContractData>
+
+  private verifier?: VerifierContract
 
 
   private constructor (addr: string, abis: AbiSet) {
@@ -54,55 +70,76 @@ export class Diamond {
       mainnet: '0x32400084c286cf3e17e7b677ea9583e60a000324',
       sepolia: '0x9a6de0f62aa270a8bcb1e2610078650d539b1ef9'
     }
-    const diamond = new Diamond(addresses[network], abis)
+    const diamond = new ZkSyncEraState(addresses[network], abis)
     await diamond.init(client)
     return diamond
   }
 
 
-  private async init (client: BlockExplorerClient) {
-    const data = await contractRead(this.addr, '0xcdffacc67a0ed62700000000000000000000000000000000000000000000000000000000')
+  private async findGetterFacetAbi(): Promise<Abi> {
+    // Manually encode calldata becasue at this stage there
+    // is no address to get the abi
+    const facetAddressSelector = 'cdffacc6'
+    const facetsSelector = '7a0ed627'
+    const callData = `0x${facetAddressSelector}${facetsSelector}${'0'.repeat(72 - facetAddressSelector.length - facetsSelector.length)}`
+    const data = await contractReadRaw(this.addr, callData)
+
+    // Manually decode address to get abi.
     const facetsAddr = `0x${data.substring(26)}`
+    return await this.abis.fetch(facetsAddr)
+  }
 
-    const abi = await this.abis.fetch(facetsAddr)
+  private async initializeFacets (abi: Abi, client: BlockExplorerClient): Promise<void> {
+    const facets = await contractRead(this.addr, 'facets', abi, facetsResponseSchema)
 
-    const facetsData = await contractRead(this.addr, '0x7a0ed627')
-    const rawFacets = decodeFunctionResult({
-      abi,
-      functionName: 'facets',
-      data: facetsData
-    })
+    await Promise.all(facets.map(async facet => {
+      // Get source code
+      const source = await client.getSourceCode(facet.addr)
+      this.facetToContractData.set(facet.addr, source)
 
-    const facets = facetsResponseSchema.parse(rawFacets)
-
-    for (const facet of facets) {
+      // Set facet and selectors data
       this.facetToSelectors.set(facet.addr, facet.selectors)
       for (const selector of facet.selectors) {
         this.selectorToFacet.set(selector, facet.addr)
       }
-    }
-
-    const promises = facets.map(async facet => {
-      const source = await client.getSourceCode(facet.addr)
-      this.facetToContractData.set(facet.addr, source)
-    })
-    await Promise.all(promises)
-
-    const contractVersionData = await contractRead(this.addr, '0x33ce93fe')
-    const protocolVersion = decodeFunctionResult({
-      abi,
-      functionName: 'getProtocolVersion',
-      data: contractVersionData
-    })
-
-    if (typeof protocolVersion !== 'bigint') {
-      throw new Error('Protocol version should be a number')
-    }
-    this.protocolVersion = protocolVersion
+    }))
   }
 
-  async calculateDiff (changes: FacetChanges, client: BlockExplorerClient): Promise<DiamondDiff> {
-    const diff = new DiamondDiff(this.protocolVersion.toString(), changes.newProtocolVersion, changes.orphanedSelectors);
+  private async initializeProtolVersion (abi: Abi): Promise<void> {
+    this.protocolVersion = await contractRead(this.addr, 'getProtocolVersion', abi, z.bigint())
+  }
+
+  private async initializeVerifier (abi: Abi): Promise<void> {
+    const verifierAddress = await contractRead(this.addr, 'getVerifier', abi, z.string())
+    const verifierParams =  await contractRead(this.addr, 'getVerifierParams', abi, verifierParamsSchema)
+    this.verifier = new VerifierContract(
+      verifierAddress,
+      verifierParams.recursionCircuitsSetVksHash,
+      verifierParams.recursionLeafLevelVkHash,
+      verifierParams.recursionNodeLevelVkHash
+    )
+  }
+
+  private async init (client: BlockExplorerClient) {
+    const abi = await this.findGetterFacetAbi()
+
+    await this.initializeFacets(abi, client)
+    await this.initializeProtolVersion(abi)
+    await this.initializeVerifier(abi)
+  }
+
+  async calculateDiff (changes: UpgradeChanges, client: BlockExplorerClient): Promise<ZkSyncEraDiff> {
+    if (!this.verifier) {
+      throw new Error('Missing verifier data')
+    }
+
+    const diff = new ZkSyncEraDiff(
+      this.protocolVersion.toString(),
+      changes.newProtocolVersion,
+      changes.orphanedSelectors,
+      this.verifier,
+      changes.verifier
+    );
 
     for (const [address, data] of this.facetToContractData.entries()) {
       const change = changes.facetAffected(data.name)
@@ -117,12 +154,13 @@ export class Diamond {
       }
     }
 
+
     return diff
   }
 }
 
 
-export class DiamondDiff {
+export class ZkSyncEraDiff {
   private oldVersion: string;
   private newVersion: string;
   private orphanedSelectors: string[]
@@ -136,12 +174,23 @@ export class DiamondDiff {
     newSelectors: string[]
   }[]
 
+  private oldVerifier: VerifierContract
+  private newVerifier: VerifierContract
 
-  constructor (oldVersion: string, newVersion: string, orphanedSelectors: string[]) {
+
+  constructor (
+    oldVersion: string,
+    newVersion: string,
+    orphanedSelectors: string[],
+    oldVerifier: VerifierContract,
+    newVerifier: VerifierContract
+  ) {
     this.oldVersion = oldVersion
     this.newVersion = newVersion
     this.orphanedSelectors = orphanedSelectors
     this.changes = []
+    this.oldVerifier = oldVerifier
+    this.newVerifier = newVerifier
   }
 
   add (oldAddress: string, newAddress: string, name: string, oldData: ContractData, newData: ContractData, oldSelectors: string[], newSelectors: string[]): void {
@@ -224,6 +273,22 @@ export class DiamondDiff {
 
       strings.push(table.toString())
     }
+
+
+    strings.push('', 'Verifier:')
+    const verifierTable = new CliTable({
+      head: ['Attribute', 'Current value', 'Upgrade value'],
+      style: {compact: true}
+    })
+
+    console.log(this.oldVerifier)
+    console.log(this.newVerifier)
+
+    verifierTable.push(['Address', this.oldVerifier.address, this.newVerifier.address])
+    verifierTable.push(['Recursion node level VkHash', this.oldVerifier.recursionNodeLevelVkHash, this.newVerifier.recursionNodeLevelVkHash])
+    verifierTable.push(['Recursion circuits set VksHash', this.oldVerifier.recursionCircuitsSetVksHash, this.newVerifier.recursionCircuitsSetVksHash])
+    verifierTable.push(['Recursion leaf level VkHash', this.oldVerifier.recursionLeafLevelVkHash, this.newVerifier.recursionLeafLevelVkHash])
+    strings.push(verifierTable.toString())
 
     return strings.join('\n')
   }

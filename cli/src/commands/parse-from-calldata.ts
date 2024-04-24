@@ -2,7 +2,7 @@ import path from 'node:path';
 import {decodeFunctionData} from 'viem';
 import {executeUpgradeSchema} from '../schema/execute-upgrade-schema';
 import {initCallDataSchema} from '../schema/init-call-data';
-import {BlockExplorerClient, Diamond, AbiSet, lookupAndParse, type Network} from '../lib';
+import {BlockExplorerClient, ZkSyncEraState, AbiSet, lookupAndParse, type Network} from '../lib';
 
 // @ts-ignore
 export async function parseFromCalldata (ethscanKey: string, upgradeDirectory: string, parentDirectory: string, network: Network): Promise<void> {
@@ -21,7 +21,7 @@ export async function parseFromCalldata (ethscanKey: string, upgradeDirectory: s
     data
   } = upgrade.transactions.governanceOperation.calls[0]
 
-  const diamond = await Diamond.create(network, l1Client, l1Abis)
+  const diamond = await ZkSyncEraState.create(network, l1Client, l1Abis)
 
   const facetAddr = diamond.selectorToFacet.get(data.substring(0, 10))
 

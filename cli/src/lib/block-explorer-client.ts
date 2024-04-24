@@ -4,7 +4,7 @@ import {
 } from "../schema/source-code-response.js";
 import {account20String, getAbiSchema} from "../schema/index.js";
 import {ETHERSCAN_ENDPOINTS, type Network} from "./constants.js";
-import {ContractData} from "./diamond.js";
+import {ContractData} from "./zkSyncEraState.js";
 
 export class BlockExplorerClient {
   private apiKey: string
@@ -74,7 +74,7 @@ export class BlockExplorerClient {
     const rawSourceCode = result[0].SourceCode.replace(/^\{\{/, '{').replace(/}}$/, '}')
     const SourceCode = sourceCodeSchema.parse(JSON.parse(rawSourceCode))
 
-    const data = new ContractData(result[0].ContractName, SourceCode)
+    const data = new ContractData(result[0].ContractName, SourceCode, contractAddr)
 
     this.sourceCache.set(rawAddress, data)
     return data;

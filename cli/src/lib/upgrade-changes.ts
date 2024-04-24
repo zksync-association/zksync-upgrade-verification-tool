@@ -1,4 +1,6 @@
-import type {FacetCutsJson, FacetsJson, UpgradeManifest} from "../schema/index.js";
+import type {FacetCutsJson, FacetsJson, TransactionsJson, UpgradeManifest} from "../schema/index.js";
+import {ADDRESS_ZERO} from "./constants.js";
+import {VerifierContract} from "./verifier.js";
 
 
 export type FacetData = {
@@ -7,15 +9,17 @@ export type FacetData = {
   selectors: string[]
 }
 
-export class FacetChanges {
+export class UpgradeChanges {
   newProtocolVersion: string;
   facets: FacetData[]
   orphanedSelectors: string[]
+  verifier: VerifierContract;
 
-  constructor (newProtocolVersion: string) {
+  constructor (newProtocolVersion: string, verifier: VerifierContract) {
     this.newProtocolVersion = newProtocolVersion
     this.facets = []
     this.orphanedSelectors = []
+    this.verifier = verifier
   }
 
   facetAffected(name: string): FacetData | undefined {
@@ -36,8 +40,21 @@ export class FacetChanges {
     this.orphanedSelectors.push(...selectors)
   }
 
-  static fromFile(common: UpgradeManifest, jsonCuts: FacetCutsJson, facets: FacetsJson): FacetChanges {
-    const instance = new FacetChanges(common.protocolVersion.toString())
+
+  addVerifier(addr: string) {
+
+  }
+
+  static fromFiles(common: UpgradeManifest, txFile: TransactionsJson, facets: FacetsJson): UpgradeChanges {
+    const jsonCuts = txFile.transparentUpgrade.facetCuts
+    const verifier = new VerifierContract(
+      txFile.proposeUpgradeTx.verifier,
+      txFile.proposeUpgradeTx.verifierParams.recursionCircuitsSetVksHash,
+      txFile.proposeUpgradeTx.verifierParams.recursionNodeLevelVkHash,
+      txFile.proposeUpgradeTx.verifierParams.recursionLeafLevelVkHash
+    )
+
+    const instance = new UpgradeChanges(common.protocolVersion.toString(), verifier)
     const facetDefs = Object.keys(facets).map((name) => {
       return {
         name: name,
@@ -60,6 +77,7 @@ export class FacetChanges {
         throw new Error('Upgrade action not suported yet')
       }
     }
+
 
     return instance
   }
