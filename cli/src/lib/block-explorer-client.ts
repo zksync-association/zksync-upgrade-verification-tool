@@ -4,7 +4,7 @@ import {
 } from "../schema/source-code-response.js";
 import {account20String, getAbiSchema} from "../schema/index.js";
 import {ETHERSCAN_ENDPOINTS, type Network} from "./constants.js";
-import {ContractData} from "./zkSyncEraState.js";
+import {ContractData} from "./zk-sync-era-state.js";
 
 export class BlockExplorerClient {
   private apiKey: string

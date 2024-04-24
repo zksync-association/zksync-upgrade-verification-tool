@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import type {AbiSet} from "./abi-set.js";
 import CliTable from "cli-table3";
 import console from "node:console";
-import {ContractData} from "./zkSyncEraState.js";
+import {ContractData} from "./zk-sync-era-state.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
