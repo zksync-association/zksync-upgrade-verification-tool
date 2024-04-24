@@ -1,6 +1,5 @@
 import type { VerifierContract } from "./verifier.js";
 import path from "node:path";
-import fs from "node:fs/promises";
 import type { AbiSet } from "./abi-set.js";
 import CliTable from "cli-table3";
 import type { ContractData } from "./zk-sync-era-state.js";
@@ -67,21 +66,23 @@ export class ZkSyncEraDiff {
     const baseDirNew = path.join(baseDirPath, "new");
 
     await this.writeFacets(filter, baseDirOld, baseDirNew);
-    await this.writeVerifier(baseDirOld, baseDirNew, client);
+    await this.writeVerifier(filter, baseDirOld, baseDirNew, client);
   }
 
-  private async writeVerifier(baseDirOld: string, baseDirNew: string, client: BlockExplorerClient) {
-    const oldVerifierPath = path.join(baseDirOld, "verifier");
-    const oldVerifierCode = await this.oldVerifier.getCode(client);
-    await oldVerifierCode.writeSources(oldVerifierPath);
-    const newVerifierPath = path.join(baseDirNew, "verifier");
-    const newVerifierCode = await this.newVerifier.getCode(client);
-    await newVerifierCode.writeSources(newVerifierPath);
+  private async writeVerifier(filter: string[], baseDirOld: string, baseDirNew: string, client: BlockExplorerClient) {
+    if (filter.length === 0 || filter.includes("verifier")) {
+      const oldVerifierPath = path.join(baseDirOld, "verifier");
+      const oldVerifierCode = await this.oldVerifier.getCode(client);
+      await oldVerifierCode.writeSources(oldVerifierPath);
+      const newVerifierPath = path.join(baseDirNew, "verifier");
+      const newVerifierCode = await this.newVerifier.getCode(client);
+      await newVerifierCode.writeSources(newVerifierPath);
+    }
   }
 
   private async writeFacets(filter: string[], baseDirOld: string, baseDirNew: string) {
     for (const { name, oldData, newData } of this.facetChanges) {
-      if (filter.length > 0 && !filter.includes(name)) {
+      if (filter.length > 0 && !filter.includes(`facet:${name}`)) {
         continue;
       }
 
@@ -143,7 +144,7 @@ export class ZkSyncEraDiff {
         "Removed functions",
         removedFunctions.length ? removedFunctions.join(", ") : "None",
       ]);
-      table.push(["To compare code", `pnpm validate show-diff ${upgradeDir} ${change.name}`]);
+      table.push(["To compare code", `pnpm validate facet-diff ${upgradeDir} ${change.name}`]);
 
       strings.push(table.toString());
     }
@@ -170,6 +171,10 @@ export class ZkSyncEraDiff {
       this.oldVerifier.recursionLeafLevelVkHash,
       this.newVerifier.recursionLeafLevelVkHash,
     ]);
+    verifierTable.push(['Show contract diff', {
+      content: `pnpm validate verifier-diff ${upgradeDir}`,
+      colSpan: 2,
+    }])
     strings.push(verifierTable.toString());
 
     return strings.join("\n");
