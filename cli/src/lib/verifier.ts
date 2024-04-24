@@ -1,5 +1,5 @@
-import type {ContractData} from "./zk-sync-era-state.js";
-import type {BlockExplorerClient} from "./block-explorer-client.js";
+import type { ContractData } from "./zk-sync-era-state.js";
+import type { BlockExplorerClient } from "./block-explorer-client.js";
 
 export class VerifierContract {
   address: string;
@@ -19,7 +19,7 @@ export class VerifierContract {
     this.recursionNodeLevelVkHash = recursionNodeLevelVkHash;
   }
 
-  async getCode (client: BlockExplorerClient): Promise<ContractData> {
-    return client.getSourceCode(this.address)
+  async getCode(client: BlockExplorerClient): Promise<ContractData> {
+    return client.getSourceCode(this.address);
   }
 }

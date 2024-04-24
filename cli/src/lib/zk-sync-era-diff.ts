@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import type { AbiSet } from "./abi-set.js";
 import CliTable from "cli-table3";
 import type { ContractData } from "./zk-sync-era-state.js";
-import type {BlockExplorerClient} from "./block-explorer-client.js";
+import type { BlockExplorerClient } from "./block-explorer-client.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -58,7 +58,11 @@ export class ZkSyncEraDiff {
     });
   }
 
-  async writeCodeDiff(baseDirPath: string, filter: string[], client: BlockExplorerClient): Promise<void> {
+  async writeCodeDiff(
+    baseDirPath: string,
+    filter: string[],
+    client: BlockExplorerClient
+  ): Promise<void> {
     const baseDirOld = path.join(baseDirPath, "old");
     const baseDirNew = path.join(baseDirPath, "new");
 
@@ -66,17 +70,17 @@ export class ZkSyncEraDiff {
     await this.writeVerifier(baseDirOld, baseDirNew, client);
   }
 
-  private async writeVerifier (baseDirOld: string, baseDirNew: string, client: BlockExplorerClient) {
-    const oldVerifierPath = path.join(baseDirOld, 'verifier')
-    const oldVerifierCode = await this.oldVerifier.getCode(client)
-    await oldVerifierCode.writeSources(oldVerifierPath)
-    const newVerifierPath = path.join(baseDirNew, 'verifier')
-    const newVerifierCode = await this.newVerifier.getCode(client)
-    await newVerifierCode.writeSources(newVerifierPath)
+  private async writeVerifier(baseDirOld: string, baseDirNew: string, client: BlockExplorerClient) {
+    const oldVerifierPath = path.join(baseDirOld, "verifier");
+    const oldVerifierCode = await this.oldVerifier.getCode(client);
+    await oldVerifierCode.writeSources(oldVerifierPath);
+    const newVerifierPath = path.join(baseDirNew, "verifier");
+    const newVerifierCode = await this.newVerifier.getCode(client);
+    await newVerifierCode.writeSources(newVerifierPath);
   }
 
-  private async writeFacets (filter: string[], baseDirOld: string, baseDirNew: string) {
-    for (const {name, oldData, newData} of this.facetChanges) {
+  private async writeFacets(filter: string[], baseDirOld: string, baseDirNew: string) {
+    for (const { name, oldData, newData } of this.facetChanges) {
       if (filter.length > 0 && !filter.includes(name)) {
         continue;
       }
@@ -84,14 +88,14 @@ export class ZkSyncEraDiff {
       const dirOld = path.join(baseDirOld, "facets", name);
       const dirNew = path.join(baseDirNew, "facets", name);
 
-      await oldData.writeSources(dirOld)
-      await newData.writeSources(dirNew)
+      await oldData.writeSources(dirOld);
+      await newData.writeSources(dirNew);
     }
   }
 
   async toCliReport(abis: AbiSet, upgradeDir: string): Promise<string> {
     const title = "Upgrade report:";
-    const strings = [`${title}`, "=".repeat(title.length), ''];
+    const strings = [`${title}`, "=".repeat(title.length), ""];
 
     const metadataTable = new CliTable({
       head: ["Metadata"],

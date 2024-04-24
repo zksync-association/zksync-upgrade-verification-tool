@@ -1,9 +1,14 @@
 import type { Abi } from "viem";
-import {account20String, getAbiSchema, sourceCodeResponseSchema, sourceCodeSchema} from "../schema/index.js";
+import {
+  account20String,
+  getAbiSchema,
+  sourceCodeResponseSchema,
+  sourceCodeSchema,
+} from "../schema/index.js";
 import { ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
 import { ContractData } from "./zk-sync-era-state.js";
 import * as console from "node:console";
-import {z, type ZodType} from "zod";
+import type { z, ZodType } from "zod";
 
 export class BlockExplorerClient {
   private apiKey: string;
@@ -17,18 +22,21 @@ export class BlockExplorerClient {
     this.baseUri = baseUri;
     this.abiCache = new Map();
     this.sourceCache = new Map();
-    this.callCount = 0
+    this.callCount = 0;
   }
 
-  private async fetch <T extends ZodType>(params: Record<string, string>, parser: T): Promise<z.infer<typeof parser>>  {
+  private async fetch<T extends ZodType>(
+    params: Record<string, string>,
+    parser: T
+  ): Promise<z.infer<typeof parser>> {
     if (this.callCount % 5 === 4) {
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
     const query = new URLSearchParams(params).toString();
 
     const response = await fetch(`${this.baseUri}?${query}`);
-    this.callCount++
+    this.callCount++;
     return parser.parse(await response.json());
   }
 
@@ -40,12 +48,15 @@ export class BlockExplorerClient {
 
     const contractAddr = account20String.parse(rawAddress);
 
-    const { message, result } = await this.fetch({
-      module: "contract",
-      action: "getabi",
-      address: contractAddr,
-      apikey: this.apiKey,
-    }, getAbiSchema)
+    const { message, result } = await this.fetch(
+      {
+        module: "contract",
+        action: "getabi",
+        address: contractAddr,
+        apikey: this.apiKey,
+      },
+      getAbiSchema
+    );
 
     if (message !== "OK") {
       throw new Error(`Failed to fetch ABI for ${rawAddress}`);
@@ -64,12 +75,15 @@ export class BlockExplorerClient {
 
     const contractAddr = account20String.parse(rawAddress);
 
-    const { message, result } = await this.fetch({
-      module: "contract",
-      action: "getsourcecode",
-      address: contractAddr,
-      apikey: this.apiKey,
-    }, sourceCodeResponseSchema)
+    const { message, result } = await this.fetch(
+      {
+        module: "contract",
+        action: "getsourcecode",
+        address: contractAddr,
+        apikey: this.apiKey,
+      },
+      sourceCodeResponseSchema
+    );
 
     if (message !== "OK") {
       throw new Error(`Failed to Source Code for ${rawAddress}`);

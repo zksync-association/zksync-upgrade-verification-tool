@@ -1,5 +1,5 @@
-import {z} from "zod";
-import {numericString} from "./common";
+import { z } from "zod";
+import { numericString } from "./common";
 
 export const getAbiSchema = z.object({
   status: numericString,
@@ -30,7 +30,7 @@ export const sourceCodeResponseSchema = z.object({
 
 export const sourceCodeSchema = z.object({
   language: z.string(),
-  sources: z.record(z.string(), z.object({content: z.string()})),
+  sources: z.record(z.string(), z.object({ content: z.string() })),
 });
 
 export type RawSourceCode = z.infer<typeof sourceCodeSchema>;
