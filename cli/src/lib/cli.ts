@@ -1,7 +1,7 @@
 import yargs from "yargs";
 import {hideBin} from "yargs/helpers";
 import {NetworkSchema} from ".";
-import {downloadCode, checkCommand, listCommand, contractDiff} from "../commands";
+import {downloadCode, checkCommand, contractDiff} from "../commands";
 import * as process from "node:process";
 
 export const cli = async () => {
@@ -23,7 +23,6 @@ export const cli = async () => {
       describe: 'Api key for etherscan',
       type: 'string',
       demandOption: true,
-      default: process.env.ETHERSCAN_API_KEY
     })
     .command(
       'check <upgradeDirectory>',

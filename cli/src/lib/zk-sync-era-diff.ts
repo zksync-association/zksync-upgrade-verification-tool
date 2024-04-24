@@ -77,7 +77,8 @@ export class ZkSyncEraDiff {
   }
 
   async toCliReport (abis: AbiSet, upgradeDir: string): Promise<string> {
-    const strings = ['L1 upgrades: \n']
+    const title = 'Upgrade report:'
+    const strings = [`${title} \n`, '='.repeat(title.length)]
 
     const metadataTable = new CliTable({
       head: ['Metadata'],
@@ -87,7 +88,12 @@ export class ZkSyncEraDiff {
     metadataTable.push(['Proposed protocol version', this.newVersion])
     strings.push(metadataTable.toString())
 
-    strings.push('Diamond upgrades:')
+
+    strings.push('L1 Main contract Diamond upgrades:')
+    if (this.changes.length === 0) {
+      strings.push('No diamond changes', '')
+    }
+
     for (const change of this.changes) {
       const table = new CliTable({
         head: [change.name],
@@ -125,9 +131,6 @@ export class ZkSyncEraDiff {
       head: ['Attribute', 'Current value', 'Upgrade value'],
       style: {compact: true}
     })
-
-    console.log(this.oldVerifier)
-    console.log(this.newVerifier)
 
     verifierTable.push(['Address', this.oldVerifier.address, this.newVerifier.address])
     verifierTable.push(['Recursion node level VkHash', this.oldVerifier.recursionNodeLevelVkHash, this.newVerifier.recursionNodeLevelVkHash])

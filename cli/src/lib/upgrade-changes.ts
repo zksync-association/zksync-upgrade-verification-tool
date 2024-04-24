@@ -39,7 +39,7 @@ export class UpgradeChanges {
     this.orphanedSelectors.push(...selectors)
   }
 
-  static fromFiles(common: UpgradeManifest, txFile: TransactionsJson, facets: FacetsJson): UpgradeChanges {
+  static fromFiles(common: UpgradeManifest, txFile: TransactionsJson, facets?: FacetsJson): UpgradeChanges {
     const jsonCuts = txFile.transparentUpgrade.facetCuts
     const verifier = new VerifierContract(
       txFile.proposeUpgradeTx.verifier,
@@ -49,26 +49,29 @@ export class UpgradeChanges {
     )
 
     const instance = new UpgradeChanges(common.protocolVersion.toString(), verifier)
-    const facetDefs = Object.keys(facets).map((name) => {
-      return {
-        name: name,
-        ...facets[name]
-      }
-    });
 
-    for (const cut of jsonCuts) {
-      if (cut.action === 2) {
-        instance.removeFacet(cut.selectors)
-      } else
-      if (cut.action === 0) {
-        const facetDef = facetDefs.find(f => f.address === cut.facet)
-        if (!facetDef) {
-          throw new Error(`Inconsistent data. ${cut.facet} not present in facets.json`)
+    if (facets) {
+      const facetDefs = Object.keys(facets).map((name) => {
+        return {
+          name: name,
+          ...facets[name]
         }
-        instance.addFacet(facetDef.name, facetDef.address, cut.selectors)
-      } else {
-        // TODO: Handle upgrade
-        throw new Error('Upgrade action not suported yet')
+      });
+
+      for (const cut of jsonCuts) {
+        if (cut.action === 2) {
+          instance.removeFacet(cut.selectors)
+        } else
+        if (cut.action === 0) {
+          const facetDef = facetDefs.find(f => f.address === cut.facet)
+          if (!facetDef) {
+            throw new Error(`Inconsistent data. ${cut.facet} not present in facets.json`)
+          }
+          instance.addFacet(facetDef.name, facetDef.address, cut.selectors)
+        } else {
+          // TODO: Handle upgrade
+          throw new Error('Upgrade action not suported yet')
+        }
       }
     }
 

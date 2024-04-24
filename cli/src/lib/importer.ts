@@ -54,8 +54,8 @@ export type UpgradeDescriptor = {
   commonData: UpgradeManifest,
   transactions: TransactionsJson,
   crypto: CryptoJson,
-  facetCuts: FacetCutsJson | null,
-  facets: FacetsJson | null,
+  facetCuts?: FacetCutsJson,
+  facets?: FacetsJson,
   l2Upgrade?: L2UpgradeJson
 }
 

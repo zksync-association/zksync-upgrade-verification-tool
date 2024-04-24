@@ -24,13 +24,6 @@ export async function compareCurrentStateWith (etherscanKey: string, network: Ne
   const upgrade = await lookupAndParse(basePath, network);
 
 
-  // TODO: Remvove this
-  // Right now we are taking care only of diamond changes. When we add l2 changes this is going to be removed
-  // to consider all changes at the same time.
-  if (!upgrade.facets || !upgrade.facetCuts) {
-    throw new Error('No diamond upgrades')
-  }
-
   const facetChanges = UpgradeChanges.fromFiles(upgrade.commonData, upgrade.transactions, upgrade.facets)
 
   return {
