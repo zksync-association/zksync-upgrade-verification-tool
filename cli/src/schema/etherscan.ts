@@ -6,4 +6,3 @@ export const getAbiSchema = z.object({
   message: z.enum(["OK", "NOTOK"]),
   result: z.string(),
 });
-

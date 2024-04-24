@@ -29,19 +29,21 @@ export const transactionsSchema = z.object({
   upgradeAddress: account20String,
   protocolVersion: z.string(),
   upgradeTimestamp: z.string(),
-  scheduleTransparentOperation: z.optional(hashString) ,
+  scheduleTransparentOperation: z.optional(hashString),
   executeOperation: z.optional(hashString),
-  governanceOperation: z.optional(z.object({
-    calls: z.array(
-      z.object({
-        target: account20String,
-        value: z.number(),
-        data: hashString,
-      })
-    ),
-    predecessor: bytes32Hash,
-    salt: bytes32Hash,
-  })),
+  governanceOperation: z.optional(
+    z.object({
+      calls: z.array(
+        z.object({
+          target: account20String,
+          value: z.number(),
+          data: hashString,
+        })
+      ),
+      predecessor: bytes32Hash,
+      salt: bytes32Hash,
+    })
+  ),
   transparentUpgrade: z.object({
     facetCuts: facetCutsSchema,
     initAddress: account20String,

@@ -1,5 +1,4 @@
-import {z} from "zod";
-
+import { z } from "zod";
 
 export const initCallDataSchema = z.object({
   l2ProtocolUpgradeTx: z.object({
@@ -14,7 +13,7 @@ export const initCallDataSchema = z.object({
     nonce: z.bigint(),
     value: z.bigint(),
     reserved: z.array(z.bigint()),
-    data: z.string()
+    data: z.string(),
   }),
   bootloaderHash: z.string(),
   defaultAccountHash: z.string(),
@@ -22,13 +21,13 @@ export const initCallDataSchema = z.object({
   verifierParams: z.object({
     recursionNodeLevelVkHash: z.string(),
     recursionLeafLevelVkHash: z.string(),
-    recursionCircuitsSetVksHash: z.string()
+    recursionCircuitsSetVksHash: z.string(),
   }),
   l1ContractsUpgradeCalldata: z.string(),
   postUpgradeCalldata: z.string(),
   upgradeTimestamp: z.bigint(),
   newProtocolVersion: z.bigint(),
-  newAllowList: z.string()
-})
+  newAllowList: z.string(),
+});
 
 // export type InitCallData = z.infer<typeof initCallDataSchema>

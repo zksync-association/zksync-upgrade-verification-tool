@@ -5,19 +5,21 @@ import pkg from "../package.json" assert { type: "json" };
 
 const execAsync = promisify(exec);
 
-const etherscanKey = process.env.ETHERSCAN_API_KEY
+const etherscanKey = process.env.ETHERSCAN_API_KEY;
 
 describe("CLI Output Test Suite", () => {
   it("should error on invalid option", async () => {
-    await expect(execAsync(`pnpm validate --ethscankey='${etherscanKey}' check reference/test-upgrade-mini --badOption defect`)).rejects.toThrowError(
-      "Unknown argument: badOption"
-    );
+    await expect(
+      execAsync(
+        `pnpm validate --ethscankey='${etherscanKey}' check reference/test-upgrade-mini --badOption defect`
+      )
+    ).rejects.toThrowError("Unknown argument: badOption");
   });
   //
   it("should error on invalid command", async () => {
-    await expect(execAsync(`pnpm validate --ethscankey='${etherscanKey}' defect`)).rejects.toThrowError(
-      "Unknown argument: defect"
-    );
+    await expect(
+      execAsync(`pnpm validate --ethscankey='${etherscanKey}' defect`)
+    ).rejects.toThrowError("Unknown argument: defect");
   });
 
   it("should error on missing command", async () => {
@@ -42,20 +44,23 @@ describe("CLI Output Test Suite", () => {
         `pnpm validate --ethscankey='${etherscanKey}' check reference/test-upgrade-mini`
       );
 
-      expect(stdout).toMatch(/Current protocol version.+\d+/)
+      expect(stdout).toMatch(/Current protocol version.+\d+/);
       expect(stdout).toMatch(/Proposed protocol version.+1337/);
-      expect(stdout).toContain('Verifier:');
-      expect(stdout).toContain('L1 Main contract Diamond upgrades:');
-      expect(stdout).toContain('No diamond changes');
+      expect(stdout).toContain("Verifier:");
+      expect(stdout).toContain("L1 Main contract Diamond upgrades:");
+      expect(stdout).toContain("No diamond changes");
 
-      expect(stdout).toMatch(/Addres.+?0x[0-9a-fA-F]{40}.+?0x0{40}/)
-      expect(stdout).toMatch(/Recursion node level VkHash.+?0x[0-9a-fA-F]{64}.+?0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a/)
-      expect(stdout).toMatch(/Recursion circuits set VksHash.+?0x[0-9a-fA-F]{64}.+?0x0000000000000000000000000000000000000000000000000000000000000000/)
-      expect(stdout).toMatch(/Recursion leaf level VkHash.+?0x[0-9a-fA-F]{64}.+?0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080/)
+      expect(stdout).toMatch(/Addres.+?0x[0-9a-fA-F]{40}.+?0x0{40}/);
+      expect(stdout).toMatch(
+        /Recursion node level VkHash.+?0x[0-9a-fA-F]{64}.+?0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a/
+      );
+      expect(stdout).toMatch(
+        /Recursion circuits set VksHash.+?0x[0-9a-fA-F]{64}.+?0x0000000000000000000000000000000000000000000000000000000000000000/
+      );
+      expect(stdout).toMatch(
+        /Recursion leaf level VkHash.+?0x[0-9a-fA-F]{64}.+?0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080/
+      );
     });
-
-
-
 
     it.skip("should match snapshot", async ({ expect }) => {
       const { stdout } = await execAsync(

@@ -71,12 +71,7 @@
   },
   {
     "facet": "0x0000000000000000000000000000000000000000",
-    "selectors": [
-      "0x0c4dd810",
-      "0xce9dcf16",
-      "0x7739cbe7",
-      "0xa9a2d18a"
-    ],
+    "selectors": ["0x0c4dd810", "0xce9dcf16", "0x7739cbe7", "0xa9a2d18a"],
     "action": 2,
     "isFreezable": false
   },
@@ -165,12 +160,7 @@
   },
   {
     "facet": "0x9e3Fa34a10619fEDd7aE40A3fb86FA515fcfd269",
-    "selectors": [
-      "0x701f58c5",
-      "0xc3d93e7c",
-      "0x7f61885c",
-      "0x97c09d34"
-    ],
+    "selectors": ["0x701f58c5", "0xc3d93e7c", "0x7f61885c", "0x97c09d34"],
     "action": 0,
     "isFreezable": true
   }

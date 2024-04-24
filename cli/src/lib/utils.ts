@@ -1,10 +1,10 @@
-import cfonts from 'cfonts';
+import cfonts from "cfonts";
 
 export const printIntro = () => {
-  cfonts.say('zkSync Era\n Validator Tool', {
-    colors: ['red', "gray"],
-    font: 'block',
-    align: 'left',
+  cfonts.say("zkSync Era\n Validator Tool", {
+    colors: ["red", "gray"],
+    font: "block",
+    align: "left",
     // background: 'transparent',  // define the background color, you can also use `backgroundColor` here as key
     // letterSpacing: 1,           // define letter spacing
     // lineHeight: 1,              // define the line height
