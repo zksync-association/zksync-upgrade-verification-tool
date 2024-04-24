@@ -12,7 +12,6 @@ import {type Abi} from "viem";
 import {ZkSyncEraDiff} from "./zk-sync-era-diff.js";
 
 const MAIN_CONTRACT_FUNCTIONS = {
-  facetAddress: 'facetAddress',
   facets: 'facets',
   getProtocolVersion: 'getProtocolVersion',
   getVerifier: 'getVerifier',
@@ -87,7 +86,7 @@ export class ZkSyncEraState {
   }
 
   private async initializeFacets (abi: Abi, client: BlockExplorerClient): Promise<void> {
-    const facets = await contractRead(this.addr, 'facets', abi, facetsResponseSchema)
+    const facets = await contractRead(this.addr, MAIN_CONTRACT_FUNCTIONS.facets, abi, facetsResponseSchema)
 
     await Promise.all(facets.map(async facet => {
       // Get source code
@@ -103,12 +102,12 @@ export class ZkSyncEraState {
   }
 
   private async initializeProtolVersion (abi: Abi): Promise<void> {
-    this.protocolVersion = await contractRead(this.addr, 'getProtocolVersion', abi, z.bigint())
+    this.protocolVersion = await contractRead(this.addr, MAIN_CONTRACT_FUNCTIONS.getProtocolVersion, abi, z.bigint())
   }
 
   private async initializeVerifier (abi: Abi): Promise<void> {
-    const verifierAddress = await contractRead(this.addr, 'getVerifier', abi, z.string())
-    const verifierParams =  await contractRead(this.addr, 'getVerifierParams', abi, verifierParamsSchema)
+    const verifierAddress = await contractRead(this.addr, MAIN_CONTRACT_FUNCTIONS.getVerifier, abi, z.string())
+    const verifierParams =  await contractRead(this.addr, MAIN_CONTRACT_FUNCTIONS.getVerifierParams, abi, verifierParamsSchema)
     this.verifier = new VerifierContract(
       verifierAddress,
       verifierParams.recursionCircuitsSetVksHash,
