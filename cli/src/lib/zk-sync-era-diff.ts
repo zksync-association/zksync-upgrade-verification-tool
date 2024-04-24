@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import type { AbiSet } from "./abi-set.js";
 import CliTable from "cli-table3";
 import type { ContractData } from "./zk-sync-era-state.js";
+import type {BlockExplorerClient} from "./block-explorer-client.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -57,27 +58,37 @@ export class ZkSyncEraDiff {
     });
   }
 
-  async writeCodeDiff(baseDirPath: string, filter: string[]): Promise<void> {
-    for (const { name, oldData, newData } of this.changes) {
+  async writeCodeDiff(baseDirPath: string, filter: string[], client: BlockExplorerClient): Promise<void> {
+    const baseDirOld = path.join(baseDirPath, "old");
+    const baseDirNew = path.join(baseDirPath, "new");
+
+    await this.writeFacets(filter, baseDirOld, baseDirNew);
+
+    const oldVerifierCode = await this.oldVerifier.getCode(client)
+    const newVerifierCode = await this.newVerifier.getCode(client)
+  }
+
+  private async writeFacets (filter: string[], baseDirOld: string, baseDirNew: string) {
+    for (const {name, oldData, newData} of this.changes) {
       if (filter.length > 0 && !filter.includes(name)) {
         continue;
       }
 
-      const dirOld = path.join(baseDirPath, "old", name);
-      const dirNew = path.join(baseDirPath, "new", name);
+      const dirOld = path.join(baseDirOld, "facets", name);
+      const dirNew = path.join(baseDirNew, "facets", name);
 
       for (const fileName in oldData.sources.sources) {
-        const { content } = oldData.sources.sources[fileName];
+        const {content} = oldData.sources.sources[fileName];
         path.parse(fileName).dir;
         const filePath = path.join(dirOld, fileName);
-        await fs.mkdir(path.parse(filePath).dir, { recursive: true });
+        await fs.mkdir(path.parse(filePath).dir, {recursive: true});
         await fs.writeFile(filePath, content);
       }
 
       for (const fileName in newData.sources.sources) {
-        const { content } = newData.sources.sources[fileName];
+        const {content} = newData.sources.sources[fileName];
         const filePath = path.join(dirNew, fileName);
-        await fs.mkdir(path.parse(filePath).dir, { recursive: true });
+        await fs.mkdir(path.parse(filePath).dir, {recursive: true});
         await fs.writeFile(filePath, content);
       }
     }
