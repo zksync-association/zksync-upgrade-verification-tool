@@ -189,8 +189,8 @@ export class DiamondDiff {
       head: ['Metadata'],
       style: {compact: true}
     })
-    metadataTable.push(['Old Version', this.oldVersion])
-    metadataTable.push(['New Version', this.newVersion])
+    metadataTable.push(['Current protocol version', this.oldVersion])
+    metadataTable.push(['Proposed protocol version', this.newVersion])
     strings.push(metadataTable.toString())
 
     strings.push('Diamond upgrades:')
@@ -200,18 +200,16 @@ export class DiamondDiff {
         style: {compact: true}
       })
 
-      table.push(['Old address', change.oldAddress])
-      table.push(['New address', change.newAddress])
-      table.push(['New contract verified etherscan', 'Yes'])
+      table.push(['Current address', change.oldAddress])
+      table.push(['Upgrade address', change.newAddress])
+      table.push(['Proposed contract verified etherscan', 'Yes'])
 
-      const newFunctionsPromises = change.newSelectors
+      const newFunctions = await Promise.all(change.newSelectors
         .filter(s => !change.oldSelectors.includes(s))
-        .map(async s => {
+        .map(async selector => {
           await abis.fetch(change.newAddress)
-          return abis.signatureForSelector(s)
-        })
-
-      const newFunctions = await Promise.all(newFunctionsPromises)
+          return abis.signatureForSelector(selector)
+        }))
       table.push(['New Functions', newFunctions.length ? newFunctions.join(', ') : 'None'])
 
       const removedFunctions = await Promise.all(change.oldSelectors

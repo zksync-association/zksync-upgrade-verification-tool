@@ -1,13 +1,11 @@
 import yargs from "yargs";
 import {hideBin} from "yargs/helpers";
-import {NetworkSchema, printIntro} from ".";
-import * as console from "node:console";
+import {NetworkSchema} from ".";
 import {downloadCode, checkCommand, listCommand, contractDiff} from "../commands";
 import * as process from "node:process";
 
 export const cli = async () => {
-  printIntro();
-
+  // printIntro();
   await yargs(hideBin(process.argv))
     .option("directory", {
       describe: "Directory to list upgrades from",
@@ -27,23 +25,6 @@ export const cli = async () => {
       demandOption: true,
       default: process.env.ETHERSCAN_API_KEY
     })
-    .command(
-      "list",
-      "List Upgrades",
-      (yargs) =>
-        yargs.option("hide-non-upgrades", {
-          type: "boolean",
-          default: true,
-          describe: "Hide directories that do not contain upgrades",
-          alias: "hide",
-        }),
-      async ({directory, hideNonUpgrades}) => {
-        const dir = Array.isArray(directory) ? directory[0] : directory;
-        Array.isArray(directory) &&
-        console.log(`⚠️ Warning: Only the first directory will be used: ${dir}`);
-        await listCommand(directory, hideNonUpgrades);
-      }
-    )
     .command(
       'check <upgradeDirectory>',
       'get current state of contracts',
