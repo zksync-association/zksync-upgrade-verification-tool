@@ -10,3 +10,4 @@ export * from './zkSyncEraState.js'
 export * from './upgrade-changes.js'
 export * from './parser'
 export * from './utils'
+export * from "./zk-sync-era-diff.js";
