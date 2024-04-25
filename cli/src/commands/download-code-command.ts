@@ -1,6 +1,7 @@
-import { compareCurrentStateWith, type Network } from "../lib";
+import {BlockExplorerClient, compareCurrentStateWith, type Network} from "../lib";
 
 import { withSpinner } from "../lib/with-spinner.js";
+import {Octokit} from "@octokit/core";
 
 export async function downloadCode(
   etherscanKey: string,
@@ -9,9 +10,11 @@ export async function downloadCode(
   targetDir: string,
   l1Filter: string[]
 ): Promise<void> {
-  const { diff, client } = await withSpinner(() =>
+  const octo = new Octokit()
+  const l2Client = BlockExplorerClient.forL2()
+  const { diff, l1Client } = await withSpinner(() =>
     compareCurrentStateWith(etherscanKey, network, upgradeDirectory)
   );
-  await diff.writeCodeDiff(targetDir, l1Filter, client);
+  await diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, octo);
   console.log(`Ok! Contracts written in: ${targetDir}`);
 }

@@ -1,11 +1,6 @@
 import {Octokit} from '@octokit/core'
-import * as console from "node:console";
 import z from "zod";
 import path from "node:path";
-
-const octo = new Octokit({
-  auth: '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'
-})
 
 const githubContentParser = z.object({
   data: z.object({
@@ -13,7 +8,7 @@ const githubContentParser = z.object({
   })
 })
 
-async function downloadFile(path: string): Promise<string> {
+async function downloadFile(octo: Octokit, path: string): Promise<string> {
   const rawResponse = await octo.request('GET /repos/{owner}/{repo}/contents/{path}{?ref}', {
     owner: "matter-labs",
     repo: "era-contracts",
@@ -34,33 +29,32 @@ function extractDeps(sourceCode: string): string[] {
   const matches = sourceCode.matchAll(reg)
 
   const res: string[] = []
-  for(const match of matches) {
+  for (const match of matches) {
     res.push(match[1])
   }
 
   return res
 }
 
-async function downloadContract(rootPath: string, partial: Record<string, string>): Promise<Record<string, string>> {
+export async function downloadContract(
+  octo: Octokit,
+  rootPath: string,
+  partial: Record<string, { content: string }>
+): Promise<Record<string, { content: string }>> {
   if (partial[rootPath]) {
     return partial
   }
 
   const dir = path.parse(rootPath).dir
-  const content = await downloadFile(rootPath)
-  partial[rootPath] = content
+  const content = await downloadFile(octo, rootPath)
+  partial[rootPath] = {content}
 
   const deps = extractDeps(content)
 
   for (const dep of deps) {
     const depPath = path.normalize(path.join(dir, dep))
-    await downloadContract(depPath, partial)
+    await downloadContract(octo, depPath, partial)
   }
 
   return partial
 }
-
-const content = await downloadContract("system-contracts/contracts/NonceHolder.sol", {})
-const keys = Object.keys(content)
-console.log(keys)
-console.log(content[keys[0]])

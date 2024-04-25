@@ -1,8 +1,9 @@
-import type { Network } from "../lib";
+import {BlockExplorerClient, type Network} from "../lib";
 import { compareCurrentStateWith } from "../lib";
 import { temporaryDirectory } from "tempy";
 import { exec } from "node:child_process";
-import { withSpinner } from "../lib/with-spinner.js";
+import {withSpinner} from "../lib/with-spinner.js";
+import {Octokit} from "@octokit/core";
 
 export const contractDiff = async (
   etherscanKey: string,
@@ -10,11 +11,13 @@ export const contractDiff = async (
   upgradeDirectory: string,
   contractName: string
 ) => {
-  const targetDir = await withSpinner(async (): Promise<string> => {
-    const { diff, client } = await compareCurrentStateWith(etherscanKey, network, upgradeDirectory);
+  const octo = new Octokit()
+  const l2Client = BlockExplorerClient.forL2()
+  const targetDir = await withSpinner(async (): Promise<String> => {
+    const { diff, l1Client } = await compareCurrentStateWith(etherscanKey, network, upgradeDirectory)
     const targetDir = temporaryDirectory({ prefix: "zksync-era-upgrade-check" });
-    await diff.writeCodeDiff(targetDir, [contractName], client);
-    return targetDir;
+    await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, octo);
+    return targetDir
   });
 
   await new Promise((resolve, reject) => {

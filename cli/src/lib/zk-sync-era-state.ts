@@ -1,17 +1,20 @@
-import type { AbiSet } from "./abi-set.js";
-import { contractRead, contractReadRaw } from "./contract-read.js";
-import { facetsResponseSchema } from "../schema/new-facets.js";
-import type { SystemContractData, UpgradeChanges } from "./upgrade-changes.js";
-import type { BlockExplorerClient } from "./block-explorer-client.js";
-import type { Network } from "./constants.js";
-import { VerifierContract } from "./verifier.js";
-import { type RawSourceCode, verifierParamsSchema } from "../schema/index.js";
-import { z } from "zod";
-import { type Abi, createPublicClient, type Hex, http } from "viem";
-import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
+import type {AbiSet} from "./abi-set.js";
+import {contractRead, contractReadRaw} from "./contract-read.js";
+import {facetsResponseSchema} from "../schema/new-facets.js";
+import type {SystemContractData, UpgradeChanges} from "./upgrade-changes.js";
+import type {BlockExplorerClient} from "./block-explorer-client.js";
+import type {Network} from "./constants.js";
+import {VerifierContract} from "./verifier.js";
+import {type RawSourceCode, verifierParamsSchema} from "../schema/index.js";
+import {z} from "zod";
+import {type Abi, createPublicClient, type Hex, http} from "viem";
+import {ZkSyncEraDiff} from "./zk-sync-era-diff.js";
 import path from "node:path";
 import fs from "node:fs/promises";
-import { utils } from "zksync-ethers";
+import {utils} from 'zksync-ethers'
+import {SystemContractChange} from "./system-contract-change.js";
+import type {Octokit} from "@octokit/core";
+import {downloadContract} from "./github-download.js";
 
 const MAIN_CONTRACT_FUNCTIONS = {
   facets: "facets",
@@ -33,9 +36,9 @@ export class ContractData {
 
   async writeSources(targetDir: string): Promise<void> {
     for (const fileName in this.sources.sources) {
-      const { content } = this.sources.sources[fileName];
+      const {content} = this.sources.sources[fileName];
       const filePath = path.join(targetDir, fileName);
-      await fs.mkdir(path.parse(filePath).dir, { recursive: true });
+      await fs.mkdir(path.parse(filePath).dir, {recursive: true});
       await fs.writeFile(filePath, content);
     }
   }
@@ -195,10 +198,14 @@ export class ZkSyncEraState {
     }
 
     for (const systemContract of changes.systemCotractChanges) {
-      diff.addSystemContract(
-        await this.getCurrentSystemContractData(systemContract.address),
-        systemContract
-      );
+      const current = await this.getCurrentSystemContractData(systemContract.address)
+
+      diff.addSystemContract(new SystemContractChange(
+        systemContract.address,
+        systemContract.name,
+        current.codeHash,
+        systemContract.codeHash
+      ))
     }
 
     return diff;
@@ -206,19 +213,29 @@ export class ZkSyncEraState {
 
   async getCurrentSystemContractData(addr: Hex): Promise<SystemContractData> {
     const client = createPublicClient({
-      transport: http("https://mainnet.era.zksync.io"),
-    });
+      transport: http('https://mainnet.era.zksync.io')
+    })
 
-    const byteCode = await client.getBytecode({ address: addr });
+    const byteCode = await client.getBytecode({address: addr})
     if (!byteCode) {
-      throw new Error(`Error fetching bytecode for: ${addr}`);
+      throw new Error(`Error fetching bytecode for: ${addr}`)
     }
-    const hex = Buffer.from(utils.hashBytecode(byteCode)).toString("hex");
+    const hex = Buffer.from(utils.hashBytecode(byteCode)).toString('hex');
 
     return {
       address: addr,
       codeHash: `0x${hex}`,
-      name: "unknown",
-    };
+      name: "unknown"
+    }
+  }
+
+  async getSystemContractSourceCode(octo: Octokit, name: string, addr: string): Promise<ContractData> {
+    const source = await downloadContract(octo, `system-contracts/contracts/${name}.sol`, {})
+
+    return new ContractData(
+      name,
+      {sources: source, language: ''},
+      addr
+    )
   }
 }

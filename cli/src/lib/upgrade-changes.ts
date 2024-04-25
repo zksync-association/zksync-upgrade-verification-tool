@@ -1,11 +1,6 @@
-import type {
-  FacetsJson,
-  L2UpgradeJson,
-  TransactionsJson,
-  UpgradeManifest,
-} from "../schema/index.js";
-import { VerifierContract } from "./verifier.js";
-import type { Hex } from "viem";
+import type {FacetsJson, L2UpgradeJson, TransactionsJson, UpgradeManifest} from "../schema/index.js";
+import {VerifierContract} from "./verifier.js";
+import type {Hex} from "viem";
 
 export type FacetData = {
   name: string;
@@ -14,19 +9,19 @@ export type FacetData = {
 };
 
 export type SystemContractData = {
-  address: Hex;
-  codeHash: string;
-  name: string;
-};
+  address: Hex,
+  codeHash: Hex,
+  name: string
+}
 
 export class UpgradeChanges {
   newProtocolVersion: string;
   facets: FacetData[];
   orphanedSelectors: string[];
   verifier: VerifierContract;
-  systemCotractChanges: SystemContractData[];
+  systemCotractChanges: SystemContractData[]
 
-  constructor(newProtocolVersion: string, verifier: VerifierContract) {
+  constructor (newProtocolVersion: string, verifier: VerifierContract) {
     this.newProtocolVersion = newProtocolVersion;
     this.facets = [];
     this.orphanedSelectors = [];
@@ -34,11 +29,11 @@ export class UpgradeChanges {
     this.verifier = verifier;
   }
 
-  facetAffected(name: string): FacetData | undefined {
+  facetAffected (name: string): FacetData | undefined {
     return this.facets.find((f) => f.name === name);
   }
 
-  addFacet(facetName: string, facetAddr: string, selectors: string[]) {
+  addFacet (facetName: string, facetAddr: string, selectors: string[]) {
     this.orphanedSelectors = this.orphanedSelectors.filter(
       (selector) => !selectors.includes(selector)
     );
@@ -50,15 +45,15 @@ export class UpgradeChanges {
     });
   }
 
-  removeFacet(selectors: string[]) {
+  removeFacet (selectors: string[]) {
     this.orphanedSelectors.push(...selectors);
   }
 
-  addSystemContract(change: SystemContractData) {
-    this.systemCotractChanges.push(change);
+  addSystemContract (change: SystemContractData) {
+    this.systemCotractChanges.push(change)
   }
 
-  static fromFiles(
+  static fromFiles (
     common: UpgradeManifest,
     txFile: TransactionsJson,
     facets?: FacetsJson,
@@ -98,13 +93,13 @@ export class UpgradeChanges {
       }
     }
 
-    const systemContracts = l2Upgrade?.systemContracts || [];
+    const systemContracts = l2Upgrade?.systemContracts || []
     for (const contract of systemContracts) {
       instance.addSystemContract({
         name: contract.name,
-        codeHash: contract.bytecodeHashes[0],
-        address: contract.address as Hex,
-      });
+        codeHash: contract.bytecodeHashes[0] as Hex,
+        address: contract.address as Hex
+      })
     }
 
     return instance;
