@@ -5,16 +5,16 @@ import type {SystemContractData, UpgradeChanges} from "./upgrade-changes.js";
 import type {BlockExplorerClient} from "./block-explorer-client.js";
 import type {Network} from "./constants.js";
 import {VerifierContract} from "./verifier.js";
-import {type RawSourceCode, verifierParamsSchema} from "../schema/index.js";
+import {type RawSourceCode, type Sources, verifierParamsSchema} from "../schema/index.js";
 import {z} from "zod";
 import {type Abi, createPublicClient, type Hex, http} from "viem";
 import {ZkSyncEraDiff} from "./zk-sync-era-diff.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import {utils} from 'zksync-ethers'
-import {SystemContractChange} from "./system-contract-change.js";
+import {downloadContract} from "./github-download";
 import type {Octokit} from "@octokit/core";
-import {downloadContract} from "./github-download.js";
+import {SystemContractChange} from "./system-contract-change";
 
 const MAIN_CONTRACT_FUNCTIONS = {
   facets: "facets",
@@ -25,22 +25,35 @@ const MAIN_CONTRACT_FUNCTIONS = {
 
 export class ContractData {
   name: string;
-  sources: RawSourceCode;
+  sources: Sources;
   addr: string;
 
-  constructor(name: string, sources: RawSourceCode, addr: string) {
+  constructor(name: string, sources: Sources, addr: string) {
     this.name = name;
     this.sources = sources;
     this.addr = addr;
   }
 
   async writeSources(targetDir: string): Promise<void> {
-    for (const fileName in this.sources.sources) {
-      const {content} = this.sources.sources[fileName];
+    console.log(this.sources)
+    for (const fileName in this.sources) {
+      const {content} = this.sources[fileName];
       const filePath = path.join(targetDir, fileName);
       await fs.mkdir(path.parse(filePath).dir, {recursive: true});
       await fs.writeFile(filePath, content);
     }
+  }
+
+  remapKeys(oldPrefix: string, newPrefix: string): void {
+    const record = this.sources
+    const keys = Object.keys(record)
+    const newRecord: Sources = {}
+    for (const key in keys) {
+      let newKey = key.replace(new RegExp(`^${oldPrefix}`), newPrefix);
+      newRecord[newKey] = record[key]
+    }
+
+    this.sources = newRecord
   }
 }
 
@@ -227,15 +240,5 @@ export class ZkSyncEraState {
       codeHash: `0x${hex}`,
       name: "unknown"
     }
-  }
-
-  async getSystemContractSourceCode(octo: Octokit, name: string, addr: string): Promise<ContractData> {
-    const source = await downloadContract(octo, `system-contracts/contracts/${name}.sol`, {})
-
-    return new ContractData(
-      name,
-      {sources: source, language: ''},
-      addr
-    )
   }
 }

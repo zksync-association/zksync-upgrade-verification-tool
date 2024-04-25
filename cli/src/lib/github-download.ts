@@ -1,6 +1,7 @@
 import {Octokit} from '@octokit/core'
 import z from "zod";
 import path from "node:path";
+import type {Sources} from "../schema";
 
 const githubContentParser = z.object({
   data: z.object({
@@ -25,8 +26,9 @@ async function downloadFile(octo: Octokit, path: string): Promise<string> {
 }
 
 function extractDeps(sourceCode: string): string[] {
-  const reg = /import.*from\s+["'](.+)["'];?/g
-  const matches = sourceCode.matchAll(reg)
+  const reg1 = /import.*["'](.+)["'];?/g
+  // const reg2 = /import.*from\s+["'](.+)["'];?/g
+  const matches = sourceCode.matchAll(reg1)
 
   const res: string[] = []
   for (const match of matches) {
@@ -39,8 +41,8 @@ function extractDeps(sourceCode: string): string[] {
 export async function downloadContract(
   octo: Octokit,
   rootPath: string,
-  partial: Record<string, { content: string }>
-): Promise<Record<string, { content: string }>> {
+  partial: Sources
+): Promise<Sources> {
   if (partial[rootPath]) {
     return partial
   }

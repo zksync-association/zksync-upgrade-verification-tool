@@ -10,7 +10,7 @@ export async function downloadCode(
   targetDir: string,
   l1Filter: string[]
 ): Promise<void> {
-  const octo = new Octokit()
+  const octo = new Octokit({ auth: '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' })
   const l2Client = BlockExplorerClient.forL2()
   const { diff, l1Client } = await withSpinner(() =>
     compareCurrentStateWith(etherscanKey, network, upgradeDirectory)

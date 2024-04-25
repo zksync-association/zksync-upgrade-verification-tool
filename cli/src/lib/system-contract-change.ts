@@ -27,7 +27,7 @@ export class SystemContractChange {
 
     return new ContractData(
       this.name,
-      {sources: source, language: ''},
+      source,
       this.address
     )
   }

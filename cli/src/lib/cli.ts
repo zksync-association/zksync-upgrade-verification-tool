@@ -123,6 +123,11 @@ export const cli = async () => {
             type: "string",
             default: "",
           })
+          .option("systemContracts", {
+            alias: 'sc',
+            type: "string",
+            default: ""
+          })
           .option("verifier", {
             describe: "Filter to include verifier source code",
             type: "boolean",
@@ -144,6 +149,10 @@ export const cli = async () => {
         if (yargs.verifier) {
           filter.push("verifier");
         }
+
+        filter.push(
+          ...yargs.systemContracts.split(',').map(sc => sc.trim()).filter(sc => sc.length > 0).map(sc => `sc:${sc}`)
+        )
 
         downloadCode(
           yargs.ethscankey,
