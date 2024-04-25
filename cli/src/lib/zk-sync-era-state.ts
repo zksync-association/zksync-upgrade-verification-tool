@@ -34,7 +34,6 @@ export class ContractData {
   async writeSources(targetDir: string): Promise<void> {
     for (const fileName in this.sources.sources) {
       const { content } = this.sources.sources[fileName];
-      path.parse(fileName).dir;
       const filePath = path.join(targetDir, fileName);
       await fs.mkdir(path.parse(filePath).dir, { recursive: true });
       await fs.writeFile(filePath, content);

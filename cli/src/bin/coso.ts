@@ -1,29 +1,66 @@
-import { Octokit } from '@octokit/core'
+import {Octokit} from '@octokit/core'
 import * as console from "node:console";
+import z from "zod";
+import path from "node:path";
 
-const octo = new Octokit()
-
-const response1 = await octo.request('GET /repos/{owner}/{repo}/contents/{path}{?ref}', {
-  owner: "matter-labs",
-  repo: "era-contracts",
-  path: "system-contracts/contracts",
-  ref: "e77971dba8f589b625e72e69dd7e33ccbe697cc0",
-  headers: {
-    'X-GitHub-Api-Version': '2022-11-28'
-  }
+const octo = new Octokit({
+  auth: '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'
 })
 
-// const response2 = await octo.request('GET /repos/{owner}/{repo}/contents/{path}{?ref}', {
-//   owner: "matter-labs",
-//   repo: "era-contracts",
-//   path: "system-contracts/SystemContractsHashes.json",
-//   ref: "abfad6f1b75348052d38a7bf5ca596e6993d8d96",
-//   headers: {
-//     'X-GitHub-Api-Version': '2022-11-28'
-//   }
-// })
+const githubContentParser = z.object({
+  data: z.object({
+    content: z.string()
+  })
+})
 
-console.log(response1)
-// console.log(Buffer.from(response1.data.content, 'base64').toString())
+async function downloadFile(path: string): Promise<string> {
+  const rawResponse = await octo.request('GET /repos/{owner}/{repo}/contents/{path}{?ref}', {
+    owner: "matter-labs",
+    repo: "era-contracts",
+    path,
+    ref: "main",
+    headers: {
+      'X-GitHub-Api-Version': '2022-11-28'
+    }
+  })
 
-// console.log(Buffer.from(response2.data.content, 'base64').toString())
+  const parsed = githubContentParser.parse(rawResponse)
+
+  return Buffer.from(parsed.data.content, 'base64').toString('utf-8')
+}
+
+function extractDeps(sourceCode: string): string[] {
+  const reg = /import.*from\s+["'](.+)["'];?/g
+  const matches = sourceCode.matchAll(reg)
+
+  const res: string[] = []
+  for(const match of matches) {
+    res.push(match[1])
+  }
+
+  return res
+}
+
+async function downloadContract(rootPath: string, partial: Record<string, string>): Promise<Record<string, string>> {
+  if (partial[rootPath]) {
+    return partial
+  }
+
+  const dir = path.parse(rootPath).dir
+  const content = await downloadFile(rootPath)
+  partial[rootPath] = content
+
+  const deps = extractDeps(content)
+
+  for (const dep of deps) {
+    const depPath = path.normalize(path.join(dir, dep))
+    await downloadContract(depPath, partial)
+  }
+
+  return partial
+}
+
+const content = await downloadContract("system-contracts/contracts/NonceHolder.sol", {})
+const keys = Object.keys(content)
+console.log(keys)
+console.log(content[keys[0]])
