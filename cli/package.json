@@ -19,6 +19,7 @@
     "*.mjs"
   ],
   "scripts": {
+    "coso": "tsx src/bin/coso.ts",
     "fmt": "biome format .",
     "fmt:fix": "biome format . --write",
     "lint": "pnpm biome lint ./src",
@@ -38,6 +39,7 @@
   },
   "dependencies": {
     "@base2/pretty-print-object": "^1.0.2",
+    "@octokit/core": "^6.1.2",
     "@types/inquirer": "^9.0.7",
     "@types/lodash": "^4.17.0",
     "@types/semver": "^7.5.8",
