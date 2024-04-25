@@ -4,6 +4,7 @@ import type { AbiSet } from "./abi-set.js";
 import CliTable from "cli-table3";
 import type { ContractData } from "./zk-sync-era-state.js";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
+import type {SystemContractData} from "./upgrade-changes.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -19,6 +20,11 @@ export class ZkSyncEraDiff {
     newSelectors: string[];
   }[];
 
+  private systemContractChanges: Array<{
+    current: SystemContractData,
+    proposed: SystemContractData
+  }>
+
   private oldVerifier: VerifierContract;
   private newVerifier: VerifierContract;
 
@@ -33,11 +39,12 @@ export class ZkSyncEraDiff {
     this.newVersion = newVersion;
     this.orphanedSelectors = orphanedSelectors;
     this.facetChanges = [];
+    this.systemContractChanges = [];
     this.oldVerifier = oldVerifier;
     this.newVerifier = newVerifier;
   }
 
-  add(
+  addFacet(
     oldAddress: string,
     newAddress: string,
     name: string,
@@ -55,6 +62,13 @@ export class ZkSyncEraDiff {
       oldSelectors,
       newSelectors,
     });
+  }
+
+  addSystemContract (current: SystemContractData, proposed: SystemContractData) {
+    this.systemContractChanges.push({
+      current,
+      proposed
+    })
   }
 
   async writeCodeDiff(
@@ -176,6 +190,10 @@ export class ZkSyncEraDiff {
       this.oldVerifier.recursionLeafLevelVkHash,
       this.newVerifier.recursionLeafLevelVkHash,
     ]);
+    verifierTable.push([{
+      content: '',
+      colSpan: 3
+    }])
     verifierTable.push([
       "Show contract diff",
       {
@@ -183,7 +201,32 @@ export class ZkSyncEraDiff {
         colSpan: 2,
       },
     ]);
-    strings.push(verifierTable.toString());
+    strings.push(verifierTable.toString(), '');
+
+    strings.push('System contracts:')
+
+
+    if (this.systemContractChanges.length > 0) {
+      const sysContractTable = new CliTable({
+        head: ["Name", "Address", "bytecode hashes"]
+        // style: { compact: true },
+      });
+
+      for(const { current, proposed } of this.systemContractChanges) {
+        sysContractTable.push([
+          {content: proposed.name, rowSpan: 2, vAlign: "center"},
+          {content: current.address, rowSpan: 2, vAlign: "center"},
+          `Current: ${current.codeHash}`,
+        ], [
+          `Proposed: ${proposed.codeHash}`
+        ])
+      }
+
+      strings.push(sysContractTable.toString())
+    } else {
+      strings.push('No changes in system contracts')
+    }
+
 
     return strings.join("\n");
   }

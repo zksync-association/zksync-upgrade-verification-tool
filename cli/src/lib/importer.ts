@@ -112,7 +112,6 @@ export const lookupAndParse = async (
     const l2UpgradeBuf = await fs.readFile(l2UpgradePath);
     l2Upgrade = SCHEMAS["l2Upgrade.json"].parse(JSON.parse(l2UpgradeBuf.toString()));
   } catch (e) {
-    // console.log(e)
     l2Upgrade = undefined;
   }
 

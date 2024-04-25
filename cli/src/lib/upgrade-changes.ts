@@ -1,5 +1,6 @@
-import type { FacetsJson, TransactionsJson, UpgradeManifest } from "../schema/index.js";
-import { VerifierContract } from "./verifier.js";
+import type {FacetsJson, L2UpgradeJson, TransactionsJson, UpgradeManifest} from "../schema/index.js";
+import {VerifierContract} from "./verifier.js";
+import type {Hex} from "viem";
 
 export type FacetData = {
   name: string;
@@ -7,24 +8,32 @@ export type FacetData = {
   selectors: string[];
 };
 
+export type SystemContractData = {
+  address: Hex,
+  codeHash: string,
+  name: string
+}
+
 export class UpgradeChanges {
   newProtocolVersion: string;
   facets: FacetData[];
   orphanedSelectors: string[];
   verifier: VerifierContract;
+  systemCotractChanges: SystemContractData[]
 
-  constructor(newProtocolVersion: string, verifier: VerifierContract) {
+  constructor (newProtocolVersion: string, verifier: VerifierContract) {
     this.newProtocolVersion = newProtocolVersion;
     this.facets = [];
     this.orphanedSelectors = [];
+    this.systemCotractChanges = [];
     this.verifier = verifier;
   }
 
-  facetAffected(name: string): FacetData | undefined {
+  facetAffected (name: string): FacetData | undefined {
     return this.facets.find((f) => f.name === name);
   }
 
-  addFacet(facetName: string, facetAddr: string, selectors: string[]) {
+  addFacet (facetName: string, facetAddr: string, selectors: string[]) {
     this.orphanedSelectors = this.orphanedSelectors.filter(
       (selector) => !selectors.includes(selector)
     );
@@ -36,14 +45,19 @@ export class UpgradeChanges {
     });
   }
 
-  removeFacet(selectors: string[]) {
+  removeFacet (selectors: string[]) {
     this.orphanedSelectors.push(...selectors);
   }
 
-  static fromFiles(
+  addSystemContract (change: SystemContractData) {
+    this.systemCotractChanges.push(change)
+  }
+
+  static fromFiles (
     common: UpgradeManifest,
     txFile: TransactionsJson,
-    facets?: FacetsJson
+    facets?: FacetsJson,
+    l2Upgrade?: L2UpgradeJson
   ): UpgradeChanges {
     const jsonCuts = txFile.transparentUpgrade.facetCuts;
     const verifier = new VerifierContract(
@@ -77,6 +91,15 @@ export class UpgradeChanges {
           throw new Error("Upgrade action not suported yet");
         }
       }
+    }
+
+    const systemContracts = l2Upgrade?.systemContracts || []
+    for (const contract of systemContracts) {
+      instance.addSystemContract({
+        name: contract.name,
+        codeHash: contract.bytecodeHashes[0],
+        address: contract.address as Hex
+      })
     }
 
     return instance;
