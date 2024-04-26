@@ -1,7 +1,7 @@
 import yargs from "yargs";
-import {hideBin} from "yargs/helpers";
-import {NetworkSchema} from ".";
-import {downloadCode, checkCommand, contractDiff} from "../commands";
+import { hideBin } from "yargs/helpers";
+import { NetworkSchema } from ".";
+import { downloadCode, checkCommand, contractDiff } from "../commands";
 import * as process from "node:process";
 
 export const cli = async () => {
@@ -28,12 +28,11 @@ export const cli = async () => {
       "check <upgradeDirectory>",
       "get current state of contracts",
       (yargs) =>
-        yargs
-          .positional("upgradeDirectory", {
-            describe: "FolderName of the upgrade to check",
-            type: "string",
-            demandOption: true,
-          }),
+        yargs.positional("upgradeDirectory", {
+          describe: "FolderName of the upgrade to check",
+          type: "string",
+          demandOption: true,
+        }),
       async (yargs) => {
         await checkCommand(
           yargs.ethscankey,
@@ -60,7 +59,7 @@ export const cli = async () => {
           .option("ref", {
             describe: "github ref to download code",
             type: "string",
-            default: "main"
+            default: "main",
           }),
       async (yargs) => {
         await contractDiff(
@@ -85,14 +84,14 @@ export const cli = async () => {
           .option("ref", {
             describe: "github ref to download code",
             type: "string",
-            default: "main"
+            default: "main",
           }),
       async (yargs) => {
         await contractDiff(
           yargs.ethscankey,
           NetworkSchema.parse(yargs.network),
           yargs.upgradeDir,
-          'validator',
+          "validator",
           yargs.ref
         );
       }
@@ -118,34 +117,38 @@ export const cli = async () => {
             default: "",
           })
           .option("systemContracts", {
-            alias: 'sc',
+            alias: "sc",
             type: "string",
-            default: ""
+            default: "",
           })
           .option("verifier", {
             describe: "Filter to include verifier source code",
             type: "boolean",
-            default: false
+            default: false,
           })
           .option("ref", {
             describe: "github ref to download code",
             type: "string",
-            default: "main"
+            default: "main",
           }),
       (yargs) => {
         const filter = yargs.facets
           .split(",")
           .map((f) => f.trim())
           .filter((f) => f.length > 0)
-          .map(f => `facet:${f}`);
+          .map((f) => `facet:${f}`);
 
         if (yargs.verifier) {
-          filter.push('verifier')
+          filter.push("verifier");
         }
 
         filter.push(
-          ...yargs.systemContracts.split(',').map(sc => sc.trim()).filter(sc => sc.length > 0).map(sc => `sc:${sc}`)
-        )
+          ...yargs.systemContracts
+            .split(",")
+            .map((sc) => sc.trim())
+            .filter((sc) => sc.length > 0)
+            .map((sc) => `sc:${sc}`)
+        );
 
         downloadCode(
           yargs.ethscankey,

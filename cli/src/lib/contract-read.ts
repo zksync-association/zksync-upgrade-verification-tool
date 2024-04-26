@@ -7,13 +7,17 @@ import {
   http,
 } from "viem";
 import type { ZodType, TypeOf } from "zod";
-import type {Network} from "./constants.js";
+import type { Network } from "./constants.js";
 
-export async function contractReadRaw(network: Network, target: string, callData: string): Promise<Hex> {
+export async function contractReadRaw(
+  network: Network,
+  target: string,
+  callData: string
+): Promise<Hex> {
   const urls = {
     mainnet: "https://ethereum-rpc.publicnode.com",
-    sepolia: "https://ethereum-sepolia-rpc.publicnode.com"
-  }
+    sepolia: "https://ethereum-sepolia-rpc.publicnode.com",
+  };
 
   const client = createPublicClient({
     transport: http(urls[network]),

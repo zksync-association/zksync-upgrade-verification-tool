@@ -6,7 +6,7 @@ export async function withSpinner<T>(fn: () => Promise<T>, taskDescription: stri
   try {
     const res = await fn();
     spinner.stop();
-    console.log(`- ${taskDescription}: OK`)
+    console.log(`- ${taskDescription}: OK`);
     return res;
   } catch (e) {
     spinner.stop();

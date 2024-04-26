@@ -7,7 +7,9 @@ export async function checkCommand(
   network: Network,
   upgradeDirectory: string
 ): Promise<void> {
-  const { diff, l1Abis } = await withSpinner(() =>
-    compareCurrentStateWith(etherscanKey, network, upgradeDirectory), "Gattering contract data...");
+  const { diff, l1Abis } = await withSpinner(
+    () => compareCurrentStateWith(etherscanKey, network, upgradeDirectory),
+    "Gattering contract data..."
+  );
   console.log(await diff.toCliReport(l1Abis, upgradeDirectory));
 }

@@ -1,12 +1,12 @@
-import type {VerifierContract} from "./verifier.js";
+import type { VerifierContract } from "./verifier.js";
 import path from "node:path";
-import type {AbiSet} from "./abi-set.js";
+import type { AbiSet } from "./abi-set.js";
 import CliTable from "cli-table3";
-import type {ContractData} from "./zk-sync-era-state.js";
-import type {BlockExplorerClient} from "./block-explorer-client.js";
-import {SystemContractChange} from "./system-contract-change";
-import type {GithubClient} from "./github-client";
-import {systemContractHashesSchema} from "../schema/github-schemas.js";
+import type { ContractData } from "./zk-sync-era-state.js";
+import type { BlockExplorerClient } from "./block-explorer-client.js";
+import type { SystemContractChange } from "./system-contract-change";
+import type { GithubClient } from "./github-client";
+import { systemContractHashesSchema } from "../schema/github-schemas.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -22,7 +22,7 @@ export class ZkSyncEraDiff {
     newSelectors: string[];
   }[];
 
-  private systemContractChanges: SystemContractChange[]
+  private systemContractChanges: SystemContractChange[];
 
   private oldVerifier: VerifierContract;
   private newVerifier: VerifierContract;
@@ -64,7 +64,7 @@ export class ZkSyncEraDiff {
   }
 
   addSystemContract(change: SystemContractChange) {
-    this.systemContractChanges.push(change)
+    this.systemContractChanges.push(change);
   }
 
   async writeCodeDiff(
@@ -80,10 +80,15 @@ export class ZkSyncEraDiff {
 
     await this.writeFacets(filter, baseDirOld, baseDirNew);
     await this.writeVerifier(filter, baseDirOld, baseDirNew, l1Client);
-    await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, github, ref)
+    await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, github, ref);
   }
 
-  private async writeVerifier(filter: string[], baseDirOld: string, baseDirNew: string, client: BlockExplorerClient) {
+  private async writeVerifier(
+    filter: string[],
+    baseDirOld: string,
+    baseDirNew: string,
+    client: BlockExplorerClient
+  ) {
     if (filter.length === 0 || filter.includes("verifier")) {
       const oldVerifierPath = path.join(baseDirOld, "verifier");
       const oldVerifierCode = await this.oldVerifier.getCode(client);
@@ -95,7 +100,7 @@ export class ZkSyncEraDiff {
   }
 
   private async writeFacets(filter: string[], baseDirOld: string, baseDirNew: string) {
-    for (const {name, oldData, newData} of this.facetChanges) {
+    for (const { name, oldData, newData } of this.facetChanges) {
       if (filter.length > 0 && !filter.includes(`facet:${name}`)) {
         continue;
       }
@@ -114,7 +119,7 @@ export class ZkSyncEraDiff {
 
     const metadataTable = new CliTable({
       head: ["Metadata"],
-      style: {compact: true},
+      style: { compact: true },
     });
     metadataTable.push(["Current protocol version", this.oldVersion]);
     metadataTable.push(["Proposed protocol version", this.newVersion]);
@@ -128,7 +133,7 @@ export class ZkSyncEraDiff {
     for (const change of this.facetChanges) {
       const table = new CliTable({
         head: [change.name],
-        style: {compact: true},
+        style: { compact: true },
       });
 
       table.push(["Current address", change.oldAddress]);
@@ -166,7 +171,7 @@ export class ZkSyncEraDiff {
     strings.push("", "Verifier:");
     const verifierTable = new CliTable({
       head: ["Attribute", "Current value", "Upgrade value"],
-      style: {compact: true},
+      style: { compact: true },
     });
 
     verifierTable.push(["Address", this.oldVerifier.address, this.newVerifier.address]);
@@ -185,37 +190,42 @@ export class ZkSyncEraDiff {
       this.oldVerifier.recursionLeafLevelVkHash,
       this.newVerifier.recursionLeafLevelVkHash,
     ]);
-    verifierTable.push([{
-      content: '',
-      colSpan: 3
-    }])
-    verifierTable.push(['Show contract diff', {
-      content: `pnpm validate verifier-diff ${upgradeDir}`,
-      colSpan: 2,
-    }])
-    strings.push(verifierTable.toString(), '');
+    verifierTable.push([
+      {
+        content: "",
+        colSpan: 3,
+      },
+    ]);
+    verifierTable.push([
+      "Show contract diff",
+      {
+        content: `pnpm validate verifier-diff ${upgradeDir}`,
+        colSpan: 2,
+      },
+    ]);
+    strings.push(verifierTable.toString(), "");
 
-    strings.push('System contracts:')
-
+    strings.push("System contracts:");
 
     if (this.systemContractChanges.length > 0) {
       const sysContractTable = new CliTable({
-        head: ["Name", "Address", "bytecode hashes"]
+        head: ["Name", "Address", "bytecode hashes"],
         // style: { compact: true },
       });
 
       for (const change of this.systemContractChanges) {
-        sysContractTable.push([
-          {content: change.name, rowSpan: 2, vAlign: "center"},
-          {content: change.address, rowSpan: 2, vAlign: "center"},
-          `Current: ${change.currentBytecodeHash}`,
-        ], [
-          `Proposed: ${change.proposedBytecodeHash}`
-        ])
+        sysContractTable.push(
+          [
+            { content: change.name, rowSpan: 2, vAlign: "center" },
+            { content: change.address, rowSpan: 2, vAlign: "center" },
+            `Current: ${change.currentBytecodeHash}`,
+          ],
+          [`Proposed: ${change.proposedBytecodeHash}`]
+        );
       }
-      strings.push(sysContractTable.toString())
+      strings.push(sysContractTable.toString());
     } else {
-      strings.push('No changes in system contracts')
+      strings.push("No changes in system contracts");
     }
 
     return strings.join("\n");
@@ -229,28 +239,28 @@ export class ZkSyncEraDiff {
     github: GithubClient,
     ref: string
   ) {
-    const rawHashes = await github.downloadFile(`system-contracts/SystemContractsHashes.json`, ref)
-    const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes))
+    const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json", ref);
+    const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
 
     for (const change of this.systemContractChanges) {
       if (filter.length !== 0 && !filter.includes(`sc:${change.name}`)) {
-        continue
+        continue;
       }
 
-      const currentHash = hashes.find(h => h.contractName === change.name)
+      const currentHash = hashes.find((h) => h.contractName === change.name);
 
       if (!currentHash || change.proposedBytecodeHash !== currentHash.bytecodeHash) {
-        throw new Error(`Bytecode hash does not match for ${change.name} inside ref "${ref}"`)
+        throw new Error(`Bytecode hash does not match for ${change.name} inside ref "${ref}"`);
       }
 
       const [current, upgrade] = await Promise.all([
         change.downloadCurrentCode(github),
-        change.downloadProposedCode(l2Client)
-      ])
+        change.downloadProposedCode(l2Client),
+      ]);
 
-      current.remapKeys('system-contracts/contracts', 'contracts-preprocessed')
-      await current.writeSources(path.join(baseDirOld, 'system-contracts', change.name))
-      await upgrade.writeSources(path.join(baseDirNew, 'system-contracts', change.name))
+      current.remapKeys("system-contracts/contracts", "contracts-preprocessed");
+      await current.writeSources(path.join(baseDirOld, "system-contracts", change.name));
+      await upgrade.writeSources(path.join(baseDirNew, "system-contracts", change.name));
     }
   }
 }
