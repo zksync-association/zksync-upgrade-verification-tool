@@ -14,11 +14,11 @@ export const contractDiff = async (
   const octo = new Octokit()
   const l2Client = BlockExplorerClient.forL2()
   const targetDir = await withSpinner(async (): Promise<String> => {
-    const { diff, l1Client } = await compareCurrentStateWith(etherscanKey, network, upgradeDirectory)
-    const targetDir = temporaryDirectory({ prefix: "zksync-era-upgrade-check" });
+    const {diff, l1Client} = await compareCurrentStateWith(etherscanKey, network, upgradeDirectory)
+    const targetDir = temporaryDirectory({prefix: "zksync-era-upgrade-check"});
     await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, octo);
     return targetDir
-  });
+  }, "Gattering contract data...");
 
   await new Promise((resolve, reject) => {
     const res = exec(

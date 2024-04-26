@@ -6,7 +6,6 @@ import type {ContractData} from "./zk-sync-era-state.js";
 import type {BlockExplorerClient} from "./block-explorer-client.js";
 import {SystemContractChange} from "./system-contract-change";
 import type {Octokit} from "@octokit/core";
-import * as console from "node:console";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -221,14 +220,16 @@ export class ZkSyncEraDiff {
   }
 
   private async writeSystemContracts(filter: string[], baseDirOld: string, baseDirNew: string, l2Client: BlockExplorerClient, octo: Octokit) {
-    const sys = this.systemContractChanges[0]
-    const current = await sys.downloadCurrentCode(octo)
-    const upgrade = await sys.downloadProposedCode(l2Client)
-    current.remapKeys('system-contracts/contracts', 'contracts-preprocessed')
-
-    console.log(path.join(baseDirOld, 'system-contracts'))
-    await current.writeSources(path.join(baseDirOld, 'system-contracts'))
-    await upgrade.writeSources(path.join(baseDirNew, 'system-contracts'))
+    for (const change of this.systemContractChanges) {
+      if (filter.length !== 0 && !filter.includes(`sc:${change.name}`)) {
+        continue
+      }
+      const current = await change.downloadCurrentCode(octo)
+      const upgrade = await change.downloadProposedCode(l2Client)
+      current.remapKeys('system-contracts/contracts', 'contracts-preprocessed')
+      await current.writeSources(path.join(baseDirOld, 'system-contracts'))
+      await upgrade.writeSources(path.join(baseDirNew, 'system-contracts'))
+    }
   }
 
   // private remapKeys(record: Record<string, { content: string }>, oldPrefix: string, newPrefix: string): Record<string, { content: string }> {

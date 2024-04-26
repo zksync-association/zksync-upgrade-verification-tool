@@ -35,7 +35,6 @@ export class ContractData {
   }
 
   async writeSources(targetDir: string): Promise<void> {
-    console.log(this.sources)
     for (const fileName in this.sources) {
       const {content} = this.sources[fileName];
       const filePath = path.join(targetDir, fileName);
@@ -48,7 +47,7 @@ export class ContractData {
     const record = this.sources
     const keys = Object.keys(record)
     const newRecord: Sources = {}
-    for (const key in keys) {
+    for (const key of keys) {
       let newKey = key.replace(new RegExp(`^${oldPrefix}`), newPrefix);
       newRecord[newKey] = record[key]
     }

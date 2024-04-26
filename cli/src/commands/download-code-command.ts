@@ -1,6 +1,6 @@
 import {BlockExplorerClient, compareCurrentStateWith, type Network} from "../lib";
 
-import { withSpinner } from "../lib/with-spinner.js";
+import {withSpinner} from "../lib/with-spinner.js";
 import {Octokit} from "@octokit/core";
 
 export async function downloadCode(
@@ -10,11 +10,17 @@ export async function downloadCode(
   targetDir: string,
   l1Filter: string[]
 ): Promise<void> {
-  const octo = new Octokit({ auth: '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' })
+  const octo = new Octokit({auth: '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'})
   const l2Client = BlockExplorerClient.forL2()
-  const { diff, l1Client } = await withSpinner(() =>
-    compareCurrentStateWith(etherscanKey, network, upgradeDirectory)
+
+  const {diff, l1Client} = await withSpinner(
+    () => compareCurrentStateWith(etherscanKey, network, upgradeDirectory),
+    "Gathering contract data"
   );
-  await diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, octo);
+
+  await withSpinner(
+    () => diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, octo),
+    'Downloading source code'
+  )
   console.log(`Ok! Contracts written in: ${targetDir}`);
 }
