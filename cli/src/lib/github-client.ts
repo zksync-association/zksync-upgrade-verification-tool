@@ -1,13 +1,7 @@
 import {Octokit} from "@octokit/core";
-import z from "zod";
 import type {Sources} from "../schema";
 import path from "node:path";
-
-const githubContentParser = z.object({
-  data: z.object({
-    content: z.string()
-  })
-})
+import {githubContentParser} from "../schema/github-schemas.js";
 
 export class GithubClient {
   private octo: Octokit

@@ -9,14 +9,15 @@ export const contractDiff = async (
   etherscanKey: string,
   network: Network,
   upgradeDirectory: string,
-  contractName: string
+  contractName: string,
+  ref: string
 ) => {
   const github = new GithubClient()
   const l2Client = BlockExplorerClient.forL2()
   const targetDir = await withSpinner(async (): Promise<String> => {
     const {diff, l1Client} = await compareCurrentStateWith(etherscanKey, network, upgradeDirectory)
     const targetDir = temporaryDirectory({prefix: "zksync-era-upgrade-check"});
-    await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, github);
+    await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, github, ref);
     return targetDir
   }, "Gattering contract data...");
 

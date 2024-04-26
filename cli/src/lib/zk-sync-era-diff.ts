@@ -5,8 +5,8 @@ import CliTable from "cli-table3";
 import type {ContractData} from "./zk-sync-era-state.js";
 import type {BlockExplorerClient} from "./block-explorer-client.js";
 import {SystemContractChange} from "./system-contract-change";
-import type {Octokit} from "@octokit/core";
 import type {GithubClient} from "./github-client";
+import {systemContractHashesSchema} from "../schema/github-schemas.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -72,14 +72,15 @@ export class ZkSyncEraDiff {
     filter: string[],
     l1Client: BlockExplorerClient,
     l2Client: BlockExplorerClient,
-    github: GithubClient
+    github: GithubClient,
+    ref: string
   ): Promise<void> {
     const baseDirOld = path.join(baseDirPath, "old");
     const baseDirNew = path.join(baseDirPath, "new");
 
     await this.writeFacets(filter, baseDirOld, baseDirNew);
     await this.writeVerifier(filter, baseDirOld, baseDirNew, l1Client);
-    await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, github)
+    await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, github, ref)
   }
 
   private async writeVerifier(filter: string[], baseDirOld: string, baseDirNew: string, client: BlockExplorerClient) {
@@ -225,11 +226,21 @@ export class ZkSyncEraDiff {
     baseDirOld: string,
     baseDirNew: string,
     l2Client: BlockExplorerClient,
-    github: GithubClient
+    github: GithubClient,
+    ref: string
   ) {
+    const rawHashes = await github.downloadFile(`system-contracts/SystemContractsHashes.json`, ref)
+    const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes))
+
     for (const change of this.systemContractChanges) {
       if (filter.length !== 0 && !filter.includes(`sc:${change.name}`)) {
         continue
+      }
+
+      const currentHash = hashes.find(h => h.contractName === change.name)
+
+      if (!currentHash || change.proposedBytecodeHash !== currentHash.bytecodeHash) {
+        throw new Error(`Bytecode hash does not match for ${change.name} inside ref "${ref}"`)
       }
 
       const [current, upgrade] = await Promise.all([

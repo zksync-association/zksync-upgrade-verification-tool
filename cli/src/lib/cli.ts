@@ -1,7 +1,7 @@
 import yargs from "yargs";
-import { hideBin } from "yargs/helpers";
-import { NetworkSchema } from ".";
-import { downloadCode, checkCommand, contractDiff } from "../commands";
+import {hideBin} from "yargs/helpers";
+import {NetworkSchema} from ".";
+import {downloadCode, checkCommand, contractDiff} from "../commands";
 import * as process from "node:process";
 
 export const cli = async () => {
@@ -63,6 +63,11 @@ export const cli = async () => {
             type: "string",
             demandOption: true,
           })
+          .option("ref", {
+            describe: "github ref to download code",
+            type: "string",
+            default: "main"
+          })
           .option("network", {
             alias: "n",
             describe: "network to check",
@@ -74,7 +79,8 @@ export const cli = async () => {
           yargs.ethscankey,
           NetworkSchema.parse(yargs.network),
           yargs.upgradeDir,
-          `facet:${yargs.facetName}`
+          `facet:${yargs.facetName}`,
+          yargs.ref
         );
       }
     )
@@ -88,6 +94,11 @@ export const cli = async () => {
             type: "string",
             demandOption: true,
           })
+          .option("ref", {
+            describe: "github ref to download code",
+            type: "string",
+            default: "main"
+          })
           .option("network", {
             alias: "n",
             describe: "network to check",
@@ -99,7 +110,8 @@ export const cli = async () => {
           yargs.ethscankey,
           NetworkSchema.parse(yargs.network),
           yargs.upgradeDir,
-          "validator"
+          'validator',
+          yargs.ref
         );
       }
     )
@@ -131,7 +143,12 @@ export const cli = async () => {
           .option("verifier", {
             describe: "Filter to include verifier source code",
             type: "boolean",
-            default: false,
+            default: false
+          })
+          .option("ref", {
+            describe: "github ref to download code",
+            type: "string",
+            default: "main"
           })
           .option("network", {
             alias: "n",
@@ -144,10 +161,10 @@ export const cli = async () => {
           .split(",")
           .map((f) => f.trim())
           .filter((f) => f.length > 0)
-          .map((f) => `facet:${f}`);
+          .map(f => `facet:${f}`);
 
         if (yargs.verifier) {
-          filter.push("verifier");
+          filter.push('verifier')
         }
 
         filter.push(
@@ -159,7 +176,8 @@ export const cli = async () => {
           NetworkSchema.parse(yargs.network),
           yargs.upgradeDir,
           yargs.targetSourceCodeDir,
-          filter
+          filter,
+          yargs.ref
         );
       }
     )

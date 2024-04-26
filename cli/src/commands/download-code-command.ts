@@ -8,7 +8,8 @@ export async function downloadCode(
   network: Network,
   upgradeDirectory: string,
   targetDir: string,
-  l1Filter: string[]
+  l1Filter: string[],
+  ref: string
 ): Promise<void> {
   const github = new GithubClient(process.env.GITHUB_API_KEY)
   const l2Client = BlockExplorerClient.forL2()
@@ -19,7 +20,7 @@ export async function downloadCode(
   );
 
   await withSpinner(
-    () => diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, github),
+    () => diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, github, ref),
     'Downloading source code'
   )
   console.log(`Ok! Contracts written in: ${targetDir}`);
