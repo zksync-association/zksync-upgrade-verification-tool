@@ -1,8 +1,7 @@
 import type {Hex} from "viem";
 import {ContractData} from "./zk-sync-era-state";
-import {downloadContract} from "./github-download";
-import type {Octokit} from "@octokit/core";
 import type {BlockExplorerClient} from "./block-explorer-client";
+import type {GithubClient} from "./github-client";
 
 export class SystemContractChange {
   address: Hex
@@ -22,8 +21,8 @@ export class SystemContractChange {
     this.proposedBytecodeHash = proposedBytecodeHash
   }
 
-  async downloadCurrentCode(octo: Octokit): Promise<ContractData> {
-    const source = await downloadContract(octo, `system-contracts/contracts/${this.name}.sol`, {})
+  async downloadCurrentCode(github: GithubClient): Promise<ContractData> {
+    const source = await github.downloadContract(this.name)
 
     return new ContractData(
       this.name,

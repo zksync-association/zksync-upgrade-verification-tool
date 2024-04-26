@@ -3,7 +3,7 @@ import { compareCurrentStateWith } from "../lib";
 import { temporaryDirectory } from "tempy";
 import { exec } from "node:child_process";
 import {withSpinner} from "../lib/with-spinner.js";
-import {Octokit} from "@octokit/core";
+import {GithubClient} from "../lib/github-client";
 
 export const contractDiff = async (
   etherscanKey: string,
@@ -11,12 +11,12 @@ export const contractDiff = async (
   upgradeDirectory: string,
   contractName: string
 ) => {
-  const octo = new Octokit()
+  const github = new GithubClient()
   const l2Client = BlockExplorerClient.forL2()
   const targetDir = await withSpinner(async (): Promise<String> => {
     const {diff, l1Client} = await compareCurrentStateWith(etherscanKey, network, upgradeDirectory)
     const targetDir = temporaryDirectory({prefix: "zksync-era-upgrade-check"});
-    await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, octo);
+    await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, github);
     return targetDir
   }, "Gattering contract data...");
 

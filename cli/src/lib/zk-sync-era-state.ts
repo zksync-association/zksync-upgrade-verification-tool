@@ -12,8 +12,6 @@ import {ZkSyncEraDiff} from "./zk-sync-era-diff.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import {utils} from 'zksync-ethers'
-import {downloadContract} from "./github-download";
-import type {Octokit} from "@octokit/core";
 import {SystemContractChange} from "./system-contract-change";
 
 const MAIN_CONTRACT_FUNCTIONS = {

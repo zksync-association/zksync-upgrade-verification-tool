@@ -1,7 +1,7 @@
 import {BlockExplorerClient, compareCurrentStateWith, type Network} from "../lib";
 
 import {withSpinner} from "../lib/with-spinner.js";
-import {Octokit} from "@octokit/core";
+import {GithubClient} from "../lib/github-client";
 
 export async function downloadCode(
   etherscanKey: string,
@@ -10,7 +10,7 @@ export async function downloadCode(
   targetDir: string,
   l1Filter: string[]
 ): Promise<void> {
-  const octo = new Octokit({auth: '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'})
+  const github = new GithubClient(process.env.GITHUB_API_KEY)
   const l2Client = BlockExplorerClient.forL2()
 
   const {diff, l1Client} = await withSpinner(
@@ -19,7 +19,7 @@ export async function downloadCode(
   );
 
   await withSpinner(
-    () => diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, octo),
+    () => diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, github),
     'Downloading source code'
   )
   console.log(`Ok! Contracts written in: ${targetDir}`);

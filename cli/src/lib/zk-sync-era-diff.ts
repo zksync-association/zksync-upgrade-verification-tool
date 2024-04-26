@@ -6,6 +6,7 @@ import type {ContractData} from "./zk-sync-era-state.js";
 import type {BlockExplorerClient} from "./block-explorer-client.js";
 import {SystemContractChange} from "./system-contract-change";
 import type {Octokit} from "@octokit/core";
+import type {GithubClient} from "./github-client";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -71,14 +72,14 @@ export class ZkSyncEraDiff {
     filter: string[],
     l1Client: BlockExplorerClient,
     l2Client: BlockExplorerClient,
-    octo: Octokit
+    github: GithubClient
   ): Promise<void> {
     const baseDirOld = path.join(baseDirPath, "old");
     const baseDirNew = path.join(baseDirPath, "new");
 
     await this.writeFacets(filter, baseDirOld, baseDirNew);
     await this.writeVerifier(filter, baseDirOld, baseDirNew, l1Client);
-    await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, octo)
+    await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, github)
   }
 
   private async writeVerifier(filter: string[], baseDirOld: string, baseDirNew: string, client: BlockExplorerClient) {
@@ -219,28 +220,26 @@ export class ZkSyncEraDiff {
     return strings.join("\n");
   }
 
-  private async writeSystemContracts(filter: string[], baseDirOld: string, baseDirNew: string, l2Client: BlockExplorerClient, octo: Octokit) {
+  private async writeSystemContracts(
+    filter: string[],
+    baseDirOld: string,
+    baseDirNew: string,
+    l2Client: BlockExplorerClient,
+    github: GithubClient
+  ) {
     for (const change of this.systemContractChanges) {
       if (filter.length !== 0 && !filter.includes(`sc:${change.name}`)) {
         continue
       }
-      const current = await change.downloadCurrentCode(octo)
-      const upgrade = await change.downloadProposedCode(l2Client)
+
+      const [current, upgrade] = await Promise.all([
+        change.downloadCurrentCode(github),
+        change.downloadProposedCode(l2Client)
+      ])
+
       current.remapKeys('system-contracts/contracts', 'contracts-preprocessed')
-      await current.writeSources(path.join(baseDirOld, 'system-contracts'))
-      await upgrade.writeSources(path.join(baseDirNew, 'system-contracts'))
+      await current.writeSources(path.join(baseDirOld, 'system-contracts', change.name))
+      await upgrade.writeSources(path.join(baseDirNew, 'system-contracts', change.name))
     }
   }
-
-  // private remapKeys(record: Record<string, { content: string }>, oldPrefix: string, newPrefix: string): Record<string, { content: string }> {
-  //   const keys = Object.keys(record)
-  //   const newRecord: Record<string, { content: string }> = {}
-  //   for (const key in keys) {
-  //     let newKey = key.replace(new RegExp(`^${oldPrefix}`), newPrefix);
-  //     console.log(newKey)
-  //     newRecord[newKey] = record[key]
-  //   }
-  //
-  //   return newRecord
-  // }
 }
