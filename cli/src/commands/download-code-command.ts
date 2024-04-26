@@ -23,5 +23,5 @@ export async function downloadCode(
     () => diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, github, ref),
     'Downloading source code'
   )
-  console.log(`Completed. Source code successfully downloaded in: ${targetDir}`);
+  console.log(`✅  Source code successfully downloaded in: ${targetDir}`);
 }
