@@ -1,5 +1,5 @@
-import type { ContractData } from "./zk-sync-era-state.js";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
+import {ContractData} from "./contract-data.js";
 
 export class VerifierContract {
   address: string;

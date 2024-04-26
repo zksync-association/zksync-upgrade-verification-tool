@@ -2,11 +2,11 @@ import type { VerifierContract } from "./verifier.js";
 import path from "node:path";
 import type { AbiSet } from "./abi-set.js";
 import CliTable from "cli-table3";
-import type { ContractData } from "./zk-sync-era-state.js";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { SystemContractChange } from "./system-contract-change";
 import type { GithubClient } from "./github-client";
 import { systemContractHashesSchema } from "../schema/github-schemas.js";
+import {ContractData} from "./contract-data.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;

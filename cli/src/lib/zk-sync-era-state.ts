@@ -1,18 +1,17 @@
-import type { AbiSet } from "./abi-set.js";
-import { contractRead, contractReadRaw } from "./contract-read.js";
-import { facetsResponseSchema } from "../schema/new-facets.js";
-import type { SystemContractData, UpgradeChanges } from "./upgrade-changes.js";
-import type { BlockExplorerClient } from "./block-explorer-client.js";
-import type { Network } from "./constants.js";
-import { VerifierContract } from "./verifier.js";
-import { type Sources, verifierParamsSchema } from "../schema/index.js";
-import { z } from "zod";
-import { type Abi, createPublicClient, type Hex, http } from "viem";
-import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
-import path from "node:path";
-import fs from "node:fs/promises";
-import { utils } from "zksync-ethers";
-import { SystemContractChange } from "./system-contract-change";
+import type {AbiSet} from "./abi-set.js";
+import {contractRead, contractReadRaw} from "./contract-read.js";
+import {facetsResponseSchema} from "../schema/new-facets.js";
+import type {SystemContractData, UpgradeChanges} from "./upgrade-changes.js";
+import type {BlockExplorerClient} from "./block-explorer-client.js";
+import type {Network} from "./constants.js";
+import {VerifierContract} from "./verifier.js";
+import {verifierParamsSchema} from "../schema/index.js";
+import {z} from "zod";
+import {type Abi, createPublicClient, type Hex, http} from "viem";
+import {ZkSyncEraDiff} from "./zk-sync-era-diff.js";
+import {utils} from "zksync-ethers";
+import {SystemContractChange} from "./system-contract-change";
+import {ContractData} from "./contract-data.js";
 
 const MAIN_CONTRACT_FUNCTIONS = {
   facets: "facets",
@@ -20,39 +19,6 @@ const MAIN_CONTRACT_FUNCTIONS = {
   getVerifier: "getVerifier",
   getVerifierParams: "getVerifierParams",
 };
-
-export class ContractData {
-  name: string;
-  sources: Sources;
-  addr: string;
-
-  constructor(name: string, sources: Sources, addr: string) {
-    this.name = name;
-    this.sources = sources;
-    this.addr = addr;
-  }
-
-  async writeSources(targetDir: string): Promise<void> {
-    for (const fileName in this.sources) {
-      const { content } = this.sources[fileName];
-      const filePath = path.join(targetDir, fileName);
-      await fs.mkdir(path.parse(filePath).dir, { recursive: true });
-      await fs.writeFile(filePath, content);
-    }
-  }
-
-  remapKeys(oldPrefix: string, newPrefix: string): void {
-    const record = this.sources;
-    const keys = Object.keys(record);
-    const newRecord: Sources = {};
-    for (const key of keys) {
-      const newKey = key.replace(new RegExp(`^${oldPrefix}`), newPrefix);
-      newRecord[newKey] = record[key];
-    }
-
-    this.sources = newRecord;
-  }
-}
 
 /**
  * Class to represent the main zkSync diamond contract.
