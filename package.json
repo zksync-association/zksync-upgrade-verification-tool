@@ -9,7 +9,7 @@
   },
   "files": [
     "dist",
-    "bin",
+    "cli/bin",
     "*.d.ts",
     "*.mjs"
   ],

@@ -7,13 +7,6 @@ import * as process from "node:process";
 export const cli = async () => {
   // printIntro();
   await yargs(hideBin(process.argv))
-    .option("directory", {
-      describe: "Directory to list upgrades from",
-      alias: "d",
-      type: "string",
-      demandOption: false,
-      default: ".",
-    })
     .middleware((yargs) => {
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
@@ -24,6 +17,13 @@ export const cli = async () => {
       type: "string",
       demandOption: true,
     })
+    .option("network", {
+      alias: "n",
+      describe: "network to check",
+      choices: ["mainnet", "sepolia"],
+      type: "string",
+      default: "mainnet",
+    })
     .command(
       "check <upgradeDirectory>",
       "get current state of contracts",
@@ -33,12 +33,6 @@ export const cli = async () => {
             describe: "FolderName of the upgrade to check",
             type: "string",
             demandOption: true,
-          })
-          .option("network", {
-            alias: "n",
-            describe: "network to check",
-            type: "string",
-            default: "mainnet",
           }),
       async (yargs) => {
         await checkCommand(
@@ -67,12 +61,6 @@ export const cli = async () => {
             describe: "github ref to download code",
             type: "string",
             default: "main"
-          })
-          .option("network", {
-            alias: "n",
-            describe: "network to check",
-            type: "string",
-            default: "mainnet",
           }),
       async (yargs) => {
         await contractDiff(
@@ -98,12 +86,6 @@ export const cli = async () => {
             describe: "github ref to download code",
             type: "string",
             default: "main"
-          })
-          .option("network", {
-            alias: "n",
-            describe: "network to check",
-            type: "string",
-            default: "mainnet",
           }),
       async (yargs) => {
         await contractDiff(
@@ -149,12 +131,6 @@ export const cli = async () => {
             describe: "github ref to download code",
             type: "string",
             default: "main"
-          })
-          .option("network", {
-            alias: "n",
-            describe: "network to check",
-            type: "string",
-            default: "mainnet",
           }),
       (yargs) => {
         const filter = yargs.facets

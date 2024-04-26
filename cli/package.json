@@ -6,7 +6,7 @@
   "main": "./dist/main.js.js",
   "module": "./dist/main.js",
   "bin": {
-    "validate": "./dist/bin/entrypoint.js"
+    "validate": "./bin/validate"
   },
   "engines": {
     "node": ">=20",
@@ -23,7 +23,7 @@
     "fmt:fix": "biome format . --write",
     "lint": "pnpm biome lint ./src",
     "lint:fix": "pnpm biome lint ./src --apply",
-    "start": "tsx src/bin/entrypoint.ts",
+    "start": "tsx src/entrypoint.ts",
     "build": "tsup src --format esm --no-splitting --sourcemap ",
     "watch": "tsup src --format esm --no-splitting --watch",
     "test": "vitest run"
