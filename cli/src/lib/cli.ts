@@ -11,11 +11,19 @@ export const cli = async () => {
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
       }
+      if (!yargs.githubApiKey) {
+        yargs.githubApiKey = process.env.GITHUB_API_KEY;
+      }
     }, true)
     .option("ethscankey", {
       describe: "Api key for etherscan",
       type: "string",
-      demandOption: true,
+      demandOption: "Please provide a valid Etherscan api key. You can set ETHERSCAN_API_KEY env var or use the option --ethscankey",
+    })
+    .option("githubApiKey", {
+      describe: "Api key for github",
+      type: "string",
+      demandOption: "Please provide a github api key. You can set GITHUB_API_KEY env var or use the option --githubApiKey",
     })
     .option("network", {
       alias: "n",
