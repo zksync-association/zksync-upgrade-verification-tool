@@ -10,16 +10,12 @@ The zkSync Era Upgrade Verification Tool is a CLI tool crafted to decode and pre
 
 ## 🌟 **Features**
 
-### **L1 Upgrades:**
-  - **Facets**: Identifies contract upgrades including additions or removals of functions.
-  - **Verifier**: Detects upgrades and parameter changes in contracts.
-  - **Solidity Diff Tool**: Compares current contracts with upgrade proposals for verification.
-
-### **L2 Upgrades:**
-  - **System Contracts**: Lists changes and verifies bytecode hashes.
-  - **Bootloader and DefaultAccount**: Validates bytecode hash.
-  - **Solidity Diff Tool**: Compares current contracts with upgrade proposals for verification (only available for system contracts for now).
-
+  - **_[L1]_ Facets**: Identifies contract upgrades including additions or removals of functions. 
+  - **_[L1]_ Verifier** : Detects upgrades and parameter changes in contracts.
+  - **_[L2]_ System Contracts**: Lists changes and validates bytecode hashes. 
+ - **_[L2]_ Bootloader and DefaultAccount**: Validates bytecode hash.
+ - **Solidity Diff Tool**: Compares current contracts with upgrade proposals for verification. *Currently available for Facets, Verifier & System Contracts.*
+ 
 <br>
 
 ## 🔍 **Prerequisites**
@@ -47,14 +43,10 @@ npm install -g pnpm
 ### **2. Clone repository**
 
 ```bash
-git clone https://github.com/Moonsong-Labs/era-l1-upgrade-checker.git
+git clone https://github.com/Moonsong-Labs/era-l1-upgrade-checker.git && cd era-l1-upgrade-checker
 ```
 
-### **3. Install dependencies in tool repository**
-
-```bash
-cd era-l1-upgrade-checker
-```
+### **3. Install dependencies & build**
 
 ```bash
 pnpm install
@@ -84,9 +76,14 @@ export GITHUB_API_KEY="<your_github_api_key>"
 
 #### ***Option 2: Configuration Files***
 
-Alternatively, you can set up your API keys in a .env file located in the root directory of the project. This file should contain the following entries:
+Alternatively, you can copy  env.example file and complete it with your keys:
 
 ```bash
+cp env.example .env
+```
+This file should contain the following entries:
+```bash
+# .env
 ETHERSCAN_API_KEY=your_etherscan_api_key
 GITHUB_API_KEY=your_github_api_key
 ```
@@ -96,7 +93,7 @@ GITHUB_API_KEY=your_github_api_key
  You can also specify your API keys directly as command line arguments when running commands that require them. For example:
 
 ```bash
-pnpm validate --ethscankey=your_etherscan_api_key --githubkey=your_github_api_key
+pnpm validate --ethscanApiKey=your_etherscan_api_key --githubApiKey=your_github_api_key
 ```
 <br>
 
@@ -126,21 +123,9 @@ The zkSync Era Upgrade Verification Tool provides a range of commands for intera
 
 <br>
 
-`version`: Displays the current version of the tool.
-
-```bash
-pnpm validate version
-```
-
-`help`: Provides usage information and displays help for all commands.
-
-```bash
-pnpm validate help
-```
-
 `check <upgradeDir>`: Prints on the terminal the changes applied for a specified upgrade. 
 
-**Etherscan API Key required.*
+ **Etherscan & Github API Key required.*
 
 ```bash
 pnpm validate check <upgradeDir>
@@ -156,7 +141,7 @@ pnpm validate show-diff <upgradeDir> <facetName>
 
 `download-diff <upgradeDir> <targetSourceCodeDir>` : To download the code differences between the current contracts and the upgrade proposal.
 
- **Etherscan & Github API  Key required.*
+ **Etherscan & Github API Key required.*
 
 1. **Run the Command:**
     ```bash
@@ -176,6 +161,13 @@ pnpm validate show-diff <upgradeDir> <facetName>
         - ```meld old new```
         - ```vimdiff old new```
 
+<br>
+
+`help`: Provides usage information and displays help for all commands.
+
+```bash
+pnpm validate help
+```
 
 ## 🧪 Testing
 
@@ -187,5 +179,3 @@ pnpm test
 ## 📄 **License**
 
 This project is licensed under the MIT License. For more details, see the LICENSE file in the repository.
-
- ![Static Badge](https://img.shields.io/badge/zkZync_Era_upgrade_verification_tool%20-%20black?style=for-the-badge&label=moonsong%20labs)                                                                               
