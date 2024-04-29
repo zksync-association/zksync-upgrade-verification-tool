@@ -1,7 +1,7 @@
 import yargs from "yargs";
-import {hideBin} from "yargs/helpers";
-import {NetworkSchema} from ".";
-import {downloadCode, checkCommand, contractDiff} from "../commands";
+import { hideBin } from "yargs/helpers";
+import { NetworkSchema } from ".";
+import { downloadCode, checkCommand, contractDiff } from "../commands";
 import * as process from "node:process";
 
 export const cli = async () => {
@@ -99,7 +99,7 @@ export const cli = async () => {
           yargs.ethscankey,
           NetworkSchema.parse(yargs.network),
           yargs.upgradeDir,
-          'validator'
+          "validator"
         );
       }
     )
@@ -126,7 +126,7 @@ export const cli = async () => {
           .option("verifier", {
             describe: "Filter to include verifier source code",
             type: "boolean",
-            default: false
+            default: false,
           })
           .option("network", {
             alias: "n",
@@ -139,10 +139,10 @@ export const cli = async () => {
           .split(",")
           .map((f) => f.trim())
           .filter((f) => f.length > 0)
-          .map(f => `facet:${f}`);
+          .map((f) => `facet:${f}`);
 
         if (yargs.verifier) {
-          filter.push('verifier')
+          filter.push("verifier");
         }
 
         downloadCode(

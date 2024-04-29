@@ -69,7 +69,12 @@ export class ZkSyncEraDiff {
     await this.writeVerifier(filter, baseDirOld, baseDirNew, client);
   }
 
-  private async writeVerifier(filter: string[], baseDirOld: string, baseDirNew: string, client: BlockExplorerClient) {
+  private async writeVerifier(
+    filter: string[],
+    baseDirOld: string,
+    baseDirNew: string,
+    client: BlockExplorerClient
+  ) {
     if (filter.length === 0 || filter.includes("verifier")) {
       const oldVerifierPath = path.join(baseDirOld, "verifier");
       const oldVerifierCode = await this.oldVerifier.getCode(client);
@@ -171,10 +176,13 @@ export class ZkSyncEraDiff {
       this.oldVerifier.recursionLeafLevelVkHash,
       this.newVerifier.recursionLeafLevelVkHash,
     ]);
-    verifierTable.push(['Show contract diff', {
-      content: `pnpm validate verifier-diff ${upgradeDir}`,
-      colSpan: 2,
-    }])
+    verifierTable.push([
+      "Show contract diff",
+      {
+        content: `pnpm validate verifier-diff ${upgradeDir}`,
+        colSpan: 2,
+      },
+    ]);
     strings.push(verifierTable.toString());
 
     return strings.join("\n");
