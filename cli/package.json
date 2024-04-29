@@ -30,7 +30,7 @@
   },
   "keywords": [],
   "author": "moonsong-labs",
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "1.6.4",
     "@types/node": "^20.12.6",
