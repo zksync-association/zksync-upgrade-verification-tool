@@ -1,19 +1,19 @@
 import type { AbiSet } from "./abi-set.js";
 import { contractRead, contractReadRaw } from "./contract-read.js";
 import { facetsResponseSchema } from "../schema/new-facets.js";
-import type {SystemContractData, UpgradeChanges} from "./upgrade-changes.js";
+import type { SystemContractData, UpgradeChanges } from "./upgrade-changes.js";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { Network } from "./constants.js";
 import { VerifierContract } from "./verifier.js";
 import { type RawSourceCode, verifierParamsSchema } from "../schema/index.js";
 import { z } from "zod";
-import {type Abi, createPublicClient, type Hex, http} from "viem";
+import { type Abi, createPublicClient, type Hex, http } from "viem";
 import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import * as console from "node:console";
-import {add} from "lodash";
-import { utils } from 'zksync-ethers'
+import { add } from "lodash";
+import { utils } from "zksync-ethers";
 
 const MAIN_CONTRACT_FUNCTIONS = {
   facets: "facets",
@@ -201,7 +201,7 @@ export class ZkSyncEraState {
       diff.addSystemContract(
         await this.getCurrentSystemContractData(systemContract.address),
         systemContract
-      )
+      );
     }
 
     return diff;
@@ -209,19 +209,19 @@ export class ZkSyncEraState {
 
   async getCurrentSystemContractData(addr: Hex): Promise<SystemContractData> {
     const client = createPublicClient({
-      transport: http('https://mainnet.era.zksync.io')
-    })
+      transport: http("https://mainnet.era.zksync.io"),
+    });
 
-    const byteCode = await client.getBytecode({address: addr})
+    const byteCode = await client.getBytecode({ address: addr });
     if (!byteCode) {
-      throw new Error(`Error fetching bytecode for: ${addr}`)
+      throw new Error(`Error fetching bytecode for: ${addr}`);
     }
-    const hex = Buffer.from(utils.hashBytecode(byteCode)).toString('hex');
+    const hex = Buffer.from(utils.hashBytecode(byteCode)).toString("hex");
 
     return {
       address: addr,
-      codeHash: `0x${hex}` ,
-      name: "unknown"
-    }
+      codeHash: `0x${hex}`,
+      name: "unknown",
+    };
   }
 }
