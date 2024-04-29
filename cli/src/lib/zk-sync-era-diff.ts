@@ -6,7 +6,8 @@ import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { SystemContractChange } from "./system-contract-change";
 import type { GithubClient } from "./github-client";
 import { systemContractHashesSchema } from "../schema/github-schemas.js";
-import type { ContractData } from "./contract-data.js";
+import {ContractData} from "./contract-data.js";
+import {ZERO_U256} from "./constants.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -125,7 +126,7 @@ export class ZkSyncEraDiff {
     }
   }
 
-  async toCliReport(abis: AbiSet, upgradeDir: string): Promise<string> {
+  async toCliReport(abis: AbiSet, upgradeDir: string, github: GithubClient, ref: string): Promise<string> {
     const title = "Upgrade report:";
     const strings = [`${title}`, "=".repeat(title.length), ""];
 
@@ -242,12 +243,37 @@ export class ZkSyncEraDiff {
 
     strings.push("", "Other contracts:");
     const otherContractsTable = new CliTable({
-      head: ["Name", "Current Bytecode hash", "Proposed Bytecode Hash"],
-      style: { compact: true },
-    });
+      head: ['Name', 'Current Bytecode hash', 'Proposed Bytecode Hash', 'BytecodeHash matches with github'],
+      style: { compact: true }
+    })
 
-    otherContractsTable.push(["Default Account", this.oldAA, this.newAA]);
-    otherContractsTable.push(["Bootloader", this.oldBootLoader, this.newBootLoader]);
+    const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json", ref);
+    const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
+
+    const defaultAccountHash = hashes.find(h => h.contractName === 'DefaultAccount')
+    const bootLoaderHash = hashes.find(h => h.contractName === 'proved_batch')
+
+    if (!defaultAccountHash) { throw new Error(`Missing default account hash for ref: ${ref}`)}
+    if (!bootLoaderHash) { throw new Error(`Missing bootloader hash for ref: ${ref}`)}
+
+    const newAAMsg = this.newAA === ZERO_U256
+      ? 'No changes'
+      : this.newAA
+
+    const aaBytecodeMatches = this.newAA === ZERO_U256
+      ? true
+      : defaultAccountHash.bytecodeHash === this.newAA
+
+    const bootLoaderMsg = this.newBootLoader === ZERO_U256
+      ? 'No changes'
+      : this.newBootLoader
+
+    const bootLoaderBytecodeMatches = this.newBootLoader === ZERO_U256
+      ? true
+      : bootLoaderHash.bytecodeHash === this.newBootLoader
+
+    otherContractsTable.push(["Default Account", this.oldAA, newAAMsg, aaBytecodeMatches]);
+    otherContractsTable.push(["Bootloader", this.oldBootLoader, bootLoaderMsg, bootLoaderBytecodeMatches]);
 
     strings.push(otherContractsTable.toString());
 
