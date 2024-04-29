@@ -8,7 +8,7 @@ export const account20String = hashString.length(42, "Invalid Ethereum address")
 export const bytes32Hash = hashString.length(66, "Invalid Ethereum word");
 export const selectorHash = hashString.length(10, "Invalid Selector hash");
 
-export const numberString = z.string().regex(/^[0-9]*$/, "Invalid number");
+export const numericString = z.string().regex(/^[0-9]*$/, "Invalid number");
 
 export const transactionSchema = z.object({
   txType: z.number(),
@@ -19,7 +19,7 @@ export const transactionSchema = z.object({
   maxFeePerGas: z.number(),
   maxPriorityFeePerGas: z.number(),
   paymaster: z.number(),
-  nonce: z.union([numberString, z.number()]),
+  nonce: z.union([numericString, z.number()]),
   value: z.number(),
   reserved: z.array(z.number()),
   data: hashString,

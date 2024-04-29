@@ -49,7 +49,7 @@ export const cli = async () => {
       }
     )
     .command(
-      "show-diff <upgradeDir> <facetName>",
+      "facet-diff <upgradeDir> <facetName>",
       "Shows the diff for an specific contract",
       (yargs) =>
         yargs
@@ -69,12 +69,37 @@ export const cli = async () => {
             type: "string",
             default: "mainnet",
           }),
-      (yargs) => {
-        contractDiff(
+      async (yargs) => {
+        await contractDiff(
           yargs.ethscankey,
           NetworkSchema.parse(yargs.network),
           yargs.upgradeDir,
-          yargs.facetName
+          `facet:${yargs.facetName}`
+        );
+      }
+    )
+    .command(
+      "verifier-diff <upgradeDir>",
+      "Shows code diff between current verifier source code and the proposed one",
+      (yargs) =>
+        yargs
+          .positional("upgradeDir", {
+            describe: "FolderName of the upgrade to check",
+            type: "string",
+            demandOption: true,
+          })
+          .option("network", {
+            alias: "n",
+            describe: "network to check",
+            type: "string",
+            default: "mainnet",
+          }),
+      async (yargs) => {
+        await contractDiff(
+          yargs.ethscankey,
+          NetworkSchema.parse(yargs.network),
+          yargs.upgradeDir,
+          "validator"
         );
       }
     )
@@ -98,6 +123,11 @@ export const cli = async () => {
             type: "string",
             default: "",
           })
+          .option("verifier", {
+            describe: "Filter to include verifier source code",
+            type: "boolean",
+            default: false,
+          })
           .option("network", {
             alias: "n",
             describe: "network to check",
@@ -105,16 +135,22 @@ export const cli = async () => {
             default: "mainnet",
           }),
       (yargs) => {
-        const facets = yargs.facets
+        const filter = yargs.facets
           .split(",")
           .map((f) => f.trim())
-          .filter((f) => f.length > 0);
+          .filter((f) => f.length > 0)
+          .map((f) => `facet:${f}`);
+
+        if (yargs.verifier) {
+          filter.push("verifier");
+        }
+
         downloadCode(
           yargs.ethscankey,
           NetworkSchema.parse(yargs.network),
           yargs.upgradeDir,
           yargs.targetSourceCodeDir,
-          facets
+          filter
         );
       }
     )

@@ -12,6 +12,7 @@ import path from "node:path";
 type CreateDiffResponse = {
   diff: ZkSyncEraDiff;
   l1Abis: AbiSet;
+  client: BlockExplorerClient;
 };
 
 export async function compareCurrentStateWith(
@@ -34,6 +35,7 @@ export async function compareCurrentStateWith(
 
   return {
     diff: await diamond.calculateDiff(facetChanges, client),
-    l1Abis: l1Abis,
+    l1Abis,
+    client,
   };
 }

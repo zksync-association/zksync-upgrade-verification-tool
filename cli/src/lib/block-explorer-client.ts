@@ -1,20 +1,45 @@
 import type { Abi } from "viem";
-import { sourceCodeResponseSchema, sourceCodeSchema } from "../schema/source-code-response.js";
-import { account20String, getAbiSchema } from "../schema/index.js";
+import {
+  account20String,
+  getAbiSchema,
+  sourceCodeResponseSchema,
+  sourceCodeSchema,
+} from "../schema/index.js";
 import { ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
 import { ContractData } from "./zk-sync-era-state.js";
+import type { z, ZodType } from "zod";
 
 export class BlockExplorerClient {
   private apiKey: string;
   private baseUri: string;
   private abiCache: Map<string, Abi>;
   private sourceCache: Map<string, ContractData>;
+  private callCount = 0;
 
   constructor(apiKey: string, baseUri: string) {
     this.apiKey = apiKey;
     this.baseUri = baseUri;
     this.abiCache = new Map();
     this.sourceCache = new Map();
+    this.callCount = 0;
+  }
+
+  private async fetch<T extends ZodType>(
+    params: Record<string, string>,
+    parser: T
+  ): Promise<z.infer<typeof parser>> {
+    // TODO: Make an option to avoid this
+    // This is to trottle the amount of request made to etherscan, because free plans
+    // rate limits the calls to 5 per second.
+    if (this.callCount % 5 === 4) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    const query = new URLSearchParams(params).toString();
+
+    const response = await fetch(`${this.baseUri}?${query}`);
+    this.callCount++;
+    return parser.parse(await response.json());
   }
 
   async getAbi(rawAddress: string): Promise<Abi> {
@@ -25,15 +50,15 @@ export class BlockExplorerClient {
 
     const contractAddr = account20String.parse(rawAddress);
 
-    const query = new URLSearchParams({
-      module: "contract",
-      action: "getabi",
-      address: contractAddr,
-      apikey: this.apiKey,
-    }).toString();
-
-    const response = await fetch(`${this.baseUri}?${query}`);
-    const { message, result } = getAbiSchema.parse(await response.json());
+    const { message, result } = await this.fetch(
+      {
+        module: "contract",
+        action: "getabi",
+        address: contractAddr,
+        apikey: this.apiKey,
+      },
+      getAbiSchema
+    );
 
     if (message !== "OK") {
       throw new Error(`Failed to fetch ABI for ${rawAddress}`);
@@ -52,22 +77,22 @@ export class BlockExplorerClient {
 
     const contractAddr = account20String.parse(rawAddress);
 
-    const query = new URLSearchParams({
-      module: "contract",
-      action: "getsourcecode",
-      address: contractAddr,
-      apikey: this.apiKey,
-    }).toString();
-
-    const response = await fetch(`${this.baseUri}?${query}`);
-    const { message, result } = sourceCodeResponseSchema.parse(await response.json());
+    const { message, result } = await this.fetch(
+      {
+        module: "contract",
+        action: "getsourcecode",
+        address: contractAddr,
+        apikey: this.apiKey,
+      },
+      sourceCodeResponseSchema
+    );
 
     if (message !== "OK") {
       throw new Error(`Failed to Source Code for ${rawAddress}`);
     }
 
     if (!result[0]) {
-      throw new Error(`Recieved empty Source Code for ${rawAddress}`);
+      throw new Error(`Received empty Source Code for ${rawAddress}`);
     }
 
     const rawSourceCode = result[0].SourceCode.replace(/^\{\{/, "{").replace(/}}$/, "}");

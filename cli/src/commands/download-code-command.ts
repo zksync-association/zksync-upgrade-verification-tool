@@ -1,5 +1,6 @@
 import { compareCurrentStateWith, type Network } from "../lib";
 import * as console from "node:console";
+import { withSpinner } from "../lib/with-spinner.js";
 
 export async function downloadCode(
   etherscanKey: string,
@@ -8,7 +9,9 @@ export async function downloadCode(
   targetDir: string,
   l1Filter: string[]
 ): Promise<void> {
-  const { diff } = await compareCurrentStateWith(etherscanKey, network, upgradeDirectory);
-  await diff.writeCodeDiff(targetDir, l1Filter);
-  console.log("Ok!");
+  const { diff, client } = await withSpinner(() =>
+    compareCurrentStateWith(etherscanKey, network, upgradeDirectory)
+  );
+  await diff.writeCodeDiff(targetDir, l1Filter, client);
+  console.log(`Ok! Contracts written in: ${targetDir}`);
 }

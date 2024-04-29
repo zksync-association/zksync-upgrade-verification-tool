@@ -1,15 +1,16 @@
 import type { AbiSet } from "./abi-set.js";
 import { contractRead, contractReadRaw } from "./contract-read.js";
 import { facetsResponseSchema } from "../schema/new-facets.js";
-import type { RawSourceCode } from "../schema/source-code-response.js";
 import type { UpgradeChanges } from "./upgrade-changes.js";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { Network } from "./constants.js";
 import { VerifierContract } from "./verifier.js";
-import { verifierParamsSchema } from "../schema/index.js";
+import { type RawSourceCode, verifierParamsSchema } from "../schema/index.js";
 import { z } from "zod";
 import type { Abi } from "viem";
 import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
+import path from "node:path";
+import fs from "node:fs/promises";
 
 const MAIN_CONTRACT_FUNCTIONS = {
   facets: "facets",
@@ -27,6 +28,16 @@ export class ContractData {
     this.name = name;
     this.sources = sources;
     this.addr = addr;
+  }
+
+  async writeSources(targetDir: string): Promise<void> {
+    for (const fileName in this.sources.sources) {
+      const { content } = this.sources.sources[fileName];
+      path.parse(fileName).dir;
+      const filePath = path.join(targetDir, fileName);
+      await fs.mkdir(path.parse(filePath).dir, { recursive: true });
+      await fs.writeFile(filePath, content);
+    }
   }
 }
 

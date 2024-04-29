@@ -1,15 +1,15 @@
 import type { VerifierContract } from "./verifier.js";
 import path from "node:path";
-import fs from "node:fs/promises";
 import type { AbiSet } from "./abi-set.js";
 import CliTable from "cli-table3";
 import type { ContractData } from "./zk-sync-era-state.js";
+import type { BlockExplorerClient } from "./block-explorer-client.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
   private newVersion: string;
   private orphanedSelectors: string[];
-  changes: {
+  facetChanges: {
     oldAddress: string;
     newAddress: string;
     name: string;
@@ -32,7 +32,7 @@ export class ZkSyncEraDiff {
     this.oldVersion = oldVersion;
     this.newVersion = newVersion;
     this.orphanedSelectors = orphanedSelectors;
-    this.changes = [];
+    this.facetChanges = [];
     this.oldVerifier = oldVerifier;
     this.newVerifier = newVerifier;
   }
@@ -46,7 +46,7 @@ export class ZkSyncEraDiff {
     oldSelectors: string[],
     newSelectors: string[]
   ): void {
-    this.changes.push({
+    this.facetChanges.push({
       oldAddress,
       newAddress,
       name,
@@ -57,35 +57,51 @@ export class ZkSyncEraDiff {
     });
   }
 
-  async writeCodeDiff(baseDirPath: string, filter: string[]): Promise<void> {
-    for (const { name, oldData, newData } of this.changes) {
-      if (filter.length > 0 && !filter.includes(name)) {
+  async writeCodeDiff(
+    baseDirPath: string,
+    filter: string[],
+    client: BlockExplorerClient
+  ): Promise<void> {
+    const baseDirOld = path.join(baseDirPath, "old");
+    const baseDirNew = path.join(baseDirPath, "new");
+
+    await this.writeFacets(filter, baseDirOld, baseDirNew);
+    await this.writeVerifier(filter, baseDirOld, baseDirNew, client);
+  }
+
+  private async writeVerifier(
+    filter: string[],
+    baseDirOld: string,
+    baseDirNew: string,
+    client: BlockExplorerClient
+  ) {
+    if (filter.length === 0 || filter.includes("verifier")) {
+      const oldVerifierPath = path.join(baseDirOld, "verifier");
+      const oldVerifierCode = await this.oldVerifier.getCode(client);
+      await oldVerifierCode.writeSources(oldVerifierPath);
+      const newVerifierPath = path.join(baseDirNew, "verifier");
+      const newVerifierCode = await this.newVerifier.getCode(client);
+      await newVerifierCode.writeSources(newVerifierPath);
+    }
+  }
+
+  private async writeFacets(filter: string[], baseDirOld: string, baseDirNew: string) {
+    for (const { name, oldData, newData } of this.facetChanges) {
+      if (filter.length > 0 && !filter.includes(`facet:${name}`)) {
         continue;
       }
 
-      const dirOld = path.join(baseDirPath, "old", name);
-      const dirNew = path.join(baseDirPath, "new", name);
+      const dirOld = path.join(baseDirOld, "facets", name);
+      const dirNew = path.join(baseDirNew, "facets", name);
 
-      for (const fileName in oldData.sources.sources) {
-        const { content } = oldData.sources.sources[fileName];
-        path.parse(fileName).dir;
-        const filePath = path.join(dirOld, fileName);
-        await fs.mkdir(path.parse(filePath).dir, { recursive: true });
-        await fs.writeFile(filePath, content);
-      }
-
-      for (const fileName in newData.sources.sources) {
-        const { content } = newData.sources.sources[fileName];
-        const filePath = path.join(dirNew, fileName);
-        await fs.mkdir(path.parse(filePath).dir, { recursive: true });
-        await fs.writeFile(filePath, content);
-      }
+      await oldData.writeSources(dirOld);
+      await newData.writeSources(dirNew);
     }
   }
 
   async toCliReport(abis: AbiSet, upgradeDir: string): Promise<string> {
     const title = "Upgrade report:";
-    const strings = [`${title} \n`, "=".repeat(title.length)];
+    const strings = [`${title}`, "=".repeat(title.length), ""];
 
     const metadataTable = new CliTable({
       head: ["Metadata"],
@@ -96,11 +112,11 @@ export class ZkSyncEraDiff {
     strings.push(metadataTable.toString());
 
     strings.push("L1 Main contract Diamond upgrades:");
-    if (this.changes.length === 0) {
+    if (this.facetChanges.length === 0) {
       strings.push("No diamond changes", "");
     }
 
-    for (const change of this.changes) {
+    for (const change of this.facetChanges) {
       const table = new CliTable({
         head: [change.name],
         style: { compact: true },
@@ -133,7 +149,7 @@ export class ZkSyncEraDiff {
         "Removed functions",
         removedFunctions.length ? removedFunctions.join(", ") : "None",
       ]);
-      table.push(["To compare code", `pnpm validate show-diff ${upgradeDir} ${change.name}`]);
+      table.push(["To compare code", `pnpm validate facet-diff ${upgradeDir} ${change.name}`]);
 
       strings.push(table.toString());
     }
@@ -159,6 +175,13 @@ export class ZkSyncEraDiff {
       "Recursion leaf level VkHash",
       this.oldVerifier.recursionLeafLevelVkHash,
       this.newVerifier.recursionLeafLevelVkHash,
+    ]);
+    verifierTable.push([
+      "Show contract diff",
+      {
+        content: `pnpm validate verifier-diff ${upgradeDir}`,
+        colSpan: 2,
+      },
     ]);
     strings.push(verifierTable.toString());
 
