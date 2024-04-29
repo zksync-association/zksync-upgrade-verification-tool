@@ -7,7 +7,6 @@ import {
 } from "../schema/index.js";
 import { ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
 import { ContractData } from "./zk-sync-era-state.js";
-import * as console from "node:console";
 import type { z, ZodType } from "zod";
 
 export class BlockExplorerClient {
