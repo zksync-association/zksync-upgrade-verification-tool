@@ -2,8 +2,6 @@
 
 > 🏗️ `Work In Progress` : This repo is being actively developed and does not represent final quality of the tool!
 
-<br>
-
 ## 📝 **Description**
 
 The zkSync Era Upgrade Verification Tool is a CLI tool crafted to decode and present zkSync Era upgrade proposals in a human-readable format.
@@ -16,7 +14,6 @@ The zkSync Era Upgrade Verification Tool is a CLI tool crafted to decode and pre
  - **_[L2]_ Bootloader and DefaultAccount**: Validates bytecode hash.
  - **Solidity Diff Tool**: Compares current contracts with upgrade proposals for verification. *Currently available for Facets, Verifier & System Contracts.*
  
-<br>
 
 ## 🔍 **Prerequisites**
 
@@ -95,7 +92,6 @@ GITHUB_API_KEY=your_github_api_key
 ```bash
 pnpm validate --ethscanApiKey=your_etherscan_api_key --githubApiKey=your_github_api_key
 ```
-<br>
 
 ### **5. Download Upgrades Directory**
 
@@ -123,7 +119,7 @@ The zkSync Era Upgrade Verification Tool provides a range of commands for intera
 
 <br>
 
-`check <upgradeDir>`: Prints on the terminal the changes applied for a specified upgrade. 
+**`check <upgradeDir>`**: Prints on the terminal the changes applied for a specified upgrade. 
 
  **Etherscan & Github API Key required.*
 
@@ -131,7 +127,7 @@ The zkSync Era Upgrade Verification Tool provides a range of commands for intera
 pnpm validate check <upgradeDir>
 ```
 
-`show-diff <upgradeDir> <facetName>`: Prints on the terminal the code differences for a particular contract facet. `<facetName>` refers to the specific contract facet to compare.
+**`show-diff <upgradeDir> <facetName>`**: Prints on the terminal the code differences for a particular contract facet. `<facetName>` refers to the specific contract facet to compare.
 
  **Etherscan & Github API Key required.*
 
@@ -139,7 +135,7 @@ pnpm validate check <upgradeDir>
 pnpm validate show-diff <upgradeDir> <facetName>
 ```
 
-`download-diff <upgradeDir> <targetSourceCodeDir>` : To download the code differences between the current contracts and the upgrade proposal.
+**`download-diff <upgradeDir> <targetSourceCodeDir>`** : To download the code differences between the current contracts and the upgrade proposal.
 
  **Etherscan & Github API Key required.*
 
@@ -163,7 +159,7 @@ pnpm validate show-diff <upgradeDir> <facetName>
 
 <br>
 
-`help`: Provides usage information and displays help for all commands.
+**`help`**: Provides usage information and displays help for all commands.
 
 ```bash
 pnpm validate help
