@@ -2,10 +2,10 @@ import { BlockExplorerClient, compareCurrentStateWith, type Network } from "../l
 
 import { withSpinner } from "../lib/with-spinner.js";
 import { GithubClient } from "../lib/github-client";
+import type {EnvBuilder} from "../lib/env-builder.js";
 
 export async function downloadCode(
-  etherscanKey: string,
-  network: Network,
+  env: EnvBuilder,
   upgradeDirectory: string,
   targetDir: string,
   l1Filter: string[],
@@ -15,7 +15,7 @@ export async function downloadCode(
   const l2Client = BlockExplorerClient.forL2();
 
   const { diff, l1Client } = await withSpinner(
-    () => compareCurrentStateWith(etherscanKey, network, upgradeDirectory),
+    () => compareCurrentStateWith(env, upgradeDirectory),
     "Gathering contract data"
   );
 

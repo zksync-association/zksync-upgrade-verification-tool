@@ -5,9 +5,9 @@ import {
   UpgradeChanges,
   lookupAndParse,
   type ZkSyncEraDiff,
-  type Network,
 } from ".";
 import path from "node:path";
+import type {EnvBuilder} from "./env-builder.js";
 
 type CreateDiffResponse = {
   diff: ZkSyncEraDiff;
@@ -16,16 +16,15 @@ type CreateDiffResponse = {
 };
 
 export async function compareCurrentStateWith(
-  etherscanKey: string,
-  network: Network,
+  env: EnvBuilder,
   upgradeDirectory: string
 ): Promise<CreateDiffResponse> {
-  const l1Client = BlockExplorerClient.fromNetwork(etherscanKey, network);
+  const l1Client = env.l1Client();
   const l1Abis = new AbiSet(l1Client);
-  const zkSyncState = await ZkSyncEraState.create(network, l1Client, l1Abis);
+  const zkSyncState = await ZkSyncEraState.create(env.network, l1Client, l1Abis, env.rpc());
 
   const basePath = path.resolve(process.cwd(), upgradeDirectory);
-  const upgrade = await lookupAndParse(basePath, network);
+  const upgrade = await lookupAndParse(basePath, env.network);
 
   const changes = UpgradeChanges.fromFiles(
     upgrade.commonData,

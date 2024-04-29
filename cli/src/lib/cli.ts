@@ -3,9 +3,12 @@ import { hideBin } from "yargs/helpers";
 import { NetworkSchema } from ".";
 import { downloadCode, checkCommand, contractDiff } from "../commands";
 import * as process from "node:process";
+import {EnvBuilder} from "./env-builder.js";
 
 export const cli = async () => {
   // printIntro();
+  let env = new EnvBuilder()
+
   await yargs(hideBin(process.argv))
     .middleware((yargs) => {
       if (!yargs.ethscankey) {
@@ -22,8 +25,7 @@ export const cli = async () => {
     })
     .option("githubApiKey", {
       describe: "Api key for github",
-      type: "string",
-      demandOption: "Please provide a github api key. You can set GITHUB_API_KEY env var or use the option --githubApiKey",
+      type: "string"
     })
     .option("network", {
       alias: "n",
@@ -31,6 +33,18 @@ export const cli = async () => {
       choices: ["mainnet", "sepolia"],
       type: "string",
       default: "mainnet",
+    })
+    .option("rpcUrl", {
+      alias: 'rpc',
+      type: "string",
+      describe: 'Ethereum rpc url',
+      demandOption: false
+    })
+    .middleware((yargs) => {
+      env.withNetwork(NetworkSchema.parse(yargs.network))
+      env.withRpcUrl(yargs.rpcUrl)
+      env.withEtherscanKey(yargs.ethscankey)
+      env.withGithubKey(yargs.githubApiKey)
     })
     .command(
       "check <upgradeDirectory>",
@@ -49,8 +63,7 @@ export const cli = async () => {
           }),
       async (yargs) => {
         await checkCommand(
-          yargs.ethscankey,
-          NetworkSchema.parse(yargs.network),
+          env,
           yargs.upgradeDirectory,
           yargs.ref
         );
@@ -78,8 +91,7 @@ export const cli = async () => {
           }),
       async (yargs) => {
         await contractDiff(
-          yargs.ethscankey,
-          NetworkSchema.parse(yargs.network),
+          env,
           yargs.upgradeDir,
           `facet:${yargs.facetName}`,
           yargs.ref
@@ -103,8 +115,7 @@ export const cli = async () => {
           }),
       async (yargs) => {
         await contractDiff(
-          yargs.ethscankey,
-          NetworkSchema.parse(yargs.network),
+          env,
           yargs.upgradeDir,
           "validator",
           yargs.ref
@@ -166,8 +177,7 @@ export const cli = async () => {
         );
 
         downloadCode(
-          yargs.ethscankey,
-          NetworkSchema.parse(yargs.network),
+          env,
           yargs.upgradeDir,
           yargs.targetSourceCodeDir,
           filter,
