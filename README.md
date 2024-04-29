@@ -127,6 +127,8 @@ The zkSync Era Upgrade Verification Tool provides a range of commands for intera
 pnpm validate check <upgradeDir>
 ```
 
+<br>
+
 **`show-diff <upgradeDir> <facetName>`**: Prints on the terminal the code differences for a particular contract facet. `<facetName>` refers to the specific contract facet to compare.
 
  **Etherscan & Github API Key required.*
@@ -134,6 +136,7 @@ pnpm validate check <upgradeDir>
 ```bash
 pnpm validate show-diff <upgradeDir> <facetName>
 ```
+<br>
 
 **`download-diff <upgradeDir> <targetSourceCodeDir>`** : To download the code differences between the current contracts and the upgrade proposal.
 
