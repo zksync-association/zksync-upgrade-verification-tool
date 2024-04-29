@@ -4,8 +4,8 @@ import type {
   TransactionsJson,
   UpgradeManifest,
 } from "../schema/index.js";
-import { VerifierContract } from "./verifier.js";
-import type { Hex } from "viem";
+import {VerifierContract} from "./verifier.js";
+import type {Hex} from "viem";
 
 export type FacetData = {
   name: string;
@@ -25,20 +25,25 @@ export class UpgradeChanges {
   orphanedSelectors: string[];
   verifier: VerifierContract;
   systemCotractChanges: SystemContractData[];
+  aaBytecodeHash: string;
+  booloaderBytecodeHash: string;
 
-  constructor(newProtocolVersion: string, verifier: VerifierContract) {
+
+  constructor (newProtocolVersion: string, verifier: VerifierContract, aaBytecodeHash: string, booloaderBytecodeHash: string) {
     this.newProtocolVersion = newProtocolVersion;
     this.facets = [];
     this.orphanedSelectors = [];
     this.systemCotractChanges = [];
     this.verifier = verifier;
+    this.aaBytecodeHash = aaBytecodeHash
+    this.booloaderBytecodeHash = booloaderBytecodeHash
   }
 
-  facetAffected(name: string): FacetData | undefined {
+  facetAffected (name: string): FacetData | undefined {
     return this.facets.find((f) => f.name === name);
   }
 
-  addFacet(facetName: string, facetAddr: string, selectors: string[]) {
+  addFacet (facetName: string, facetAddr: string, selectors: string[]) {
     this.orphanedSelectors = this.orphanedSelectors.filter(
       (selector) => !selectors.includes(selector)
     );
@@ -50,15 +55,15 @@ export class UpgradeChanges {
     });
   }
 
-  removeFacet(selectors: string[]) {
+  removeFacet (selectors: string[]) {
     this.orphanedSelectors.push(...selectors);
   }
 
-  addSystemContract(change: SystemContractData) {
+  addSystemContract (change: SystemContractData) {
     this.systemCotractChanges.push(change);
   }
 
-  static fromFiles(
+  static fromFiles (
     common: UpgradeManifest,
     txFile: TransactionsJson,
     facets?: FacetsJson,
@@ -72,7 +77,12 @@ export class UpgradeChanges {
       txFile.proposeUpgradeTx.verifierParams.recursionLeafLevelVkHash
     );
 
-    const instance = new UpgradeChanges(common.protocolVersion.toString(), verifier);
+    const instance = new UpgradeChanges(
+      common.protocolVersion.toString(),
+      verifier,
+      txFile.proposeUpgradeTx.defaultAccountHash,
+      txFile.proposeUpgradeTx.bootloaderHash
+    );
 
     if (facets) {
       const facetDefs = Object.keys(facets).map((name) => {

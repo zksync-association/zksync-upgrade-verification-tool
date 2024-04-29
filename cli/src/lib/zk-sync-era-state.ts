@@ -18,6 +18,8 @@ const MAIN_CONTRACT_FUNCTIONS = {
   getProtocolVersion: "getProtocolVersion",
   getVerifier: "getVerifier",
   getVerifierParams: "getVerifierParams",
+  getL2BootloaderBytecodeHash: "getL2BootloaderBytecodeHash",
+  getL2DefaultAccountBytecodeHash: "getL2DefaultAccountBytecodeHash"
 };
 
 /**
@@ -42,15 +44,8 @@ export class ZkSyncEraState {
   private verifier?: VerifierContract;
   private network: Network;
 
-  private constructor(network: Network, addr: string, abis: AbiSet) {
-    this.network = network;
-    this.addr = addr;
-    this.abis = abis;
-    this.selectorToFacet = new Map();
-    this.facetToSelectors = new Map();
-    this.facetToContractData = new Map();
-    this.protocolVersion = -1n;
-  }
+  private _aaBytecodeHash?: string;
+  private _bootloaderStringHash?: string;
 
   static async create(network: Network, client: BlockExplorerClient, abis: AbiSet) {
     const addresses = {
@@ -61,6 +56,106 @@ export class ZkSyncEraState {
     await diamond.init(client);
     return diamond;
   }
+
+  async calculateDiff(
+    changes: UpgradeChanges,
+    client: BlockExplorerClient
+  ): Promise<ZkSyncEraDiff> {
+    if (!this.verifier) {
+      throw new Error("Missing verifier data");
+    }
+
+    const diff = new ZkSyncEraDiff(
+      this.protocolVersion.toString(),
+      changes.newProtocolVersion,
+      changes.orphanedSelectors,
+      this.verifier,
+      changes.verifier,
+      this.aaBytecodeHash,
+      changes.aaBytecodeHash,
+      this.bootloaderStringHash,
+      changes.booloaderBytecodeHash
+    );
+
+    for (const [address, data] of this.facetToContractData.entries()) {
+      const change = changes.facetAffected(data.name);
+      if (change && change.address !== address) {
+        const newContractData = await client.getSourceCode(change.address);
+        const oldFacets = this.facetToSelectors.get(address);
+        if (!oldFacets) {
+          throw new Error("Inconsistent data");
+        }
+
+        diff.addFacet(
+          address,
+          change.address,
+          data.name,
+          data,
+          newContractData,
+          oldFacets,
+          change.selectors
+        );
+      }
+    }
+
+    for (const systemContract of changes.systemCotractChanges) {
+      const current = await this.getCurrentSystemContractData(systemContract.address);
+
+      diff.addSystemContract(
+        new SystemContractChange(
+          systemContract.address,
+          systemContract.name,
+          current.codeHash,
+          systemContract.codeHash
+        )
+      );
+    }
+
+    return diff;
+  }
+
+  async getCurrentSystemContractData(addr: Hex): Promise<SystemContractData> {
+    const client = createPublicClient({
+      transport: http("https://mainnet.era.zksync.io"),
+    });
+
+    const byteCode = await client.getBytecode({ address: addr });
+    if (!byteCode) {
+      throw new Error(`Error fetching bytecode for: ${addr}`);
+    }
+    const hex = Buffer.from(utils.hashBytecode(byteCode)).toString("hex");
+
+    return {
+      address: addr,
+      codeHash: `0x${hex}`,
+      name: "unknown",
+    };
+  }
+
+  get aaBytecodeHash(): string {
+    if (!this._aaBytecodeHash) {
+      throw new Error(`Not initialized yet`)
+    }
+    return this._aaBytecodeHash
+  }
+
+  get bootloaderStringHash(): string {
+    if (!this._bootloaderStringHash) {
+      throw new Error(`Not initialized yet`)
+    }
+    return this._bootloaderStringHash
+  }
+
+  private constructor(network: Network, addr: string, abis: AbiSet) {
+    this.network = network;
+    this.addr = addr;
+    this.abis = abis;
+    this.selectorToFacet = new Map();
+    this.facetToSelectors = new Map();
+    this.facetToContractData = new Map();
+    this.protocolVersion = -1n;
+  }
+
 
   private async findGetterFacetAbi(): Promise<Abi> {
     // Manually encode calldata becasue at this stage there
@@ -140,76 +235,26 @@ export class ZkSyncEraState {
     await this.initializeFacets(abi, client);
     await this.initializeProtolVersion(abi);
     await this.initializeVerifier(abi);
+    await this.initializeSpecialContacts(abi)
   }
 
-  async calculateDiff(
-    changes: UpgradeChanges,
-    client: BlockExplorerClient
-  ): Promise<ZkSyncEraDiff> {
-    if (!this.verifier) {
-      throw new Error("Missing verifier data");
-    }
-
-    const diff = new ZkSyncEraDiff(
-      this.protocolVersion.toString(),
-      changes.newProtocolVersion,
-      changes.orphanedSelectors,
-      this.verifier,
-      changes.verifier
-    );
-
-    for (const [address, data] of this.facetToContractData.entries()) {
-      const change = changes.facetAffected(data.name);
-      if (change && change.address !== address) {
-        const newContractData = await client.getSourceCode(change.address);
-        const oldFacets = this.facetToSelectors.get(address);
-        if (!oldFacets) {
-          throw new Error("Inconsistent data");
-        }
-
-        diff.addFacet(
-          address,
-          change.address,
-          data.name,
-          data,
-          newContractData,
-          oldFacets,
-          change.selectors
-        );
-      }
-    }
-
-    for (const systemContract of changes.systemCotractChanges) {
-      const current = await this.getCurrentSystemContractData(systemContract.address);
-
-      diff.addSystemContract(
-        new SystemContractChange(
-          systemContract.address,
-          systemContract.name,
-          current.codeHash,
-          systemContract.codeHash
-        )
-      );
-    }
-
-    return diff;
+  private async initializeSpecialContacts(abi: Abi): Promise<void> {
+    this._aaBytecodeHash = await contractRead(
+      this.network,
+      this.addr,
+      MAIN_CONTRACT_FUNCTIONS.getL2BootloaderBytecodeHash,
+      abi,
+      z.string()
+    )
+    this._bootloaderStringHash = await contractRead(
+      this.network,
+      this.addr,
+      MAIN_CONTRACT_FUNCTIONS.getL2DefaultAccountBytecodeHash,
+      abi,
+      z.string()
+    )
   }
 
-  async getCurrentSystemContractData(addr: Hex): Promise<SystemContractData> {
-    const client = createPublicClient({
-      transport: http("https://mainnet.era.zksync.io"),
-    });
 
-    const byteCode = await client.getBytecode({ address: addr });
-    if (!byteCode) {
-      throw new Error(`Error fetching bytecode for: ${addr}`);
-    }
-    const hex = Buffer.from(utils.hashBytecode(byteCode)).toString("hex");
 
-    return {
-      address: addr,
-      codeHash: `0x${hex}`,
-      name: "unknown",
-    };
-  }
 }
