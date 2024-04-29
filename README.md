@@ -182,12 +182,15 @@ pnpm test
 ***Short version:***
 
 - **Extended Support for L2 Upgrades**: We plan to expand the capabilities of the Solidity Diff Tool to include Bootloader and DefaultAccount contracts.
-- **User Interface Enhancements**: To improve user experience, an HTML UI will be developed.
-- **Performance & Personalization Optimization**: Efforts will be made to optimize the processing speed and efficiency of the tool.
+
+- **Improve Error Handling**: We plan to improve error messages and handling throughout the tool.
+
 
 We welcome community feedback and suggestions which can be submitted via our GitHub repository.
 
 ***Extended from notion backlog TBD***
+
+- **User Interface Enhancements**: To improve user experience, an HTML UI can be developed.
 
 - **Add File Output Option**: Implementing file output option. 
 
