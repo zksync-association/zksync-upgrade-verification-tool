@@ -11,7 +11,7 @@ import { ContractData } from "./contract-data.js";
 
 export class BlockExplorerClient {
   private apiKey: string;
-  private baseUri: string;
+  baseUri: string;
   private abiCache: Map<string, Abi>;
   private sourceCache: Map<string, ContractData>;
   private callCount = 0;

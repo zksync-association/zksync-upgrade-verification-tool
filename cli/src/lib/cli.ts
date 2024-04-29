@@ -43,8 +43,8 @@ export const cli = async () => {
     .middleware((yargs) => {
       env.withNetwork(NetworkSchema.parse(yargs.network))
       env.withRpcUrl(yargs.rpcUrl)
-      env.withEtherscanKey(yargs.ethscankey)
-      env.withGithubKey(yargs.githubApiKey)
+      env.withEtherscanApiKey(yargs.ethscankey)
+      env.withGithubApiKey(yargs.githubApiKey)
     })
     .command(
       "check <upgradeDirectory>",

@@ -33,11 +33,14 @@
   "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "1.6.4",
+    "@types/chai": "^4.3.14",
+    "@types/mocha": "^10.0.6",
     "@types/node": "^20.12.6",
+    "chai": "^5.1.0",
+    "mocha": "^10.4.0",
     "typescript": "^5.4.4"
   },
   "dependencies": {
-    "@base2/pretty-print-object": "^1.0.2",
     "@octokit/core": "^6.1.2",
     "@types/yargs": "^17.0.32",
     "cfonts": "^3.2.0",
@@ -48,7 +51,6 @@
     "tsup": "^8.0.2",
     "tsx": "^4.7.2",
     "viem": "^2.9.15",
-    "vitest": "^1.4.0",
     "yargs": "^17.7.2",
     "zksync-ethers": "^6.7.0",
     "zod": "^3.22.4"

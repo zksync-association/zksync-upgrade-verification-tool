@@ -16,6 +16,10 @@ export class RpcClient {
     })
   }
 
+  rpcUrl (): string {
+    return (this.viemClient?.transport?.url) as string
+  }
+
   async contractReadRaw(target: string, callData: string): Promise<Hex> {
     const { data } = await this.viemClient.call({
       to: target as `0x${string}`,

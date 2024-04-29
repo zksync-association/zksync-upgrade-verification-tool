@@ -4,18 +4,34 @@ import {GithubClient} from "./github-client.js";
 import {RpcClient} from "./rpc-client.js";
 
 export class EnvBuilder {
-  _etherscanKey?: string
-  githubKey?: string
+  private _etherscanApiKey?: string
+  githubApiKey?: string
   rpcUrl?: string
-  _network?: Network
+  private _network?: Network
 
-  _l1Client?: BlockExplorerClient
-  _l2Client?: BlockExplorerClient
-  _github?: GithubClient
+  private _l1Client?: BlockExplorerClient
+  private _l2Client?: BlockExplorerClient
+  private _github?: GithubClient
+
+  // Config
 
   withNetwork(n: Network): void {
     this._network = n
   }
+
+  withEtherscanApiKey(etherscanKey: string): void {
+    this._etherscanApiKey = etherscanKey
+  }
+
+  withGithubApiKey(maybeKey: string | undefined): void {
+    this.githubApiKey = maybeKey
+  }
+
+  withRpcUrl(maybeUrl: string | undefined): void {
+    this.rpcUrl = maybeUrl
+  }
+
+  // Get components
 
   get network(): Network {
     if (!this._network) {
@@ -24,23 +40,11 @@ export class EnvBuilder {
     return this._network
   }
 
-  get etherscanKey (): string {
-    if (!this._etherscanKey) {
+  get etherscanApiKey (): string {
+    if (!this._etherscanApiKey) {
       throw new Error('Missing etherscan key')
     }
-    return this._etherscanKey
-  }
-
-  withEtherscanKey(etherscanKey: string): void {
-    this._etherscanKey = etherscanKey
-  }
-
-  withGithubKey(maybeKey: string | undefined): void {
-    this.githubKey = maybeKey
-  }
-
-  withRpcUrl(maybeUrl: string | undefined): void {
-    this.rpcUrl = maybeUrl
+    return this._etherscanApiKey
   }
 
   l1Client (): BlockExplorerClient {
@@ -48,7 +52,7 @@ export class EnvBuilder {
       return this._l1Client
     }
 
-    this._l1Client = BlockExplorerClient.fromNetwork(this.etherscanKey, this.network);
+    this._l1Client = BlockExplorerClient.fromNetwork(this.etherscanApiKey, this.network);
     return this._l1Client
   }
 
@@ -65,7 +69,7 @@ export class EnvBuilder {
       return this._github
     }
 
-    this._github = new GithubClient(this.githubKey);
+    this._github = new GithubClient(this.githubApiKey);
     return this._github
   }
 

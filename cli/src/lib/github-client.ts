@@ -88,4 +88,8 @@ export class GithubClient {
 
     return res;
   }
+
+  async auth(): Promise<Record<string, string>> {
+    return await this.octo.auth() as Record<string, string>
+  }
 }
