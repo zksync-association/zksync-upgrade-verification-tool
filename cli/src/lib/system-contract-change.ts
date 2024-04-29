@@ -16,13 +16,13 @@ export class SystemContractChange {
     this.proposedBytecodeHash = proposedBytecodeHash;
   }
 
-  async downloadCurrentCode(github: GithubClient): Promise<ContractData> {
-    const source = await github.downloadContract(this.name);
-
-    return new ContractData(this.name, source, this.address);
+  async downloadCurrentCode(client: BlockExplorerClient): Promise<ContractData> {
+    return client.getSourceCode(this.address);
   }
 
-  async downloadProposedCode(client: BlockExplorerClient): Promise<ContractData> {
-    return client.getSourceCode(this.address);
+  async downloadProposedCode(github: GithubClient, ref: string): Promise<ContractData> {
+    const source = await github.downloadContract(this.name, ref);
+
+    return new ContractData(this.name, source, this.address);
   }
 }

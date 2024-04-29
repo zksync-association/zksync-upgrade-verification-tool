@@ -254,8 +254,8 @@ export class ZkSyncEraDiff {
       }
 
       const [current, upgrade] = await Promise.all([
-        change.downloadCurrentCode(github),
-        change.downloadProposedCode(l2Client),
+        change.downloadProposedCode(github, ref),
+        change.downloadCurrentCode(l2Client),
       ]);
 
       current.remapKeys("system-contracts/contracts", "contracts-preprocessed");
