@@ -26,16 +26,23 @@ The zkSync Era Upgrade Verification Tool is a CLI tool crafted to decode and pre
 
 ### **1. Installing Node.js & pnpm**
 
-To install `pnpm`, you need to have Node.js installed on your system. If you do not have Node.js installed, you can download it from [nodejs.org](https://nodejs.org/).
+```bash
+node --version  # Checks the installed version of Node.js
+pnpm --version  # Checks the installed version of pnpm
+```
 
-With Node.js installed, you can install `pnpm` using the following command:
+
+If you do not have Node.js installed, please install it from [nodejs.org](https://nodejs.org/en/download/package-manager). For example: 
+
+```bash
+brew install node
+```
+
+If you do not have `pnpm` installed, please install it from [pnpm installation guide](https://pnpm.io/installation). For example:
 
 ```bash
 npm install -g pnpm
 ```
-
-For other ways of installing pnpm or troubleshooting errors, please visit: [pnpm installation guide](https://pnpm.io/installation).
-
 
 ### **2. Clone repository**
 
