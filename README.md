@@ -117,11 +117,11 @@ And define the target `<upgradeDir>` in tool commands using the relative path:
 ## 🛠️ **Usage**
 The zkSync Era Upgrade Verification Tool provides a range of commands for interacting with and verifying zkSync protocol upgrade data.
 
+>**Etherscan & Github API Key required.*
+
 <br>
 
 **`check <upgradeDir>`**: Prints on the terminal the changes applied for a specified upgrade. 
-
- **Etherscan & Github API Key required.*
 
 ```bash
 pnpm validate check <upgradeDir>
@@ -131,7 +131,6 @@ pnpm validate check <upgradeDir>
 
 **`show-diff <upgradeDir> <facetName>`**: Prints on the terminal the code differences for a particular contract facet. `<facetName>` refers to the specific contract facet to compare.
 
- **Etherscan & Github API Key required.*
 
 ```bash
 pnpm validate show-diff <upgradeDir> <facetName>
@@ -140,7 +139,6 @@ pnpm validate show-diff <upgradeDir> <facetName>
 
 **`download-diff <upgradeDir> <targetSourceCodeDir>`** : To download the code differences between the current contracts and the upgrade proposal.
 
- **Etherscan & Github API Key required.*
 
 1. **Run the Command:**
     ```bash
@@ -161,6 +159,9 @@ pnpm validate show-diff <upgradeDir> <facetName>
         - ```vimdiff old new```
 
 <br>
+
+
+## ❓ Help
 
 **`help`**: Provides usage information and displays help for all commands.
 
