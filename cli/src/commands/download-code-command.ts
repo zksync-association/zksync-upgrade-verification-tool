@@ -1,5 +1,5 @@
 import { compareCurrentStateWith, type Network } from "../lib";
-import * as console from "node:console";
+
 import { withSpinner } from "../lib/with-spinner.js";
 
 export async function downloadCode(

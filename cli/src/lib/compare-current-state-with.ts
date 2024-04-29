@@ -22,7 +22,7 @@ export async function compareCurrentStateWith(
 ): Promise<CreateDiffResponse> {
   const client = BlockExplorerClient.fromNetwork(etherscanKey, network);
   const l1Abis = new AbiSet(client);
-  const diamond = await ZkSyncEraState.create(network, client, l1Abis);
+  const zkSyncState = await ZkSyncEraState.create(network, client, l1Abis);
 
   const basePath = path.resolve(process.cwd(), upgradeDirectory);
   const upgrade = await lookupAndParse(basePath, network);
@@ -30,11 +30,12 @@ export async function compareCurrentStateWith(
   const facetChanges = UpgradeChanges.fromFiles(
     upgrade.commonData,
     upgrade.transactions,
-    upgrade.facets
+    upgrade.facets,
+    upgrade.l2Upgrade
   );
 
   return {
-    diff: await diamond.calculateDiff(facetChanges, client),
+    diff: await zkSyncState.calculateDiff(facetChanges, client),
     l1Abis,
     client,
   };
