@@ -1,11 +1,5 @@
 import { z } from "zod";
-import {
-  account20String,
-  bytes32Hash,
-  hashString,
-  selectorhash,
-  transactionSchema,
-} from "../schema";
+import { account20String, bytes32Hash, hashString, transactionSchema } from "../schema";
 
 const systemContractNames = z.enum([
   "AccountCodeStorage",
@@ -65,4 +59,4 @@ export const l2UpgradeSchema = z.object({
   tx: transactionSchema,
 });
 
-export type l2UpgradeJson = z.infer<typeof l2UpgradeSchema>;
+export type L2UpgradeJson = z.infer<typeof l2UpgradeSchema>;

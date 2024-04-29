@@ -1,20 +1,28 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { commonJsonSchema, type AllSchemas, type SchemaMap, type UpgradeManifest } from "../schema";
+import {
+  commonJsonSchema,
+  type CryptoJson,
+  type FacetCutsJson,
+  type FacetsJson,
+  type L2UpgradeJson,
+  type TransactionsJson,
+  type UpgradeManifest,
+} from "../schema";
 import { ZodError } from "zod";
-import { SCHEMAS, knownFileNames } from "./parser";
+import { SCHEMAS } from "./parser";
+import type { Network } from "./constants";
 
-export const retrieveDirNames = async (targetDir: string, verbose = true) => {
+export const retrieveDirNames = async (targetDir: string) => {
   const items = await fs.readdir(targetDir, { withFileTypes: true });
   const directories = items.filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
-  const dirs = await Promise.all(
+
+  return await Promise.all(
     directories.map(async (dir) => ({
       name: dir,
       parsed: await isUpgradeBlob(path.join(targetDir, dir)),
     }))
   );
-
-  return dirs;
 };
 
 const isUpgradeBlob = async (
@@ -42,39 +50,78 @@ const isUpgradeBlob = async (
   }
 };
 
-export type FileStatus = {
-  filePath: string;
-  isValid: boolean;
+export type UpgradeDescriptor = {
+  commonData: UpgradeManifest;
+  transactions: TransactionsJson;
+  crypto: CryptoJson;
+  facetCuts?: FacetCutsJson;
+  facets?: FacetsJson;
+  l2Upgrade?: L2UpgradeJson;
 };
 
-export const lookupAndParse = async (targetDir: string) => {
-  const parsedData: SchemaMap = {};
-  const fileStatuses: FileStatus[] = [];
+function translateNetwork(n: Network) {
+  if (n === "mainnet") {
+    return "mainnet2";
+  }
+  if (n === "sepolia") {
+    return "testnet-sepolia";
+  }
+  throw new Error(`Unknown network: ${n}`);
+}
 
-  const traverseDirectory = async (currentPath: string) => {
-    const entries = await fs.readdir(currentPath, { withFileTypes: true });
+export const lookupAndParse = async (
+  targetDir: string,
+  network: Network
+): Promise<UpgradeDescriptor> => {
+  const networkPath = translateNetwork(network);
 
-    for (const entry of entries) {
-      const entryPath = path.join(currentPath, entry.name);
+  const commonPath = path.join(targetDir, "common.json");
+  const commonBuf = await fs.readFile(commonPath);
+  const commonParser = SCHEMAS["common.json"];
+  const commonData = commonParser.parse(JSON.parse(commonBuf.toString()));
 
-      if (entry.isDirectory()) {
-        await traverseDirectory(entryPath);
-      } else {
-        const fileName = knownFileNames.parse(entry.name);
-        const parser = SCHEMAS[fileName];
-        try {
-          const fileContents = await fs.readFile(entryPath, "utf8");
-          const parsed = parser.parse(JSON.parse(fileContents));
-          parsedData[entryPath] = parsed;
-          fileStatuses.push({ filePath: entryPath, isValid: true });
-        } catch (error) {
-          // process.env.DEBUG === "1" && console.error(`Error parsing ${entryPath}:`, error);
-          fileStatuses.push({ filePath: entryPath, isValid: false });
-        }
-      }
-    }
+  const transactionsPath = path.join(targetDir, networkPath, "transactions.json");
+  const transactionsBuf = await fs.readFile(transactionsPath);
+  const transactions = SCHEMAS["transactions.json"].parse(JSON.parse(transactionsBuf.toString()));
+
+  const cryptoPath = path.join(targetDir, networkPath, "crypto.json");
+  const cryptoBuf = await fs.readFile(cryptoPath);
+  const crypto = SCHEMAS["crypto.json"].parse(JSON.parse(cryptoBuf.toString()));
+
+  const facetCutsPath = path.join(targetDir, networkPath, "facetCuts.json");
+  let facetCuts: FacetCutsJson | undefined;
+  try {
+    const facetCutsBuf = await fs.readFile(facetCutsPath);
+    facetCuts = SCHEMAS["facetCuts.json"].parse(JSON.parse(facetCutsBuf.toString()));
+  } catch (e) {
+    facetCuts = undefined;
+  }
+
+  const facetsPath = path.join(targetDir, networkPath, "facets.json");
+  let facets: FacetsJson | undefined;
+  try {
+    const facetCutsBuf = await fs.readFile(facetsPath);
+    facets = SCHEMAS["facets.json"].parse(JSON.parse(facetCutsBuf.toString()));
+  } catch (e) {
+    facets = undefined;
+  }
+
+  const l2UpgradePath = path.join(targetDir, networkPath, "l2Upgrade.json");
+  let l2Upgrade: L2UpgradeJson | undefined;
+  try {
+    const l2UpgradeBuf = await fs.readFile(l2UpgradePath);
+    l2Upgrade = SCHEMAS["l2Upgrade.json"].parse(JSON.parse(l2UpgradeBuf.toString()));
+  } catch (e) {
+    // console.log(e)
+    l2Upgrade = undefined;
+  }
+
+  return {
+    commonData,
+    transactions,
+    crypto,
+    facetCuts,
+    facets,
+    l2Upgrade,
   };
-  await traverseDirectory(targetDir);
-
-  return { parsedData, fileStatuses };
 };

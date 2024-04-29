@@ -6,16 +6,6 @@ import {
   l2UpgradeSchema,
   transactionsSchema,
 } from "../schema";
-import { z } from "zod";
-
-export const knownFileNames = z.enum([
-  "common.json",
-  "crypto.json",
-  "facetCuts.json",
-  "facets.json",
-  "l2Upgrade.json",
-  "transactions.json",
-]);
 
 export const SCHEMAS = {
   "common.json": commonJsonSchema,
