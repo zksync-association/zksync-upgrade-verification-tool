@@ -9,7 +9,7 @@ export async function checkCommand(
 ): Promise<void> {
   const { diff, l1Abis } = await withSpinner(
     () => compareCurrentStateWith(etherscanKey, network, upgradeDirectory),
-    "Gattering contract data"
+    "Gathering contract data"
   );
   console.log(await diff.toCliReport(l1Abis, upgradeDirectory));
 }

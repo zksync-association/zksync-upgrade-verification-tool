@@ -23,7 +23,7 @@ export const contractDiff = async (
     const targetDir = temporaryDirectory({ prefix: "zksync-era-upgrade-check" });
     await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, github, ref);
     return targetDir;
-  }, "Gattering contract data");
+  }, "Gathering contract data");
 
   await new Promise((resolve, reject) => {
     const res = exec(
