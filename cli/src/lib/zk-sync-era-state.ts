@@ -11,8 +11,6 @@ import { type Abi, createPublicClient, type Hex, http } from "viem";
 import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
 import path from "node:path";
 import fs from "node:fs/promises";
-import * as console from "node:console";
-import { add } from "lodash";
 import { utils } from "zksync-ethers";
 
 const MAIN_CONTRACT_FUNCTIONS = {
