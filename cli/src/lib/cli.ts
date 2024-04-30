@@ -3,11 +3,11 @@ import { hideBin } from "yargs/helpers";
 import { NetworkSchema } from ".";
 import { downloadCode, checkCommand, contractDiff } from "../commands";
 import * as process from "node:process";
-import {EnvBuilder} from "./env-builder.js";
+import { EnvBuilder } from "./env-builder.js";
 
 export const cli = async () => {
   // printIntro();
-  let env = new EnvBuilder()
+  const env = new EnvBuilder();
 
   await yargs(hideBin(process.argv))
     .middleware((yargs) => {
@@ -21,11 +21,12 @@ export const cli = async () => {
     .option("ethscankey", {
       describe: "Api key for etherscan",
       type: "string",
-      demandOption: "Please provide a valid Etherscan api key. You can set ETHERSCAN_API_KEY env var or use the option --ethscankey",
+      demandOption:
+        "Please provide a valid Etherscan api key. You can set ETHERSCAN_API_KEY env var or use the option --ethscankey",
     })
     .option("githubApiKey", {
       describe: "Api key for github",
-      type: "string"
+      type: "string",
     })
     .option("network", {
       alias: "n",
@@ -35,16 +36,16 @@ export const cli = async () => {
       default: "mainnet",
     })
     .option("rpcUrl", {
-      alias: 'rpc',
+      alias: "rpc",
       type: "string",
-      describe: 'Ethereum rpc url',
-      demandOption: false
+      describe: "Ethereum rpc url",
+      demandOption: false,
     })
     .middleware((yargs) => {
-      env.withNetwork(NetworkSchema.parse(yargs.network))
-      env.withRpcUrl(yargs.rpcUrl)
-      env.withEtherscanApiKey(yargs.ethscankey)
-      env.withGithubApiKey(yargs.githubApiKey)
+      env.withNetwork(NetworkSchema.parse(yargs.network));
+      env.withRpcUrl(yargs.rpcUrl);
+      env.withEtherscanApiKey(yargs.ethscankey);
+      env.withGithubApiKey(yargs.githubApiKey);
     })
     .command(
       "check <upgradeDirectory>",
@@ -62,9 +63,7 @@ export const cli = async () => {
             default: "main",
           }),
       async (yargs) => {
-        await checkCommand(
-          env,
-          yargs.upgradeDirectory,
+        await checkCommand(env, yargs.upgradeDirectory,
           yargs.ref
         );
       }
@@ -90,12 +89,7 @@ export const cli = async () => {
             default: "main",
           }),
       async (yargs) => {
-        await contractDiff(
-          env,
-          yargs.upgradeDir,
-          `facet:${yargs.facetName}`,
-          yargs.ref
-        );
+        await contractDiff(env, yargs.upgradeDir, `facet:${yargs.facetName}`, yargs.ref);
       }
     )
     .command(
@@ -114,12 +108,7 @@ export const cli = async () => {
             default: "main",
           }),
       async (yargs) => {
-        await contractDiff(
-          env,
-          yargs.upgradeDir,
-          "validator",
-          yargs.ref
-        );
+        await contractDiff(env, yargs.upgradeDir, "validator", yargs.ref);
       }
     )
     .command(
@@ -176,13 +165,7 @@ export const cli = async () => {
             .map((sc) => `sc:${sc}`)
         );
 
-        downloadCode(
-          env,
-          yargs.upgradeDir,
-          yargs.targetSourceCodeDir,
-          filter,
-          yargs.ref
-        );
+        downloadCode(env, yargs.upgradeDir, yargs.targetSourceCodeDir, filter, yargs.ref);
       }
     )
     .demandCommand(1, "Please specify a command")

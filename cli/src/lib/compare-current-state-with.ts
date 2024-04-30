@@ -1,13 +1,13 @@
 import {
   AbiSet,
-  BlockExplorerClient,
+  type BlockExplorerClient,
   ZkSyncEraState,
   UpgradeChanges,
   lookupAndParse,
   type ZkSyncEraDiff,
 } from ".";
 import path from "node:path";
-import type {EnvBuilder} from "./env-builder.js";
+import type { EnvBuilder } from "./env-builder.js";
 
 type CreateDiffResponse = {
   diff: ZkSyncEraDiff;
