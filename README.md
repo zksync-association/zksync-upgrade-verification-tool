@@ -37,13 +37,36 @@ If you do not have `pnpm` installed, please install it from [pnpm installation g
 npm install -g pnpm
 ```
 
-### **2. Clone repository**
+### **2. Download Upgrades Directory**
+
+To use the `<upgradeDir>` parameter, you need access to the upgrades directory from the zkSync Era repository. You can [find "Upgrades" directory](https://github.com/matter-labs/zksync-era/tree/main/etc/upgrades) at the following relative path:
+
+```bash
+../zksync-era/etc/upgrades
+````
+
+For example, you can clone [zkSync Era Repo](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics) to access this directory: 
+
+```bash
+git clone https://github.com/matter-labs/zksync-era.git
+```
+
+And define the target `<upgradeDir>` in tool commands using the relative path:
+
+```bash
+../zksync-era/etc/upgrades/1699353977-boojum
+```
+
+
+## 🏃 **Set Up**
+
+### **1. Clone repository**
 
 ```bash
 git clone https://github.com/Moonsong-Labs/era-l1-upgrade-checker.git && cd era-l1-upgrade-checker
 ```
 
-### **3. Install dependencies & build**
+### **2. Install dependencies & build**
 
 ```bash
 pnpm install
@@ -53,7 +76,7 @@ pnpm install
 pnpm build
 ```
 
-### **4. Etherscan & Github API Key Setup**
+### **3. Etherscan & Github API Key Setup**
 <br>
 
 >You can create an Etherscan API key at [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).
@@ -92,26 +115,6 @@ GITHUB_API_KEY=your_github_api_key
 ```bash
 pnpm validate --ethscanApiKey=your_etherscan_api_key --githubApiKey=your_github_api_key
 ```
-
-### **5. Download Upgrades Directory**
-
-To use the `<upgradeDir>` parameter, you need access to the upgrades directory from the zkSync Era repository. You can [find "Upgrades" directory](https://github.com/matter-labs/zksync-era/tree/main/etc/upgrades) at the following relative path:
-
-```bash
-../zksync-era/etc/upgrades
-````
-
-For example, you can clone [zkSync Era Repo](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics) to access this directory: 
-
-```bash
-git clone https://github.com/matter-labs/zksync-era.git
-```
-
-And define the target `<upgradeDir>` in tool commands using the relative path:
-
-```bash
-../zksync-era/etc/upgrades/1699353977-boojum
-````
 
 
 ## 🛠️ **Usage**
