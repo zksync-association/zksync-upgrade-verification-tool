@@ -1,21 +1,29 @@
-import type { Network } from "../lib";
+import { BlockExplorerClient, type Network } from "../lib";
 import { compareCurrentStateWith } from "../lib";
 import { temporaryDirectory } from "tempy";
 import { exec } from "node:child_process";
 import { withSpinner } from "../lib/with-spinner.js";
+import { GithubClient } from "../lib/github-client";
 
 export const contractDiff = async (
   etherscanKey: string,
   network: Network,
   upgradeDirectory: string,
-  contractName: string
+  contractName: string,
+  ref: string
 ) => {
+  const github = new GithubClient();
+  const l2Client = BlockExplorerClient.forL2();
   const targetDir = await withSpinner(async (): Promise<string> => {
-    const { diff, client } = await compareCurrentStateWith(etherscanKey, network, upgradeDirectory);
+    const { diff, l1Client } = await compareCurrentStateWith(
+      etherscanKey,
+      network,
+      upgradeDirectory
+    );
     const targetDir = temporaryDirectory({ prefix: "zksync-era-upgrade-check" });
-    await diff.writeCodeDiff(targetDir, [contractName], client);
+    await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, github, ref);
     return targetDir;
-  });
+  }, "Gathering contract data");
 
   await new Promise((resolve, reject) => {
     const res = exec(

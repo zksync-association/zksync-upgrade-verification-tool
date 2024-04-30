@@ -7,13 +7,6 @@ import * as process from "node:process";
 export const cli = async () => {
   // printIntro();
   await yargs(hideBin(process.argv))
-    .option("directory", {
-      describe: "Directory to list upgrades from",
-      alias: "d",
-      type: "string",
-      demandOption: false,
-      default: ".",
-    })
     .middleware((yargs) => {
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
@@ -24,22 +17,22 @@ export const cli = async () => {
       type: "string",
       demandOption: true,
     })
+    .option("network", {
+      alias: "n",
+      describe: "network to check",
+      choices: ["mainnet", "sepolia"],
+      type: "string",
+      default: "mainnet",
+    })
     .command(
       "check <upgradeDirectory>",
       "get current state of contracts",
       (yargs) =>
-        yargs
-          .positional("upgradeDirectory", {
-            describe: "FolderName of the upgrade to check",
-            type: "string",
-            demandOption: true,
-          })
-          .option("network", {
-            alias: "n",
-            describe: "network to check",
-            type: "string",
-            default: "mainnet",
-          }),
+        yargs.positional("upgradeDirectory", {
+          describe: "FolderName of the upgrade to check",
+          type: "string",
+          demandOption: true,
+        }),
       async (yargs) => {
         await checkCommand(
           yargs.ethscankey,
@@ -63,18 +56,18 @@ export const cli = async () => {
             type: "string",
             demandOption: true,
           })
-          .option("network", {
-            alias: "n",
-            describe: "network to check",
+          .option("ref", {
+            describe: "github ref to download code",
             type: "string",
-            default: "mainnet",
+            default: "main",
           }),
       async (yargs) => {
         await contractDiff(
           yargs.ethscankey,
           NetworkSchema.parse(yargs.network),
           yargs.upgradeDir,
-          `facet:${yargs.facetName}`
+          `facet:${yargs.facetName}`,
+          yargs.ref
         );
       }
     )
@@ -88,18 +81,18 @@ export const cli = async () => {
             type: "string",
             demandOption: true,
           })
-          .option("network", {
-            alias: "n",
-            describe: "network to check",
+          .option("ref", {
+            describe: "github ref to download code",
             type: "string",
-            default: "mainnet",
+            default: "main",
           }),
       async (yargs) => {
         await contractDiff(
           yargs.ethscankey,
           NetworkSchema.parse(yargs.network),
           yargs.upgradeDir,
-          "validator"
+          "validator",
+          yargs.ref
         );
       }
     )
@@ -123,16 +116,20 @@ export const cli = async () => {
             type: "string",
             default: "",
           })
+          .option("systemContracts", {
+            alias: "sc",
+            type: "string",
+            default: "",
+          })
           .option("verifier", {
             describe: "Filter to include verifier source code",
             type: "boolean",
             default: false,
           })
-          .option("network", {
-            alias: "n",
-            describe: "network to check",
+          .option("ref", {
+            describe: "github ref to download code",
             type: "string",
-            default: "mainnet",
+            default: "main",
           }),
       (yargs) => {
         const filter = yargs.facets
@@ -145,12 +142,21 @@ export const cli = async () => {
           filter.push("verifier");
         }
 
+        filter.push(
+          ...yargs.systemContracts
+            .split(",")
+            .map((sc) => sc.trim())
+            .filter((sc) => sc.length > 0)
+            .map((sc) => `sc:${sc}`)
+        );
+
         downloadCode(
           yargs.ethscankey,
           NetworkSchema.parse(yargs.network),
           yargs.upgradeDir,
           yargs.targetSourceCodeDir,
-          filter
+          filter,
+          yargs.ref
         );
       }
     )

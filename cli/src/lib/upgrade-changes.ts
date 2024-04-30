@@ -15,7 +15,7 @@ export type FacetData = {
 
 export type SystemContractData = {
   address: Hex;
-  codeHash: string;
+  codeHash: Hex;
   name: string;
 };
 
@@ -102,7 +102,7 @@ export class UpgradeChanges {
     for (const contract of systemContracts) {
       instance.addSystemContract({
         name: contract.name,
-        codeHash: contract.bytecodeHashes[0],
+        codeHash: contract.bytecodeHashes[0] as Hex,
         address: contract.address as Hex,
       });
     }

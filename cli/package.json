@@ -6,7 +6,7 @@
   "main": "./dist/main.js.js",
   "module": "./dist/main.js",
   "bin": {
-    "validate": "./dist/bin/entrypoint.js"
+    "validate": "./bin/validate"
   },
   "engines": {
     "node": ">=20",
@@ -23,7 +23,7 @@
     "fmt:fix": "biome format . --write",
     "lint": "pnpm biome lint ./src",
     "lint:fix": "pnpm biome lint ./src --apply",
-    "start": "tsx src/bin/entrypoint.ts",
+    "start": "tsx src/entrypoint.ts",
     "build": "tsup src --format esm --no-splitting --sourcemap ",
     "watch": "tsup src --format esm --no-splitting --watch",
     "test": "vitest run"
@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@base2/pretty-print-object": "^1.0.2",
+    "@octokit/core": "^6.1.2",
     "@types/inquirer": "^9.0.7",
     "@types/lodash": "^4.17.0",
     "@types/semver": "^7.5.8",
@@ -48,7 +49,6 @@
     "inquirer": "^9.2.17",
     "lodash": "^4.17.21",
     "ora": "^8.0.1",
-    "semver": "^7.6.0",
     "tempy": "^3.1.0",
     "tsup": "^8.0.2",
     "tsx": "^4.7.2",

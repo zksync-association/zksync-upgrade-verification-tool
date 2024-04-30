@@ -4,7 +4,9 @@ import type { AbiSet } from "./abi-set.js";
 import CliTable from "cli-table3";
 import type { ContractData } from "./zk-sync-era-state.js";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
-import type { SystemContractData } from "./upgrade-changes.js";
+import type { SystemContractChange } from "./system-contract-change";
+import type { GithubClient } from "./github-client";
+import { systemContractHashesSchema } from "../schema/github-schemas.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -20,10 +22,7 @@ export class ZkSyncEraDiff {
     newSelectors: string[];
   }[];
 
-  private systemContractChanges: Array<{
-    current: SystemContractData;
-    proposed: SystemContractData;
-  }>;
+  private systemContractChanges: SystemContractChange[];
 
   private oldVerifier: VerifierContract;
   private newVerifier: VerifierContract;
@@ -64,23 +63,24 @@ export class ZkSyncEraDiff {
     });
   }
 
-  addSystemContract(current: SystemContractData, proposed: SystemContractData) {
-    this.systemContractChanges.push({
-      current,
-      proposed,
-    });
+  addSystemContract(change: SystemContractChange) {
+    this.systemContractChanges.push(change);
   }
 
   async writeCodeDiff(
     baseDirPath: string,
     filter: string[],
-    client: BlockExplorerClient
+    l1Client: BlockExplorerClient,
+    l2Client: BlockExplorerClient,
+    github: GithubClient,
+    ref: string
   ): Promise<void> {
     const baseDirOld = path.join(baseDirPath, "old");
     const baseDirNew = path.join(baseDirPath, "new");
 
     await this.writeFacets(filter, baseDirOld, baseDirNew);
-    await this.writeVerifier(filter, baseDirOld, baseDirNew, client);
+    await this.writeVerifier(filter, baseDirOld, baseDirNew, l1Client);
+    await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, github, ref);
   }
 
   private async writeVerifier(
@@ -213,22 +213,54 @@ export class ZkSyncEraDiff {
         // style: { compact: true },
       });
 
-      for (const { current, proposed } of this.systemContractChanges) {
+      for (const change of this.systemContractChanges) {
         sysContractTable.push(
           [
-            { content: proposed.name, rowSpan: 2, vAlign: "center" },
-            { content: current.address, rowSpan: 2, vAlign: "center" },
-            `Current: ${current.codeHash}`,
+            { content: change.name, rowSpan: 2, vAlign: "center" },
+            { content: change.address, rowSpan: 2, vAlign: "center" },
+            `Current: ${change.currentBytecodeHash}`,
           ],
-          [`Proposed: ${proposed.codeHash}`]
+          [`Proposed: ${change.proposedBytecodeHash}`]
         );
       }
-
       strings.push(sysContractTable.toString());
     } else {
       strings.push("No changes in system contracts");
     }
 
     return strings.join("\n");
+  }
+
+  private async writeSystemContracts(
+    filter: string[],
+    baseDirOld: string,
+    baseDirNew: string,
+    l2Client: BlockExplorerClient,
+    github: GithubClient,
+    ref: string
+  ) {
+    const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json", ref);
+    const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
+
+    for (const change of this.systemContractChanges) {
+      if (filter.length !== 0 && !filter.includes(`sc:${change.name}`)) {
+        continue;
+      }
+
+      const currentHash = hashes.find((h) => h.contractName === change.name);
+
+      if (!currentHash || change.proposedBytecodeHash !== currentHash.bytecodeHash) {
+        throw new Error(`Bytecode hash does not match for ${change.name} inside ref "${ref}"`);
+      }
+
+      const [current, upgrade] = await Promise.all([
+        change.downloadProposedCode(github, ref),
+        change.downloadCurrentCode(l2Client),
+      ]);
+
+      current.remapKeys("system-contracts/contracts", "contracts-preprocessed");
+      await current.writeSources(path.join(baseDirOld, "system-contracts", change.name));
+      await upgrade.writeSources(path.join(baseDirNew, "system-contracts", change.name));
+    }
   }
 }

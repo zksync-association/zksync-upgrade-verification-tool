@@ -1,17 +1,27 @@
-import { compareCurrentStateWith, type Network } from "../lib";
+import { BlockExplorerClient, compareCurrentStateWith, type Network } from "../lib";
 
 import { withSpinner } from "../lib/with-spinner.js";
+import { GithubClient } from "../lib/github-client";
 
 export async function downloadCode(
   etherscanKey: string,
   network: Network,
   upgradeDirectory: string,
   targetDir: string,
-  l1Filter: string[]
+  l1Filter: string[],
+  ref: string
 ): Promise<void> {
-  const { diff, client } = await withSpinner(() =>
-    compareCurrentStateWith(etherscanKey, network, upgradeDirectory)
+  const github = new GithubClient(process.env.GITHUB_API_KEY);
+  const l2Client = BlockExplorerClient.forL2();
+
+  const { diff, l1Client } = await withSpinner(
+    () => compareCurrentStateWith(etherscanKey, network, upgradeDirectory),
+    "Gathering contract data"
   );
-  await diff.writeCodeDiff(targetDir, l1Filter, client);
-  console.log(`Ok! Contracts written in: ${targetDir}`);
+
+  await withSpinner(
+    () => diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, github, ref),
+    "Downloading source code"
+  );
+  console.log(`✅  Source code successfully downloaded in: ${targetDir}`);
 }

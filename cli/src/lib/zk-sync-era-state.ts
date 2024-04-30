@@ -5,13 +5,14 @@ import type { SystemContractData, UpgradeChanges } from "./upgrade-changes.js";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { Network } from "./constants.js";
 import { VerifierContract } from "./verifier.js";
-import { type RawSourceCode, verifierParamsSchema } from "../schema/index.js";
+import { type Sources, verifierParamsSchema } from "../schema/index.js";
 import { z } from "zod";
 import { type Abi, createPublicClient, type Hex, http } from "viem";
 import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { utils } from "zksync-ethers";
+import { SystemContractChange } from "./system-contract-change";
 
 const MAIN_CONTRACT_FUNCTIONS = {
   facets: "facets",
@@ -22,23 +23,34 @@ const MAIN_CONTRACT_FUNCTIONS = {
 
 export class ContractData {
   name: string;
-  sources: RawSourceCode;
+  sources: Sources;
   addr: string;
 
-  constructor(name: string, sources: RawSourceCode, addr: string) {
+  constructor(name: string, sources: Sources, addr: string) {
     this.name = name;
     this.sources = sources;
     this.addr = addr;
   }
 
   async writeSources(targetDir: string): Promise<void> {
-    for (const fileName in this.sources.sources) {
-      const { content } = this.sources.sources[fileName];
-      path.parse(fileName).dir;
+    for (const fileName in this.sources) {
+      const { content } = this.sources[fileName];
       const filePath = path.join(targetDir, fileName);
       await fs.mkdir(path.parse(filePath).dir, { recursive: true });
       await fs.writeFile(filePath, content);
     }
+  }
+
+  remapKeys(oldPrefix: string, newPrefix: string): void {
+    const record = this.sources;
+    const keys = Object.keys(record);
+    const newRecord: Sources = {};
+    for (const key of keys) {
+      const newKey = key.replace(new RegExp(`^${oldPrefix}`), newPrefix);
+      newRecord[newKey] = record[key];
+    }
+
+    this.sources = newRecord;
   }
 }
 
@@ -62,8 +74,10 @@ export class ZkSyncEraState {
   facetToContractData: Map<string, ContractData>;
 
   private verifier?: VerifierContract;
+  private network: Network;
 
-  private constructor(addr: string, abis: AbiSet) {
+  private constructor(network: Network, addr: string, abis: AbiSet) {
+    this.network = network;
     this.addr = addr;
     this.abis = abis;
     this.selectorToFacet = new Map();
@@ -77,7 +91,7 @@ export class ZkSyncEraState {
       mainnet: "0x32400084c286cf3e17e7b677ea9583e60a000324",
       sepolia: "0x9a6de0f62aa270a8bcb1e2610078650d539b1ef9",
     };
-    const diamond = new ZkSyncEraState(addresses[network], abis);
+    const diamond = new ZkSyncEraState(network, addresses[network], abis);
     await diamond.init(client);
     return diamond;
   }
@@ -90,7 +104,7 @@ export class ZkSyncEraState {
     const callData = `0x${facetAddressSelector}${facetsSelector}${"0".repeat(
       72 - facetAddressSelector.length - facetsSelector.length
     )}`;
-    const data = await contractReadRaw(this.addr, callData);
+    const data = await contractReadRaw(this.network, this.addr, callData);
 
     // Manually decode address to get abi.
     const facetsAddr = `0x${data.substring(26)}`;
@@ -99,6 +113,7 @@ export class ZkSyncEraState {
 
   private async initializeFacets(abi: Abi, client: BlockExplorerClient): Promise<void> {
     const facets = await contractRead(
+      this.network,
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.facets,
       abi,
@@ -122,6 +137,7 @@ export class ZkSyncEraState {
 
   private async initializeProtolVersion(abi: Abi): Promise<void> {
     this.protocolVersion = await contractRead(
+      this.network,
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.getProtocolVersion,
       abi,
@@ -131,12 +147,14 @@ export class ZkSyncEraState {
 
   private async initializeVerifier(abi: Abi): Promise<void> {
     const verifierAddress = await contractRead(
+      this.network,
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.getVerifier,
       abi,
       z.string()
     );
     const verifierParams = await contractRead(
+      this.network,
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.getVerifierParams,
       abi,
@@ -196,9 +214,15 @@ export class ZkSyncEraState {
     }
 
     for (const systemContract of changes.systemCotractChanges) {
+      const current = await this.getCurrentSystemContractData(systemContract.address);
+
       diff.addSystemContract(
-        await this.getCurrentSystemContractData(systemContract.address),
-        systemContract
+        new SystemContractChange(
+          systemContract.address,
+          systemContract.name,
+          current.codeHash,
+          systemContract.codeHash
+        )
       );
     }
 

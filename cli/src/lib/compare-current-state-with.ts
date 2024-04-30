@@ -12,7 +12,7 @@ import path from "node:path";
 type CreateDiffResponse = {
   diff: ZkSyncEraDiff;
   l1Abis: AbiSet;
-  client: BlockExplorerClient;
+  l1Client: BlockExplorerClient;
 };
 
 export async function compareCurrentStateWith(
@@ -20,9 +20,9 @@ export async function compareCurrentStateWith(
   network: Network,
   upgradeDirectory: string
 ): Promise<CreateDiffResponse> {
-  const client = BlockExplorerClient.fromNetwork(etherscanKey, network);
-  const l1Abis = new AbiSet(client);
-  const zkSyncState = await ZkSyncEraState.create(network, client, l1Abis);
+  const l1Client = BlockExplorerClient.fromNetwork(etherscanKey, network);
+  const l1Abis = new AbiSet(l1Client);
+  const zkSyncState = await ZkSyncEraState.create(network, l1Client, l1Abis);
 
   const basePath = path.resolve(process.cwd(), upgradeDirectory);
   const upgrade = await lookupAndParse(basePath, network);
@@ -35,8 +35,8 @@ export async function compareCurrentStateWith(
   );
 
   return {
-    diff: await zkSyncState.calculateDiff(facetChanges, client),
+    diff: await zkSyncState.calculateDiff(facetChanges, l1Client),
     l1Abis,
-    client,
+    l1Client,
   };
 }
