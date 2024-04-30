@@ -2,11 +2,11 @@ import type { VerifierContract } from "./verifier.js";
 import path from "node:path";
 import type { AbiSet } from "./abi-set.js";
 import CliTable from "cli-table3";
-import type { ContractData } from "./zk-sync-era-state.js";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { SystemContractChange } from "./system-contract-change";
 import type { GithubClient } from "./github-client";
 import { systemContractHashesSchema } from "../schema/github-schemas.js";
+import type { ContractData } from "./contract-data.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -26,13 +26,21 @@ export class ZkSyncEraDiff {
 
   private oldVerifier: VerifierContract;
   private newVerifier: VerifierContract;
+  private oldAA: string;
+  private newAA: string;
+  private oldBootLoader: string;
+  private newBootLoader: string;
 
   constructor(
     oldVersion: string,
     newVersion: string,
     orphanedSelectors: string[],
     oldVerifier: VerifierContract,
-    newVerifier: VerifierContract
+    newVerifier: VerifierContract,
+    oldAA: string,
+    newAA: string,
+    oldBootLoader: string,
+    newBootLoader: string
   ) {
     this.oldVersion = oldVersion;
     this.newVersion = newVersion;
@@ -41,6 +49,10 @@ export class ZkSyncEraDiff {
     this.systemContractChanges = [];
     this.oldVerifier = oldVerifier;
     this.newVerifier = newVerifier;
+    this.oldAA = oldAA;
+    this.newAA = newAA;
+    this.oldBootLoader = oldBootLoader;
+    this.newBootLoader = newBootLoader;
   }
 
   addFacet(
@@ -227,6 +239,17 @@ export class ZkSyncEraDiff {
     } else {
       strings.push("No changes in system contracts");
     }
+
+    strings.push("", "Other contracts:");
+    const otherContractsTable = new CliTable({
+      head: ["Name", "Current Bytecode hash", "Proposed Bytecode Hash"],
+      style: { compact: true },
+    });
+
+    otherContractsTable.push(["Default Account", this.oldAA, this.newAA]);
+    otherContractsTable.push(["Bootloader", this.oldBootLoader, this.newBootLoader]);
+
+    strings.push(otherContractsTable.toString());
 
     return strings.join("\n");
   }

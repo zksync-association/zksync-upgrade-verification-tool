@@ -27,7 +27,7 @@ export async function compareCurrentStateWith(
   const basePath = path.resolve(process.cwd(), upgradeDirectory);
   const upgrade = await lookupAndParse(basePath, network);
 
-  const facetChanges = UpgradeChanges.fromFiles(
+  const changes = UpgradeChanges.fromFiles(
     upgrade.commonData,
     upgrade.transactions,
     upgrade.facets,
@@ -35,7 +35,7 @@ export async function compareCurrentStateWith(
   );
 
   return {
-    diff: await zkSyncState.calculateDiff(facetChanges, l1Client),
+    diff: await zkSyncState.calculateDiff(changes, l1Client),
     l1Abis,
     l1Client,
   };
