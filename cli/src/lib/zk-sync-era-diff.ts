@@ -6,8 +6,8 @@ import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { SystemContractChange } from "./system-contract-change";
 import type { GithubClient } from "./github-client";
 import { systemContractHashesSchema } from "../schema/github-schemas.js";
-import {ContractData} from "./contract-data.js";
-import {ADDRESS_ZERO, ZERO_U256} from "./constants.js";
+import { ContractData } from "./contract-data.js";
+import { ADDRESS_ZERO, ZERO_U256 } from "./constants.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -98,33 +98,39 @@ export class ZkSyncEraDiff {
   }
 
   private async writeSpecialContracts(dir: string, github: GithubClient, ref: string) {
-    const baseDirAA = path.join(dir, 'defaultAA')
-    const baseDirBL = path.join(dir, 'bootloader')
+    const baseDirAA = path.join(dir, "defaultAA");
+    const baseDirBL = path.join(dir, "bootloader");
 
     const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json", ref);
     const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
 
     if (this.newAA !== ZERO_U256) {
-      const defaultAccountHash = hashes.find(h => h.contractName === 'DefaultAccount')
+      const defaultAccountHash = hashes.find((h) => h.contractName === "DefaultAccount");
       if (!defaultAccountHash || defaultAccountHash.bytecodeHash !== this.newAA) {
-        throw new Error(`Default Account contract byte code hash does not match in ref: ${ref}`)
+        throw new Error(`Default Account contract byte code hash does not match in ref: ${ref}`);
       }
 
-      const sourcesAA = await github.downloadContract("DefaultAccount", ref)
-      const contractAA = new ContractData('DefaultAA', sourcesAA, ADDRESS_ZERO)
-      await contractAA.writeSources(baseDirAA)
+      const sourcesAA = await github.downloadContract("DefaultAccount", ref);
+      const contractAA = new ContractData("DefaultAA", sourcesAA, ADDRESS_ZERO);
+      await contractAA.writeSources(baseDirAA);
     }
 
-
     if (this.newBootLoader !== ZERO_U256) {
-      const bootLoaderHash = hashes.find(h => h.contractName === 'proved_batch')
+      const bootLoaderHash = hashes.find((h) => h.contractName === "proved_batch");
       if (!bootLoaderHash || bootLoaderHash.bytecodeHash !== this.newBootLoader) {
-        throw new Error(`Bootloader contract byte code hash does not match in ref: ${ref}`)
+        throw new Error(`Bootloader contract byte code hash does not match in ref: ${ref}`);
       }
 
-      const sourcesBL = await github.downloadFile('system-contracts/bootloader/bootloader.yul', ref)
-      const contractBL = new ContractData('Bootloader', {'bootloader.yul': { content: sourcesBL }}, ADDRESS_ZERO)
-      await contractBL.writeSources(baseDirBL)
+      const sourcesBL = await github.downloadFile(
+        "system-contracts/bootloader/bootloader.yul",
+        ref
+      );
+      const contractBL = new ContractData(
+        "Bootloader",
+        { "bootloader.yul": { content: sourcesBL } },
+        ADDRESS_ZERO
+      );
+      await contractBL.writeSources(baseDirBL);
     }
   }
 
@@ -158,7 +164,12 @@ export class ZkSyncEraDiff {
     }
   }
 
-  async toCliReport(abis: AbiSet, upgradeDir: string, github: GithubClient, ref: string): Promise<string> {
+  async toCliReport(
+    abis: AbiSet,
+    upgradeDir: string,
+    github: GithubClient,
+    ref: string
+  ): Promise<string> {
     const title = "Upgrade report:";
     const strings = [`${title}`, "=".repeat(title.length), ""];
 
@@ -275,37 +286,45 @@ export class ZkSyncEraDiff {
 
     strings.push("", "Other contracts:");
     const otherContractsTable = new CliTable({
-      head: ['Name', 'Current Bytecode hash', 'Proposed Bytecode Hash', 'BytecodeHash matches with github'],
-      style: { compact: true }
-    })
+      head: [
+        "Name",
+        "Current Bytecode hash",
+        "Proposed Bytecode Hash",
+        "BytecodeHash matches with github",
+      ],
+      style: { compact: true },
+    });
 
     const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json", ref);
     const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
 
-    const defaultAccountHash = hashes.find(h => h.contractName === 'DefaultAccount')
-    const bootLoaderHash = hashes.find(h => h.contractName === 'proved_batch')
+    const defaultAccountHash = hashes.find((h) => h.contractName === "DefaultAccount");
+    const bootLoaderHash = hashes.find((h) => h.contractName === "proved_batch");
 
-    if (!defaultAccountHash) { throw new Error(`Missing default account hash for ref: ${ref}`)}
-    if (!bootLoaderHash) { throw new Error(`Missing bootloader hash for ref: ${ref}`)}
+    if (!defaultAccountHash) {
+      throw new Error(`Missing default account hash for ref: ${ref}`);
+    }
+    if (!bootLoaderHash) {
+      throw new Error(`Missing bootloader hash for ref: ${ref}`);
+    }
 
-    const newAAMsg = this.newAA === ZERO_U256
-      ? 'No changes'
-      : this.newAA
+    const newAAMsg = this.newAA === ZERO_U256 ? "No changes" : this.newAA;
 
-    const aaBytecodeMatches = this.newAA === ZERO_U256
-      ? true
-      : defaultAccountHash.bytecodeHash === this.newAA
+    const aaBytecodeMatches =
+      this.newAA === ZERO_U256 ? true : defaultAccountHash.bytecodeHash === this.newAA;
 
-    const bootLoaderMsg = this.newBootLoader === ZERO_U256
-      ? 'No changes'
-      : this.newBootLoader
+    const bootLoaderMsg = this.newBootLoader === ZERO_U256 ? "No changes" : this.newBootLoader;
 
-    const bootLoaderBytecodeMatches = this.newBootLoader === ZERO_U256
-      ? true
-      : bootLoaderHash.bytecodeHash === this.newBootLoader
+    const bootLoaderBytecodeMatches =
+      this.newBootLoader === ZERO_U256 ? true : bootLoaderHash.bytecodeHash === this.newBootLoader;
 
     otherContractsTable.push(["Default Account", this.oldAA, newAAMsg, aaBytecodeMatches]);
-    otherContractsTable.push(["Bootloader", this.oldBootLoader, bootLoaderMsg, bootLoaderBytecodeMatches]);
+    otherContractsTable.push([
+      "Bootloader",
+      this.oldBootLoader,
+      bootLoaderMsg,
+      bootLoaderBytecodeMatches,
+    ]);
 
     strings.push(otherContractsTable.toString());
 
