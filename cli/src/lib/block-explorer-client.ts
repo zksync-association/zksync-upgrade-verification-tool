@@ -6,8 +6,8 @@ import {
   sourceCodeSchema,
 } from "../schema/index.js";
 import { ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
-import { ContractData } from "./zk-sync-era-state.js";
 import type { z, ZodType } from "zod";
+import { ContractData } from "./contract-data.js";
 
 export class BlockExplorerClient {
   private apiKey: string;
@@ -96,12 +96,20 @@ export class BlockExplorerClient {
     }
 
     const rawSourceCode = result[0].SourceCode.replace(/^\{\{/, "{").replace(/}}$/, "}");
-    const SourceCode = sourceCodeSchema.parse(JSON.parse(rawSourceCode));
-
-    const data = new ContractData(result[0].ContractName, SourceCode, contractAddr);
-
-    this.sourceCache.set(rawAddress, data);
-    return data;
+    try {
+      const SourceCode = sourceCodeSchema.parse(JSON.parse(rawSourceCode));
+      const data = new ContractData(result[0].ContractName, SourceCode.sources, contractAddr);
+      this.sourceCache.set(rawAddress, data);
+      return data;
+    } catch (e) {
+      if (e instanceof SyntaxError) {
+        const sources = { "main.sol": { content: rawSourceCode } };
+        const data = new ContractData(result[0].ContractName, sources, contractAddr);
+        this.sourceCache.set(rawAddress, data);
+        return data;
+      }
+      throw e;
+    }
   }
 
   static fromNetwork(apiKey: string, network: Network): BlockExplorerClient {

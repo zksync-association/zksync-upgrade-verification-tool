@@ -28,7 +28,7 @@ describe("CLI Output Test Suite", () => {
 
   it("should display help", async () => {
     const { stdout } = await execAsync("pnpm validate --help");
-    expect(stdout).toContain("entrypoint.js <command>");
+    expect(stdout).toContain("validate <command>");
     expect(stdout).toContain("Commands:");
     expect(stdout).toContain("Options:");
   });

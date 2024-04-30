@@ -11,3 +11,5 @@ export * from "./upgrade-changes.js";
 export * from "./parser";
 export * from "./utils";
 export * from "./zk-sync-era-diff.js";
+export { SystemContractChange } from "./system-contract-change";
+export { ContractData } from "./contract-data.js";

@@ -28,9 +28,11 @@ export const sourceCodeResponseSchema = z.object({
   result: z.array(etherscanSourceCodeSchema),
 });
 
+const sourcesParser = z.record(z.string(), z.object({ content: z.string() }));
 export const sourceCodeSchema = z.object({
   language: z.string(),
-  sources: z.record(z.string(), z.object({ content: z.string() })),
+  sources: sourcesParser,
 });
 
 export type RawSourceCode = z.infer<typeof sourceCodeSchema>;
+export type Sources = z.infer<typeof sourcesParser>;
