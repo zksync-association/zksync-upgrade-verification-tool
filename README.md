@@ -37,7 +37,7 @@ If you do not have `pnpm` installed, please install it from [pnpm installation g
 npm install -g pnpm
 ```
 
-### **5. Access to Upgrades Directory**
+### **5. Access to Upgrade Directory**
 
 For the `<upgradeDir>` parameter, you need access to a upgrade directory. For example, [zksync-era upgrades directory](https://github.com/matter-labs/zksync-era/tree/main/etc/upgrades)
 
