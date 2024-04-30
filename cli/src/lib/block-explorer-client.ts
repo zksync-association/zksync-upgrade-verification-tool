@@ -5,7 +5,7 @@ import {
   sourceCodeResponseSchema,
   sourceCodeSchema,
 } from "../schema/index.js";
-import { ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
+import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
 import type { z, ZodType } from "zod";
 import { ContractData } from "./contract-data.js";
 
@@ -117,10 +117,8 @@ export class BlockExplorerClient {
     return new BlockExplorerClient(apiKey, baseUri);
   }
 
-  static forL2(): BlockExplorerClient {
-    return new BlockExplorerClient(
-      "no api key needed",
-      "https://block-explorer-api.mainnet.zksync.io/api"
-    );
+  static forL2(network: Network): BlockExplorerClient {
+    const baseUri = ERA_BLOCK_EXPLORER_ENDPOINTS[network];
+    return new BlockExplorerClient("no api key needed", baseUri);
   }
 }

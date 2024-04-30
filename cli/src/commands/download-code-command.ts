@@ -2,7 +2,7 @@ import { BlockExplorerClient, compareCurrentStateWith, type Network } from "../l
 
 import { withSpinner } from "../lib/with-spinner.js";
 import { GithubClient } from "../lib/github-client";
-import type {EnvBuilder} from "../lib/env-builder.js";
+import type { EnvBuilder } from "../lib/env-builder.js";
 
 export async function downloadCode(
   env: EnvBuilder,
@@ -12,7 +12,7 @@ export async function downloadCode(
   ref: string
 ): Promise<void> {
   const github = new GithubClient(process.env.GITHUB_API_KEY);
-  const l2Client = BlockExplorerClient.forL2();
+  const l2Client = env.l2Client();
 
   const { diff, l1Client } = await withSpinner(
     () => compareCurrentStateWith(env, upgradeDirectory),

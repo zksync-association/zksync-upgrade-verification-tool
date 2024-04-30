@@ -5,6 +5,11 @@ export const ETHERSCAN_ENDPOINTS = {
   sepolia: "https://api-sepolia.etherscan.io/api",
 } as const;
 
+export const ERA_BLOCK_EXPLORER_ENDPOINTS = {
+  mainnet: "https://block-explorer-api.mainnet.zksync.io/api",
+  sepolia: "https://block-explorer-api.sepolia.zksync.dev",
+} as const;
+
 export const NetworkSchema = z.enum(["mainnet", "sepolia"]);
 
 export type Network = z.infer<typeof NetworkSchema>;

@@ -42,7 +42,6 @@ export class ZkSyncEraState {
   facetToContractData: Map<string, ContractData>;
 
   private verifier?: VerifierContract;
-  private network: Network;
   private rpc: RpcClient;
 
   private _aaBytecodeHash?: string;
@@ -53,9 +52,9 @@ export class ZkSyncEraState {
       mainnet: "0x32400084c286cf3e17e7b677ea9583e60a000324",
       sepolia: "0x9a6de0f62aa270a8bcb1e2610078650d539b1ef9",
     };
-    const diamond = new ZkSyncEraState(network, addresses[network], abis, rpc);
-    await diamond.init(client);
-    return diamond;
+    const zkSyncState = new ZkSyncEraState(addresses[network], abis, rpc);
+    await zkSyncState.init(client);
+    return zkSyncState;
   }
 
   async calculateDiff (
@@ -147,16 +146,16 @@ export class ZkSyncEraState {
     return this._bootloaderStringHash;
   }
 
-  private constructor (network: Network, addr: string, abis: AbiSet, rpc: RpcClient) {
-    this.network = network;
+  private constructor (addr: string, abis: AbiSet, rpc: RpcClient) {
     this.addr = addr;
     this.abis = abis;
-    this.rpc = rpc
+    this.rpc = rpc;
     this.selectorToFacet = new Map();
     this.facetToSelectors = new Map();
     this.facetToContractData = new Map();
     this.protocolVersion = -1n;
   }
+
 
   private async findGetterFacetAbi (): Promise<Abi> {
     // Manually encode calldata becasue at this stage there
