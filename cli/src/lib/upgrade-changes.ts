@@ -77,8 +77,8 @@ export class UpgradeChanges {
     const verifier = new VerifierContract(
       txFile.proposeUpgradeTx.verifier,
       txFile.proposeUpgradeTx.verifierParams.recursionCircuitsSetVksHash,
-      txFile.proposeUpgradeTx.verifierParams.recursionNodeLevelVkHash,
-      txFile.proposeUpgradeTx.verifierParams.recursionLeafLevelVkHash
+      txFile.proposeUpgradeTx.verifierParams.recursionLeafLevelVkHash,
+      txFile.proposeUpgradeTx.verifierParams.recursionNodeLevelVkHash
     );
 
     const instance = new UpgradeChanges(
