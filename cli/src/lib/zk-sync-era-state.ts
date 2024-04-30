@@ -1,17 +1,17 @@
-import type {AbiSet} from "./abi-set.js";
-import {facetsResponseSchema} from "../schema/new-facets.js";
-import type {SystemContractData, UpgradeChanges} from "./upgrade-changes.js";
-import type {BlockExplorerClient} from "./block-explorer-client.js";
-import type {Network} from "./constants.js";
-import {VerifierContract} from "./verifier.js";
-import {verifierParamsSchema} from "../schema/index.js";
-import {z} from "zod";
-import {type Abi, createPublicClient, type Hex, http} from "viem";
-import {ZkSyncEraDiff} from "./zk-sync-era-diff.js";
-import {utils} from "zksync-ethers";
-import {SystemContractChange} from "./system-contract-change";
-import type {RpcClient} from "./rpc-client.js";
-import type {ContractData} from "./contract-data.js";
+import type { AbiSet } from "./abi-set.js";
+import { facetsResponseSchema } from "../schema/new-facets.js";
+import type { SystemContractData, UpgradeChanges } from "./upgrade-changes.js";
+import type { BlockExplorerClient } from "./block-explorer-client.js";
+import type { Network } from "./constants.js";
+import { VerifierContract } from "./verifier.js";
+import { verifierParamsSchema } from "../schema/index.js";
+import { z } from "zod";
+import { type Abi, createPublicClient, type Hex, http } from "viem";
+import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
+import { utils } from "zksync-ethers";
+import { SystemContractChange } from "./system-contract-change";
+import type { RpcClient } from "./rpc-client.js";
+import type { ContractData } from "./contract-data.js";
 
 const MAIN_CONTRACT_FUNCTIONS = {
   facets: "facets",
@@ -47,7 +47,7 @@ export class ZkSyncEraState {
   private _aaBytecodeHash?: string;
   private _bootloaderStringHash?: string;
 
-  static async create (network: Network, client: BlockExplorerClient, abis: AbiSet, rpc: RpcClient) {
+  static async create(network: Network, client: BlockExplorerClient, abis: AbiSet, rpc: RpcClient) {
     const addresses = {
       mainnet: "0x32400084c286cf3e17e7b677ea9583e60a000324",
       sepolia: "0x9a6de0f62aa270a8bcb1e2610078650d539b1ef9",
@@ -57,7 +57,7 @@ export class ZkSyncEraState {
     return zkSyncState;
   }
 
-  async calculateDiff (
+  async calculateDiff(
     changes: UpgradeChanges,
     client: BlockExplorerClient
   ): Promise<ZkSyncEraDiff> {
@@ -114,12 +114,12 @@ export class ZkSyncEraState {
     return diff;
   }
 
-  async getCurrentSystemContractData (addr: Hex): Promise<SystemContractData> {
+  async getCurrentSystemContractData(addr: Hex): Promise<SystemContractData> {
     const client = createPublicClient({
       transport: http("https://mainnet.era.zksync.io"),
     });
 
-    const byteCode = await client.getBytecode({address: addr});
+    const byteCode = await client.getBytecode({ address: addr });
     if (!byteCode) {
       throw new Error(`Error fetching bytecode for: ${addr}`);
     }
@@ -132,21 +132,21 @@ export class ZkSyncEraState {
     };
   }
 
-  get aaBytecodeHash (): string {
+  get aaBytecodeHash(): string {
     if (!this._aaBytecodeHash) {
       throw new Error("Not initialized yet");
     }
     return this._aaBytecodeHash;
   }
 
-  get bootloaderStringHash (): string {
+  get bootloaderStringHash(): string {
     if (!this._bootloaderStringHash) {
       throw new Error("Not initialized yet");
     }
     return this._bootloaderStringHash;
   }
 
-  private constructor (addr: string, abis: AbiSet, rpc: RpcClient) {
+  private constructor(addr: string, abis: AbiSet, rpc: RpcClient) {
     this.addr = addr;
     this.abis = abis;
     this.rpc = rpc;
@@ -156,8 +156,7 @@ export class ZkSyncEraState {
     this.protocolVersion = -1n;
   }
 
-
-  private async findGetterFacetAbi (): Promise<Abi> {
+  private async findGetterFacetAbi(): Promise<Abi> {
     // Manually encode calldata becasue at this stage there
     // is no address to get the abi
     const facetAddressSelector = "cdffacc6";
@@ -172,7 +171,7 @@ export class ZkSyncEraState {
     return await this.abis.fetch(facetsAddr);
   }
 
-  private async initializeFacets (abi: Abi, client: BlockExplorerClient): Promise<void> {
+  private async initializeFacets(abi: Abi, client: BlockExplorerClient): Promise<void> {
     const facets = await this.rpc.contractRead(
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.facets,
@@ -195,7 +194,7 @@ export class ZkSyncEraState {
     );
   }
 
-  private async initializeProtolVersion (abi: Abi): Promise<void> {
+  private async initializeProtolVersion(abi: Abi): Promise<void> {
     this.protocolVersion = await this.rpc.contractRead(
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.getProtocolVersion,
@@ -204,7 +203,7 @@ export class ZkSyncEraState {
     );
   }
 
-  private async initializeVerifier (abi: Abi): Promise<void> {
+  private async initializeVerifier(abi: Abi): Promise<void> {
     const verifierAddress = await this.rpc.contractRead(
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.getVerifier,
@@ -225,7 +224,7 @@ export class ZkSyncEraState {
     );
   }
 
-  private async init (client: BlockExplorerClient) {
+  private async init(client: BlockExplorerClient) {
     const abi = await this.findGetterFacetAbi();
 
     await this.initializeFacets(abi, client);
@@ -234,7 +233,7 @@ export class ZkSyncEraState {
     await this.initializeSpecialContacts(abi);
   }
 
-  private async initializeSpecialContacts (abi: Abi): Promise<void> {
+  private async initializeSpecialContacts(abi: Abi): Promise<void> {
     this._aaBytecodeHash = await this.rpc.contractRead(
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.getL2BootloaderBytecodeHash,

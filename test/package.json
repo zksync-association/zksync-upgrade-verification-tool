@@ -16,7 +16,7 @@
     "*.mjs"
   ],
   "scripts": {
-    "update":"vitest -u",
+    "update": "vitest -u",
     "fmt": "biome format .",
     "fmt:fix": "biome format . --write",
     "lint": "pnpm biome lint .",
@@ -32,6 +32,7 @@
     "typescript": "^5.4.4"
   },
   "dependencies": {
+    "dotenv": "^16.4.5",
     "validate-cli": "workspace:*",
     "vitest": "^1.4.0"
   }

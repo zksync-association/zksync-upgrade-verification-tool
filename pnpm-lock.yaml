@@ -88,6 +88,9 @@ importers:
 
   test:
     dependencies:
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.4.5
       validate-cli:
         specifier: workspace:*
         version: link:../cli

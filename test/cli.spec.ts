@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import pkg from "../package.json" assert { type: "json" };
+import "dotenv/config";
 
 const execAsync = promisify(exec);
 
@@ -52,13 +53,13 @@ describe("CLI Output Test Suite", () => {
 
       expect(stdout).toMatch(/Addres.+?0x[0-9a-fA-F]{40}.+?0x0{40}/);
       expect(stdout).toMatch(
-        /Recursion node level VkHash.+?0x[0-9a-fA-F]{64}.+?0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a/
+        /Recursion node level VkHash.+?0x[0-9a-fA-F]{64}.+?0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080/
       );
       expect(stdout).toMatch(
         /Recursion circuits set VksHash.+?0x[0-9a-fA-F]{64}.+?0x0000000000000000000000000000000000000000000000000000000000000000/
       );
       expect(stdout).toMatch(
-        /Recursion leaf level VkHash.+?0x[0-9a-fA-F]{64}.+?0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080/
+        /Recursion leaf level VkHash.+?0x[0-9a-fA-F]{64}.+?0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a/
       );
     });
 

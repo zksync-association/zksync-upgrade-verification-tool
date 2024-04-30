@@ -63,9 +63,7 @@ export const cli = async () => {
             default: "main",
           }),
       async (yargs) => {
-        await checkCommand(env, yargs.upgradeDirectory,
-          yargs.ref
-        );
+        await checkCommand(env, yargs.upgradeDirectory, yargs.ref);
       }
     )
     .command(
