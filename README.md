@@ -39,13 +39,9 @@ npm install -g pnpm
 
 ### **5. Access to Upgrades Directory**
 
-To use the `<upgradeDir>` parameter, you need access to the upgrades directory from the zkSync Era repository. You can [find "Upgrades" directory](https://github.com/matter-labs/zksync-era/tree/main/etc/upgrades) at the following relative path:
+For the `<upgradeDir>` parameter, you need access to a upgrade directory. For example, [zksync-era upgrades directory](https://github.com/matter-labs/zksync-era/tree/main/etc/upgrades)
 
-```bash
-../zksync-era/etc/upgrades
-````
-
-For example, you can clone [zkSync Era Repo](https://github.com/matter-labs/zksync-era) to access this directory: 
+You can clone [zkSync Era Repo](https://github.com/matter-labs/zksync-era) to access this directory: 
 
 ```bash
 git clone https://github.com/matter-labs/zksync-era.git
