@@ -183,11 +183,7 @@ pnpm test
 
 - **Improve Error Handling**: We plan to improve error messages and handling throughout the tool.
 
-- **Add File Output Option**: Implementing file output option. 
-
-- **GitHub Integration**: Enabling the tool to fetch all upgrade data directly from GitHub repositories to streamline upgrade verification processes.
-
-- **Network Deployment Personalization & Consistency**: Incorporating features to check for consistency between different network deployments and add a network option to choose between networks.
+- **Add HTML File Output Option**: Implementing HTML file output option to improve diff visualization and user experience. 
 
 We welcome community feedback and suggestions which can be submitted via our GitHub repository.
 
