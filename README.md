@@ -114,8 +114,6 @@ The zkSync Era Upgrade Verification Tool provides a range of commands for intera
 
 >**Etherscan & Github API Key required.*
 
-<br>
-
 ### **`check <upgradeDir>`**: 
 Checks the validity of the upgrade and prints a summary of the changes.
 
