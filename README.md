@@ -17,7 +17,7 @@ The zkSync Era Upgrade Verification Tool is a CLI tool crafted to decode and pre
 
 ## 🔍 **Prerequisites**
 
-### **1. Installing Node.js & pnpm**
+### **1. Node.js & pnpm**
 
 ```bash
 node --version  # Checks the installed version of Node.js
@@ -37,6 +37,28 @@ If you do not have `pnpm` installed, please install it from [pnpm installation g
 npm install -g pnpm
 ```
 
+### **5. Access to Upgrades Directory**
+
+To use the `<upgradeDir>` parameter, you need access to the upgrades directory from the zkSync Era repository. You can [find "Upgrades" directory](https://github.com/matter-labs/zksync-era/tree/main/etc/upgrades) at the following relative path:
+
+```bash
+../zksync-era/etc/upgrades
+````
+
+For example, you can clone [zkSync Era Repo](https://github.com/matter-labs/zksync-era) to access this directory: 
+
+```bash
+git clone https://github.com/matter-labs/zksync-era.git
+```
+
+Later you can define the target `<upgradeDir>` in tool commands using the path to a specific upgrade, for example:
+
+```bash
+path-to-directory/zksync-era/etc/upgrades/1699353977-boojum
+````
+
+## 🏃 **Set up**
+
 ### **2. Clone repository**
 
 ```bash
@@ -53,7 +75,7 @@ pnpm install
 pnpm build
 ```
 
-### **4. Etherscan & Github API Key Setup**
+### **4. Etherscan & Github API Key Setup **
 <br>
 
 >You can create an Etherscan API key at [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).
@@ -92,27 +114,6 @@ GITHUB_API_KEY=your_github_api_key
 ```bash
 pnpm validate --ethscanApiKey=your_etherscan_api_key --githubApiKey=your_github_api_key
 ```
-
-### **5. Download Upgrades Directory**
-
-To use the `<upgradeDir>` parameter, you need access to the upgrades directory from the zkSync Era repository. You can [find "Upgrades" directory](https://github.com/matter-labs/zksync-era/tree/main/etc/upgrades) at the following relative path:
-
-```bash
-../zksync-era/etc/upgrades
-````
-
-For example, you can clone [zkSync Era Repo](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics) to access this directory: 
-
-```bash
-git clone https://github.com/matter-labs/zksync-era.git
-```
-
-And define the target `<upgradeDir>` in tool commands using the relative path:
-
-```bash
-../zksync-era/etc/upgrades/1699353977-boojum
-````
-
 
 ## 🛠️ **Usage**
 The zkSync Era Upgrade Verification Tool provides a range of commands for interacting with and verifying zkSync protocol upgrade data.
