@@ -179,34 +179,17 @@ pnpm test
 
 ## 🔮 Future Improvements/Limitations
 
-***Short version:***
-
 - **Extended Support for L2 Upgrades**: We plan to expand the capabilities of the Solidity Diff Tool to include Bootloader and DefaultAccount contracts.
 
 - **Improve Error Handling**: We plan to improve error messages and handling throughout the tool.
 
-
-We welcome community feedback and suggestions which can be submitted via our GitHub repository.
-
-***Extended from notion backlog TBD***
-
-- **User Interface Enhancements**: To improve user experience, an HTML UI can be developed.
-
 - **Add File Output Option**: Implementing file output option. 
-
-- **Single Executable**: Refining the tool to operate as a single executable, simplifying deployment and usage.
-
-- **Changelog Creation**: Generate a changelog with each new release, improving transparency on updates and changes.
 
 - **GitHub Integration**: Enabling the tool to fetch all upgrade data directly from GitHub repositories to streamline upgrade verification processes.
 
 - **Network Deployment Personalization & Consistency**: Incorporating features to check for consistency between different network deployments and add a network option to choose between networks.
 
-- **Logging System**: Adding a logging system to track and record the tool's operations, aiding in debugging and monitoring.
-
-- **Dynamic Queries**: Removing hardcoded selectors in favor of dynamic queries for diamond pattern contracts. 
-
-- **Explicit Code Verification**: Providing clear documentation and functionality on how code verified in Etherscan is checked within the tool. 
+We welcome community feedback and suggestions which can be submitted via our GitHub repository.
 
 ## 📄 **License**
 
