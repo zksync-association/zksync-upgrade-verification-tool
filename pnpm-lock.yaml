@@ -47,7 +47,7 @@ importers:
         version: 3.1.0
       tsup:
         specifier: ^8.0.2
-        version: 8.0.2(postcss@8.4.38)(typescript@5.4.4)
+        version: 8.0.2(typescript@5.4.4)
       tsx:
         specifier: ^4.7.2
         version: 4.7.2
@@ -2104,7 +2104,7 @@ snapshots:
       pretty-format: 29.7.0
 
   abitype@1.0.0(typescript@5.4.4)(zod@3.22.4):
-    optionalDependencies:
+    dependencies:
       typescript: 5.4.4
       zod: 3.22.4
 
@@ -2273,7 +2273,6 @@ snapshots:
   debug@4.3.4(supports-color@8.1.1):
     dependencies:
       ms: 2.1.2
-    optionalDependencies:
       supports-color: 8.1.1
 
   decamelize@4.0.0: {}
@@ -2760,12 +2759,10 @@ snapshots:
       mlly: 1.6.1
       pathe: 1.1.2
 
-  postcss-load-config@4.0.2(postcss@8.4.38):
+  postcss-load-config@4.0.2:
     dependencies:
       lilconfig: 3.1.1
       yaml: 2.4.1
-    optionalDependencies:
-      postcss: 8.4.38
 
   postcss@8.4.38:
     dependencies:
@@ -2954,7 +2951,7 @@ snapshots:
 
   tslib@2.4.0: {}
 
-  tsup@8.0.2(postcss@8.4.38)(typescript@5.4.4):
+  tsup@8.0.2(typescript@5.4.4):
     dependencies:
       bundle-require: 4.0.2(esbuild@0.19.12)
       cac: 6.7.14
@@ -2964,14 +2961,12 @@ snapshots:
       execa: 5.1.1
       globby: 11.1.0
       joycon: 3.1.1
-      postcss-load-config: 4.0.2(postcss@8.4.38)
+      postcss-load-config: 4.0.2
       resolve-from: 5.0.0
       rollup: 4.14.1
       source-map: 0.8.0-beta.0
       sucrase: 3.35.0
       tree-kill: 1.2.2
-    optionalDependencies:
-      postcss: 8.4.38
       typescript: 5.4.4
     transitivePeerDependencies:
       - supports-color
@@ -3011,9 +3006,8 @@ snapshots:
       '@scure/bip39': 1.2.1
       abitype: 1.0.0(typescript@5.4.4)(zod@3.22.4)
       isows: 1.0.3(ws@8.13.0)
-      ws: 8.13.0
-    optionalDependencies:
       typescript: 5.4.4
+      ws: 8.13.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -3038,15 +3032,16 @@ snapshots:
 
   vite@5.2.8(@types/node@20.12.6):
     dependencies:
+      '@types/node': 20.12.6
       esbuild: 0.20.2
       postcss: 8.4.38
       rollup: 4.14.1
     optionalDependencies:
-      '@types/node': 20.12.6
       fsevents: 2.3.3
 
   vitest@1.4.0(@types/node@20.12.6):
     dependencies:
+      '@types/node': 20.12.6
       '@vitest/expect': 1.4.0
       '@vitest/runner': 1.4.0
       '@vitest/snapshot': 1.4.0
@@ -3067,8 +3062,6 @@ snapshots:
       vite: 5.2.8(@types/node@20.12.6)
       vite-node: 1.4.0(@types/node@20.12.6)
       why-is-node-running: 2.2.2
-    optionalDependencies:
-      '@types/node': 20.12.6
     transitivePeerDependencies:
       - less
       - lightningcss
