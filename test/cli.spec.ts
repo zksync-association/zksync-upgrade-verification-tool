@@ -38,7 +38,7 @@ describe("CLI Output Test Suite", () => {
     expect(stdout).toContain(pkg.version);
   });
 
-  describe.skip("Command: <check>", () => {
+  describe("Command: <check>", () => {
     it("should validate an upgrade", async () => {
       const { stdout } = await execAsync(
         `pnpm validate --ethscankey='${etherscanKey}' check reference/test-upgrade-mini`
@@ -62,9 +62,9 @@ describe("CLI Output Test Suite", () => {
       );
     });
 
-    it.skip("should match snapshot", async ({ expect }) => {
+    it("should match snapshot", async ({ expect }) => {
       const { stdout } = await execAsync(
-        `pnpm validate --ethscankey='${etherscanKey}' check reference/1709067445-protodanksharding`
+        `pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0 --ethscankey='${etherscanKey}'`
       );
       expect(stdout).toMatchSnapshot();
     });
