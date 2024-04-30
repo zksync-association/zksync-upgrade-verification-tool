@@ -7,7 +7,7 @@ import {
 } from "../schema/index.js";
 import { ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
 import type { z, ZodType } from "zod";
-import {ContractData} from "./contract-data.js";
+import { ContractData } from "./contract-data.js";
 
 export class BlockExplorerClient {
   private apiKey: string;

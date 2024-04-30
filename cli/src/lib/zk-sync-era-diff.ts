@@ -6,7 +6,7 @@ import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { SystemContractChange } from "./system-contract-change";
 import type { GithubClient } from "./github-client";
 import { systemContractHashesSchema } from "../schema/github-schemas.js";
-import {ContractData} from "./contract-data.js";
+import type { ContractData } from "./contract-data.js";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -49,10 +49,10 @@ export class ZkSyncEraDiff {
     this.systemContractChanges = [];
     this.oldVerifier = oldVerifier;
     this.newVerifier = newVerifier;
-    this.oldAA = oldAA
-    this.newAA = newAA
-    this.oldBootLoader = oldBootLoader
-    this.newBootLoader = newBootLoader
+    this.oldAA = oldAA;
+    this.newAA = newAA;
+    this.oldBootLoader = oldBootLoader;
+    this.newBootLoader = newBootLoader;
   }
 
   addFacet(
@@ -240,16 +240,16 @@ export class ZkSyncEraDiff {
       strings.push("No changes in system contracts");
     }
 
-    strings.push('', 'Other contracts:')
+    strings.push("", "Other contracts:");
     const otherContractsTable = new CliTable({
-      head: ['Name', 'Current Bytecode hash', 'Proposed Bytecode Hash'],
-      style: { compact: true }
-    })
+      head: ["Name", "Current Bytecode hash", "Proposed Bytecode Hash"],
+      style: { compact: true },
+    });
 
-    otherContractsTable.push(['Default Account', this.oldAA, this.newAA])
-    otherContractsTable.push(['Bootloader', this.oldBootLoader, this.newBootLoader])
+    otherContractsTable.push(["Default Account", this.oldAA, this.newAA]);
+    otherContractsTable.push(["Bootloader", this.oldBootLoader, this.newBootLoader]);
 
-    strings.push(otherContractsTable.toString())
+    strings.push(otherContractsTable.toString());
 
     return strings.join("\n");
   }

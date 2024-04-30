@@ -1,7 +1,7 @@
 import type { Hex } from "viem";
 import type { BlockExplorerClient } from "./block-explorer-client";
 import type { GithubClient } from "./github-client";
-import {ContractData} from "./contract-data.js";
+import { ContractData } from "./contract-data.js";
 
 export class SystemContractChange {
   address: Hex;

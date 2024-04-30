@@ -1,17 +1,17 @@
-import type {AbiSet} from "./abi-set.js";
-import {contractRead, contractReadRaw} from "./contract-read.js";
-import {facetsResponseSchema} from "../schema/new-facets.js";
-import type {SystemContractData, UpgradeChanges} from "./upgrade-changes.js";
-import type {BlockExplorerClient} from "./block-explorer-client.js";
-import type {Network} from "./constants.js";
-import {VerifierContract} from "./verifier.js";
-import {verifierParamsSchema} from "../schema/index.js";
-import {z} from "zod";
-import {type Abi, createPublicClient, type Hex, http} from "viem";
-import {ZkSyncEraDiff} from "./zk-sync-era-diff.js";
-import {utils} from "zksync-ethers";
-import {SystemContractChange} from "./system-contract-change";
-import {ContractData} from "./contract-data.js";
+import type { AbiSet } from "./abi-set.js";
+import { contractRead, contractReadRaw } from "./contract-read.js";
+import { facetsResponseSchema } from "../schema/new-facets.js";
+import type { SystemContractData, UpgradeChanges } from "./upgrade-changes.js";
+import type { BlockExplorerClient } from "./block-explorer-client.js";
+import type { Network } from "./constants.js";
+import { VerifierContract } from "./verifier.js";
+import { verifierParamsSchema } from "../schema/index.js";
+import { z } from "zod";
+import { type Abi, createPublicClient, type Hex, http } from "viem";
+import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
+import { utils } from "zksync-ethers";
+import { SystemContractChange } from "./system-contract-change";
+import type { ContractData } from "./contract-data.js";
 
 const MAIN_CONTRACT_FUNCTIONS = {
   facets: "facets",
@@ -19,7 +19,7 @@ const MAIN_CONTRACT_FUNCTIONS = {
   getVerifier: "getVerifier",
   getVerifierParams: "getVerifierParams",
   getL2BootloaderBytecodeHash: "getL2BootloaderBytecodeHash",
-  getL2DefaultAccountBytecodeHash: "getL2DefaultAccountBytecodeHash"
+  getL2DefaultAccountBytecodeHash: "getL2DefaultAccountBytecodeHash",
 };
 
 /**
@@ -134,16 +134,16 @@ export class ZkSyncEraState {
 
   get aaBytecodeHash(): string {
     if (!this._aaBytecodeHash) {
-      throw new Error(`Not initialized yet`)
+      throw new Error("Not initialized yet");
     }
-    return this._aaBytecodeHash
+    return this._aaBytecodeHash;
   }
 
   get bootloaderStringHash(): string {
     if (!this._bootloaderStringHash) {
-      throw new Error(`Not initialized yet`)
+      throw new Error("Not initialized yet");
     }
-    return this._bootloaderStringHash
+    return this._bootloaderStringHash;
   }
 
   private constructor(network: Network, addr: string, abis: AbiSet) {
@@ -155,7 +155,6 @@ export class ZkSyncEraState {
     this.facetToContractData = new Map();
     this.protocolVersion = -1n;
   }
-
 
   private async findGetterFacetAbi(): Promise<Abi> {
     // Manually encode calldata becasue at this stage there
@@ -235,7 +234,7 @@ export class ZkSyncEraState {
     await this.initializeFacets(abi, client);
     await this.initializeProtolVersion(abi);
     await this.initializeVerifier(abi);
-    await this.initializeSpecialContacts(abi)
+    await this.initializeSpecialContacts(abi);
   }
 
   private async initializeSpecialContacts(abi: Abi): Promise<void> {
@@ -245,16 +244,13 @@ export class ZkSyncEraState {
       MAIN_CONTRACT_FUNCTIONS.getL2BootloaderBytecodeHash,
       abi,
       z.string()
-    )
+    );
     this._bootloaderStringHash = await contractRead(
       this.network,
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.getL2DefaultAccountBytecodeHash,
       abi,
       z.string()
-    )
+    );
   }
-
-
-
 }
