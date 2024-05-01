@@ -94,10 +94,14 @@ export class ZkSyncEraDiff {
     await this.writeFacets(filter, baseDirOld, baseDirNew);
     await this.writeVerifier(filter, baseDirOld, baseDirNew, l1Client);
     await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, github, ref);
-    await this.writeSpecialContracts(baseDirNew, github, ref);
+    await this.writeSpecialContracts(filter, baseDirNew, github, ref);
   }
 
-  private async writeSpecialContracts(dir: string, github: GithubClient, ref: string) {
+  private async writeSpecialContracts(filter: string[], dir: string, github: GithubClient, ref: string) {
+    if (filter.length !== 0) {
+      return
+    }
+
     const baseDirAA = path.join(dir, "defaultAA");
     const baseDirBL = path.join(dir, "bootloader");
 
