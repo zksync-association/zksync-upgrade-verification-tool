@@ -141,7 +141,6 @@ Downloads both the current and proposed versions of each contract being upgraded
     ```
     `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences. If this directory does not already exist, download-diff will create it for you inside the directory you are at. 
 
-<br>
 
 2. **Navigate to Directory:** After running the command, navigate to the `<targetSourceCodeDir>` directory.
 

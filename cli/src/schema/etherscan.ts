@@ -34,5 +34,4 @@ export const sourceCodeSchema = z.object({
   sources: sourcesParser,
 });
 
-export type RawSourceCode = z.infer<typeof sourceCodeSchema>;
 export type Sources = z.infer<typeof sourcesParser>;

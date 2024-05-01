@@ -1,4 +1,3 @@
-import type { Network } from "../lib";
 import { compareCurrentStateWith } from "../lib";
 import { withSpinner } from "../lib/with-spinner.js";
 import type { EnvBuilder } from "../lib/env-builder.js";

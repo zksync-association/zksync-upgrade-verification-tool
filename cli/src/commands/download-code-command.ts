@@ -1,7 +1,6 @@
-import { BlockExplorerClient, compareCurrentStateWith, type Network } from "../lib";
+import { compareCurrentStateWith } from "../lib";
 
 import { withSpinner } from "../lib/with-spinner.js";
-import { GithubClient } from "../lib/github-client";
 import type { EnvBuilder } from "../lib/env-builder.js";
 
 export async function downloadCode(

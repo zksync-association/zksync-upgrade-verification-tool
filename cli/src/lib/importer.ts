@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
-  commonJsonSchema,
   type CryptoJson,
   type FacetCutsJson,
   type FacetsJson,
@@ -9,46 +8,8 @@ import {
   type TransactionsJson,
   type UpgradeManifest,
 } from "../schema";
-import { ZodError } from "zod";
 import { SCHEMAS } from "./parser";
 import type { Network } from "./constants";
-
-export const retrieveDirNames = async (targetDir: string) => {
-  const items = await fs.readdir(targetDir, { withFileTypes: true });
-  const directories = items.filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
-
-  return await Promise.all(
-    directories.map(async (dir) => ({
-      name: dir,
-      parsed: await isUpgradeBlob(path.join(targetDir, dir)),
-    }))
-  );
-};
-
-const isUpgradeBlob = async (
-  filePath: string
-): Promise<{ valid: boolean; parsed?: UpgradeManifest }> => {
-  const items = await fs.readdir(filePath);
-  const files = items.filter((file) => file === "common.json");
-
-  if (files.length !== 1) {
-    return { valid: false };
-  }
-
-  try {
-    const commonJson = JSON.parse(await fs.readFile(`${filePath}/common.json`, "utf-8"));
-    const parsed = commonJsonSchema.parse(commonJson);
-    return { valid: true, parsed };
-  } catch (e) {
-    if (e instanceof ZodError) {
-      process.env.DEBUG === "1" && console.error(e.message);
-    } else {
-      console.error(e);
-    }
-    // TODO: Add a logging system and add debug logs for parse failure
-    return { valid: false };
-  }
-};
 
 export type UpgradeDescriptor = {
   commonData: UpgradeManifest;
