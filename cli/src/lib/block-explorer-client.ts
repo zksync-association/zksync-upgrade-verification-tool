@@ -26,7 +26,8 @@ export class BlockExplorerClient {
 
   private async fetch<T extends ZodType>(
     params: Record<string, string>,
-    parser: T
+    parser: T,
+    debug = false
   ): Promise<z.infer<typeof parser>> {
     // TODO: Make an option to avoid this
     // This is to trottle the amount of request made to etherscan, because free plans
@@ -43,7 +44,12 @@ export class BlockExplorerClient {
     }
 
     this.callCount++;
-    return parser.parse(await response.json());
+
+    const json = await response.json() as any
+    if (debug && typeof json.result === 'string') {
+      console.log('result string', json?.result)
+    }
+    return parser.parse(json);
   }
 
   async getAbi(rawAddress: string): Promise<Abi> {
@@ -88,7 +94,8 @@ export class BlockExplorerClient {
         address: contractAddr,
         apikey: this.apiKey,
       },
-      sourceCodeResponseSchema
+      sourceCodeResponseSchema,
+      true
     );
 
     if (message !== "OK") {
