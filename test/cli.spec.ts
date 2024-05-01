@@ -72,14 +72,18 @@ describe("CLI Output Test Suite", () => {
           const { stdout } = await execAsync(
             `pnpm validate --ethscankey='${etherscanKey}' check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0`
           );
+          console.log('success!!')
+          console.log(stdout)
         } catch (e) {
           const error = e as any
+          console.log('ERRRORRRR!!!')
           if (error.stdout) {
             console.log(error.stdout)
           }
           if (error.stdout) {
             console.log(error.stdout)
           }
+          throw e
         }
       })
 
