@@ -21,7 +21,7 @@
     "fmt:fix": "biome format . --write",
     "lint": "pnpm biome lint .",
     "lint:fix": "pnpm biome lint . --apply",
-    "test": "vitest run"
+    "test": "vitest run --sequence.concurrent=false"
   },
   "keywords": [],
   "author": "moonsong-labs",

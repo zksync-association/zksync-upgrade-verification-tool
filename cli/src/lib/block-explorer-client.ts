@@ -78,7 +78,6 @@ export class BlockExplorerClient {
 
     const contractAddr = account20String.parse(rawAddress);
 
-    console.log('debug:', this.baseUri, contractAddr)
     const { message, result } = await this.fetch(
       {
         module: "contract",

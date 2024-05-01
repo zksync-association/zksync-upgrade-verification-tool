@@ -7,6 +7,11 @@ export default defineConfig({
     fileParallelism: false,
     sequence: {
       concurrent: false
+    },
+    poolOptions: {
+      threads: {
+        singleThread: true
+      }
     }
   },
 });
