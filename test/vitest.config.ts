@@ -8,19 +8,11 @@ export default defineConfig({
     sequence: {
       concurrent: false,
     },
+    pool: "threads",
     poolOptions: {
       threads: {
         singleThread: true,
         maxThreads: 1
-      },
-      forks: {
-        singleFork: true
-      },
-      vmForks: {
-        singleFork: true
-      },
-      vmThreads: {
-        singleThread: true
       }
     }
   },
