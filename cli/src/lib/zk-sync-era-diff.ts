@@ -97,9 +97,14 @@ export class ZkSyncEraDiff {
     await this.writeSpecialContracts(filter, baseDirNew, github, ref);
   }
 
-  private async writeSpecialContracts(filter: string[], dir: string, github: GithubClient, ref: string) {
+  private async writeSpecialContracts(
+    filter: string[],
+    dir: string,
+    github: GithubClient,
+    ref: string
+  ) {
     if (filter.length !== 0) {
-      return
+      return;
     }
 
     const baseDirAA = path.join(dir, "defaultAA");
@@ -234,32 +239,37 @@ export class ZkSyncEraDiff {
       style: { compact: true },
     });
 
-    const newVerifierAddr = this.oldVerifier.address === this.newVerifier.address || this.newVerifier.address === ADDRESS_ZERO
-      ? 'No changes'
-      : this.newVerifier.address
+    const newVerifierAddr =
+      this.oldVerifier.address === this.newVerifier.address ||
+      this.newVerifier.address === ADDRESS_ZERO
+        ? "No changes"
+        : this.newVerifier.address;
     verifierTable.push(["Address", this.oldVerifier.address, newVerifierAddr]);
 
-    const newNodeHash = this.oldVerifier.recursionNodeLevelVkHash === this.newVerifier.recursionNodeLevelVkHash
-      ? 'No changes'
-      : this.newVerifier.recursionNodeLevelVkHash
+    const newNodeHash =
+      this.oldVerifier.recursionNodeLevelVkHash === this.newVerifier.recursionNodeLevelVkHash
+        ? "No changes"
+        : this.newVerifier.recursionNodeLevelVkHash;
     verifierTable.push([
       "Recursion node level VkHash",
       this.oldVerifier.recursionNodeLevelVkHash,
       newNodeHash,
     ]);
 
-    const newCircuitsHash = this.oldVerifier.recursionCircuitsSetVksHash === this.newVerifier.recursionCircuitsSetVksHash
-      ? 'No changes'
-      : this.newVerifier.recursionCircuitsSetVksHash
+    const newCircuitsHash =
+      this.oldVerifier.recursionCircuitsSetVksHash === this.newVerifier.recursionCircuitsSetVksHash
+        ? "No changes"
+        : this.newVerifier.recursionCircuitsSetVksHash;
     verifierTable.push([
       "Recursion circuits set VksHash",
       this.oldVerifier.recursionCircuitsSetVksHash,
       newCircuitsHash,
     ]);
 
-    const newLeafHash = this.oldVerifier.recursionLeafLevelVkHash === this.newVerifier.recursionLeafLevelVkHash
-      ? 'No changes'
-      : this.newVerifier.recursionNodeLevelVkHash
+    const newLeafHash =
+      this.oldVerifier.recursionLeafLevelVkHash === this.newVerifier.recursionLeafLevelVkHash
+        ? "No changes"
+        : this.newVerifier.recursionNodeLevelVkHash;
     verifierTable.push([
       "Recursion leaf level VkHash",
       this.oldVerifier.recursionLeafLevelVkHash,

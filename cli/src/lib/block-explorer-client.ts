@@ -39,7 +39,7 @@ export class BlockExplorerClient {
 
     const response = await fetch(`${this.baseUri}?${query}`);
     if (!response.ok) {
-      throw new Error(`Received error from block explorer: ${await response.text()}`)
+      throw new Error(`Received error from block explorer: ${await response.text()}`);
     }
 
     this.callCount++;
