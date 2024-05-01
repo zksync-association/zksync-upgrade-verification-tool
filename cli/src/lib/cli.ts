@@ -15,7 +15,7 @@ export const cli = async () => {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
       }
       if (!yargs.githubApiKey) {
-        yargs.githubApiKey = process.env.GITHUB_API_KEY;
+        yargs.githubApiKey = process.env.API_KEY_GITHUB;
       }
     }, true)
     .option("ethscankey", {

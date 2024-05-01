@@ -84,7 +84,7 @@ pnpm build
 export ETHERSCAN_API_KEY="<your_etherscan_api_key>"
 ```
 ```bash
-export GITHUB_API_KEY="<your_github_api_key>"
+export API_KEY_GITHUB="<your_github_api_key>"
 ```
 
 #### ***Option 2: Configuration Files***
@@ -98,7 +98,7 @@ This file should contain the following entries:
 ```bash
 # .env
 ETHERSCAN_API_KEY=your_etherscan_api_key
-GITHUB_API_KEY=your_github_api_key
+API_KEY_GITHUB=your_github_api_key
 ```
 
 #### ***Option 3: CLI Argument***

@@ -11,8 +11,8 @@ export async function downloadCode(
   l1Filter: string[],
   ref: string
 ): Promise<void> {
-  const github = new GithubClient(process.env.GITHUB_API_KEY);
   const l2Client = env.l2Client();
+  const github = env.github();
 
   const { diff, l1Client } = await withSpinner(
     () => compareCurrentStateWith(env, upgradeDirectory),
