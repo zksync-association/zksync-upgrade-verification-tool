@@ -3,6 +3,7 @@ import {account20String, getAbiSchema, sourceCodeResponseSchema, sourceCodeSchem
 import {ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network} from "./constants.js";
 import type {z, ZodType} from "zod";
 import {ContractData} from "./contract-data.js";
+import * as console from "node:console";
 
 export class BlockExplorerClient {
   private apiKey: string;
@@ -77,6 +78,7 @@ export class BlockExplorerClient {
 
     const contractAddr = account20String.parse(rawAddress);
 
+    console.log('debug:', this.baseUri, contractAddr)
     const { message, result } = await this.fetch(
       {
         module: "contract",
