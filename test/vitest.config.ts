@@ -11,7 +11,11 @@ export default defineConfig({
     poolOptions: {
       threads: {
         singleThread: true,
+        maxThreads: 1
       },
-    },
+      forks: {
+        singleFork: true
+      }
+    }
   },
 });
