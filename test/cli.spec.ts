@@ -67,27 +67,8 @@ describe("CLI Output Test Suite", () => {
     });
 
     describe("1699353977-boojum", () => {
-      it.skip('minimal', async () => {
-        try {
-          const { stdout } = await execAsync(
-            `pnpm validate --ethscankey='${etherscanKey}' check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0`
-          );
-          console.log('success!!')
-          console.log(stdout)
-        } catch (e) {
-          const error = e as any
-          console.log('ERRRORRRR!!!')
-          if (error.stdout) {
-            console.log(error.stdout)
-          }
-          if (error.stdout) {
-            console.log(error.stdout)
-          }
-          throw e
-        }
-      })
-
       it("prints all the information for this upgrade", async () => {
+        await new Promise(resolve => setTimeout(resolve, 1500));
         const { stdout } = await execAsync(
           `pnpm validate --ethscankey='${etherscanKey}' check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0`
         );
@@ -276,7 +257,8 @@ describe("CLI Output Test Suite", () => {
       });
     });
 
-    it.skip("should match snapshot", async ({ expect }) => {
+    it("should match snapshot", async ({ expect }) => {
+      await new Promise(resolve => setTimeout(resolve, 1500));
       const { stdout } = await execAsync(
         `pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0 --ethscankey='${etherscanKey}'`
       );
