@@ -1,15 +1,17 @@
 import yargs from "yargs";
-import { hideBin } from "yargs/helpers";
-import { NetworkSchema } from ".";
-import { downloadCode, checkCommand, contractDiff } from "../commands";
+import {hideBin} from "yargs/helpers";
+import {NetworkSchema} from ".";
+import {downloadCode, checkCommand, contractDiff} from "../commands";
 import * as process from "node:process";
-import { EnvBuilder } from "./env-builder.js";
+import {EnvBuilder} from "./env-builder.js";
+import {ZodError} from "zod";
+import * as console from "node:console";
 
 export const cli = async () => {
   // printIntro();
   const env = new EnvBuilder();
 
-  await yargs(hideBin(process.argv))
+  const argParser = yargs(hideBin(process.argv))
     .middleware((yargs) => {
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
@@ -168,6 +170,14 @@ export const cli = async () => {
     )
     .demandCommand(1, "Please specify a command")
     .help()
-    .strict()
-    .parseAsync();
+    .strict();
+
+  try {
+    await argParser.parseAsync()
+  } catch (e) {
+    if (e instanceof ZodError) {
+      console.error(JSON.stringify(e, null, 2))
+    }
+    throw e
+  }
 };
