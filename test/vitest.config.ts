@@ -6,12 +6,12 @@ export default defineConfig({
     testTimeout: 30000,
     fileParallelism: false,
     sequence: {
-      concurrent: false
+      concurrent: false,
     },
     poolOptions: {
       threads: {
-        singleThread: true
-      }
-    }
+        singleThread: true,
+      },
+    },
   },
 });
