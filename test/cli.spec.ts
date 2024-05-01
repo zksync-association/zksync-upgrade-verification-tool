@@ -256,11 +256,13 @@ describe("CLI Output Test Suite", () => {
       });
     });
 
-    it("should match snapshot", async ({ expect }) => {
-      const { stdout } = await execAsync(
-        `pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0 --ethscankey='${etherscanKey}'`
-      );
-      expect(stdout).toMatchSnapshot();
+    describe('another describe', () => {
+      it("should match snapshot", async ({ expect }) => {
+        const { stdout } = await execAsync(
+          `pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0 --ethscankey='${etherscanKey}'`
+        );
+        expect(stdout).toMatchSnapshot();
+      });
     });
   });
 });
