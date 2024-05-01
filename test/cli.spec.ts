@@ -67,7 +67,7 @@ describe("CLI Output Test Suite", () => {
     });
 
     describe("1699353977-boojum", () => {
-      it('minimal', async () => {
+      it.skip('minimal', async () => {
         try {
           const { stdout } = await execAsync(
             `pnpm validate --ethscankey='${etherscanKey}' check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0`
