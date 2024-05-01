@@ -21,7 +21,7 @@
     "fmt:fix": "biome format . --write",
     "lint": "pnpm biome lint .",
     "lint:fix": "pnpm biome lint . --apply",
-    "test": "env VITEST_MODE=run vitest run --sequence.concurrent=false --pool=threads --poolOptions.threads.singleThread=true"
+    "test": "vitest run --maxWorkers=1"
   },
   "keywords": [],
   "author": "moonsong-labs",
