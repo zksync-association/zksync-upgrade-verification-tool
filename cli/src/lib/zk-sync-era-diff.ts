@@ -204,7 +204,7 @@ export class ZkSyncEraDiff {
             return abis.signatureForSelector(selector);
           })
       );
-      table.push(["New Functions", newFunctions.length ? newFunctions.join(", ") : "None"]);
+      table.push(["New functions", newFunctions.length ? newFunctions.join(", ") : "None"]);
 
       const removedFunctions = await Promise.all(
         change.oldSelectors

@@ -38,6 +38,10 @@ export class BlockExplorerClient {
     const query = new URLSearchParams(params).toString();
 
     const response = await fetch(`${this.baseUri}?${query}`);
+    if (!response.ok) {
+      throw new Error(`Received error from block explorer: ${await response.text()}`)
+    }
+
     this.callCount++;
     return parser.parse(await response.json());
   }
