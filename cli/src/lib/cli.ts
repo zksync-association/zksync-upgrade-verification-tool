@@ -175,9 +175,6 @@ export const cli = async () => {
   try {
     await argParser.parseAsync()
   } catch (e) {
-    if (e instanceof ZodError) {
-      console.error(JSON.stringify(e, null, 2))
-    }
     throw e
   }
 };

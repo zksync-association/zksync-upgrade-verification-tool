@@ -1,13 +1,8 @@
-import type { Abi } from "viem";
-import {
-  account20String,
-  getAbiSchema,
-  sourceCodeResponseSchema,
-  sourceCodeSchema,
-} from "../schema/index.js";
-import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
-import type { z, ZodType } from "zod";
-import { ContractData } from "./contract-data.js";
+import type {Abi} from "viem";
+import {account20String, getAbiSchema, sourceCodeResponseSchema, sourceCodeSchema,} from "../schema/index.js";
+import {ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network} from "./constants.js";
+import type {z, ZodType} from "zod";
+import {ContractData} from "./contract-data.js";
 
 export class BlockExplorerClient {
   private apiKey: string;
@@ -27,7 +22,6 @@ export class BlockExplorerClient {
   private async fetch<T extends ZodType>(
     params: Record<string, string>,
     parser: T,
-    debug = false
   ): Promise<z.infer<typeof parser>> {
     // TODO: Make an option to avoid this
     // This is to trottle the amount of request made to etherscan, because free plans
@@ -45,11 +39,7 @@ export class BlockExplorerClient {
 
     this.callCount++;
 
-    const json = await response.json() as any
-    if (debug && typeof json.result === 'string') {
-      console.log('result string', json?.result)
-    }
-    return parser.parse(json);
+    return parser.parse(await response.json() as any);
   }
 
   async getAbi(rawAddress: string): Promise<Abi> {
@@ -94,8 +84,7 @@ export class BlockExplorerClient {
         address: contractAddr,
         apikey: this.apiKey,
       },
-      sourceCodeResponseSchema,
-      true
+      sourceCodeResponseSchema
     );
 
     if (message !== "OK") {
