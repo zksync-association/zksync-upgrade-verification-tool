@@ -172,9 +172,5 @@ export const cli = async () => {
     .help()
     .strict();
 
-  try {
-    await argParser.parseAsync()
-  } catch (e) {
-    throw e
-  }
+  await argParser.parseAsync()
 };
