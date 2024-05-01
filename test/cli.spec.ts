@@ -87,7 +87,7 @@ describe("CLI Output Test Suite", () => {
         }
       })
 
-      it.skip("prints all the information for this upgrade", async () => {
+      it("prints all the information for this upgrade", async () => {
         const { stdout } = await execAsync(
           `pnpm validate --ethscankey='${etherscanKey}' check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0`
         );
