@@ -15,6 +15,12 @@ export default defineConfig({
       },
       forks: {
         singleFork: true
+      },
+      vmForks: {
+        singleFork: true
+      },
+      vmThreads: {
+        singleThread: true
       }
     }
   },
