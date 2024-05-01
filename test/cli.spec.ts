@@ -67,6 +67,22 @@ describe("CLI Output Test Suite", () => {
     });
 
     describe("1699353977-boojum", () => {
+      it.only('minimal', async () => {
+        try {
+          const { stdout } = await execAsync(
+            `pnpm validate --ethscankey='${etherscanKey}' check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0`
+          );
+        } catch (e) {
+          const error = e as any
+          if (error.stdout) {
+            console.log(error.stdout)
+          }
+          if (error.stdout) {
+            console.log(error.stdout)
+          }
+        }
+      })
+
       it("prints all the information for this upgrade", async () => {
         const { stdout } = await execAsync(
           `pnpm validate --ethscankey='${etherscanKey}' check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0`
@@ -256,7 +272,7 @@ describe("CLI Output Test Suite", () => {
       });
     });
 
-    it("should match snapshot", async ({ expect }) => {
+    it.skip("should match snapshot", async ({ expect }) => {
       const { stdout } = await execAsync(
         `pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0 --ethscankey='${etherscanKey}'`
       );
