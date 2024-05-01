@@ -1,12 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import {
-  type CryptoJson,
-  type FacetCutsJson,
-  type FacetsJson,
-  type L2UpgradeJson,
-  type TransactionsJson,
-  type UpgradeManifest,
+import type {
+  CryptoJson,
+  FacetCutsJson,
+  FacetsJson,
+  L2UpgradeJson,
+  TransactionsJson,
+  UpgradeManifest,
 } from "../schema";
 import { SCHEMAS } from "./parser";
 import type { Network } from "./constants";

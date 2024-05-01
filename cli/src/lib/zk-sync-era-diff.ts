@@ -74,7 +74,7 @@ export class ZkSyncEraDiff {
       oldSelectors,
       newSelectors,
     });
-    this.facetChanges.sort((f1, f2) => f1.name.localeCompare(f2.name))
+    this.facetChanges.sort((f1, f2) => f1.name.localeCompare(f2.name));
   }
 
   addSystemContract(change: SystemContractChange) {

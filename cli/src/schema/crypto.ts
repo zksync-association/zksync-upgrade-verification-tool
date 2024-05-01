@@ -13,4 +13,3 @@ export const cryptoSchema = z.object({
 });
 
 export type CryptoJson = z.infer<typeof cryptoSchema>;
-
