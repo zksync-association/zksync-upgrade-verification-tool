@@ -234,13 +234,21 @@ describe("CLI Output Test Suite", () => {
     });
 
     describe('1710255955-no-verified-contract', () => {
-      it.only('returns that the contract is not verified on etherscan.', async () => {
+      it('returns that the contract is not verified on etherscan.', async () => {
         const { stdout } = await execAsync(
-          `pnpm validate check reference/1710255955-no-verified-contract`
+          "pnpm validate check reference/1710255955-no-verified-contract"
         );
         expect(stdout).to.match(/Proposed contract verified etherscan.*NO!/)
         expect(stdout).to.include("Warning!!:")
         expect(stdout).to.include("⚠️ L1 Contract not verified in therscan: 0x0011223344556677889900aabbccddeeff001122")
+      })
+    });
+
+    describe('fails when directory does not contain an upgrade', () => {
+      it.only('returns that the contract is not verified on etherscan.', async () => {
+        await expect(async () => execAsync(
+          "pnpm validate check reference/not_an_upgrade"
+        )).rejects.toThrowError(/Not an upgrade/)
       })
     });
   });

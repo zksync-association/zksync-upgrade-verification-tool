@@ -10,6 +10,7 @@ import type {
 } from "../schema";
 import { SCHEMAS } from "./parser";
 import type { Network } from "./constants";
+import {NotAnUpgradeDir} from "./errors.js";
 
 export type UpgradeDescriptor = {
   commonData: UpgradeManifest;
@@ -31,13 +32,29 @@ function translateNetwork(n: Network) {
 }
 
 export const lookupAndParse = async (
-  targetDir: string,
+  upgradeDirectory: string,
   network: Network
 ): Promise<UpgradeDescriptor> => {
+  const targetDir = path.resolve(process.cwd(), upgradeDirectory);
   const networkPath = translateNetwork(network);
 
+  const targetDirStat = await fs.stat(targetDir)
+
+  if (!targetDirStat.isDirectory()) {
+    throw new NotAnUpgradeDir(upgradeDirectory)
+  }
+
   const commonPath = path.join(targetDir, "common.json");
-  const commonBuf = await fs.readFile(commonPath);
+
+
+  const commonBuf = await fs.readFile(commonPath).catch(e => {
+    if (e instanceof Error && e.message.includes("no such file or directory")) {
+      throw new NotAnUpgradeDir(upgradeDirectory)
+    } else {
+      throw e
+    }
+  });
+
   const commonParser = SCHEMAS["common.json"];
   const commonData = commonParser.parse(JSON.parse(commonBuf.toString()));
 

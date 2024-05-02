@@ -6,6 +6,7 @@ import * as process from "node:process";
 import {EnvBuilder} from "./env-builder.js";
 import {ZodError} from "zod";
 import * as console from "node:console";
+import {printError, NotAnUpgradeDir} from "./errors.js";
 
 export const cli = async () => {
   // printIntro();
@@ -146,7 +147,7 @@ export const cli = async () => {
             type: "string",
             default: "main",
           }),
-      (yargs) => {
+      async (yargs) => {
         const filter = yargs.facets
           .split(",")
           .map((f) => f.trim())
@@ -165,11 +166,24 @@ export const cli = async () => {
             .map((sc) => `sc:${sc}`)
         );
 
-        downloadCode(env, yargs.upgradeDir, yargs.targetSourceCodeDir, filter, yargs.ref);
+        await downloadCode(env, yargs.upgradeDir, yargs.targetSourceCodeDir, filter, yargs.ref);
       }
     )
     .demandCommand(1, "Please specify a command")
+    .wrap(100)
     .help()
+    .fail(async (msg, err, _yargs) => {
+      // console.log(msg)
+      if (msg) {
+        const help = await argParser.getHelp()
+        console.log(help)
+        console.log('')
+        console.log(msg)
+      }
+
+      printError(err)
+      process.exit(1)
+    })
     .strict();
 
   await argParser.parseAsync()

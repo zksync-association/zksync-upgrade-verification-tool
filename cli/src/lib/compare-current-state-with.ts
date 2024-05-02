@@ -20,8 +20,7 @@ export async function compareCurrentStateWith(
   env: EnvBuilder,
   upgradeDirectory: string
 ): Promise<CreateDiffResponse> {
-  const basePath = path.resolve(process.cwd(), upgradeDirectory);
-  const upgrade = await lookupAndParse(basePath, env.network);
+  const upgrade = await lookupAndParse(upgradeDirectory, env.network);
 
   const l1Client = env.l1Client();
   const l1Abis = new AbiSet(l1Client);
