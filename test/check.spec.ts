@@ -246,9 +246,13 @@ describe("CLI Output Test Suite", () => {
 
     describe('fails when directory does not contain an upgrade', () => {
       it.only('returns that the contract is not verified on etherscan.', async () => {
-        await expect(async () => execAsync(
+        expect(async () => await execAsync(
           "pnpm validate check reference/not_an_upgrade"
-        )).rejects.toThrowError(/Not an upgrade/)
+        )).rejects.toSatisfy(e => {
+          const err = e as any
+          expect(err.stdout).to.contain("Expected reference/not_an_upgrade to be an upgrade directory but it's not. Upgrade directories contain a \"common.json\" file inside")
+          return true
+        })
       })
     });
   });

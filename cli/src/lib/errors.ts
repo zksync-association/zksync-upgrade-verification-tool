@@ -1,4 +1,5 @@
 import * as console from "node:console";
+import type {Network} from "./constants.js";
 
 export class ContracNotVerified extends Error {
   constructor (addr: string) {
@@ -7,10 +8,15 @@ export class ContracNotVerified extends Error {
 }
 
 export class NotAnUpgradeDir extends Error {
-  private path: string;
+
   constructor (path: string) {
     super(`Expected ${path} to be an upgrade directory but it's not. Upgrade directories contain a "common.json" file inside`);
-    this.path = path
+  }
+}
+
+export class MissingNetwork extends Error {
+  constructor (path: string, network: Network) {
+    super(`Upgrade inside ${path} does not contain information for ${network}. Maybe you can try with a different network.`);
   }
 }
 
@@ -20,6 +26,7 @@ export function printError(e: Error): void {
   const isKnown = KNOWN_ERRORS.some(kind => e instanceof kind)
 
   if (isKnown) {
+    console.log("")
     console.log(`> ${e.message}`)
   } else {
     console.log('Unexpected error:')

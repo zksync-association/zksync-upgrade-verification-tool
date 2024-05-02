@@ -10,7 +10,7 @@ import type {
 } from "../schema";
 import { SCHEMAS } from "./parser";
 import type { Network } from "./constants";
-import {NotAnUpgradeDir} from "./errors.js";
+import {MissingNetwork, NotAnUpgradeDir} from "./errors.js";
 
 export type UpgradeDescriptor = {
   commonData: UpgradeManifest;
@@ -57,6 +57,11 @@ export const lookupAndParse = async (
 
   const commonParser = SCHEMAS["common.json"];
   const commonData = commonParser.parse(JSON.parse(commonBuf.toString()));
+
+  const networkStat = await fs.stat(path.join(targetDir, networkPath));
+  if (!networkStat.isDirectory()) {
+    throw new MissingNetwork(upgradeDirectory, network)
+  }
 
   const transactionsPath = path.join(targetDir, networkPath, "transactions.json");
   const transactionsBuf = await fs.readFile(transactionsPath);

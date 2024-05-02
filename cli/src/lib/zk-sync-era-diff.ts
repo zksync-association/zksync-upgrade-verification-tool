@@ -380,12 +380,12 @@ export class ZkSyncEraDiff {
     const bootLoaderBytecodeMatches =
       this.newBootLoader === ZERO_U256 ? true : bootLoaderHash.bytecodeHash === this.newBootLoader;
 
-    otherContractsTable.push(["Default Account", this.oldAA, newAAMsg, aaBytecodeMatches]);
+    otherContractsTable.push(["Default Account", this.oldAA, newAAMsg, aaBytecodeMatches ? chalk.green('Yes') : chalk.red('No')]);
     otherContractsTable.push([
       "Bootloader",
       this.oldBootLoader,
       bootLoaderMsg,
-      bootLoaderBytecodeMatches,
+      bootLoaderBytecodeMatches ? chalk.green('Yes') : chalk.red('No'),
     ]);
 
     strings.push(otherContractsTable.toString());
