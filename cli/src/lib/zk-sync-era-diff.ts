@@ -1,6 +1,5 @@
 import type { VerifierContract } from "./verifier.js";
 import path from "node:path";
-import type { AbiSet } from "./abi-set.js";
 import CliTable from "cli-table3";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { SystemContractChange } from "./system-contract-change";
@@ -8,6 +7,9 @@ import type { GithubClient } from "./github-client";
 import { systemContractHashesSchema } from "../schema/github-schemas.js";
 import { ContractData } from "./contract-data.js";
 import { ADDRESS_ZERO, ZERO_U256 } from "./constants.js";
+import chalk from "chalk";
+import type {AbiSet} from "./abi-set.js";
+import * as console from "node:console";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -16,9 +18,8 @@ export class ZkSyncEraDiff {
   facetChanges: {
     oldAddress: string;
     newAddress: string;
-    name: string;
     oldData: ContractData;
-    newData: ContractData;
+    newData?: ContractData;
     oldSelectors: string[];
     newSelectors: string[];
   }[];
@@ -31,6 +32,7 @@ export class ZkSyncEraDiff {
   private newAA: string;
   private oldBootLoader: string;
   private newBootLoader: string;
+  private warnings: string[];
 
   constructor(
     oldVersion: string,
@@ -54,28 +56,46 @@ export class ZkSyncEraDiff {
     this.newAA = newAA;
     this.oldBootLoader = oldBootLoader;
     this.newBootLoader = newBootLoader;
+    this.warnings = []
   }
 
-  addFacet(
+  addFacetVerifiedFacet (
     oldAddress: string,
     newAddress: string,
-    name: string,
     oldData: ContractData,
-    newData: ContractData,
+    newData: ContractData | undefined,
     oldSelectors: string[],
     newSelectors: string[]
   ): void {
     this.facetChanges.push({
       oldAddress,
       newAddress,
-      name,
       oldData,
       newData,
       oldSelectors,
       newSelectors,
     });
-    this.facetChanges.sort((f1, f2) => f1.name.localeCompare(f2.name));
+    this.facetChanges.sort((f1, f2) => f1.oldData.name.localeCompare(f2.oldData.name));
   }
+
+  addFacetUnverifiedFacet (
+    oldAddress: string,
+    newAddress: string,
+    oldData: ContractData,
+    oldSelectors: string[],
+    newSelectors: string[]
+  ): void {
+    this.facetChanges.push({
+      oldAddress,
+      newAddress,
+      oldData,
+      oldSelectors,
+      newSelectors,
+    });
+    this.warnings.push(`L1 Contract not verified in therscan: ${newAddress}`)
+    this.facetChanges.sort((f1, f2) => f1.oldData.name.localeCompare(f2.oldData.name));
+  }
+
 
   addSystemContract(change: SystemContractChange) {
     this.systemContractChanges.push(change);
@@ -161,7 +181,12 @@ export class ZkSyncEraDiff {
   }
 
   private async writeFacets(filter: string[], baseDirOld: string, baseDirNew: string) {
-    for (const { name, oldData, newData } of this.facetChanges) {
+    for (const { oldData, newData, newAddress } of this.facetChanges) {
+      if (!newData) {
+        throw new Error(`Cannot show diff for ${oldData.name} facet. The new contract (${newAddress}) is not verified in etherscan`)
+      }
+
+      const name = oldData.name
       if (filter.length > 0 && !filter.includes(`facet:${name}`)) {
         continue;
       }
@@ -198,29 +223,36 @@ export class ZkSyncEraDiff {
 
     for (const change of this.facetChanges) {
       const table = new CliTable({
-        head: [change.name],
+        head: [change.oldData.name],
         style: { compact: true },
       });
 
       table.push(["Current address", change.oldAddress]);
       table.push(["Upgrade address", change.newAddress]);
-      table.push(["Proposed contract verified etherscan", "Yes"]);
+      table.push(["Proposed contract verified etherscan", change.newData ? 'Yes' : chalk.red('NO!')]);
 
-      const newFunctions = await Promise.all(
-        change.newSelectors
-          .filter((s) => !change.oldSelectors.includes(s))
-          .map(async (selector) => {
-            await abis.fetch(change.newAddress);
-            return abis.signatureForSelector(selector);
-          })
-      );
+
+      let newFunctions = change.newSelectors
+        .filter((s) => !change.oldSelectors.includes(s))
+
+      if (change.newData) {
+        newFunctions = await Promise.all(
+          newFunctions
+            .map(async (selector) => {
+              console.log(change.newAddress)
+              await abis.fetch(change.newAddress);
+              // return abis.signatureForSelector(selector);
+              return selector
+            })
+        );
+      }
       table.push(["New functions", newFunctions.length ? newFunctions.join(", ") : "None"]);
 
       const removedFunctions = await Promise.all(
         change.oldSelectors
           .filter((s) => this.orphanedSelectors.includes(s))
           .map(async (selector) => {
-            await abis.fetch(change.newAddress);
+            await abis.fetch(change.oldAddress);
             return abis.signatureForSelector(selector);
           })
       );
@@ -229,7 +261,7 @@ export class ZkSyncEraDiff {
         "Removed functions",
         removedFunctions.length ? removedFunctions.join(", ") : "None",
       ]);
-      table.push(["To compare code", `pnpm validate facet-diff ${upgradeDir} ${change.name}`]);
+      table.push(["To compare code", `pnpm validate facet-diff ${upgradeDir} ${change.oldData.name}`]);
 
       strings.push(table.toString());
     }
@@ -357,6 +389,11 @@ export class ZkSyncEraDiff {
     ]);
 
     strings.push(otherContractsTable.toString());
+
+    if (this.warnings.length !== 0) {
+      strings.push('', chalk.red('Warning!!:'))
+      strings.push(...this.warnings.map(w => `⚠️ ${w}`))
+    }
 
     return strings.join("\n");
   }

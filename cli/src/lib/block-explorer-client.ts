@@ -4,12 +4,14 @@ import {ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network} from ".
 import type {z, ZodType} from "zod";
 import {ContractData} from "./contract-data.js";
 import * as console from "node:console";
+import {ContracNotVerified} from "./errors.js";
 
 export class BlockExplorerClient {
   private apiKey: string;
   baseUri: string;
   private abiCache: Map<string, Abi>;
   private sourceCache: Map<string, ContractData>;
+  private contractsNotVerified: Set<string>
   private callCount = 0;
 
   constructor(apiKey: string, baseUri: string) {
@@ -17,6 +19,7 @@ export class BlockExplorerClient {
     this.baseUri = baseUri;
     this.abiCache = new Map();
     this.sourceCache = new Map();
+    this.contractsNotVerified = new Set()
     this.callCount = 0;
   }
 
@@ -40,7 +43,7 @@ export class BlockExplorerClient {
 
     this.callCount++;
 
-    return parser.parse(await response.json() as any);
+    return parser.parse(await response.json());
   }
 
   async getAbi(rawAddress: string): Promise<Abi> {
@@ -75,6 +78,9 @@ export class BlockExplorerClient {
     if (existing) {
       return existing;
     }
+    if (this.contractsNotVerified.has(rawAddress)) {
+      throw new ContracNotVerified(rawAddress)
+    }
 
     const contractAddr = account20String.parse(rawAddress);
 
@@ -96,20 +102,29 @@ export class BlockExplorerClient {
       throw new Error(`Received empty Source Code for ${rawAddress}`);
     }
 
+    if (result[0].SourceCode === "" || result[0].ABI === "Contract source code not verified") {
+      throw new ContracNotVerified(rawAddress)
+    }
+
     const rawSourceCode = result[0].SourceCode.replace(/^\{\{/, "{").replace(/}}$/, "}");
+    const abi = JSON.parse(result[0].ABI)
+
+    const SourceCode = sourceCodeSchema.parse(JSON.parse(rawSourceCode));
+    const data = new ContractData(result[0].ContractName, SourceCode.sources, contractAddr);
+    this.sourceCache.set(rawAddress, data);
+    this.abiCache.set(rawAddress, abi)
+    return data;
+  }
+
+  async isVerified(addr: string): Promise<boolean> {
     try {
-      const SourceCode = sourceCodeSchema.parse(JSON.parse(rawSourceCode));
-      const data = new ContractData(result[0].ContractName, SourceCode.sources, contractAddr);
-      this.sourceCache.set(rawAddress, data);
-      return data;
+      await this.getSourceCode(addr)
+      return true
     } catch (e) {
-      if (e instanceof SyntaxError) {
-        const sources = { "main.sol": { content: rawSourceCode } };
-        const data = new ContractData(result[0].ContractName, sources, contractAddr);
-        this.sourceCache.set(rawAddress, data);
-        return data;
+      if (e instanceof ContracNotVerified) {
+        return false
       }
-      throw e;
+      throw e
     }
   }
 

@@ -57,7 +57,6 @@ export const lookupAndParse = async (
   } catch (e) {
     facetCuts = undefined;
   }
-
   const facetsPath = path.join(targetDir, networkPath, "facets.json");
   let facets: FacetsJson | undefined;
   try {

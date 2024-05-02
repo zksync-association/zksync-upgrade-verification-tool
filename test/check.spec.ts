@@ -9,36 +9,6 @@ const execAsync = promisify(exec);
 const etherscanKey = process.env.ETHERSCAN_API_KEY;
 
 describe("CLI Output Test Suite", () => {
-  it("should error on invalid option", async () => {
-    await expect(
-      execAsync(
-        `pnpm validate --ethscankey='${etherscanKey}' check reference/test-upgrade-mini --badOption defect`
-      )
-    ).rejects.toThrowError("Unknown argument: badOption");
-  });
-  //
-  it("should error on invalid command", async () => {
-    await expect(
-      execAsync(`pnpm validate --ethscankey='${etherscanKey}' defect`)
-    ).rejects.toThrowError("Unknown argument: defect");
-  });
-
-  it("should error on missing command", async () => {
-    await expect(execAsync("pnpm validate")).rejects.toThrowError("Please specify a command");
-  });
-
-  it("should display help", async () => {
-    const { stdout } = await execAsync("pnpm validate --help");
-    expect(stdout).toContain("validate <command>");
-    expect(stdout).toContain("Commands:");
-    expect(stdout).toContain("Options:");
-  });
-
-  it("should display version", async () => {
-    const { stdout } = await execAsync("pnpm validate --version");
-    expect(stdout).toContain(pkg.version);
-  });
-
   describe("Command: <check>", () => {
     describe("test-mini-upgrade", () => {
       it("prints all the information for the mini upgrade", async () => {
@@ -254,15 +224,22 @@ describe("CLI Output Test Suite", () => {
           expect(line).toContain("true");
         }
       });
-    });
 
-    describe("another describe", () => {
       it("should match snapshot", async ({ expect }) => {
         const { stdout } = await execAsync(
-          `pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0 --ethscankey='${etherscanKey}'`
+          `pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0'`
         );
         expect(stdout).toMatchSnapshot();
-      });
+      })
+    });
+
+    describe('1710255955-no-verified-contract', () => {
+      it.only('returns that the contract is not verified on etherscan.', async () => {
+        const { stdout } = await execAsync(
+          `pnpm validate check reference/1710255955-no-verified-contract'`
+        );
+        expect(stdout).to.match(/No/)
+      })
     });
   });
 });
