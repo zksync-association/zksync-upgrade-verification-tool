@@ -1,19 +1,12 @@
 import {describe, expect, it} from "vitest";
-import {exec} from "node:child_process";
-import {promisify} from "node:util";
-import pkg from "../package.json" assert {type: "json"};
 import "dotenv/config";
-import {expectToFailAsync} from "./util";
-
-const execAsync = promisify(exec);
-
-const etherscanKey = process.env.ETHERSCAN_API_KEY;
+import {execAsync, expectToFailAsync} from "./util";
 
 describe("validate check", () => {
   describe("test-mini-upgrade", () => {
     it("prints all the information for the mini upgrade", async () => {
       const {stdout} = await execAsync(
-        `pnpm validate --ethscankey='${etherscanKey}' check reference/test-upgrade-mini`
+        "pnpm validate check reference/test-upgrade-mini"
       );
 
       expect(stdout).toMatch(/Current protocol version.+\d+/);
@@ -39,7 +32,7 @@ describe("validate check", () => {
   describe("1699353977-boojum", () => {
     it("prints all the information for this upgrade", async () => {
       const {stdout} = await execAsync(
-        `pnpm validate --ethscankey='${etherscanKey}' check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0`
+        "pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0"
       );
 
       const lines = stdout.split("\n");
