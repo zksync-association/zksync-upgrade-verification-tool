@@ -239,10 +239,8 @@ export class ZkSyncEraDiff {
         newFunctions = await Promise.all(
           newFunctions
             .map(async (selector) => {
-              console.log(change.newAddress)
               await abis.fetch(change.newAddress);
-              // return abis.signatureForSelector(selector);
-              return selector
+              return abis.signatureForSelector(selector);
             })
         );
       }

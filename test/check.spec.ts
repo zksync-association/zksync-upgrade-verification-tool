@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
-import pkg from "../package.json" assert { type: "json" };
+import {describe, expect, it} from "vitest";
+import {exec} from "node:child_process";
+import {promisify} from "node:util";
+import pkg from "../package.json" assert {type: "json"};
 import "dotenv/config";
+import {expectToFailAsync} from "./util";
 
 const execAsync = promisify(exec);
 
@@ -12,7 +13,7 @@ describe("CLI Output Test Suite", () => {
   describe("Command: <check>", () => {
     describe("test-mini-upgrade", () => {
       it("prints all the information for the mini upgrade", async () => {
-        const { stdout } = await execAsync(
+        const {stdout} = await execAsync(
           `pnpm validate --ethscankey='${etherscanKey}' check reference/test-upgrade-mini`
         );
 
@@ -38,7 +39,7 @@ describe("CLI Output Test Suite", () => {
 
     describe("1699353977-boojum", () => {
       it("prints all the information for this upgrade", async () => {
-        const { stdout } = await execAsync(
+        const {stdout} = await execAsync(
           `pnpm validate --ethscankey='${etherscanKey}' check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0`
         );
 
@@ -225,9 +226,9 @@ describe("CLI Output Test Suite", () => {
         }
       });
 
-      it("should match snapshot", async ({ expect }) => {
-        const { stdout } = await execAsync(
-          `pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0'`
+      it("should match snapshot", async ({expect}) => {
+        const {stdout} = await execAsync(
+          "pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0"
         );
         expect(stdout).toMatchSnapshot();
       })
@@ -235,7 +236,7 @@ describe("CLI Output Test Suite", () => {
 
     describe('1710255955-no-verified-contract', () => {
       it('returns that the contract is not verified on etherscan.', async () => {
-        const { stdout } = await execAsync(
+        const {stdout} = await execAsync(
           "pnpm validate check reference/1710255955-no-verified-contract"
         );
         expect(stdout).to.match(/Proposed contract verified etherscan.*NO!/)
@@ -258,13 +259,12 @@ describe("CLI Output Test Suite", () => {
 
     describe('when directory does not exists', () => {
       it('fails', async () => {
-        expect(async () => await execAsync(
-          "pnpm validate check reference/not_a_directory"
-        )).rejects.toSatisfy(e => {
-          const err = e as any
-          expect(err.stdout).to.contain("Specified path \"reference/not_an_upgrade\" is not a directory or there are no permissions to access it.")
-          return true
-        })
+        const { stdout } = await expectToFailAsync(
+          () => execAsync(
+            "pnpm validate check reference/not_a_directory"
+          )
+        )
+        expect(stdout).toContain("Specified path \"reference/not_a_directory\" is not a directory or there are no permissions to access it.")
       })
     });
 
