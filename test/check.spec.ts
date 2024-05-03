@@ -31,8 +31,8 @@ describe("CLI Output Test Suite", () => {
         expect(stdout).toContain("No changes in system contracts");
 
         expect(stdout).toContain("Other contracts:");
-        expect(stdout).toMatch(/Default Account.*0x[0-9a-fA-F]{64}.+No changes.+true/);
-        expect(stdout).toMatch(/Bootloader.*0x[0-9a-fA-F]{64}.+No changes.+true/);
+        expect(stdout).toMatch(/Default Account.*0x[0-9a-fA-F]{64}.+No changes.+Yes/);
+        expect(stdout).toMatch(/Bootloader.*0x[0-9a-fA-F]{64}.+No changes.+Yes/);
       });
     });
 
@@ -221,7 +221,7 @@ describe("CLI Output Test Suite", () => {
           }
           expect(line).toContain(name);
           expect(line).toContain(byteCodeHash);
-          expect(line).toContain("true");
+          expect(line).toContain("Yes");
         }
       });
 
