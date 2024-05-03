@@ -16,7 +16,7 @@ describe("validate download-diff", () => {
     expect(stdout).toContain(`Specified path "${temp}" is not a directory or there are no permissions to access it.`)
   })
 
-  it.only('downloads all the files inside the specified directory ', async () => {
+  it('downloads all the files inside the specified directory ', async () => {
     const temp = createTempDir()
     const { stdout } = await execAsync(
       `pnpm validate download-diff reference/1699353977-boojum ${temp} --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0`

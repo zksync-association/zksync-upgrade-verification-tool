@@ -12,6 +12,6 @@ export async function checkCommand(
     () => compareCurrentStateWith(env, upgradeDirectory),
     "Gathering contract data"
   );
-  const github = new GithubClient();
+  const github = env.github();
   console.log(await diff.toCliReport(l1Abis, upgradeDirectory, github, ref));
 }
