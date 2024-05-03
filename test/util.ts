@@ -1,6 +1,7 @@
 import {promisify} from "node:util";
 import {exec} from "node:child_process";
 import {expect} from "vitest";
+import {temporaryDirectory} from "tempy";
 
 export const execAsync = promisify(exec);
 
@@ -19,4 +20,8 @@ export const expectToFailAsync = async ( fn: () => Promise<any>): Promise<{ stdo
     }
   }
   expect.fail('Command did not fail')
+}
+
+export function createTempDir () {
+  return temporaryDirectory({prefix: 'test-validate-era-upgrade'});
 }

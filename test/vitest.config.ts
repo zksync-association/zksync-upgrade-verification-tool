@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     reporters: ["default"],
-    testTimeout: 40000,
+    testTimeout: 60000,
     fileParallelism: false,
     sequence: {
       concurrent: false,

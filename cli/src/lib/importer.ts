@@ -11,7 +11,7 @@ import type {
 import { SCHEMAS } from "./parser";
 import type { Network } from "./constants";
 import {MissingNetwork, NotADir, NotAnUpgradeDir} from "./errors.js";
-import * as console from "node:console";
+import {assertDirectoryExists} from "./fs-utils.js";
 
 export type UpgradeDescriptor = {
   commonData: UpgradeManifest;
@@ -39,17 +39,7 @@ export const lookupAndParse = async (
   const targetDir = path.resolve(process.cwd(), upgradeDirectory);
   const networkPath = translateNetwork(network);
 
-
-  let targetDirStat
-  try {
-    targetDirStat = await fs.stat(targetDir)
-  } catch (e) {
-    throw new NotADir(upgradeDirectory)
-  }
-
-  if (!targetDirStat.isDirectory()) {
-    throw new NotAnUpgradeDir(upgradeDirectory)
-  }
+  await assertDirectoryExists(targetDir, upgradeDirectory)
 
   const commonPath = path.join(targetDir, "common.json");
 
