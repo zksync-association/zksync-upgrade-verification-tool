@@ -78,15 +78,28 @@ export class ZkSyncEraState {
     );
 
     for (const [address, data] of this.facetToContractData.entries()) {
-      const oldSelectors = this.facetToSelectors.get(address)
-      if (!oldSelectors) throw new Error('Inconsistent data')
+      const oldSelectors = this.facetToSelectors.get(address);
+      if (!oldSelectors) throw new Error("Inconsistent data");
       const change = changes.matchingFacet(oldSelectors);
       if (change && change.address !== address) {
         if (await client.isVerified(change.address)) {
           const newContractData = await client.getSourceCode(change.address);
-          diff.addFacetVerifiedFacet(address, change.address, data, newContractData, oldSelectors, change.selectors);
+          diff.addFacetVerifiedFacet(
+            address,
+            change.address,
+            data,
+            newContractData,
+            oldSelectors,
+            change.selectors
+          );
         } else {
-          diff.addFacetUnverifiedFacet(address, change.address, data, oldSelectors, change.selectors);
+          diff.addFacetUnverifiedFacet(
+            address,
+            change.address,
+            data,
+            oldSelectors,
+            change.selectors
+          );
         }
       }
     }

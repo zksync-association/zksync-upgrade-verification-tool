@@ -2,7 +2,7 @@ import { compareCurrentStateWith } from "../lib";
 
 import { withSpinner } from "../lib/with-spinner.js";
 import type { EnvBuilder } from "../lib/env-builder.js";
-import {assertDirectoryExists} from "../lib/fs-utils.js";
+import { assertDirectoryExists } from "../lib/fs-utils.js";
 
 export async function downloadCode(
   env: EnvBuilder,
@@ -11,7 +11,7 @@ export async function downloadCode(
   l1Filter: string[],
   ref: string
 ): Promise<void> {
-  await assertDirectoryExists(targetDir)
+  await assertDirectoryExists(targetDir);
 
   const l2Client = env.l2Client();
   const github = env.github();

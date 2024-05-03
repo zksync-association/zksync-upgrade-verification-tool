@@ -8,7 +8,7 @@ import { systemContractHashesSchema } from "../schema/github-schemas.js";
 import { ContractData } from "./contract-data.js";
 import { ADDRESS_ZERO, ZERO_U256 } from "./constants.js";
 import chalk from "chalk";
-import type {AbiSet} from "./abi-set.js";
+import type { AbiSet } from "./abi-set.js";
 import * as console from "node:console";
 
 export class ZkSyncEraDiff {
@@ -56,10 +56,10 @@ export class ZkSyncEraDiff {
     this.newAA = newAA;
     this.oldBootLoader = oldBootLoader;
     this.newBootLoader = newBootLoader;
-    this.warnings = []
+    this.warnings = [];
   }
 
-  addFacetVerifiedFacet (
+  addFacetVerifiedFacet(
     oldAddress: string,
     newAddress: string,
     oldData: ContractData,
@@ -78,7 +78,7 @@ export class ZkSyncEraDiff {
     this.facetChanges.sort((f1, f2) => f1.oldData.name.localeCompare(f2.oldData.name));
   }
 
-  addFacetUnverifiedFacet (
+  addFacetUnverifiedFacet(
     oldAddress: string,
     newAddress: string,
     oldData: ContractData,
@@ -92,10 +92,9 @@ export class ZkSyncEraDiff {
       oldSelectors,
       newSelectors,
     });
-    this.warnings.push(`L1 Contract not verified in therscan: ${newAddress}`)
+    this.warnings.push(`L1 Contract not verified in therscan: ${newAddress}`);
     this.facetChanges.sort((f1, f2) => f1.oldData.name.localeCompare(f2.oldData.name));
   }
-
 
   addSystemContract(change: SystemContractChange) {
     this.systemContractChanges.push(change);
@@ -183,10 +182,12 @@ export class ZkSyncEraDiff {
   private async writeFacets(filter: string[], baseDirOld: string, baseDirNew: string) {
     for (const { oldData, newData, newAddress } of this.facetChanges) {
       if (!newData) {
-        throw new Error(`Cannot show diff for ${oldData.name} facet. The new contract (${newAddress}) is not verified in etherscan`)
+        throw new Error(
+          `Cannot show diff for ${oldData.name} facet. The new contract (${newAddress}) is not verified in etherscan`
+        );
       }
 
-      const name = oldData.name
+      const name = oldData.name;
       if (filter.length > 0 && !filter.includes(`facet:${name}`)) {
         continue;
       }
@@ -229,19 +230,19 @@ export class ZkSyncEraDiff {
 
       table.push(["Current address", change.oldAddress]);
       table.push(["Upgrade address", change.newAddress]);
-      table.push(["Proposed contract verified etherscan", change.newData ? 'Yes' : chalk.red('NO!')]);
+      table.push([
+        "Proposed contract verified etherscan",
+        change.newData ? "Yes" : chalk.red("NO!"),
+      ]);
 
-
-      let newFunctions = change.newSelectors
-        .filter((s) => !change.oldSelectors.includes(s))
+      let newFunctions = change.newSelectors.filter((s) => !change.oldSelectors.includes(s));
 
       if (change.newData) {
         newFunctions = await Promise.all(
-          newFunctions
-            .map(async (selector) => {
-              await abis.fetch(change.newAddress);
-              return abis.signatureForSelector(selector);
-            })
+          newFunctions.map(async (selector) => {
+            await abis.fetch(change.newAddress);
+            return abis.signatureForSelector(selector);
+          })
         );
       }
       table.push(["New functions", newFunctions.length ? newFunctions.join(", ") : "None"]);
@@ -259,7 +260,10 @@ export class ZkSyncEraDiff {
         "Removed functions",
         removedFunctions.length ? removedFunctions.join(", ") : "None",
       ]);
-      table.push(["To compare code", `pnpm validate facet-diff ${upgradeDir} ${change.oldData.name}`]);
+      table.push([
+        "To compare code",
+        `pnpm validate facet-diff ${upgradeDir} ${change.oldData.name}`,
+      ]);
 
       strings.push(table.toString());
     }
@@ -378,19 +382,24 @@ export class ZkSyncEraDiff {
     const bootLoaderBytecodeMatches =
       this.newBootLoader === ZERO_U256 ? true : bootLoaderHash.bytecodeHash === this.newBootLoader;
 
-    otherContractsTable.push(["Default Account", this.oldAA, newAAMsg, aaBytecodeMatches ? chalk.green('Yes') : chalk.red('No')]);
+    otherContractsTable.push([
+      "Default Account",
+      this.oldAA,
+      newAAMsg,
+      aaBytecodeMatches ? chalk.green("Yes") : chalk.red("No"),
+    ]);
     otherContractsTable.push([
       "Bootloader",
       this.oldBootLoader,
       bootLoaderMsg,
-      bootLoaderBytecodeMatches ? chalk.green('Yes') : chalk.red('No'),
+      bootLoaderBytecodeMatches ? chalk.green("Yes") : chalk.red("No"),
     ]);
 
     strings.push(otherContractsTable.toString());
 
     if (this.warnings.length !== 0) {
-      strings.push('', chalk.red('Warning!!:'))
-      strings.push(...this.warnings.map(w => `⚠️ ${w}`))
+      strings.push("", chalk.red("Warning!!:"));
+      strings.push(...this.warnings.map((w) => `⚠️ ${w}`));
     }
 
     return strings.join("\n");

@@ -10,8 +10,8 @@ import type {
 } from "../schema";
 import { SCHEMAS } from "./parser";
 import type { Network } from "./constants";
-import {MissingNetwork, NotADir, NotAnUpgradeDir} from "./errors.js";
-import {assertDirectoryExists} from "./fs-utils.js";
+import { MissingNetwork, NotADir, NotAnUpgradeDir } from "./errors.js";
+import { assertDirectoryExists } from "./fs-utils.js";
 
 export type UpgradeDescriptor = {
   commonData: UpgradeManifest;
@@ -39,16 +39,15 @@ export const lookupAndParse = async (
   const targetDir = path.resolve(process.cwd(), upgradeDirectory);
   const networkPath = translateNetwork(network);
 
-  await assertDirectoryExists(targetDir, upgradeDirectory)
+  await assertDirectoryExists(targetDir, upgradeDirectory);
 
   const commonPath = path.join(targetDir, "common.json");
 
-  const commonBuf = await fs.readFile(commonPath).catch(e => {
+  const commonBuf = await fs.readFile(commonPath).catch((e) => {
     if (e instanceof Error && e.message.includes("no such file or directory")) {
-      throw new NotAnUpgradeDir(upgradeDirectory)
-    } else {
-      throw e
+      throw new NotAnUpgradeDir(upgradeDirectory);
     }
+    throw e;
   });
 
   const commonParser = SCHEMAS["common.json"];
@@ -56,7 +55,7 @@ export const lookupAndParse = async (
 
   const networkStat = await fs.stat(path.join(targetDir, networkPath));
   if (!networkStat.isDirectory()) {
-    throw new MissingNetwork(upgradeDirectory, network)
+    throw new MissingNetwork(upgradeDirectory, network);
   }
 
   const transactionsPath = path.join(targetDir, networkPath, "transactions.json");

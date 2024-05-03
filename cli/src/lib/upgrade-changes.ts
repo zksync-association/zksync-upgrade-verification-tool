@@ -44,7 +44,7 @@ export class UpgradeChanges {
   }
 
   matchingFacet(targetSelectors: string[]): FacetData | undefined {
-    return this.facets.find(f => f.selectors.some(sel => targetSelectors.includes(sel)));
+    return this.facets.find((f) => f.selectors.some((sel) => targetSelectors.includes(sel)));
   }
 
   addFacet(facetName: string, facetAddr: string, selectors: string[]) {

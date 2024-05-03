@@ -1,12 +1,12 @@
 import yargs from "yargs";
-import {hideBin} from "yargs/helpers";
-import {NetworkSchema} from ".";
-import {downloadCode, checkCommand, contractDiff} from "../commands";
+import { hideBin } from "yargs/helpers";
+import { NetworkSchema } from ".";
+import { downloadCode, checkCommand, contractDiff } from "../commands";
 import * as process from "node:process";
-import {EnvBuilder} from "./env-builder.js";
-import {ZodError} from "zod";
+import { EnvBuilder } from "./env-builder.js";
+import { ZodError } from "zod";
 import * as console from "node:console";
-import {printError, NotAnUpgradeDir} from "./errors.js";
+import { printError, NotAnUpgradeDir } from "./errors.js";
 
 export const cli = async () => {
   // printIntro();
@@ -174,18 +174,18 @@ export const cli = async () => {
     .help()
     .fail(async (msg, err, _yargs) => {
       if (msg) {
-        const help = await argParser.getHelp()
-        console.log(help)
-        console.log('')
+        const help = await argParser.getHelp();
+        console.log(help);
+        console.log("");
         // console.log(_yargs.help())
-        console.log(msg)
-        process.exit(1)
+        console.log(msg);
+        process.exit(1);
       }
 
-      printError(err)
-      process.exit(1)
+      printError(err);
+      process.exit(1);
     })
     .strict();
 
-  await argParser.parseAsync()
+  await argParser.parseAsync();
 };
