@@ -7,10 +7,15 @@ export class ContracNotVerified extends Error {
   }
 }
 
-export class NotAnUpgradeDir extends Error {
-
+export class NotADir extends Error {
   constructor (path: string) {
-    super(`Expected ${path} to be an upgrade directory but it's not. Upgrade directories contain a "common.json" file inside`);
+    super(`Specified path "${path}" is not a directory or there are no permissions to access it.`);
+  }
+}
+
+export class NotAnUpgradeDir extends Error {
+  constructor (path: string) {
+    super(`Expected "${path}" to be an upgrade directory but it's not. Upgrade directories contain a "common.json" file inside`);
   }
 }
 
@@ -20,7 +25,11 @@ export class MissingNetwork extends Error {
   }
 }
 
-const KNOWN_ERRORS = [ ContracNotVerified, NotAnUpgradeDir ]
+const KNOWN_ERRORS = [
+  ContracNotVerified,
+  NotAnUpgradeDir,
+  NotADir
+]
 
 export function printError(e: Error): void {
   const isKnown = KNOWN_ERRORS.some(kind => e instanceof kind)

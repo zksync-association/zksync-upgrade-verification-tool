@@ -173,12 +173,13 @@ export const cli = async () => {
     .wrap(100)
     .help()
     .fail(async (msg, err, _yargs) => {
-      // console.log(msg)
       if (msg) {
         const help = await argParser.getHelp()
         console.log(help)
         console.log('')
+        // console.log(_yargs.help())
         console.log(msg)
+        process.exit(1)
       }
 
       printError(err)

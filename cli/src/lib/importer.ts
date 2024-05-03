@@ -10,7 +10,8 @@ import type {
 } from "../schema";
 import { SCHEMAS } from "./parser";
 import type { Network } from "./constants";
-import {MissingNetwork, NotAnUpgradeDir} from "./errors.js";
+import {MissingNetwork, NotADir, NotAnUpgradeDir} from "./errors.js";
+import * as console from "node:console";
 
 export type UpgradeDescriptor = {
   commonData: UpgradeManifest;
@@ -38,14 +39,19 @@ export const lookupAndParse = async (
   const targetDir = path.resolve(process.cwd(), upgradeDirectory);
   const networkPath = translateNetwork(network);
 
-  const targetDirStat = await fs.stat(targetDir)
+
+  let targetDirStat
+  try {
+    targetDirStat = await fs.stat(targetDir)
+  } catch (e) {
+    throw new NotADir(upgradeDirectory)
+  }
 
   if (!targetDirStat.isDirectory()) {
     throw new NotAnUpgradeDir(upgradeDirectory)
   }
 
   const commonPath = path.join(targetDir, "common.json");
-
 
   const commonBuf = await fs.readFile(commonPath).catch(e => {
     if (e instanceof Error && e.message.includes("no such file or directory")) {
