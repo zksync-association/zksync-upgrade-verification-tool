@@ -115,11 +115,7 @@ export class ZkSyncEraDiff {
     await this.writeSpecialContracts(filter, baseDirNew, github);
   }
 
-  private async writeSpecialContracts(
-    filter: string[],
-    dir: string,
-    github: GithubClient
-  ) {
+  private async writeSpecialContracts(filter: string[], dir: string, github: GithubClient) {
     if (filter.length !== 0) {
       return;
     }
@@ -133,7 +129,9 @@ export class ZkSyncEraDiff {
     if (this.newAA !== ZERO_U256) {
       const defaultAccountHash = hashes.find((h) => h.contractName === "DefaultAccount");
       if (!defaultAccountHash || defaultAccountHash.bytecodeHash !== this.newAA) {
-        throw new Error(`Default Account contract byte code hash does not match in ref: ${github.ref}`);
+        throw new Error(
+          `Default Account contract byte code hash does not match in ref: ${github.ref}`
+        );
       }
 
       const sourcesAA = await github.downloadContract("DefaultAccount");
@@ -194,11 +192,7 @@ export class ZkSyncEraDiff {
     }
   }
 
-  async toCliReport(
-    abis: AbiSet,
-    upgradeDir: string,
-    github: GithubClient
-  ): Promise<string> {
+  async toCliReport(abis: AbiSet, upgradeDir: string, github: GithubClient): Promise<string> {
     const title = "Upgrade report:";
     const strings = [`${title}`, "=".repeat(title.length), ""];
 
@@ -416,7 +410,9 @@ export class ZkSyncEraDiff {
       const currentHash = hashes.find((h) => h.contractName === change.name);
 
       if (!currentHash || change.proposedBytecodeHash !== currentHash.bytecodeHash) {
-        throw new Error(`Bytecode hash does not match for ${change.name} inside ref "${github.ref}"`);
+        throw new Error(
+          `Bytecode hash does not match for ${change.name} inside ref "${github.ref}"`
+        );
       }
 
       const [current, upgrade] = await Promise.all([

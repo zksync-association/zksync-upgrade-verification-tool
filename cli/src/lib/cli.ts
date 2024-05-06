@@ -53,18 +53,17 @@ export const cli = async () => {
       env.withRpcUrl(yargs.rpcUrl);
       env.withEtherscanApiKey(yargs.ethscankey);
       env.withGithubApiKey(yargs.githubApiKey);
-      env.withRef(yargs.ref)
+      env.withRef(yargs.ref);
     })
     .command(
       "check <upgradeDirectory>",
       "get current state of contracts",
       (yargs) =>
-        yargs
-          .positional("upgradeDirectory", {
-            describe: "FolderName of the upgrade to check",
-            type: "string",
-            demandOption: true,
-          }),
+        yargs.positional("upgradeDirectory", {
+          describe: "FolderName of the upgrade to check",
+          type: "string",
+          demandOption: true,
+        }),
       async (yargs) => {
         await checkCommand(env, yargs.upgradeDirectory);
       }
@@ -92,12 +91,11 @@ export const cli = async () => {
       "verifier-diff <upgradeDir>",
       "Shows code diff between current verifier source code and the proposed one",
       (yargs) =>
-        yargs
-          .positional("upgradeDir", {
-            describe: "FolderName of the upgrade to check",
-            type: "string",
-            demandOption: true,
-          }),
+        yargs.positional("upgradeDir", {
+          describe: "FolderName of the upgrade to check",
+          type: "string",
+          demandOption: true,
+        }),
       async (yargs) => {
         await contractDiff(env, yargs.upgradeDir, "validator");
       }

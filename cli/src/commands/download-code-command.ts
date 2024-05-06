@@ -5,10 +5,10 @@ import type { EnvBuilder } from "../lib/env-builder.js";
 import { assertDirectoryExists } from "../lib/fs-utils.js";
 
 export async function downloadCode(
-    env: EnvBuilder,
-    upgradeDirectory: string,
-    targetDir: string,
-    l1Filter: string[]
+  env: EnvBuilder,
+  upgradeDirectory: string,
+  targetDir: string,
+  l1Filter: string[]
 ): Promise<void> {
   await assertDirectoryExists(targetDir);
 

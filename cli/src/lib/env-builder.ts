@@ -29,7 +29,7 @@ export class EnvBuilder {
   }
 
   withRef(ref: string): void {
-    this.ref = ref
+    this.ref = ref;
   }
 
   withRpcUrl(maybeUrl: string | undefined): void {

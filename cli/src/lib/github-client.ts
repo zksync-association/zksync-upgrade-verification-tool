@@ -9,7 +9,7 @@ export class GithubClient {
   ref: string;
 
   constructor(ref: string, apiKey?: string) {
-    this.ref = ref
+    this.ref = ref;
     this.octo = apiKey ? new Octokit({ auth: apiKey }) : new Octokit();
     this.cache = new Map();
   }
@@ -54,10 +54,7 @@ export class GithubClient {
     return this.downloadContractInt(`system-contracts/contracts/${contractName}.sol`, {});
   }
 
-  private async downloadContractInt(
-    rootPath: string,
-    partial: Sources
-  ): Promise<Sources> {
+  private async downloadContractInt(rootPath: string, partial: Sources): Promise<Sources> {
     if (partial[rootPath]) {
       return partial;
     }
