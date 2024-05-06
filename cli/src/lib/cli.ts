@@ -28,16 +28,23 @@ export const cli = async () => {
       "check <upgradeDirectory>",
       "get current state of contracts",
       (yargs) =>
-        yargs.positional("upgradeDirectory", {
-          describe: "FolderName of the upgrade to check",
-          type: "string",
-          demandOption: true,
-        }),
+        yargs
+          .positional("upgradeDirectory", {
+            describe: "FolderName of the upgrade to check",
+            type: "string",
+            demandOption: true,
+          })
+          .option("ref", {
+            describe: "github ref to download code",
+            type: "string",
+            default: "main",
+          }),
       async (yargs) => {
         await checkCommand(
           yargs.ethscankey,
           NetworkSchema.parse(yargs.network),
-          yargs.upgradeDirectory
+          yargs.upgradeDirectory,
+          yargs.ref
         );
       }
     )
