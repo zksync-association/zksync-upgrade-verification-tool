@@ -8,6 +8,7 @@ export class EnvBuilder {
   githubApiKey?: string;
   rpcUrl?: string;
   private _network?: Network;
+  private ref = "main";
 
   private _l1Client?: BlockExplorerClient;
   private _l2Client?: BlockExplorerClient;
@@ -25,6 +26,10 @@ export class EnvBuilder {
 
   withGithubApiKey(maybeKey: string | undefined): void {
     this.githubApiKey = maybeKey;
+  }
+
+  withRef(ref: string): void {
+    this.ref = ref
   }
 
   withRpcUrl(maybeUrl: string | undefined): void {
@@ -68,8 +73,7 @@ export class EnvBuilder {
     if (this._github) {
       return this._github;
     }
-
-    this._github = new GithubClient(this.githubApiKey);
+    this._github = new GithubClient(this.ref, this.githubApiKey);
     return this._github;
   }
 

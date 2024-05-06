@@ -44,11 +44,17 @@ export const cli = async () => {
       describe: "Ethereum rpc url",
       demandOption: false,
     })
+    .option("ref", {
+      type: "string",
+      describe: "github ref for era contracts repo",
+      default: "main",
+    })
     .middleware((yargs) => {
       env.withNetwork(NetworkSchema.parse(yargs.network));
       env.withRpcUrl(yargs.rpcUrl);
       env.withEtherscanApiKey(yargs.ethscankey);
       env.withGithubApiKey(yargs.githubApiKey);
+      env.withRef(yargs.ref)
     })
     .command(
       "check <upgradeDirectory>",
@@ -59,14 +65,9 @@ export const cli = async () => {
             describe: "FolderName of the upgrade to check",
             type: "string",
             demandOption: true,
-          })
-          .option("ref", {
-            describe: "github ref to download code",
-            type: "string",
-            default: "main",
           }),
       async (yargs) => {
-        await checkCommand(env, yargs.upgradeDirectory, yargs.ref);
+        await checkCommand(env, yargs.upgradeDirectory);
       }
     )
     .command(
@@ -83,14 +84,9 @@ export const cli = async () => {
             describe: "Name of the facet to show diff",
             type: "string",
             demandOption: true,
-          })
-          .option("ref", {
-            describe: "github ref to download code",
-            type: "string",
-            default: "main",
           }),
       async (yargs) => {
-        await contractDiff(env, yargs.upgradeDir, `facet:${yargs.facetName}`, yargs.ref);
+        await contractDiff(env, yargs.upgradeDir, `facet:${yargs.facetName}`);
       }
     )
     .command(
@@ -102,14 +98,9 @@ export const cli = async () => {
             describe: "FolderName of the upgrade to check",
             type: "string",
             demandOption: true,
-          })
-          .option("ref", {
-            describe: "github ref to download code",
-            type: "string",
-            default: "main",
           }),
       async (yargs) => {
-        await contractDiff(env, yargs.upgradeDir, "validator", yargs.ref);
+        await contractDiff(env, yargs.upgradeDir, "validator");
       }
     )
     .command(
@@ -141,11 +132,6 @@ export const cli = async () => {
             describe: "Filter to include verifier source code",
             type: "boolean",
             default: false,
-          })
-          .option("ref", {
-            describe: "github ref to download code",
-            type: "string",
-            default: "main",
           }),
       async (yargs) => {
         const filter = yargs.facets
@@ -166,7 +152,7 @@ export const cli = async () => {
             .map((sc) => `sc:${sc}`)
         );
 
-        await downloadCode(env, yargs.upgradeDir, yargs.targetSourceCodeDir, filter, yargs.ref);
+        await downloadCode(env, yargs.upgradeDir, yargs.targetSourceCodeDir, filter);
       }
     )
     .demandCommand(1, "Please specify a command")

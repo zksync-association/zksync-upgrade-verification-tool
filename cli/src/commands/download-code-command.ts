@@ -5,11 +5,10 @@ import type { EnvBuilder } from "../lib/env-builder.js";
 import { assertDirectoryExists } from "../lib/fs-utils.js";
 
 export async function downloadCode(
-  env: EnvBuilder,
-  upgradeDirectory: string,
-  targetDir: string,
-  l1Filter: string[],
-  ref: string
+    env: EnvBuilder,
+    upgradeDirectory: string,
+    targetDir: string,
+    l1Filter: string[]
 ): Promise<void> {
   await assertDirectoryExists(targetDir);
 
@@ -22,7 +21,7 @@ export async function downloadCode(
   );
 
   await withSpinner(
-    () => diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, github, ref),
+    () => diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, github),
     "Downloading source code"
   );
   console.log(`✅ Source code successfully downloaded in: ${targetDir}`);
