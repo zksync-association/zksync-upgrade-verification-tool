@@ -4,9 +4,8 @@ import { NetworkSchema } from ".";
 import { downloadCode, checkCommand, contractDiff } from "../commands";
 import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
-import { ZodError } from "zod";
 import * as console from "node:console";
-import { printError, NotAnUpgradeDir } from "./errors.js";
+import { printError } from "./errors.js";
 
 export const cli = async () => {
   // printIntro();

@@ -9,7 +9,6 @@ import { ContractData } from "./contract-data.js";
 import { ADDRESS_ZERO, ZERO_U256 } from "./constants.js";
 import chalk from "chalk";
 import type { AbiSet } from "./abi-set.js";
-import * as console from "node:console";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
