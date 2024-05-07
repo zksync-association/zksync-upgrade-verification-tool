@@ -123,8 +123,8 @@ pnpm validate check <upgradeDir>
 
 <br>
 
-### **`show-diff <upgradeDir> <facetName>`**: 
-Shows the proposed changes in a specified contract.
+### **`facet-diff <upgradeDir> <facetName>`**: 
+Shows the proposed changes in a specified facet.
 
 
 ```bash
@@ -139,7 +139,9 @@ Downloads both the current and proposed versions of each contract being upgraded
     ```bash
       pnpm validate download-diff <upgradeDir> <targetSourceCodeDir>
     ```
-    `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences. If this directory does not already exist, download-diff will create it for you inside the directory you are at. 
+    `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences.
+
+   *Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please refer to [Options section.](#🎛️-options)*   
 
 <br>
 
@@ -173,6 +175,12 @@ Specifies the Ethereum RPC URL to be used for connecting to the blockchain.
 ### `--ref`
 Specifies the GitHub commit reference from which the L2 code will be downloaded.
 - **Default**: The last commit on the `main` branch.
+- **Example**: `--ref` to commit (related to `boojum` upgrade in `download_dif` command).
+
+  ```bash
+  pnpm validate download-diff ../zksync-era/etc/upgrades/1699353977-boojum boojumDiff --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0
+  ```
+
 
 ## ❓ **Help**
 
