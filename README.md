@@ -132,6 +132,16 @@ pnpm validate show-diff <upgradeDir> <facetName>
 ```
 <br>
 
+### **`verifier-diff <upgradeDir>`**: 
+Shows the proposed changes between current verifier source code and the proposed one.
+
+```bash
+pnpm validate show-diff <upgradeDir>
+```
+*Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please refer to [--ref in options section.](#🎛️-options)*   
+
+<br>
+
 ### **`download-diff <upgradeDir> <targetSourceCodeDir>`** :
 Downloads both the current and proposed versions of each contract being upgraded for comparison.
 
@@ -141,7 +151,7 @@ Downloads both the current and proposed versions of each contract being upgraded
     ```
     `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences.
 
-   *Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please refer to [Options section.](#🎛️-options)*   
+   *Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please refer to [--ref in options section.](#🎛️-options)*   
 
 <br>
 
