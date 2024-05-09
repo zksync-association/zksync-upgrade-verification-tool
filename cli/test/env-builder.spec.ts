@@ -1,5 +1,4 @@
-import { describe } from "mocha";
-import { expect } from "chai";
+import { describe, it, expect } from "vitest";
 import { EnvBuilder } from "../src/lib/env-builder.js";
 
 describe("EnvBuilder", () => {
@@ -9,9 +8,9 @@ describe("EnvBuilder", () => {
       expect(() => target().l1Client()).to.throw();
     });
 
-    it("returns a l2 explorer client", () => {
-      const client = target().l2Client();
-      expect(client.baseUri).to.match(/block-explorer-api\.mainnet\.zksync\.io/);
+    it("cannot return a l2 explorer client without a network specified", () => {
+      expect(() => target().l2Client()).to.throw();
+
     });
 
     it("cannot return an rpc client", () => {
