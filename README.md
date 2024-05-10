@@ -1,4 +1,7 @@
-# 🔍 Upgrade Verification Tool - zkSync Era
+![CoverImage](zkSyncEraUpgradeToolCover.png)
+
+
+# 🔍 zkSync Era Upgrade Verification Tool 
 
 > 🏗️ `Work In Progress` : This repo is being actively developed and does not represent final quality of the tool!
 
@@ -175,6 +178,11 @@ The following options are available to configure the zkSync Era Upgrade Verifica
 Specifies the target network where the tool will perform the checks. 
 - **Values**: `mainnet`, `sepolia`
 - **Default**: `mainnet`
+- **Example**: *Protodanksharding upgrade in sepolia*
+
+```bash
+pnpm validate check ../zksync-era/etc/upgrades/1709067445-protodanksharding --network=sepolia
+```
 
 ###  `--rpc` , `--rpcUrl`
 Specifies the Ethereum RPC URL to be used for connecting to the blockchain.
