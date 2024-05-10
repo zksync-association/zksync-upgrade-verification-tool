@@ -3,19 +3,24 @@
 
 # 🔍 zkSync Era Upgrade Verification Tool 
 
-> 🏗️ `Work In Progress` : This repo is being actively developed and does not represent final quality of the tool!
+The zkSync Era Upgrade Verification Tool is a **CLI tool crafted to decode and present zkSync Era upgrade proposals in a human-readable format**.
 
-## 📝 **Description**
-
-The zkSync Era Upgrade Verification Tool is a CLI tool crafted to decode and present zkSync Era upgrade proposals in a human-readable format.
+<br>
 
 ## 🌟 **Features**
+
+ > 🏗️ `Work In Progress` : This repo is being actively developed and does not represent final quality of the tool!
 
   - **_[L1]_ Facets**: Identifies contract upgrades including additions or removals of functions. 
   - **_[L1]_ Verifier** : Detects upgrades and parameter changes in contracts.
   - **_[L2]_ System Contracts**: Lists changes and validates bytecode hashes. 
  - **_[L2]_ Bootloader and DefaultAccount**: Validates bytecode hash.
  - **Solidity Diff Tool**: Compares current contracts with upgrade proposals for verification. *Currently available for Facets, Verifier & System Contracts.*
+
+<br>
+
+
+
 
 ## 🔍 **Prerequisites**
 
@@ -124,6 +129,10 @@ Checks the validity of the upgrade and prints a summary of the changes.
 pnpm validate check <upgradeDir>
 ```
 
+```bash
+pnpm validate check ../zksync-era/etc/upgrades/1699353977-boojum #Example of check command with Boojum upgrade.
+```
+
 <br>
 
 ### **`facet-diff <upgradeDir> <facetName>`**: 
@@ -133,15 +142,21 @@ Shows the proposed changes in a specified facet.
 ```bash
 pnpm validate show-diff <upgradeDir> <facetName>
 ```
+
+```bash
+pnpm validate facet-diff ../zksync-era/etc/upgrades/1699353977-boojum GettersFacet --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0 #Example with GettersFacet in Boojum upgrade with specific commit reference.
+```
 <br>
 
 ### **`verifier-diff <upgradeDir>`**: 
 Shows the proposed changes between current verifier source code and the proposed one.
 
 ```bash
-pnpm validate show-diff <upgradeDir>
+pnpm validate verifier-diff <upgradeDir>
 ```
-*Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please refer to [--ref in options section.](#🎛️-options)*   
+```bash
+pnpm validate verifier-diff ../zksync-era/etc/upgrades/1699353977-boojum #Example of verifier-diff command for Boojum upgrade.
+``` 
 
 <br>
 
