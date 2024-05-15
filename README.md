@@ -186,7 +186,7 @@ pnpm validate help
 Unit tests are located inside the cli package. To run:
 
 ```bash
-pnpm run --filter=cli test
+pnpm run --filter=./cli test
 ```
 
 Integration tests are inside "test" package. In order to run them
@@ -201,7 +201,7 @@ vim .env # complete with real api keys
 Once it's completed you can run the integration tests with:
 
 ``` test
-pnpm run test --filter=test
+pnpm run --filter=./test test
 ```
 
 Lastly, this command will execute all automated tests associated with the tool:
