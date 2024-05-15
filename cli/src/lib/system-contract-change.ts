@@ -34,7 +34,7 @@ export class SystemContractChange {
   }
 
   async downloadProposedCode(github: GithubClient): Promise<ContractData> {
-    const source = await github.downloadContract(this.name);
+    const source = await github.downloadSystemContract(this.name);
 
     return new ContractData(this.name, source, this.address);
   }

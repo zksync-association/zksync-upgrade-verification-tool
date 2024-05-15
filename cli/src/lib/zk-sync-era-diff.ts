@@ -134,7 +134,7 @@ export class ZkSyncEraDiff {
         );
       }
 
-      const sourcesAA = await github.downloadContract("DefaultAccount");
+      const sourcesAA = await github.downloadSystemContract("DefaultAccount");
       const contractAA = new ContractData("DefaultAA", sourcesAA, ADDRESS_ZERO);
       await contractAA.writeSources(baseDirAA);
     }
@@ -420,7 +420,7 @@ export class ZkSyncEraDiff {
         change.downloadProposedCode(github),
       ]);
 
-      current.remapKeys("system-contracts/contracts", "contracts-preprocessed");
+      upgrade.remapKeys("system-contracts/contracts", "contracts-preprocessed");
       await current.writeSources(path.join(baseDirOld, "system-contracts", change.name));
       await upgrade.writeSources(path.join(baseDirNew, "system-contracts", change.name));
     }
