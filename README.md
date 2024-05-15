@@ -183,7 +183,28 @@ pnpm validate help
 
 ## 🧪 **Testing**
 
-This command will execute all automated tests associated with the tool, verifying that all components operate as expected.
+Unit tests are located inside the cli package. To run:
+
+```bash
+pnpm run --filter=cli test
+```
+
+Integration tests are inside "test" package. In order to run them
+it's important to config api keys for testing. That can be done with
+a dotenv file inside the test directory:
+
+``` bash
+cp env.example test/.env
+vim .env # complete with real api keys
+```
+
+Once it's completed you can run the integration tests with:
+
+``` test
+pnpm run test --filter=test
+```
+
+Lastly, this command will execute all automated tests associated with the tool:
 
 ```bash
 pnpm test

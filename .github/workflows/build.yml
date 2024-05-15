@@ -23,4 +23,5 @@ jobs:
       - run: pnpm install
       - run: pnpm run build
       - name: Link Binary & Test
-        run: pnpm i && pnpm run test
+        # Temporary running only unit tests in ci.
+        run: pnpm i && pnpm run test --filter=cli
