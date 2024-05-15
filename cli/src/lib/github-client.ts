@@ -1,53 +1,22 @@
 import { Octokit } from "@octokit/core";
 import type { Sources } from "../schema";
 import path from "node:path";
-import { githubContentParser } from "../schema/github-schemas.js";
+import { EraContractsRepo } from "./era-contracts-repo";
 
 export class GithubClient {
   private octo: Octokit;
-  private cache: Map<string, string>;
   ref: string;
 
   constructor(ref: string, apiKey?: string) {
     this.ref = ref;
     this.octo = apiKey ? new Octokit({ auth: apiKey }) : new Octokit();
-    this.cache = new Map();
   }
 
   async downloadFile(filePath: string): Promise<string> {
-    const cacheValue = this.cache.get(filePath);
-    if (cacheValue !== undefined) {
-      return cacheValue;
-    }
+    const repo = await EraContractsRepo.default()
+    await repo.init()
 
-    try {
-      const rawResponse = await this.octo.request(
-        "GET /repos/{owner}/{repo}/contents/{path}{?ref}",
-        {
-          owner: "matter-labs",
-          repo: "era-contracts",
-          path: filePath,
-          ref: this.ref,
-          headers: {
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
-        }
-      );
-
-      const parsed = githubContentParser.parse(rawResponse);
-
-      const fileContent = Buffer.from(parsed.data.content, "base64").toString("utf-8");
-      this.cache.set(filePath, fileContent);
-      return fileContent;
-    } catch (e) {
-      const error = e as any;
-      if (error.status && error.status === 404) {
-        const fileContent = "Content not found";
-        this.cache.set(filePath, fileContent);
-        return fileContent;
-      }
-      throw e;
-    }
+    return repo.readFile(filePath)
   }
 
   async downloadSystemContract(contractName: string): Promise<Sources> {
