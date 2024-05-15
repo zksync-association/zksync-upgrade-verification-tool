@@ -10,7 +10,6 @@ describe("EnvBuilder", () => {
 
     it("cannot return a l2 explorer client without a network specified", () => {
       expect(() => target().l2Client()).to.throw();
-
     });
 
     it("cannot return an rpc client", () => {

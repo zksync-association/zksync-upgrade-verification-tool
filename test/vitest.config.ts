@@ -15,6 +15,6 @@ export default defineConfig({
         maxThreads: 1,
       },
     },
-    maxWorkers: 1
+    maxWorkers: 1,
   },
 });

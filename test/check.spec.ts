@@ -1,13 +1,11 @@
-import {describe, expect, it} from "vitest";
+import { describe, expect, it } from "vitest";
 import "dotenv/config";
-import {execAsync, expectToFailAsync} from "./util";
+import { execAsync, expectToFailAsync } from "./util";
 
 describe("validate check", () => {
   describe("test-mini-upgrade", () => {
     it("prints all the information for the mini upgrade", async () => {
-      const {stdout} = await execAsync(
-        "pnpm validate check reference/test-upgrade-mini"
-      );
+      const { stdout } = await execAsync("pnpm validate check reference/test-upgrade-mini");
 
       expect(stdout).toMatch(/Current protocol version.+\d+/);
       expect(stdout).toMatch(/Proposed protocol version.+1337/);
@@ -31,7 +29,7 @@ describe("validate check", () => {
 
   describe("1699353977-boojum", () => {
     it("prints all the information for this upgrade", async () => {
-      const {stdout} = await execAsync(
+      const { stdout } = await execAsync(
         "pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0"
       );
 
@@ -41,7 +39,7 @@ describe("validate check", () => {
       expect(stdout).toMatch(/Proposed protocol version.+18/);
       expect(stdout).toContain("L1 Main contract Diamond upgrades:");
 
-      function validateFacet (
+      function validateFacet(
         facetName: string,
         facetAddress: string,
         newFunctions: string,
@@ -218,45 +216,49 @@ describe("validate check", () => {
       }
     });
 
-    it("should match snapshot", async ({expect}) => {
-      const {stdout} = await execAsync(
+    it("should match snapshot", async ({ expect }) => {
+      const { stdout } = await execAsync(
         "pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0"
       );
       expect(stdout).toMatchSnapshot();
-    })
+    });
   });
 
-  describe('1710255955-no-verified-contract', () => {
-    it('returns that the contract is not verified on etherscan.', async () => {
-      const {stdout} = await execAsync(
+  describe("1710255955-no-verified-contract", () => {
+    it("returns that the contract is not verified on etherscan.", async () => {
+      const { stdout } = await execAsync(
         "pnpm validate check reference/1710255955-no-verified-contract"
       );
-      expect(stdout).to.match(/Proposed contract verified etherscan.*NO!/)
-      expect(stdout).to.include("Warning!!:")
-      expect(stdout).to.include("⚠️ L1 Contract not verified in therscan: 0x0011223344556677889900aabbccddeeff001122")
-    })
+      expect(stdout).to.match(/Proposed contract verified etherscan.*NO!/);
+      expect(stdout).to.include("Warning!!:");
+      expect(stdout).to.include(
+        "⚠️ L1 Contract not verified in therscan: 0x0011223344556677889900aabbccddeeff001122"
+      );
+    });
   });
 
-  describe('when the directory is not a valid upgrade', () => {
-    it('fails', async () => {
-      expect(async () => await execAsync(
-        "pnpm validate check reference/not_an_upgrade"
-      )).rejects.toSatisfy(e => {
-        const err = e as any
-        expect(err.stdout).to.contain("Expected \"reference/not_an_upgrade\" to be an upgrade directory but it's not. Upgrade directories contain a \"common.json\" file inside")
-        return true
-      })
-    })
+  describe("when the directory is not a valid upgrade", () => {
+    it("fails", async () => {
+      expect(
+        async () => await execAsync("pnpm validate check reference/not_an_upgrade")
+      ).rejects.toSatisfy((e) => {
+        const err = e as any;
+        expect(err.stdout).to.contain(
+          'Expected "reference/not_an_upgrade" to be an upgrade directory but it\'s not. Upgrade directories contain a "common.json" file inside'
+        );
+        return true;
+      });
+    });
   });
 
-  describe('when directory does not exists', () => {
-    it('fails', async () => {
-      const {stdout} = await expectToFailAsync(
-        () => execAsync(
-          "pnpm validate check reference/not_a_directory"
-        )
-      )
-      expect(stdout).toContain("Specified path \"reference/not_a_directory\" is not a directory or there are no permissions to access it.")
-    })
+  describe("when directory does not exists", () => {
+    it("fails", async () => {
+      const { stdout } = await expectToFailAsync(() =>
+        execAsync("pnpm validate check reference/not_a_directory")
+      );
+      expect(stdout).toContain(
+        'Specified path "reference/not_a_directory" is not a directory or there are no permissions to access it.'
+      );
+    });
   });
 });
