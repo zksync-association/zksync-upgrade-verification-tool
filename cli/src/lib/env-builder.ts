@@ -71,11 +71,11 @@ export class EnvBuilder {
     return this._l2Client;
   }
 
-  github(): GithubClient {
+  async github(): Promise<GithubClient> {
     if (this._github) {
       return this._github;
     }
-    this._github = new GithubClient(this.ref, this.githubApiKey);
+    this._github = await GithubClient.create(this.ref);
     return this._github;
   }
 

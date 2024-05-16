@@ -4,20 +4,21 @@ import path from "node:path";
 import { EraContractsRepo } from "./era-contracts-repo";
 
 export class GithubClient {
-  private octo: Octokit;
-  ref: string;
+  private contractsRepo: EraContractsRepo;
+  private ref: string;
 
-  constructor(ref: string, apiKey?: string) {
-    this.ref = ref;
-    this.octo = apiKey ? new Octokit({ auth: apiKey }) : new Octokit();
+  constructor(contractsRepo: EraContractsRepo, ref: string = "main") {
+    this.ref = ref
+    this.contractsRepo = contractsRepo
+  }
+
+  static async create(ref: string): Promise<GithubClient> {
+    const repo = await EraContractsRepo.default()
+    return new GithubClient(repo, ref)
   }
 
   async downloadFile(filePath: string): Promise<string> {
-    const repo = await EraContractsRepo.default()
-    await repo.init()
-    await repo.goToRef(this.ref)
-
-    return repo.readFile(filePath)
+    return this.contractsRepo.readFile(filePath, this.ref)
   }
 
   async downloadSystemContract(contractName: string): Promise<Sources> {
@@ -58,6 +59,6 @@ export class GithubClient {
   }
 
   async auth(): Promise<Record<string, string>> {
-    return (await this.octo.auth()) as Record<string, string>;
+    return {'auth': 'no-auth'}
   }
 }

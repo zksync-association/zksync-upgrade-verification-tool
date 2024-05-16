@@ -25,15 +25,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 `;
 
-describe("Github client", () => {
-  it("can get a top level file", async () => {
-    const client = new GithubClient("f3630fc");
+describe('Github client', () => {
+  it('can get a top level file', async () => {
+    const client = await GithubClient.create("f3630fc");
     const file = await client.downloadFile("LICENSE-MIT");
     expect(file).to.eql(MIT_CONTENT);
-  });
+  })
 
   it("can download a nested file", async () => {
-    const client = new GithubClient("f3630fc");
+    const client = await GithubClient.create("f3630fc");
     const content = await client.downloadFile("l1-contracts/package.json");
     const pkgJson = JSON.parse(content);
     expect(pkgJson.version).to.eql("0.1.0");
@@ -42,7 +42,7 @@ describe("Github client", () => {
 
   it('can download entire contracts', async (t) => {
     // a8f589b625e72e69dd7e33ccbe697cc0
-    const client = new GithubClient('e77971db')
+    const client = await GithubClient.create('e77971db')
     const content = await client.downloadSystemContract('NonceHolder')
     const data = new ContractData('NonceHolder', content, 'some address')
     data.remapKeys('system-contracts/contracts/', '')
