@@ -1,6 +1,7 @@
 import type { Sources } from "../schema";
 import path from "node:path";
 import { EraContractsRepo } from "./era-contracts-repo";
+import { GitError } from "simple-git";
 
 export class GithubClient {
   private contractsRepo: EraContractsRepo;
@@ -17,7 +18,14 @@ export class GithubClient {
   }
 
   async downloadFile(filePath: string): Promise<string> {
-    return this.contractsRepo.readFile(filePath, this.ref)
+    try {
+      return await this.contractsRepo.readFile(filePath, this.ref)
+    } catch (e) {
+      if (e instanceof GitError) {
+        return "Content not found"
+      }
+      throw e
+    }
   }
 
   async downloadSystemContract(contractName: string): Promise<Sources> {
