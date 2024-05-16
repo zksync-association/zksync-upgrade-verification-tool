@@ -15,6 +15,7 @@ export class GithubClient {
   async downloadFile(filePath: string): Promise<string> {
     const repo = await EraContractsRepo.default()
     await repo.init()
+    await repo.goToRef(this.ref)
 
     return repo.readFile(filePath)
   }
