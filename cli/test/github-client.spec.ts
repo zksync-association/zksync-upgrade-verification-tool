@@ -40,6 +40,12 @@ describe('Github client', () => {
     expect(pkgJson.name).to.eql("l1-contracts");
   });
 
+  it('returns defualt content for not found file', async () => {
+    const client = await GithubClient.create('f3630fc')
+    const content = await client.downloadFile('this/file/does/not/exists.xyz')
+    expect(content).to.eql("Content not found")
+  })
+
   it('can download entire contracts', async () => {
     // a8f589b625e72e69dd7e33ccbe697cc0
     const client = await GithubClient.create('e77971db')
