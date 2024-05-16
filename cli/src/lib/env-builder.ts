@@ -5,7 +5,6 @@ import { RpcClient } from "./rpc-client.js";
 
 export class EnvBuilder {
   private _etherscanApiKey?: string;
-  githubApiKey?: string;
   rpcUrl?: string;
   private _network?: Network;
   private ref = "main";
@@ -22,10 +21,6 @@ export class EnvBuilder {
 
   withEtherscanApiKey(etherscanKey: string): void {
     this._etherscanApiKey = etherscanKey;
-  }
-
-  withGithubApiKey(maybeKey: string | undefined): void {
-    this.githubApiKey = maybeKey;
   }
 
   withRef(ref: string): void {

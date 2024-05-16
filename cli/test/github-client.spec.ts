@@ -40,7 +40,7 @@ describe('Github client', () => {
     expect(pkgJson.name).to.eql("l1-contracts");
   });
 
-  it('can download entire contracts', async (t) => {
+  it('can download entire contracts', async () => {
     // a8f589b625e72e69dd7e33ccbe697cc0
     const client = await GithubClient.create('e77971db')
     const content = await client.downloadSystemContract('NonceHolder')
