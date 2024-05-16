@@ -7,24 +7,24 @@ export class GithubClient {
   private contractsRepo: EraContractsRepo;
   private ref: string;
 
-  constructor(contractsRepo: EraContractsRepo, ref: string = "main") {
-    this.ref = ref
-    this.contractsRepo = contractsRepo
+  constructor(contractsRepo: EraContractsRepo, ref: string) {
+    this.ref = ref;
+    this.contractsRepo = contractsRepo;
   }
 
   static async create(ref: string): Promise<GithubClient> {
-    const repo = await EraContractsRepo.default()
-    return new GithubClient(repo, ref)
+    const repo = await EraContractsRepo.default();
+    return new GithubClient(repo, ref);
   }
 
   async downloadFile(filePath: string): Promise<string> {
     try {
-      return await this.contractsRepo.readFile(filePath, this.ref)
+      return await this.contractsRepo.readFile(filePath, this.ref);
     } catch (e) {
       if (e instanceof GitError) {
-        return "Content not found"
+        return "Content not found";
       }
-      throw e
+      throw e;
     }
   }
 
@@ -66,6 +66,6 @@ export class GithubClient {
   }
 
   async auth(): Promise<Record<string, string>> {
-    return {'auth': 'no-auth'}
+    return { auth: "no-auth" };
   }
 }
