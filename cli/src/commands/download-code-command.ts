@@ -13,7 +13,7 @@ export async function downloadCode(
   await assertDirectoryExists(targetDir);
 
   const l2Client = env.l2Client();
-  const github = env.github();
+  const github = await env.github();
 
   const { diff, l1Client } = await withSpinner(
     () => compareCurrentStateWith(env, upgradeDirectory),
