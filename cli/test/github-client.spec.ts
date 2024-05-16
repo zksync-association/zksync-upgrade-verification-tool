@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { GithubClient } from '../src/lib/github-client'
+import { GithubClient } from "../src/lib/github-client";
 import { ContractData } from "../src/lib";
 
 const MIT_CONTENT = `MIT License
@@ -25,12 +25,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 `;
 
-describe('Github client', () => {
-  it('can get a top level file', async () => {
+describe("Github client", () => {
+  it("can get a top level file", async () => {
     const client = await GithubClient.create("f3630fc");
     const file = await client.downloadFile("LICENSE-MIT");
     expect(file).to.eql(MIT_CONTENT);
-  })
+  });
 
   it("can download a nested file", async () => {
     const client = await GithubClient.create("f3630fc");
@@ -40,48 +40,48 @@ describe('Github client', () => {
     expect(pkgJson.name).to.eql("l1-contracts");
   });
 
-  it('returns defualt content for not found file', async () => {
-    const client = await GithubClient.create('f3630fc')
-    const content = await client.downloadFile('this/file/does/not/exists.xyz')
-    expect(content).to.eql("Content not found")
-  })
+  it("returns defualt content for not found file", async () => {
+    const client = await GithubClient.create("f3630fc");
+    const content = await client.downloadFile("this/file/does/not/exists.xyz");
+    expect(content).to.eql("Content not found");
+  });
 
-  it('can download entire contracts', async () => {
+  it("can download entire contracts", async () => {
     // a8f589b625e72e69dd7e33ccbe697cc0
-    const client = await GithubClient.create('e77971db')
-    const content = await client.downloadSystemContract('NonceHolder')
-    const data = new ContractData('NonceHolder', content, 'some address')
-    data.remapKeys('system-contracts/contracts/', '')
+    const client = await GithubClient.create("e77971db");
+    const content = await client.downloadSystemContract("NonceHolder");
+    const data = new ContractData("NonceHolder", content, "some address");
+    data.remapKeys("system-contracts/contracts/", "");
     const expected = [
-      'interfaces/IAccountCodeStorage.sol',
-      'interfaces/IBootloaderUtilities.sol',
-      'interfaces/IComplexUpgrader.sol',
-      'interfaces/ICompressor.sol',
-      'interfaces/IContractDeployer.sol',
-      'interfaces/IEthToken.sol',
-      'interfaces/IImmutableSimulator.sol',
-      'interfaces/IKnownCodesStorage.sol',
-      'interfaces/IL1Messenger.sol',
-      'interfaces/INonceHolder.sol',
-      'interfaces/IPaymasterFlow.sol',
-      'interfaces/ISystemContext.sol',
-      'interfaces/ISystemContract.sol',
-      'libraries/EfficientCall.sol',
-      'libraries/RLPEncoder.sol',
-      'libraries/SystemContractHelper.sol',
-      'libraries/SystemContractsCaller.sol',
-      'libraries/TransactionHelper.sol',
-      'libraries/Utils.sol',
-      'openzeppelin/token/ERC20/extensions/IERC20Permit.sol',
-      'openzeppelin/token/ERC20/IERC20.sol',
-      'openzeppelin/token/ERC20/utils/SafeERC20.sol',
-      'openzeppelin/utils/Address.sol',
-      'Constants.sol',
-      'NonceHolder.sol',
+      "interfaces/IAccountCodeStorage.sol",
+      "interfaces/IBootloaderUtilities.sol",
+      "interfaces/IComplexUpgrader.sol",
+      "interfaces/ICompressor.sol",
+      "interfaces/IContractDeployer.sol",
+      "interfaces/IEthToken.sol",
+      "interfaces/IImmutableSimulator.sol",
+      "interfaces/IKnownCodesStorage.sol",
+      "interfaces/IL1Messenger.sol",
+      "interfaces/INonceHolder.sol",
+      "interfaces/IPaymasterFlow.sol",
+      "interfaces/ISystemContext.sol",
+      "interfaces/ISystemContract.sol",
+      "libraries/EfficientCall.sol",
+      "libraries/RLPEncoder.sol",
+      "libraries/SystemContractHelper.sol",
+      "libraries/SystemContractsCaller.sol",
+      "libraries/TransactionHelper.sol",
+      "libraries/Utils.sol",
+      "openzeppelin/token/ERC20/extensions/IERC20Permit.sol",
+      "openzeppelin/token/ERC20/IERC20.sol",
+      "openzeppelin/token/ERC20/utils/SafeERC20.sol",
+      "openzeppelin/utils/Address.sol",
+      "Constants.sol",
+      "NonceHolder.sol",
     ];
-    expected.sort()
+    expected.sort();
     const actual = Object.keys(data.sources);
-    actual.sort()
-    expect(actual).toEqual(expected)
-  })
+    actual.sort();
+    expect(actual).toEqual(expected);
+  });
 });
