@@ -16,19 +16,12 @@ export const cli = async () => {
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
       }
-      if (!yargs.githubApiKey) {
-        yargs.githubApiKey = process.env.API_KEY_GITHUB;
-      }
     }, true)
     .option("ethscankey", {
       describe: "Api key for etherscan",
       type: "string",
       demandOption:
         "Please provide a valid Etherscan api key. You can set ETHERSCAN_API_KEY env var or use the option --ethscankey",
-    })
-    .option("githubApiKey", {
-      describe: "Api key for github",
-      type: "string",
     })
     .option("network", {
       alias: "n",
@@ -52,7 +45,6 @@ export const cli = async () => {
       env.withNetwork(NetworkSchema.parse(yargs.network));
       env.withRpcUrl(yargs.rpcUrl);
       env.withEtherscanApiKey(yargs.ethscankey);
-      env.withGithubApiKey(yargs.githubApiKey);
       env.withRef(yargs.ref);
     })
     .command(

@@ -17,7 +17,7 @@ describe("EnvBuilder", () => {
     });
 
     it("returns a github client with no auth info", async () => {
-      const githubClient = target().github();
+      const githubClient = await target().github();
       expect(await githubClient.auth()).to.eql({ type: "unauthenticated" });
     });
 
@@ -27,27 +27,6 @@ describe("EnvBuilder", () => {
 
     it("cannot return ethscan key", async () => {
       expect(() => target().network).to.throw();
-    });
-
-    it("returns undefined for github api key", async () => {
-      expect(target().githubApiKey).to.eql(undefined);
-    });
-  });
-
-  describe("when github api key is set", () => {
-    const target = () => {
-      const env = new EnvBuilder();
-      env.withGithubApiKey("sometoken");
-      return env;
-    };
-
-    it("returns an autheticated github client", async () => {
-      const githubClient = target().github();
-      expect(await githubClient.auth()).to.eql({
-        token: "sometoken",
-        tokenType: "oauth",
-        type: "token",
-      });
     });
   });
 

@@ -9,7 +9,7 @@ export const contractDiff = async (
   upgradeDirectory: string,
   contractName: string
 ) => {
-  const github = env.github();
+  const github = await env.github();
   const l2Client = env.l2Client();
   const targetDir = await withSpinner(async (): Promise<string> => {
     const { diff, l1Client } = await compareCurrentStateWith(env, upgradeDirectory);

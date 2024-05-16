@@ -34,7 +34,6 @@ export class EraContractsRepo {
   }
 
   async readFile(subPath: string, ref: string): Promise<string> {
-    const file = await this.git.show(`${ref}:${subPath}`)
-    return file
+    return this.git.show(`${ref}:${subPath}`)
   }
 }

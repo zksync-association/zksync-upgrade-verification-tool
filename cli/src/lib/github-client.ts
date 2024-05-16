@@ -1,4 +1,3 @@
-import { Octokit } from "@octokit/core";
 import type { Sources } from "../schema";
 import path from "node:path";
 import { EraContractsRepo } from "./era-contracts-repo";
