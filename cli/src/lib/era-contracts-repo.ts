@@ -29,6 +29,10 @@ export class EraContractsRepo {
     }
   }
 
+  async goToRef(ref: string) {
+    this.git.checkout(ref)
+  }
+
   async readFile(subPath: string): Promise<string> {
     const filePath = path.join(this.repoPath, subPath)
     const content = await fs.readFile(filePath)
