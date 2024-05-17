@@ -1,54 +1,17 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import {
-  commonJsonSchema,
-  type CryptoJson,
-  type FacetCutsJson,
-  type FacetsJson,
-  type L2UpgradeJson,
-  type TransactionsJson,
-  type UpgradeManifest,
+import type {
+  CryptoJson,
+  FacetCutsJson,
+  FacetsJson,
+  L2UpgradeJson,
+  TransactionsJson,
+  UpgradeManifest,
 } from "../schema";
-import { ZodError } from "zod";
 import { SCHEMAS } from "./parser";
 import type { Network } from "./constants";
-
-export const retrieveDirNames = async (targetDir: string) => {
-  const items = await fs.readdir(targetDir, { withFileTypes: true });
-  const directories = items.filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
-
-  return await Promise.all(
-    directories.map(async (dir) => ({
-      name: dir,
-      parsed: await isUpgradeBlob(path.join(targetDir, dir)),
-    }))
-  );
-};
-
-const isUpgradeBlob = async (
-  filePath: string
-): Promise<{ valid: boolean; parsed?: UpgradeManifest }> => {
-  const items = await fs.readdir(filePath);
-  const files = items.filter((file) => file === "common.json");
-
-  if (files.length !== 1) {
-    return { valid: false };
-  }
-
-  try {
-    const commonJson = JSON.parse(await fs.readFile(`${filePath}/common.json`, "utf-8"));
-    const parsed = commonJsonSchema.parse(commonJson);
-    return { valid: true, parsed };
-  } catch (e) {
-    if (e instanceof ZodError) {
-      process.env.DEBUG === "1" && console.error(e.message);
-    } else {
-      console.error(e);
-    }
-    // TODO: Add a logging system and add debug logs for parse failure
-    return { valid: false };
-  }
-};
+import { MissingNetwork, NotADir, NotAnUpgradeDir } from "./errors.js";
+import { assertDirectoryExists } from "./fs-utils.js";
 
 export type UpgradeDescriptor = {
   commonData: UpgradeManifest;
@@ -70,15 +33,30 @@ function translateNetwork(n: Network) {
 }
 
 export const lookupAndParse = async (
-  targetDir: string,
+  upgradeDirectory: string,
   network: Network
 ): Promise<UpgradeDescriptor> => {
+  const targetDir = path.resolve(process.cwd(), upgradeDirectory);
   const networkPath = translateNetwork(network);
 
+  await assertDirectoryExists(targetDir, upgradeDirectory);
+
   const commonPath = path.join(targetDir, "common.json");
-  const commonBuf = await fs.readFile(commonPath);
+
+  const commonBuf = await fs.readFile(commonPath).catch((e) => {
+    if (e instanceof Error && e.message.includes("no such file or directory")) {
+      throw new NotAnUpgradeDir(upgradeDirectory);
+    }
+    throw e;
+  });
+
   const commonParser = SCHEMAS["common.json"];
   const commonData = commonParser.parse(JSON.parse(commonBuf.toString()));
+
+  const networkStat = await fs.stat(path.join(targetDir, networkPath));
+  if (!networkStat.isDirectory()) {
+    throw new MissingNetwork(upgradeDirectory, network);
+  }
 
   const transactionsPath = path.join(targetDir, networkPath, "transactions.json");
   const transactionsBuf = await fs.readFile(transactionsPath);
@@ -96,7 +74,6 @@ export const lookupAndParse = async (
   } catch (e) {
     facetCuts = undefined;
   }
-
   const facetsPath = path.join(targetDir, networkPath, "facets.json");
   let facets: FacetsJson | undefined;
   try {

@@ -6,7 +6,7 @@
   "main": "./dist/main.js.js",
   "module": "./dist/main.js",
   "bin": {
-    "validate": "./bin/validate"
+    "validate": "./bin/validate.js"
   },
   "engines": {
     "node": ">=20",
@@ -34,26 +34,20 @@
   "devDependencies": {
     "@biomejs/biome": "1.6.4",
     "@types/node": "^20.12.6",
-    "typescript": "^5.4.4"
+    "typescript": "^5.4.4",
+    "vitest": "^1.4.0"
   },
   "dependencies": {
-    "@base2/pretty-print-object": "^1.0.2",
     "@octokit/core": "^6.1.2",
-    "@types/inquirer": "^9.0.7",
-    "@types/lodash": "^4.17.0",
-    "@types/semver": "^7.5.8",
     "@types/yargs": "^17.0.32",
-    "cfonts": "^3.2.0",
+    "chalk": "^5.3.0",
     "cli-table3": "^0.6.4",
     "dotenv": "^16.4.5",
-    "inquirer": "^9.2.17",
-    "lodash": "^4.17.21",
     "ora": "^8.0.1",
     "tempy": "^3.1.0",
     "tsup": "^8.0.2",
     "tsx": "^4.7.2",
     "viem": "^2.9.15",
-    "vitest": "^1.4.0",
     "yargs": "^17.7.2",
     "zksync-ethers": "^6.7.0",
     "zod": "^3.22.4"

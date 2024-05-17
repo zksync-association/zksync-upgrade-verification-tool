@@ -43,8 +43,8 @@ export class UpgradeChanges {
     this.booloaderBytecodeHash = booloaderBytecodeHash;
   }
 
-  facetAffected(name: string): FacetData | undefined {
-    return this.facets.find((f) => f.name === name);
+  matchingFacet(targetSelectors: string[]): FacetData | undefined {
+    return this.facets.find((f) => f.selectors.some((sel) => targetSelectors.includes(sel)));
   }
 
   addFacet(facetName: string, facetAddr: string, selectors: string[]) {
@@ -77,8 +77,8 @@ export class UpgradeChanges {
     const verifier = new VerifierContract(
       txFile.proposeUpgradeTx.verifier,
       txFile.proposeUpgradeTx.verifierParams.recursionCircuitsSetVksHash,
-      txFile.proposeUpgradeTx.verifierParams.recursionNodeLevelVkHash,
-      txFile.proposeUpgradeTx.verifierParams.recursionLeafLevelVkHash
+      txFile.proposeUpgradeTx.verifierParams.recursionLeafLevelVkHash,
+      txFile.proposeUpgradeTx.verifierParams.recursionNodeLevelVkHash
     );
 
     const instance = new UpgradeChanges(

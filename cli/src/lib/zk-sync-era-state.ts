@@ -1,5 +1,4 @@
 import type { AbiSet } from "./abi-set.js";
-import { contractRead, contractReadRaw } from "./contract-read.js";
 import { facetsResponseSchema } from "../schema/new-facets.js";
 import type { SystemContractData, UpgradeChanges } from "./upgrade-changes.js";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
@@ -11,6 +10,7 @@ import { type Abi, createPublicClient, type Hex, http } from "viem";
 import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
 import { utils } from "zksync-ethers";
 import { SystemContractChange } from "./system-contract-change";
+import type { RpcClient } from "./rpc-client.js";
 import type { ContractData } from "./contract-data.js";
 
 const MAIN_CONTRACT_FUNCTIONS = {
@@ -42,19 +42,19 @@ export class ZkSyncEraState {
   facetToContractData: Map<string, ContractData>;
 
   private verifier?: VerifierContract;
-  private network: Network;
+  private rpc: RpcClient;
 
   private _aaBytecodeHash?: string;
   private _bootloaderStringHash?: string;
 
-  static async create(network: Network, client: BlockExplorerClient, abis: AbiSet) {
+  static async create(network: Network, client: BlockExplorerClient, abis: AbiSet, rpc: RpcClient) {
     const addresses = {
       mainnet: "0x32400084c286cf3e17e7b677ea9583e60a000324",
       sepolia: "0x9a6de0f62aa270a8bcb1e2610078650d539b1ef9",
     };
-    const diamond = new ZkSyncEraState(network, addresses[network], abis);
-    await diamond.init(client);
-    return diamond;
+    const zkSyncState = new ZkSyncEraState(addresses[network], abis, rpc);
+    await zkSyncState.init(client);
+    return zkSyncState;
   }
 
   async calculateDiff(
@@ -78,23 +78,29 @@ export class ZkSyncEraState {
     );
 
     for (const [address, data] of this.facetToContractData.entries()) {
-      const change = changes.facetAffected(data.name);
+      const oldSelectors = this.facetToSelectors.get(address);
+      if (!oldSelectors) throw new Error("Inconsistent data");
+      const change = changes.matchingFacet(oldSelectors);
       if (change && change.address !== address) {
-        const newContractData = await client.getSourceCode(change.address);
-        const oldFacets = this.facetToSelectors.get(address);
-        if (!oldFacets) {
-          throw new Error("Inconsistent data");
+        if (await client.isVerified(change.address)) {
+          const newContractData = await client.getSourceCode(change.address);
+          diff.addFacetVerifiedFacet(
+            address,
+            change.address,
+            data,
+            newContractData,
+            oldSelectors,
+            change.selectors
+          );
+        } else {
+          diff.addFacetUnverifiedFacet(
+            address,
+            change.address,
+            data,
+            oldSelectors,
+            change.selectors
+          );
         }
-
-        diff.addFacet(
-          address,
-          change.address,
-          data.name,
-          data,
-          newContractData,
-          oldFacets,
-          change.selectors
-        );
       }
     }
 
@@ -146,10 +152,10 @@ export class ZkSyncEraState {
     return this._bootloaderStringHash;
   }
 
-  private constructor(network: Network, addr: string, abis: AbiSet) {
-    this.network = network;
+  private constructor(addr: string, abis: AbiSet, rpc: RpcClient) {
     this.addr = addr;
     this.abis = abis;
+    this.rpc = rpc;
     this.selectorToFacet = new Map();
     this.facetToSelectors = new Map();
     this.facetToContractData = new Map();
@@ -164,7 +170,7 @@ export class ZkSyncEraState {
     const callData = `0x${facetAddressSelector}${facetsSelector}${"0".repeat(
       72 - facetAddressSelector.length - facetsSelector.length
     )}`;
-    const data = await contractReadRaw(this.network, this.addr, callData);
+    const data = await this.rpc.contractReadRaw(this.addr, callData);
 
     // Manually decode address to get abi.
     const facetsAddr = `0x${data.substring(26)}`;
@@ -172,8 +178,7 @@ export class ZkSyncEraState {
   }
 
   private async initializeFacets(abi: Abi, client: BlockExplorerClient): Promise<void> {
-    const facets = await contractRead(
-      this.network,
+    const facets = await this.rpc.contractRead(
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.facets,
       abi,
@@ -196,8 +201,7 @@ export class ZkSyncEraState {
   }
 
   private async initializeProtolVersion(abi: Abi): Promise<void> {
-    this.protocolVersion = await contractRead(
-      this.network,
+    this.protocolVersion = await this.rpc.contractRead(
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.getProtocolVersion,
       abi,
@@ -206,15 +210,13 @@ export class ZkSyncEraState {
   }
 
   private async initializeVerifier(abi: Abi): Promise<void> {
-    const verifierAddress = await contractRead(
-      this.network,
+    const verifierAddress = await this.rpc.contractRead(
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.getVerifier,
       abi,
       z.string()
     );
-    const verifierParams = await contractRead(
-      this.network,
+    const verifierParams = await this.rpc.contractRead(
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.getVerifierParams,
       abi,
@@ -238,15 +240,13 @@ export class ZkSyncEraState {
   }
 
   private async initializeSpecialContacts(abi: Abi): Promise<void> {
-    this._aaBytecodeHash = await contractRead(
-      this.network,
+    this._aaBytecodeHash = await this.rpc.contractRead(
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.getL2BootloaderBytecodeHash,
       abi,
       z.string()
     );
-    this._bootloaderStringHash = await contractRead(
-      this.network,
+    this._bootloaderStringHash = await this.rpc.contractRead(
       this.addr,
       MAIN_CONTRACT_FUNCTIONS.getL2DefaultAccountBytecodeHash,
       abi,

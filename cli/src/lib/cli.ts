@@ -3,19 +3,33 @@ import { hideBin } from "yargs/helpers";
 import { NetworkSchema } from ".";
 import { downloadCode, checkCommand, contractDiff } from "../commands";
 import * as process from "node:process";
+import { EnvBuilder } from "./env-builder.js";
+import { ZodError } from "zod";
+import * as console from "node:console";
+import { printError, NotAnUpgradeDir } from "./errors.js";
 
 export const cli = async () => {
   // printIntro();
-  await yargs(hideBin(process.argv))
+  const env = new EnvBuilder();
+
+  const argParser = yargs(hideBin(process.argv))
     .middleware((yargs) => {
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
+      }
+      if (!yargs.githubApiKey) {
+        yargs.githubApiKey = process.env.API_KEY_GITHUB;
       }
     }, true)
     .option("ethscankey", {
       describe: "Api key for etherscan",
       type: "string",
-      demandOption: true,
+      demandOption:
+        "Please provide a valid Etherscan api key. You can set ETHERSCAN_API_KEY env var or use the option --ethscankey",
+    })
+    .option("githubApiKey", {
+      describe: "Api key for github",
+      type: "string",
     })
     .option("network", {
       alias: "n",
@@ -23,6 +37,18 @@ export const cli = async () => {
       choices: ["mainnet", "sepolia"],
       type: "string",
       default: "mainnet",
+    })
+    .option("rpcUrl", {
+      alias: "rpc",
+      type: "string",
+      describe: "Ethereum rpc url",
+      demandOption: false,
+    })
+    .middleware((yargs) => {
+      env.withNetwork(NetworkSchema.parse(yargs.network));
+      env.withRpcUrl(yargs.rpcUrl);
+      env.withEtherscanApiKey(yargs.ethscankey);
+      env.withGithubApiKey(yargs.githubApiKey);
     })
     .command(
       "check <upgradeDirectory>",
@@ -40,12 +66,7 @@ export const cli = async () => {
             default: "main",
           }),
       async (yargs) => {
-        await checkCommand(
-          yargs.ethscankey,
-          NetworkSchema.parse(yargs.network),
-          yargs.upgradeDirectory,
-          yargs.ref
-        );
+        await checkCommand(env, yargs.upgradeDirectory, yargs.ref);
       }
     )
     .command(
@@ -69,13 +90,7 @@ export const cli = async () => {
             default: "main",
           }),
       async (yargs) => {
-        await contractDiff(
-          yargs.ethscankey,
-          NetworkSchema.parse(yargs.network),
-          yargs.upgradeDir,
-          `facet:${yargs.facetName}`,
-          yargs.ref
-        );
+        await contractDiff(env, yargs.upgradeDir, `facet:${yargs.facetName}`, yargs.ref);
       }
     )
     .command(
@@ -94,13 +109,7 @@ export const cli = async () => {
             default: "main",
           }),
       async (yargs) => {
-        await contractDiff(
-          yargs.ethscankey,
-          NetworkSchema.parse(yargs.network),
-          yargs.upgradeDir,
-          "validator",
-          yargs.ref
-        );
+        await contractDiff(env, yargs.upgradeDir, "validator", yargs.ref);
       }
     )
     .command(
@@ -138,7 +147,7 @@ export const cli = async () => {
             type: "string",
             default: "main",
           }),
-      (yargs) => {
+      async (yargs) => {
         const filter = yargs.facets
           .split(",")
           .map((f) => f.trim())
@@ -157,18 +166,26 @@ export const cli = async () => {
             .map((sc) => `sc:${sc}`)
         );
 
-        downloadCode(
-          yargs.ethscankey,
-          NetworkSchema.parse(yargs.network),
-          yargs.upgradeDir,
-          yargs.targetSourceCodeDir,
-          filter,
-          yargs.ref
-        );
+        await downloadCode(env, yargs.upgradeDir, yargs.targetSourceCodeDir, filter, yargs.ref);
       }
     )
     .demandCommand(1, "Please specify a command")
+    .wrap(100)
     .help()
-    .strict()
-    .parseAsync();
+    .fail(async (msg, err, _yargs) => {
+      if (msg) {
+        const help = await argParser.getHelp();
+        console.log(help);
+        console.log("");
+        // console.log(_yargs.help())
+        console.log(msg);
+        process.exit(1);
+      }
+
+      printError(err);
+      process.exit(1);
+    })
+    .strict();
+
+  await argParser.parseAsync();
 };

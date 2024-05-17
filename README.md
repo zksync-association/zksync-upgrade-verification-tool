@@ -84,7 +84,7 @@ pnpm build
 export ETHERSCAN_API_KEY="<your_etherscan_api_key>"
 ```
 ```bash
-export GITHUB_API_KEY="<your_github_api_key>"
+export API_KEY_GITHUB="<your_github_api_key>"
 ```
 
 #### ***Option 2: Configuration Files***
@@ -98,7 +98,7 @@ This file should contain the following entries:
 ```bash
 # .env
 ETHERSCAN_API_KEY=your_etherscan_api_key
-GITHUB_API_KEY=your_github_api_key
+API_KEY_GITHUB=your_github_api_key
 ```
 
 #### ***Option 3: CLI Argument***
@@ -141,7 +141,6 @@ Downloads both the current and proposed versions of each contract being upgraded
     ```
     `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences. If this directory does not already exist, download-diff will create it for you inside the directory you are at. 
 
-<br>
 
 2. **Navigate to Directory:** After running the command, navigate to the `<targetSourceCodeDir>` directory.
 
@@ -184,7 +183,28 @@ pnpm validate help
 
 ## 🧪 **Testing**
 
-This command will execute all automated tests associated with the tool, verifying that all components operate as expected.
+Unit tests are located inside the cli package. To run:
+
+```bash
+pnpm run --filter=./cli test
+```
+
+Integration tests are inside "test" package. In order to run them
+it's important to config api keys for testing. That can be done with
+a dotenv file inside the test directory:
+
+``` bash
+cp env.example test/.env
+vim .env # complete with real api keys
+```
+
+Once it's completed you can run the integration tests with:
+
+``` test
+pnpm run --filter=./test test
+```
+
+Lastly, this command will execute all automated tests associated with the tool:
 
 ```bash
 pnpm test

@@ -5,15 +5,18 @@ import {
   sourceCodeResponseSchema,
   sourceCodeSchema,
 } from "../schema/index.js";
-import { ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
+import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
 import type { z, ZodType } from "zod";
 import { ContractData } from "./contract-data.js";
+import * as console from "node:console";
+import { ContracNotVerified } from "./errors.js";
 
 export class BlockExplorerClient {
   private apiKey: string;
-  private baseUri: string;
+  baseUri: string;
   private abiCache: Map<string, Abi>;
   private sourceCache: Map<string, ContractData>;
+  private contractsNotVerified: Set<string>;
   private callCount = 0;
 
   constructor(apiKey: string, baseUri: string) {
@@ -21,6 +24,7 @@ export class BlockExplorerClient {
     this.baseUri = baseUri;
     this.abiCache = new Map();
     this.sourceCache = new Map();
+    this.contractsNotVerified = new Set();
     this.callCount = 0;
   }
 
@@ -38,7 +42,12 @@ export class BlockExplorerClient {
     const query = new URLSearchParams(params).toString();
 
     const response = await fetch(`${this.baseUri}?${query}`);
+    if (!response.ok) {
+      throw new Error(`Received error from block explorer: ${await response.text()}`);
+    }
+
     this.callCount++;
+
     return parser.parse(await response.json());
   }
 
@@ -74,6 +83,9 @@ export class BlockExplorerClient {
     if (existing) {
       return existing;
     }
+    if (this.contractsNotVerified.has(rawAddress)) {
+      throw new ContracNotVerified(rawAddress);
+    }
 
     const contractAddr = account20String.parse(rawAddress);
 
@@ -95,18 +107,45 @@ export class BlockExplorerClient {
       throw new Error(`Received empty Source Code for ${rawAddress}`);
     }
 
-    const rawSourceCode = result[0].SourceCode.replace(/^\{\{/, "{").replace(/}}$/, "}");
+    if (result[0].SourceCode === "" || result[0].ABI === "Contract source code not verified") {
+      throw new ContracNotVerified(rawAddress);
+    }
+
+    const abi = JSON.parse(result[0].ABI);
+    this.abiCache.set(rawAddress, abi);
+
     try {
+      const rawSourceCode = result[0].SourceCode.replace(/^\{\{/, "{").replace(/}}$/, "}");
       const SourceCode = sourceCodeSchema.parse(JSON.parse(rawSourceCode));
       const data = new ContractData(result[0].ContractName, SourceCode.sources, contractAddr);
       this.sourceCache.set(rawAddress, data);
       return data;
     } catch (e) {
+      // This means that the response was not an object, instead it was a string with the source code.
+      // We cannot recreate the dir structure in this case. We also don't know the right file name or file type.
       if (e instanceof SyntaxError) {
-        const sources = { "main.sol": { content: rawSourceCode } };
-        const data = new ContractData(result[0].ContractName, sources, contractAddr);
+        const content = { content: result[0].SourceCode };
+        const data = new ContractData(
+          result[0].ContractName,
+          { "contract.sol": content },
+          contractAddr
+        );
         this.sourceCache.set(rawAddress, data);
         return data;
+      }
+
+      // Any other error cannot be handled
+      throw e;
+    }
+  }
+
+  async isVerified(addr: string): Promise<boolean> {
+    try {
+      await this.getSourceCode(addr);
+      return true;
+    } catch (e) {
+      if (e instanceof ContracNotVerified) {
+        return false;
       }
       throw e;
     }
@@ -117,10 +156,8 @@ export class BlockExplorerClient {
     return new BlockExplorerClient(apiKey, baseUri);
   }
 
-  static forL2(): BlockExplorerClient {
-    return new BlockExplorerClient(
-      "no api key needed",
-      "https://block-explorer-api.mainnet.zksync.io/api"
-    );
+  static forL2(network: Network): BlockExplorerClient {
+    const baseUri = ERA_BLOCK_EXPLORER_ENDPOINTS[network];
+    return new BlockExplorerClient("no api key needed", baseUri);
   }
 }

@@ -1,6 +1,5 @@
 import type { VerifierContract } from "./verifier.js";
 import path from "node:path";
-import type { AbiSet } from "./abi-set.js";
 import CliTable from "cli-table3";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { SystemContractChange } from "./system-contract-change";
@@ -8,6 +7,9 @@ import type { GithubClient } from "./github-client";
 import { systemContractHashesSchema } from "../schema/github-schemas.js";
 import { ContractData } from "./contract-data.js";
 import { ADDRESS_ZERO, ZERO_U256 } from "./constants.js";
+import chalk from "chalk";
+import type { AbiSet } from "./abi-set.js";
+import * as console from "node:console";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -16,9 +18,8 @@ export class ZkSyncEraDiff {
   facetChanges: {
     oldAddress: string;
     newAddress: string;
-    name: string;
     oldData: ContractData;
-    newData: ContractData;
+    newData?: ContractData;
     oldSelectors: string[];
     newSelectors: string[];
   }[];
@@ -31,6 +32,7 @@ export class ZkSyncEraDiff {
   private newAA: string;
   private oldBootLoader: string;
   private newBootLoader: string;
+  private warnings: string[];
 
   constructor(
     oldVersion: string,
@@ -54,26 +56,44 @@ export class ZkSyncEraDiff {
     this.newAA = newAA;
     this.oldBootLoader = oldBootLoader;
     this.newBootLoader = newBootLoader;
+    this.warnings = [];
   }
 
-  addFacet(
+  addFacetVerifiedFacet(
     oldAddress: string,
     newAddress: string,
-    name: string,
     oldData: ContractData,
-    newData: ContractData,
+    newData: ContractData | undefined,
     oldSelectors: string[],
     newSelectors: string[]
   ): void {
     this.facetChanges.push({
       oldAddress,
       newAddress,
-      name,
       oldData,
       newData,
       oldSelectors,
       newSelectors,
     });
+    this.facetChanges.sort((f1, f2) => f1.oldData.name.localeCompare(f2.oldData.name));
+  }
+
+  addFacetUnverifiedFacet(
+    oldAddress: string,
+    newAddress: string,
+    oldData: ContractData,
+    oldSelectors: string[],
+    newSelectors: string[]
+  ): void {
+    this.facetChanges.push({
+      oldAddress,
+      newAddress,
+      oldData,
+      oldSelectors,
+      newSelectors,
+    });
+    this.warnings.push(`L1 Contract not verified in therscan: ${newAddress}`);
+    this.facetChanges.sort((f1, f2) => f1.oldData.name.localeCompare(f2.oldData.name));
   }
 
   addSystemContract(change: SystemContractChange) {
@@ -94,10 +114,19 @@ export class ZkSyncEraDiff {
     await this.writeFacets(filter, baseDirOld, baseDirNew);
     await this.writeVerifier(filter, baseDirOld, baseDirNew, l1Client);
     await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, github, ref);
-    await this.writeSpecialContracts(baseDirNew, github, ref);
+    await this.writeSpecialContracts(filter, baseDirNew, github, ref);
   }
 
-  private async writeSpecialContracts(dir: string, github: GithubClient, ref: string) {
+  private async writeSpecialContracts(
+    filter: string[],
+    dir: string,
+    github: GithubClient,
+    ref: string
+  ) {
+    if (filter.length !== 0) {
+      return;
+    }
+
     const baseDirAA = path.join(dir, "defaultAA");
     const baseDirBL = path.join(dir, "bootloader");
 
@@ -151,7 +180,14 @@ export class ZkSyncEraDiff {
   }
 
   private async writeFacets(filter: string[], baseDirOld: string, baseDirNew: string) {
-    for (const { name, oldData, newData } of this.facetChanges) {
+    for (const { oldData, newData, newAddress } of this.facetChanges) {
+      if (!newData) {
+        throw new Error(
+          `Cannot show diff for ${oldData.name} facet. The new contract (${newAddress}) is not verified in etherscan`
+        );
+      }
+
+      const name = oldData.name;
       if (filter.length > 0 && !filter.includes(`facet:${name}`)) {
         continue;
       }
@@ -188,29 +224,34 @@ export class ZkSyncEraDiff {
 
     for (const change of this.facetChanges) {
       const table = new CliTable({
-        head: [change.name],
+        head: [change.oldData.name],
         style: { compact: true },
       });
 
       table.push(["Current address", change.oldAddress]);
       table.push(["Upgrade address", change.newAddress]);
-      table.push(["Proposed contract verified etherscan", "Yes"]);
+      table.push([
+        "Proposed contract verified etherscan",
+        change.newData ? "Yes" : chalk.red("NO!"),
+      ]);
 
-      const newFunctions = await Promise.all(
-        change.newSelectors
-          .filter((s) => !change.oldSelectors.includes(s))
-          .map(async (selector) => {
+      let newFunctions = change.newSelectors.filter((s) => !change.oldSelectors.includes(s));
+
+      if (change.newData) {
+        newFunctions = await Promise.all(
+          newFunctions.map(async (selector) => {
             await abis.fetch(change.newAddress);
             return abis.signatureForSelector(selector);
           })
-      );
-      table.push(["New Functions", newFunctions.length ? newFunctions.join(", ") : "None"]);
+        );
+      }
+      table.push(["New functions", newFunctions.length ? newFunctions.join(", ") : "None"]);
 
       const removedFunctions = await Promise.all(
         change.oldSelectors
           .filter((s) => this.orphanedSelectors.includes(s))
           .map(async (selector) => {
-            await abis.fetch(change.newAddress);
+            await abis.fetch(change.oldAddress);
             return abis.signatureForSelector(selector);
           })
       );
@@ -219,7 +260,10 @@ export class ZkSyncEraDiff {
         "Removed functions",
         removedFunctions.length ? removedFunctions.join(", ") : "None",
       ]);
-      table.push(["To compare code", `pnpm validate facet-diff ${upgradeDir} ${change.name}`]);
+      table.push([
+        "To compare code",
+        `pnpm validate facet-diff ${upgradeDir} ${change.oldData.name}`,
+      ]);
 
       strings.push(table.toString());
     }
@@ -230,21 +274,41 @@ export class ZkSyncEraDiff {
       style: { compact: true },
     });
 
-    verifierTable.push(["Address", this.oldVerifier.address, this.newVerifier.address]);
+    const newVerifierAddr =
+      this.oldVerifier.address === this.newVerifier.address ||
+      this.newVerifier.address === ADDRESS_ZERO
+        ? "No changes"
+        : this.newVerifier.address;
+    verifierTable.push(["Address", this.oldVerifier.address, newVerifierAddr]);
+
+    const newNodeHash =
+      this.oldVerifier.recursionNodeLevelVkHash === this.newVerifier.recursionNodeLevelVkHash
+        ? "No changes"
+        : this.newVerifier.recursionNodeLevelVkHash;
     verifierTable.push([
       "Recursion node level VkHash",
       this.oldVerifier.recursionNodeLevelVkHash,
-      this.newVerifier.recursionNodeLevelVkHash,
+      newNodeHash,
     ]);
+
+    const newCircuitsHash =
+      this.oldVerifier.recursionCircuitsSetVksHash === this.newVerifier.recursionCircuitsSetVksHash
+        ? "No changes"
+        : this.newVerifier.recursionCircuitsSetVksHash;
     verifierTable.push([
       "Recursion circuits set VksHash",
       this.oldVerifier.recursionCircuitsSetVksHash,
-      this.newVerifier.recursionCircuitsSetVksHash,
+      newCircuitsHash,
     ]);
+
+    const newLeafHash =
+      this.oldVerifier.recursionLeafLevelVkHash === this.newVerifier.recursionLeafLevelVkHash
+        ? "No changes"
+        : this.newVerifier.recursionNodeLevelVkHash;
     verifierTable.push([
       "Recursion leaf level VkHash",
       this.oldVerifier.recursionLeafLevelVkHash,
-      this.newVerifier.recursionLeafLevelVkHash,
+      newLeafHash,
     ]);
     verifierTable.push([
       {
@@ -318,15 +382,25 @@ export class ZkSyncEraDiff {
     const bootLoaderBytecodeMatches =
       this.newBootLoader === ZERO_U256 ? true : bootLoaderHash.bytecodeHash === this.newBootLoader;
 
-    otherContractsTable.push(["Default Account", this.oldAA, newAAMsg, aaBytecodeMatches]);
+    otherContractsTable.push([
+      "Default Account",
+      this.oldAA,
+      newAAMsg,
+      aaBytecodeMatches ? chalk.green("Yes") : chalk.red("No"),
+    ]);
     otherContractsTable.push([
       "Bootloader",
       this.oldBootLoader,
       bootLoaderMsg,
-      bootLoaderBytecodeMatches,
+      bootLoaderBytecodeMatches ? chalk.green("Yes") : chalk.red("No"),
     ]);
 
     strings.push(otherContractsTable.toString());
+
+    if (this.warnings.length !== 0) {
+      strings.push("", chalk.red("Warning!!:"));
+      strings.push(...this.warnings.map((w) => `⚠️ ${w}`));
+    }
 
     return strings.join("\n");
   }
@@ -354,8 +428,8 @@ export class ZkSyncEraDiff {
       }
 
       const [current, upgrade] = await Promise.all([
-        change.downloadProposedCode(github, ref),
         change.downloadCurrentCode(l2Client),
+        change.downloadProposedCode(github, ref),
       ]);
 
       current.remapKeys("system-contracts/contracts", "contracts-preprocessed");

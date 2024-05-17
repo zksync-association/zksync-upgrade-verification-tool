@@ -13,8 +13,3 @@ export const cryptoSchema = z.object({
 });
 
 export type CryptoJson = z.infer<typeof cryptoSchema>;
-export const ALL_VERIFIER_PARAMS = [
-  "recursionNodeLevelVkHash",
-  "recursionLeafLevelVkHash",
-  "recursionCircuitsSetVksHash",
-] as const;

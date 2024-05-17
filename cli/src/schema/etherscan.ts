@@ -9,6 +9,7 @@ export const getAbiSchema = z.object({
 
 export const etherscanSourceCodeSchema = z.object({
   SourceCode: z.string(),
+  ABI: z.string(),
   ContractName: z.string(),
   CompilerVersion: z.string(),
   OptimizationUsed: z.string(),
@@ -34,5 +35,4 @@ export const sourceCodeSchema = z.object({
   sources: sourcesParser,
 });
 
-export type RawSourceCode = z.infer<typeof sourceCodeSchema>;
 export type Sources = z.infer<typeof sourcesParser>;

@@ -16,12 +16,12 @@
     "*.mjs"
   ],
   "scripts": {
-    "update":"vitest -u",
+    "update": "vitest -u",
     "fmt": "biome format .",
     "fmt:fix": "biome format . --write",
     "lint": "pnpm biome lint .",
     "lint:fix": "pnpm biome lint . --apply",
-    "test": "vitest run"
+    "test": "vitest run --maxWorkers=1"
   },
   "keywords": [],
   "author": "moonsong-labs",
@@ -32,6 +32,8 @@
     "typescript": "^5.4.4"
   },
   "dependencies": {
+    "dotenv": "^16.4.5",
+    "tempy": "^3.1.0",
     "validate-cli": "workspace:*",
     "vitest": "^1.4.0"
   }
