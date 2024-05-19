@@ -11,7 +11,7 @@ import type {
 import { SCHEMAS } from "./parser";
 import type { Network } from "./constants";
 import { MissingNetwork, NotADir, NotAnUpgradeDir } from "./errors.js";
-import { assertDirectoryExists } from "./fs-utils.js";
+import { assertDirectoryExists, directoryExists } from "./fs-utils.js";
 
 export type UpgradeDescriptor = {
   commonData: UpgradeManifest;
@@ -22,12 +22,12 @@ export type UpgradeDescriptor = {
   l2Upgrade?: L2UpgradeJson;
 };
 
-function translateNetwork(n: Network) {
+function possibleDirNamesFor(n: Network): string[] {
   if (n === "mainnet") {
-    return "mainnet2";
+    return ["mainnet", "mainnet2"];
   }
   if (n === "sepolia") {
-    return "testnet-sepolia";
+    return ["testnet-sepolia", "testnet"];
   }
   throw new Error(`Unknown network: ${n}`);
 }
@@ -37,7 +37,7 @@ export const lookupAndParse = async (
   network: Network
 ): Promise<UpgradeDescriptor> => {
   const targetDir = path.resolve(process.cwd(), upgradeDirectory);
-  const networkPath = translateNetwork(network);
+  const possibleNetworkDirs = possibleDirNamesFor(network);
 
   await assertDirectoryExists(targetDir, upgradeDirectory);
 
@@ -53,20 +53,26 @@ export const lookupAndParse = async (
   const commonParser = SCHEMAS["common.json"];
   const commonData = commonParser.parse(JSON.parse(commonBuf.toString()));
 
-  const networkStat = await fs.stat(path.join(targetDir, networkPath));
-  if (!networkStat.isDirectory()) {
+  let networkDir: string | undefined
+  for (const name of possibleNetworkDirs) {
+    if (await directoryExists(path.join(targetDir, name))) {
+      networkDir = name
+    }
+  }
+
+  if (!networkDir) {
     throw new MissingNetwork(upgradeDirectory, network);
   }
 
-  const transactionsPath = path.join(targetDir, networkPath, "transactions.json");
+  const transactionsPath = path.join(targetDir, networkDir, "transactions.json");
   const transactionsBuf = await fs.readFile(transactionsPath);
   const transactions = SCHEMAS["transactions.json"].parse(JSON.parse(transactionsBuf.toString()));
 
-  const cryptoPath = path.join(targetDir, networkPath, "crypto.json");
+  const cryptoPath = path.join(targetDir, networkDir, "crypto.json");
   const cryptoBuf = await fs.readFile(cryptoPath);
   const crypto = SCHEMAS["crypto.json"].parse(JSON.parse(cryptoBuf.toString()));
 
-  const facetCutsPath = path.join(targetDir, networkPath, "facetCuts.json");
+  const facetCutsPath = path.join(targetDir, networkDir, "facetCuts.json");
   let facetCuts: FacetCutsJson | undefined;
   try {
     const facetCutsBuf = await fs.readFile(facetCutsPath);
@@ -74,7 +80,7 @@ export const lookupAndParse = async (
   } catch (e) {
     facetCuts = undefined;
   }
-  const facetsPath = path.join(targetDir, networkPath, "facets.json");
+  const facetsPath = path.join(targetDir, networkDir, "facets.json");
   let facets: FacetsJson | undefined;
   try {
     const facetCutsBuf = await fs.readFile(facetsPath);
@@ -83,7 +89,7 @@ export const lookupAndParse = async (
     facets = undefined;
   }
 
-  const l2UpgradePath = path.join(targetDir, networkPath, "l2Upgrade.json");
+  const l2UpgradePath = path.join(targetDir, networkDir, "l2Upgrade.json");
   let l2Upgrade: L2UpgradeJson | undefined;
   try {
     const l2UpgradeBuf = await fs.readFile(l2UpgradePath);
