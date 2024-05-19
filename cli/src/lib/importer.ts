@@ -53,10 +53,10 @@ export const lookupAndParse = async (
   const commonParser = SCHEMAS["common.json"];
   const commonData = commonParser.parse(JSON.parse(commonBuf.toString()));
 
-  let networkDir: string | undefined
+  let networkDir: string | undefined;
   for (const name of possibleNetworkDirs) {
     if (await directoryExists(path.join(targetDir, name))) {
-      networkDir = name
+      networkDir = name;
     }
   }
 

@@ -17,7 +17,7 @@ export async function assertDirectoryExists(
   path: string,
   originalPath: string = path
 ): Promise<void> {
-  if (!await directoryExists(path)) {
+  if (!(await directoryExists(path))) {
     throw new NotADir(originalPath);
   }
 }
