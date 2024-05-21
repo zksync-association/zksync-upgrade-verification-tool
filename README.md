@@ -1,18 +1,26 @@
-# 🔍 Upgrade Verification Tool - zkSync Era
+![CoverImage](zkSyncEraUpgradeToolCover.png)
 
-> 🏗️ `Work In Progress` : This repo is being actively developed and does not represent final quality of the tool!
 
-## 📝 **Description**
+# 🔍 zkSync Era Upgrade Verification Tool 
 
-The zkSync Era Upgrade Verification Tool is a CLI tool crafted to decode and present zkSync Era upgrade proposals in a human-readable format.
+The zkSync Era Upgrade Verification Tool is a **CLI tool crafted to decode and present zkSync Era upgrade proposals in a human-readable format**.
+
+<br>
 
 ## 🌟 **Features**
+
+ > 🏗️ `Work In Progress` : This repo is being actively developed and does not represent final quality of the tool!
 
   - **_[L1]_ Facets**: Identifies contract upgrades including additions or removals of functions. 
   - **_[L1]_ Verifier** : Detects upgrades and parameter changes in contracts.
   - **_[L2]_ System Contracts**: Lists changes and validates bytecode hashes. 
  - **_[L2]_ Bootloader and DefaultAccount**: Validates bytecode hash.
  - **Solidity Diff Tool**: Compares current contracts with upgrade proposals for verification. *Currently available for Facets, Verifier & System Contracts.*
+
+<br>
+
+
+
 
 ## 🔍 **Prerequisites**
 
@@ -121,15 +129,35 @@ Checks the validity of the upgrade and prints a summary of the changes.
 pnpm validate check <upgradeDir>
 ```
 
+```bash
+pnpm validate check ../zksync-era/etc/upgrades/1699353977-boojum #Example of check command with Boojum upgrade.
+```
+
 <br>
 
-### **`show-diff <upgradeDir> <facetName>`**: 
-Shows the proposed changes in a specified contract.
+### **`facet-diff <upgradeDir> <facetName>`**: 
+Shows the proposed changes in a specified facet.
 
 
 ```bash
 pnpm validate show-diff <upgradeDir> <facetName>
 ```
+
+```bash
+pnpm validate facet-diff ../zksync-era/etc/upgrades/1699353977-boojum GettersFacet --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0 #Example with GettersFacet in Boojum upgrade with specific commit reference.
+```
+<br>
+
+### **`verifier-diff <upgradeDir>`**: 
+Shows the proposed changes between current verifier source code and the proposed one.
+
+```bash
+pnpm validate verifier-diff <upgradeDir>
+```
+```bash
+pnpm validate verifier-diff ../zksync-era/etc/upgrades/1699353977-boojum #Example of verifier-diff command for Boojum upgrade.
+``` 
+
 <br>
 
 ### **`download-diff <upgradeDir> <targetSourceCodeDir>`** :
@@ -139,7 +167,9 @@ Downloads both the current and proposed versions of each contract being upgraded
     ```bash
       pnpm validate download-diff <upgradeDir> <targetSourceCodeDir>
     ```
-    `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences. If this directory does not already exist, download-diff will create it for you inside the directory you are at. 
+    `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences.
+
+   *Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please refer to [--ref in options section.](#🎛️-options)*   
 
 
 2. **Navigate to Directory:** After running the command, navigate to the `<targetSourceCodeDir>` directory.
@@ -162,6 +192,11 @@ The following options are available to configure the zkSync Era Upgrade Verifica
 Specifies the target network where the tool will perform the checks. 
 - **Values**: `mainnet`, `sepolia`
 - **Default**: `mainnet`
+- **Example**: *Protodanksharding upgrade in sepolia*
+
+```bash
+pnpm validate check ../zksync-era/etc/upgrades/1709067445-protodanksharding --network=sepolia
+```
 
 ###  `--rpc` , `--rpcUrl`
 Specifies the Ethereum RPC URL to be used for connecting to the blockchain.
@@ -172,6 +207,12 @@ Specifies the Ethereum RPC URL to be used for connecting to the blockchain.
 ### `--ref`
 Specifies the GitHub commit reference from which the L2 code will be downloaded.
 - **Default**: The last commit on the `main` branch.
+- **Example**: `--ref` to commit (related to `boojum` upgrade in `download_dif` command).
+
+  ```bash
+  pnpm validate download-diff ../zksync-era/etc/upgrades/1699353977-boojum boojumDiff --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0
+  ```
+
 
 ## ❓ **Help**
 

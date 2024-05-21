@@ -232,7 +232,7 @@ export class ZkSyncEraDiff {
           })
         );
       }
-      table.push(["New functions", newFunctions.length ? newFunctions.join(", ") : "None"]);
+      table.push(["New functions", newFunctions.length ? newFunctions.join("\n") : "None"]);
 
       const removedFunctions = await Promise.all(
         change.oldSelectors

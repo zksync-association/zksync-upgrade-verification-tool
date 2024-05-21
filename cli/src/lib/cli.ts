@@ -97,7 +97,7 @@ export const cli = async () => {
           demandOption: true,
         }),
       async (yargs) => {
-        await contractDiff(env, yargs.upgradeDir, "validator");
+        await contractDiff(env, yargs.upgradeDir, "verifier");
       }
     )
     .command(
