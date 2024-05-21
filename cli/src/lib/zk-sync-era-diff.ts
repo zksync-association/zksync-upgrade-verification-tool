@@ -346,11 +346,8 @@ export class ZkSyncEraDiff {
       style: { compact: true },
     });
 
-    const rawHashes = await repo.readFile("system-contracts/SystemContractsHashes.json");
-    const hashes = systemContractHashesParser.parse(JSON.parse(rawHashes));
-
-    const defaultAccountHash = hashes.find((h) => h.contractName === "DefaultAccount");
-    const bootLoaderHash = hashes.find((h) => h.contractName === "proved_batch");
+    const defaultAccountHash = await repo.byteCodeHashFor("DefaultAccount");
+    const bootLoaderHash =  await repo.byteCodeHashFor("proved_batch");
 
     if (!defaultAccountHash) {
       throw new Error(`Missing default account hash for ref: ${await repo.currentRef()}`);
@@ -362,12 +359,12 @@ export class ZkSyncEraDiff {
     const newAAMsg = this.newAA === ZERO_U256 ? "No changes" : this.newAA;
 
     const aaBytecodeMatches =
-      this.newAA === ZERO_U256 ? true : defaultAccountHash.bytecodeHash === this.newAA;
+      this.newAA === ZERO_U256 ? true : defaultAccountHash === this.newAA;
 
     const bootLoaderMsg = this.newBootLoader === ZERO_U256 ? "No changes" : this.newBootLoader;
 
     const bootLoaderBytecodeMatches =
-      this.newBootLoader === ZERO_U256 ? true : bootLoaderHash.bytecodeHash === this.newBootLoader;
+      this.newBootLoader === ZERO_U256 ? true : bootLoaderHash === this.newBootLoader;
 
     otherContractsTable.push([
       "Default Account",
