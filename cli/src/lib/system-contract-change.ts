@@ -3,7 +3,6 @@ import type { BlockExplorerClient } from "./block-explorer-client";
 import type { GithubClient } from "./github-client";
 import { ContractData } from "./contract-data.js";
 import { ContracNotVerified } from "./errors.js";
-import * as console from "node:console";
 
 export class SystemContractChange {
   address: Hex;
@@ -34,8 +33,8 @@ export class SystemContractChange {
     }
   }
 
-  async downloadProposedCode(github: GithubClient, ref: string): Promise<ContractData> {
-    const source = await github.downloadContract(this.name, ref);
+  async downloadProposedCode(github: GithubClient): Promise<ContractData> {
+    const source = await github.downloadContract(this.name);
 
     return new ContractData(this.name, source, this.address);
   }
