@@ -1,8 +1,8 @@
 import type { Hex } from "viem";
 import type { BlockExplorerClient } from "./block-explorer-client";
-import type { GithubClient } from "./github-client";
 import { ContractData } from "./contract-data.js";
 import { ContracNotVerified } from "./errors.js";
+import type { EraContractsRepo } from "./era-contracts-repo";
 
 export class SystemContractChange {
   address: Hex;
@@ -33,9 +33,8 @@ export class SystemContractChange {
     }
   }
 
-  async downloadProposedCode(github: GithubClient): Promise<ContractData> {
-    const source = await github.downloadSystemContract(this.name);
-
+  async downloadProposedCode(repo: EraContractsRepo): Promise<ContractData> {
+    const source = await repo.downloadSystemContract(this.name);
     return new ContractData(this.name, source, this.address);
   }
 }

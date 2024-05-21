@@ -9,12 +9,12 @@ export const contractDiff = async (
   upgradeDirectory: string,
   contractName: string
 ) => {
-  const github = await env.github();
+  const repo = await env.contractsRepo();
   const l2Client = env.l2Client();
   const targetDir = await withSpinner(async (): Promise<string> => {
     const { diff, l1Client } = await compareCurrentStateWith(env, upgradeDirectory);
     const targetDir = temporaryDirectory({ prefix: "zksync-era-upgrade-check" });
-    await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, github);
+    await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, repo);
     return targetDir;
   }, "Gathering contract data");
 

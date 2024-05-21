@@ -8,5 +8,5 @@ export async function checkCommand(env: EnvBuilder, upgradeDirectory: string): P
     "Gathering contract data"
   );
 
-  console.log(await diff.toCliReport(l1Abis, upgradeDirectory, await env.github()));
+  console.log(await diff.toCliReport(l1Abis, upgradeDirectory, await env.contractsRepo()));
 }

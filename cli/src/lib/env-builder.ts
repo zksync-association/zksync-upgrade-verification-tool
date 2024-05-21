@@ -1,7 +1,7 @@
 import { BlockExplorerClient } from "./block-explorer-client.js";
 import type { Network } from "./constants.js";
-import { GithubClient } from "./github-client.js";
 import { RpcClient } from "./rpc-client.js";
+import { EraContractsRepo } from "./era-contracts-repo";
 import { FileSystem } from "./file-system";
 import { UpgradeImporter } from "./importer";
 
@@ -13,7 +13,7 @@ export class EnvBuilder {
 
   private _l1Client?: BlockExplorerClient;
   private _l2Client?: BlockExplorerClient;
-  private _github?: GithubClient;
+  private _repo?: EraContractsRepo;
 
   // Config
 
@@ -66,14 +66,6 @@ export class EnvBuilder {
     return this._l2Client;
   }
 
-  async github(): Promise<GithubClient> {
-    if (this._github) {
-      return this._github;
-    }
-    this._github = await GithubClient.create(this.ref);
-    return this._github;
-  }
-
   rpcL1(): RpcClient {
     return RpcClient.forL1(this.network);
   }
@@ -88,5 +80,17 @@ export class EnvBuilder {
 
   importer(): UpgradeImporter {
     return new UpgradeImporter(this.fs());
+  }
+
+  async contractsRepo(): Promise<EraContractsRepo> {
+    if (!this._repo) {
+      const repo = await EraContractsRepo.default()
+      await repo.init()
+      this._repo = repo
+      await this._repo.setRevision(this.ref)
+      return repo
+    }
+
+    return this._repo
   }
 }

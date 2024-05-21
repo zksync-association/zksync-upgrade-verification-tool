@@ -3,12 +3,12 @@ import path from "node:path";
 import CliTable from "cli-table3";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { SystemContractChange } from "./system-contract-change";
-import type { GithubClient } from "./github-client";
 import { systemContractHashesSchema } from "../schema/github-schemas.js";
 import { ContractData } from "./contract-data.js";
 import { ADDRESS_ZERO, ZERO_U256 } from "./constants.js";
 import chalk from "chalk";
 import type { AbiSet } from "./abi-set.js";
+import type { EraContractsRepo } from "./era-contracts-repo";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -104,18 +104,18 @@ export class ZkSyncEraDiff {
     filter: string[],
     l1Client: BlockExplorerClient,
     l2Client: BlockExplorerClient,
-    github: GithubClient
+    repo: EraContractsRepo
   ): Promise<void> {
     const baseDirOld = path.join(baseDirPath, "old");
     const baseDirNew = path.join(baseDirPath, "new");
 
     await this.writeFacets(filter, baseDirOld, baseDirNew);
     await this.writeVerifier(filter, baseDirOld, baseDirNew, l1Client);
-    await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, github);
-    await this.writeSpecialContracts(filter, baseDirNew, github);
+    await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, repo);
+    await this.writeSpecialContracts(filter, baseDirNew, repo);
   }
 
-  private async writeSpecialContracts(filter: string[], dir: string, github: GithubClient) {
+  private async writeSpecialContracts(filter: string[], dir: string, repo: EraContractsRepo) {
     if (filter.length !== 0) {
       return;
     }
@@ -123,18 +123,18 @@ export class ZkSyncEraDiff {
     const baseDirAA = path.join(dir, "defaultAA");
     const baseDirBL = path.join(dir, "bootloader");
 
-    const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json");
+    const rawHashes = await repo.readFile("system-contracts/SystemContractsHashes.json");
     const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
 
     if (this.newAA !== ZERO_U256) {
       const defaultAccountHash = hashes.find((h) => h.contractName === "DefaultAccount");
       if (!defaultAccountHash || defaultAccountHash.bytecodeHash !== this.newAA) {
         throw new Error(
-          `Default Account contract byte code hash does not match in ref: ${github.ref}`
+          `Default Account contract byte code hash does not match in ref: ${await repo.currentRef()}`
         );
       }
 
-      const sourcesAA = await github.downloadSystemContract("DefaultAccount");
+      const sourcesAA = await repo.downloadSystemContract("DefaultAccount");
       const contractAA = new ContractData("DefaultAA", sourcesAA, ADDRESS_ZERO);
       await contractAA.writeSources(baseDirAA);
     }
@@ -142,10 +142,10 @@ export class ZkSyncEraDiff {
     if (this.newBootLoader !== ZERO_U256) {
       const bootLoaderHash = hashes.find((h) => h.contractName === "proved_batch");
       if (!bootLoaderHash || bootLoaderHash.bytecodeHash !== this.newBootLoader) {
-        throw new Error(`Bootloader contract byte code hash does not match in ref: ${github.ref}`);
+        throw new Error(`Bootloader contract byte code hash does not match in ref: ${await repo.currentRef()}`);
       }
 
-      const sourcesBL = await github.downloadFile("system-contracts/bootloader/bootloader.yul");
+      const sourcesBL = await repo.readFile("system-contracts/bootloader/bootloader.yul");
       const contractBL = new ContractData(
         "Bootloader",
         { "bootloader.yul": { content: sourcesBL } },
@@ -192,7 +192,7 @@ export class ZkSyncEraDiff {
     }
   }
 
-  async toCliReport(abis: AbiSet, upgradeDir: string, github: GithubClient): Promise<string> {
+  async toCliReport(abis: AbiSet, upgradeDir: string, repo: EraContractsRepo): Promise<string> {
     const title = "Upgrade report:";
     const strings = [`${title}`, "=".repeat(title.length), ""];
 
@@ -346,17 +346,17 @@ export class ZkSyncEraDiff {
       style: { compact: true },
     });
 
-    const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json");
+    const rawHashes = await repo.readFile("system-contracts/SystemContractsHashes.json");
     const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
 
     const defaultAccountHash = hashes.find((h) => h.contractName === "DefaultAccount");
     const bootLoaderHash = hashes.find((h) => h.contractName === "proved_batch");
 
     if (!defaultAccountHash) {
-      throw new Error(`Missing default account hash for ref: ${github.ref}`);
+      throw new Error(`Missing default account hash for ref: ${await repo.currentRef()}`);
     }
     if (!bootLoaderHash) {
-      throw new Error(`Missing bootloader hash for ref: ${github.ref}`);
+      throw new Error(`Missing bootloader hash for ref: ${await repo.currentRef()}`);
     }
 
     const newAAMsg = this.newAA === ZERO_U256 ? "No changes" : this.newAA;
@@ -397,9 +397,9 @@ export class ZkSyncEraDiff {
     baseDirOld: string,
     baseDirNew: string,
     l2Client: BlockExplorerClient,
-    github: GithubClient
+    repo: EraContractsRepo
   ) {
-    const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json");
+    const rawHashes = await repo.readFile("system-contracts/SystemContractsHashes.json");
     const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
 
     for (const change of this.systemContractChanges) {
@@ -411,13 +411,13 @@ export class ZkSyncEraDiff {
 
       if (!currentHash || change.proposedBytecodeHash !== currentHash.bytecodeHash) {
         throw new Error(
-          `Bytecode hash does not match for ${change.name} inside ref "${github.ref}"`
+          `Bytecode hash does not match for ${change.name} inside ref "${await repo.currentRef()}"`
         );
       }
 
       const [current, upgrade] = await Promise.all([
         change.downloadCurrentCode(l2Client),
-        change.downloadProposedCode(github),
+        change.downloadProposedCode(repo),
       ]);
 
       upgrade.remapKeys("system-contracts/contracts", "contracts-preprocessed");

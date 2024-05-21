@@ -13,7 +13,7 @@ export async function downloadCode(
   await assertDirectoryExists(targetDir);
 
   const l2Client = env.l2Client();
-  const github = await env.github();
+  const repo = await env.contractsRepo();
 
   const { diff, l1Client } = await withSpinner(
     () => compareCurrentStateWith(env, upgradeDirectory),
@@ -21,7 +21,7 @@ export async function downloadCode(
   );
 
   await withSpinner(
-    () => diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, github),
+    () => diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, repo),
     "Downloading source code"
   );
   console.log(`✅ Source code successfully downloaded in: ${targetDir}`);

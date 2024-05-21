@@ -16,10 +16,11 @@ describe("EnvBuilder", () => {
       expect(() => target().rpcL1()).to.throw();
     });
 
-    it("returns a github client with no auth info", async () => {
-      const githubClient = await target().github();
-      expect(await githubClient.auth()).to.eql({ type: "unauthenticated" });
-    });
+    it("returns an era contracts repo in main", async () => {
+      const repo = await target().contractsRepo();
+      const current = await repo.currentRef()
+      expect(current).to.eql('main')
+    })
 
     it("cannot return the network", async () => {
       expect(() => target().network).to.throw();
@@ -82,5 +83,16 @@ describe("EnvBuilder", () => {
       const rpc = target().l1Client();
       expect(rpc.baseUri).to.eql("https://api-sepolia.etherscan.io/api");
     });
+  });
+
+  describe('when ref is set', () => {
+    it("returns an era contracts repo in that ref", async () => {
+      const target = new EnvBuilder();
+      const ref = 'e77971dba8f589b625e72e69dd7e33ccbe697cc0';
+      target.withRef(ref)
+      const repo = await target.contractsRepo();
+      const current = await repo.currentRef()
+      expect(current).to.eql(ref)
+    })
   });
 });
