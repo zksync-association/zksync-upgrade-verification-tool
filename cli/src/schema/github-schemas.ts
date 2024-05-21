@@ -1,6 +1,6 @@
 import z from "zod";
 
-export const systemContractHashesSchema = z.array(
+export const systemContractHashesParser = z.array(
   z.object({
     contractName: z.string(),
     bytecodePath: z.string(),
@@ -10,8 +10,4 @@ export const systemContractHashesSchema = z.array(
   })
 );
 
-export const githubContentParser = z.object({
-  data: z.object({
-    content: z.string(),
-  }),
-});
+export type SystemContractHashes = z.infer<typeof systemContractHashesParser>

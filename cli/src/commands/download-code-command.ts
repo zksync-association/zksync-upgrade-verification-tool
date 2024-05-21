@@ -1,4 +1,4 @@
-import { compareCurrentStateWith } from "../lib";
+import { calculateDiffWithUpgrade } from "../lib";
 
 import { withSpinner } from "../lib/with-spinner.js";
 import type { EnvBuilder } from "../lib/env-builder.js";
@@ -11,18 +11,15 @@ export async function downloadCode(
   l1Filter: string[]
 ): Promise<void> {
   await assertDirectoryExists(targetDir);
+  const { diff } = await calculateDiffWithUpgrade(env, upgradeDirectory);
 
   const l2Client = env.l2Client();
   const repo = await env.contractsRepo();
 
-  const { diff, l1Client } = await withSpinner(
-    () => compareCurrentStateWith(env, upgradeDirectory),
-    "Gathering contract data"
+  await withSpinner(
+    () => diff.writeCodeDiff(targetDir, l1Filter, env.l1Client(), l2Client, repo),
+    "Downloading all source code"
   );
 
-  await withSpinner(
-    () => diff.writeCodeDiff(targetDir, l1Filter, l1Client, l2Client, repo),
-    "Downloading source code"
-  );
   console.log(`✅ Source code successfully downloaded in: ${targetDir}`);
 }

@@ -6,7 +6,7 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { compiledArtifactParser } from "../schema/compiled";
 import { utils } from "zksync-ethers";
-import { systemContractHashesSchema } from "../schema/github-schemas";
+import { type SystemContractHashes, systemContractHashesParser } from "../schema/github-schemas";
 import type { Sources } from "../schema";
 import { Option } from "nochoices";
 
@@ -56,10 +56,13 @@ export class EraContractsRepo {
     await execPromise(`yarn build`, { cwd: systemContractsDir })
   }
 
-  async byteCodeFor(systemContractName: string): Promise<Buffer> {
-    const hashesRaw = await this.git.show("HEAD:system-contracts/SystemContractsHashes.json")
-    const hashes = systemContractHashesSchema.parse(JSON.parse(hashesRaw))
+  async systemContractHashes (ref = 'HEAD'): Promise<SystemContractHashes> {
+    const hashesRaw = await this.git.show(`${ref}:system-contracts/SystemContractsHashes.json`)
+    return  systemContractHashesParser.parse(JSON.parse(hashesRaw))
+  }
 
+  async byteCodeFor(systemContractName: string): Promise<Buffer> {
+    const hashes =  await this.systemContractHashes()
     const hashData = hashes.find(d => d.contractName === systemContractName)
     if (!hashData) {
       throw new Error(`Unknown contract: ${systemContractName}`)

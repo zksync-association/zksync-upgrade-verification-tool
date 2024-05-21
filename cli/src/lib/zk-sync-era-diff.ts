@@ -3,7 +3,7 @@ import path from "node:path";
 import CliTable from "cli-table3";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { SystemContractChange } from "./system-contract-change";
-import { systemContractHashesSchema } from "../schema/github-schemas.js";
+import { systemContractHashesParser } from "../schema/github-schemas.js";
 import { ContractData } from "./contract-data.js";
 import { ADDRESS_ZERO, ZERO_U256 } from "./constants.js";
 import chalk from "chalk";
@@ -124,7 +124,7 @@ export class ZkSyncEraDiff {
     const baseDirBL = path.join(dir, "bootloader");
 
     const rawHashes = await repo.readFile("system-contracts/SystemContractsHashes.json");
-    const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
+    const hashes = systemContractHashesParser.parse(JSON.parse(rawHashes));
 
     if (this.newAA !== ZERO_U256) {
       const defaultAccountHash = hashes.find((h) => h.contractName === "DefaultAccount");
@@ -347,7 +347,7 @@ export class ZkSyncEraDiff {
     });
 
     const rawHashes = await repo.readFile("system-contracts/SystemContractsHashes.json");
-    const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
+    const hashes = systemContractHashesParser.parse(JSON.parse(rawHashes));
 
     const defaultAccountHash = hashes.find((h) => h.contractName === "DefaultAccount");
     const bootLoaderHash = hashes.find((h) => h.contractName === "proved_batch");
@@ -400,7 +400,7 @@ export class ZkSyncEraDiff {
     repo: EraContractsRepo
   ) {
     const rawHashes = await repo.readFile("system-contracts/SystemContractsHashes.json");
-    const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
+    const hashes = systemContractHashesParser.parse(JSON.parse(rawHashes));
 
     for (const change of this.systemContractChanges) {
       if (filter.length !== 0 && !filter.includes(`sc:${change.name}`)) {
