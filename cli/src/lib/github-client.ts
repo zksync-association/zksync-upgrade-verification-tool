@@ -6,13 +6,15 @@ import { githubContentParser } from "../schema/github-schemas.js";
 export class GithubClient {
   private octo: Octokit;
   private cache: Map<string, string>;
+  ref: string;
 
-  constructor(apiKey?: string) {
+  constructor(ref: string, apiKey?: string) {
+    this.ref = ref;
     this.octo = apiKey ? new Octokit({ auth: apiKey }) : new Octokit();
     this.cache = new Map();
   }
 
-  async downloadFile(filePath: string, ref: string): Promise<string> {
+  async downloadFile(filePath: string): Promise<string> {
     const cacheValue = this.cache.get(filePath);
     if (cacheValue !== undefined) {
       return cacheValue;
@@ -25,7 +27,7 @@ export class GithubClient {
           owner: "matter-labs",
           repo: "era-contracts",
           path: filePath,
-          ref,
+          ref: this.ref,
           headers: {
             "X-GitHub-Api-Version": "2022-11-28",
           },
@@ -48,21 +50,17 @@ export class GithubClient {
     }
   }
 
-  async downloadContract(contractName: string, ref: string): Promise<Sources> {
-    return this.downloadContractInt(`system-contracts/contracts/${contractName}.sol`, ref, {});
+  async downloadContract(contractName: string): Promise<Sources> {
+    return this.downloadContractInt(`system-contracts/contracts/${contractName}.sol`, {});
   }
 
-  private async downloadContractInt(
-    rootPath: string,
-    ref: string,
-    partial: Sources
-  ): Promise<Sources> {
+  private async downloadContractInt(rootPath: string, partial: Sources): Promise<Sources> {
     if (partial[rootPath]) {
       return partial;
     }
 
     const dir = path.parse(rootPath).dir;
-    const content = await this.downloadFile(rootPath, ref);
+    const content = await this.downloadFile(rootPath);
     partial[rootPath] = { content };
 
     const deps = this.extractDeps(content);
@@ -70,7 +68,7 @@ export class GithubClient {
     await Promise.all(
       deps.map(async (dep: string): Promise<void> => {
         const depPath = path.normalize(path.join(dir, dep));
-        await this.downloadContractInt(depPath, ref, partial);
+        await this.downloadContractInt(depPath, partial);
       })
     );
 

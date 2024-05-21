@@ -9,7 +9,6 @@ import { ContractData } from "./contract-data.js";
 import { ADDRESS_ZERO, ZERO_U256 } from "./constants.js";
 import chalk from "chalk";
 import type { AbiSet } from "./abi-set.js";
-import * as console from "node:console";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -105,24 +104,18 @@ export class ZkSyncEraDiff {
     filter: string[],
     l1Client: BlockExplorerClient,
     l2Client: BlockExplorerClient,
-    github: GithubClient,
-    ref: string
+    github: GithubClient
   ): Promise<void> {
     const baseDirOld = path.join(baseDirPath, "old");
     const baseDirNew = path.join(baseDirPath, "new");
 
     await this.writeFacets(filter, baseDirOld, baseDirNew);
     await this.writeVerifier(filter, baseDirOld, baseDirNew, l1Client);
-    await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, github, ref);
-    await this.writeSpecialContracts(filter, baseDirNew, github, ref);
+    await this.writeSystemContracts(filter, baseDirOld, baseDirNew, l2Client, github);
+    await this.writeSpecialContracts(filter, baseDirNew, github);
   }
 
-  private async writeSpecialContracts(
-    filter: string[],
-    dir: string,
-    github: GithubClient,
-    ref: string
-  ) {
+  private async writeSpecialContracts(filter: string[], dir: string, github: GithubClient) {
     if (filter.length !== 0) {
       return;
     }
@@ -130,16 +123,18 @@ export class ZkSyncEraDiff {
     const baseDirAA = path.join(dir, "defaultAA");
     const baseDirBL = path.join(dir, "bootloader");
 
-    const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json", ref);
+    const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json");
     const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
 
     if (this.newAA !== ZERO_U256) {
       const defaultAccountHash = hashes.find((h) => h.contractName === "DefaultAccount");
       if (!defaultAccountHash || defaultAccountHash.bytecodeHash !== this.newAA) {
-        throw new Error(`Default Account contract byte code hash does not match in ref: ${ref}`);
+        throw new Error(
+          `Default Account contract byte code hash does not match in ref: ${github.ref}`
+        );
       }
 
-      const sourcesAA = await github.downloadContract("DefaultAccount", ref);
+      const sourcesAA = await github.downloadContract("DefaultAccount");
       const contractAA = new ContractData("DefaultAA", sourcesAA, ADDRESS_ZERO);
       await contractAA.writeSources(baseDirAA);
     }
@@ -147,13 +142,10 @@ export class ZkSyncEraDiff {
     if (this.newBootLoader !== ZERO_U256) {
       const bootLoaderHash = hashes.find((h) => h.contractName === "proved_batch");
       if (!bootLoaderHash || bootLoaderHash.bytecodeHash !== this.newBootLoader) {
-        throw new Error(`Bootloader contract byte code hash does not match in ref: ${ref}`);
+        throw new Error(`Bootloader contract byte code hash does not match in ref: ${github.ref}`);
       }
 
-      const sourcesBL = await github.downloadFile(
-        "system-contracts/bootloader/bootloader.yul",
-        ref
-      );
+      const sourcesBL = await github.downloadFile("system-contracts/bootloader/bootloader.yul");
       const contractBL = new ContractData(
         "Bootloader",
         { "bootloader.yul": { content: sourcesBL } },
@@ -200,12 +192,7 @@ export class ZkSyncEraDiff {
     }
   }
 
-  async toCliReport(
-    abis: AbiSet,
-    upgradeDir: string,
-    github: GithubClient,
-    ref: string
-  ): Promise<string> {
+  async toCliReport(abis: AbiSet, upgradeDir: string, github: GithubClient): Promise<string> {
     const title = "Upgrade report:";
     const strings = [`${title}`, "=".repeat(title.length), ""];
 
@@ -359,17 +346,17 @@ export class ZkSyncEraDiff {
       style: { compact: true },
     });
 
-    const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json", ref);
+    const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json");
     const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
 
     const defaultAccountHash = hashes.find((h) => h.contractName === "DefaultAccount");
     const bootLoaderHash = hashes.find((h) => h.contractName === "proved_batch");
 
     if (!defaultAccountHash) {
-      throw new Error(`Missing default account hash for ref: ${ref}`);
+      throw new Error(`Missing default account hash for ref: ${github.ref}`);
     }
     if (!bootLoaderHash) {
-      throw new Error(`Missing bootloader hash for ref: ${ref}`);
+      throw new Error(`Missing bootloader hash for ref: ${github.ref}`);
     }
 
     const newAAMsg = this.newAA === ZERO_U256 ? "No changes" : this.newAA;
@@ -410,10 +397,9 @@ export class ZkSyncEraDiff {
     baseDirOld: string,
     baseDirNew: string,
     l2Client: BlockExplorerClient,
-    github: GithubClient,
-    ref: string
+    github: GithubClient
   ) {
-    const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json", ref);
+    const rawHashes = await github.downloadFile("system-contracts/SystemContractsHashes.json");
     const hashes = systemContractHashesSchema.parse(JSON.parse(rawHashes));
 
     for (const change of this.systemContractChanges) {
@@ -424,12 +410,14 @@ export class ZkSyncEraDiff {
       const currentHash = hashes.find((h) => h.contractName === change.name);
 
       if (!currentHash || change.proposedBytecodeHash !== currentHash.bytecodeHash) {
-        throw new Error(`Bytecode hash does not match for ${change.name} inside ref "${ref}"`);
+        throw new Error(
+          `Bytecode hash does not match for ${change.name} inside ref "${github.ref}"`
+        );
       }
 
       const [current, upgrade] = await Promise.all([
         change.downloadCurrentCode(l2Client),
-        change.downloadProposedCode(github, ref),
+        change.downloadProposedCode(github),
       ]);
 
       current.remapKeys("system-contracts/contracts", "contracts-preprocessed");
