@@ -242,13 +242,13 @@ export class ZkSyncEraState {
   private async initializeSpecialContacts(abi: Abi): Promise<void> {
     this._aaBytecodeHash = await this.rpc.contractRead(
       this.addr,
-      MAIN_CONTRACT_FUNCTIONS.getL2BootloaderBytecodeHash,
+      MAIN_CONTRACT_FUNCTIONS.getL2DefaultAccountBytecodeHash,
       abi,
       z.string()
     );
     this._bootloaderStringHash = await this.rpc.contractRead(
       this.addr,
-      MAIN_CONTRACT_FUNCTIONS.getL2DefaultAccountBytecodeHash,
+      MAIN_CONTRACT_FUNCTIONS.getL2BootloaderBytecodeHash,
       abi,
       z.string()
     );
