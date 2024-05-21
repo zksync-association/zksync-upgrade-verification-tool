@@ -51,13 +51,15 @@ export class EraContractsRepo {
   }
 
   async byteCodeFor(systemContractName: string): Promise<Buffer> {
-    const baseCompileDir = path.join(this.repoPath, 'system-contracts', 'artifacts-zk', 'cache-zk')
+    const baseCompileDir = path.join(this.repoPath, 'system-contracts', 'artifacts-zk')
     await assertDirectoryExists(baseCompileDir)
-    const possibleDirs = ["contracts-preprocessed", "solpp-generated-contracts"]
+    const possibleDirs = [
+      path.join("contracts-preprocessed"),
+      path.join("cache-zk", "solpp-generated-contracts")
+    ]
 
     let subDir: string | undefined
     for (const dir of possibleDirs) {
-      console.log(path.join(baseCompileDir, dir))
       if (await directoryExists(path.join(baseCompileDir, dir))) {
         subDir = dir
       }
