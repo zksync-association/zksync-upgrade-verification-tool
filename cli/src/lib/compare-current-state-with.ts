@@ -6,9 +6,7 @@ import {
   lookupAndParse,
   type ZkSyncEraDiff,
 } from ".";
-import path from "node:path";
 import type { EnvBuilder } from "./env-builder.js";
-import * as console from "node:console";
 
 type CreateDiffResponse = {
   diff: ZkSyncEraDiff;
@@ -24,7 +22,7 @@ export async function compareCurrentStateWith(
 
   const l1Client = env.l1Client();
   const l1Abis = new AbiSet(l1Client);
-  const zkSyncState = await ZkSyncEraState.create(env.network, l1Client, l1Abis, env.rpc());
+  const zkSyncState = await ZkSyncEraState.create(env.network, l1Client, l1Abis, env.rpcL1(), env.rpcL2());
 
   const changes = UpgradeChanges.fromFiles(
     upgrade.commonData,

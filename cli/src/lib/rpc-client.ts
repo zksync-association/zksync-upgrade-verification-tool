@@ -9,18 +9,33 @@ import {
 } from "viem";
 import type { TypeOf, ZodType } from "zod";
 
-const DEFAULT_URLS = {
+const L1_DEFAULT_URLS = {
   mainnet: "https://ethereum-rpc.publicnode.com",
   sepolia: "https://ethereum-sepolia-rpc.publicnode.com",
+};
+
+const L2_DEFAULT_URLS = {
+  mainnet: "https://mainnet.era.zksync.io",
+  sepolia: "https://sepolia.era.zksync.dev",
 };
 
 export class RpcClient {
   private viemClient: ReturnType<typeof createPublicClient>;
 
-  constructor(network: Network, url?: string) {
+  constructor(url: string) {
     this.viemClient = createPublicClient({
-      transport: http(url || DEFAULT_URLS[network]),
+      transport: http(url),
     });
+  }
+
+  static forL1(network: Network): RpcClient {
+    const url = L1_DEFAULT_URLS[network]
+    return new RpcClient(url)
+  }
+
+  static forL2(network: Network): RpcClient {
+    const url = L2_DEFAULT_URLS[network]
+    return new RpcClient(url)
   }
 
   rpcUrl(): string {
@@ -38,6 +53,10 @@ export class RpcClient {
     }
 
     return data;
+  }
+
+  async getByteCode(addr: Hex): Promise<Hex | undefined> {
+    return this.viemClient.getBytecode({ address: addr })
   }
 
   async contractRead<T extends ZodType>(

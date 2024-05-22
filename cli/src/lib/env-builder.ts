@@ -77,7 +77,11 @@ export class EnvBuilder {
     return this._github;
   }
 
-  rpc(): RpcClient {
-    return new RpcClient(this.network, this.rpcUrl);
+  rpcL1(): RpcClient {
+    return RpcClient.forL1(this.network);
+  }
+
+  rpcL2(): RpcClient {
+    return RpcClient.forL2(this.network)
   }
 }
