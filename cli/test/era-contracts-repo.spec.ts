@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { EraContractsRepo } from "../src/lib/era-contracts-repo";
 import { ContractData } from "../src/lib";
+import fs from "node:fs/promises";
 
 const MIT_CONTENT = `MIT License
 
@@ -26,9 +27,14 @@ SOFTWARE.
 `;
 
 describe.sequential('EraContractsRepo', () => {
+  const target = async (): Promise<EraContractsRepo> => {
+    await fs.mkdir("/tmp/era-contract-repo-test", { recursive: true });
+    return new EraContractsRepo("/tmp/era-contract-repo-test")
+  }
+
   describe.sequential('compile', () => {
     it.sequential('can compile and get the bytecode hash for a contract (f3630fcb01ad8b6e2e423a6f313abefe8502c3a2)', async () => {
-      const repo = await EraContractsRepo.default()
+      const repo = await target()
       await repo.init()
       await repo.setRevision('f3630fcb01ad8b6e2e423a6f313abefe8502c3a2')
       await repo.compile()
@@ -140,7 +146,6 @@ describe.sequential('EraContractsRepo', () => {
         }
       ];
 
-
       for (const { contractName, bytecodeHash } of contracts) {
         const received = await repo.byteCodeHashFor(contractName)
         expect(`${contractName} ${received}`).to.eql(`${contractName} ${bytecodeHash}`)
@@ -148,7 +153,7 @@ describe.sequential('EraContractsRepo', () => {
     })
 
     it.sequential('can compile and get the bytecode hash for a contract (e77971dba8f589b625e72e69dd7e33ccbe697cc0)', async () => {
-      const repo = await EraContractsRepo.default()
+      const repo = await target()
       await repo.init()
       await repo.setRevision('e77971dba8f589b625e72e69dd7e33ccbe697cc0')
       await repo.compile()
@@ -263,9 +268,9 @@ describe.sequential('EraContractsRepo', () => {
     })
   })
 
-  describe('#readFile', () => {
+  describe.sequential('#readFile', () => {
     it("can get a top level file", async () => {
-      const repo = await EraContractsRepo.default()
+      const repo = await target()
       await repo.init()
 
       const file = await repo.readFile("LICENSE-MIT");
@@ -273,7 +278,7 @@ describe.sequential('EraContractsRepo', () => {
     });
 
     it("can download a nested file", async () => {
-      const repo = await EraContractsRepo.default()
+      const repo = await target()
       await repo.init()
       const content = await repo.readFile("l1-contracts/package.json", "f3630fc");
       const pkgJson = JSON.parse(content);
@@ -282,7 +287,7 @@ describe.sequential('EraContractsRepo', () => {
     });
 
     it("errors when file does not exists", async () => {
-      const repo = await EraContractsRepo.default()
+      const repo = await target()
       await repo.init()
       await expect(repo.readFile("this/file/does/not/exists.xyz")).rejects.toThrow()
     });
@@ -291,7 +296,7 @@ describe.sequential('EraContractsRepo', () => {
   describe.sequential('#downloadContract', () => {
     it.sequential("can download entire contracts", async () => {
       // a8f589b625e72e69dd7e33ccbe697cc0
-      const repo = await EraContractsRepo.default()
+      const repo = await target()
       await repo.init();
       await repo.setRevision("e77971db")
 
