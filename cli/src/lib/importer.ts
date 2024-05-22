@@ -90,13 +90,17 @@ export const lookupAndParse = async (
   }
 
   const l2UpgradePath = path.join(targetDir, networkDir, "l2Upgrade.json");
-  let l2Upgrade: L2UpgradeJson | undefined;
+  let l2UpgradeBuf: Buffer | undefined
   try {
-    const l2UpgradeBuf = await fs.readFile(l2UpgradePath);
-    l2Upgrade = SCHEMAS["l2Upgrade.json"].parse(JSON.parse(l2UpgradeBuf.toString()));
+    l2UpgradeBuf = await fs.readFile(l2UpgradePath);
   } catch (e) {
-    l2Upgrade = undefined;
+    console.error(e)
   }
+
+  const l2Upgrade = l2UpgradeBuf !== undefined
+    ? SCHEMAS["l2Upgrade.json"].parse(JSON.parse(l2UpgradeBuf.toString()))
+    : undefined;
+
 
   return {
     commonData,
