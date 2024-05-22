@@ -1,35 +1,9 @@
 import { z } from "zod";
 import { account20String, bytes32Hash, hashString, transactionSchema } from "../schema";
 
-const systemContractNames = z.enum([
-  "AccountCodeStorage",
-  "NonceHolder",
-  "KnownCodesStorage",
-  "ImmutableSimulator",
-  "ContractDeployer",
-  "L1Messenger",
-  "MsgValueSimulator",
-  "L2EthToken",
-  "Keccak256",
-  "SHA256",
-  "Ecrecover",
-  "EcAdd",
-  "EcMul",
-  "P256Verify",
-  "CodeOracle",
-  "SystemContext",
-  "EventWriter",
-  "BootloaderUtilities",
-  "Compressor",
-  "ComplexUpgrader",
-  "EmptyContract",
-  "PubdataChunkPublisher",
-  "GasBoundCaller",
-]);
-
 const systemContracts = z.array(
   z.object({
-    name: systemContractNames,
+    name: z.string(),
     bytecodeHashes: z.array(bytes32Hash),
     address: account20String,
   })
