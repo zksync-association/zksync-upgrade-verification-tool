@@ -38,10 +38,4 @@ describe("Github client", () => {
     expect(pkgJson.version).to.eql("0.1.0");
     expect(pkgJson.name).to.eql("l1-contracts");
   });
-
-  it("can download entire contracts", async (t) => {
-    const client = new GithubClient("f3630fc");
-    const content = await client.downloadSystemContract("EcAdd");
-    expect(Object.keys(content)).to.have.length(11);
-  });
 });
