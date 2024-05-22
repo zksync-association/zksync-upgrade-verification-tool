@@ -341,7 +341,7 @@ export class ZkSyncEraDiff {
         "Name",
         "Current Bytecode hash",
         "Proposed Bytecode Hash",
-        "BytecodeHash matches with github",
+        "BytecodeHash matches with locally compiled",
       ],
       style: { compact: true },
     });
