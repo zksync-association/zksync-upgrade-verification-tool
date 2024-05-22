@@ -82,6 +82,6 @@ export class EnvBuilder {
   }
 
   rpcL2(): RpcClient {
-    return RpcClient.forL2(this.network)
+    return RpcClient.forL2(this.network);
   }
 }

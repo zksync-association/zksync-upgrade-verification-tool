@@ -48,7 +48,13 @@ export class ZkSyncEraState {
   private _aaBytecodeHash?: string;
   private _bootloaderStringHash?: string;
 
-  static async create(network: Network, client: BlockExplorerClient, abis: AbiSet, l1Rpc: RpcClient, l2Rpc: RpcClient) {
+  static async create(
+    network: Network,
+    client: BlockExplorerClient,
+    abis: AbiSet,
+    l1Rpc: RpcClient,
+    l2Rpc: RpcClient
+  ) {
     const addresses = {
       mainnet: "0x32400084c286cf3e17e7b677ea9583e60a000324",
       sepolia: "0x9a6de0f62aa270a8bcb1e2610078650d539b1ef9",
@@ -106,7 +112,9 @@ export class ZkSyncEraState {
     }
 
     for (const systemContract of changes.systemCotractChanges) {
-      const currentBytecodeHash = await this.getCurrentSystemContractBytecodeHash(systemContract.address);
+      const currentBytecodeHash = await this.getCurrentSystemContractBytecodeHash(
+        systemContract.address
+      );
 
       diff.addSystemContract(
         new SystemContractChange(
@@ -122,7 +130,7 @@ export class ZkSyncEraState {
   }
 
   async getCurrentSystemContractBytecodeHash(addr: Hex): Promise<string> {
-    const byteCode = await this.l2Rpc.getByteCode(addr)
+    const byteCode = await this.l2Rpc.getByteCode(addr);
 
     if (!byteCode) {
       return "Not present";

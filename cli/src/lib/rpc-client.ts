@@ -29,13 +29,13 @@ export class RpcClient {
   }
 
   static forL1(network: Network): RpcClient {
-    const url = L1_DEFAULT_URLS[network]
-    return new RpcClient(url)
+    const url = L1_DEFAULT_URLS[network];
+    return new RpcClient(url);
   }
 
   static forL2(network: Network): RpcClient {
-    const url = L2_DEFAULT_URLS[network]
-    return new RpcClient(url)
+    const url = L2_DEFAULT_URLS[network];
+    return new RpcClient(url);
   }
 
   rpcUrl(): string {
@@ -56,7 +56,7 @@ export class RpcClient {
   }
 
   async getByteCode(addr: Hex): Promise<Hex | undefined> {
-    return this.viemClient.getBytecode({ address: addr })
+    return this.viemClient.getBytecode({ address: addr });
   }
 
   async contractRead<T extends ZodType>(
