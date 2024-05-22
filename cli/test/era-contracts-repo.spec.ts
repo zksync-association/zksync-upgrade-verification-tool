@@ -27,7 +27,7 @@ SOFTWARE.
 
 describe.sequential('EraContractsRepo', () => {
   describe.sequential('compile', () => {
-    it('can compile and get the bytecode hash for a contract (f3630fcb01ad8b6e2e423a6f313abefe8502c3a2)', async () => {
+    it.sequential('can compile and get the bytecode hash for a contract (f3630fcb01ad8b6e2e423a6f313abefe8502c3a2)', async () => {
       const repo = await EraContractsRepo.default()
       await repo.init()
       await repo.setRevision('f3630fcb01ad8b6e2e423a6f313abefe8502c3a2')
@@ -147,7 +147,7 @@ describe.sequential('EraContractsRepo', () => {
       }
     })
 
-    it('can compile and get the bytecode hash for a contract (e77971dba8f589b625e72e69dd7e33ccbe697cc0)', async () => {
+    it.sequential('can compile and get the bytecode hash for a contract (e77971dba8f589b625e72e69dd7e33ccbe697cc0)', async () => {
       const repo = await EraContractsRepo.default()
       await repo.init()
       await repo.setRevision('e77971dba8f589b625e72e69dd7e33ccbe697cc0')
@@ -288,8 +288,8 @@ describe.sequential('EraContractsRepo', () => {
     });
   });
 
-  describe('#downloadContract', () => {
-    it("can download entire contracts", async () => {
+  describe.sequential('#downloadContract', () => {
+    it.sequential("can download entire contracts", async () => {
       // a8f589b625e72e69dd7e33ccbe697cc0
       const repo = await EraContractsRepo.default()
       await repo.init();
