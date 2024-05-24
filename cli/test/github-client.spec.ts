@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { GithubClient } from "../src/lib/github-client";
-import { ContractData } from "../src/lib";
+import { cli, ContractData } from "../src/lib";
 
 const MIT_CONTENT = `MIT License
 
