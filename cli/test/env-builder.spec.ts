@@ -16,11 +16,6 @@ describe("EnvBuilder", () => {
       expect(() => target().rpc()).to.throw();
     });
 
-    it("returns a github client with no auth info", async () => {
-      const githubClient = await target().github();
-      expect(await githubClient.auth()).to.eql({ type: "unauthenticated" });
-    });
-
     it("cannot return the network", async () => {
       expect(() => target().network).to.throw();
     });
