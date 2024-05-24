@@ -18,7 +18,9 @@ export async function compareCurrentStateWith(
   env: EnvBuilder,
   upgradeDirectory: string
 ): Promise<CreateDiffResponse> {
-  const upgrade = await lookupAndParse(upgradeDirectory, env.network);
+  const importer = env.importer()
+
+  const changes = await importer.readFromFiles(upgradeDirectory, env.network);
 
   const l1Client = env.l1Client();
   const l1Abis = new AbiSet(l1Client);
@@ -28,13 +30,6 @@ export async function compareCurrentStateWith(
     l1Abis,
     env.rpcL1(),
     env.rpcL2()
-  );
-
-  const changes = UpgradeChanges.fromFiles(
-    upgrade.commonData,
-    upgrade.transactions,
-    upgrade.facets,
-    upgrade.l2Upgrade
   );
 
   return {
