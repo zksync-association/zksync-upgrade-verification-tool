@@ -1,119 +1,19 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type {
-  CryptoJson,
-  FacetCutsJson,
-  FacetsJson,
-  L2UpgradeJson,
-  TransactionsJson,
-  UpgradeManifest,
+import {
+  commonJsonSchema,
+  type FacetsJson, facetsSchema,
+  type L2UpgradeJson, l2UpgradeSchema, transactionsSchema,
 } from "../schema";
-import { SCHEMAS } from "./parser";
 import type { Network } from "./constants";
-import { MissingNetwork, NotADir, NotAnUpgradeDir } from "./errors.js";
-import { assertDirectoryExists, directoryExists } from "./fs-utils.js";
+import { MissingNetwork, NotAnUpgradeDir } from "./errors.js";
 import { UpgradeChanges } from "./upgrade-changes";
 import type { FileSystem } from "./file-system";
 
-export type UpgradeDescriptor = {
-  commonData: UpgradeManifest;
-  transactions: TransactionsJson;
-  crypto: CryptoJson;
-  facetCuts?: FacetCutsJson;
-  facets?: FacetsJson;
-  l2Upgrade?: L2UpgradeJson;
-};
-
-function possibleDirNamesFor(n: Network): string[] {
-  if (n === "mainnet") {
-    return ["mainnet", "mainnet2"];
-  }
-  if (n === "sepolia") {
-    return ["testnet-sepolia", "testnet"];
-  }
-  throw new Error(`Unknown network: ${n}`);
+const POSSIBLE_DIRS_PER_NETWORK = {
+  mainnet: ["mainnet", "mainnet2"],
+  sepolia: ["testnet-sepolia", "testnet"]
 }
-
-export const lookupAndParse = async (
-  upgradeDirectory: string,
-  network: Network
-): Promise<UpgradeDescriptor> => {
-  const targetDir = path.resolve(process.cwd(), upgradeDirectory);
-  const possibleNetworkDirs = possibleDirNamesFor(network);
-
-  await assertDirectoryExists(targetDir, upgradeDirectory);
-
-  const commonPath = path.join(targetDir, "common.json");
-
-  const commonBuf = await fs.readFile(commonPath).catch((e) => {
-    if (e instanceof Error && e.message.includes("no such file or directory")) {
-      throw new NotAnUpgradeDir(upgradeDirectory);
-    }
-    throw e;
-  });
-
-  const commonParser = SCHEMAS["common.json"];
-  const commonData = commonParser.parse(JSON.parse(commonBuf.toString()));
-
-  let networkDir: string | undefined;
-  for (const name of possibleNetworkDirs) {
-    if (await directoryExists(path.join(targetDir, name))) {
-      networkDir = name;
-    }
-  }
-
-  if (!networkDir) {
-    throw new MissingNetwork(upgradeDirectory, network);
-  }
-
-  const transactionsPath = path.join(targetDir, networkDir, "transactions.json");
-  const transactionsBuf = await fs.readFile(transactionsPath);
-  const transactions = SCHEMAS["transactions.json"].parse(JSON.parse(transactionsBuf.toString()));
-
-  const cryptoPath = path.join(targetDir, networkDir, "crypto.json");
-  const cryptoBuf = await fs.readFile(cryptoPath);
-  const crypto = SCHEMAS["crypto.json"].parse(JSON.parse(cryptoBuf.toString()));
-
-  const facetCutsPath = path.join(targetDir, networkDir, "facetCuts.json");
-  let facetCuts: FacetCutsJson | undefined;
-  try {
-    const facetCutsBuf = await fs.readFile(facetCutsPath);
-    facetCuts = SCHEMAS["facetCuts.json"].parse(JSON.parse(facetCutsBuf.toString()));
-  } catch (e) {
-    facetCuts = undefined;
-  }
-  const facetsPath = path.join(targetDir, networkDir, "facets.json");
-  let facets: FacetsJson | undefined;
-  try {
-    const facetCutsBuf = await fs.readFile(facetsPath);
-    facets = SCHEMAS["facets.json"].parse(JSON.parse(facetCutsBuf.toString()));
-  } catch (e) {
-    facets = undefined;
-  }
-
-  const l2UpgradePath = path.join(targetDir, networkDir, "l2Upgrade.json");
-  let l2UpgradeBuf: Buffer | undefined;
-  try {
-    l2UpgradeBuf = await fs.readFile(l2UpgradePath);
-  } catch (e) {
-    l2UpgradeBuf = undefined;
-  }
-
-  const l2Upgrade =
-    l2UpgradeBuf !== undefined
-      ? SCHEMAS["l2Upgrade.json"].parse(JSON.parse(l2UpgradeBuf.toString()))
-      : undefined;
-
-  return {
-    commonData,
-    transactions,
-    crypto,
-    facetCuts,
-    facets,
-    l2Upgrade,
-  };
-};
-
 
 export class UpgradeImporter {
   private fs: FileSystem;
@@ -122,13 +22,50 @@ export class UpgradeImporter {
     this.fs = fs
   }
 
-  async readFromFiles(basePath: string, network: Network): Promise<UpgradeChanges> {
-    const files = await lookupAndParse(basePath, network)
+  private possibleDirNamesFor(network: Network): string[] {
+    return POSSIBLE_DIRS_PER_NETWORK[network]
+  }
+
+  private async findNetworkDir(baseDir: string, network: Network): Promise<string> {
+    const possibleNetworkDirs = this.possibleDirNamesFor(network);
+    for (const possibleDir of possibleNetworkDirs) {
+      const fullNetworkDir = path.join(baseDir, possibleDir);
+      if (await this.fs.directoryExists(fullNetworkDir)) {
+        return fullNetworkDir
+      }
+    }
+    throw new MissingNetwork(baseDir, network);
+  }
+
+  async readFromFiles(upgradeDirectory: string, network: Network): Promise<UpgradeChanges> {
+    const targetDir = path.resolve(process.cwd(), upgradeDirectory);
+    const networkDir = await this.findNetworkDir(targetDir, network)
+
+    await this.fs.assertDirectoryExists(targetDir, upgradeDirectory);
+    await this.fs.assertDirectoryExists(targetDir, networkDir);
+
+    const common = await fs.readFile(path.join(targetDir, 'common.json'))
+      .catch(() => { throw new NotAnUpgradeDir(upgradeDirectory)})
+      .then(buf => commonJsonSchema.parse(JSON.parse(buf.toString())))
+    const transactions = await fs.readFile(path.join(networkDir, 'transactions.json'))
+      .then(buf => transactionsSchema.parse(JSON.parse(buf.toString())))
+
+    const facets: FacetsJson | undefined = await fs.readFile(path.join(networkDir, 'facets.json'))
+      .then(
+        (buf) => facetsSchema.parse(JSON.parse(buf.toString())),
+        () => undefined
+      )
+
+    const l2Upgrade: L2UpgradeJson | undefined = await fs.readFile(path.join(networkDir, 'l2Upgrade.json'))
+      .then(
+        (buf) => l2UpgradeSchema.parse(JSON.parse(buf.toString())),
+      )
+
     return UpgradeChanges.fromFiles(
-      files.commonData,
-      files.transactions,
-      files.facets,
-      files.l2Upgrade
+      common,
+      transactions,
+      facets,
+      l2Upgrade
     )
   }
 }

@@ -2,8 +2,6 @@ import {
   AbiSet,
   type BlockExplorerClient,
   ZkSyncEraState,
-  UpgradeChanges,
-  lookupAndParse,
   type ZkSyncEraDiff,
 } from ".";
 import type { EnvBuilder } from "./env-builder.js";

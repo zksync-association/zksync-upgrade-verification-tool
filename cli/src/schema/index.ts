@@ -1,6 +1,5 @@
 export * from "./common";
 export * from "./manifest";
-export * from "./crypto";
 export * from "./etherscan";
 export * from "./facetCuts";
 export * from "./facets";
