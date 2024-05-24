@@ -21,6 +21,8 @@ export class NotAnUpgradeDir extends Error {
   }
 }
 
+export class MalformedUpgrade extends Error {}
+
 export class MissingNetwork extends Error {
   constructor(path: string, network: Network) {
     super(
