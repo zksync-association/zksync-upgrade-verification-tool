@@ -10,4 +10,3 @@ export const facetCutsSchema = z.array(
   })
 );
 
-export type FacetCutsJson = z.infer<typeof facetCutsSchema>;
