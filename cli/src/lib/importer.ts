@@ -3,10 +3,10 @@ import path from "node:path";
 import {
   commonJsonSchema,
   type FacetsJson, facetsSchema,
-  type L2UpgradeJson, l2UpgradeSchema, transactionsSchema,
+  type L2UpgradeJson, l2UpgradeSchema, transactionsSchema, type UpgradeManifest,
 } from "../schema";
 import type { Network } from "./constants";
-import { MissingNetwork, NotAnUpgradeDir } from "./errors.js";
+import { MalformedUpgrade, MissingNetwork, NotAnUpgradeDir } from "./errors.js";
 import { UpgradeChanges } from "./upgrade-changes";
 import type { FileSystem } from "./file-system";
 
@@ -44,9 +44,10 @@ export class UpgradeImporter {
     await this.fs.assertDirectoryExists(targetDir, upgradeDirectory);
     await this.fs.assertDirectoryExists(targetDir, networkDir);
 
-    const common = await this.fs.readFile(path.join(targetDir, 'common.json'))
+    const common: UpgradeManifest = await this.fs.readFile(path.join(targetDir, 'common.json'))
       .catch(() => { throw new NotAnUpgradeDir(upgradeDirectory)})
       .then(buf => commonJsonSchema.parse(JSON.parse(buf.toString())))
+      .catch(() => { throw new MalformedUpgrade()})
     const transactions = await this.fs.readFile(path.join(networkDir, 'transactions.json'))
       .then(buf => transactionsSchema.parse(JSON.parse(buf.toString())))
 

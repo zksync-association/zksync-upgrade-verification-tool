@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { UpgradeImporter } from "../src/lib";
 import { FileSystem } from "../src/lib/file-system";
 import path from 'node:path'
-import type { Hex } from "viem";
+import { ZodError } from "zod";
+import { MalformedUpgrade } from "../src/lib/errors";
 
 class TestFS extends FileSystem {
   private registered: Map<string, string>
@@ -35,10 +36,10 @@ class TestFS extends FileSystem {
   async directoryExists(dirPath: string): Promise<boolean> {
     return [...this.registered.keys()].some(key => key.startsWith(dirPath))
   }
+}
 
-  // async assertDirectoryExists(path: string, originalPath?: string): Promise<void> {
-  //   if (!this.as)
-  // }
+function repeated(n: number, times: number): string {
+  return `0x${Buffer.from([n]).toString('hex').repeat(times)}`
 }
 
 interface Ctx {
@@ -97,10 +98,6 @@ describe('UpgradeImporter', () => {
 
   describe('full upgrade', () => {
     const baseDir = 'base'
-
-    function repeated(n: number, times: number): string {
-      return `0x${Buffer.from([n]).toString('hex').repeat(times)}`
-    }
 
     beforeEach<Ctx>(({ fs }) => {
       fs.register([baseDir, 'common.json'], JSON.stringify(
@@ -166,6 +163,36 @@ describe('UpgradeImporter', () => {
           address: repeated(11, 20)
         }
       ])
+    })
+  })
+
+  describe('when the common.js file is malformed', () => {
+    const baseDir = 'base'
+
+    beforeEach<Ctx>(({ fs }) => {
+      // missing "name"
+      fs.register([baseDir, 'common.json'], JSON.stringify(
+        { creationTimestamp: 1, protocolVersion: "25" }
+      ))
+      fs.register([baseDir, 'mainnet', 'transactions.json'], JSON.stringify({
+        proposeUpgradeTx: {
+          bootloaderHash: repeated(1, 32),
+          defaultAccountHash: repeated(2, 32),
+          verifier: repeated(3, 20),
+          verifierParams: {
+            recursionNodeLevelVkHash: repeated(4, 32),
+            recursionLeafLevelVkHash: repeated(5, 32),
+            recursionCircuitsSetVksHash: repeated(6, 32)
+          },
+        },
+        transparentUpgrade: {
+          facetCuts: []
+        }
+      }))
+    })
+
+    it<Ctx>('fails with proppr error', async ({ importer }) => {
+      await expect(importer.readFromFiles(baseDir, "mainnet")).rejects.toThrow(MalformedUpgrade)
     })
   })
 })
