@@ -18,10 +18,4 @@ describe('FileSyste class', () => {
       await expect(() => fs.readFile(path.join('does/not/exist.xyz'))).rejects.toThrow()
     })
   })
-
-  it('lala', async () => {
-    const p = Promise.reject('bad').catch(() => 'good')
-
-    expect(await p).to.eql('good')
-  })
 })
