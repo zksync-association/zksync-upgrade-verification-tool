@@ -12,6 +12,8 @@ import { SCHEMAS } from "./parser";
 import type { Network } from "./constants";
 import { MissingNetwork, NotADir, NotAnUpgradeDir } from "./errors.js";
 import { assertDirectoryExists, directoryExists } from "./fs-utils.js";
+import { UpgradeChanges } from "./upgrade-changes";
+import type { FileSystem } from "./file-system";
 
 export type UpgradeDescriptor = {
   commonData: UpgradeManifest;
@@ -111,3 +113,22 @@ export const lookupAndParse = async (
     l2Upgrade,
   };
 };
+
+
+export class UpgradeImporter {
+  private fs: FileSystem;
+
+  constructor(fs: FileSystem) {
+    this.fs = fs
+  }
+
+  async readFromFiles(basePath: string, network: Network): Promise<UpgradeChanges> {
+    const files = await lookupAndParse(basePath, network)
+    return UpgradeChanges.fromFiles(
+      files.commonData,
+      files.transactions,
+      files.facets,
+      files.l2Upgrade
+    )
+  }
+}

@@ -2,6 +2,8 @@ import { BlockExplorerClient } from "./block-explorer-client.js";
 import type { Network } from "./constants.js";
 import { GithubClient } from "./github-client.js";
 import { RpcClient } from "./rpc-client.js";
+import { FileSystem } from "./file-system";
+import { UpgradeImporter } from "./importer";
 
 export class EnvBuilder {
   private _etherscanApiKey?: string;
@@ -83,5 +85,13 @@ export class EnvBuilder {
 
   rpcL2(): RpcClient {
     return RpcClient.forL2(this.network);
+  }
+
+  fs(): FileSystem {
+    return new FileSystem()
+  }
+
+  importer(): UpgradeImporter {
+    return new UpgradeImporter(this.fs())
   }
 }

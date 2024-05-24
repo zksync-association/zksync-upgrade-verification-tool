@@ -9,7 +9,6 @@ export async function directoryExists(path: string): Promise<boolean> {
   } catch (e) {
     return false;
   }
-
   return targetDirStat.isDirectory();
 }
 
