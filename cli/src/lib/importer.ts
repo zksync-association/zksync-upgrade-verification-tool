@@ -38,27 +38,28 @@ export class UpgradeImporter {
   }
 
   async readFromFiles(upgradeDirectory: string, network: Network): Promise<UpgradeChanges> {
-    const targetDir = path.resolve(process.cwd(), upgradeDirectory);
+    const targetDir = upgradeDirectory;
     const networkDir = await this.findNetworkDir(targetDir, network)
 
     await this.fs.assertDirectoryExists(targetDir, upgradeDirectory);
     await this.fs.assertDirectoryExists(targetDir, networkDir);
 
-    const common = await fs.readFile(path.join(targetDir, 'common.json'))
+    const common = await this.fs.readFile(path.join(targetDir, 'common.json'))
       .catch(() => { throw new NotAnUpgradeDir(upgradeDirectory)})
       .then(buf => commonJsonSchema.parse(JSON.parse(buf.toString())))
-    const transactions = await fs.readFile(path.join(networkDir, 'transactions.json'))
+    const transactions = await this.fs.readFile(path.join(networkDir, 'transactions.json'))
       .then(buf => transactionsSchema.parse(JSON.parse(buf.toString())))
 
-    const facets: FacetsJson | undefined = await fs.readFile(path.join(networkDir, 'facets.json'))
+    const facets: FacetsJson | undefined = await this.fs.readFile(path.join(networkDir, 'facets.json'))
       .then(
         (buf) => facetsSchema.parse(JSON.parse(buf.toString())),
         () => undefined
       )
 
-    const l2Upgrade: L2UpgradeJson | undefined = await fs.readFile(path.join(networkDir, 'l2Upgrade.json'))
+    const l2Upgrade: L2UpgradeJson | undefined = await this.fs.readFile(path.join(networkDir, 'l2Upgrade.json'))
       .then(
         (buf) => l2UpgradeSchema.parse(JSON.parse(buf.toString())),
+        () => undefined
       )
 
     return UpgradeChanges.fromFiles(
