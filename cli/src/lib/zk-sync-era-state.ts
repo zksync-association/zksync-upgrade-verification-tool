@@ -111,7 +111,7 @@ export class ZkSyncEraState {
       }
     }
 
-    for (const systemContract of changes.systemCotractChanges) {
+    for (const systemContract of changes.systemContractChanges) {
       const currentBytecodeHash = await this.getCurrentSystemContractBytecodeHash(
         systemContract.address
       );
