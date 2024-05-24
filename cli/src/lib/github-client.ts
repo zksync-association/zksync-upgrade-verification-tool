@@ -14,7 +14,7 @@ export class GithubClient {
 
   static async create(ref: string): Promise<GithubClient> {
     const repo = await EraContractsRepo.default();
-    await repo.init()
+    await repo.init();
     return new GithubClient(repo, ref);
   }
 
