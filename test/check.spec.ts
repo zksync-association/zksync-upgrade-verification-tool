@@ -261,4 +261,15 @@ describe("validate check", () => {
       );
     });
   });
+
+  describe("when the upgrade is malformed", () => {
+    it("fails with a propper error", async () => {
+      const { stdout } = await expectToFailAsync(() =>
+        execAsync("pnpm validate check reference/malformed-upgrade")
+      );
+      expect(stdout).toContain(
+        'Problem processing specified upgrade: "reference/malformed-upgrade/common.json" does not follow expected schema.'
+      );
+    });
+  })
 });

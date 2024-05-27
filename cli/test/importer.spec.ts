@@ -224,7 +224,7 @@ describe('UpgradeImporter', () => {
       }))
     })
 
-    it<Ctx>('fails with proppr error', async ({ importer }) => {
+    it<Ctx>('fails with propper error', async ({ importer }) => {
       await expect(importer.readFromFiles(baseDir, "mainnet")).rejects.toThrow(MalformedUpgrade)
     })
   })

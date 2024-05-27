@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import {
   commonJsonSchema,
@@ -45,26 +44,11 @@ export class UpgradeImporter {
     await this.fs.assertDirectoryExists(targetDir, upgradeDirectory);
     await this.fs.assertDirectoryExists(targetDir, networkDir);
 
-    const common: UpgradeManifest = await this.fs.readFile(path.join(targetDir, 'common.json'))
-      .catch(() => { throw new NotAnUpgradeDir(upgradeDirectory)})
-      .then(buf => commonJsonSchema.parse(JSON.parse(buf.toString())))
-      .catch(() => { throw new MalformedUpgrade()})
+    const common = await this.readMandatoryFile(path.join(targetDir, 'common.json'), commonJsonSchema, new NotAnUpgradeDir(upgradeDirectory))
+    const transactions = await this.readMandatoryFile(path.join(networkDir, 'transactions.json'), transactionsSchema, new MalformedUpgrade("Missing transactions.json"))
 
-    const transactions = await this.fs.readFile(path.join(networkDir, 'transactions.json'))
-      .then(buf => transactionsSchema.parse(JSON.parse(buf.toString())))
-      .catch(() => { throw new MalformedUpgrade()})
-
-    const facets: FacetsJson | undefined = await this.fs.readFile(path.join(networkDir, 'facets.json'))
-      .then(
-        (buf) => facetsSchema.parse(JSON.parse(buf.toString())),
-        () => undefined
-      )
-
-    const l2Upgrade: L2UpgradeJson | undefined = await this.fs.readFile(path.join(networkDir, 'l2Upgrade.json'))
-      .then(
-        (buf) => l2UpgradeSchema.parse(JSON.parse(buf.toString())),
-        () => undefined
-      )
+    const facets = await this.readOptionalFile(path.join(networkDir, 'facets.json'), facetsSchema)
+    const l2Upgrade = await this.readOptionalFile(path.join(networkDir, 'l2Upgrade.json'), l2UpgradeSchema)
 
     return UpgradeChanges.fromFiles(
       common,
@@ -74,11 +58,37 @@ export class UpgradeImporter {
     )
   }
 
+  private async readMandatoryFile<T extends ZodType>(filePath: string, parser: T, ifMissing: Error): Promise<z.infer<typeof parser>> {
+    const res = await this.readOptionalFile(filePath, parser)
+    if (res === undefined) {
+      return ifMissing
+    }
+    return res
+  }
+
   private async readOptionalFile<T extends ZodType>(filePath: string, parser: T): Promise<z.infer<typeof parser> | undefined> {
-    return this.fs.readFile(filePath)
+    const fileContent: string | undefined = await this.fs.readFile(filePath)
       .then(
-        (buf) => parser.parse(JSON.parse(buf.toString())),
+        (buf) => buf.toString(),
         () => undefined
       )
+
+    if (fileContent === undefined) {
+      return undefined
+    }
+
+    let json: any
+
+    try {
+      json = JSON.parse(fileContent)
+   } catch (e) {
+      throw new MalformedUpgrade(`"${filePath}" expected to be a json but it's not.`)
+    }
+
+    try {
+      return parser.parse(json)
+    } catch (e) {
+      throw new MalformedUpgrade(`"${filePath}" does not follow expected schema.`)
+    }
   }
 }
