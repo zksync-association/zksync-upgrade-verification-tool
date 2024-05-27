@@ -47,6 +47,52 @@ interface Ctx {
   importer: UpgradeImporter
 }
 
+function registerFullUpgrade(baseDir: string, fs: TestFS) {
+  fs.register([baseDir, 'common.json'], JSON.stringify(
+    { name: "test", creationTimestamp: 1, protocolVersion: "25" }
+  ))
+
+  const facetAddr = repeated(7, 20)
+  fs.register([baseDir, 'mainnet', 'transactions.json'], JSON.stringify({
+    proposeUpgradeTx: {
+      bootloaderHash: repeated(1, 32),
+      defaultAccountHash: repeated(2, 32),
+      verifier: repeated(3, 20),
+      verifierParams: {
+        recursionNodeLevelVkHash: repeated(4, 32),
+        recursionLeafLevelVkHash: repeated(5, 32),
+        recursionCircuitsSetVksHash: repeated(6, 32)
+      },
+    },
+    transparentUpgrade: {
+      facetCuts: [
+        {
+          facet: facetAddr,
+          selectors: [repeated(8, 4)],
+          action: 0,
+          isFreezable: false
+        }
+      ]
+    }
+  }))
+  fs.register([baseDir, 'mainnet', 'facets.json'], JSON.stringify({
+    SomeFacet: {
+      address: facetAddr,
+      txHash: repeated(9, 32),
+    },
+  }))
+
+  fs.register([baseDir, 'mainnet', 'l2Upgrade.json'], JSON.stringify({
+    systemContracts: [
+      {
+        name: "SomeSystemContract",
+        bytecodeHashes: [repeated(10, 32)],
+        address: repeated(11, 20)
+      }
+    ]
+  }))
+}
+
 describe('UpgradeImporter', () => {
   beforeEach<Ctx>((ctx) => {
     ctx.fs = new TestFS()
@@ -100,49 +146,7 @@ describe('UpgradeImporter', () => {
     const baseDir = 'base'
 
     beforeEach<Ctx>(({ fs }) => {
-      fs.register([baseDir, 'common.json'], JSON.stringify(
-        { name: "test", creationTimestamp: 1, protocolVersion: "25" }
-      ))
-
-      const facetAddr = repeated(7, 20)
-      fs.register([baseDir, 'mainnet', 'transactions.json'], JSON.stringify({
-        proposeUpgradeTx: {
-          bootloaderHash: repeated(1, 32),
-          defaultAccountHash: repeated(2, 32),
-          verifier: repeated(3, 20),
-          verifierParams: {
-            recursionNodeLevelVkHash: repeated(4, 32),
-            recursionLeafLevelVkHash: repeated(5, 32),
-            recursionCircuitsSetVksHash: repeated(6, 32)
-          },
-        },
-        transparentUpgrade: {
-          facetCuts: [
-            {
-              facet: facetAddr,
-              selectors: [repeated(8, 4)],
-              action: 0,
-              isFreezable: false
-            }
-          ]
-        }
-      }))
-      fs.register([baseDir, 'mainnet', 'facets.json'], JSON.stringify({
-        SomeFacet: {
-          address: facetAddr,
-          txHash: repeated(9, 32),
-        },
-      }))
-
-      fs.register([baseDir, 'mainnet', 'l2Upgrade.json'], JSON.stringify({
-        systemContracts: [
-          {
-            name: "SomeSystemContract",
-            bytecodeHashes: [repeated(10, 32)],
-            address: repeated(11, 20)
-          }
-        ]
-      }))
+      registerFullUpgrade(baseDir, fs)
     })
 
     it<Ctx>('adds new facets in upgrades', async ({ importer }) => {
@@ -170,24 +174,53 @@ describe('UpgradeImporter', () => {
     const baseDir = 'base'
 
     beforeEach<Ctx>(({ fs }) => {
+      registerFullUpgrade(baseDir, fs)
       // missing "name"
       fs.register([baseDir, 'common.json'], JSON.stringify(
         { creationTimestamp: 1, protocolVersion: "25" }
       ))
+    })
+
+    it<Ctx>('fails with proppr error', async ({ importer }) => {
+      await expect(importer.readFromFiles(baseDir, "mainnet")).rejects.toThrow(MalformedUpgrade)
+    })
+  })
+
+  describe('when the transactions.js file is malformed', () => {
+    const baseDir = 'base'
+
+    beforeEach<Ctx>(({ fs }) => {
+      registerFullUpgrade(baseDir, fs)
+      // missing "proposeUpgradeTx"
       fs.register([baseDir, 'mainnet', 'transactions.json'], JSON.stringify({
-        proposeUpgradeTx: {
-          bootloaderHash: repeated(1, 32),
-          defaultAccountHash: repeated(2, 32),
-          verifier: repeated(3, 20),
-          verifierParams: {
-            recursionNodeLevelVkHash: repeated(4, 32),
-            recursionLeafLevelVkHash: repeated(5, 32),
-            recursionCircuitsSetVksHash: repeated(6, 32)
-          },
-        },
         transparentUpgrade: {
-          facetCuts: []
+          facetCuts: [
+            {
+              facet: repeated(7, 20),
+              selectors: [repeated(8, 4)],
+              action: 0,
+              isFreezable: false
+            }
+          ]
         }
+      }))
+    })
+
+    it<Ctx>('fails with proppr error', async ({ importer }) => {
+      await expect(importer.readFromFiles(baseDir, "mainnet")).rejects.toThrow(MalformedUpgrade)
+    })
+  })
+
+  describe('when the facets.js file is malformed', () => {
+    const baseDir = 'base'
+
+    beforeEach<Ctx>(({ fs }) => {
+      registerFullUpgrade(baseDir, fs)
+      // missing "SomeFacet.address"
+      fs.register([baseDir, 'mainnet', 'facets.json'], JSON.stringify({
+        SomeFacet: {
+          txHash: repeated(9, 32),
+        },
       }))
     })
 
