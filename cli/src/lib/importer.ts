@@ -9,6 +9,7 @@ import type { Network } from "./constants";
 import { MalformedUpgrade, MissingNetwork, NotAnUpgradeDir } from "./errors.js";
 import { UpgradeChanges } from "./upgrade-changes";
 import type { FileSystem } from "./file-system";
+import { z, type ZodType } from "zod";
 
 const POSSIBLE_DIRS_PER_NETWORK = {
   mainnet: ["mainnet", "mainnet2"],
@@ -48,8 +49,10 @@ export class UpgradeImporter {
       .catch(() => { throw new NotAnUpgradeDir(upgradeDirectory)})
       .then(buf => commonJsonSchema.parse(JSON.parse(buf.toString())))
       .catch(() => { throw new MalformedUpgrade()})
+
     const transactions = await this.fs.readFile(path.join(networkDir, 'transactions.json'))
       .then(buf => transactionsSchema.parse(JSON.parse(buf.toString())))
+      .catch(() => { throw new MalformedUpgrade()})
 
     const facets: FacetsJson | undefined = await this.fs.readFile(path.join(networkDir, 'facets.json'))
       .then(
@@ -69,5 +72,13 @@ export class UpgradeImporter {
       facets,
       l2Upgrade
     )
+  }
+
+  private async readOptionalFile<T extends ZodType>(filePath: string, parser: T): Promise<z.infer<typeof parser> | undefined> {
+    return this.fs.readFile(filePath)
+      .then(
+        (buf) => parser.parse(JSON.parse(buf.toString())),
+        () => undefined
+      )
   }
 }
