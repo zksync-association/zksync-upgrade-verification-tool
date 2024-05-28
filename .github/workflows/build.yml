@@ -28,4 +28,4 @@ jobs:
       - name: Coverage
         uses: romeovs/lcov-reporter-action@v0.2.16
         with:
-          lcov-file: cli/coverage/lcov.info
+          working-directory: cli
