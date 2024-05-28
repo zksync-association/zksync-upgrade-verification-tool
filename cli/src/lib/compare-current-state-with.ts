@@ -6,11 +6,9 @@ import {
 import type {EnvBuilder} from "./env-builder.js";
 import {withSpinner} from "./with-spinner";
 
-
-export async function calculateDiffWithUpgrade (
+export async function calculateDiffWithUpgrade(
   env: EnvBuilder,
-  upgradeDirectory: string,
-  compile = true
+  upgradeDirectory: string
 ): Promise<{ diff: ZkSyncEraDiff, state: ZkSyncEraState }> {
   const state = await withSpinner(async () => {
     const l1Client = env.l1Client();
@@ -24,12 +22,9 @@ export async function calculateDiffWithUpgrade (
     );
   }, "Gathering contract data");
 
-
   await withSpinner(async () => {
     const repo = await env.contractsRepo();
-    if (compile) {
-      await repo.compile();
-    }
+    await repo.compile();
   }, "Compiling system contracts");
 
   const diff = await withSpinner(async () => {
@@ -42,6 +37,6 @@ export async function calculateDiffWithUpgrade (
 
   return {
     diff,
-    state
-  }
+    state,
+  };
 }

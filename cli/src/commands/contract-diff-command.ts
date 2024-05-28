@@ -1,7 +1,6 @@
 import { calculateDiffWithUpgrade } from "../lib";
 import { temporaryDirectory } from "tempy";
 import { exec } from "node:child_process";
-import { withSpinner } from "../lib/with-spinner.js";
 import type { EnvBuilder } from "../lib/env-builder.js";
 
 export const contractDiff = async (
