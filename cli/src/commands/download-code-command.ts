@@ -11,7 +11,7 @@ export async function downloadCode(
   l1Filter: string[]
 ): Promise<void> {
   await assertDirectoryExists(targetDir);
-  const { diff } = await calculateDiffWithUpgrade(env, upgradeDirectory);
+  const { diff } = await calculateDiffWithUpgrade(env, upgradeDirectory, false);
 
   const l2Client = env.l2Client();
   const repo = await env.contractsRepo();

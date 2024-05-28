@@ -1,16 +1,16 @@
 import {
   AbiSet,
   ZkSyncEraState,
-  UpgradeChanges,
   type ZkSyncEraDiff,
 } from ".";
-import type { EnvBuilder } from "./env-builder.js";
-import { withSpinner } from "./with-spinner";
+import type {EnvBuilder} from "./env-builder.js";
+import {withSpinner} from "./with-spinner";
 
 
-export async function calculateDiffWithUpgrade(
+export async function calculateDiffWithUpgrade (
   env: EnvBuilder,
-  upgradeDirectory: string
+  upgradeDirectory: string,
+  compile = true
 ): Promise<{ diff: ZkSyncEraDiff, state: ZkSyncEraState }> {
   const state = await withSpinner(async () => {
     const l1Client = env.l1Client();
@@ -26,20 +26,19 @@ export async function calculateDiffWithUpgrade(
 
 
   await withSpinner(async () => {
-    const repo = await env.contractsRepo()
-    await repo.compile()
-  }, 'Compiling system contracts')
+    const repo = await env.contractsRepo();
+    if (compile) {
+      await repo.compile();
+    }
+  }, "Compiling system contracts");
 
-  const diff = await withSpinner(
-    async () => {
-      const importer = env.importer();
+  const diff = await withSpinner(async () => {
+    const importer = env.importer();
 
-      const changes = await importer.readFromFiles(upgradeDirectory, env.network);
+    const changes = await importer.readFromFiles(upgradeDirectory, env.network);
 
-      return state.calculateDiff(changes, env.l1Client())
-    },
-    'Checking differences between versions'
-  )
+    return state.calculateDiff(changes, env.l1Client())
+  }, "Checking differences between versions");
 
   return {
     diff,
