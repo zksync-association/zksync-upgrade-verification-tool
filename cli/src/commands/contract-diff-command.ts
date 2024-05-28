@@ -13,9 +13,9 @@ export const contractDiff = async (
   const l2Client = env.l2Client();
 
   const targetDir = temporaryDirectory({ prefix: "zksync-era-upgrade-check" });
-  const l1Client = env.l1Client()
-  const { diff } = await calculateDiffWithUpgrade(env, upgradeDirectory)
-  await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, repo)
+  const l1Client = env.l1Client();
+  const { diff } = await calculateDiffWithUpgrade(env, upgradeDirectory);
+  await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, repo);
 
   await new Promise((resolve, reject) => {
     const res = exec(

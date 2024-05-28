@@ -18,9 +18,9 @@ describe("EnvBuilder", () => {
 
     it("returns an era contracts repo in main", async () => {
       const repo = await target().contractsRepo();
-      const current = await repo.currentRef()
-      expect(current).to.eql('main')
-    })
+      const current = await repo.currentRef();
+      expect(current).to.eql("main");
+    });
 
     it("cannot return the network", async () => {
       expect(() => target().network).to.throw();
@@ -85,14 +85,14 @@ describe("EnvBuilder", () => {
     });
   });
 
-  describe('when ref is set', () => {
+  describe("when ref is set", () => {
     it("returns an era contracts repo in that ref", async () => {
       const target = new EnvBuilder();
-      const ref = 'e77971dba8f589b625e72e69dd7e33ccbe697cc0';
-      target.withRef(ref)
+      const ref = "e77971dba8f589b625e72e69dd7e33ccbe697cc0";
+      target.withRef(ref);
       const repo = await target.contractsRepo();
-      const current = await repo.currentRef()
-      expect(current).to.eql(ref)
-    })
+      const current = await repo.currentRef();
+      expect(current).to.eql(ref);
+    });
   });
 });

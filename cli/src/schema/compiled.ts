@@ -1,6 +1,6 @@
-import { z } from "zod"
+import { z } from "zod";
 
 export const compiledArtifactParser = z.object({
   bytecode: z.string(),
-  abi: z.array(z.any())
-})
+  abi: z.array(z.any()),
+});

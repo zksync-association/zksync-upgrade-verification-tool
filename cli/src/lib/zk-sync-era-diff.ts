@@ -142,7 +142,9 @@ export class ZkSyncEraDiff {
     if (this.newBootLoader !== ZERO_U256) {
       const bootLoaderHash = hashes.find((h) => h.contractName === "proved_batch");
       if (!bootLoaderHash || bootLoaderHash.bytecodeHash !== this.newBootLoader) {
-        throw new Error(`Bootloader contract byte code hash does not match in ref: ${await repo.currentRef()}`);
+        throw new Error(
+          `Bootloader contract byte code hash does not match in ref: ${await repo.currentRef()}`
+        );
       }
 
       const sourcesBL = await repo.readFile("system-contracts/bootloader/bootloader.yul");
@@ -347,7 +349,7 @@ export class ZkSyncEraDiff {
     });
 
     const defaultAccountHash = await repo.byteCodeHashFor("DefaultAccount");
-    const bootLoaderHash =  await repo.byteCodeHashFor("proved_batch");
+    const bootLoaderHash = await repo.byteCodeHashFor("proved_batch");
 
     if (!defaultAccountHash) {
       throw new Error(`Missing default account hash for ref: ${await repo.currentRef()}`);
@@ -358,8 +360,7 @@ export class ZkSyncEraDiff {
 
     const newAAMsg = this.newAA === ZERO_U256 ? "No changes" : this.newAA;
 
-    const aaBytecodeMatches =
-      this.newAA === ZERO_U256 ? true : defaultAccountHash === this.newAA;
+    const aaBytecodeMatches = this.newAA === ZERO_U256 ? true : defaultAccountHash === this.newAA;
 
     const bootLoaderMsg = this.newBootLoader === ZERO_U256 ? "No changes" : this.newBootLoader;
 

@@ -84,13 +84,13 @@ export class EnvBuilder {
 
   async contractsRepo(): Promise<EraContractsRepo> {
     if (!this._repo) {
-      const repo = await EraContractsRepo.default()
-      await repo.init()
-      this._repo = repo
-      await this._repo.setRevision(this.ref)
-      return repo
+      const repo = await EraContractsRepo.default();
+      await repo.init();
+      this._repo = repo;
+      await this._repo.setRevision(this.ref);
+      return repo;
     }
 
-    return this._repo
+    return this._repo;
   }
 }

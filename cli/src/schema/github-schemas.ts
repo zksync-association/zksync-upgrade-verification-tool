@@ -10,4 +10,4 @@ export const systemContractHashesParser = z.array(
   })
 );
 
-export type SystemContractHashes = z.infer<typeof systemContractHashesParser>
+export type SystemContractHashes = z.infer<typeof systemContractHashesParser>;

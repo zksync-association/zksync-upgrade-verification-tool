@@ -1,12 +1,9 @@
 import path from "node:path";
 import {
   commonJsonSchema,
-  type FacetsJson,
   facetsSchema,
-  type L2UpgradeJson,
   l2UpgradeSchema,
   transactionsSchema,
-  type UpgradeManifest,
 } from "../schema";
 import type { Network } from "./constants";
 import { MalformedUpgrade, MissingNetwork, NotAnUpgradeDir } from "./errors.js";

@@ -10,7 +10,7 @@ import { type SystemContractHashes, systemContractHashesParser } from "../schema
 import type { Sources } from "../schema";
 import { Option } from "nochoices";
 
-const execPromise = promisify(exec)
+const execPromise = promisify(exec);
 
 export class EraContractsRepo {
   repoPath: string;
@@ -22,7 +22,7 @@ export class EraContractsRepo {
     this.git = simpleGit({
       baseDir: repoPath,
     });
-    this._currentRef = Option.None()
+    this._currentRef = Option.None();
   }
 
   static async default(): Promise<EraContractsRepo> {
@@ -40,57 +40,58 @@ export class EraContractsRepo {
     }
   }
 
-  async readFile(subPath: string, ref = 'HEAD'): Promise<string> {
+  async readFile(subPath: string, ref = "HEAD"): Promise<string> {
     return this.git.show(`${ref}:${subPath}`);
   }
 
   async setRevision(ref: string): Promise<void> {
-    this._currentRef.insert(Promise.resolve(ref))
-    await this.git.checkout(ref, ['--force'])
+    this._currentRef.insert(Promise.resolve(ref));
+    await this.git.checkout(ref, ["--force"]);
   }
 
   async compile(): Promise<void> {
-    await execPromise(`yarn`, { cwd: this.repoPath })
+    await execPromise("yarn", { cwd: this.repoPath });
     const systemContractsDir = `${this.repoPath}/system-contracts`;
-    await execPromise(`yarn clean`, { cwd: systemContractsDir })
-    await execPromise(`yarn build`, { cwd: systemContractsDir })
+    await execPromise("yarn clean", { cwd: systemContractsDir });
+    await execPromise("yarn build", { cwd: systemContractsDir });
   }
 
-  async systemContractHashes (ref = 'HEAD'): Promise<SystemContractHashes> {
-    const hashesRaw = await this.git.show(`${ref}:system-contracts/SystemContractsHashes.json`)
-    return  systemContractHashesParser.parse(JSON.parse(hashesRaw))
+  async systemContractHashes(ref = "HEAD"): Promise<SystemContractHashes> {
+    const hashesRaw = await this.git.show(`${ref}:system-contracts/SystemContractsHashes.json`);
+    return systemContractHashesParser.parse(JSON.parse(hashesRaw));
   }
 
   async byteCodeFor(systemContractName: string): Promise<Buffer> {
-    const hashes =  await this.systemContractHashes()
-    const hashData = hashes.find(d => d.contractName === systemContractName)
+    const hashes = await this.systemContractHashes();
+    const hashData = hashes.find((d) => d.contractName === systemContractName);
     if (!hashData) {
-      throw new Error(`Unknown contract: ${systemContractName}`)
+      throw new Error(`Unknown contract: ${systemContractName}`);
     }
 
-    return this.extractBytecodeFromFile(hashData.bytecodePath)
+    return this.extractBytecodeFromFile(hashData.bytecodePath);
   }
 
   async byteCodeHashFor(systemContractName: string): Promise<string> {
-    const byteCode = await this.byteCodeFor(systemContractName)
+    const byteCode = await this.byteCodeFor(systemContractName);
     const rawHash = utils.hashBytecode(byteCode);
-    const hex = Buffer.from(rawHash).toString('hex');
-    return `0x${hex}`
+    const hex = Buffer.from(rawHash).toString("hex");
+    return `0x${hex}`;
   }
 
-
   private async extractBytecodeFromFile(filePath: string): Promise<Buffer> {
-    const contractArtifactoryFile = path.join(this.repoPath, "system-contracts", filePath)
-    if (contractArtifactoryFile.endsWith('.json')) {
-      const content = await fs.readFile(contractArtifactoryFile)
-      const json = JSON.parse(content.toString())
-      const parsed = compiledArtifactParser.parse(json)
-      return Buffer.from(parsed.bytecode.substring(2), 'hex')
-    } else if (contractArtifactoryFile.endsWith(".yul.zbin")) {
-      return await fs.readFile(contractArtifactoryFile)
-    } else {
-      throw new Error(`Unknown bytecode file type: ${contractArtifactoryFile}`)
+    const contractArtifactoryFile = path.join(this.repoPath, "system-contracts", filePath);
+    if (contractArtifactoryFile.endsWith(".json")) {
+      const content = await fs.readFile(contractArtifactoryFile);
+      const json = JSON.parse(content.toString());
+      const parsed = compiledArtifactParser.parse(json);
+      return Buffer.from(parsed.bytecode.substring(2), "hex");
     }
+
+    if (contractArtifactoryFile.endsWith(".yul.zbin")) {
+      return await fs.readFile(contractArtifactoryFile);
+    }
+
+    throw new Error(`Unknown bytecode file type: ${contractArtifactoryFile}`);
   }
 
   async downloadSystemContract(contractName: string): Promise<Sources> {
@@ -131,6 +132,6 @@ export class EraContractsRepo {
   }
 
   async currentRef(): Promise<string> {
-    return this._currentRef.getOrInsert(this.git.revparse('--short HEAD'))
+    return this._currentRef.getOrInsert(this.git.revparse("--short HEAD"));
   }
 }
