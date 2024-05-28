@@ -26,7 +26,8 @@
     "start": "tsx src/entrypoint.ts",
     "build": "tsup src --format esm --no-splitting --sourcemap ",
     "watch": "tsup src --format esm --no-splitting --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:ci": "vitest run --coverage"
   },
   "keywords": [],
   "author": "moonsong-labs",
