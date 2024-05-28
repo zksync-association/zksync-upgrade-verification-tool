@@ -25,9 +25,7 @@ jobs:
       - name: Link Binary & Test
         # Temporary running only unit tests in ci.
         run: pnpm i && pnpm run --filter=./cli test:ci
-      - name: Coverage Diff
-        uses: greatwizard/coverage-diff-action@v1
+      - name: Coverage
+        uses: romeovs/lcov-reporter-action@v0.2.16
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          coverage-filename: cli/coverage/coverage-final.json
-          badge-enabled: false
+          lcov-file: cli/coverage/lcov.info

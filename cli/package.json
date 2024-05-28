@@ -27,7 +27,7 @@
     "build": "tsup src --format esm --no-splitting --sourcemap ",
     "watch": "tsup src --format esm --no-splitting --watch",
     "test": "vitest run",
-    "test:ci": "vitest run --coverage --coverage.reporter=json"
+    "test:ci": "vitest run --coverage --coverage.reporter=lcov"
   },
   "keywords": [],
   "author": "moonsong-labs",
