@@ -1,9 +1,4 @@
-import {
-  AbiSet,
-  type BlockExplorerClient,
-  ZkSyncEraState,
-  type ZkSyncEraDiff,
-} from ".";
+import { AbiSet, type BlockExplorerClient, ZkSyncEraState, type ZkSyncEraDiff } from ".";
 import type { EnvBuilder } from "./env-builder.js";
 
 type CreateDiffResponse = {
@@ -16,7 +11,7 @@ export async function compareCurrentStateWith(
   env: EnvBuilder,
   upgradeDirectory: string
 ): Promise<CreateDiffResponse> {
-  const importer = env.importer()
+  const importer = env.importer();
 
   const changes = await importer.readFromFiles(upgradeDirectory, env.network);
 

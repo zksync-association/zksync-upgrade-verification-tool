@@ -9,4 +9,3 @@ export const facetCutsSchema = z.array(
     isFreezable: z.boolean(),
   })
 );
-

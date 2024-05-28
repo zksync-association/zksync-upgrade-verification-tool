@@ -271,5 +271,5 @@ describe("validate check", () => {
         'Problem processing specified upgrade: "reference/malformed-upgrade/common.json" does not follow expected schema.'
       );
     });
-  })
+  });
 });

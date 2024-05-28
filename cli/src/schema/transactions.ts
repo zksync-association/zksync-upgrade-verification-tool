@@ -1,10 +1,5 @@
 import { z } from "zod";
-import {
-  account20String,
-  bytes32Hash,
-  hashString,
-  transactionSchema,
-} from "../schema";
+import { account20String, bytes32Hash, hashString, transactionSchema } from "../schema";
 import { facetCutsSchema } from "./facetCuts";
 
 export const verifierParamsSchema = z.object({
@@ -12,7 +7,6 @@ export const verifierParamsSchema = z.object({
   recursionLeafLevelVkHash: bytes32Hash,
   recursionCircuitsSetVksHash: bytes32Hash,
 });
-
 
 export const transactionsSchema = z.object({
   proposeUpgradeTx: z.object({
