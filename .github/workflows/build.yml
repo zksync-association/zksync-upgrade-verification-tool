@@ -26,6 +26,6 @@ jobs:
         # Temporary running only unit tests in ci.
         run: pnpm i && pnpm run --filter=./cli test:ci
       - name: Coverage
-        uses: romeovs/lcov-reporter-action@v0.2.16
+        uses: romeovs/lcov-reporter-action@v0.2.19
         with:
           working-directory: cli
