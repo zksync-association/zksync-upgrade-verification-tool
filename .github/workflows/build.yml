@@ -24,4 +24,9 @@ jobs:
       - run: pnpm run build
       - name: Link Binary & Test
         # Temporary running only unit tests in ci.
-        run: pnpm i && pnpm run --filter=./cli test
+        run: pnpm i && pnpm run --filter=./cli test:ci
+      - name: Coverage Diff
+        uses: greatwizard/coverage-diff-action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          coverage-filename: cli/coverage/coverage-final.json
