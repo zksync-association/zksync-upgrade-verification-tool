@@ -29,3 +29,4 @@ jobs:
         uses: romeovs/lcov-reporter-action@v0.3.1
         with:
           lcov-file: ./cli/coverage/lcov.info
+          github-token: ${{ github.token }}
