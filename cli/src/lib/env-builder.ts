@@ -88,10 +88,10 @@ export class EnvBuilder {
   }
 
   fs(): FileSystem {
-    return new FileSystem()
+    return new FileSystem();
   }
 
   importer(): UpgradeImporter {
-    return new UpgradeImporter(this.fs())
+    return new UpgradeImporter(this.fs());
   }
 }

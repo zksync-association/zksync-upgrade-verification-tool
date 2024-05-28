@@ -1,14 +1,14 @@
-import fs from 'node:fs/promises'
+import fs from "node:fs/promises";
 import type { Stats } from "node:fs";
 import { NotADir } from "./errors";
 
 export class FileSystem {
   async readFile(path: string): Promise<Buffer> {
-    return fs.readFile(path)
+    return fs.readFile(path);
   }
 
   async writeFile(path: string, content: Buffer): Promise<void> {
-    return fs.writeFile(path, content)
+    return fs.writeFile(path, content);
   }
 
   async directoryExists(path: string): Promise<boolean> {
@@ -22,8 +22,8 @@ export class FileSystem {
   }
 
   async assertDirectoryExists(path: string, originalPath: string = path): Promise<void> {
-    if (!await this.directoryExists(path)) {
-      throw new NotADir(originalPath)
+    if (!(await this.directoryExists(path))) {
+      throw new NotADir(originalPath);
     }
   }
 }

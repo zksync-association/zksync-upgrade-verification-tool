@@ -10,7 +10,7 @@ const systemContracts = z.array(
 );
 
 export const l2UpgradeSchema = z.object({
-  systemContracts
+  systemContracts,
 });
 
 export type L2UpgradeJson = z.infer<typeof l2UpgradeSchema>;
