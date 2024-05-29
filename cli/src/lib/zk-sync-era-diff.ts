@@ -291,7 +291,7 @@ export class ZkSyncEraDiff {
     const newLeafHash =
       this.oldVerifier.recursionLeafLevelVkHash === this.newVerifier.recursionLeafLevelVkHash
         ? "No changes"
-        : this.newVerifier.recursionNodeLevelVkHash;
+        : this.newVerifier.recursionLeafLevelVkHash;
     verifierTable.push([
       "Recursion leaf level VkHash",
       this.oldVerifier.recursionLeafLevelVkHash,

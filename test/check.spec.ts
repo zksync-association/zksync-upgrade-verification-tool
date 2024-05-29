@@ -81,7 +81,7 @@ describe("validate check", () => {
       expect(stdout).toMatch(/Recursion circuits set VksHash.*No changes/);
 
       expect(stdout).toMatch(
-        /Recursion leaf level VkHash.*0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080/
+        /Recursion leaf level VkHash.*0x14628525c227822148e718ca1138acfc6d25e759e19452455d89f7f610c3dcb8/
       );
 
       expect(stdout).toMatch(
