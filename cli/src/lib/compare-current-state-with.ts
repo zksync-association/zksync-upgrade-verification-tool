@@ -10,6 +10,11 @@ export async function calculateDiffWithUpgrade(
   env: EnvBuilder,
   upgradeDirectory: string
 ): Promise<{ diff: ZkSyncEraDiff, state: ZkSyncEraState }> {
+  const changes = await withSpinner(async () => {
+    const importer = env.importer();
+    return importer.readFromFiles(upgradeDirectory, env.network);
+  }, 'Reading proposed upgrade...')
+
   const state = await withSpinner(async () => {
     const l1Client = env.l1Client();
     const l1Abis = new AbiSet(l1Client);
@@ -22,18 +27,14 @@ export async function calculateDiffWithUpgrade(
     );
   }, "Gathering contract data");
 
+  const diff = await withSpinner(async () => {
+    return state.calculateDiff(changes, env.l1Client())
+  }, "Checking differences between versions");
+
   await withSpinner(async () => {
     const repo = await env.contractsRepo();
     await repo.compile();
   }, "Compiling system contracts");
-
-  const diff = await withSpinner(async () => {
-    const importer = env.importer();
-
-    const changes = await importer.readFromFiles(upgradeDirectory, env.network);
-
-    return state.calculateDiff(changes, env.l1Client())
-  }, "Checking differences between versions");
 
   return {
     diff,

@@ -30,16 +30,23 @@ export class MalformedUpgrade extends Error {
 export class MissingNetwork extends Error {
   constructor(path: string, network: Network) {
     super(
-      `Upgrade inside ${path} does not contain information for ${network}. Maybe you can try with a different network.`
+      `Upgrade inside ${path} does not contain information for "${network}". Maybe you can try with a different network.`
     );
   }
 }
 
-const KNOWN_ERRORS = [ContracNotVerified, NotAnUpgradeDir, NotADir, MalformedUpgrade];
+const KNOWN_ERRORS = [
+  ContracNotVerified,
+  NotAnUpgradeDir,
+  NotADir,
+  MalformedUpgrade,
+  MissingNetwork
+];
 
 export function printError(e: Error): void {
   const isKnown = KNOWN_ERRORS.some((kind) => e instanceof kind);
 
+  console.error(e)
   if (isKnown) {
     console.log("");
     console.log(`> ${e.message}`);

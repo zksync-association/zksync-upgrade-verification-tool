@@ -40,10 +40,9 @@ export class UpgradeImporter {
 
   async readFromFiles(upgradeDirectory: string, network: Network): Promise<UpgradeChanges> {
     const targetDir = upgradeDirectory;
+    await this.fs.assertDirectoryExists(targetDir);
     const networkDir = await this.findNetworkDir(targetDir, network);
-
-    await this.fs.assertDirectoryExists(targetDir, upgradeDirectory);
-    await this.fs.assertDirectoryExists(targetDir, networkDir);
+    await this.fs.assertDirectoryExists(networkDir);
 
     const common = await this.readMandatoryFile(
       path.join(targetDir, "common.json"),
@@ -72,7 +71,7 @@ export class UpgradeImporter {
   ): Promise<z.infer<typeof parser>> {
     const res = await this.readOptionalFile(filePath, parser);
     if (res === undefined) {
-      return ifMissing;
+      throw ifMissing;
     }
     return res;
   }
