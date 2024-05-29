@@ -308,7 +308,7 @@ describe.sequential("EraContractsRepo", () => {
 
       const content = await repo.downloadSystemContract("NonceHolder");
       const data = new ContractData("NonceHolder", content, "some address");
-      data.remapKeys("system-contracts/contracts/", "");
+      data.remapKeys("system-contracts/cache-zk/solpp-generated-contracts/", "");
       const expected = [
         "interfaces/IAccountCodeStorage.sol",
         "interfaces/IBootloaderUtilities.sol",
