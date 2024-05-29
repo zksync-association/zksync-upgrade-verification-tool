@@ -42,11 +42,9 @@ export class EraContractsRepo {
 
   async readFile(subPath: string, ref = "HEAD"): Promise<string> {
     if (ref === "HEAD") {
-      return fs.readFile(path.join(this.repoPath, subPath))
-        .then(buf => buf.toString())
-    } else {
-      return this.git.show(`${ref}:${subPath}`);
+      return fs.readFile(path.join(this.repoPath, subPath)).then((buf) => buf.toString());
     }
+    return this.git.show(`${ref}:${subPath}`);
   }
 
   async setRevision(ref: string): Promise<void> {
@@ -100,10 +98,10 @@ export class EraContractsRepo {
   }
 
   async downloadSystemContract(contractName: string): Promise<Sources> {
-    const json = await this.systemContractHashes()
-    const found = json.find(json => json.contractName === contractName)
+    const json = await this.systemContractHashes();
+    const found = json.find((json) => json.contractName === contractName);
     if (!found) {
-      throw new Error(`Unknown contract: ${contractName}`)
+      throw new Error(`Unknown contract: ${contractName}`);
     }
     return this.downloadContractInt(path.join("system-contracts", found.sourceCodePath), {});
   }

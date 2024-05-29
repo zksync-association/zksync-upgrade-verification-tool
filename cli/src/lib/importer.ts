@@ -1,10 +1,5 @@
 import path from "node:path";
-import {
-  commonJsonSchema,
-  facetsSchema,
-  l2UpgradeSchema,
-  transactionsSchema,
-} from "../schema";
+import { commonJsonSchema, facetsSchema, l2UpgradeSchema, transactionsSchema } from "../schema";
 import type { Network } from "./constants";
 import { MalformedUpgrade, MissingNetwork, NotAnUpgradeDir } from "./errors.js";
 import { UpgradeChanges } from "./upgrade-changes";

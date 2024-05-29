@@ -40,13 +40,13 @@ const KNOWN_ERRORS = [
   NotAnUpgradeDir,
   NotADir,
   MalformedUpgrade,
-  MissingNetwork
+  MissingNetwork,
 ];
 
 export function printError(e: Error): void {
   const isKnown = KNOWN_ERRORS.some((kind) => e instanceof kind);
 
-  console.error(e)
+  console.error(e);
   if (isKnown) {
     console.log("");
     console.log(`> ${e.message}`);

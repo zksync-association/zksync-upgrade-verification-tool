@@ -21,7 +21,7 @@ export class FileSystem {
     return targetDirStat.isDirectory();
   }
 
-  async assertDirectoryExists (path: string): Promise<void> {
+  async assertDirectoryExists(path: string): Promise<void> {
     if (!(await this.directoryExists(path))) {
       throw new NotADir(path);
     }
