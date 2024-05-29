@@ -7,7 +7,6 @@ import { systemContractHashesParser } from "../schema/github-schemas.js";
 import { ContractData } from "./contract-data.js";
 import { ADDRESS_ZERO, ZERO_U256 } from "./constants.js";
 import chalk from "chalk";
-import type { AbiSet } from "./abi-set.js";
 import type { EraContractsRepo } from "./era-contracts-repo";
 import fs from "node:fs/promises";
 
@@ -92,7 +91,7 @@ export class ZkSyncEraDiff {
       oldSelectors,
       newSelectors,
     });
-    this.warnings.push(`L1 Contract not verified in therscan: ${newAddress}`);
+    this.warnings.push(`L1 Contract not verified in etherscan: ${newAddress}`);
     this.facetChanges.sort((f1, f2) => f1.oldData.name.localeCompare(f2.oldData.name));
   }
 
@@ -198,7 +197,7 @@ export class ZkSyncEraDiff {
     }
   }
 
-  async toCliReport(abis: AbiSet, upgradeDir: string, repo: EraContractsRepo): Promise<string> {
+  async toCliReport(client: BlockExplorerClient, upgradeDir: string, repo: EraContractsRepo): Promise<string> {
     const title = "Upgrade report:";
     const strings = [`${title}`, "=".repeat(title.length), ""];
 
@@ -233,8 +232,9 @@ export class ZkSyncEraDiff {
       if (change.newData) {
         newFunctions = await Promise.all(
           newFunctions.map(async (selector) => {
-            await abis.fetch(change.newAddress);
-            return abis.signatureForSelector(selector);
+            const abi = await client.getAbi(change.newAddress);
+            console.log('abi', abi.constructor)
+            return abi.signatureForSelector(selector);
           })
         );
       }
@@ -244,8 +244,8 @@ export class ZkSyncEraDiff {
         change.oldSelectors
           .filter((s) => this.orphanedSelectors.includes(s))
           .map(async (selector) => {
-            await abis.fetch(change.oldAddress);
-            return abis.signatureForSelector(selector);
+            const abi = await client.getAbi(change.oldAddress);
+            return abi.signatureForSelector(selector);
           })
       );
 

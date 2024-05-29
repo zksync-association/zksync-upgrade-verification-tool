@@ -1,19 +1,20 @@
-import type { Abi } from "viem";
+import type {Abi} from "viem";
 import {
   account20String,
   getAbiSchema,
   sourceCodeResponseSchema,
   sourceCodeSchema,
 } from "../schema/index.js";
-import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
-import type { z, ZodType } from "zod";
-import { ContractData } from "./contract-data.js";
-import { ContracNotVerified } from "./errors.js";
+import {ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network} from "./constants.js";
+import type {z, ZodType} from "zod";
+import {ContractData} from "./contract-data.js";
+import {ContracNotVerified} from "./errors.js";
+import {ContractAbi} from "./contract-abi";
 
 export class BlockExplorerClient {
   private apiKey: string;
   baseUri: string;
-  private abiCache: Map<string, Abi>;
+  private abiCache: Map<string, ContractAbi>;
   private sourceCache: Map<string, ContractData>;
   private contractsNotVerified: Set<string>;
   private callCount = 0;
@@ -50,7 +51,7 @@ export class BlockExplorerClient {
     return parser.parse(await response.json());
   }
 
-  async getAbi(rawAddress: string): Promise<Abi> {
+  async getAbi (rawAddress: string): Promise<ContractAbi> {
     const existing = this.abiCache.get(rawAddress);
     if (existing) {
       return existing;
@@ -72,12 +73,12 @@ export class BlockExplorerClient {
       throw new Error(`Failed to fetch ABI for ${rawAddress}`);
     }
 
-    const abi = JSON.parse(result);
+    const abi = new ContractAbi(JSON.parse(result));
     this.abiCache.set(rawAddress, abi);
     return abi;
   }
 
-  async getSourceCode(rawAddress: string): Promise<ContractData> {
+  async getSourceCode (rawAddress: string): Promise<ContractData> {
     const existing = this.sourceCache.get(rawAddress);
     if (existing) {
       return existing;
@@ -110,7 +111,7 @@ export class BlockExplorerClient {
       throw new ContracNotVerified(rawAddress);
     }
 
-    const abi = JSON.parse(result[0].ABI);
+    const abi = new ContractAbi(JSON.parse(result[0].ABI));
     this.abiCache.set(rawAddress, abi);
 
     try {
