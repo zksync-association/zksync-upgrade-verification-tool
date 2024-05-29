@@ -24,7 +24,7 @@ export class UpgradeChanges {
   facets: FacetData[];
   orphanedSelectors: string[];
   verifier: VerifierContract;
-  systemCotractChanges: SystemContractData[];
+  systemContractChanges: SystemContractData[];
   aaBytecodeHash: string;
   booloaderBytecodeHash: string;
 
@@ -37,7 +37,7 @@ export class UpgradeChanges {
     this.newProtocolVersion = newProtocolVersion;
     this.facets = [];
     this.orphanedSelectors = [];
-    this.systemCotractChanges = [];
+    this.systemContractChanges = [];
     this.verifier = verifier;
     this.aaBytecodeHash = aaBytecodeHash;
     this.booloaderBytecodeHash = booloaderBytecodeHash;
@@ -64,7 +64,7 @@ export class UpgradeChanges {
   }
 
   addSystemContract(change: SystemContractData) {
-    this.systemCotractChanges.push(change);
+    this.systemContractChanges.push(change);
   }
 
   static fromFiles(

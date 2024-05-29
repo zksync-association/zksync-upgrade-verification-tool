@@ -7,10 +7,10 @@ import { ContracNotVerified } from "./errors.js";
 export class SystemContractChange {
   address: Hex;
   name: string;
-  currentBytecodeHash: Hex;
+  currentBytecodeHash: string;
   proposedBytecodeHash: Hex;
 
-  constructor(address: Hex, name: string, currentBytecodeHash: Hex, proposedBytecodeHash: Hex) {
+  constructor(address: Hex, name: string, currentBytecodeHash: string, proposedBytecodeHash: Hex) {
     this.address = address;
     this.name = name;
     this.currentBytecodeHash = currentBytecodeHash;
@@ -27,14 +27,14 @@ export class SystemContractChange {
         const content = {
           content: `Code for contract ${this.address} (${this.name}) is not available in block explorer`,
         };
-        return new ContractData(this.name, { "messate.txt": content }, this.address);
+        return new ContractData(this.name, { "message.txt": content }, this.address);
       }
       throw e;
     }
   }
 
   async downloadProposedCode(github: GithubClient): Promise<ContractData> {
-    const source = await github.downloadContract(this.name);
+    const source = await github.downloadSystemContract(this.name);
 
     return new ContractData(this.name, source, this.address);
   }

@@ -21,6 +21,12 @@ export class NotAnUpgradeDir extends Error {
   }
 }
 
+export class MalformedUpgrade extends Error {
+  constructor(msg: string) {
+    super(`Problem processing specified upgrade: ${msg}`);
+  }
+}
+
 export class MissingNetwork extends Error {
   constructor(path: string, network: Network) {
     super(
@@ -29,7 +35,7 @@ export class MissingNetwork extends Error {
   }
 }
 
-const KNOWN_ERRORS = [ContracNotVerified, NotAnUpgradeDir, NotADir];
+const KNOWN_ERRORS = [ContracNotVerified, NotAnUpgradeDir, NotADir, MalformedUpgrade];
 
 export function printError(e: Error): void {
   const isKnown = KNOWN_ERRORS.some((kind) => e instanceof kind);

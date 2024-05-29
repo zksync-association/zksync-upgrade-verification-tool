@@ -50,7 +50,7 @@ export class GithubClient {
     }
   }
 
-  async downloadContract(contractName: string): Promise<Sources> {
+  async downloadSystemContract(contractName: string): Promise<Sources> {
     return this.downloadContractInt(`system-contracts/contracts/${contractName}.sol`, {});
   }
 

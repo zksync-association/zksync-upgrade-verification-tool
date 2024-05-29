@@ -1,14 +1,5 @@
-import {
-  AbiSet,
-  type BlockExplorerClient,
-  ZkSyncEraState,
-  UpgradeChanges,
-  lookupAndParse,
-  type ZkSyncEraDiff,
-} from ".";
-import path from "node:path";
+import { AbiSet, type BlockExplorerClient, ZkSyncEraState, type ZkSyncEraDiff } from ".";
 import type { EnvBuilder } from "./env-builder.js";
-import * as console from "node:console";
 
 type CreateDiffResponse = {
   diff: ZkSyncEraDiff;
@@ -20,17 +11,18 @@ export async function compareCurrentStateWith(
   env: EnvBuilder,
   upgradeDirectory: string
 ): Promise<CreateDiffResponse> {
-  const upgrade = await lookupAndParse(upgradeDirectory, env.network);
+  const importer = env.importer();
+
+  const changes = await importer.readFromFiles(upgradeDirectory, env.network);
 
   const l1Client = env.l1Client();
   const l1Abis = new AbiSet(l1Client);
-  const zkSyncState = await ZkSyncEraState.create(env.network, l1Client, l1Abis, env.rpc());
-
-  const changes = UpgradeChanges.fromFiles(
-    upgrade.commonData,
-    upgrade.transactions,
-    upgrade.facets,
-    upgrade.l2Upgrade
+  const zkSyncState = await ZkSyncEraState.create(
+    env.network,
+    l1Client,
+    l1Abis,
+    env.rpcL1(),
+    env.rpcL2()
   );
 
   return {

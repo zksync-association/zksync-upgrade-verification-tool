@@ -9,5 +9,3 @@ export const facetCutsSchema = z.array(
     isFreezable: z.boolean(),
   })
 );
-
-export type FacetCutsJson = z.infer<typeof facetCutsSchema>;

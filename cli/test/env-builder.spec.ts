@@ -13,7 +13,7 @@ describe("EnvBuilder", () => {
     });
 
     it("cannot return an rpc client", () => {
-      expect(() => target().rpc()).to.throw();
+      expect(() => target().rpcL1()).to.throw();
     });
 
     it("returns a github client with no auth info", async () => {
@@ -59,7 +59,7 @@ describe("EnvBuilder", () => {
     };
 
     it("returns an rpc client pointing to public mainnet node", () => {
-      const rpc = target().rpc();
+      const rpc = target().rpcL1();
       expect(rpc.rpcUrl()).to.eql("https://ethereum-rpc.publicnode.com");
     });
   });
@@ -86,7 +86,7 @@ describe("EnvBuilder", () => {
     };
 
     it("returns an rpc client pointing to sepolia public node", () => {
-      const rpc = target().rpc();
+      const rpc = target().rpcL1();
       expect(rpc.rpcUrl()).to.eql("https://ethereum-sepolia-rpc.publicnode.com");
     });
   });
