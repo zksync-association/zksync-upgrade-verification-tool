@@ -1,8 +1,8 @@
-import type {Hex} from "viem";
-import type {BlockExplorerClient} from "./block-explorer-client";
-import {ContractData} from "./contract-data.js";
-import {ContracNotVerified} from "./errors.js";
-import type {EraContractsRepo} from "./era-contracts-repo";
+import type { Hex } from "viem";
+import type { BlockExplorerClient } from "./block-explorer-client";
+import { ContractData } from "./contract-data.js";
+import { ContracNotVerified } from "./errors.js";
+import type { EraContractsRepo } from "./era-contracts-repo";
 
 export class SystemContractChange {
   address: Hex;
@@ -29,7 +29,7 @@ export class SystemContractChange {
         const content = {
           content: `Code for contract ${this.address} (${this.name}) is not available in block explorer`,
         };
-        return new ContractData(this.name, {"message.txt": content}, this.address);
+        return new ContractData(this.name, { "message.txt": content }, this.address);
       }
       throw e;
     }
