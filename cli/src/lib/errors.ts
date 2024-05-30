@@ -1,6 +1,8 @@
 import * as console from "node:console";
 import type { Network } from "./constants.js";
 
+// export class FinishWithError extends Error {}
+
 export class ContracNotVerified extends Error {
   constructor(addr: string) {
     super(`Contract for ${addr} not verified in block explorer`);
