@@ -7,8 +7,12 @@ import { EnvBuilder } from "./env-builder.js";
 import * as console from "node:console";
 import { printError } from "./errors.js";
 
-
-export function buildCli (args: string[], checkCbk: typeof checkCommand, diffCbk: typeof contractDiff, downloadCodeCbk: typeof downloadCode): Argv {
+export function buildCli(
+  args: string[],
+  checkCbk: typeof checkCommand,
+  diffCbk: typeof contractDiff,
+  downloadCodeCbk: typeof downloadCode
+): Argv {
   const env = new EnvBuilder();
   const argParser = yargs(args)
     .middleware((yargs) => {
@@ -153,18 +157,18 @@ export function buildCli (args: string[], checkCbk: typeof checkCommand, diffCbk
         console.log("");
         console.log(msg);
         // process.exit(1);
-        return
+        return;
       }
 
       printError(err);
       // process.exit(1);
     })
-    .strict()
+    .strict();
 
-  return argParser
+  return argParser;
 }
 
 export const cli = async () => {
-  const argParser = buildCli(hideBin(process.argv), checkCommand, contractDiff, downloadCode)
+  const argParser = buildCli(hideBin(process.argv), checkCommand, contractDiff, downloadCode);
   await argParser.parseAsync();
 };

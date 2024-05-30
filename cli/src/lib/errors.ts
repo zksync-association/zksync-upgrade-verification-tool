@@ -38,7 +38,7 @@ export class MissingNetwork extends Error {
 }
 
 export class ExternalApiError extends Error {
-  constructor (apiName: string, details: string) {
+  constructor(apiName: string, details: string) {
     super(`Error consuming data from ${apiName}: ${details}`);
   }
 }
@@ -49,7 +49,7 @@ const KNOWN_ERRORS = [
   NotADir,
   MalformedUpgrade,
   MissingNetwork,
-  ExternalApiError
+  ExternalApiError,
 ];
 
 export function printError(e: Error): void {
