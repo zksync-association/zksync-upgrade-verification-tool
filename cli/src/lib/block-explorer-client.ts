@@ -8,7 +8,7 @@ import {
 import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
 import type { z, ZodType } from "zod";
 import { ContractData } from "./contract-data.js";
-import { ContracNotVerified } from "./errors.js";
+import {ContracNotVerified, ExternalApiError} from "./errors.js";
 import { ContractAbi } from "./contract-abi";
 
 export class BlockExplorerClient {
@@ -43,7 +43,7 @@ export class BlockExplorerClient {
 
     const response = await fetch(`${this.baseUri}?${query}`);
     if (!response.ok) {
-      throw new Error(`Received error from block explorer: ${await response.text()}`);
+      throw new ExternalApiError("Block Explorer", `error accessing api. url=${this.baseUri}, status=${response.status}.`);
     }
 
     this.callCount++;
@@ -70,7 +70,7 @@ export class BlockExplorerClient {
     );
 
     if (message !== "OK") {
-      throw new Error(`Failed to fetch ABI for ${rawAddress}`);
+      throw new ExternalApiError("BlockExplorer", `Cannot get abi for ${rawAddress}`)
     }
 
     const abi = new ContractAbi(JSON.parse(result));
@@ -152,7 +152,7 @@ export class BlockExplorerClient {
     }
   }
 
-  static fromNetwork(apiKey: string, network: Network): BlockExplorerClient {
+  static forL1(apiKey: string, network: Network): BlockExplorerClient {
     const baseUri = ETHERSCAN_ENDPOINTS[network];
     return new BlockExplorerClient(apiKey, baseUri);
   }

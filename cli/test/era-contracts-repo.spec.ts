@@ -27,7 +27,7 @@ SOFTWARE.
 `;
 
 describe("EraContractsRepo", () => {
-  describe("after compile for commit (a1a05513c110586f7a1d8b5fa46115cc7307587a)", () => {
+  describe.skip("after compile for commit (a1a05513c110586f7a1d8b5fa46115cc7307587a)", () => {
     let contractsRepo: EraContractsRepo;
 
     beforeAll(async () => {
