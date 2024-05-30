@@ -11,7 +11,7 @@ import { utils } from "zksync-ethers";
 import { SystemContractChange } from "./system-contract-change";
 import type { RpcClient } from "./rpc-client.js";
 import type { ContractData } from "./contract-data.js";
-import type {ContractAbi} from "./contract-abi";
+import type { ContractAbi } from "./contract-abi";
 
 const MAIN_CONTRACT_FUNCTIONS = {
   facets: "facets",
@@ -47,7 +47,7 @@ export class ZkSyncEraState {
   private _aaBytecodeHash?: string;
   private _bootloaderStringHash?: string;
 
-  static async create (
+  static async create(
     network: Network,
     client: BlockExplorerClient,
     l1Rpc: RpcClient,
@@ -152,7 +152,7 @@ export class ZkSyncEraState {
     return this._bootloaderStringHash;
   }
 
-  constructor (addr: string, l1Rpc: RpcClient, l2Rpc: RpcClient) {
+  constructor(addr: string, l1Rpc: RpcClient, l2Rpc: RpcClient) {
     this.addr = addr;
     this.l1Rpc = l1Rpc;
     this.l2Rpc = l2Rpc;

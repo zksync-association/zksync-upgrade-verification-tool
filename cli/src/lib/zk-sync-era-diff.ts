@@ -197,7 +197,11 @@ export class ZkSyncEraDiff {
     }
   }
 
-  async toCliReport(client: BlockExplorerClient, upgradeDir: string, repo: EraContractsRepo): Promise<string> {
+  async toCliReport(
+    client: BlockExplorerClient,
+    upgradeDir: string,
+    repo: EraContractsRepo
+  ): Promise<string> {
     const title = "Upgrade report:";
     const strings = [`${title}`, "=".repeat(title.length), ""];
 
@@ -233,7 +237,7 @@ export class ZkSyncEraDiff {
         newFunctions = await Promise.all(
           newFunctions.map(async (selector) => {
             const abi = await client.getAbi(change.newAddress);
-            console.log('abi', abi.constructor)
+            console.log("abi", abi.constructor);
             return abi.signatureForSelector(selector);
           })
         );

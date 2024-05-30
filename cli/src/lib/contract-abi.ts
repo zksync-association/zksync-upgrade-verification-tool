@@ -1,12 +1,12 @@
-import {type Abi, type AbiFunction, toFunctionSelector} from "viem";
+import { type Abi, type AbiFunction, toFunctionSelector } from "viem";
 
 export class ContractAbi {
-  raw: Abi
+  raw: Abi;
   private selectors: Map<string, AbiFunction>;
 
-  constructor (raw: Abi) {
-    this.raw = raw
-    this.selectors = new Map()
+  constructor(raw: Abi) {
+    this.raw = raw;
+    this.selectors = new Map();
 
     const fns = raw.filter((desc) => desc.type === "function") as AbiFunction[];
     for (const fn of fns) {
