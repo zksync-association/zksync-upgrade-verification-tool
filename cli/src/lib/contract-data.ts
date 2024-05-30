@@ -27,9 +27,7 @@ export class ContractData {
     const keys = Object.keys(record);
     const newRecord: Sources = {};
     for (const key of keys) {
-      const newKey = key.startsWith(oldPrefix)
-        ? key.replace(oldPrefix, newPrefix)
-        : key
+      const newKey = key.startsWith(oldPrefix) ? key.replace(oldPrefix, newPrefix) : key;
 
       newRecord[newKey] = record[key];
     }

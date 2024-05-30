@@ -118,7 +118,7 @@ export class BlockExplorerClient {
       const SourceCode = sourceCodeSchema.parse(JSON.parse(rawSourceCode));
       const data = new ContractData(result[0].ContractName, SourceCode.sources, contractAddr);
       this.sourceCache.set(rawAddress, data);
-      data.remapKeys("cache/solpp-generated-contracts", "contracts")
+      data.remapKeys("cache/solpp-generated-contracts", "contracts");
       return data;
     } catch (e) {
       // This means that the response was not an object, instead it was a string with the source code.

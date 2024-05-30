@@ -2,7 +2,7 @@ import { AbiSet, ZkSyncEraState, type ZkSyncEraDiff } from ".";
 import type { EnvBuilder } from "./env-builder.js";
 import { withSpinner } from "./with-spinner";
 
-export async function calculateDiffWithUpgrade (
+export async function calculateDiffWithUpgrade(
   env: EnvBuilder,
   upgradeDirectory: string
 ): Promise<{ diff: ZkSyncEraDiff; state: ZkSyncEraState }> {
