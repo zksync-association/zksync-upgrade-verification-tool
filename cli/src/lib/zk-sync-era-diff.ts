@@ -9,6 +9,7 @@ import { ADDRESS_ZERO, ZERO_U256 } from "./constants.js";
 import chalk from "chalk";
 import type { AbiSet } from "./abi-set.js";
 import type { EraContractsRepo } from "./era-contracts-repo";
+import fs from "node:fs/promises"
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -108,6 +109,9 @@ export class ZkSyncEraDiff {
   ): Promise<void> {
     const baseDirOld = path.join(baseDirPath, "old");
     const baseDirNew = path.join(baseDirPath, "new");
+
+    await fs.rm(baseDirOld, { recursive: true, force: true});
+    await fs.rm(baseDirNew, { recursive: true, force: true});
 
     await this.writeFacets(filter, baseDirOld, baseDirNew);
     await this.writeVerifier(filter, baseDirOld, baseDirNew, l1Client);
@@ -417,8 +421,6 @@ export class ZkSyncEraDiff {
         change.downloadCurrentCode(l2Client),
         change.downloadProposedCode(repo),
       ]);
-
-      upgrade.remapKeys("system-contracts/contracts", "contracts-preprocessed");
       await current.writeSources(path.join(baseDirOld, "system-contracts", change.name));
       await upgrade.writeSources(path.join(baseDirNew, "system-contracts", change.name));
     }

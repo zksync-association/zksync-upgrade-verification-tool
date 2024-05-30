@@ -19,7 +19,9 @@ export class SystemContractChange {
 
   async downloadCurrentCode(client: BlockExplorerClient): Promise<ContractData> {
     try {
-      return await client.getSourceCode(this.address);
+      const data = await client.getSourceCode(this.address);
+      data.remapKeys("contracts-preprocessed", "")
+      return data;
     } catch (e) {
       // Some system contracts do not have the code available in the block explorer. But this is not an error.
       // For these contracts we cannot show the current source code.
@@ -27,7 +29,8 @@ export class SystemContractChange {
         const content = {
           content: `Code for contract ${this.address} (${this.name}) is not available in block explorer`,
         };
-        return new ContractData(this.name, { "message.txt": content }, this.address);
+        const data = new ContractData(this.name, { "message.txt": content }, this.address);
+        return data;
       }
       throw e;
     }
@@ -35,6 +38,8 @@ export class SystemContractChange {
 
   async downloadProposedCode(repo: EraContractsRepo): Promise<ContractData> {
     const source = await repo.downloadSystemContract(this.name);
-    return new ContractData(this.name, source, this.address);
+    const data = new ContractData(this.name, source, this.address);
+    data.remapKeys("system-contracts/contracts-preprocessed", "")
+    return data;
   }
 }

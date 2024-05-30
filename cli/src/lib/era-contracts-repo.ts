@@ -52,9 +52,9 @@ export class EraContractsRepo {
     await this.git.checkout(ref, ["--force"]);
   }
 
-  async compile(): Promise<void> {
+  async compileSystemContracts(): Promise<void> {
     await execPromise("yarn", { cwd: this.repoPath });
-    const systemContractsDir = `${this.repoPath}/system-contracts`;
+    const systemContractsDir = path.join(this.repoPath, "system-contracts");
     await execPromise("yarn clean", { cwd: systemContractsDir });
     await execPromise("yarn build", { cwd: systemContractsDir });
   }

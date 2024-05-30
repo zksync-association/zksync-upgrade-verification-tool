@@ -39,7 +39,7 @@ describe.sequential("EraContractsRepo", () => {
         const repo = await target();
         await repo.init();
         await repo.setRevision("f3630fcb01ad8b6e2e423a6f313abefe8502c3a2");
-        await repo.compile();
+        await repo.compileSystemContracts();
 
         const contracts = [
           {
@@ -161,7 +161,7 @@ describe.sequential("EraContractsRepo", () => {
         const repo = await target();
         await repo.init();
         await repo.setRevision("e77971dba8f589b625e72e69dd7e33ccbe697cc0");
-        await repo.compile();
+        await repo.compileSystemContracts();
 
         const contracts = [
           {
