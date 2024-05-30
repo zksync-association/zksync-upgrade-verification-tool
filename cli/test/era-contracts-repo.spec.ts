@@ -27,11 +27,6 @@ SOFTWARE.
 `;
 
 describe("EraContractsRepo", () => {
-  const target = async (): Promise<EraContractsRepo> => {
-    await fs.mkdir("/tmp/era-contract-repo-test", { recursive: true });
-    return new EraContractsRepo("/tmp/era-contract-repo-test");
-  };
-
   describe("after compile for commit (a1a05513c110586f7a1d8b5fa46115cc7307587a)", () => {
     let contractsRepo: EraContractsRepo;
 
