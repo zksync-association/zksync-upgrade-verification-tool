@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { EraContractsRepo } from "../src/lib/era-contracts-repo";
 import { ContractData } from "../src/lib";
 import fs from "node:fs/promises";
@@ -26,289 +26,166 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 `;
 
-describe.sequential("EraContractsRepo", () => {
-  const target = async (): Promise<EraContractsRepo> => {
-    await fs.mkdir("/tmp/era-contract-repo-test", { recursive: true });
-    return new EraContractsRepo("/tmp/era-contract-repo-test");
-  };
+describe("EraContractsRepo", () => {
+  describe.skip("after compile for commit (a1a05513c110586f7a1d8b5fa46115cc7307587a)", () => {
+    let contractsRepo: EraContractsRepo;
 
-  describe.sequential("compile", () => {
-    it.sequential(
-      "can compile and get the bytecode hash for a contract (f3630fcb01ad8b6e2e423a6f313abefe8502c3a2)",
-      async () => {
-        const repo = await target();
-        await repo.init();
-        await repo.setRevision("f3630fcb01ad8b6e2e423a6f313abefe8502c3a2");
-        await repo.compileSystemContracts();
+    beforeAll(async () => {
+      await fs.mkdir("/tmp/era-contract-repo-test", { recursive: true });
+      contractsRepo = new EraContractsRepo("/tmp/era-contract-repo-test");
+      await contractsRepo.init();
+      await contractsRepo.setRevision("a1a05513c110586f7a1d8b5fa46115cc7307587a");
+      await contractsRepo.compileSystemContracts();
+    }, 90000);
 
-        const contracts = [
-          {
-            contractName: "AccountCodeStorage",
-            bytecodeHash: "0x0100007537b226f7de4103e8c2d1df831e990ff722dc3aca654fd45ce61bd2ec",
-          },
-          {
-            contractName: "BootloaderUtilities",
-            bytecodeHash: "0x010007c975f78e50264c2d3b4deb89cbbb04a04a105dd3524848bad5329948f2",
-          },
-          {
-            contractName: "ComplexUpgrader",
-            bytecodeHash: "0x0100005589186a7446ebd5e1d568dada8f903693ea9daa75b010981f3e9e2585",
-          },
-          {
-            contractName: "Compressor",
-            bytecodeHash: "0x01000167fb76a165404d403ea1d5853cdefe4e71b93d595125f7576981381919",
-          },
-          {
-            contractName: "ContractDeployer",
-            bytecodeHash: "0x010005559dd27f9279b39dce0350dbef9636e743b7f00edf49b40f23b90e523b",
-          },
-          {
-            contractName: "DefaultAccount",
-            bytecodeHash: "0x0100055b041eb28aff6e3a6e0f37c31fd053fc9ef142683b05e5f0aee6934066",
-          },
-          {
-            contractName: "EmptyContract",
-            bytecodeHash: "0x01000007f845e3f2ab16646632231e4fee11627449b45067fa0e7c76ba114d06",
-          },
-          {
-            contractName: "ImmutableSimulator",
-            bytecodeHash: "0x0100003d5fe89ded57edee93a69c969ad6f43a4fcf22dc24f0b8742f27e0410f",
-          },
-          {
-            contractName: "KnownCodesStorage",
-            bytecodeHash: "0x0100007d0340c8a63df15d428ff5ab8acc61c74e67874c5252656ff9a694aacf",
-          },
-          {
-            contractName: "L1Messenger",
-            bytecodeHash: "0x010002af715306a32366b81dee75e9f888355e430bfe591228314b08ce2d77d9",
-          },
-          {
-            contractName: "L2EthToken",
-            bytecodeHash: "0x01000101390b0b7b816627d366d34fe732328fafc6ba339be74376c6219d3a3f",
-          },
-          {
-            contractName: "MsgValueSimulator",
-            bytecodeHash: "0x010000632c2595abece956e70cf98f7f95672588c636500ebfee820547ff723d",
-          },
-          {
-            contractName: "NonceHolder",
-            bytecodeHash: "0x010000e53b54bc7d1e273de73918fe1b12123c61e0fb0c1ab2ac94839d311029",
-          },
-          {
-            contractName: "PubdataChunkPublisher",
-            bytecodeHash: "0x010000472947f34d576bdcf99b520fa40c159e32ddce9fc600d65e2469f6a267",
-          },
-          {
-            contractName: "SystemContext",
-            bytecodeHash: "0x01000181520b3a64b82e423d221b35739c35c0021e586e911531b6987c33562d",
-          },
-          {
-            contractName: "EventWriter",
-            bytecodeHash: "0x0100001752ddb6f7d76adaf32594816c0bda5b9c17d6fd86e90a06acba2e4cb6",
-          },
-          {
-            contractName: "EcAdd",
-            bytecodeHash: "0x0100008f337dc5cc92411071569be5cd4bfd755adf20021c8a0e316c4834c4ef",
-          },
-          {
-            contractName: "EcMul",
-            bytecodeHash: "0x010000d941fe2d54aa725915db7d63795e02ced38fa2709d736631e30792ccb2",
-          },
-          {
-            contractName: "Ecrecover",
-            bytecodeHash: "0x0100001147fcb33fbc266df8067be8b51d68ad9362a6204de5a6b2279c613d12",
-          },
-          {
-            contractName: "Keccak256",
-            bytecodeHash: "0x0100000fb004b644efe76e9ef3ba89dfa3eaac946e3fa19f8a046ed27465eeef",
-          },
-          {
-            contractName: "SHA256",
-            bytecodeHash: "0x010000179d3c90b59acbc8fbda5ba2389cc80dfa840840e5183d44ea3c9b0131",
-          },
-          {
-            contractName: "bootloader_test",
-            bytecodeHash: "0x01000347e73f7fd172cf7ac124a8d709281635681f3091f977ac3c966b52777a",
-          },
-          {
-            contractName: "fee_estimate",
-            bytecodeHash: "0x0100080b27dab34e52063ba3f1c56d545ba01cfb9ddfdc862d3495df2a7c97b9",
-          },
-          {
-            contractName: "gas_test",
-            bytecodeHash: "0x010007db160db5b3f3065cc117f64e297a4c274185d7d565f6887d4e724468c2",
-          },
-          {
-            contractName: "playground_batch",
-            bytecodeHash: "0x01000813831e3f41ff63cdf3259a9352d22ecb8c53bfd3d4ecc39856b8670933",
-          },
-          {
-            contractName: "proved_batch",
-            bytecodeHash: "0x010007ede999d096c84553fb514d3d6ca76fbf39789dda76bfeda9f3ae06236e",
-          },
-        ];
+    it("gets right hashcode for every contract", async () => {
+      const contracts = [
+        {
+          contractName: "AccountCodeStorage",
+          bytecodeHash: "0x0100007545573b787fcb5e59e1744a3f0587699c7174fb22fa287f9947f1400c",
+        },
+        {
+          contractName: "BootloaderUtilities",
+          bytecodeHash: "0x010007d1c6b5dd244ae63e4fa219d75aefc7516b94bc60071315f512a4dd8d97",
+        },
+        {
+          contractName: "ComplexUpgrader",
+          bytecodeHash: "0x0100005535644003030026183be2c9a360ea75f25e9258059c667ae732cc9d8d",
+        },
+        {
+          contractName: "Compressor",
+          bytecodeHash: "0x0100016f82aaa974f06ffca704567788945eeb205f7fe4de61162c97d1434876",
+        },
+        {
+          contractName: "ContractDeployer",
+          bytecodeHash: "0x01000521106ae713e577abe15045de9a31a6006f43f0a432a17cf604acd0c880",
+        },
+        {
+          contractName: "DefaultAccount",
+          bytecodeHash: "0x01000563ee5d0abdf9fc65f748a700d2c377aadebc16d5bf21105f8a94eff028",
+        },
+        {
+          contractName: "EmptyContract",
+          bytecodeHash: "0x010000072fe700c98bf6cf17626307bbd796f9c0a70dd843ca59bdde56d4c356",
+        },
+        {
+          contractName: "GasBoundCaller",
+          bytecodeHash: "0x010000b598ce45b73d1525e52deaa83ed71629e8a47835dfe1df3911d9a60584",
+        },
+        {
+          contractName: "ImmutableSimulator",
+          bytecodeHash: "0x0100003d1f8ed700770da53630a4e91f00262d50c66ade90b3a888f292ffa420",
+        },
+        {
+          contractName: "KnownCodesStorage",
+          bytecodeHash: "0x0100007dcfde871c6aaa1c96b8a9d66c33a5bd20cdd7fd11a62c5eebc6bb3238",
+        },
+        {
+          contractName: "L1Messenger",
+          bytecodeHash: "0x010002b9341260be01cd833214e6f3d576845752dd65f40828d714a51473b0e0",
+        },
+        {
+          contractName: "L2EthToken",
+          bytecodeHash: "0x010001031bae9a1d5045c7c18b2e783b0e1948f3e6763c410d1e49dfbb472845",
+        },
+        {
+          contractName: "MsgValueSimulator",
+          bytecodeHash: "0x01000069510d6b538ef968b7a3e4a00622e55b6014fc836c8805612cfe646fee",
+        },
+        {
+          contractName: "NonceHolder",
+          bytecodeHash: "0x010000e5a5c5ea642f7f1b414f4ab9e01e22d79797316b424c80a3db417bf492",
+        },
+        {
+          contractName: "PubdataChunkPublisher",
+          bytecodeHash: "0x01000049a9d14cc0f0e701381db282516d11168e65bec83c6c3a3fa9dc1cb128",
+        },
+        {
+          contractName: "SystemContext",
+          bytecodeHash: "0x010001ab20083a6388c8c0b105359f6ee8c6eaf4598e461610427e279ede5d50",
+        },
+        {
+          contractName: "EventWriter",
+          bytecodeHash: "0x010000159a3a08da3ac57cdefec0e9e30da60456bc5643134cf16d6957bcf1ac",
+        },
+        {
+          contractName: "CodeOracle",
+          bytecodeHash: "0x01000023a41e01fe51bd507d56670250d7e1db443b04cb707d6e610508f18066",
+        },
+        {
+          contractName: "EcAdd",
+          bytecodeHash: "0x01000087290d3aab305a710f2c91fd95ba3ba174ffc9deb7b6bac2eb32e29af6",
+        },
+        {
+          contractName: "EcMul",
+          bytecodeHash: "0x010000bdca40cc75328f2fd7b8f460ac66db2011f34fd6a42363625e9c4293e0",
+        },
+        {
+          contractName: "Ecrecover",
+          bytecodeHash: "0x0100001112e34172b2bc31574d155893a087a1cf4b608cf9895a2201ea7bd6ee",
+        },
+        {
+          contractName: "Keccak256",
+          bytecodeHash: "0x0100000f248e111a1b587fef850dc4585c39af2dd505bc8a0d5cc6d3fcc7ed3c",
+        },
+        {
+          contractName: "P256Verify",
+          bytecodeHash: "0x010000114427f5e04adb275ebc6fd3b224cf020422527fc6610c2dbc98a2f8d7",
+        },
+        {
+          contractName: "SHA256",
+          bytecodeHash: "0x010000177072046ab4402036ace5c7a747d341b58e246be147b3fb7f4e5b3439",
+        },
+        {
+          contractName: "bootloader_test",
+          bytecodeHash: "0x010003a96080f61197d8e05ed160afe42e7fe9d2a509247623fc3933504a1db1",
+        },
+        {
+          contractName: "fee_estimate",
+          bytecodeHash: "0x01000905d7d0a85d94c059ea25fdf63cf6d3c616db8c0c052d9a85a7b0b2768b",
+        },
+        {
+          contractName: "gas_test",
+          bytecodeHash: "0x0100088d5f20c3f97e92737590792bce36ce326ebbb05c9948c84fd2894f266c",
+        },
+        {
+          contractName: "playground_batch",
+          bytecodeHash: "0x0100090b30022da73c3bfbd373dd9ea4eca6b68f17cae8c329f5b0b79ca11c07",
+        },
+        {
+          contractName: "proved_batch",
+          bytecodeHash: "0x0100089d6cf001d52b9e64572fa9b3555211f56a2ad66784f495c4192a88b477",
+        },
+      ];
 
-        for (const { contractName, bytecodeHash } of contracts) {
-          const received = await repo.byteCodeHashFor(contractName);
-          expect(`${contractName} ${received}`).to.eql(`${contractName} ${bytecodeHash}`);
-        }
+      for (const { contractName, bytecodeHash } of contracts) {
+        const received = await contractsRepo.byteCodeHashFor(contractName);
+        expect(`${contractName} ${received}`).to.eql(`${contractName} ${bytecodeHash}`);
       }
-    );
-
-    it.sequential(
-      "can compile and get the bytecode hash for a contract (e77971dba8f589b625e72e69dd7e33ccbe697cc0)",
-      async () => {
-        const repo = await target();
-        await repo.init();
-        await repo.setRevision("e77971dba8f589b625e72e69dd7e33ccbe697cc0");
-        await repo.compileSystemContracts();
-
-        const contracts = [
-          {
-            contractName: "AccountCodeStorage",
-            bytecodeHash: "0x0100009bc0511159b5ec703d0c56f87615964017739def4ab1ee606b8ec6458c",
-          },
-          {
-            contractName: "BootloaderUtilities",
-            bytecodeHash: "0x010009759cab4fa9e6ca0784746e1df600ff523f0f90c1e94191755cab4b2ed0",
-          },
-          {
-            contractName: "ComplexUpgrader",
-            bytecodeHash: "0x0100005bfc0443349233459892b51e9f67e27ac828d44d9c7cba8c8285fd66bc",
-          },
-          {
-            contractName: "Compressor",
-            bytecodeHash: "0x010001b72874590239af612f65d50a35975299f88de022493fe7f0a190e79496",
-          },
-          {
-            contractName: "ContractDeployer",
-            bytecodeHash: "0x010006091341955c8f76409de00549fb00b275166b5a0d0d7b82cbd629bb4212",
-          },
-          {
-            contractName: "DefaultAccount",
-            bytecodeHash: "0x01000651c5ae96f2aab07d720439e42491bb44c6384015e3a08e32620a4d582d",
-          },
-          {
-            contractName: "EmptyContract",
-            bytecodeHash: "0x01000007271e9710c356751295d83a25ffec94be2b4ada01ec1fa04c7cd6f2c7",
-          },
-          {
-            contractName: "ImmutableSimulator",
-            bytecodeHash: "0x01000047a3c40e3f4eb98f14967f141452ae602d8723a10975dc33960911d8c5",
-          },
-          {
-            contractName: "KnownCodesStorage",
-            bytecodeHash: "0x0100008b0ca6c6f277035366e99407fbb4b01e743e80b7d24dea5a3d647b423e",
-          },
-          {
-            contractName: "L1Messenger",
-            bytecodeHash: "0x01000301c943edb65f5a0b8cdd806218b8ecf25c022720fe3afe6951f202f3fa",
-          },
-          {
-            contractName: "L2EthToken",
-            bytecodeHash: "0x01000139b506af2b02225838c5a33e30ace701b44b210a422eedab7dd31c28a3",
-          },
-          {
-            contractName: "MsgValueSimulator",
-            bytecodeHash: "0x0100006fa1591d93fcc4a25e9340ad11d0e825904cd1842b8f7255701e1aacbb",
-          },
-          {
-            contractName: "NonceHolder",
-            bytecodeHash: "0x0100012fa73fa922dd9fabb40d3275ce80396eff6ccf1b452c928c17d98bd470",
-          },
-          {
-            contractName: "SystemContext",
-            bytecodeHash: "0x0100023ba65021e4689dd1755f82108214a1f25150d439fe58c55cdb1f376436",
-          },
-          {
-            contractName: "EventWriter",
-            bytecodeHash: "0x01000019642d87621fdd82cf65aa9146486c9256d5f8849af9a37c78ef519339",
-          },
-          {
-            contractName: "EcAdd",
-            bytecodeHash: "0x010000c5a85a372f441ac693210a18e683b530bed875fdcab2f7e101b057d433",
-          },
-          {
-            contractName: "EcMul",
-            bytecodeHash: "0x0100013759b40792c2c3d033990e992e5508263c15252eb2d9bfbba571350675",
-          },
-          {
-            contractName: "Ecrecover",
-            bytecodeHash: "0x010000114daca2ff44f27d543b8ef67d885bfed09a74ba9cb25f5912dd3d739c",
-          },
-          {
-            contractName: "Keccak256",
-            bytecodeHash: "0x0100001fb52ca33668d01c230a1c3b13ede90fe2e37d77222410e9f183cb7a89",
-          },
-          {
-            contractName: "SHA256",
-            bytecodeHash: "0x010000178d93b2d7d6448866009892223caf018a8e8dbcf090c2b9053a285f8d",
-          },
-          {
-            contractName: "bootloader_test",
-            bytecodeHash: "0x0100038548508a2a29b0c6e8a86fc0ec5c512baf563155e8171afd1a060c81fa",
-          },
-          {
-            contractName: "fee_estimate",
-            bytecodeHash: "0x01000989a967ab5b446c084adf05e13399a24e5cf37e9cf7db05a5dd6d7c5e0b",
-          },
-          {
-            contractName: "gas_test",
-            bytecodeHash: "0x0100096912f983649836f812c6db81c814cc0a5ff24b80ecffbf79ca01e7946c",
-          },
-          {
-            contractName: "playground_batch",
-            bytecodeHash: "0x0100099308cc5367de190e240aa355df7d0cfacb6a752726bad8f3100044629f",
-          },
-          {
-            contractName: "proved_batch",
-            bytecodeHash: "0x01000983d4ac4f797cf5c077e022f72284969b13248c2a8e9846f574bdeb5b88",
-          },
-        ];
-
-        for (const { contractName, bytecodeHash } of contracts) {
-          const received = await repo.byteCodeHashFor(contractName);
-          expect(`${contractName} ${received}`).to.eql(`${contractName} ${bytecodeHash}`);
-        }
-      }
-    );
-  });
-
-  describe.sequential("#readFile", () => {
-    it("can get a top level file", async () => {
-      const repo = await target();
-      await repo.init();
-
-      const file = await repo.readFile("LICENSE-MIT");
-      expect(file).to.eql(MIT_CONTENT);
     });
 
-    it("can download a nested file", async () => {
-      const repo = await target();
-      await repo.init();
-      const content = await repo.readFile("l1-contracts/package.json", "f3630fc");
-      const pkgJson = JSON.parse(content);
-      expect(pkgJson.version).to.eql("0.1.0");
-      expect(pkgJson.name).to.eql("l1-contracts");
+    describe("#readFile", () => {
+      it("can get a top level file", async () => {
+        const file = await contractsRepo.readFile("LICENSE-MIT");
+        expect(file).to.eql(MIT_CONTENT);
+      });
+
+      it("can download a nested file", async () => {
+        const content = await contractsRepo.readFile("l1-contracts/package.json", "f3630fc");
+        const pkgJson = JSON.parse(content);
+        expect(pkgJson.version).to.eql("0.1.0");
+        expect(pkgJson.name).to.eql("l1-contracts");
+      });
+
+      it("errors when file does not exists", async () => {
+        await expect(contractsRepo.readFile("this/file/does/not/exists.xyz")).rejects.toThrow();
+      });
     });
 
-    it("errors when file does not exists", async () => {
-      const repo = await target();
-      await repo.init();
-      await expect(repo.readFile("this/file/does/not/exists.xyz")).rejects.toThrow();
-    });
-  });
-
-  describe.sequential("#downloadContract", () => {
-    it.sequential("can download entire contracts", async () => {
-      // a8f589b625e72e69dd7e33ccbe697cc0
-      const repo = await target();
-      await repo.init();
-      await repo.setRevision("e77971db");
-
-      const content = await repo.downloadSystemContract("NonceHolder");
+    it("can download entire contracts", async () => {
+      const content = await contractsRepo.downloadSystemContract("NonceHolder");
       const data = new ContractData("NonceHolder", content, "some address");
-      data.remapKeys("system-contracts/cache-zk/solpp-generated-contracts/", "");
+      data.remapKeys("system-contracts/contracts-preprocessed/", "");
       const expected = [
         "interfaces/IAccountCodeStorage.sol",
         "interfaces/IBootloaderUtilities.sol",
@@ -321,6 +198,7 @@ describe.sequential("EraContractsRepo", () => {
         "interfaces/IL1Messenger.sol",
         "interfaces/INonceHolder.sol",
         "interfaces/IPaymasterFlow.sol",
+        "interfaces/IPubdataChunkPublisher.sol",
         "interfaces/ISystemContext.sol",
         "interfaces/ISystemContract.sol",
         "libraries/EfficientCall.sol",

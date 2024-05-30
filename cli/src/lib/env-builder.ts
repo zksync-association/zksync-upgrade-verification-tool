@@ -54,7 +54,7 @@ export class EnvBuilder {
       return this._l1Client;
     }
 
-    this._l1Client = BlockExplorerClient.fromNetwork(this.etherscanApiKey, this.network);
+    this._l1Client = BlockExplorerClient.forL1(this.etherscanApiKey, this.network);
     return this._l1Client;
   }
 
