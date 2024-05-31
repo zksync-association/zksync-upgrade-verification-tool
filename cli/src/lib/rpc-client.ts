@@ -1,13 +1,8 @@
-import type { Network } from "./constants.js";
-import {
-  type Abi,
-  createPublicClient,
-  decodeFunctionResult,
-  encodeFunctionData,
-  type Hex,
-  http,
-} from "viem";
-import type { TypeOf, ZodType } from "zod";
+import type {Network} from "./constants.js";
+import {type Abi, createPublicClient, decodeFunctionResult, encodeFunctionData, type Hex, http,} from "viem";
+import type {TypeOf, ZodType} from "zod";
+import { type PublicClient, type HttpTransport } from "viem"
+import type {FileSystem} from "./file-system";
 
 const L1_DEFAULT_URLS = {
   mainnet: "https://ethereum-rpc.publicnode.com",
@@ -20,7 +15,7 @@ const L2_DEFAULT_URLS = {
 };
 
 export class RpcClient {
-  private viemClient: ReturnType<typeof createPublicClient>;
+  private viemClient: PublicClient<HttpTransport>;
 
   constructor(url: string) {
     this.viemClient = createPublicClient({
@@ -78,5 +73,32 @@ export class RpcClient {
     });
 
     return parser.parse(rawValue);
+  }
+
+  async debugTraceCall (from: string, to: string, callData: string, fs: FileSystem) {
+    const res = await fetch(this.rpcUrl(), {
+      method: 'POST',
+      body: JSON.stringify({
+        method: "debug_traceCall",
+        id: 1,
+        jsonrpc: "2.0",
+        params: [
+          {
+            from,
+            to,
+            data: callData
+          },
+          "latest",
+          {
+            tracer: "prestateTracer",
+            tracerConfig: {
+              diffMode: true
+            }
+          }
+        ]
+      }),
+    })
+
+    await fs.writeFile('data.json', Buffer.from(await res.text()))
   }
 }

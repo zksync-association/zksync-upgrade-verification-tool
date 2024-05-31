@@ -18,6 +18,14 @@ export const transactionsSchema = z.object({
   transparentUpgrade: z.object({
     facetCuts: facetCutsSchema,
   }),
+  governanceOperation: z.object({
+    calls: z.array(
+      z.object({
+        target: z.string(),
+        data: z.string(),
+      })
+    )
+  })
 });
 
 export type TransactionsJson = z.infer<typeof transactionsSchema>;

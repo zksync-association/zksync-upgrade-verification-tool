@@ -33,7 +33,7 @@ const MAIN_CONTRACT_FUNCTIONS = {
  * ```
  */
 export class ZkSyncEraState {
-  private addr: string;
+  addr: string;
   private protocolVersion: bigint;
 
   selectorToFacet: Map<string, string>;

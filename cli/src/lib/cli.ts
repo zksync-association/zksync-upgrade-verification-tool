@@ -6,6 +6,7 @@ import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
 import * as console from "node:console";
 import { printError } from "./errors.js";
+import {memoryMapCommand} from "../commands/memory-map-command";
 
 export function buildCli(
   args: string[],
@@ -93,6 +94,19 @@ export function buildCli(
         }),
       async (yargs) => {
         await diffCbk(env, yargs.upgradeDir, "verifier");
+      }
+    )
+    .command(
+      "coso <upgradeDir>",
+      "Esto es un coso",
+      (yargs) =>
+        yargs.positional("upgradeDir", {
+          describe: "FolderName of the upgrade to check",
+          type: "string",
+          demandOption: true,
+        }),
+      async (yargs) => {
+        return memoryMapCommand(env, yargs.upgradeDir)
       }
     )
     .command(

@@ -27,12 +27,14 @@ export class UpgradeChanges {
   systemContractChanges: SystemContractData[];
   aaBytecodeHash: string;
   bootloaderBytecodeHash: string;
+  upgradeTxHex: string;
 
   constructor(
     newProtocolVersion: string,
     verifier: VerifierContract,
     aaBytecodeHash: string,
-    booloaderBytecodeHash: string
+    booloaderBytecodeHash: string,
+    upgradeTxHex: string
   ) {
     this.newProtocolVersion = newProtocolVersion;
     this.facets = [];
@@ -41,6 +43,7 @@ export class UpgradeChanges {
     this.verifier = verifier;
     this.aaBytecodeHash = aaBytecodeHash;
     this.bootloaderBytecodeHash = booloaderBytecodeHash;
+    this.upgradeTxHex = upgradeTxHex
   }
 
   matchingFacet(targetSelectors: string[]): FacetData | undefined {
@@ -85,7 +88,8 @@ export class UpgradeChanges {
       common.protocolVersion.toString(),
       verifier,
       txFile.proposeUpgradeTx.defaultAccountHash,
-      txFile.proposeUpgradeTx.bootloaderHash
+      txFile.proposeUpgradeTx.bootloaderHash,
+      txFile.governanceOperation.calls[0].data
     );
 
     if (facets) {
