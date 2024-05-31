@@ -237,7 +237,6 @@ export class ZkSyncEraDiff {
         newFunctions = await Promise.all(
           newFunctions.map(async (selector) => {
             const abi = await client.getAbi(change.newAddress);
-            console.log("abi", abi.constructor);
             return abi.signatureForSelector(selector);
           })
         );
