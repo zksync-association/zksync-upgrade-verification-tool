@@ -26,7 +26,7 @@ export class UpgradeChanges {
   verifier: VerifierContract;
   systemContractChanges: SystemContractData[];
   aaBytecodeHash: string;
-  booloaderBytecodeHash: string;
+  bootloaderBytecodeHash: string;
 
   constructor(
     newProtocolVersion: string,
@@ -40,7 +40,7 @@ export class UpgradeChanges {
     this.systemContractChanges = [];
     this.verifier = verifier;
     this.aaBytecodeHash = aaBytecodeHash;
-    this.booloaderBytecodeHash = booloaderBytecodeHash;
+    this.bootloaderBytecodeHash = booloaderBytecodeHash;
   }
 
   matchingFacet(targetSelectors: string[]): FacetData | undefined {

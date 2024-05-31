@@ -79,7 +79,7 @@ export class ZkSyncEraState {
       this.aaBytecodeHash,
       changes.aaBytecodeHash,
       this.bootloaderStringHash,
-      changes.booloaderBytecodeHash
+      changes.bootloaderBytecodeHash
     );
 
     for (const [address, data] of this.facetToContractData.entries()) {
