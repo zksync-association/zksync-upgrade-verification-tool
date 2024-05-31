@@ -1,6 +1,8 @@
 import * as console from "node:console";
 import type { Network } from "./constants.js";
 
+// export class FinishWithError extends Error {}
+
 export class ContracNotVerified extends Error {
   constructor(addr: string) {
     super(`Contract for ${addr} not verified in block explorer`);
@@ -30,16 +32,30 @@ export class MalformedUpgrade extends Error {
 export class MissingNetwork extends Error {
   constructor(path: string, network: Network) {
     super(
-      `Upgrade inside ${path} does not contain information for ${network}. Maybe you can try with a different network.`
+      `Upgrade inside ${path} does not contain information for "${network}". Maybe you can try with a different network.`
     );
   }
 }
 
-const KNOWN_ERRORS = [ContracNotVerified, NotAnUpgradeDir, NotADir, MalformedUpgrade];
+export class ExternalApiError extends Error {
+  constructor(apiName: string, details: string) {
+    super(`Error consuming data from ${apiName}: ${details}`);
+  }
+}
+
+const KNOWN_ERRORS = [
+  ContracNotVerified,
+  NotAnUpgradeDir,
+  NotADir,
+  MalformedUpgrade,
+  MissingNetwork,
+  ExternalApiError,
+];
 
 export function printError(e: Error): void {
   const isKnown = KNOWN_ERRORS.some((kind) => e instanceof kind);
 
+  console.error(e);
   if (isKnown) {
     console.log("");
     console.log(`> ${e.message}`);

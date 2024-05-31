@@ -1,7 +1,6 @@
-import { compareCurrentStateWith } from "../lib";
+import { calculateDiffWithUpgrade } from "../lib";
 import { temporaryDirectory } from "tempy";
 import { exec } from "node:child_process";
-import { withSpinner } from "../lib/with-spinner.js";
 import type { EnvBuilder } from "../lib/env-builder.js";
 
 export const contractDiff = async (
@@ -9,14 +8,13 @@ export const contractDiff = async (
   upgradeDirectory: string,
   contractName: string
 ) => {
-  const github = env.github();
+  const repo = await env.contractsRepo();
   const l2Client = env.l2Client();
-  const targetDir = await withSpinner(async (): Promise<string> => {
-    const { diff, l1Client } = await compareCurrentStateWith(env, upgradeDirectory);
-    const targetDir = temporaryDirectory({ prefix: "zksync-era-upgrade-check" });
-    await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, github);
-    return targetDir;
-  }, "Gathering contract data");
+
+  const targetDir = temporaryDirectory({ prefix: "zksync-era-upgrade-check" });
+  const l1Client = env.l1Client();
+  const { diff } = await calculateDiffWithUpgrade(env, upgradeDirectory);
+  await diff.writeCodeDiff(targetDir, [contractName], l1Client, l2Client, repo);
 
   await new Promise((resolve, reject) => {
     const res = exec(

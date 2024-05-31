@@ -1,33 +1,32 @@
-import { AbiSet, type BlockExplorerClient, ZkSyncEraState, type ZkSyncEraDiff } from ".";
+import { ZkSyncEraState, type ZkSyncEraDiff } from ".";
 import type { EnvBuilder } from "./env-builder.js";
+import { withSpinner } from "./with-spinner";
 
-type CreateDiffResponse = {
-  diff: ZkSyncEraDiff;
-  l1Abis: AbiSet;
-  l1Client: BlockExplorerClient;
-};
-
-export async function compareCurrentStateWith(
+export async function calculateDiffWithUpgrade(
   env: EnvBuilder,
   upgradeDirectory: string
-): Promise<CreateDiffResponse> {
-  const importer = env.importer();
+): Promise<{ diff: ZkSyncEraDiff; state: ZkSyncEraState }> {
+  const changes = await withSpinner(async () => {
+    const importer = env.importer();
+    return importer.readFromFiles(upgradeDirectory, env.network);
+  }, "Reading proposed upgrade...");
 
-  const changes = await importer.readFromFiles(upgradeDirectory, env.network);
+  const state = await withSpinner(async () => {
+    const l1Client = env.l1Client();
+    return ZkSyncEraState.create(env.network, l1Client, env.rpcL1(), env.rpcL2());
+  }, "Gathering contract data");
 
-  const l1Client = env.l1Client();
-  const l1Abis = new AbiSet(l1Client);
-  const zkSyncState = await ZkSyncEraState.create(
-    env.network,
-    l1Client,
-    l1Abis,
-    env.rpcL1(),
-    env.rpcL2()
-  );
+  const diff = await withSpinner(async () => {
+    return state.calculateDiff(changes, env.l1Client());
+  }, "Checking differences between versions");
+
+  await withSpinner(async () => {
+    const repo = await env.contractsRepo();
+    await repo.compileSystemContracts();
+  }, "Compiling system contracts");
 
   return {
-    diff: await zkSyncState.calculateDiff(changes, l1Client),
-    l1Abis,
-    l1Client,
+    diff,
+    state,
   };
 }

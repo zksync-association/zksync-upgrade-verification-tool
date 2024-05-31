@@ -1,8 +1,8 @@
 import type { Hex } from "viem";
 import type { BlockExplorerClient } from "./block-explorer-client";
-import type { GithubClient } from "./github-client";
 import { ContractData } from "./contract-data.js";
 import { ContracNotVerified } from "./errors.js";
+import type { EraContractsRepo } from "./era-contracts-repo";
 
 export class SystemContractChange {
   address: Hex;
@@ -19,7 +19,9 @@ export class SystemContractChange {
 
   async downloadCurrentCode(client: BlockExplorerClient): Promise<ContractData> {
     try {
-      return await client.getSourceCode(this.address);
+      const data = await client.getSourceCode(this.address);
+      data.remapKeys("contracts-preprocessed", "");
+      return data;
     } catch (e) {
       // Some system contracts do not have the code available in the block explorer. But this is not an error.
       // For these contracts we cannot show the current source code.
@@ -33,9 +35,10 @@ export class SystemContractChange {
     }
   }
 
-  async downloadProposedCode(github: GithubClient): Promise<ContractData> {
-    const source = await github.downloadSystemContract(this.name);
-
-    return new ContractData(this.name, source, this.address);
+  async downloadProposedCode(repo: EraContractsRepo): Promise<ContractData> {
+    const source = await repo.downloadSystemContract(this.name);
+    const data = new ContractData(this.name, source, this.address);
+    data.remapKeys("system-contracts/contracts-preprocessed", "");
+    return data;
   }
 }

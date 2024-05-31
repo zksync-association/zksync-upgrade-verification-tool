@@ -239,21 +239,27 @@ describe("validate check", () => {
 
   describe("when the directory is not a valid upgrade", () => {
     it("fails", async () => {
-      expect(
-        async () => await execAsync("pnpm validate check reference/not_an_upgrade")
-      ).rejects.toSatisfy((e) => {
-        const err = e as any;
-        expect(err.stdout).to.contain(
-          'Expected "reference/not_an_upgrade" to be an upgrade directory but it\'s not. Upgrade directories contain a "common.json" file inside'
-        );
-        return true;
-      });
+      const { stdout, stderr } = await expectToFailAsync(() =>
+        execAsync("pnpm validate check reference/not_an_upgrade")
+      );
+      expect(stdout).to.contain(
+        'Expected "reference/not_an_upgrade" to be an upgrade directory but it\'s not. Upgrade directories contain a "common.json" file inside'
+      );
+      // expect(
+      //   async () => await execAsync("pnpm validate check reference/not_an_upgrade")
+      // ).rejects.toSatisfy((e) => {
+      //   const err = e as any;
+      //   expect(err.stdout).to.contain(
+      //     'Expected "reference/not_an_upgrade" to be an upgrade directory but it\'s not. Upgrade directories contain a "common.json" file inside'
+      //   );
+      //   return true;
+      // });
     });
   });
 
   describe("when directory does not exists", () => {
     it("fails", async () => {
-      const { stdout } = await expectToFailAsync(() =>
+      const { stdout, stderr } = await expectToFailAsync(() =>
         execAsync("pnpm validate check reference/not_a_directory")
       );
       expect(stdout).toContain(

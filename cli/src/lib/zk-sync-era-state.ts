@@ -1,4 +1,3 @@
-import type { AbiSet } from "./abi-set.js";
 import { facetsResponseSchema } from "../schema/new-facets.js";
 import type { SystemContractData, UpgradeChanges } from "./upgrade-changes.js";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
@@ -12,6 +11,7 @@ import { utils } from "zksync-ethers";
 import { SystemContractChange } from "./system-contract-change";
 import type { RpcClient } from "./rpc-client.js";
 import type { ContractData } from "./contract-data.js";
+import type { ContractAbi } from "./contract-abi";
 
 const MAIN_CONTRACT_FUNCTIONS = {
   facets: "facets",
@@ -35,7 +35,6 @@ const MAIN_CONTRACT_FUNCTIONS = {
 export class ZkSyncEraState {
   private addr: string;
   private protocolVersion: bigint;
-  private abis: AbiSet;
 
   selectorToFacet: Map<string, string>;
   facetToSelectors: Map<string, string[]>;
@@ -51,7 +50,6 @@ export class ZkSyncEraState {
   static async create(
     network: Network,
     client: BlockExplorerClient,
-    abis: AbiSet,
     l1Rpc: RpcClient,
     l2Rpc: RpcClient
   ) {
@@ -59,7 +57,7 @@ export class ZkSyncEraState {
       mainnet: "0x32400084c286cf3e17e7b677ea9583e60a000324",
       sepolia: "0x9a6de0f62aa270a8bcb1e2610078650d539b1ef9",
     };
-    const zkSyncState = new ZkSyncEraState(addresses[network], abis, l1Rpc, l2Rpc);
+    const zkSyncState = new ZkSyncEraState(addresses[network], l1Rpc, l2Rpc);
     await zkSyncState.init(client);
     return zkSyncState;
   }
@@ -154,9 +152,8 @@ export class ZkSyncEraState {
     return this._bootloaderStringHash;
   }
 
-  private constructor(addr: string, abis: AbiSet, l1Rpc: RpcClient, l2Rpc: RpcClient) {
+  constructor(addr: string, l1Rpc: RpcClient, l2Rpc: RpcClient) {
     this.addr = addr;
-    this.abis = abis;
     this.l1Rpc = l1Rpc;
     this.l2Rpc = l2Rpc;
     this.selectorToFacet = new Map();
@@ -165,7 +162,7 @@ export class ZkSyncEraState {
     this.protocolVersion = -1n;
   }
 
-  private async findGetterFacetAbi(): Promise<Abi> {
+  private async findGetterFacetAbi(client: BlockExplorerClient): Promise<ContractAbi> {
     // Manually encode calldata becasue at this stage there
     // is no address to get the abi
     const facetAddressSelector = "cdffacc6";
@@ -177,7 +174,7 @@ export class ZkSyncEraState {
 
     // Manually decode address to get abi.
     const facetsAddr = `0x${data.substring(26)}`;
-    return await this.abis.fetch(facetsAddr);
+    return await client.getAbi(facetsAddr);
   }
 
   private async initializeFacets(abi: Abi, client: BlockExplorerClient): Promise<void> {
@@ -234,12 +231,12 @@ export class ZkSyncEraState {
   }
 
   private async init(client: BlockExplorerClient) {
-    const abi = await this.findGetterFacetAbi();
+    const abi = await this.findGetterFacetAbi(client);
 
-    await this.initializeFacets(abi, client);
-    await this.initializeProtolVersion(abi);
-    await this.initializeVerifier(abi);
-    await this.initializeSpecialContacts(abi);
+    await this.initializeFacets(abi.raw, client);
+    await this.initializeProtolVersion(abi.raw);
+    await this.initializeVerifier(abi.raw);
+    await this.initializeSpecialContacts(abi.raw);
   }
 
   private async initializeSpecialContacts(abi: Abi): Promise<void> {

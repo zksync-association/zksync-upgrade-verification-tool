@@ -1,20 +1,19 @@
 import { BlockExplorerClient } from "./block-explorer-client.js";
 import type { Network } from "./constants.js";
-import { GithubClient } from "./github-client.js";
 import { RpcClient } from "./rpc-client.js";
+import { EraContractsRepo } from "./era-contracts-repo";
 import { FileSystem } from "./file-system";
 import { UpgradeImporter } from "./importer";
 
 export class EnvBuilder {
   private _etherscanApiKey?: string;
-  githubApiKey?: string;
   rpcUrl?: string;
   private _network?: Network;
   private ref = "main";
 
   private _l1Client?: BlockExplorerClient;
   private _l2Client?: BlockExplorerClient;
-  private _github?: GithubClient;
+  private _repo?: EraContractsRepo;
 
   // Config
 
@@ -24,10 +23,6 @@ export class EnvBuilder {
 
   withEtherscanApiKey(etherscanKey: string): void {
     this._etherscanApiKey = etherscanKey;
-  }
-
-  withGithubApiKey(maybeKey: string | undefined): void {
-    this.githubApiKey = maybeKey;
   }
 
   withRef(ref: string): void {
@@ -59,7 +54,7 @@ export class EnvBuilder {
       return this._l1Client;
     }
 
-    this._l1Client = BlockExplorerClient.fromNetwork(this.etherscanApiKey, this.network);
+    this._l1Client = BlockExplorerClient.forL1(this.etherscanApiKey, this.network);
     return this._l1Client;
   }
 
@@ -69,14 +64,6 @@ export class EnvBuilder {
     }
     this._l2Client = BlockExplorerClient.forL2(this.network);
     return this._l2Client;
-  }
-
-  github(): GithubClient {
-    if (this._github) {
-      return this._github;
-    }
-    this._github = new GithubClient(this.ref, this.githubApiKey);
-    return this._github;
   }
 
   rpcL1(): RpcClient {
@@ -93,5 +80,17 @@ export class EnvBuilder {
 
   importer(): UpgradeImporter {
     return new UpgradeImporter(this.fs());
+  }
+
+  async contractsRepo(): Promise<EraContractsRepo> {
+    if (!this._repo) {
+      const repo = await EraContractsRepo.default();
+      await repo.init();
+      this._repo = repo;
+      await this._repo.setRevision(this.ref);
+      return repo;
+    }
+
+    return this._repo;
   }
 }

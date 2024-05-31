@@ -1,12 +1,14 @@
-import { compareCurrentStateWith } from "../lib";
-import { withSpinner } from "../lib/with-spinner.js";
+import { calculateDiffWithUpgrade } from "../lib";
 import type { EnvBuilder } from "../lib/env-builder.js";
+import { withSpinner } from "../lib/with-spinner";
 
 export async function checkCommand(env: EnvBuilder, upgradeDirectory: string): Promise<void> {
-  const { diff, l1Abis } = await withSpinner(
-    () => compareCurrentStateWith(env, upgradeDirectory),
-    "Gathering contract data"
+  const { diff } = await calculateDiffWithUpgrade(env, upgradeDirectory);
+
+  const report = await withSpinner(
+    async () => diff.toCliReport(env.l1Client(), upgradeDirectory, await env.contractsRepo()),
+    "Generating report"
   );
-  const github = env.github();
-  console.log(await diff.toCliReport(l1Abis, upgradeDirectory, github));
+
+  console.log(report);
 }

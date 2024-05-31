@@ -1,4 +1,4 @@
-import yargs from "yargs";
+import yargs, { type Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
 import { NetworkSchema } from ".";
 import { downloadCode, checkCommand, contractDiff } from "../commands";
@@ -7,17 +7,17 @@ import { EnvBuilder } from "./env-builder.js";
 import * as console from "node:console";
 import { printError } from "./errors.js";
 
-export const cli = async () => {
-  // printIntro();
+export function buildCli(
+  args: string[],
+  checkCbk: typeof checkCommand,
+  diffCbk: typeof contractDiff,
+  downloadCodeCbk: typeof downloadCode
+): Argv {
   const env = new EnvBuilder();
-
-  const argParser = yargs(hideBin(process.argv))
+  const argParser = yargs(args)
     .middleware((yargs) => {
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
-      }
-      if (!yargs.githubApiKey) {
-        yargs.githubApiKey = process.env.API_KEY_GITHUB;
       }
     }, true)
     .option("ethscankey", {
@@ -25,10 +25,6 @@ export const cli = async () => {
       type: "string",
       demandOption:
         "Please provide a valid Etherscan api key. You can set ETHERSCAN_API_KEY env var or use the option --ethscankey",
-    })
-    .option("githubApiKey", {
-      describe: "Api key for github",
-      type: "string",
     })
     .option("network", {
       alias: "n",
@@ -52,7 +48,6 @@ export const cli = async () => {
       env.withNetwork(NetworkSchema.parse(yargs.network));
       env.withRpcUrl(yargs.rpcUrl);
       env.withEtherscanApiKey(yargs.ethscankey);
-      env.withGithubApiKey(yargs.githubApiKey);
       env.withRef(yargs.ref);
     })
     .command(
@@ -65,7 +60,7 @@ export const cli = async () => {
           demandOption: true,
         }),
       async (yargs) => {
-        await checkCommand(env, yargs.upgradeDirectory);
+        await checkCbk(env, yargs.upgradeDirectory);
       }
     )
     .command(
@@ -84,7 +79,7 @@ export const cli = async () => {
             demandOption: true,
           }),
       async (yargs) => {
-        await contractDiff(env, yargs.upgradeDir, `facet:${yargs.facetName}`);
+        await diffCbk(env, yargs.upgradeDir, `facet:${yargs.facetName}`);
       }
     )
     .command(
@@ -97,7 +92,7 @@ export const cli = async () => {
           demandOption: true,
         }),
       async (yargs) => {
-        await contractDiff(env, yargs.upgradeDir, "verifier");
+        await diffCbk(env, yargs.upgradeDir, "verifier");
       }
     )
     .command(
@@ -149,7 +144,7 @@ export const cli = async () => {
             .map((sc) => `sc:${sc}`)
         );
 
-        await downloadCode(env, yargs.upgradeDir, yargs.targetSourceCodeDir, filter);
+        await downloadCodeCbk(env, yargs.upgradeDir, yargs.targetSourceCodeDir, filter);
       }
     )
     .demandCommand(1, "Please specify a command")
@@ -160,15 +155,20 @@ export const cli = async () => {
         const help = await argParser.getHelp();
         console.log(help);
         console.log("");
-        // console.log(_yargs.help())
         console.log(msg);
-        process.exit(1);
+        // process.exit(1);
+        return;
       }
 
       printError(err);
-      process.exit(1);
+      // process.exit(1);
     })
     .strict();
 
+  return argParser;
+}
+
+export const cli = async () => {
+  const argParser = buildCli(hideBin(process.argv), checkCommand, contractDiff, downloadCode);
   await argParser.parseAsync();
 };
