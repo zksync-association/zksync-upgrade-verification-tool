@@ -1,17 +1,75 @@
 import type {MemoryDiffRaw} from "../schema/rpc";
 import {Option} from "nochoices";
+import {bytesToHex, type Hex, hexToBigInt, hexToBytes, numberToHex} from "viem";
+
+
+interface MemoryDataType {
+  format (data: Hex): string
+
+  extract (memory: Record<string, Hex>, slot: string): Option<string>
+}
+
+class AddressType implements MemoryDataType {
+  extract (memory: Record<string, Hex>, slot: string): Option<string> {
+    return Option.fromNullable(memory[slot])
+      .map(this.format)
+  }
+
+  format (data: Hex): string {
+    return bytesToHex(hexToBytes(data).slice(12));
+  }
+}
+
+class HexFormat implements MemoryDataType {
+  extract (memory: Record<string, Hex>, slot: string): Option<string> {
+    return Option.fromNullable(memory[slot])
+      .map(this.format)
+  }
+
+  format (data: Hex): string {
+    return data
+  }
+}
+
+class FixedArray implements MemoryDataType {
+  private size: number;
+  inner: MemoryDataType;
+
+  constructor (size: number, inner: MemoryDataType) {
+    this.size = size
+    this.inner = inner
+  }
+
+  extract (memory: Record<string, Hex>, slot: Hex): Option<string> {
+    const slots = new Array(this.size).fill(0).map((_, i) => BigInt(i) + hexToBigInt(slot))
+
+    const content = slots
+      .map(slot => this.inner.extract(memory, numberToHex(slot, {size: 32})))
+      .map((mayBeContent, i) => mayBeContent.map(str => `[${i}]: ${str}`))
+      .filter(mayBeContent => mayBeContent.isSome())
+      .map(maybeContent => maybeContent.unwrap())
+
+    return Option.Some(content)
+      .filter(c => c.length !== 0)
+      .map(lines => lines.join("\n"))
+  }
+
+  format (data: Hex): string {
+    throw new Error("Not implemented yet")
+  }
+}
 
 class Property {
   name: string
-  slot: number
+  slot: string
   description: string
-  type: string
+  type: MemoryDataType
 
   constructor (
     name: string,
-    slot: number,
+    slot: string,
     description: string,
-    type: string
+    type: MemoryDataType
   ) {
     this.name = name
     this.slot = slot
@@ -19,23 +77,36 @@ class Property {
     this.type = type
   }
 
-  format (): string {
-    return ""
-  }
-
-  private formatedSlot (): string {
-    return `0x${this.slot.toString(16).padStart(64, '0')}`
-  }
-
-  extract (pre: Record<string, string>): Option<string> {
-    return Option.fromNullable(pre[this.formatedSlot()]);
+  extract (memory: Record<string, Hex>): Option<string> {
+    return this.type.extract(memory, this.slot)
   }
 }
 
 const allProps = [
-  new Property("Storage.__DEPRECATED_diamondCutStorage", 0, "[DEPRECATED] Storage of variables needed for deprecated diamond cut facet", "FixedArray"),
-  new Property("Storage.governor", 7, "Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing)", "address"),
-  new Property("Storage.l2DefaultAccountBytecodeHash", 24, "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.", "LongNumber")
+  new Property(
+    "Storage.__DEPRECATED_diamondCutStorage",
+    numberToHex(0, {size: 32}),
+    "[DEPRECATED] Storage of variables needed for deprecated diamond cut facet",
+    new FixedArray(7, new AddressType())
+  ),
+  new Property(
+    "Storage.governor",
+    numberToHex(7, {size: 32}),
+    "Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing)",
+    new AddressType()
+  ),
+  new Property(
+    "Storage.verifier",
+    numberToHex(10, {size: 32}),
+    "Verifier contract. Used to verify aggregated proof for batches",
+    new AddressType()
+  ),
+  new Property(
+    "Storage.l2DefaultAccountBytecodeHash",
+    numberToHex(24, {size: 32}),
+    "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
+    new HexFormat()
+  )
 ]
 
 export class PropertyChange {
@@ -56,8 +127,8 @@ export class PropertyChange {
 
 
 export class MemoryMap {
-  pre: Record<string, string>
-  post: Record<string, string>
+  pre: Record<string, Hex>
+  post: Record<string, Hex>
 
   constructor (diff: MemoryDiffRaw, addr: string) {
     const pre = diff.result.pre[addr]
@@ -71,8 +142,8 @@ export class MemoryMap {
       throw new Error("missing post")
     }
 
-    this.pre = pre.storage
-    this.post = post.storage
+    this.pre = pre.storage as Record<string, Hex>
+    this.post = post.storage as Record<string, Hex>
   }
 
   // toReport (): string {
