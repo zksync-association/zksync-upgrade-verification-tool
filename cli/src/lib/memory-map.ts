@@ -1,33 +1,32 @@
 import type {MemoryDiffRaw} from "../schema/rpc";
 import {Option} from "nochoices";
-import {bytesToHex, type Hex, hexToBigInt, hexToBytes, hexToNumber, numberToHex} from "viem";
-import {undefined} from "zod";
+import {bytesToBigInt, hexToBigInt, numberToHex, stringToHex} from "viem";
 
 
 interface MemoryDataType {
-  extract (memory: Record<string, Hex>, slot: string): Option<string>
+  extract (memory: MemorySnapshot, slot: bigint): Option<string>
 }
 
 class AddressType implements MemoryDataType {
-  extract (memory: Record<string, Hex>, slot: string): Option<string> {
-    return Option.fromNullable(memory[slot])
+  extract (memory: MemorySnapshot, slot: bigint): Option<string> {
+    return memory.at(slot)
       .map(this.format)
   }
 
-  format (data: Hex): string {
-    return bytesToHex(hexToBytes(data).slice(12));
+  format (data: bigint): string {
+    return numberToHex(data, { size: 20 });
   }
 }
 
 class HexFormat implements MemoryDataType {
-  extract (memory: Record<string, Hex>, slot: string): Option<string> {
-    return Option.fromNullable(memory[slot])
+  extract (memory: MemorySnapshot, slot: bigint): Option<string> {
+    return memory.at(slot)
       .map(this.format)
       .map(str => str.toLowerCase())
   }
 
-  format (data: Hex): string {
-    return data
+  format (data: bigint): string {
+    return numberToHex(data, { size: 32 })
   }
 }
 
@@ -40,11 +39,11 @@ class FixedArray implements MemoryDataType {
     this.inner = inner
   }
 
-  extract (memory: Record<string, Hex>, slot: Hex): Option<string> {
-    const slots = new Array(this.size).fill(0).map((_, i) => BigInt(i) + hexToBigInt(slot))
+  extract (memory: MemorySnapshot, slot: bigint): Option<string> {
+    const slots = new Array(this.size).fill(0).map((_, i) => slot + BigInt(i))
 
     const content = slots
-      .map(slot => this.inner.extract(memory, numberToHex(slot, {size: 32})))
+      .map(slot => this.inner.extract(memory, slot))
       .map((mayBeContent, i) => mayBeContent.map(str => `[${i}]: ${str}`))
       .filter(mayBeContent => mayBeContent.isSome())
       .map(maybeContent => maybeContent.unwrap())
@@ -56,7 +55,7 @@ class FixedArray implements MemoryDataType {
 }
 
 class VerifierParamsType implements MemoryDataType {
-  extract (memory: Record<string, Hex>, slot: Hex): Option<string> {
+  extract (memory: MemorySnapshot, slot: bigint): Option<string> {
     const hex = new HexFormat()
     const keys = [
       "recursionNodeLevelVkHash",
@@ -65,7 +64,7 @@ class VerifierParamsType implements MemoryDataType {
     ]
 
     const arr = keys.map<[string, Option<string>]>((name, i) => {
-      const index = numberToHex(hexToNumber(slot) + i, {size: 32});
+      const index = slot + BigInt(i);
       return [name, hex.extract(memory, index)]
     })
 
@@ -74,28 +73,26 @@ class VerifierParamsType implements MemoryDataType {
     }
 
     return Option.Some(
-      arr.map(([name, opt]) => `[${name}]: ${opt.unwrapOr("Not affected")}`).join("\n")
+      arr.map(([name, opt]) => `.${name}: ${opt.unwrapOr("Not affected")}`).join("\n")
     )
   }
 }
 
 class BigNumberType implements MemoryDataType {
-  extract (memory: Record<string, Hex>, slot: string): Option<string> {
-    return Option.fromNullable(memory[slot])
-      .map(value => hexToBigInt(value).toString()) ;
+  extract (memory: MemorySnapshot, slot: bigint): Option<string> {
+    return memory.at(slot).map(value => value.toString()) ;
   }
-
 }
 
 class Property {
   name: string
-  slot: string
+  slot: bigint
   description: string
   type: MemoryDataType
 
   constructor (
     name: string,
-    slot: string,
+    slot: bigint,
     description: string,
     type: MemoryDataType
   ) {
@@ -105,7 +102,7 @@ class Property {
     this.type = type
   }
 
-  extract (memory: Record<string, Hex>): Option<string> {
+  extract (memory: MemorySnapshot): Option<string> {
     return this.type.extract(memory, this.slot)
   }
 }
@@ -113,37 +110,37 @@ class Property {
 const allProps = [
   new Property(
     "Storage.__DEPRECATED_diamondCutStorage",
-    numberToHex(0, {size: 32}),
+    0n,
     "[DEPRECATED] Storage of variables needed for deprecated diamond cut facet",
     new FixedArray(7, new AddressType())
   ),
   new Property(
     "Storage.governor",
-    numberToHex(7, {size: 32}),
+    7n,
     "Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing)",
     new AddressType()
   ),
   new Property(
     "Storage.verifier",
-    numberToHex(10, {size: 32}),
+    10n,
     "Verifier contract. Used to verify aggregated proof for batches",
     new AddressType()
   ),
   new Property(
     "Storage.verifierParams",
-    numberToHex(20, {size: 32}),
+    20n,
     "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
     new VerifierParamsType()
   ),
   new Property(
     "Storage.l2DefaultAccountBytecodeHash",
-    numberToHex(24, {size: 32}),
+    24n,
     "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
     new HexFormat()
   ),
   new Property(
     "Storage.protocolVersion",
-    numberToHex(33, {size: 32}),
+    33n,
     "Stores the protocol version. Note, that the protocol version may not only encompass changes to the smart contracts, but also to the node behavior.",
     new BigNumberType()
   )
@@ -165,10 +162,29 @@ export class PropertyChange {
   }
 }
 
+export class MemorySnapshot {
+  data: Map<bigint, bigint>
+
+  constructor (raw: Record<string, string>) {
+    this.data = new Map()
+    const keys = Object.keys(raw)
+
+    for (const key of keys) {
+      const keyHex = Buffer.from(key.substring(2, 67), 'hex')
+      const valueHex = Buffer.from(raw[key].substring(2, 67), 'hex')
+      this.data.set(bytesToBigInt(keyHex), bytesToBigInt(valueHex))
+    }
+  }
+
+  at(pos: bigint): Option<bigint> {
+    return Option.fromNullable(this.data.get(pos))
+  }
+}
+
 
 export class MemoryMap {
-  pre: Record<string, Hex>
-  post: Record<string, Hex>
+  pre: MemorySnapshot
+  post: MemorySnapshot
 
   constructor (diff: MemoryDiffRaw, addr: string) {
     const pre = diff.result.pre[addr]
@@ -182,14 +198,9 @@ export class MemoryMap {
       throw new Error("missing post")
     }
 
-    this.pre = pre.storage as Record<string, Hex>
-    this.post = post.storage as Record<string, Hex>
+    this.pre = new MemorySnapshot(pre.storage)
+    this.post = new MemorySnapshot(post.storage)
   }
-
-  // toReport (): string {
-  //   const table = new CliTable()
-  //   return ""
-  // }
 
   changeFor (propName: string): Option<PropertyChange> {
     const maybe = Option.fromNullable(allProps.find(p => p.name === propName))
