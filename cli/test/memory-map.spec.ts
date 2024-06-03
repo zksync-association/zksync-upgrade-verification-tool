@@ -3,12 +3,13 @@ import {MemoryMap} from "../src/lib/memory-map";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {memoryDiffParser} from "../src/schema/rpc";
+import {type Hex, hexToBigInt, hexToBytes, keccak256, numberToBytes} from "viem";
 
 describe("MemoryMap", () => {
-  const subject = async (file: string) => {
+  const subject = async (file: string, selectors: Hex[] = []) => {
     const diff = await fs.readFile(path.join(import.meta.dirname, "data", file));
     const json = memoryDiffParser.parse(JSON.parse(diff.toString()));
-    return new MemoryMap(json, "0x32400084c286cf3e17e7b677ea9583e60a000324");
+    return new MemoryMap(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", selectors);
   }
 
   it('can extract value change for a simple hash value', async () => {
@@ -87,19 +88,36 @@ describe("MemoryMap", () => {
     expect(value.after.unwrap()).to.eql("24")
   })
 
-  // it('can show mappings', async () => {
-  //   const memory = await subject("realistic-memory-diff.json")
-  //   const maybeValue = memory.changeFor("DiamondStorage.selectorToFacet")
-  //   const value = maybeValue.unwrap()
-  //   // 0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b
-  //   const beforeLines = value.before.unwrap().split("\n");
-  //   expect(beforeLines).to.eql([
-  //     "[0x0e18b681]: 0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080"
-  //   ])
-  //
-  //   const afterLines = value.after.unwrap().split("\n");
-  //   expect(beforeLines).to.eql([
-  //     "[0x0e18b681]: 0x342a09385E9BAD4AD32a6220765A6c333552e565"
-  //   ])
-  // })
+  it('test mapping keys', () => {
+    const mapSlot = "0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b"
+    const key = "0x0e18b681"
+    const mapSlotBytes = hexToBytes(mapSlot, { size: 32 })
+    const keyBytes = hexToBytes(key, { size: 32 })
+    //
+    const buf = Buffer.concat([keyBytes, mapSlotBytes]);
+    console.log(buf.toString('hex'))
+    const value = keccak256(buf)
+                                // 0x0e18b60000000000000000000000000000000000000000000000000000000000c8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b
+    // const value = keccak256("0x0e18b68100000000000000000000000000000000000000000000000000000000c8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b")
+    expect(value).to.eql("0x02a257d44d183668a0c30e9d57fecdb34cf2d5f9fbb4a7ae8491d04bf23a7439")
+
+    // const arrSlot = keccak256("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131d")
+    // console.log(arrSlot)
+  })
+
+  it('can show mappings', async () => {
+    const memory = await subject("realistic-memory-diff.json", ["0x0e18b681"])
+    const maybeValue = memory.changeFor("DiamondStorage.selectorToFacet")
+    const value = maybeValue.unwrap()
+
+    const beforeLines = value.before.unwrap().split("\n");
+    expect(beforeLines).to.eql([
+      "[0x0e18b681]: 0x230214F0224C7E0485f348a79512ad00514DB1F7".toLowerCase()
+    ])
+
+    const afterLines = value.after.unwrap().split("\n");
+    expect(afterLines).to.eql([
+      "[0x0e18b681]: 0x342a09385E9BAD4AD32a6220765A6c333552e565".toLowerCase()
+    ])
+  })
 })

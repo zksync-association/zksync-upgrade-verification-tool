@@ -1,7 +1,15 @@
 import type {MemoryDiffRaw} from "../schema/rpc";
 import {Option} from "nochoices";
-import {bytesToBigInt, hexToBigInt, numberToHex, stringToHex} from "viem";
-
+import {
+  bytesToBigInt,
+  bytesToHex,
+  type Hex,
+  hexToBigInt,
+  hexToBytes,
+  keccak256,
+  numberToBytes,
+  numberToHex
+} from "viem";
 
 interface MemoryDataType {
   extract (memory: MemorySnapshot, slot: bigint): Option<string>
@@ -27,6 +35,29 @@ class HexFormat implements MemoryDataType {
 
   format (data: bigint): string {
     return numberToHex(data, { size: 32 })
+  }
+}
+
+class SelectorMappingFormat implements MemoryDataType{
+  private keys: Buffer[];
+  constructor (keys: Buffer[]) {
+    this.keys = keys
+  }
+
+  extract (memory: MemorySnapshot, slot: bigint): Option<string> {
+    const bufSlot = numberToBytes(slot, { size: 32 })
+    const values = this.keys.map(key => {
+      const keyBuf = Buffer.alloc(32)
+      key.copy(keyBuf, 0, 0, key.length)
+      const keySlot = Buffer.concat([keyBuf, bufSlot])
+
+      const hashed = keccak256(keySlot)
+      // return memory.at(hexToBigInt(hashed)).map(v => v.toString())
+      const addr = new AddressType()
+      return addr.extract(memory, hexToBigInt(hashed))
+        .map(value => `[${bytesToHex(key)}]: ${value}`)
+    })
+    return values[0];
   }
 }
 
@@ -107,45 +138,6 @@ class Property {
   }
 }
 
-const allProps = [
-  new Property(
-    "Storage.__DEPRECATED_diamondCutStorage",
-    0n,
-    "[DEPRECATED] Storage of variables needed for deprecated diamond cut facet",
-    new FixedArray(7, new AddressType())
-  ),
-  new Property(
-    "Storage.governor",
-    7n,
-    "Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing)",
-    new AddressType()
-  ),
-  new Property(
-    "Storage.verifier",
-    10n,
-    "Verifier contract. Used to verify aggregated proof for batches",
-    new AddressType()
-  ),
-  new Property(
-    "Storage.verifierParams",
-    20n,
-    "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
-    new VerifierParamsType()
-  ),
-  new Property(
-    "Storage.l2DefaultAccountBytecodeHash",
-    24n,
-    "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
-    new HexFormat()
-  ),
-  new Property(
-    "Storage.protocolVersion",
-    33n,
-    "Stores the protocol version. Note, that the protocol version may not only encompass changes to the smart contracts, but also to the node behavior.",
-    new BigNumberType()
-  )
-]
-
 export class PropertyChange {
   prop: Property
   before: Option<string>
@@ -185,8 +177,9 @@ export class MemorySnapshot {
 export class MemoryMap {
   pre: MemorySnapshot
   post: MemorySnapshot
+  private selectors: Hex[];
 
-  constructor (diff: MemoryDiffRaw, addr: string) {
+  constructor (diff: MemoryDiffRaw, addr: string, selectors: Hex[]) {
     const pre = diff.result.pre[addr]
     const post = diff.result.post[addr]
 
@@ -200,15 +193,66 @@ export class MemoryMap {
 
     this.pre = new MemorySnapshot(pre.storage)
     this.post = new MemorySnapshot(post.storage)
+    this.selectors = selectors
   }
 
   changeFor (propName: string): Option<PropertyChange> {
-    const maybe = Option.fromNullable(allProps.find(p => p.name === propName))
+    const maybe = Option.fromNullable(this.allProps().find(p => p.name === propName))
     return maybe.map(prop => new PropertyChange(
         prop,
         prop.extract(this.pre),
         prop.extract(this.post)
       )
     )
+  }
+
+  private allProps(): Property[] {
+    return [
+      new Property(
+        "Storage.__DEPRECATED_diamondCutStorage",
+        0n,
+        "[DEPRECATED] Storage of variables needed for deprecated diamond cut facet",
+        new FixedArray(7, new AddressType())
+      ),
+      new Property(
+        "Storage.governor",
+        7n,
+        "Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing)",
+        new AddressType()
+      ),
+      new Property(
+        "Storage.verifier",
+        10n,
+        "Verifier contract. Used to verify aggregated proof for batches",
+        new AddressType()
+      ),
+      new Property(
+        "Storage.verifierParams",
+        20n,
+        "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
+        new VerifierParamsType()
+      ),
+      new Property(
+        "Storage.l2DefaultAccountBytecodeHash",
+        24n,
+        "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
+        new HexFormat()
+      ),
+      new Property(
+        "Storage.protocolVersion",
+        33n,
+        "Stores the protocol version. Note, that the protocol version may not only encompass changes to the smart contracts, but also to the node behavior.",
+        new BigNumberType()
+      ),
+      new Property(
+        "DiamondStorage.selectorToFacet",
+         hexToBigInt("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b"),
+        "A mapping from the selector to the facet address and its meta information",
+        new SelectorMappingFormat(this.selectors.map(sel => {
+          const as = hexToBytes(sel);
+          return Buffer.from(as)
+        }))
+      )
+    ]
   }
 }
