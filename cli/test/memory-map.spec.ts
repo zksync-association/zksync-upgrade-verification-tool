@@ -76,6 +76,14 @@ describe("MemoryMap", () => {
       "[recursionLeafLevelVkHash]: 0x435202d277dd06ef3c64ddd99fda043fc27c2bd8b7c66882966840202c27f4f6",
       "[recursionCircuitsSetVksHash]: Not affected",
     ])
-    // expect(value.after.unwrap().toLowerCase()).to.eql("0x9D6c59D9A234F585B367b4ba3C62e5Ec7A6179FD".toLowerCase())
+  })
+
+  it('can show big numbers', async () => {
+    const memory = await subject("realistic-memory-diff.json")
+    const maybeValue = memory.changeFor("Storage.protocolVersion")
+    const value = maybeValue.unwrap()
+
+    expect(value.before.unwrap()).to.eql("22")
+    expect(value.after.unwrap()).to.eql("24")
   })
 })

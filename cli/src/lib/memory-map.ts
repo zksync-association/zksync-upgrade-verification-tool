@@ -65,7 +65,7 @@ class VerifierParamsType implements MemoryDataType {
     ]
 
     const arr = keys.map<[string, Option<string>]>((name, i) => {
-      const index = numberToHex(hexToNumber(slot) + i, { size: 32 });
+      const index = numberToHex(hexToNumber(slot) + i, {size: 32});
       return [name, hex.extract(memory, index)]
     })
 
@@ -77,6 +77,14 @@ class VerifierParamsType implements MemoryDataType {
       arr.map(([name, opt]) => `[${name}]: ${opt.unwrapOr("Not affected")}`).join("\n")
     )
   }
+}
+
+class BigNumberType implements MemoryDataType {
+  extract (memory: Record<string, Hex>, slot: string): Option<string> {
+    return Option.fromNullable(memory[slot])
+      .map(value => hexToBigInt(value).toString()) ;
+  }
+
 }
 
 class Property {
@@ -132,6 +140,12 @@ const allProps = [
     numberToHex(24, {size: 32}),
     "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
     new HexFormat()
+  ),
+  new Property(
+    "Storage.protocolVersion",
+    numberToHex(33, {size: 32}),
+    "Stores the protocol version. Note, that the protocol version may not only encompass changes to the smart contracts, but also to the node behavior.",
+    new BigNumberType()
   )
 ]
 
