@@ -57,4 +57,25 @@ describe("MemoryMap", () => {
       "[6]: 0x7777777777777777777777777777777777777777",
     ])
   })
+
+  it('can show verifier param changes', async () => {
+    const memory = await subject("realistic-memory-diff.json")
+    const maybeValue = memory.changeFor("Storage.verifierParams")
+    const value = maybeValue.unwrap()
+
+    const beforeLines = value.before.unwrap().split("\n");
+    expect(beforeLines).to.eql([
+      "[recursionNodeLevelVkHash]: 0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080",
+      "[recursionLeafLevelVkHash]: 0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a",
+      "[recursionCircuitsSetVksHash]: Not affected",
+    ])
+
+    const afterLines = value.after.unwrap().split("\n");
+    expect(afterLines).to.eql([
+      "[recursionNodeLevelVkHash]: 0xf520cd5b37e74e19fdb369c8d676a04dce8a19457497ac6686d2bb95d94109c8",
+      "[recursionLeafLevelVkHash]: 0x435202d277dd06ef3c64ddd99fda043fc27c2bd8b7c66882966840202c27f4f6",
+      "[recursionCircuitsSetVksHash]: Not affected",
+    ])
+    // expect(value.after.unwrap().toLowerCase()).to.eql("0x9D6c59D9A234F585B367b4ba3C62e5Ec7A6179FD".toLowerCase())
+  })
 })

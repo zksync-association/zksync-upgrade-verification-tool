@@ -1,11 +1,10 @@
 import type {MemoryDiffRaw} from "../schema/rpc";
 import {Option} from "nochoices";
-import {bytesToHex, type Hex, hexToBigInt, hexToBytes, numberToHex} from "viem";
+import {bytesToHex, type Hex, hexToBigInt, hexToBytes, hexToNumber, numberToHex} from "viem";
+import {undefined} from "zod";
 
 
 interface MemoryDataType {
-  format (data: Hex): string
-
   extract (memory: Record<string, Hex>, slot: string): Option<string>
 }
 
@@ -24,6 +23,7 @@ class HexFormat implements MemoryDataType {
   extract (memory: Record<string, Hex>, slot: string): Option<string> {
     return Option.fromNullable(memory[slot])
       .map(this.format)
+      .map(str => str.toLowerCase())
   }
 
   format (data: Hex): string {
@@ -53,9 +53,29 @@ class FixedArray implements MemoryDataType {
       .filter(c => c.length !== 0)
       .map(lines => lines.join("\n"))
   }
+}
 
-  format (data: Hex): string {
-    throw new Error("Not implemented yet")
+class VerifierParamsType implements MemoryDataType {
+  extract (memory: Record<string, Hex>, slot: Hex): Option<string> {
+    const hex = new HexFormat()
+    const keys = [
+      "recursionNodeLevelVkHash",
+      "recursionLeafLevelVkHash",
+      "recursionCircuitsSetVksHash"
+    ]
+
+    const arr = keys.map<[string, Option<string>]>((name, i) => {
+      const index = numberToHex(hexToNumber(slot) + i, { size: 32 });
+      return [name, hex.extract(memory, index)]
+    })
+
+    if (!arr.some(([_name, opt]) => opt.isSome())) {
+      return Option.None()
+    }
+
+    return Option.Some(
+      arr.map(([name, opt]) => `[${name}]: ${opt.unwrapOr("Not affected")}`).join("\n")
+    )
   }
 }
 
@@ -100,6 +120,12 @@ const allProps = [
     numberToHex(10, {size: 32}),
     "Verifier contract. Used to verify aggregated proof for batches",
     new AddressType()
+  ),
+  new Property(
+    "Storage.verifierParams",
+    numberToHex(20, {size: 32}),
+    "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
+    new VerifierParamsType()
   ),
   new Property(
     "Storage.l2DefaultAccountBytecodeHash",
