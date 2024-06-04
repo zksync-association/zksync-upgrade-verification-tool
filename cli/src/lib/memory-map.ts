@@ -7,8 +7,7 @@ import {
   hexToBigInt,
   hexToBytes,
   keccak256,
-  numberToBytes,
-  numberToHex
+  numberToBytes
 } from "viem";
 
 interface MemoryDataType {
@@ -21,9 +20,8 @@ class AddressType implements MemoryDataType {
       .map(this.format)
   }
 
-  format (data: bigint): string {
-    const buf = numberToBytes(data);
-    const sub = buf.subarray(buf.length - 20, buf.length)
+  format (data: Buffer): string {
+    const sub = data.subarray(data.length - 20, data.length)
     return bytesToHex(sub);
   }
 }
@@ -35,8 +33,8 @@ class HexFormat implements MemoryDataType {
       .map(str => str.toLowerCase())
   }
 
-  format (data: bigint): string {
-    return numberToHex(data, { size: 32 })
+  format (data: Buffer): string {
+    return bytesToHex(data, { size: 32 })
   }
 }
 
@@ -121,7 +119,9 @@ class VerifierParamsType implements MemoryDataType {
 
 class BigNumberType implements MemoryDataType {
   extract (memory: MemorySnapshot, slot: bigint): Option<string> {
-    return memory.at(slot).map(value => value.toString()) ;
+    return memory.at(slot)
+      .map(bytesToBigInt)
+      .map(int => int.toString());
   }
 }
 
@@ -165,7 +165,7 @@ export class PropertyChange {
 }
 
 export class MemorySnapshot {
-  data: Map<bigint, bigint>
+  data: Map<bigint, Buffer>
 
   constructor (raw: Record<string, string>) {
     this.data = new Map()
@@ -174,11 +174,11 @@ export class MemorySnapshot {
     for (const key of keys) {
       const keyHex = Buffer.from(key.substring(2, 67), 'hex')
       const valueHex = Buffer.from(raw[key].substring(2, 67), 'hex')
-      this.data.set(bytesToBigInt(keyHex), bytesToBigInt(valueHex))
+      this.data.set(bytesToBigInt(keyHex), valueHex)
     }
   }
 
-  at(pos: bigint): Option<bigint> {
+  at(pos: bigint): Option<Buffer> {
     return Option.fromNullable(this.data.get(pos))
   }
 }
