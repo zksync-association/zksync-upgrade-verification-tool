@@ -1,14 +1,14 @@
-import {describe, expect, it} from "vitest";
-import {MemoryMap} from "../src/lib/memory-map/memory-map";
+import { describe, expect, it } from "vitest";
+import { MemoryMap } from "../src/lib/memory-map/memory-map";
 import fs from "node:fs/promises";
 import path from "node:path";
-import {memoryDiffParser} from "../src/schema/rpc";
-import {type Hex, hexToBigInt} from "viem";
-import {AddressType} from "../src/lib/memory-map/types/address-type";
-import {StructType} from "../src/lib/memory-map/types/struct-type";
-import {BigNumberType} from "../src/lib/memory-map/types/big-number-type";
-import {Property} from "../src/lib/memory-map/property";
-import {BooleanType} from "../src/lib/memory-map/types/boolean-type";
+import { memoryDiffParser } from "../src/schema/rpc";
+import { type Hex, hexToBigInt } from "viem";
+import { AddressType } from "../src/lib/memory-map/types/address-type";
+import { StructType } from "../src/lib/memory-map/types/struct-type";
+import { BigNumberType } from "../src/lib/memory-map/types/big-number-type";
+import { Property } from "../src/lib/memory-map/property";
+import { BooleanType } from "../src/lib/memory-map/types/boolean-type";
 
 describe("MemoryMap", () => {
   const subject = async (file: string, selectors: Hex[] = []) => {
@@ -80,15 +80,15 @@ describe("MemoryMap", () => {
     const beforeLines = value.before.unwrap();
     expect(beforeLines).toEqual(
       "{recursionNodeLevelVkHash=>0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080" +
-      ",recursionLeafLevelVkHash=>0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a," +
-      "recursionCircuitsSetVksHash=>No content.}"
+        ",recursionLeafLevelVkHash=>0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a," +
+        "recursionCircuitsSetVksHash=>No content.}"
     );
 
     const afterLines = value.after.unwrap();
     expect(afterLines).toEqual(
       "{recursionNodeLevelVkHash=>0xf520cd5b37e74e19fdb369c8d676a04dce8a19457497ac6686d2bb95d94109c8" +
-      ",recursionLeafLevelVkHash=>0x435202d277dd06ef3c64ddd99fda043fc27c2bd8b7c66882966840202c27f4f6," +
-      "recursionCircuitsSetVksHash=>No content.}"
+        ",recursionLeafLevelVkHash=>0x435202d277dd06ef3c64ddd99fda043fc27c2bd8b7c66882966840202c27f4f6," +
+        "recursionCircuitsSetVksHash=>No content.}"
     );
   });
 
@@ -174,35 +174,41 @@ describe("MemoryMap", () => {
   });
 
   it("can show variable arrays", async () => {
-    const memory = await subject("realistic-memory-diff.json")
-    const change = memory.changeFor("DiamondStorage.facets").unwrap()
+    const memory = await subject("realistic-memory-diff.json");
+    const change = memory.changeFor("DiamondStorage.facets").unwrap();
 
-    const before = change.before.unwrap()
-      .replace('[', '')
-      .replace(']', '')
-      .split(',')
-      .map(addr => addr.toLowerCase())
-    expect(before).toHaveLength(4)
-    expect(before).toEqual(expect.arrayContaining([
-      "0x230214F0224C7E0485f348a79512ad00514DB1F7".toLowerCase(),
-      "0x10113bB3a8e64f8eD67003126adC8CE74C34610c".toLowerCase(),
-      "0xA57F9FFD65fC0F5792B5e958dF42399a114EC7e7".toLowerCase(),
-      "0xfd3779e6214eBBd40f5F5890351298e123A46BA6".toLowerCase()
-    ]))
+    const before = change.before
+      .unwrap()
+      .replace("[", "")
+      .replace("]", "")
+      .split(",")
+      .map((addr) => addr.toLowerCase());
+    expect(before).toHaveLength(4);
+    expect(before).toEqual(
+      expect.arrayContaining([
+        "0x230214F0224C7E0485f348a79512ad00514DB1F7".toLowerCase(),
+        "0x10113bB3a8e64f8eD67003126adC8CE74C34610c".toLowerCase(),
+        "0xA57F9FFD65fC0F5792B5e958dF42399a114EC7e7".toLowerCase(),
+        "0xfd3779e6214eBBd40f5F5890351298e123A46BA6".toLowerCase(),
+      ])
+    );
 
-    const after = change.after.unwrap()
-      .replace('[', '')
-      .replace(']', '')
-      .split(',')
-      .map(addr => addr.toLowerCase())
-    expect(after).toHaveLength(4)
-    expect(after).toEqual(expect.arrayContaining([
-      "0x1a451d9bFBd176321966e9bc540596Ca9d39B4B1".toLowerCase(),
-      "0x342a09385E9BAD4AD32a6220765A6c333552e565".toLowerCase(),
-      "0x345c6ca2F3E08445614f4299001418F125AD330a".toLowerCase(),
-      "0x7814399116C17F2750Ca99cBFD2b75bA9a0793d7".toLowerCase()
-    ]))
-  })
+    const after = change.after
+      .unwrap()
+      .replace("[", "")
+      .replace("]", "")
+      .split(",")
+      .map((addr) => addr.toLowerCase());
+    expect(after).toHaveLength(4);
+    expect(after).toEqual(
+      expect.arrayContaining([
+        "0x1a451d9bFBd176321966e9bc540596Ca9d39B4B1".toLowerCase(),
+        "0x342a09385E9BAD4AD32a6220765A6c333552e565".toLowerCase(),
+        "0x345c6ca2F3E08445614f4299001418F125AD330a".toLowerCase(),
+        "0x7814399116C17F2750Ca99cBFD2b75bA9a0793d7".toLowerCase(),
+      ])
+    );
+  });
 
   it("can show structs correctly", async () => {
     const diff = await fs.readFile(

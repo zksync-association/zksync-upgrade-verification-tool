@@ -1,17 +1,17 @@
-import type {MemoryDiffRaw} from "../../schema/rpc";
-import {Option} from "nochoices";
-import {type Hex, hexToBigInt, hexToBytes} from "viem";
-import {AddressType} from "./types/address-type";
-import {BlobType} from "./types/blob-type";
-import {MappingType} from "./mapping-type";
-import {StructType} from "./types/struct-type";
-import {BigNumberType} from "./types/big-number-type";
-import {Property} from "./property";
-import {MemorySnapshot} from "./memory-snapshot";
-import {PropertyChange} from "./property-change";
-import {BooleanType} from "./types/boolean-type";
-import {FixedArrayType} from "./types/fixed-array-type";
-import {ArrayType} from "./types/array-type";
+import type { MemoryDiffRaw } from "../../schema/rpc";
+import { Option } from "nochoices";
+import { type Hex, hexToBigInt, hexToBytes } from "viem";
+import { AddressType } from "./types/address-type";
+import { BlobType } from "./types/blob-type";
+import { MappingType } from "./mapping-type";
+import { StructType } from "./types/struct-type";
+import { BigNumberType } from "./types/big-number-type";
+import { Property } from "./property";
+import { MemorySnapshot } from "./memory-snapshot";
+import { PropertyChange } from "./property-change";
+import { BooleanType } from "./types/boolean-type";
+import { FixedArrayType } from "./types/fixed-array-type";
+import { ArrayType } from "./types/array-type";
 
 export class MemoryMap {
   pre: MemorySnapshot;
@@ -67,9 +67,92 @@ export class MemoryMap {
         new AddressType()
       ),
       new Property(
+        "Storage.pendingGovernor",
+        8n,
+        "Address that the governor proposed as one that will replace it",
+        new AddressType()
+      ),
+      new Property(
+        "Storage.validators",
+        9n,
+        "List of permitted validators",
+        new MappingType([], new BooleanType())
+      ),
+      new Property(
         "Storage.verifier",
         10n,
         "Verifier contract. Used to verify aggregated proof for batches",
+        new AddressType()
+      ),
+      new Property(
+        "Storage.totalBatchesExecuted",
+        11n,
+        "Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch (batch 0 is genesis)",
+        new BigNumberType()
+      ),
+      new Property(
+        "Storage.totalBatchesVerified",
+        12n,
+        "Total number of proved batches i.e. batches[totalBatchesProved] points at the latest proved batch",
+        new BigNumberType()
+      ),
+      new Property(
+        "Storage.totalBatchesCommitted",
+        13n,
+        "Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed batch",
+        new BigNumberType()
+      ),
+      new Property(
+        "Storage.storedBatchHashes",
+        14n,
+        "Stored hashed StoredBatch for batch number",
+        new MappingType([], new BigNumberType())
+      ),
+      new Property(
+        "Storage.l2LogsRootHashes",
+        15n,
+        "Stored root hashes of L2 -> L1 logs",
+        new MappingType([], new BigNumberType())
+      ),
+      new Property(
+        "Storage.priorityQueue",
+        15n,
+        "Container that stores transactions requested from L1",
+        new StructType([
+          {
+            name: "data",
+            type: new MappingType(
+              [],
+              new StructType([
+                {
+                  name: "canonicalTxHash",
+                  type: new BlobType(),
+                },
+                {
+                  name: "expirationTimestamp",
+                  type: new BigNumberType(8),
+                },
+                {
+                  name: "layer2Tip",
+                  type: new BigNumberType(24, 8),
+                },
+              ])
+            ),
+          },
+          {
+            name: "tail",
+            type: new BigNumberType(),
+          },
+          {
+            name: "head",
+            type: new BigNumberType(),
+          },
+        ])
+      ),
+      new Property(
+        "Storage.__DEPRECATED_allowList",
+        19n,
+        "The smart contract that manages the list with permission to call contract functions",
         new AddressType()
       ),
       new Property(
@@ -79,17 +162,23 @@ export class MemoryMap {
         new StructType([
           {
             name: "recursionNodeLevelVkHash",
-            type: new BlobType()
+            type: new BlobType(),
           },
           {
             name: "recursionLeafLevelVkHash",
-            type: new BlobType()
+            type: new BlobType(),
           },
           {
             name: "recursionCircuitsSetVksHash",
-            type: new BlobType()
-          }
+            type: new BlobType(),
+          },
         ])
+      ),
+      new Property(
+        "Storage.l2BootloaderBytecodeHash",
+        23n,
+        "Bytecode hash of bootloader program. Used as an input to zkp-circuit.",
+        new BlobType()
       ),
       new Property(
         "Storage.l2DefaultAccountBytecodeHash",
@@ -98,10 +187,115 @@ export class MemoryMap {
         new BlobType()
       ),
       new Property(
+        "Storage.zkPorterIsAvailable",
+        25n,
+        "Indicates that the porter may be touched on L2 transactions. " +
+          "Used as an input to zkp-circuit.",
+        new BooleanType()
+      ),
+      new Property(
+        "Storage.priorityTxMaxGasLimit",
+        26n,
+        "The maximum number of the L2 gas that a user can request for L1 -> L2 transactions " +
+          'This is the maximum number of L2 gas that is available for the "body" of the transaction, i.e. ' +
+          "without overhead for proving the batch.",
+        new BigNumberType()
+      ),
+      new Property(
+        "Storage.__DEPRECATED_upgrades",
+        27n,
+        "[DEPRECATED] Storage of variables needed for upgrade facet",
+        new BlobType()
+      ),
+      new Property(
+        "Storage.isEthWithdrawalFinalized",
+        29n,
+        "A mapping L2 batch number => message number => flag. " +
+          "The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as " +
+          "a flag to indicate that the message was already processed. " +
+          "Used to indicate that eth withdrawal was already processed",
+        new MappingType([], new MappingType([], new BooleanType()))
+      ),
+      new Property(
+        "Storage.__DEPRECATED_lastWithdrawalLimitReset",
+        30n,
+        "The most recent withdrawal time and amount reset",
+        new BigNumberType()
+      ),
+      new Property(
+        "Storage.__DEPRECATED_withdrawnAmountInWindow",
+        31n,
+        "The accumulated withdrawn amount during the withdrawal limit window",
+        new BigNumberType()
+      ),
+      new Property(
+        "Storage.__DEPRECATED_totalDepositedAmountPerUser",
+        32n,
+        "[DEPRECATED] A mapping user address => the total deposited amount by the user",
+        new MappingType([], new BigNumberType())
+      ),
+      new Property(
         "Storage.protocolVersion",
         33n,
         "Stores the protocol version. Note, that the protocol version may not only encompass changes to the smart contracts, but also to the node behavior.",
         new BigNumberType()
+      ),
+      new Property(
+        "Storage.l2SystemContractsUpgradeTxHash",
+        34n,
+        "Hash of the system contract upgrade transaction. If 0, then no upgrade transaction needs to be done.",
+        new BlobType()
+      ),
+      new Property(
+        "Storage.l2SystemContractsUpgradeBatchNumber",
+        35n,
+        "Batch number where the upgrade transaction has happened. If 0, then no upgrade " +
+          "yet transaction has happened",
+        new BlobType()
+      ),
+      new Property(
+        "Storage.admin",
+        36n,
+        "Address which will exercise non-critical changes to the Diamond Proxy (changing validator set & unfreezing)",
+        new AddressType()
+      ),
+      new Property(
+        "Storage.pendingAdmin",
+        37n,
+        "Address that the governor or admin proposed as one that will replace admin role",
+        new AddressType()
+      ),
+      new Property(
+        "Storage.feeParams",
+        38n,
+        "Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions, " +
+          "the bootloader gives enough freedom to the operator.",
+        new StructType([
+          {
+            name: "pubdataPricingMode",
+            type: new BigNumberType(1),
+          },
+          {
+            name: "batchOverheadL1Gas",
+            type: new BigNumberType(4, 1),
+          },
+          {
+            name: "maxPubdataPerBatch",
+            type: new BigNumberType(4, 5),
+          },
+          {
+            name: "maxL2GasPerBatch",
+            type: new BigNumberType(4, 9),
+          },
+          {
+            name: "priorityTxMaxPubdata",
+            type: new BigNumberType(4, 13),
+          },
+          {
+            name: "minimalL2GasPrice",
+            type: new BigNumberType(8, 17),
+          },
+        ])
       ),
       new Property(
         "DiamondStorage.selectorToFacet",
@@ -129,11 +323,29 @@ export class MemoryMap {
         )
       ),
       new Property(
+        "DiamondStorage.facetToSelectors",
+        hexToBigInt("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b") + 1n,
+        "The array of all unique facet addresses that belong to the diamond proxy",
+        new MappingType(
+          [],
+          new StructType([
+            {
+              name: "selectors",
+              type: new ArrayType(new BlobType()),
+            },
+            {
+              name: "facetPosition",
+              type: new BigNumberType(2),
+            },
+          ])
+        )
+      ),
+      new Property(
         "DiamondStorage.facets",
         hexToBigInt("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b") + 2n,
         "The array of all unique facet addresses that belong to the diamond proxy",
         new ArrayType(new AddressType())
-      )
+      ),
     ];
   }
 }

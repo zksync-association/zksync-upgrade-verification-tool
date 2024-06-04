@@ -5,7 +5,7 @@ import type { Option } from "nochoices";
 export class BooleanType implements MemoryDataType {
   private offset: number;
 
-  constructor(offset: number) {
+  constructor(offset = 0) {
     this.offset = offset;
   }
 
