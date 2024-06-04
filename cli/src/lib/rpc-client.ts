@@ -3,6 +3,7 @@ import {type Abi, createPublicClient, decodeFunctionResult, encodeFunctionData, 
 import type {TypeOf, ZodType} from "zod";
 import { type PublicClient, type HttpTransport } from "viem"
 import type {FileSystem} from "./file-system";
+import {memoryDiffParser, type MemoryDiffRaw} from "../schema/rpc";
 
 const L1_DEFAULT_URLS = {
   mainnet: "https://ethereum-rpc.publicnode.com",
@@ -75,7 +76,7 @@ export class RpcClient {
     return parser.parse(rawValue);
   }
 
-  async debugTraceCall (from: string, to: string, callData: string, fs: FileSystem) {
+  async debugTraceCall (from: string, to: string, callData: string, fs: FileSystem): Promise<MemoryDiffRaw> {
     const res = await fetch(this.rpcUrl(), {
       method: 'POST',
       body: JSON.stringify({
@@ -99,6 +100,8 @@ export class RpcClient {
       }),
     })
 
-    await fs.writeFile('data.json', Buffer.from(await res.text()))
+    const data = await res.json();
+
+    return memoryDiffParser.parse(data)
   }
 }

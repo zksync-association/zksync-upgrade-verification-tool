@@ -206,6 +206,12 @@ export class MemoryMap {
     )
   }
 
+  allChanges (): PropertyChange[] {
+    return this.allProps().map(prop => {
+      return new PropertyChange(prop, prop.extract(this.pre), prop.extract(this.post))
+    }).filter(change => change.before.isSome() || change.after.isSome())
+  }
+
   private allProps(): Property[] {
     return [
       new Property(
