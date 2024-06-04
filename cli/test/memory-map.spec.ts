@@ -120,4 +120,33 @@ describe("MemoryMap", () => {
       "[0x0e18b681]: 0x342a09385E9BAD4AD32a6220765A6c333552e565".toLowerCase()
     ])
   })
+
+  it('can show multiple mappings', async () => {
+    const memory = await subject("realistic-memory-diff.json", [
+      "0x0e18b681",
+      "0x64bf8d66",
+      "0x52ef6b2c",
+      "0x6c0960f9"
+    ])
+    const maybeValue = memory.changeFor("DiamondStorage.selectorToFacet")
+    const value = maybeValue.unwrap()
+
+    const beforeLines = value.before.unwrap().split("\n");
+    expect(beforeLines).toHaveLength(4)
+    expect(beforeLines).toEqual(expect.arrayContaining([
+      "[0x0e18b681]: 0x230214F0224C7E0485f348a79512ad00514DB1F7".toLowerCase(),
+      "[0x64bf8d66]: 0x230214F0224C7E0485f348a79512ad00514DB1F7".toLowerCase(),
+      "[0x52ef6b2c]: 0x10113bB3a8e64f8eD67003126adC8CE74C34610c".toLowerCase(),
+      "[0x6c0960f9]: 0xA57F9FFD65fC0F5792B5e958dF42399a114EC7e7".toLowerCase(),
+    ]))
+
+    const afterLines = value.after.unwrap().split("\n");
+    expect(afterLines).toHaveLength(4)
+    expect(afterLines).toEqual(expect.arrayContaining([
+      "[0x0e18b681]: 0x342a09385E9BAD4AD32a6220765A6c333552e565".toLowerCase(),
+      "[0x64bf8d66]: 0x342a09385E9BAD4AD32a6220765A6c333552e565".toLowerCase(),
+      "[0x52ef6b2c]: 0x345c6ca2F3E08445614f4299001418F125AD330a".toLowerCase(),
+      "[0x6c0960f9]: 0x7814399116C17F2750Ca99cBFD2b75bA9a0793d7".toLowerCase(),
+    ]))
+  })
 })

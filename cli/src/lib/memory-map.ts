@@ -22,7 +22,9 @@ class AddressType implements MemoryDataType {
   }
 
   format (data: bigint): string {
-    return numberToHex(data, { size: 20 });
+    const buf = numberToBytes(data);
+    const sub = buf.subarray(buf.length - 20, buf.length)
+    return bytesToHex(sub);
   }
 }
 
@@ -57,7 +59,15 @@ class SelectorMappingFormat implements MemoryDataType{
       return addr.extract(memory, hexToBigInt(hashed))
         .map(value => `[${bytesToHex(key)}]: ${value}`)
     })
-    return values[0];
+
+    if (values.every(v => v.isNone())) {
+      return Option.None()
+    }
+
+    return Option.Some(values
+      .filter(o => o.isSome())
+      .map(o => o.unwrap())
+      .join("\n"));
   }
 }
 
