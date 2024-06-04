@@ -1,9 +1,16 @@
-import type {Network} from "./constants.js";
-import {type Abi, createPublicClient, decodeFunctionResult, encodeFunctionData, type Hex, http,} from "viem";
-import type {TypeOf, ZodType} from "zod";
-import { type PublicClient, type HttpTransport } from "viem"
-import type {FileSystem} from "./file-system";
-import {memoryDiffParser, type MemoryDiffRaw} from "../schema/rpc";
+import type { Network } from "./constants.js";
+import {
+  type Abi,
+  createPublicClient,
+  decodeFunctionResult,
+  encodeFunctionData,
+  type Hex,
+  http,
+} from "viem";
+import type { TypeOf, ZodType } from "zod";
+import type { PublicClient, HttpTransport } from "viem";
+import type { FileSystem } from "./file-system";
+import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
 
 const L1_DEFAULT_URLS = {
   mainnet: "https://ethereum-rpc.publicnode.com",
@@ -76,9 +83,9 @@ export class RpcClient {
     return parser.parse(rawValue);
   }
 
-  async debugTraceCall (from: string, to: string, callData: string, fs: FileSystem): Promise<MemoryDiffRaw> {
+  async debugTraceCall(from: string, to: string, callData: string): Promise<MemoryDiffRaw> {
     const res = await fetch(this.rpcUrl(), {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({
         method: "debug_traceCall",
         id: 1,
@@ -87,21 +94,21 @@ export class RpcClient {
           {
             from,
             to,
-            data: callData
+            data: callData,
           },
           "latest",
           {
             tracer: "prestateTracer",
             tracerConfig: {
-              diffMode: true
-            }
-          }
-        ]
+              diffMode: true,
+            },
+          },
+        ],
       }),
-    })
+    });
 
     const data = await res.json();
 
-    return memoryDiffParser.parse(data)
+    return memoryDiffParser.parse(data);
   }
 }

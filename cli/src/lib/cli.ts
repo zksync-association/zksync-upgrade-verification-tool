@@ -6,7 +6,7 @@ import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
 import * as console from "node:console";
 import { printError } from "./errors.js";
-import {memoryMapCommand} from "../commands/memory-map-command";
+import { memoryMapCommand } from "../commands/memory-map-command";
 
 export function buildCli(
   args: string[],
@@ -106,7 +106,7 @@ export function buildCli(
           demandOption: true,
         }),
       async (yargs) => {
-        return memoryMapCommand(env, yargs.upgradeDir)
+        return memoryMapCommand(env, yargs.upgradeDir);
       }
     )
     .command(

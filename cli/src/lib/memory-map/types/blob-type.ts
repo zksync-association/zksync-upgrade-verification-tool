@@ -1,21 +1,22 @@
-import type {MemoryDataType} from "./data-type";
-import {Option} from "nochoices";
-import {bytesToHex} from "viem";
+import type { MemoryDataType } from "./data-type";
+import type { Option } from "nochoices";
+import { bytesToHex } from "viem";
 
-import {MemorySnapshot} from "../memory-snapshot";
+import type { MemorySnapshot } from "../memory-snapshot";
 
 export class BlobType implements MemoryDataType {
-  extract (memory: MemorySnapshot, slot: bigint): Option<string> {
-    return memory.at(slot)
+  extract(memory: MemorySnapshot, slot: bigint): Option<string> {
+    return memory
+      .at(slot)
       .map(this.format)
-      .map(str => str.toLowerCase())
+      .map((str) => str.toLowerCase());
   }
 
-  format (data: Buffer): string {
-    return bytesToHex(data, {size: 32})
+  format(data: Buffer): string {
+    return bytesToHex(data, { size: 32 });
   }
 
-  get evmSize (): number {
+  get evmSize(): number {
     return 32;
   }
 }

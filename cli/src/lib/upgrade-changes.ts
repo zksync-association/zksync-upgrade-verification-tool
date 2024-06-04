@@ -43,7 +43,7 @@ export class UpgradeChanges {
     this.verifier = verifier;
     this.aaBytecodeHash = aaBytecodeHash;
     this.bootloaderBytecodeHash = booloaderBytecodeHash;
-    this.upgradeTxHex = upgradeTxHex
+    this.upgradeTxHex = upgradeTxHex;
   }
 
   matchingFacet(targetSelectors: string[]): FacetData | undefined {

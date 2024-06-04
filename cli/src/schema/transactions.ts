@@ -24,8 +24,8 @@ export const transactionsSchema = z.object({
         target: z.string(),
         data: z.string(),
       })
-    )
-  })
+    ),
+  }),
 });
 
 export type TransactionsJson = z.infer<typeof transactionsSchema>;
