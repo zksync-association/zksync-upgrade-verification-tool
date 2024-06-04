@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { account20String, bytes32Hash, hashString, transactionSchema } from "../schema";
+import { account20String, bytes32Hash } from "./common";
 import { facetCutsSchema } from "./facetCuts";
 
 export const verifierParamsSchema = z.object({

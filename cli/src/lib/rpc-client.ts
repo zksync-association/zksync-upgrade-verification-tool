@@ -9,7 +9,6 @@ import {
 } from "viem";
 import type { TypeOf, ZodType } from "zod";
 import type { PublicClient, HttpTransport } from "viem";
-import type { FileSystem } from "./file-system";
 import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
 
 const L1_DEFAULT_URLS = {
