@@ -1,9 +1,14 @@
 import {describe, expect, it} from "vitest";
-import {AddressType, BigNumberType, BooleanType, MemoryMap, Property, StructType} from "../src/lib/memory-map";
+import {MemoryMap} from "../src/lib/memory-map/memory-map";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {memoryDiffParser} from "../src/schema/rpc";
 import {type Hex, hexToBigInt, hexToBytes, keccak256} from "viem";
+import {AddressType} from "../src/lib/memory-map/types/address-type";
+import {StructType} from "../src/lib/memory-map/types/struct-type";
+import {BigNumberType} from "../src/lib/memory-map/types/big-number-type";
+import {Property} from "../src/lib/memory-map/property";
+import {BooleanType} from "../src/lib/memory-map/types/boolean-type";
 
 describe("MemoryMap", () => {
   const subject = async (file: string, selectors: Hex[] = []) => {
@@ -110,14 +115,14 @@ describe("MemoryMap", () => {
     const maybeValue = memory.changeFor("DiamondStorage.selectorToFacet")
     const value = maybeValue.unwrap()
 
-    const beforeLines = value.before.unwrap().split("\n");
+    const beforeLines = value.before.unwrap().split("\n").map(l => l.toLowerCase());
     expect(beforeLines).to.eql([
-      "[0x0e18b681]: 0x230214F0224C7E0485f348a79512ad00514DB1F7".toLowerCase()
+      "[0x0e18b681]: {facetAddress=>0x230214f0224c7e0485f348a79512ad00514db1f7,selectorPosition=>0,isFreezable=>false}".toLowerCase()
     ])
 
-    const afterLines = value.after.unwrap().split("\n");
+    const afterLines = value.after.unwrap().split("\n").map(l => l.toLowerCase());
     expect(afterLines).to.eql([
-      "[0x0e18b681]: 0x342a09385E9BAD4AD32a6220765A6c333552e565".toLowerCase()
+      "[0x0e18b681]: {facetAddress=>0x342a09385E9BAD4AD32a6220765A6c333552e565,selectorPosition=>0,isFreezable=>false}".toLowerCase()
     ])
   })
 
@@ -131,22 +136,22 @@ describe("MemoryMap", () => {
     const maybeValue = memory.changeFor("DiamondStorage.selectorToFacet")
     const value = maybeValue.unwrap()
 
-    const beforeLines = value.before.unwrap().split("\n");
+    const beforeLines = value.before.unwrap().split("\n").map(l => l.toLowerCase());
     expect(beforeLines).toHaveLength(4)
     expect(beforeLines).toEqual(expect.arrayContaining([
-      "[0x0e18b681]: 0x230214F0224C7E0485f348a79512ad00514DB1F7".toLowerCase(),
-      "[0x64bf8d66]: 0x230214F0224C7E0485f348a79512ad00514DB1F7".toLowerCase(),
-      "[0x52ef6b2c]: 0x10113bB3a8e64f8eD67003126adC8CE74C34610c".toLowerCase(),
-      "[0x6c0960f9]: 0xA57F9FFD65fC0F5792B5e958dF42399a114EC7e7".toLowerCase(),
+      "[0x0e18b681]: {facetAddress=>0x230214F0224C7E0485f348a79512ad00514DB1F7,selectorPosition=>0,isFreezable=>false}".toLowerCase(),
+      "[0x64bf8d66]: {facetAddress=>0x230214F0224C7E0485f348a79512ad00514DB1F7,selectorPosition=>2,isFreezable=>false}".toLowerCase(),
+      "[0x52ef6b2c]: {facetAddress=>0x10113bB3a8e64f8eD67003126adC8CE74C34610c,selectorPosition=>1,isFreezable=>false}".toLowerCase(),
+      "[0x6c0960f9]: {facetAddress=>0xA57F9FFD65fC0F5792B5e958dF42399a114EC7e7,selectorPosition=>0,isFreezable=>true}".toLowerCase(),
     ]))
 
-    const afterLines = value.after.unwrap().split("\n");
+    const afterLines = value.after.unwrap().split("\n").map(l => l.toLowerCase());
     expect(afterLines).toHaveLength(4)
     expect(afterLines).toEqual(expect.arrayContaining([
-      "[0x0e18b681]: 0x342a09385E9BAD4AD32a6220765A6c333552e565".toLowerCase(),
-      "[0x64bf8d66]: 0x342a09385E9BAD4AD32a6220765A6c333552e565".toLowerCase(),
-      "[0x52ef6b2c]: 0x345c6ca2F3E08445614f4299001418F125AD330a".toLowerCase(),
-      "[0x6c0960f9]: 0x7814399116C17F2750Ca99cBFD2b75bA9a0793d7".toLowerCase(),
+      "[0x0e18b681]: {facetAddress=>0x342a09385E9BAD4AD32a6220765A6c333552e565,selectorPosition=>0,isFreezable=>false}".toLowerCase(),
+      "[0x64bf8d66]: {facetAddress=>0x342a09385E9BAD4AD32a6220765A6c333552e565,selectorPosition=>1,isFreezable=>false}".toLowerCase(),
+      "[0x52ef6b2c]: {facetAddress=>0x345c6ca2F3E08445614f4299001418F125AD330a,selectorPosition=>3,isFreezable=>false}".toLowerCase(),
+      "[0x6c0960f9]: {facetAddress=>0x7814399116C17F2750Ca99cBFD2b75bA9a0793d7,selectorPosition=>1,isFreezable=>true}".toLowerCase(),
     ]))
   })
 
