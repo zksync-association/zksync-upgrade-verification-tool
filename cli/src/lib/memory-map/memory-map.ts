@@ -11,7 +11,6 @@ import { MemorySnapshot } from "./memory-snapshot";
 import { PropertyChange } from "./property-change";
 import { BooleanType } from "./types/boolean-type";
 import { FixedArrayType } from "./types/fixed-array-type";
-import { VerifierParamsType } from "./types/verifier-params-type";
 
 export class MemoryMap {
   pre: MemorySnapshot;
@@ -76,7 +75,20 @@ export class MemoryMap {
         "Storage.verifierParams",
         20n,
         "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
-        new VerifierParamsType()
+        new StructType([
+          {
+            name: "recursionNodeLevelVkHash",
+            type: new BlobType()
+          },
+          {
+            name: "recursionLeafLevelVkHash",
+            type: new BlobType()
+          },
+          {
+            name: "recursionCircuitsSetVksHash",
+            type: new BlobType()
+          }
+        ])
       ),
       new Property(
         "Storage.l2DefaultAccountBytecodeHash",

@@ -1,14 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { MemoryMap } from "../src/lib/memory-map/memory-map";
+import {describe, expect, it} from "vitest";
+import {MemoryMap} from "../src/lib/memory-map/memory-map";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { memoryDiffParser } from "../src/schema/rpc";
-import { type Hex, hexToBigInt } from "viem";
-import { AddressType } from "../src/lib/memory-map/types/address-type";
-import { StructType } from "../src/lib/memory-map/types/struct-type";
-import { BigNumberType } from "../src/lib/memory-map/types/big-number-type";
-import { Property } from "../src/lib/memory-map/property";
-import { BooleanType } from "../src/lib/memory-map/types/boolean-type";
+import {memoryDiffParser} from "../src/schema/rpc";
+import {type Hex, hexToBigInt} from "viem";
+import {AddressType} from "../src/lib/memory-map/types/address-type";
+import {StructType} from "../src/lib/memory-map/types/struct-type";
+import {BigNumberType} from "../src/lib/memory-map/types/big-number-type";
+import {Property} from "../src/lib/memory-map/property";
+import {BooleanType} from "../src/lib/memory-map/types/boolean-type";
 
 describe("MemoryMap", () => {
   const subject = async (file: string, selectors: Hex[] = []) => {
@@ -77,19 +77,19 @@ describe("MemoryMap", () => {
     const maybeValue = memory.changeFor("Storage.verifierParams");
     const value = maybeValue.unwrap();
 
-    const beforeLines = value.before.unwrap().split("\n");
-    expect(beforeLines).to.eql([
-      ".recursionNodeLevelVkHash: 0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080",
-      ".recursionLeafLevelVkHash: 0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a",
-      ".recursionCircuitsSetVksHash: Not affected",
-    ]);
+    const beforeLines = value.before.unwrap();
+    expect(beforeLines).toEqual(
+      "{recursionNodeLevelVkHash=>0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080" +
+      ",recursionLeafLevelVkHash=>0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a," +
+      "recursionCircuitsSetVksHash=>No content.}"
+    );
 
-    const afterLines = value.after.unwrap().split("\n");
-    expect(afterLines).to.eql([
-      ".recursionNodeLevelVkHash: 0xf520cd5b37e74e19fdb369c8d676a04dce8a19457497ac6686d2bb95d94109c8",
-      ".recursionLeafLevelVkHash: 0x435202d277dd06ef3c64ddd99fda043fc27c2bd8b7c66882966840202c27f4f6",
-      ".recursionCircuitsSetVksHash: Not affected",
-    ]);
+    const afterLines = value.after.unwrap();
+    expect(afterLines).toEqual(
+      "{recursionNodeLevelVkHash=>0xf520cd5b37e74e19fdb369c8d676a04dce8a19457497ac6686d2bb95d94109c8" +
+      ",recursionLeafLevelVkHash=>0x435202d277dd06ef3c64ddd99fda043fc27c2bd8b7c66882966840202c27f4f6," +
+      "recursionCircuitsSetVksHash=>No content.}"
+    );
   });
 
   it("can show big numbers", async () => {
