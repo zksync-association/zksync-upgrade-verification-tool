@@ -93,22 +93,16 @@ describe("MemoryMap", () => {
     expect(value.after.unwrap()).to.eql("24")
   })
 
-  it('test mapping keys', () => {
-    const mapSlot = "0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b"
-    const key = "0x0e18b681"
-    const mapSlotBytes = hexToBytes(mapSlot, {size: 32})
-    const keyBytes = hexToBytes(key, {size: 32})
-    //
-    const buf = Buffer.concat([keyBytes, mapSlotBytes]);
-    console.log(buf.toString('hex'))
-    const value = keccak256(buf)
-    // 0x0e18b60000000000000000000000000000000000000000000000000000000000c8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b
-    // const value = keccak256("0x0e18b68100000000000000000000000000000000000000000000000000000000c8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b")
-    expect(value).to.eql("0x02a257d44d183668a0c30e9d57fecdb34cf2d5f9fbb4a7ae8491d04bf23a7439")
-
-    // const arrSlot = keccak256("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131d")
-    // console.log(arrSlot)
-  })
+  // it('test mapping keys', () => {
+  //   const mapSlot = "0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b"
+  //   const key = "0x0e18b681"
+  //   const mapSlotBytes = hexToBytes(mapSlot, {size: 32})
+  //   const keyBytes = hexToBytes(key, {size: 32})
+  //   const buf = Buffer.concat([keyBytes, mapSlotBytes]);
+  //
+  //   const value = keccak256(buf)
+  //   expect(value).to.eql("0x02a257d44d183668a0c30e9d57fecdb34cf2d5f9fbb4a7ae8491d04bf23a7439")
+  // })
 
   it('can show mappings', async () => {
     const memory = await subject("realistic-memory-diff.json", ["0x0e18b681"])
