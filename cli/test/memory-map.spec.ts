@@ -173,6 +173,37 @@ describe("MemoryMap", () => {
     );
   });
 
+  it("can show variable arrays", async () => {
+    const memory = await subject("realistic-memory-diff.json")
+    const change = memory.changeFor("DiamondStorage.facets").unwrap()
+
+    const before = change.before.unwrap()
+      .replace('[', '')
+      .replace(']', '')
+      .split(',')
+      .map(addr => addr.toLowerCase())
+    expect(before).toHaveLength(4)
+    expect(before).toEqual(expect.arrayContaining([
+      "0x230214F0224C7E0485f348a79512ad00514DB1F7".toLowerCase(),
+      "0x10113bB3a8e64f8eD67003126adC8CE74C34610c".toLowerCase(),
+      "0xA57F9FFD65fC0F5792B5e958dF42399a114EC7e7".toLowerCase(),
+      "0xfd3779e6214eBBd40f5F5890351298e123A46BA6".toLowerCase()
+    ]))
+
+    const after = change.after.unwrap()
+      .replace('[', '')
+      .replace(']', '')
+      .split(',')
+      .map(addr => addr.toLowerCase())
+    expect(after).toHaveLength(4)
+    expect(after).toEqual(expect.arrayContaining([
+      "0x1a451d9bFBd176321966e9bc540596Ca9d39B4B1".toLowerCase(),
+      "0x342a09385E9BAD4AD32a6220765A6c333552e565".toLowerCase(),
+      "0x345c6ca2F3E08445614f4299001418F125AD330a".toLowerCase(),
+      "0x7814399116C17F2750Ca99cBFD2b75bA9a0793d7".toLowerCase()
+    ]))
+  })
+
   it("can show structs correctly", async () => {
     const diff = await fs.readFile(
       path.join(import.meta.dirname, "data", "realistic-memory-diff.json")

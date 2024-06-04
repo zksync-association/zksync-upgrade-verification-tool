@@ -1,16 +1,17 @@
-import type { MemoryDiffRaw } from "../../schema/rpc";
-import { Option } from "nochoices";
-import { type Hex, hexToBigInt, hexToBytes } from "viem";
-import { AddressType } from "./types/address-type";
-import { BlobType } from "./types/blob-type";
-import { MappingType } from "./mapping-type";
-import { StructType } from "./types/struct-type";
-import { BigNumberType } from "./types/big-number-type";
-import { Property } from "./property";
-import { MemorySnapshot } from "./memory-snapshot";
-import { PropertyChange } from "./property-change";
-import { BooleanType } from "./types/boolean-type";
-import { FixedArrayType } from "./types/fixed-array-type";
+import type {MemoryDiffRaw} from "../../schema/rpc";
+import {Option} from "nochoices";
+import {type Hex, hexToBigInt, hexToBytes} from "viem";
+import {AddressType} from "./types/address-type";
+import {BlobType} from "./types/blob-type";
+import {MappingType} from "./mapping-type";
+import {StructType} from "./types/struct-type";
+import {BigNumberType} from "./types/big-number-type";
+import {Property} from "./property";
+import {MemorySnapshot} from "./memory-snapshot";
+import {PropertyChange} from "./property-change";
+import {BooleanType} from "./types/boolean-type";
+import {FixedArrayType} from "./types/fixed-array-type";
+import {ArrayType} from "./types/array-type";
 
 export class MemoryMap {
   pre: MemorySnapshot;
@@ -127,6 +128,12 @@ export class MemoryMap {
           ])
         )
       ),
+      new Property(
+        "DiamondStorage.facets",
+        hexToBigInt("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b") + 2n,
+        "The array of all unique facet addresses that belong to the diamond proxy",
+        new ArrayType(new AddressType())
+      )
     ];
   }
 }
