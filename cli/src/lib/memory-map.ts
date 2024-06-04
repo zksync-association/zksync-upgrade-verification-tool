@@ -7,14 +7,17 @@ import {
   hexToBigInt,
   hexToBytes,
   keccak256,
-  numberToBytes
+  numberToBytes,
 } from "viem";
+import {undefined} from "zod";
 
 interface MemoryDataType {
   extract (memory: MemorySnapshot, slot: bigint): Option<string>
+
+  get evmSize (): number
 }
 
-class AddressType implements MemoryDataType {
+export class AddressType implements MemoryDataType {
   extract (memory: MemorySnapshot, slot: bigint): Option<string> {
     return memory.at(slot)
       .map(this.format)
@@ -24,9 +27,13 @@ class AddressType implements MemoryDataType {
     const sub = data.subarray(data.length - 20, data.length)
     return bytesToHex(sub);
   }
+
+  get evmSize (): number {
+    return 20;
+  }
 }
 
-class HexFormat implements MemoryDataType {
+class BlobSlot implements MemoryDataType {
   extract (memory: MemorySnapshot, slot: bigint): Option<string> {
     return memory.at(slot)
       .map(this.format)
@@ -35,6 +42,10 @@ class HexFormat implements MemoryDataType {
 
   format (data: Buffer): string {
     return bytesToHex(data, { size: 32 })
+  }
+
+  get evmSize (): number {
+    return 32;
   }
 }
 
@@ -67,6 +78,10 @@ class SelectorMappingFormat implements MemoryDataType{
       .map(o => o.unwrap())
       .join("\n"));
   }
+
+  get evmSize (): number {
+    return 32;
+  }
 }
 
 class FixedArray implements MemoryDataType {
@@ -91,11 +106,15 @@ class FixedArray implements MemoryDataType {
       .filter(c => c.length !== 0)
       .map(lines => lines.join("\n"))
   }
+
+  get evmSize (): number {
+    return this.inner.evmSize * this.size;
+  }
 }
 
 class VerifierParamsType implements MemoryDataType {
   extract (memory: MemorySnapshot, slot: bigint): Option<string> {
-    const hex = new HexFormat()
+    const hex = new BlobSlot()
     const keys = [
       "recursionNodeLevelVkHash",
       "recursionLeafLevelVkHash",
@@ -115,17 +134,97 @@ class VerifierParamsType implements MemoryDataType {
       arr.map(([name, opt]) => `.${name}: ${opt.unwrapOr("Not affected")}`).join("\n")
     )
   }
-}
 
-class BigNumberType implements MemoryDataType {
-  extract (memory: MemorySnapshot, slot: bigint): Option<string> {
-    return memory.at(slot)
-      .map(bytesToBigInt)
-      .map(int => int.toString());
+  get evmSize (): number {
+    return 32 * 3;
   }
 }
 
-class Property {
+export class BooleanType implements MemoryDataType {
+  private offset: number;
+
+  constructor (offset: number) {
+    this.offset = offset
+  }
+
+  extract (memory: MemorySnapshot, slot: bigint): Option<string> {
+    return memory.at(slot)
+      .map(buf => buf[buf.length - this.offset - 1])
+      .map(byte => byte === 0 ? "false" : "true");
+  }
+
+  get evmSize (): number {
+    return 1;
+  }
+
+}
+
+export class BigNumberType implements MemoryDataType {
+  private size: number;
+  private offset: number;
+  constructor (size = 32, offset = 0) {
+    this.size = size
+    this.offset = offset
+  }
+
+  extract (memory: MemorySnapshot, slot: bigint): Option<string> {
+    const start = 32 - this.offset - this.size
+    return memory.at(slot)
+      .map(buf => buf.subarray(start, start + this.size))
+      .map(bytesToBigInt)
+      .map(int => int.toString());
+  }
+
+  get evmSize (): number {
+    return this.size;
+  }
+}
+
+type StructField = { name: string, type: MemoryDataType }
+export class StructType implements MemoryDataType {
+  private fields: StructField[];
+
+  constructor (fields: StructField[]) {
+    this.fields = fields
+  }
+
+  extract (memory: MemorySnapshot, slot: bigint): Option<string> {
+    let acum = 0
+    // let current = memory.at(slot).unwrapOr(Buffer.alloc(32).fill(0))
+    let slotPosition = 0n
+    const res: Record<string, Option<string>> = {}
+    for (const { name, type} of this.fields) {
+      if (acum + type.evmSize > 32) {
+        // current = memory.at(slot + slotPosition).unwrapOr(Buffer.alloc(32).fill(0))
+        slotPosition += 1n
+        acum = 0
+      }
+
+      res[name] = type.extract(memory, slot + slotPosition)
+
+      acum += type.evmSize
+    }
+
+    if (Object.values(res).every(r => r.isNone())) {
+      return Option.None()
+    }
+
+    const content = []
+
+    for (const key in res) {
+      const value = res[key]
+      content.push(`${key}=>${value.unwrapOr("No content.")}`)
+    }
+
+    return Option.Some(`{${content.join(',')}}`)
+  }
+
+  get evmSize (): number {
+    return this.fields.map(field => field.type.evmSize).reduce((a,b) => a + b);
+  }
+}
+
+export class Property {
   name: string
   slot: bigint
   description: string
@@ -188,8 +287,9 @@ export class MemoryMap {
   pre: MemorySnapshot
   post: MemorySnapshot
   private selectors: Hex[];
+  private contractProps: Property[];
 
-  constructor (diff: MemoryDiffRaw, addr: string, selectors: Hex[]) {
+  constructor (diff: MemoryDiffRaw, addr: string, selectors: Hex[], contractProps: Property[] = []) {
     const pre = diff.result.pre[addr]
     const post = diff.result.post[addr]
 
@@ -204,10 +304,13 @@ export class MemoryMap {
     this.pre = new MemorySnapshot(pre.storage)
     this.post = new MemorySnapshot(post.storage)
     this.selectors = selectors
+    this.contractProps = contractProps.length === 0
+      ? this.allContractProps()
+      : contractProps
   }
 
   changeFor (propName: string): Option<PropertyChange> {
-    const maybe = Option.fromNullable(this.allProps().find(p => p.name === propName))
+    const maybe = Option.fromNullable(this.contractProps.find(p => p.name === propName))
     return maybe.map(prop => new PropertyChange(
         prop,
         prop.extract(this.pre),
@@ -217,12 +320,12 @@ export class MemoryMap {
   }
 
   allChanges (): PropertyChange[] {
-    return this.allProps().map(prop => {
+    return this.allContractProps().map(prop => {
       return new PropertyChange(prop, prop.extract(this.pre), prop.extract(this.post))
     }).filter(change => change.before.isSome() || change.after.isSome())
   }
 
-  private allProps(): Property[] {
+  private allContractProps(): Property[] {
     return [
       new Property(
         "Storage.__DEPRECATED_diamondCutStorage",
@@ -252,7 +355,7 @@ export class MemoryMap {
         "Storage.l2DefaultAccountBytecodeHash",
         24n,
         "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
-        new HexFormat()
+        new BlobSlot()
       ),
       new Property(
         "Storage.protocolVersion",

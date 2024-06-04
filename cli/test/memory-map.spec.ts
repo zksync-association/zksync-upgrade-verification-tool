@@ -1,9 +1,9 @@
 import {describe, expect, it} from "vitest";
-import {MemoryMap} from "../src/lib/memory-map";
+import {AddressType, BigNumberType, BooleanType, MemoryMap, Property, StructType} from "../src/lib/memory-map";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {memoryDiffParser} from "../src/schema/rpc";
-import {type Hex, hexToBigInt, hexToBytes, keccak256, numberToBytes} from "viem";
+import {type Hex, hexToBigInt, hexToBytes, keccak256} from "viem";
 
 describe("MemoryMap", () => {
   const subject = async (file: string, selectors: Hex[] = []) => {
@@ -91,13 +91,13 @@ describe("MemoryMap", () => {
   it('test mapping keys', () => {
     const mapSlot = "0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b"
     const key = "0x0e18b681"
-    const mapSlotBytes = hexToBytes(mapSlot, { size: 32 })
-    const keyBytes = hexToBytes(key, { size: 32 })
+    const mapSlotBytes = hexToBytes(mapSlot, {size: 32})
+    const keyBytes = hexToBytes(key, {size: 32})
     //
     const buf = Buffer.concat([keyBytes, mapSlotBytes]);
     console.log(buf.toString('hex'))
     const value = keccak256(buf)
-                                // 0x0e18b60000000000000000000000000000000000000000000000000000000000c8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b
+    // 0x0e18b60000000000000000000000000000000000000000000000000000000000c8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b
     // const value = keccak256("0x0e18b68100000000000000000000000000000000000000000000000000000000c8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b")
     expect(value).to.eql("0x02a257d44d183668a0c30e9d57fecdb34cf2d5f9fbb4a7ae8491d04bf23a7439")
 
@@ -148,5 +148,37 @@ describe("MemoryMap", () => {
       "[0x52ef6b2c]: 0x345c6ca2F3E08445614f4299001418F125AD330a".toLowerCase(),
       "[0x6c0960f9]: 0x7814399116C17F2750Ca99cBFD2b75bA9a0793d7".toLowerCase(),
     ]))
+  })
+
+
+  it("can show structs correctly", async () => {
+    const diff = await fs.readFile(path.join(import.meta.dirname, "data", "realistic-memory-diff.json"));
+    const json = memoryDiffParser.parse(JSON.parse(diff.toString()));
+    const prop = new Property(
+      "myStruct",
+      hexToBigInt("0xf78707ba12ab026e6a86b731b9d6b0fc0e151ddd06be4f9f8e940a8fa89bb893"),
+      "Some struct",
+      new StructType([
+        {
+          name: "facetAddress",
+          type: new AddressType()
+        },
+        {
+          name: "selectorPosition",
+          type: new BigNumberType(2, 20)
+        },
+        {
+          name: "isFreezable",
+          type: new BooleanType(22)
+        }
+      ])
+    )
+
+    const map = new MemoryMap(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", [], [prop])
+
+    const change = map.changeFor("myStruct").unwrap()
+
+    expect(change.before.unwrap().toLowerCase()).toEqual("{facetAddress=>0xA57F9FFD65fC0F5792B5e958dF42399a114EC7e7,selectorPosition=>3,isFreezable=>true}".toLowerCase())
+    expect(change.after.unwrap().toLowerCase()).toEqual("{facetAddress=>0x7814399116C17F2750Ca99cBFD2b75bA9a0793d7,selectorPosition=>4,isFreezable=>true}".toLowerCase())
   })
 })
