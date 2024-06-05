@@ -6,6 +6,7 @@ import type {
 } from "../schema/index.js";
 import {VerifierContract} from "./verifier.js";
 import type {Hex} from "viem";
+import {Option} from "nochoices";
 
 export type FacetData = {
   name: string;
@@ -27,14 +28,14 @@ export class UpgradeChanges {
   systemContractChanges: SystemContractData[];
   aaBytecodeHash: string;
   bootloaderBytecodeHash: string;
-  upgradeTxHex: string;
+  upgradeCalldataHex: Option<string>;
 
   constructor (
     newProtocolVersion: string,
     verifier: VerifierContract,
     aaBytecodeHash: string,
     booloaderBytecodeHash: string,
-    upgradeTxHex: string
+    upgradeTxHex?: string
   ) {
     this.newProtocolVersion = newProtocolVersion;
     this.facets = [];
@@ -43,7 +44,7 @@ export class UpgradeChanges {
     this.verifier = verifier;
     this.aaBytecodeHash = aaBytecodeHash;
     this.bootloaderBytecodeHash = booloaderBytecodeHash;
-    this.upgradeTxHex = upgradeTxHex;
+    this.upgradeCalldataHex = Option.fromNullable(upgradeTxHex);
   }
 
   matchingFacet (targetSelectors: string[]): FacetData | undefined {
@@ -89,7 +90,7 @@ export class UpgradeChanges {
       verifier,
       txFile.proposeUpgradeTx.defaultAccountHash,
       txFile.proposeUpgradeTx.bootloaderHash,
-      txFile.governanceOperation.calls[0].data
+      txFile.governanceOperation?.calls[0]?.data
     );
 
     if (facets) {

@@ -13,7 +13,7 @@ export async function memoryMapCommand(env: EnvBuilder, dir: string): Promise<vo
   const rawMap = await anotherRpc.debugTraceCall(
     "0x0b622a2061eaccae1c664ebc3e868b8438e03f61",
     state.addr,
-    changes.upgradeTxHex
+    changes.upgradeCalldataHex.expect(new Error("Missing upgrade calldata"))
   );
 
   const selectors = new Set<Hex>()
