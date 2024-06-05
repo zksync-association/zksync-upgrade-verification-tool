@@ -1,15 +1,17 @@
 import type { MemoryDataType } from "./data-type";
 import type { Option } from "nochoices";
-import { bytesToHex } from "viem";
+import {bytesToHex, type Hex} from "viem";
 
 import type { MemorySnapshot } from "../memory-snapshot";
+import {AddressValue} from "../values/address-value";
+import type {MemoryValue} from "../values/memory-value";
 
 export class AddressType implements MemoryDataType {
-  extract(memory: MemorySnapshot, slot: bigint): Option<string> {
-    return memory.at(slot).map(this.format);
+  extract(memory: MemorySnapshot, slot: bigint): Option<AddressValue> {
+    return memory.at(slot).map(this.format).map(str => new AddressValue(str));
   }
 
-  format(data: Buffer): string {
+  format(data: Buffer): Hex {
     const sub = data.subarray(data.length - 20, data.length);
     return bytesToHex(sub);
   }

@@ -3,6 +3,7 @@ import type { Option } from "nochoices";
 import { bytesToBigInt } from "viem";
 
 import type { MemorySnapshot } from "../memory-snapshot";
+import {BigNumberValue} from "../values/big-number-value";
 
 export class BigNumberType implements MemoryDataType {
   private size: number;
@@ -13,13 +14,13 @@ export class BigNumberType implements MemoryDataType {
     this.offset = offset;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint): Option<string> {
+  extract(memory: MemorySnapshot, slot: bigint): Option<BigNumberValue> {
     const start = 32 - this.offset - this.size;
     return memory
       .at(slot)
       .map((buf) => buf.subarray(start, start + this.size))
       .map(bytesToBigInt)
-      .map((int) => int.toString());
+      .map(n => new BigNumberValue(n))
   }
 
   get evmSize(): number {
