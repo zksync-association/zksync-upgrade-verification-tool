@@ -14,12 +14,12 @@ describe("MemoryMap", () => {
   const subject = async (file: string, selectors: Hex[] = []) => {
     const diff = await fs.readFile(path.join(import.meta.dirname, "data", file));
     const json = memoryDiffParser.parse(JSON.parse(diff.toString()));
-    return new MemoryMap(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", selectors);
+    return new MemoryMap(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", selectors, []);
   };
 
   it("can extract value change for a simple hash value", async () => {
     const memory = await subject("realistic-memory-diff.json");
-    const maybeValue = memory.changeFor("Storage.l2DefaultAccountBytecodeHash");
+    const maybeValue = memory.changeFor("Base.s.l2DefaultAccountBytecodeHash");
     const value = maybeValue.unwrap();
 
     expect(value.before.unwrap()).to.eql(
@@ -32,7 +32,7 @@ describe("MemoryMap", () => {
 
   it("can extract value change that is an address", async () => {
     const memory = await subject("realistic-memory-diff.json");
-    const maybeValue = memory.changeFor("Storage.verifier");
+    const maybeValue = memory.changeFor("Base.s.verifier");
     const value = maybeValue.unwrap();
 
     expect(value.before.unwrap().toLowerCase()).to.eql(
@@ -45,7 +45,7 @@ describe("MemoryMap", () => {
 
   it("can extract value change for fixed array", async () => {
     const memory = await subject("change-in-deprecated-facets-array.json");
-    const maybeValue = memory.changeFor("Storage.__DEPRECATED_diamondCutStorage");
+    const maybeValue = memory.changeFor("Base.s.__DEPRECATED_diamondCutStorage");
     const value = maybeValue.unwrap();
 
     const beforeLines = value.before.unwrap().split("\n");
@@ -74,7 +74,7 @@ describe("MemoryMap", () => {
 
   it("can show verifier param changes", async () => {
     const memory = await subject("realistic-memory-diff.json");
-    const maybeValue = memory.changeFor("Storage.verifierParams");
+    const maybeValue = memory.changeFor("Base.s.verifierParams");
     const value = maybeValue.unwrap();
 
     const beforeLines = value.before.unwrap();
@@ -94,7 +94,7 @@ describe("MemoryMap", () => {
 
   it("can show big numbers", async () => {
     const memory = await subject("realistic-memory-diff.json");
-    const maybeValue = memory.changeFor("Storage.protocolVersion");
+    const maybeValue = memory.changeFor("Base.s.protocolVersion");
     const value = maybeValue.unwrap();
 
     expect(value.before.unwrap()).to.eql("22");
@@ -235,7 +235,7 @@ describe("MemoryMap", () => {
       ])
     );
 
-    const map = new MemoryMap(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", [], [prop]);
+    const map = new MemoryMap(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", [], [], [prop]);
 
     const change = map.changeFor("myStruct").unwrap();
 

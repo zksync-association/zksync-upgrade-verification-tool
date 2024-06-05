@@ -1,11 +1,11 @@
 import { facetsResponseSchema } from "../schema/new-facets.js";
-import type { SystemContractData, UpgradeChanges } from "./upgrade-changes.js";
+import type { UpgradeChanges } from "./upgrade-changes.js";
 import type { BlockExplorerClient } from "./block-explorer-client.js";
 import type { Network } from "./constants.js";
 import { VerifierContract } from "./verifier.js";
 import { verifierParamsSchema } from "../schema/index.js";
 import { z } from "zod";
-import { type Abi, createPublicClient, type Hex, http } from "viem";
+import { type Abi, type Hex } from "viem";
 import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
 import { utils } from "zksync-ethers";
 import { SystemContractChange } from "./system-contract-change";
@@ -36,9 +36,9 @@ export class ZkSyncEraState {
   addr: string;
   private protocolVersion: bigint;
 
-  selectorToFacet: Map<string, string>;
-  facetToSelectors: Map<string, string[]>;
-  facetToContractData: Map<string, ContractData>;
+  selectorToFacet: Map<Hex, Hex>;
+  facetToSelectors: Map<Hex, Hex[]>;
+  facetToContractData: Map<Hex, ContractData>;
 
   private verifier?: VerifierContract;
   private l1Rpc: RpcClient;
@@ -252,5 +252,9 @@ export class ZkSyncEraState {
       abi,
       z.string()
     );
+  }
+
+  allSelectors (): Hex[] {
+    return [...this.selectorToFacet.keys()]
   }
 }

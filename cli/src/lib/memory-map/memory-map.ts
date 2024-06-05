@@ -13,13 +13,16 @@ import { BooleanType } from "./types/boolean-type";
 import { FixedArrayType } from "./types/fixed-array-type";
 import { ArrayType } from "./types/array-type";
 
+const DIAMOND_STORAGE_SLOT = hexToBigInt("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b");
+
 export class MemoryMap {
   pre: MemorySnapshot;
   post: MemorySnapshot;
   private selectors: Hex[];
   private contractProps: Property[];
+  private facets: Hex[];
 
-  constructor(diff: MemoryDiffRaw, addr: string, selectors: Hex[], contractProps: Property[] = []) {
+  constructor (diff: MemoryDiffRaw, addr: string, selectors: Hex[], facets: Hex[] = [], contractProps: Property[] = []) {
     const pre = diff.result.pre[addr];
     const post = diff.result.post[addr];
 
@@ -34,6 +37,7 @@ export class MemoryMap {
     this.pre = new MemorySnapshot(pre.storage);
     this.post = new MemorySnapshot(post.storage);
     this.selectors = selectors;
+    this.facets = facets
     this.contractProps = contractProps.length === 0 ? this.allContractProps() : contractProps;
   }
 
@@ -55,67 +59,67 @@ export class MemoryMap {
   private allContractProps(): Property[] {
     return [
       new Property(
-        "Storage.__DEPRECATED_diamondCutStorage",
+        "Base.s.__DEPRECATED_diamondCutStorage",
         0n,
         "[DEPRECATED] Storage of variables needed for deprecated diamond cut facet",
         new FixedArrayType(7, new AddressType())
       ),
       new Property(
-        "Storage.governor",
+        "Base.s.governor",
         7n,
         "Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing)",
         new AddressType()
       ),
       new Property(
-        "Storage.pendingGovernor",
+        "Base.s.pendingGovernor",
         8n,
         "Address that the governor proposed as one that will replace it",
         new AddressType()
       ),
       new Property(
-        "Storage.validators",
+        "Base.s.validators",
         9n,
         "List of permitted validators",
         new MappingType([], new BooleanType())
       ),
       new Property(
-        "Storage.verifier",
+        "Base.s.verifier",
         10n,
         "Verifier contract. Used to verify aggregated proof for batches",
         new AddressType()
       ),
       new Property(
-        "Storage.totalBatchesExecuted",
+        "Base.s.totalBatchesExecuted",
         11n,
         "Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch (batch 0 is genesis)",
         new BigNumberType()
       ),
       new Property(
-        "Storage.totalBatchesVerified",
+        "Base.s.totalBatchesVerified",
         12n,
         "Total number of proved batches i.e. batches[totalBatchesProved] points at the latest proved batch",
         new BigNumberType()
       ),
       new Property(
-        "Storage.totalBatchesCommitted",
+        "Base.s.totalBatchesCommitted",
         13n,
         "Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed batch",
         new BigNumberType()
       ),
       new Property(
-        "Storage.storedBatchHashes",
+        "Base.s.storedBatchHashes",
         14n,
         "Stored hashed StoredBatch for batch number",
         new MappingType([], new BigNumberType())
       ),
       new Property(
-        "Storage.l2LogsRootHashes",
+        "Base.s.l2LogsRootHashes",
         15n,
         "Stored root hashes of L2 -> L1 logs",
         new MappingType([], new BigNumberType())
       ),
       new Property(
-        "Storage.priorityQueue",
+        "Base.s.priorityQueue",
         15n,
         "Container that stores transactions requested from L1",
         new StructType([
@@ -150,13 +154,13 @@ export class MemoryMap {
         ])
       ),
       new Property(
-        "Storage.__DEPRECATED_allowList",
+        "Base.s.__DEPRECATED_allowList",
         19n,
         "The smart contract that manages the list with permission to call contract functions",
         new AddressType()
       ),
       new Property(
-        "Storage.verifierParams",
+        "Base.s.verifierParams",
         20n,
         "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
         new StructType([
@@ -175,26 +179,26 @@ export class MemoryMap {
         ])
       ),
       new Property(
-        "Storage.l2BootloaderBytecodeHash",
+        "Base.s.l2BootloaderBytecodeHash",
         23n,
         "Bytecode hash of bootloader program. Used as an input to zkp-circuit.",
         new BlobType()
       ),
       new Property(
-        "Storage.l2DefaultAccountBytecodeHash",
+        "Base.s.l2DefaultAccountBytecodeHash",
         24n,
         "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
         new BlobType()
       ),
       new Property(
-        "Storage.zkPorterIsAvailable",
+        "Base.s.zkPorterIsAvailable",
         25n,
         "Indicates that the porter may be touched on L2 transactions. " +
           "Used as an input to zkp-circuit.",
         new BooleanType()
       ),
       new Property(
-        "Storage.priorityTxMaxGasLimit",
+        "Base.s.priorityTxMaxGasLimit",
         26n,
         "The maximum number of the L2 gas that a user can request for L1 -> L2 transactions " +
           'This is the maximum number of L2 gas that is available for the "body" of the transaction, i.e. ' +
@@ -202,13 +206,13 @@ export class MemoryMap {
         new BigNumberType()
       ),
       new Property(
-        "Storage.__DEPRECATED_upgrades",
+        "Base.s.__DEPRECATED_upgrades",
         27n,
         "[DEPRECATED] Storage of variables needed for upgrade facet",
         new BlobType()
       ),
       new Property(
-        "Storage.isEthWithdrawalFinalized",
+        "Base.s.isEthWithdrawalFinalized",
         29n,
         "A mapping L2 batch number => message number => flag. " +
           "The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as " +
@@ -217,44 +221,44 @@ export class MemoryMap {
         new MappingType([], new MappingType([], new BooleanType()))
       ),
       new Property(
-        "Storage.__DEPRECATED_lastWithdrawalLimitReset",
+        "Base.s.__DEPRECATED_lastWithdrawalLimitReset",
         30n,
         "The most recent withdrawal time and amount reset",
         new BigNumberType()
       ),
       new Property(
-        "Storage.__DEPRECATED_withdrawnAmountInWindow",
+        "Base.s.__DEPRECATED_withdrawnAmountInWindow",
         31n,
         "The accumulated withdrawn amount during the withdrawal limit window",
         new BigNumberType()
       ),
       new Property(
-        "Storage.__DEPRECATED_totalDepositedAmountPerUser",
+        "Base.s.__DEPRECATED_totalDepositedAmountPerUser",
         32n,
         "[DEPRECATED] A mapping user address => the total deposited amount by the user",
         new MappingType([], new BigNumberType())
       ),
       new Property(
-        "Storage.protocolVersion",
+        "Base.s.protocolVersion",
         33n,
         "Stores the protocol version. Note, that the protocol version may not only encompass changes to the smart contracts, but also to the node behavior.",
         new BigNumberType()
       ),
       new Property(
-        "Storage.l2SystemContractsUpgradeTxHash",
+        "Base.s.l2SystemContractsUpgradeTxHash",
         34n,
         "Hash of the system contract upgrade transaction. If 0, then no upgrade transaction needs to be done.",
         new BlobType()
       ),
       new Property(
-        "Storage.l2SystemContractsUpgradeBatchNumber",
+        "Base.s.l2SystemContractsUpgradeBatchNumber",
         35n,
         "Batch number where the upgrade transaction has happened. If 0, then no upgrade " +
           "yet transaction has happened",
         new BlobType()
       ),
       new Property(
-        "Storage.admin",
+        "Base.s.admin",
         36n,
         "Address which will exercise non-critical changes to the Diamond Proxy (changing validator set & unfreezing)",
         new AddressType()
@@ -299,7 +303,7 @@ export class MemoryMap {
       ),
       new Property(
         "DiamondStorage.selectorToFacet",
-        hexToBigInt("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b"),
+        DIAMOND_STORAGE_SLOT,
         "A mapping from the selector to the facet address and its meta information",
         new MappingType(
           this.selectors.map((sel) => {
@@ -324,10 +328,10 @@ export class MemoryMap {
       ),
       new Property(
         "DiamondStorage.facetToSelectors",
-        hexToBigInt("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b") + 1n,
+        DIAMOND_STORAGE_SLOT + 1n,
         "The array of all unique facet addresses that belong to the diamond proxy",
         new MappingType(
-          [],
+          this.facets.map(s => hexToBytes(s)).map(Buffer.from),
           new StructType([
             {
               name: "selectors",
@@ -342,7 +346,7 @@ export class MemoryMap {
       ),
       new Property(
         "DiamondStorage.facets",
-        hexToBigInt("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b") + 2n,
+        DIAMOND_STORAGE_SLOT + 2n,
         "The array of all unique facet addresses that belong to the diamond proxy",
         new ArrayType(new AddressType())
       ),

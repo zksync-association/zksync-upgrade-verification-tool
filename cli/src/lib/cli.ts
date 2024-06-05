@@ -97,8 +97,8 @@ export function buildCli(
       }
     )
     .command(
-      "coso <upgradeDir>",
-      "Esto es un coso",
+      "storage-diff <upgradeDir>",
+      "Executes the upgrade transaction in debug mode to analyze the changes in contract storage",
       (yargs) =>
         yargs.positional("upgradeDir", {
           describe: "FolderName of the upgrade to check",

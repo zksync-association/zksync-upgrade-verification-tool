@@ -4,13 +4,13 @@ import type {
   TransactionsJson,
   UpgradeManifest,
 } from "../schema/index.js";
-import { VerifierContract } from "./verifier.js";
-import type { Hex } from "viem";
+import {VerifierContract} from "./verifier.js";
+import type {Hex} from "viem";
 
 export type FacetData = {
   name: string;
   address: string;
-  selectors: string[];
+  selectors: Hex[];
 };
 
 export type SystemContractData = {
@@ -22,14 +22,14 @@ export type SystemContractData = {
 export class UpgradeChanges {
   newProtocolVersion: string;
   facets: FacetData[];
-  orphanedSelectors: string[];
+  orphanedSelectors: Hex[];
   verifier: VerifierContract;
   systemContractChanges: SystemContractData[];
   aaBytecodeHash: string;
   bootloaderBytecodeHash: string;
   upgradeTxHex: string;
 
-  constructor(
+  constructor (
     newProtocolVersion: string,
     verifier: VerifierContract,
     aaBytecodeHash: string,
@@ -46,11 +46,11 @@ export class UpgradeChanges {
     this.upgradeTxHex = upgradeTxHex;
   }
 
-  matchingFacet(targetSelectors: string[]): FacetData | undefined {
+  matchingFacet (targetSelectors: string[]): FacetData | undefined {
     return this.facets.find((f) => f.selectors.some((sel) => targetSelectors.includes(sel)));
   }
 
-  addFacet(facetName: string, facetAddr: string, selectors: string[]) {
+  addFacet (facetName: string, facetAddr: string, selectors: string[]) {
     this.orphanedSelectors = this.orphanedSelectors.filter(
       (selector) => !selectors.includes(selector)
     );
@@ -58,19 +58,19 @@ export class UpgradeChanges {
     this.facets.push({
       name: facetName,
       address: facetAddr,
-      selectors: selectors,
+      selectors: selectors as Hex[],
     });
   }
 
-  removeFacet(selectors: string[]) {
-    this.orphanedSelectors.push(...selectors);
+  removeFacet (selectors: string[]) {
+    this.orphanedSelectors.push(...selectors as Hex[]);
   }
 
-  addSystemContract(change: SystemContractData) {
+  addSystemContract (change: SystemContractData) {
     this.systemContractChanges.push(change);
   }
 
-  static fromFiles(
+  static fromFiles (
     common: UpgradeManifest,
     txFile: TransactionsJson,
     facets?: FacetsJson,
@@ -126,5 +126,12 @@ export class UpgradeChanges {
     }
 
     return instance;
+  }
+
+  allSelectors (): Hex[] {
+    return this.facets
+      .map(f => f.selectors)
+      .flat()
+      .concat(this.orphanedSelectors);
   }
 }

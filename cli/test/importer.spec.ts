@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { UpgradeImporter } from "../src/lib";
+import {BlockExplorerClient, UpgradeImporter, ZkSyncEraState} from "../src/lib";
 import { FileSystem } from "../src/lib/file-system";
 import path from "node:path";
-import { ZodError } from "zod";
+import {z, ZodError} from "zod";
 import { MalformedUpgrade } from "../src/lib/errors";
+import {facetsResponseSchema} from "../src/schema/new-facets";
+import {RpcClient} from "../src/lib/rpc-client";
 
 class TestFS extends FileSystem {
   private registered: Map<string, string>;

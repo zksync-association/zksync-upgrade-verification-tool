@@ -1,9 +1,9 @@
-import { BlockExplorerClient } from "./block-explorer-client.js";
-import type { Network } from "./constants.js";
-import { RpcClient } from "./rpc-client.js";
-import { EraContractsRepo } from "./era-contracts-repo";
-import { FileSystem } from "./file-system";
-import { UpgradeImporter } from "./importer";
+import {BlockExplorerClient} from "./block-explorer-client.js";
+import type {Network} from "./constants.js";
+import {RpcClient} from "./rpc-client.js";
+import {EraContractsRepo} from "./era-contracts-repo";
+import {FileSystem} from "./file-system";
+import {UpgradeImporter} from "./importer";
 
 export class EnvBuilder {
   private _etherscanApiKey?: string;
@@ -16,6 +16,7 @@ export class EnvBuilder {
   private _repo?: EraContractsRepo;
 
   // Config
+  private _rpcL1?: RpcClient;
 
   withNetwork(n: Network): void {
     this._network = n;
@@ -67,7 +68,13 @@ export class EnvBuilder {
   }
 
   rpcL1(): RpcClient {
-    return RpcClient.forL1(this.network);
+    if (!this._rpcL1) {
+      this._rpcL1 = this.rpcUrl
+        ? new RpcClient(this.rpcUrl)
+        : RpcClient.forL1(this.network)
+    }
+
+    return this._rpcL1;
   }
 
   rpcL2(): RpcClient {
