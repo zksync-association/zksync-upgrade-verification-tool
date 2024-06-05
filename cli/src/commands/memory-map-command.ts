@@ -1,8 +1,6 @@
 import type { EnvBuilder } from "../lib/env-builder";
 import { UpgradeImporter, ZkSyncEraState } from "../lib/index";
-import { RpcClient } from "../lib/rpc-client";
 import { MemoryMap } from "../lib/memory-map/memory-map";
-import CliTable from "cli-table3";
 import chalk from "chalk";
 import type {Hex} from "viem";
 
