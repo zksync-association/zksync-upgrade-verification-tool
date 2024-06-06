@@ -3,7 +3,7 @@ import { MemoryMap } from "../src/lib/memory-map/memory-map";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { memoryDiffParser } from "../src/schema/rpc";
-import {bytesToHex, type Hex, hexToBigInt} from "viem";
+import {bytesToHex, type Hex, hexToBigInt, numberToBytes, numberToHex} from "viem";
 import { AddressType } from "../src/lib/memory-map/types/address-type";
 import { StructType } from "../src/lib/memory-map/types/struct-type";
 import { BigNumberType } from "../src/lib/memory-map/types/big-number-type";
@@ -75,7 +75,7 @@ class TestReport implements MemoryReport<string> {
   writeMapping (fields: ValueField[]): string {
     return fields.map(({key, value}) => {
       return `[${key}]: ${value.writeInto(this)}`
-    }).join(", ");
+    }).join("\n");
   }
 }
 
@@ -94,6 +94,13 @@ describe("MemoryMap", () => {
     test.add(value)
     return test
   }
+
+  it("coso", () => {
+      let a = numberToBytes(103079215105n)
+      console.log(Buffer.from(a).toString("hex"))
+
+
+  })
 
   it("can extract value change for a simple hash value", async () => {
     const test = await scenario("realistic-memory-diff.json", "Base.s.l2DefaultAccountBytecodeHash")
@@ -183,37 +190,36 @@ describe("MemoryMap", () => {
       .unwrap()
 
     expect(beforeLines).toEqual(
-      "[0x0e18b681]: {facetAddress=>0x230214f0224c7e0485f348a79512ad00514db1f7,selectorPosition=>0,isFreezable=>false}".toLowerCase(),
+      "[0x0e18b681]: facetAddress=>0x230214f0224c7e0485f348a79512ad00514db1f7, selectorPosition=>0, isFreezable=>true",
     );
 
     const afterLines = test.after()
       .unwrap()
-    expect(afterLines).toEqual([
-      "[0x0e18b681]: {facetAddress=>0x342a09385E9BAD4AD32a6220765A6c333552e565,selectorPosition=>0,isFreezable=>false}".toLowerCase(),
-    ]);
+    expect(afterLines).toEqual(
+      "[0x0e18b681]: facetAddress=>0x342a09385e9bad4ad32a6220765a6c333552e565, selectorPosition=>0, isFreezable=>true",
+    );
   });
 
   it("can show multiple mappings", async () => {
-    const memory = await subject("realistic-memory-diff.json", [
+    const test = await scenario("realistic-memory-diff.json", "DiamondStorage.selectorToFacet", [
       "0x0e18b681",
       "0x64bf8d66",
       "0x52ef6b2c",
       "0x6c0960f9",
-    ]);
-    const maybeValue = memory.changeFor("DiamondStorage.selectorToFacet");
-    const value = maybeValue.unwrap();
+    ])
 
-    const beforeLines = value.before
+    const beforeLines = test.before()
       .unwrap()
       .split("\n")
       .map((l) => l.toLowerCase());
+
     expect(beforeLines).toHaveLength(4);
     expect(beforeLines).toEqual(
       expect.arrayContaining([
-        "[0x0e18b681]: {facetAddress=>0x230214F0224C7E0485f348a79512ad00514DB1F7,selectorPosition=>0,isFreezable=>false}".toLowerCase(),
-        "[0x64bf8d66]: {facetAddress=>0x230214F0224C7E0485f348a79512ad00514DB1F7,selectorPosition=>2,isFreezable=>false}".toLowerCase(),
-        "[0x52ef6b2c]: {facetAddress=>0x10113bB3a8e64f8eD67003126adC8CE74C34610c,selectorPosition=>1,isFreezable=>false}".toLowerCase(),
-        "[0x6c0960f9]: {facetAddress=>0xA57F9FFD65fC0F5792B5e958dF42399a114EC7e7,selectorPosition=>0,isFreezable=>true}".toLowerCase(),
+        "[0x0e18b681]: facetAddress=>0x230214f0224c7e0485f348a79512ad00514db1f7,selectorPosition=>0,isFreezable=>false",
+        "[0x64bf8d66]: facetAddress=>0x230214f0224c7e0485f348a79512ad00514db1f7,selectorPosition=>2,isFreezable=>false",
+        "[0x52ef6b2c]: facetAddress=>0x10113bb3a8e64f8ed67003126adc8ce74c34610c,selectorPosition=>1,isFreezable=>false",
+        "[0x6c0960f9]: facetAddress=>0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7,selectorPosition=>0,isFreezable=>true",
       ])
     );
 
