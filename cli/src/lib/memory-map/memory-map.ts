@@ -7,7 +7,7 @@ import { MappingType } from "./mapping-type";
 import { StructType } from "./types/struct-type";
 import { BigNumberType } from "./types/big-number-type";
 import { Property } from "./property";
-import { MemorySnapshot } from "./memory-snapshot";
+import { MemorySnapshot} from "./memory-snapshot";
 import { PropertyChange } from "./property-change";
 import { BooleanType } from "./types/boolean-type";
 import { FixedArrayType } from "./types/fixed-array-type";

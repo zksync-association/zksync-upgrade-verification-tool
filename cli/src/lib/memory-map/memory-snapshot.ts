@@ -1,4 +1,4 @@
-import { bytesToBigInt } from "viem";
+import {bytesToBigInt} from "viem";
 import { Option } from "nochoices";
 
 export class MemorySnapshot {

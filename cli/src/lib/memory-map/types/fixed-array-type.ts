@@ -1,6 +1,9 @@
-import type { MemoryDataType } from "./data-type";
-import type { MemorySnapshot } from "../memory-snapshot";
-import { Option } from "nochoices";
+import type {MemoryDataType} from "./data-type";
+import type {MemorySnapshot} from "../memory-snapshot";
+import {Option} from "nochoices";
+import type {MemoryValue} from "../values/memory-value";
+import {ArrayValue} from "../values/array-value";
+import {EmptyValue} from "../values/empty-value";
 
 export class FixedArrayType implements MemoryDataType {
   private size: number;
@@ -11,18 +14,15 @@ export class FixedArrayType implements MemoryDataType {
     this.inner = inner;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint): Option<string> {
+  extract(memory: MemorySnapshot, slot: bigint): Option<MemoryValue> {
     const slots = new Array(this.size).fill(0).map((_, i) => slot + BigInt(i));
 
     const content = slots
       .map((slot) => this.inner.extract(memory, slot))
-      .map((mayBeContent, i) => mayBeContent.map((str) => `[${i}]: ${str}`))
-      .filter((mayBeContent) => mayBeContent.isSome())
-      .map((maybeContent) => maybeContent.unwrap());
 
-    return Option.Some(content)
-      .filter((c) => c.length !== 0)
-      .map((lines) => lines.join("\n"));
+    return Option.Some(new ArrayValue(content.map(o =>
+      o.unwrapOr(new EmptyValue())
+    )))
   }
 
   get evmSize(): number {

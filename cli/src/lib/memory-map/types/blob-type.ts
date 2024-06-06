@@ -24,10 +24,6 @@ export class BlobType implements MemoryDataType {
       .map(buf => new BlobValue(buf));
   }
 
-  format(data: Buffer): string {
-    return bytesToHex(data, { size: 32 });
-  }
-
   get evmSize(): number {
     return 32;
   }

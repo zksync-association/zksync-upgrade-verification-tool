@@ -1,8 +1,12 @@
 import type { MemoryDataType } from "./types/data-type";
 import { Option } from "nochoices";
-import { bytesToHex, hexToBigInt, keccak256, numberToBytes } from "viem";
+import {bytesToHex, hexToBigInt, hexToNumber, keccak256, numberToBytes} from "viem";
 
 import type { MemorySnapshot } from "./memory-snapshot";
+import type {MemoryValue} from "./values/memory-value";
+import {StructValue} from "./values/struct-value";
+import {EmptyValue} from "./values/empty-value";
+import {MappingValue} from "./values/mapping-value";
 
 export class MappingType implements MemoryDataType {
   private keys: Buffer[];
@@ -13,7 +17,7 @@ export class MappingType implements MemoryDataType {
     this.valueType = valueType;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint): Option<string> {
+  extract(memory: MemorySnapshot, slot: bigint): Option<MemoryValue> {
     const bufSlot = numberToBytes(slot, { size: 32 });
     const values = this.keys.map((key) => {
       const keyBuf = Buffer.alloc(32);
@@ -22,21 +26,29 @@ export class MappingType implements MemoryDataType {
 
       const hashed = keccak256(keySlot);
 
-      return this.valueType
-        .extract(memory, hexToBigInt(hashed))
-        .map((value) => `[${bytesToHex(key)}]: ${value}`);
+      return {
+        key: bytesToHex(key),
+        values: this.valueType.extract(memory, hexToBigInt(hashed))
+      };
     });
 
-    if (values.every((v) => v.isNone())) {
+    if (values.every((v) => v.values.isNone())) {
       return Option.None();
     }
 
-    return Option.Some(
-      values
-        .filter((o) => o.isSome())
-        .map((o) => o.unwrap())
-        .join("\n")
-    );
+    const res = values.map(v => ({
+      key: v.key,
+      value: v.values.unwrapOr(new EmptyValue())
+    }))
+
+    return Option.Some(new MappingValue(res));
+
+    // return Option.Some(
+    //   values
+    //     .filter((o) => o.isSome())
+    //     .map((o) => o.unwrap())
+    //     .join("\n")
+    // );
   }
 
   get evmSize(): number {

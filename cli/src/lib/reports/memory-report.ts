@@ -1,6 +1,10 @@
 import  {type PropertyChange} from "../memory-map/property-change";
 import chalk from "chalk";
 import {bytesToHex, type Hex} from "viem";
+import type {MemoryValue} from "../memory-map/values/memory-value";
+import type {ValueField} from "../memory-map/values/struct-value";
+import * as Buffer from "node:buffer";
+import {undefined} from "zod";
 
 export interface MemoryReport<T> {
   add(change: PropertyChange): void
@@ -8,6 +12,14 @@ export interface MemoryReport<T> {
   addBigNumber (n: bigint): T;
   writeBuf (buf: Buffer): T;
   addBoolean (val: boolean): T;
+
+  addArray (inner: MemoryValue[]): T;
+
+  writeEmpty (): T;
+
+  writeStruct (fields: ValueField[]): T;
+
+  writeMapping (fields: ValueField[]): T;
 }
 
 export class StringMemoryReport implements MemoryReport<string>{
@@ -47,5 +59,27 @@ export class StringMemoryReport implements MemoryReport<string>{
 
   addBoolean (val: boolean): string {
     return val ? "true" : "false"
+  }
+
+  addArray (inner: MemoryValue[]): string {
+    return inner
+      .map(v => v.writeInto(this))
+      .map(str => `- ${str}`)
+      .join("\n  ")
+  }
+
+  writeEmpty (): string {
+    return "Empty slot.";
+  }
+
+  writeStruct (fields: ValueField[]): string {
+    return fields
+      .map(({ key, value }) =>
+        `.${key}: ${value.writeInto(this)}`
+      ).join("\n  ");
+  }
+
+  writeMapping (fields: ValueField[]): string {
+    throw new Error("not implemented yet")
   }
 }

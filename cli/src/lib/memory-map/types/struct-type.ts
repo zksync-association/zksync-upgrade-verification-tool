@@ -2,6 +2,9 @@ import type { MemoryDataType } from "./data-type";
 import { Option } from "nochoices";
 
 import type { MemorySnapshot } from "../memory-snapshot";
+import type {MemoryValue} from "../values/memory-value";
+import {StructValue} from "../values/struct-value";
+import {EmptyValue} from "../values/empty-value";
 
 type StructField = { name: string; type: MemoryDataType };
 export class StructType implements MemoryDataType {
@@ -11,35 +14,34 @@ export class StructType implements MemoryDataType {
     this.fields = fields;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint): Option<string> {
+  extract(memory: MemorySnapshot, slot: bigint): Option<MemoryValue> {
     let acum = 0;
     // let current = memory.at(slot).unwrapOr(Buffer.alloc(32).fill(0))
     let slotPosition = 0n;
-    const res: Record<string, Option<string>> = {};
+    const extractedValues = []
     for (const { name, type } of this.fields) {
       if (acum + type.evmSize > 32) {
-        // current = memory.at(slot + slotPosition).unwrapOr(Buffer.alloc(32).fill(0))
         slotPosition += 1n;
         acum = 0;
       }
 
-      res[name] = type.extract(memory, slot + slotPosition);
+      extractedValues.push({
+        key: name,
+        value: type.extract(memory, slot + slotPosition)
+      })
 
       acum += type.evmSize;
     }
 
-    if (Object.values(res).every((r) => r.isNone())) {
+    if (extractedValues.map(r => r.value).every((r) => r.isNone())) {
       return Option.None();
     }
 
-    const content = [];
-
-    for (const key in res) {
-      const value = res[key];
-      content.push(`${key}=>${value.unwrapOr("No content.")}`);
-    }
-
-    return Option.Some(`{${content.join(",")}}`);
+    const res = extractedValues.map(t => ({
+      key: t.key,
+      value: t.value.unwrapOr(new EmptyValue())
+    }))
+    return Option.Some(new StructValue(res));
   }
 
   get evmSize(): number {
