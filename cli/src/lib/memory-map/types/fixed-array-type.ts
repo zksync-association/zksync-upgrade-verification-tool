@@ -20,6 +20,10 @@ export class FixedArrayType implements MemoryDataType {
     const content = slots
       .map((slot) => this.inner.extract(memory, slot))
 
+    if (content.every(s => s.isNone())) {
+      return Option.None()
+    }
+
     return Option.Some(new ArrayValue(content.map(o =>
       o.unwrapOr(new EmptyValue())
     )))

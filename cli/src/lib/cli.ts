@@ -7,6 +7,7 @@ import { EnvBuilder } from "./env-builder.js";
 import * as console from "node:console";
 import { printError } from "./errors.js";
 import { memoryMapCommand } from "../commands/memory-map-command";
+import {Option} from "nochoices";
 
 export function buildCli(
   args: string[],
@@ -104,9 +105,17 @@ export function buildCli(
           describe: "FolderName of the upgrade to check",
           type: "string",
           demandOption: true,
-        }),
+        })
+          .option(
+            "precalculated",
+            {
+              alias: "p",
+              type: "string",
+              demandOption: false
+            }
+          ),
       async (yargs) => {
-        return memoryMapCommand(env, yargs.upgradeDir);
+        return memoryMapCommand(env, yargs.upgradeDir, Option.fromNullable(yargs.precalculated));
       }
     )
     .command(

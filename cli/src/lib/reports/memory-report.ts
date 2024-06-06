@@ -80,6 +80,11 @@ export class StringMemoryReport implements MemoryReport<string>{
   }
 
   writeMapping (fields: ValueField[]): string {
-    throw new Error("not implemented yet")
+    return fields
+      .map(({ key, value }) => {
+        const lines = value.writeInto(this).split("\n");
+        const formated = lines.join(`\n${" ".repeat(key.length + 4)}`)
+        return `[${key}]: ${formated}`
+      }).join("\n  ");
   }
 }
