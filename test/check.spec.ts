@@ -239,7 +239,7 @@ describe("validate check", () => {
 
   describe("when the directory is not a valid upgrade", () => {
     it("fails", async () => {
-      const { stdout, stderr } = await expectToFailAsync(() =>
+      const { stdout } = await expectToFailAsync(() =>
         execAsync("pnpm validate check reference/not_an_upgrade")
       );
       expect(stdout).to.contain(
@@ -259,7 +259,7 @@ describe("validate check", () => {
 
   describe("when directory does not exists", () => {
     it("fails", async () => {
-      const { stdout, stderr } = await expectToFailAsync(() =>
+      const { stdout } = await expectToFailAsync(() =>
         execAsync("pnpm validate check reference/not_a_directory")
       );
       expect(stdout).toContain(
