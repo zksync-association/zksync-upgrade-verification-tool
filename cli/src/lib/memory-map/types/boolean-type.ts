@@ -15,7 +15,8 @@ export class BooleanType implements MemoryDataType {
   extract(memory: MemorySnapshot, slot: bigint): Option<MemoryValue> {
     return memory
       .at(slot)
-      .map((buf) => new BooleanValue(bytesToBigInt(buf) !== 0n))
+      .map((buf) => buf[buf.length - this.offset - 1])
+      .map((num) => new BooleanValue(num !== 0))
   }
 
   get evmSize(): number {
