@@ -281,11 +281,9 @@ describe("validate check", () => {
 
   describe("when version is semver", () => {
     it.only("execs ok and shows correct version", async () => {
-      const { stdout } = await execAsync("pnpm validate check reference/test-semver")
+      const { stdout } = await execAsync("pnpm validate check reference/test-semver");
 
-      expect(stdout).toMatch(
-        /Proposed protocol version.*1.3.2009/
-      );
+      expect(stdout).toMatch(/Proposed protocol version.*1.3.2009/);
     });
-  })
+  });
 });
