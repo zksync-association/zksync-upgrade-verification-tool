@@ -12,8 +12,8 @@ class BlobValue implements MemoryValue {
     this.buf = buf
   }
 
-  writeInto (report: MemoryReport): void {
-    report.writeBuf(this.buf)
+  writeInto<T> (report: MemoryReport<T>): T {
+    return report.writeBuf(this.buf)
   }
 }
 

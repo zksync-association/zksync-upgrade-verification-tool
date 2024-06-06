@@ -9,7 +9,7 @@ export class AddressValue implements MemoryValue {
     this.addr = addr
   }
 
-  writeInto (report: MemoryReport): void {
-    report.addAddress(this.addr)
+  writeInto<T> (report: MemoryReport<T>): T {
+    return report.addAddress(this.addr)
   }
 }

@@ -8,8 +8,8 @@ export class BigNumberValue implements MemoryValue{
     this.n = n
   }
 
-  writeInto (report: MemoryReport): void {
-    report.addBigNumber(this.n)
+  writeInto<T> (report: MemoryReport<T>): T {
+    return report.addBigNumber(this.n)
   }
 
 

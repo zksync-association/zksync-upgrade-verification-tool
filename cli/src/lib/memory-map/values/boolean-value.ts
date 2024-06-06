@@ -9,7 +9,7 @@ export class BooleanValue implements MemoryValue {
     this.val = val
   }
 
-  writeInto (report: MemoryReport): void {
-    report.addBoolean(this.val)
+  writeInto<T> (report: MemoryReport<T>): T {
+    return report.addBoolean(this.val)
   }
 }

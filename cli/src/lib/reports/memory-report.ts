@@ -2,15 +2,15 @@ import  {type PropertyChange} from "../memory-map/property-change";
 import chalk from "chalk";
 import {bytesToHex, type Hex} from "viem";
 
-export interface MemoryReport {
+export interface MemoryReport<T> {
   add(change: PropertyChange): void
-  addAddress(addr: Hex): void
-  addBigNumber (n: bigint): void;
-  writeBuf (buf: Buffer): void;
-  addBoolean (val: boolean): void;
+  addAddress(addr: Hex): T
+  addBigNumber (n: bigint): T;
+  writeBuf (buf: Buffer): T;
+  addBoolean (val: boolean): T;
 }
 
-export class StringMemoryReport implements MemoryReport{
+export class StringMemoryReport implements MemoryReport<string>{
   lines: string[]
   constructor () {
     this.lines = []
@@ -22,20 +22,10 @@ export class StringMemoryReport implements MemoryReport{
     this.lines.push(`description: ${change.prop.description}`)
     this.lines.push("")
     this.lines.push('before:')
-    this.lines.push(`  `)
-    change.before.map(v => v.writeInto(this)).ifNone(() => {
-      const lastLineIndex = this.lines.length - 1
-      const line = this.lines[lastLineIndex]
-      this.lines[lastLineIndex] = line.concat("Not present.")
-    })
+    this.lines.push(`  ${change.before.map(v => v.writeInto(this)).unwrapOr("No content.")}`)
     this.lines.push("")
     this.lines.push('after:')
-    this.lines.push("  ")
-    change.after.map(v => v.writeInto(this)).ifNone(() => {
-      const lastLineIndex = this.lines.length - 1
-      const line = this.lines[lastLineIndex]
-      this.lines[lastLineIndex] = line.concat("Not present.")
-    })
+    this.lines.push(`  ${change.after.map(v => v.writeInto(this)).unwrapOr("No content.")}`)
     this.lines.push("--------------------------")
   }
 
@@ -43,27 +33,19 @@ export class StringMemoryReport implements MemoryReport{
     return this.lines.join("\n")
   }
 
-  addAddress (addr: Hex): void {
-    const lastLineIndex = this.lines.length - 1
-    const line = this.lines[lastLineIndex]
-    this.lines[lastLineIndex] = line.concat(addr)
+  addAddress (addr: Hex): string {
+    return addr
   }
 
-  addBigNumber (n: bigint): void {
-    const lastLineIndex = this.lines.length - 1
-    const line = this.lines[lastLineIndex]
-    this.lines[lastLineIndex] = line.concat(n.toString())
+  addBigNumber (n: bigint): string {
+    return n.toString()
   }
 
-  writeBuf (buf: Buffer): void {
-    const lastLineIndex = this.lines.length - 1
-    const line = this.lines[lastLineIndex]
-    this.lines[lastLineIndex] = line.concat(bytesToHex(buf))
+  writeBuf (buf: Buffer): string {
+    return bytesToHex(buf)
   }
 
-  addBoolean (val: boolean): void {
-    const lastLineIndex = this.lines.length - 1
-    const line = this.lines[lastLineIndex]
-    this.lines[lastLineIndex] = line.concat(val ? "true" : "false")
+  addBoolean (val: boolean): string {
+    return val ? "true" : "false"
   }
 }
