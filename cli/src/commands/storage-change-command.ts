@@ -2,7 +2,7 @@ import type { EnvBuilder } from "../lib/env-builder";
 import { type UpgradeChanges, UpgradeImporter, ZkSyncEraState } from "../lib/index";
 import { StorageChanges } from "../lib/storage/storage-changes";
 import type { Hex } from "viem";
-import { StringMemoryReport } from "../lib/reports/memory-report";
+import { StringStorageChangeReport } from "../lib/reports/storage-report";
 import type { Option } from "nochoices";
 import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
 import { withSpinner } from "../lib/with-spinner";
@@ -70,7 +70,7 @@ export async function storageChangeCommand(
   );
   const memoryChanges = memoryMap.allChanges();
 
-  const report = new StringMemoryReport(env.colored);
+  const report = new StringStorageChangeReport(env.colored);
 
   for (const change of memoryChanges) {
     report.add(change);

@@ -9,13 +9,13 @@ import { StructType } from "../src/lib/storage/types/struct-type";
 import { BigNumberType } from "../src/lib/storage/types/big-number-type";
 import { Property } from "../src/lib/storage/property";
 import { BooleanType } from "../src/lib/storage/types/boolean-type";
-import type { MemoryReport } from "../src/lib/reports/memory-report";
+import type { StorageReport } from "../src/lib/reports/storage-report";
 import { type PropertyChange } from "../src/lib/storage/property-change";
 import type { MemoryValue } from "../src/lib/storage/values/memory-value";
 import type { ValueField } from "../src/lib/storage/values/struct-value";
 import { Option } from "nochoices";
 
-class TestReport implements MemoryReport<string> {
+class TestReport implements StorageReport<string> {
   beforeData: Option<string>;
   afterData: Option<string>;
 

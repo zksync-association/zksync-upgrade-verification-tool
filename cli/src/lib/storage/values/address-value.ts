@@ -1,4 +1,4 @@
-import type { MemoryReport } from "../../reports/memory-report";
+import type { StorageReport } from "../../reports/storage-report";
 import type { MemoryValue } from "./memory-value";
 import type { Hex } from "viem";
 
@@ -9,7 +9,7 @@ export class AddressValue implements MemoryValue {
     this.addr = addr;
   }
 
-  writeInto<T>(report: MemoryReport<T>): T {
+  writeInto<T>(report: StorageReport<T>): T {
     return report.addAddress(this.addr);
   }
 }

@@ -6,7 +6,7 @@ import chalk from "chalk";
 import { AddressType } from "../src/lib/storage/types/address-type";
 import { Property } from "../src/lib/storage/property";
 import { BigNumberType } from "../src/lib/storage/types/big-number-type";
-import { StringMemoryReport } from "../src/lib/reports/memory-report";
+import { StringStorageChangeReport } from "../src/lib/reports/storage-report";
 import { BlobType } from "../src/lib/storage/types/blob-type";
 import { BooleanType } from "../src/lib/storage/types/boolean-type";
 import { ArrayType } from "../src/lib/storage/types/array-type";
@@ -88,7 +88,7 @@ describe("MemoryMapReport", () => {
       );
 
       const change = memoryMap.changeFor("someProp").unwrap();
-      const report = new StringMemoryReport();
+      const report = new StringStorageChangeReport();
       report.add(change);
 
       expect(report.format()).toEqual(
@@ -111,7 +111,7 @@ describe("MemoryMapReport", () => {
       );
 
       const change = memoryMap.changeFor("numberProp").unwrap();
-      const report = new StringMemoryReport();
+      const report = new StringStorageChangeReport();
       report.add(change);
 
       expect(report.format()).toEqual(expectedReport("numberProp", "it is a number", "10", "20"));
@@ -127,7 +127,7 @@ describe("MemoryMapReport", () => {
       );
 
       const change = memoryMap.changeFor("blobProp").unwrap();
-      const report = new StringMemoryReport();
+      const report = new StringStorageChangeReport();
       report.add(change);
 
       expect(report.format()).toEqual(
@@ -150,7 +150,7 @@ describe("MemoryMapReport", () => {
       );
 
       const change = memoryMap.changeFor("blobProp").unwrap();
-      const report = new StringMemoryReport();
+      const report = new StringStorageChangeReport();
       report.add(change);
 
       expect(report.format()).toEqual(expectedReport("blobProp", "it is a blob", "true", "false"));
@@ -166,7 +166,7 @@ describe("MemoryMapReport", () => {
       );
 
       const change = memoryMap.changeFor("listProp").unwrap();
-      const report = new StringMemoryReport();
+      const report = new StringStorageChangeReport();
       report.add(change);
 
       const before = ["- 100", "- 101", "- 102"].join("\n  ");
@@ -192,7 +192,7 @@ describe("MemoryMapReport", () => {
       );
 
       const change = memoryMap.changeFor("listProp").unwrap();
-      const report = new StringMemoryReport();
+      const report = new StringStorageChangeReport();
       report.add(change);
 
       const before = ["- 100", "- 101", "- 102"].join("\n  ");
@@ -218,7 +218,7 @@ describe("MemoryMapReport", () => {
       );
 
       const change = memoryMap.changeFor("listProp").unwrap();
-      const report = new StringMemoryReport();
+      const report = new StringStorageChangeReport();
       report.add(change);
 
       const before = ["- 101", "- 102", "- Empty slot."].join("\n  ");
@@ -261,7 +261,7 @@ describe("MemoryMapReport", () => {
       );
 
       const change = memoryMap.changeFor("listProp").unwrap();
-      const report = new StringMemoryReport();
+      const report = new StringStorageChangeReport();
       report.add(change);
 
       const before = [

@@ -1,5 +1,5 @@
-import type { MemoryReport } from "../../reports/memory-report";
+import type { StorageReport } from "../../reports/storage-report";
 
 export interface MemoryValue {
-  writeInto<T>(report: MemoryReport<T>): T;
+  writeInto<T>(report: StorageReport<T>): T;
 }

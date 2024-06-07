@@ -1,4 +1,4 @@
-import type { MemoryReport } from "../../reports/memory-report";
+import type { StorageReport } from "../../reports/storage-report";
 import type { MemoryValue } from "./memory-value";
 
 export class BooleanValue implements MemoryValue {
@@ -8,7 +8,7 @@ export class BooleanValue implements MemoryValue {
     this.val = val;
   }
 
-  writeInto<T>(report: MemoryReport<T>): T {
+  writeInto<T>(report: StorageReport<T>): T {
     return report.addBoolean(this.val);
   }
 }

@@ -4,7 +4,7 @@ import { bytesToHex, type Hex } from "viem";
 import type { MemoryValue } from "../storage/values/memory-value";
 import type { ValueField } from "../storage/values/struct-value";
 
-export interface MemoryReport<T> {
+export interface StorageReport<T> {
   add(change: PropertyChange): void;
   addAddress(addr: Hex): T;
   addBigNumber(n: bigint): T;
@@ -20,7 +20,7 @@ export interface MemoryReport<T> {
   writeMapping(fields: ValueField[]): T;
 }
 
-export class StringMemoryReport implements MemoryReport<string> {
+export class StringStorageChangeReport implements StorageReport<string> {
   lines: string[];
   private colored: boolean;
   constructor(colored = true) {

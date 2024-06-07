@@ -1,5 +1,5 @@
 import type { MemoryValue } from "./memory-value";
-import type { MemoryReport } from "../../reports/memory-report";
+import type { StorageReport } from "../../reports/storage-report";
 
 export class ArrayValue implements MemoryValue {
   inner: MemoryValue[];
@@ -8,7 +8,7 @@ export class ArrayValue implements MemoryValue {
     this.inner = inner;
   }
 
-  writeInto<T>(report: MemoryReport<T>): T {
+  writeInto<T>(report: StorageReport<T>): T {
     return report.addArray(this.inner);
   }
 }

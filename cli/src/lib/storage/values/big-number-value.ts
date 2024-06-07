@@ -1,5 +1,5 @@
 import type { MemoryValue } from "./memory-value";
-import type { MemoryReport } from "../../reports/memory-report";
+import type { StorageReport } from "../../reports/storage-report";
 
 export class BigNumberValue implements MemoryValue {
   n: bigint;
@@ -8,7 +8,7 @@ export class BigNumberValue implements MemoryValue {
     this.n = n;
   }
 
-  writeInto<T>(report: MemoryReport<T>): T {
+  writeInto<T>(report: StorageReport<T>): T {
     return report.addBigNumber(this.n);
   }
 }
