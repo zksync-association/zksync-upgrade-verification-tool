@@ -10,7 +10,7 @@ import {Option} from "nochoices";
 
 export type FacetData = {
   name: string;
-  address: string;
+  address: Hex;
   selectors: Hex[];
 };
 
@@ -34,7 +34,7 @@ export class UpgradeChanges {
     newProtocolVersion: string,
     verifier: VerifierContract,
     aaBytecodeHash: string,
-    booloaderBytecodeHash: string,
+    bootloaderBytecodeHash: string,
     upgradeTxHex?: string
   ) {
     this.newProtocolVersion = newProtocolVersion;
@@ -43,7 +43,7 @@ export class UpgradeChanges {
     this.systemContractChanges = [];
     this.verifier = verifier;
     this.aaBytecodeHash = aaBytecodeHash;
-    this.bootloaderBytecodeHash = booloaderBytecodeHash;
+    this.bootloaderBytecodeHash = bootloaderBytecodeHash;
     this.upgradeCalldataHex = Option.fromNullable(upgradeTxHex);
   }
 
@@ -51,7 +51,7 @@ export class UpgradeChanges {
     return this.facets.find((f) => f.selectors.some((sel) => targetSelectors.includes(sel)));
   }
 
-  addFacet (facetName: string, facetAddr: string, selectors: string[]) {
+  addFacet (facetName: string, facetAddr: Hex, selectors: string[]) {
     this.orphanedSelectors = this.orphanedSelectors.filter(
       (selector) => !selectors.includes(selector)
     );
@@ -112,7 +112,7 @@ export class UpgradeChanges {
           instance.addFacet(facetDef.name, facetDef.address, cut.selectors);
         } else {
           // TODO: Handle upgrade
-          throw new Error("Upgrade action not suported yet");
+          throw new Error("Upgrade action not supported yet");
         }
       }
     }
@@ -134,5 +134,10 @@ export class UpgradeChanges {
       .map(f => f.selectors)
       .flat()
       .concat(this.orphanedSelectors);
+  }
+
+  allFacetsAddresses (): Hex[] {
+    return this.facets
+      .map(f => f.address)
   }
 }

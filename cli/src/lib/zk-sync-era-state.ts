@@ -257,4 +257,8 @@ export class ZkSyncEraState {
   allSelectors (): Hex[] {
     return [...this.selectorToFacet.keys()]
   }
+
+  allFacetsAddresses (): Hex[] {
+    return [...this.facetToSelectors.keys()]
+  }
 }

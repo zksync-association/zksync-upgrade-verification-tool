@@ -13,7 +13,7 @@ describe("cli", () => {
         expect(env.etherscanApiKey).to.eql("fakeKey");
         called = true;
       };
-      const cli = buildCli(["check", "someDir", "--ethscankey=fakeKey"], fakeCheck, fail, fail);
+      const cli = buildCli(["check", "someDir", "--ethscankey=fakeKey"], fakeCheck, fail, fail, fail);
       await cli.parseAsync();
       expect(called).toBe(true);
     });
@@ -36,6 +36,7 @@ describe("cli", () => {
         ["facet-diff", "someDir", "SomeFacet", "--ethscankey=fakeKey"],
         fail,
         fakeCheck,
+        fail,
         fail
       );
       await cli.parseAsync();
@@ -60,6 +61,7 @@ describe("cli", () => {
         ["verifier-diff", "someDir", "--ethscankey=fakeKey"],
         fail,
         fakeCheck,
+        fail,
         fail
       );
       await cli.parseAsync();
@@ -86,7 +88,8 @@ describe("cli", () => {
         ["download-diff", "someDir", "targetDir", "--ethscankey=fakeKey"],
         fail,
         fail,
-        fakeDownload
+        fakeDownload,
+        fail
       );
       await cli.parseAsync();
       expect(called).toBe(true);

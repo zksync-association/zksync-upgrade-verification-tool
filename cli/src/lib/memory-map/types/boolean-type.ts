@@ -6,16 +6,10 @@ import {BooleanValue} from "../values/boolean-value";
 import {bytesToBigInt} from "viem";
 
 export class BooleanType implements MemoryDataType {
-  private offset: number;
-
-  constructor(offset = 0) {
-    this.offset = offset;
-  }
-
-  extract(memory: MemorySnapshot, slot: bigint): Option<MemoryValue> {
+  extract (memory: MemorySnapshot, slot: bigint, offset: number = 0): Option<MemoryValue> {
     return memory
       .at(slot)
-      .map((buf) => buf[buf.length - this.offset - 1])
+      .map((buf) => buf[buf.length - offset - 1])
       .map((num) => new BooleanValue(num !== 0))
   }
 

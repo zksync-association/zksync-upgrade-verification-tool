@@ -3,7 +3,7 @@ import {MemoryMap} from "../src/lib/memory-map/memory-map";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {memoryDiffParser} from "../src/schema/rpc";
-import {bytesToHex, type Hex, hexToBigInt, numberToBytes, numberToHex} from "viem";
+import {bytesToHex, type Hex, hexToBigInt, hexToBytes, keccak256, numberToBytes, numberToHex} from "viem";
 import {AddressType} from "../src/lib/memory-map/types/address-type";
 import {StructType} from "../src/lib/memory-map/types/struct-type";
 import {BigNumberType} from "../src/lib/memory-map/types/big-number-type";
@@ -81,14 +81,14 @@ class TestReport implements MemoryReport<string> {
 }
 
 describe("MemoryMap", () => {
-  const subject = async (file: string, selectors: Hex[] = []) => {
+  const subject = async (file: string, selectors: Hex[] = [], facets: Hex[] = []) => {
     const diff = await fs.readFile(path.join(import.meta.dirname, "data", file));
     const json = memoryDiffParser.parse(JSON.parse(diff.toString()));
-    return new MemoryMap(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", selectors, []);
+    return new MemoryMap(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", selectors, facets);
   };
 
-  const scenario = async (file: string, changeName: string, selectors: Hex[] = []): Promise<TestReport> => {
-    const memory = await subject(file, selectors);
+  const scenario = async (file: string, changeName: string, selectors: Hex[] = [], facets: Hex[] = []): Promise<TestReport> => {
+    const memory = await subject(file, selectors, facets);
     const maybeValue = memory.changeFor(changeName);
     const test = new TestReport()
     const value = maybeValue.unwrap();
@@ -145,7 +145,7 @@ describe("MemoryMap", () => {
     ]);
   });
 
-  it("can show verifier param changes", async () => {
+  it("can display verifier param changes", async () => {
     const test = await scenario("realistic-memory-diff.json", "Base.s.verifierParams")
 
     const beforeLines = test.before().unwrap();
@@ -159,7 +159,7 @@ describe("MemoryMap", () => {
     expect(afterLines).toMatch(/recursionCircuitsSetVksHash=>No content./);
   });
 
-  it("can show big numbers", async () => {
+  it("can display big numbers", async () => {
     const test = await scenario("realistic-memory-diff.json", "Base.s.protocolVersion")
 
     expect(test.before().unwrap()).to.eql("22");
@@ -177,7 +177,7 @@ describe("MemoryMap", () => {
   //   expect(value).to.eql("0x02a257d44d183668a0c30e9d57fecdb34cf2d5f9fbb4a7ae8491d04bf23a7439")
   // })
 
-  it("can show mappings", async () => {
+  it("can display mappings", async () => {
     const test = await scenario("realistic-memory-diff.json", "DiamondStorage.selectorToFacet", ["0x0e18b681"])
 
     const beforeLines = test.before()
@@ -194,7 +194,7 @@ describe("MemoryMap", () => {
     );
   });
 
-  it("can show multiple mappings", async () => {
+  it("can display multiple mappings", async () => {
     const test = await scenario("realistic-memory-diff.json", "DiamondStorage.selectorToFacet", [
       "0x0e18b681",
       "0x64bf8d66",
@@ -231,10 +231,8 @@ describe("MemoryMap", () => {
     );
   });
 
-  it("can show variable arrays", async () => {
+  it("can display variable arrays", async () => {
     const test = await scenario("realistic-memory-diff.json", "DiamondStorage.facets", [])
-    // const memory = await subject("realistic-memory-diff.json");
-    // const change = memory.changeFor("DiamondStorage.facets").unwrap();
 
     const before = test.before()
       .unwrap()
@@ -265,7 +263,14 @@ describe("MemoryMap", () => {
     );
   });
 
-  it("can show structs correctly", async () => {
+  it("can display DiamondStorage.facetToSelectors correctly", async () => {
+    const test = await scenario("realistic-memory-diff.json", "DiamondStorage.facetToSelectors", [], [
+      "0x230214f0224c7e0485f348a79512ad00514db1f7"
+    ]);
+    console.log(test.before().unwrap())
+  })
+
+  it("can display structs correctly", async () => {
     const diff = await fs.readFile(
       path.join(import.meta.dirname, "data", "realistic-memory-diff.json")
     );
@@ -281,11 +286,11 @@ describe("MemoryMap", () => {
         },
         {
           name: "selectorPosition",
-          type: new BigNumberType(2, 20),
+          type: new BigNumberType(2),
         },
         {
           name: "isFreezable",
-          type: new BooleanType(22),
+          type: new BooleanType(),
         },
       ])
     );

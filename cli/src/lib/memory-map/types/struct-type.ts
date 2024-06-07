@@ -14,8 +14,8 @@ export class StructType implements MemoryDataType {
     this.fields = fields;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint): Option<MemoryValue> {
-    let acum = 0;
+  extract (memory: MemorySnapshot, slot: bigint, offset: number = 0): Option<MemoryValue> {
+    let acum = offset;
     // let current = memory.at(slot).unwrapOr(Buffer.alloc(32).fill(0))
     let slotPosition = 0n;
     const extractedValues = []
@@ -27,7 +27,7 @@ export class StructType implements MemoryDataType {
 
       extractedValues.push({
         key: name,
-        value: type.extract(memory, slot + slotPosition)
+        value: type.extract(memory, slot + slotPosition, acum)
       })
 
       acum += type.evmSize;

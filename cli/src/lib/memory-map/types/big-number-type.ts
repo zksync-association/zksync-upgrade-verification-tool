@@ -4,18 +4,17 @@ import { bytesToBigInt } from "viem";
 
 import type { MemorySnapshot } from "../memory-snapshot";
 import {BigNumberValue} from "../values/big-number-value";
+import type {MemoryValue} from "../values/memory-value";
 
 export class BigNumberType implements MemoryDataType {
   private size: number;
-  private offset: number;
 
-  constructor(size = 32, offset = 0) {
+  constructor (size = 32) {
     this.size = size;
-    this.offset = offset;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint): Option<BigNumberValue> {
-    const start = 32 - this.offset - this.size;
+  extract (memory: MemorySnapshot, slot: bigint, offset: number = 0): Option<MemoryValue> {
+    const start = 32 - offset - this.size;
     return memory
       .at(slot)
       .map((buf) => buf.subarray(start, start + this.size))

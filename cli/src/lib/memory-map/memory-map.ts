@@ -138,7 +138,7 @@ export class MemoryMap {
                 },
                 {
                   name: "layer2Tip",
-                  type: new BigNumberType(24, 8),
+                  type: new BigNumberType(24),
                 },
               ])
             ),
@@ -281,23 +281,23 @@ export class MemoryMap {
           },
           {
             name: "batchOverheadL1Gas",
-            type: new BigNumberType(4, 1),
+            type: new BigNumberType(4),
           },
           {
             name: "maxPubdataPerBatch",
-            type: new BigNumberType(4, 5),
+            type: new BigNumberType(4),
           },
           {
             name: "maxL2GasPerBatch",
-            type: new BigNumberType(4, 9),
+            type: new BigNumberType(4),
           },
           {
             name: "priorityTxMaxPubdata",
-            type: new BigNumberType(4, 13),
+            type: new BigNumberType(4),
           },
           {
             name: "minimalL2GasPrice",
-            type: new BigNumberType(8, 17),
+            type: new BigNumberType(8),
           },
         ])
       ),
@@ -317,13 +317,14 @@ export class MemoryMap {
             },
             {
               name: "selectorPosition",
-              type: new BigNumberType(2, 20),
+              type: new BigNumberType(2),
             },
             {
               name: "isFreezable",
-              type: new BooleanType(22),
+              type: new BooleanType(),
             },
-          ])
+          ]),
+          false
         )
       ),
       new Property(
@@ -335,7 +336,7 @@ export class MemoryMap {
           new StructType([
             {
               name: "selectors",
-              type: new ArrayType(new BlobType()),
+              type: new ArrayType(new BlobType(4)),
             },
             {
               name: "facetPosition",

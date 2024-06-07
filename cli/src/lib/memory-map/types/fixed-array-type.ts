@@ -14,11 +14,11 @@ export class FixedArrayType implements MemoryDataType {
     this.inner = inner;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint): Option<MemoryValue> {
+  extract (memory: MemorySnapshot, slot: bigint, _offset: number): Option<MemoryValue> {
     const slots = new Array(this.size).fill(0).map((_, i) => slot + BigInt(i));
 
     const content = slots
-      .map((slot) => this.inner.extract(memory, slot))
+      .map((slot) => this.inner.extract(memory, slot, 0))
 
     if (content.every(s => s.isNone())) {
       return Option.None()

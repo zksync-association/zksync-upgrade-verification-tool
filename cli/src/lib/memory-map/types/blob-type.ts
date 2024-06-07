@@ -1,30 +1,23 @@
-import type { MemoryDataType } from "./data-type";
-import type { Option } from "nochoices";
-import { bytesToHex } from "viem";
+import type {MemoryDataType} from "./data-type";
+import type {Option} from "nochoices";
 
-import type { MemorySnapshot } from "../memory-snapshot";
+import type {MemorySnapshot} from "../memory-snapshot";
 import type {MemoryValue} from "../values/memory-value";
-import type {MemoryReport} from "../../reports/memory-report";
-
-class BlobValue implements MemoryValue {
-  private buf: Buffer;
-  constructor (buf: Buffer) {
-    this.buf = buf
-  }
-
-  writeInto<T> (report: MemoryReport<T>): T {
-    return report.writeBuf(this.buf)
-  }
-}
+import {BlobValue} from "../values/blob-value";
 
 export class BlobType implements MemoryDataType {
-  extract(memory: MemorySnapshot, slot: bigint): Option<MemoryValue> {
+  private size: number;
+  constructor (size = 32) {
+    this.size = size
+  }
+
+  extract (memory: MemorySnapshot, slot: bigint, offset: number = 0): Option<MemoryValue> {
     return memory
       .at(slot)
-      .map(buf => new BlobValue(buf));
+      .map(buf => new BlobValue(buf.subarray(32 - offset - this.size, 32 - offset)));
   }
 
   get evmSize(): number {
-    return 32;
+    return this.size;
   }
 }

@@ -18,6 +18,6 @@ export class Property {
   }
 
   extract(memory: MemorySnapshot): Option<MemoryValue> {
-    return this.type.extract(memory, this.slot);
+    return this.type.extract(memory, this.slot, 0);
   }
 }

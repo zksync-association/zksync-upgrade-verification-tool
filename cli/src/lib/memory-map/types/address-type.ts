@@ -7,7 +7,7 @@ import {AddressValue} from "../values/address-value";
 import type {MemoryValue} from "../values/memory-value";
 
 export class AddressType implements MemoryDataType {
-  extract(memory: MemorySnapshot, slot: bigint): Option<AddressValue> {
+  extract (memory: MemorySnapshot, slot: bigint, _offset: number = 0): Option<MemoryValue> {
     return memory.at(slot).map(this.format).map(str => new AddressValue(str));
   }
 

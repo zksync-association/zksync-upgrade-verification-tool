@@ -6,14 +6,15 @@ import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
 import * as console from "node:console";
 import { printError } from "./errors.js";
-import { memoryMapCommand } from "../commands/memory-map-command";
+import { storageChangeCommand } from "../commands/storage-change-command";
 import {Option} from "nochoices";
 
 export function buildCli(
   args: string[],
   checkCbk: typeof checkCommand,
   diffCbk: typeof contractDiff,
-  downloadCodeCbk: typeof downloadCode
+  downloadCodeCbk: typeof downloadCode,
+  storageDiffCbk: typeof storageChangeCommand
 ): Argv {
   const env = new EnvBuilder();
   const argParser = yargs(args)
@@ -115,7 +116,7 @@ export function buildCli(
             }
           ),
       async (yargs) => {
-        return memoryMapCommand(env, yargs.upgradeDir, Option.fromNullable(yargs.precalculated));
+        return storageDiffCbk(env, yargs.upgradeDir, Option.fromNullable(yargs.precalculated));
       }
     )
     .command(
@@ -192,6 +193,6 @@ export function buildCli(
 }
 
 export const cli = async () => {
-  const argParser = buildCli(hideBin(process.argv), checkCommand, contractDiff, downloadCode);
+  const argParser = buildCli(hideBin(process.argv), checkCommand, contractDiff, downloadCode, storageChangeCommand);
   await argParser.parseAsync();
 };
