@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildCli } from "../src/lib/index";
 import type { EnvBuilder } from "../src/lib/env-builder";
-import type {Option} from "nochoices";
+import type { Option } from "nochoices";
 
 const fail = () => expect.fail("should not be called");
 

@@ -25,14 +25,14 @@ export class StringMemoryReport implements MemoryReport<string> {
   private colored: boolean;
   constructor(colored = true) {
     this.lines = [];
-    this.colored = colored
+    this.colored = colored;
   }
 
   private bold(text: string): string {
     if (this.colored) {
-      return chalk.bold(text)
+      return chalk.bold(text);
     }
-    return text
+    return text;
   }
 
   add(change: PropertyChange) {

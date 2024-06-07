@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { BlockExplorerClient, cli } from "../src/lib/index";
+import { BlockExplorerClient } from "../src/lib/index";
 import { ExternalApiError } from "../src/lib/errors";
 
 describe("BlockExplorerClient", () => {

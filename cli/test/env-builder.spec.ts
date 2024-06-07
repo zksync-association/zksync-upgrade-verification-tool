@@ -100,18 +100,18 @@ describe("EnvBuilder", () => {
     it("is true by default", () => {
       const target = new EnvBuilder();
       expect(target.colored).toEqual(true);
-    })
+    });
 
     it("is false after set to false", () => {
       const target = new EnvBuilder();
-      target.withColored(false)
+      target.withColored(false);
       expect(target.colored).toEqual(false);
-    })
+    });
 
     it("is true after set to true", () => {
       const target = new EnvBuilder();
-      target.withColored(true)
+      target.withColored(true);
       expect(target.colored).toEqual(true);
-    })
-  })
+    });
+  });
 });
