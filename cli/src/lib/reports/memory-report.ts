@@ -1,90 +1,86 @@
-import  {type PropertyChange} from "../memory-map/property-change";
+import type { PropertyChange } from "../memory-map/property-change";
 import chalk from "chalk";
-import {bytesToHex, type Hex} from "viem";
-import type {MemoryValue} from "../memory-map/values/memory-value";
-import type {ValueField} from "../memory-map/values/struct-value";
-import * as Buffer from "node:buffer";
-import {undefined} from "zod";
+import { bytesToHex, type Hex } from "viem";
+import type { MemoryValue } from "../memory-map/values/memory-value";
+import type { ValueField } from "../memory-map/values/struct-value";
 
 export interface MemoryReport<T> {
-  add(change: PropertyChange): void
-  addAddress(addr: Hex): T
-  addBigNumber (n: bigint): T;
-  writeBuf (buf: Buffer): T;
-  addBoolean (val: boolean): T;
+  add(change: PropertyChange): void;
+  addAddress(addr: Hex): T;
+  addBigNumber(n: bigint): T;
+  writeBuf(buf: Buffer): T;
+  addBoolean(val: boolean): T;
 
-  addArray (inner: MemoryValue[]): T;
+  addArray(inner: MemoryValue[]): T;
 
-  writeEmpty (): T;
+  writeEmpty(): T;
 
-  writeStruct (fields: ValueField[]): T;
+  writeStruct(fields: ValueField[]): T;
 
-  writeMapping (fields: ValueField[]): T;
+  writeMapping(fields: ValueField[]): T;
 }
 
-export class StringMemoryReport implements MemoryReport<string>{
-  lines: string[]
-  constructor () {
-    this.lines = []
+export class StringMemoryReport implements MemoryReport<string> {
+  lines: string[];
+  constructor() {
+    this.lines = [];
   }
 
   add(change: PropertyChange) {
-    this.lines.push("--------------------------")
-    this.lines.push(`name: ${chalk.bold(change.prop.name)}`)
-    this.lines.push(`description: ${change.prop.description}`)
-    this.lines.push("")
-    this.lines.push('before:')
-    this.lines.push(`  ${change.before.map(v => v.writeInto(this)).unwrapOr("No content.")}`)
-    this.lines.push("")
-    this.lines.push('after:')
-    this.lines.push(`  ${change.after.map(v => v.writeInto(this)).unwrapOr("No content.")}`)
-    this.lines.push("--------------------------")
+    this.lines.push("--------------------------");
+    this.lines.push(`name: ${chalk.bold(change.prop.name)}`);
+    this.lines.push(`description: ${change.prop.description}`);
+    this.lines.push("");
+    this.lines.push("before:");
+    this.lines.push(`  ${change.before.map((v) => v.writeInto(this)).unwrapOr("No content.")}`);
+    this.lines.push("");
+    this.lines.push("after:");
+    this.lines.push(`  ${change.after.map((v) => v.writeInto(this)).unwrapOr("No content.")}`);
+    this.lines.push("--------------------------");
   }
 
-  format (): string {
-    return this.lines.join("\n")
+  format(): string {
+    return this.lines.join("\n");
   }
 
-  addAddress (addr: Hex): string {
-    return addr
+  addAddress(addr: Hex): string {
+    return addr;
   }
 
-  addBigNumber (n: bigint): string {
-    return n.toString()
+  addBigNumber(n: bigint): string {
+    return n.toString();
   }
 
-  writeBuf (buf: Buffer): string {
-    return bytesToHex(buf)
+  writeBuf(buf: Buffer): string {
+    return bytesToHex(buf);
   }
 
-  addBoolean (val: boolean): string {
-    return val ? "true" : "false"
+  addBoolean(val: boolean): string {
+    return val ? "true" : "false";
   }
 
-  addArray (inner: MemoryValue[]): string {
+  addArray(inner: MemoryValue[]): string {
     return inner
-      .map(v => v.writeInto(this))
-      .map(str => `- ${str}`)
-      .join("\n  ")
+      .map((v) => v.writeInto(this))
+      .map((str) => `- ${str}`)
+      .join("\n  ");
   }
 
-  writeEmpty (): string {
+  writeEmpty(): string {
     return "Empty slot.";
   }
 
-  writeStruct (fields: ValueField[]): string {
-    return fields
-      .map(({ key, value }) =>
-        `.${key}: ${value.writeInto(this)}`
-      ).join("\n  ");
+  writeStruct(fields: ValueField[]): string {
+    return fields.map(({ key, value }) => `.${key}: ${value.writeInto(this)}`).join("\n  ");
   }
 
-  writeMapping (fields: ValueField[]): string {
+  writeMapping(fields: ValueField[]): string {
     return fields
       .map(({ key, value }) => {
         const lines = value.writeInto(this).split("\n");
-        const formated = lines.join(`\n${" ".repeat(key.length + 4)}`)
-        return `[${key}]: ${formated}`
-      }).join("\n  ");
+        const formated = lines.join(`\n${" ".repeat(key.length + 4)}`);
+        return `[${key}]: ${formated}`;
+      })
+      .join("\n  ");
   }
 }

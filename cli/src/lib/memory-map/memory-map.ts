@@ -7,13 +7,15 @@ import { MappingType } from "./mapping-type";
 import { StructType } from "./types/struct-type";
 import { BigNumberType } from "./types/big-number-type";
 import { Property } from "./property";
-import { MemorySnapshot} from "./memory-snapshot";
+import { MemorySnapshot } from "./memory-snapshot";
 import { PropertyChange } from "./property-change";
 import { BooleanType } from "./types/boolean-type";
 import { FixedArrayType } from "./types/fixed-array-type";
 import { ArrayType } from "./types/array-type";
 
-const DIAMOND_STORAGE_SLOT = hexToBigInt("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b");
+const DIAMOND_STORAGE_SLOT = hexToBigInt(
+  "0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b"
+);
 
 export class MemoryMap {
   pre: MemorySnapshot;
@@ -22,7 +24,13 @@ export class MemoryMap {
   private contractProps: Property[];
   private facets: Hex[];
 
-  constructor (diff: MemoryDiffRaw, addr: string, selectors: Hex[], facets: Hex[] = [], contractProps: Property[] = []) {
+  constructor(
+    diff: MemoryDiffRaw,
+    addr: string,
+    selectors: Hex[],
+    facets: Hex[] = [],
+    contractProps: Property[] = []
+  ) {
     const pre = diff.result.pre[addr];
     const post = diff.result.post[addr];
 
@@ -37,7 +45,7 @@ export class MemoryMap {
     this.pre = new MemorySnapshot(pre.storage);
     this.post = new MemorySnapshot(post.storage);
     this.selectors = selectors;
-    this.facets = facets
+    this.facets = facets;
     this.contractProps = contractProps.length === 0 ? this.allContractProps() : contractProps;
   }
 
@@ -332,7 +340,7 @@ export class MemoryMap {
         DIAMOND_STORAGE_SLOT + 1n,
         "The array of all unique facet addresses that belong to the diamond proxy",
         new MappingType(
-          this.facets.map(s => hexToBytes(s)).map(Buffer.from),
+          this.facets.map((s) => hexToBytes(s)).map(Buffer.from),
           new StructType([
             {
               name: "selectors",

@@ -13,7 +13,13 @@ describe("cli", () => {
         expect(env.etherscanApiKey).to.eql("fakeKey");
         called = true;
       };
-      const cli = buildCli(["check", "someDir", "--ethscankey=fakeKey"], fakeCheck, fail, fail, fail);
+      const cli = buildCli(
+        ["check", "someDir", "--ethscankey=fakeKey"],
+        fakeCheck,
+        fail,
+        fail,
+        fail
+      );
       await cli.parseAsync();
       expect(called).toBe(true);
     });

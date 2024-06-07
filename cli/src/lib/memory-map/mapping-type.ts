@@ -1,26 +1,25 @@
-import type {MemoryDataType} from "./types/data-type";
-import {Option} from "nochoices";
-import {bytesToHex, hexToBigInt, hexToNumber, keccak256, numberToBytes} from "viem";
+import type { MemoryDataType } from "./types/data-type";
+import { Option } from "nochoices";
+import { bytesToHex, hexToBigInt, keccak256, numberToBytes } from "viem";
 
-import type {MemorySnapshot} from "./memory-snapshot";
-import type {MemoryValue} from "./values/memory-value";
-import {StructValue} from "./values/struct-value";
-import {EmptyValue} from "./values/empty-value";
-import {MappingValue} from "./values/mapping-value";
+import type { MemorySnapshot } from "./memory-snapshot";
+import type { MemoryValue } from "./values/memory-value";
+import { EmptyValue } from "./values/empty-value";
+import { MappingValue } from "./values/mapping-value";
 
 export class MappingType implements MemoryDataType {
   private keys: Buffer[];
   private valueType: MemoryDataType;
   private leftPadded: boolean;
 
-  constructor (keys: Buffer[], valueType: MemoryDataType, leftPadded = false) {
+  constructor(keys: Buffer[], valueType: MemoryDataType, leftPadded = false) {
     this.keys = keys;
     this.valueType = valueType;
-    this.leftPadded = leftPadded
+    this.leftPadded = leftPadded;
   }
 
-  extract (memory: MemorySnapshot, slot: bigint, _offset: number = 0): Option<MemoryValue> {
-    const bufSlot = numberToBytes(slot, {size: 32});
+  extract(memory: MemorySnapshot, slot: bigint, _offset = 0): Option<MemoryValue> {
+    const bufSlot = numberToBytes(slot, { size: 32 });
     const values = this.keys.map((key) => {
       const keyBuf = Buffer.alloc(32);
       if (this.leftPadded) {
@@ -34,7 +33,7 @@ export class MappingType implements MemoryDataType {
 
       return {
         key: bytesToHex(key),
-        values: this.valueType.extract(memory, hexToBigInt(hashed), 0)
+        values: this.valueType.extract(memory, hexToBigInt(hashed), 0),
       };
     });
 
@@ -42,10 +41,10 @@ export class MappingType implements MemoryDataType {
       return Option.None();
     }
 
-    const res = values.map(v => ({
+    const res = values.map((v) => ({
       key: v.key,
-      value: v.values.unwrapOr(new EmptyValue())
-    }))
+      value: v.values.unwrapOr(new EmptyValue()),
+    }));
 
     return Option.Some(new MappingValue(res));
 
@@ -57,7 +56,7 @@ export class MappingType implements MemoryDataType {
     // );
   }
 
-  get evmSize (): number {
+  get evmSize(): number {
     return 32;
   }
 }

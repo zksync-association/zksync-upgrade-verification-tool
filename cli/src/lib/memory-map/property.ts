@@ -2,7 +2,7 @@ import type { MemoryDataType } from "./types/data-type";
 import type { Option } from "nochoices";
 
 import type { MemorySnapshot } from "./memory-snapshot";
-import type {MemoryValue} from "./values/memory-value";
+import type { MemoryValue } from "./values/memory-value";
 
 export class Property {
   name: string;

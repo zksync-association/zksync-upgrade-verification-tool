@@ -4,9 +4,9 @@ import type {
   TransactionsJson,
   UpgradeManifest,
 } from "../schema/index.js";
-import {VerifierContract} from "./verifier.js";
-import type {Hex} from "viem";
-import {Option} from "nochoices";
+import { VerifierContract } from "./verifier.js";
+import type { Hex } from "viem";
+import { Option } from "nochoices";
 
 export type FacetData = {
   name: string;
@@ -30,7 +30,7 @@ export class UpgradeChanges {
   bootloaderBytecodeHash: string;
   upgradeCalldataHex: Option<string>;
 
-  constructor (
+  constructor(
     newProtocolVersion: string,
     verifier: VerifierContract,
     aaBytecodeHash: string,
@@ -47,11 +47,11 @@ export class UpgradeChanges {
     this.upgradeCalldataHex = Option.fromNullable(upgradeTxHex);
   }
 
-  matchingFacet (targetSelectors: string[]): FacetData | undefined {
+  matchingFacet(targetSelectors: string[]): FacetData | undefined {
     return this.facets.find((f) => f.selectors.some((sel) => targetSelectors.includes(sel)));
   }
 
-  addFacet (facetName: string, facetAddr: Hex, selectors: string[]) {
+  addFacet(facetName: string, facetAddr: Hex, selectors: string[]) {
     this.orphanedSelectors = this.orphanedSelectors.filter(
       (selector) => !selectors.includes(selector)
     );
@@ -63,15 +63,15 @@ export class UpgradeChanges {
     });
   }
 
-  removeFacet (selectors: string[]) {
-    this.orphanedSelectors.push(...selectors as Hex[]);
+  removeFacet(selectors: string[]) {
+    this.orphanedSelectors.push(...(selectors as Hex[]));
   }
 
-  addSystemContract (change: SystemContractData) {
+  addSystemContract(change: SystemContractData) {
     this.systemContractChanges.push(change);
   }
 
-  static fromFiles (
+  static fromFiles(
     common: UpgradeManifest,
     txFile: TransactionsJson,
     facets?: FacetsJson,
@@ -129,15 +129,11 @@ export class UpgradeChanges {
     return instance;
   }
 
-  allSelectors (): Hex[] {
-    return this.facets
-      .map(f => f.selectors)
-      .flat()
-      .concat(this.orphanedSelectors);
+  allSelectors(): Hex[] {
+    return this.facets.flatMap((f) => f.selectors).concat(this.orphanedSelectors);
   }
 
-  allFacetsAddresses (): Hex[] {
-    return this.facets
-      .map(f => f.address)
+  allFacetsAddresses(): Hex[] {
+    return this.facets.map((f) => f.address);
   }
 }

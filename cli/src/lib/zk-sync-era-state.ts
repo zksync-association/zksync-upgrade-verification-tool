@@ -5,7 +5,7 @@ import type { Network } from "./constants.js";
 import { VerifierContract } from "./verifier.js";
 import { verifierParamsSchema } from "../schema/index.js";
 import { z } from "zod";
-import { type Abi, type Hex } from "viem";
+import type { Abi, Hex } from "viem";
 import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
 import { utils } from "zksync-ethers";
 import { SystemContractChange } from "./system-contract-change";
@@ -254,11 +254,11 @@ export class ZkSyncEraState {
     );
   }
 
-  allSelectors (): Hex[] {
-    return [...this.selectorToFacet.keys()]
+  allSelectors(): Hex[] {
+    return [...this.selectorToFacet.keys()];
   }
 
-  allFacetsAddresses (): Hex[] {
-    return [...this.facetToSelectors.keys()]
+  allFacetsAddresses(): Hex[] {
+    return [...this.facetToSelectors.keys()];
   }
 }

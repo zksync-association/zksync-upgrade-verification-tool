@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
+import {describe, expect, it} from "vitest";
 import "dotenv/config";
-import { execAsync, expectToFailAsync } from "./util";
+import {execAsync, expectToFailAsync} from "./util";
 
 describe("validate check", () => {
   describe("test-mini-upgrade", () => {
     it("prints all the information for the mini upgrade", async () => {
-      const { stdout } = await execAsync("pnpm validate check reference/test-upgrade-mini");
+      const {stdout} = await execAsync("pnpm validate check reference/test-upgrade-mini");
 
       expect(stdout).toMatch(/Current protocol version.+\d+/);
       expect(stdout).toMatch(/Proposed protocol version.+1337/);
@@ -29,7 +29,7 @@ describe("validate check", () => {
 
   describe("1699353977-boojum", () => {
     it("prints all the information for this upgrade", async () => {
-      const { stdout } = await execAsync(
+      const {stdout} = await execAsync(
         "pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0"
       );
 
@@ -76,7 +76,7 @@ describe("validate check", () => {
         ["GettersFacet", "0xF3ACF6a03ea4a914B78Ec788624B25ceC37c14A4", "getAllowList()", "None"],
       ];
 
-      for (const [name, addr, added, removed] of facetData) {
+      for (const [name, addr] of facetData) {
         validateFacet(name, addr);
       }
 
@@ -222,8 +222,8 @@ describe("validate check", () => {
       }
     });
 
-    it("should match snapshot", async ({ expect }) => {
-      const { stdout } = await execAsync(
+    it("should match snapshot", async ({expect}) => {
+      const {stdout} = await execAsync(
         "pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0"
       );
       expect(stdout).toMatchSnapshot();
@@ -232,7 +232,7 @@ describe("validate check", () => {
 
   describe("1710255955-no-verified-contract", () => {
     it("returns that the contract is not verified on etherscan.", async () => {
-      const { stdout } = await execAsync(
+      const {stdout} = await execAsync(
         "pnpm validate check reference/1710255955-no-verified-contract"
       );
       expect(stdout).to.match(/Proposed contract verified etherscan.*NO!/);
@@ -245,7 +245,7 @@ describe("validate check", () => {
 
   describe("when the directory is not a valid upgrade", () => {
     it("fails", async () => {
-      const { stdout, stderr } = await expectToFailAsync(() =>
+      const {stdout} = await expectToFailAsync(() =>
         execAsync("pnpm validate check reference/not_an_upgrade")
       );
       expect(stdout).to.contain(
@@ -265,7 +265,7 @@ describe("validate check", () => {
 
   describe("when directory does not exists", () => {
     it("fails", async () => {
-      const { stdout, stderr } = await expectToFailAsync(() =>
+      const {stdout} = await expectToFailAsync(() =>
         execAsync("pnpm validate check reference/not_a_directory")
       );
       expect(stdout).toContain(
@@ -276,7 +276,7 @@ describe("validate check", () => {
 
   describe("when the upgrade is malformed", () => {
     it("fails with a propper error", async () => {
-      const { stdout } = await expectToFailAsync(() =>
+      const {stdout} = await expectToFailAsync(() =>
         execAsync("pnpm validate check reference/malformed-upgrade")
       );
       expect(stdout).toContain(

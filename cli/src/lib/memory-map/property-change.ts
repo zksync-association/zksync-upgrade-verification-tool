@@ -1,6 +1,6 @@
 import type { Property } from "./property";
 import type { Option } from "nochoices";
-import type {MemoryValue} from "./values/memory-value";
+import type { MemoryValue } from "./values/memory-value";
 
 export class PropertyChange {
   prop: Property;
