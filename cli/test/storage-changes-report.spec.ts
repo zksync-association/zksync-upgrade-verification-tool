@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { StorageChanges } from "../src/lib/memory-map/storage-changes";
+import { StorageChanges } from "../src/lib/storage-changes/storage-changes";
 import {memoryDiffParser, type MemoryDiffRaw} from "../src/schema/rpc";
 import { type Hex, hexToBigInt, keccak256, numberToBytes, numberToHex } from "viem";
 import chalk from "chalk";
-import { AddressType } from "../src/lib/memory-map/types/address-type";
-import { Property } from "../src/lib/memory-map/property";
-import { BigNumberType } from "../src/lib/memory-map/types/big-number-type";
+import { AddressType } from "../src/lib/storage-changes/types/address-type";
+import { Property } from "../src/lib/storage-changes/property";
+import { BigNumberType } from "../src/lib/storage-changes/types/big-number-type";
 import { StringMemoryReport } from "../src/lib/reports/memory-report";
-import { BlobType } from "../src/lib/memory-map/types/blob-type";
-import { BooleanType } from "../src/lib/memory-map/types/boolean-type";
-import { ArrayType } from "../src/lib/memory-map/types/array-type";
-import { FixedArrayType } from "../src/lib/memory-map/types/fixed-array-type";
-import { StructType } from "../src/lib/memory-map/types/struct-type";
+import { BlobType } from "../src/lib/storage-changes/types/blob-type";
+import { BooleanType } from "../src/lib/storage-changes/types/boolean-type";
+import { ArrayType } from "../src/lib/storage-changes/types/array-type";
+import { FixedArrayType } from "../src/lib/storage-changes/types/fixed-array-type";
+import { StructType } from "../src/lib/storage-changes/types/struct-type";
 
 describe("MemoryMapReport", () => {
   describe("For simple memory diff", () => {

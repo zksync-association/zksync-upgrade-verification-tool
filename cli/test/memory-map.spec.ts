@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { StorageChanges } from "../src/lib/memory-map/storage-changes";
+import { StorageChanges } from "../src/lib/storage-changes/storage-changes";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { memoryDiffParser } from "../src/schema/rpc";
 import { bytesToHex, type Hex, hexToBigInt } from "viem";
-import { AddressType } from "../src/lib/memory-map/types/address-type";
-import { StructType } from "../src/lib/memory-map/types/struct-type";
-import { BigNumberType } from "../src/lib/memory-map/types/big-number-type";
-import { Property } from "../src/lib/memory-map/property";
-import { BooleanType } from "../src/lib/memory-map/types/boolean-type";
+import { AddressType } from "../src/lib/storage-changes/types/address-type";
+import { StructType } from "../src/lib/storage-changes/types/struct-type";
+import { BigNumberType } from "../src/lib/storage-changes/types/big-number-type";
+import { Property } from "../src/lib/storage-changes/property";
+import { BooleanType } from "../src/lib/storage-changes/types/boolean-type";
 import type { MemoryReport } from "../src/lib/reports/memory-report";
-import { type PropertyChange } from "../src/lib/memory-map/property-change";
-import type { MemoryValue } from "../src/lib/memory-map/values/memory-value";
-import type { ValueField } from "../src/lib/memory-map/values/struct-value";
+import { type PropertyChange } from "../src/lib/storage-changes/property-change";
+import type { MemoryValue } from "../src/lib/storage-changes/values/memory-value";
+import type { ValueField } from "../src/lib/storage-changes/values/struct-value";
 import { Option } from "nochoices";
 
 class TestReport implements MemoryReport<string> {

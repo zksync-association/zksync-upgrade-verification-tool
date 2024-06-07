@@ -1,6 +1,6 @@
 import type { EnvBuilder } from "../lib/env-builder";
 import { type UpgradeChanges, UpgradeImporter, ZkSyncEraState } from "../lib/index";
-import { StorageChanges } from "../lib/memory-map/storage-changes";
+import { StorageChanges } from "../lib/storage-changes/storage-changes";
 import type { Hex } from "viem";
 import { StringMemoryReport } from "../lib/reports/memory-report";
 import type { Option } from "nochoices";
