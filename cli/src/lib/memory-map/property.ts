@@ -9,15 +9,17 @@ export class Property {
   slot: bigint;
   description: string;
   type: MemoryDataType;
+  private offset: number;
 
-  constructor(name: string, slot: bigint, description: string, type: MemoryDataType) {
+  constructor(name: string, slot: bigint, description: string, type: MemoryDataType, offset = 0) {
     this.name = name;
     this.slot = slot;
     this.description = description;
     this.type = type;
+    this.offset = offset
   }
 
   extract(memory: MemorySnapshot): Option<MemoryValue> {
-    return this.type.extract(memory, this.slot, 0);
+    return this.type.extract(memory, this.slot, this.offset);
   }
 }

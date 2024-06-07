@@ -275,13 +275,13 @@ export class MemoryMap {
         new AddressType()
       ),
       new Property(
-        "Storage.pendingAdmin",
+        "Base.s.pendingAdmin",
         37n,
         "Address that the governor or admin proposed as one that will replace admin role",
         new AddressType()
       ),
       new Property(
-        "Storage.feeParams",
+        "Base.s.feeParams",
         38n,
         "Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions, " +
           "the bootloader gives enough freedom to the operator.",
@@ -311,6 +311,61 @@ export class MemoryMap {
             type: new BigNumberType(8),
           },
         ])
+      ),
+      new Property(
+        "Base.s.blobVersionedHashRetriever",
+        39n,
+        "Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.",
+        new AddressType()
+      ),
+      new Property(
+        "Base.s.chainId",
+        40n,
+        "The chainId of the chain",
+        new BigNumberType()
+      ),
+      new Property(
+        "Base.s.bridgehub",
+        41n,
+        "The address of the bridgehub",
+        new AddressType()
+      ),
+      new Property(
+        "Base.s.stateTransitionManager",
+        42n,
+        "The address of the StateTransitionManager",
+        new AddressType()
+      ),
+      new Property(
+        "Base.s.baseToken",
+        43n,
+        "The address of the baseToken contract. Eth is address(1)",
+        new AddressType()
+      ),
+      new Property(
+        "Base.s.baseTokenBridge",
+        44n,
+        "The address of the baseTokenbridge. Eth also uses the shared bridge",
+        new AddressType()
+      ),
+      new Property(
+        "Base.s.baseTokenGasPriceMultiplierNominator",
+        45n,
+        "The chainId of the chain",
+        new BigNumberType(16)
+      ),
+      new Property(
+        "Base.s.baseTokenGasPriceMultiplierDenominator",
+        45n,
+        "The chainId of the chain",
+        new BigNumberType(16),
+        16
+      ),
+      new Property(
+        "Base.s.transactionFilterer",
+        45n,
+        "The address of the baseTokenbridge. Eth also uses the shared bridge",
+        new AddressType()
       ),
       new Property(
         "DiamondStorage.selectorToFacet",
