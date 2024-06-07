@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildCli } from "../src/lib/index";
 import type { EnvBuilder } from "../src/lib/env-builder";
+import type {Option} from "nochoices";
 
 const fail = () => expect.fail("should not be called");
 
@@ -79,7 +80,7 @@ describe("cli", () => {
     it("sends right arguments", async () => {
       let called = false;
       const fakeDownload = async (
-        env: EnvBuilder,
+        _env: EnvBuilder,
         upgradeDirectory: string,
         targetDir: string,
         l1Filter: string[]
@@ -96,6 +97,52 @@ describe("cli", () => {
         fail,
         fakeDownload,
         fail
+      );
+      await cli.parseAsync();
+      expect(called).toBe(true);
+    });
+  });
+
+  describe("storage-diff", () => {
+    it("sends right arguments", async () => {
+      let called = false;
+      const fakeStorageDiff = async (
+        _env: EnvBuilder,
+        upgradeDirectory: string,
+        preCalculatedPath: Option<string>
+      ): Promise<void> => {
+        expect(upgradeDirectory).to.equal("someDir");
+        expect(preCalculatedPath.isNone()).to.equal(true);
+        called = true;
+      };
+      const cli = buildCli(
+        ["storage-diff", "someDir", "--ethscankey=fakeKey"],
+        fail,
+        fail,
+        fail,
+        fakeStorageDiff
+      );
+      await cli.parseAsync();
+      expect(called).toBe(true);
+    });
+
+    it("when precalculated is specified it is received", async () => {
+      let called = false;
+      const fakeStorageDiff = async (
+        _env: EnvBuilder,
+        upgradeDirectory: string,
+        preCalculatedPath: Option<string>
+      ): Promise<void> => {
+        expect(upgradeDirectory).toEqual("someDir");
+        expect(preCalculatedPath.unwrap()).toEqual("path/to/data.json");
+        called = true;
+      };
+      const cli = buildCli(
+        ["storage-diff", "someDir", "--ethscankey=fakeKey", "--precalculated=path/to/data.json"],
+        fail,
+        fail,
+        fail,
+        fakeStorageDiff
       );
       await cli.parseAsync();
       expect(called).toBe(true);

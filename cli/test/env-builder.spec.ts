@@ -19,7 +19,7 @@ describe("EnvBuilder", () => {
     it("returns an era contracts repo in main", async () => {
       const repo = await target().contractsRepo();
       const current = await repo.currentRef();
-      expect(current).to.eql("main");
+      expect(current).toEqual("main");
     });
 
     it("cannot return the network", async () => {
@@ -40,7 +40,7 @@ describe("EnvBuilder", () => {
 
     it("returns an rpc client pointing to public mainnet node", () => {
       const rpc = target().rpcL1();
-      expect(rpc.rpcUrl()).to.eql("https://ethereum-rpc.publicnode.com");
+      expect(rpc.rpcUrl()).toEqual("https://ethereum-rpc.publicnode.com");
     });
   });
 
@@ -54,7 +54,7 @@ describe("EnvBuilder", () => {
 
     it("returns an rpc client pointing to public mainnet node", () => {
       const rpc = target().l1Client();
-      expect(rpc.baseUri).to.eql("https://api.etherscan.io/api");
+      expect(rpc.baseUri).toEqual("https://api.etherscan.io/api");
     });
   });
 
@@ -67,7 +67,7 @@ describe("EnvBuilder", () => {
 
     it("returns an rpc client pointing to sepolia public node", () => {
       const rpc = target().rpcL1();
-      expect(rpc.rpcUrl()).to.eql("https://ethereum-sepolia-rpc.publicnode.com");
+      expect(rpc.rpcUrl()).toEqual("https://ethereum-sepolia-rpc.publicnode.com");
     });
   });
 
@@ -81,7 +81,7 @@ describe("EnvBuilder", () => {
 
     it("returns an rpc client pointing to public mainnet node", () => {
       const rpc = target().l1Client();
-      expect(rpc.baseUri).to.eql("https://api-sepolia.etherscan.io/api");
+      expect(rpc.baseUri).toEqual("https://api-sepolia.etherscan.io/api");
     });
   });
 
@@ -92,7 +92,26 @@ describe("EnvBuilder", () => {
       target.withRef(ref);
       const repo = await target.contractsRepo();
       const current = await repo.currentRef();
-      expect(current).to.eql(ref);
+      expect(current).toEqual(ref);
     });
   });
+
+  describe("colored", () => {
+    it("is true by default", () => {
+      const target = new EnvBuilder();
+      expect(target.colored).toEqual(true);
+    })
+
+    it("is false after set to false", () => {
+      const target = new EnvBuilder();
+      target.withColored(false)
+      expect(target.colored).toEqual(false);
+    })
+
+    it("is true after set to true", () => {
+      const target = new EnvBuilder();
+      target.withColored(true)
+      expect(target.colored).toEqual(true);
+    })
+  })
 });
