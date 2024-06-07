@@ -1,6 +1,5 @@
 import type { MemoryReport } from "../../reports/memory-report";
 import type { MemoryValue } from "./memory-value";
-import type { Hex } from "viem";
 
 export class BooleanValue implements MemoryValue {
   val: boolean;
