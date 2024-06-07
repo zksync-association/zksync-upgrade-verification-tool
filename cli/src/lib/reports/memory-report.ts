@@ -1,8 +1,8 @@
-import type { PropertyChange } from "../storage-changes/property-change";
+import type { PropertyChange } from "../storage/property-change";
 import chalk from "chalk";
 import { bytesToHex, type Hex } from "viem";
-import type { MemoryValue } from "../storage-changes/values/memory-value";
-import type { ValueField } from "../storage-changes/values/struct-value";
+import type { MemoryValue } from "../storage/values/memory-value";
+import type { ValueField } from "../storage/values/struct-value";
 
 export interface MemoryReport<T> {
   add(change: PropertyChange): void;
