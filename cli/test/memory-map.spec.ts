@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MemoryMap } from "../src/lib/memory-map/memory-map";
+import { StorageChanges } from "../src/lib/memory-map/storage-changes";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { memoryDiffParser } from "../src/schema/rpc";
@@ -91,7 +91,7 @@ describe("MemoryMap", () => {
   const subject = async (file: string, selectors: Hex[] = [], facets: Hex[] = []) => {
     const diff = await fs.readFile(path.join(import.meta.dirname, "data", file));
     const json = memoryDiffParser.parse(JSON.parse(diff.toString()));
-    return new MemoryMap(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", selectors, facets);
+    return new StorageChanges(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", selectors, facets);
   };
 
   const scenario = async (
@@ -321,7 +321,7 @@ describe("MemoryMap", () => {
       ])
     );
 
-    const map = new MemoryMap(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", [], [], [prop]);
+    const map = new StorageChanges(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", [], [], [prop]);
 
     const change = map.changeFor("myStruct").unwrap();
 

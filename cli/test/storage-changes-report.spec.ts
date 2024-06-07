@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MemoryMap } from "../src/lib/memory-map/memory-map";
-import type { MemoryDiffRaw } from "../src/schema/rpc";
+import { StorageChanges } from "../src/lib/memory-map/storage-changes";
+import {memoryDiffParser, type MemoryDiffRaw} from "../src/schema/rpc";
 import { type Hex, hexToBigInt, keccak256, numberToBytes, numberToHex } from "viem";
 import chalk from "chalk";
 import { AddressType } from "../src/lib/memory-map/types/address-type";
@@ -24,7 +24,7 @@ describe("MemoryMapReport", () => {
       return numberToHex(n + add, { size: 32 });
     }
 
-    const diff: MemoryDiffRaw = {
+    const diff: MemoryDiffRaw = memoryDiffParser.parse({
       result: {
         pre: {
           addr: {
@@ -58,7 +58,7 @@ describe("MemoryMapReport", () => {
           },
         },
       },
-    };
+    });
 
     function expectedReport(
       name: string,
@@ -79,7 +79,7 @@ describe("MemoryMapReport", () => {
     }
 
     it("can display address elements", () => {
-      const memoryMap = new MemoryMap(
+      const memoryMap = new StorageChanges(
         diff,
         "addr",
         [],
@@ -102,7 +102,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display types elements", () => {
-      const memoryMap = new MemoryMap(
+      const memoryMap = new StorageChanges(
         diff,
         "addr",
         [],
@@ -118,7 +118,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display blob elements", () => {
-      const memoryMap = new MemoryMap(
+      const memoryMap = new StorageChanges(
         diff,
         "addr",
         [],
@@ -141,7 +141,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display boolean elements", () => {
-      const memoryMap = new MemoryMap(
+      const memoryMap = new StorageChanges(
         diff,
         "addr",
         [],
@@ -157,7 +157,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display list elements", () => {
-      const memoryMap = new MemoryMap(
+      const memoryMap = new StorageChanges(
         diff,
         "addr",
         [],
@@ -176,7 +176,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display fixed array elements", () => {
-      const memoryMap = new MemoryMap(
+      const memoryMap = new StorageChanges(
         diff,
         "addr",
         [],
@@ -202,7 +202,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display fixed array elements when some are not present", () => {
-      const memoryMap = new MemoryMap(
+      const memoryMap = new StorageChanges(
         diff,
         "addr",
         [],
@@ -228,7 +228,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display struct elements", () => {
-      const memoryMap = new MemoryMap(
+      const memoryMap = new StorageChanges(
         diff,
         "addr",
         [],

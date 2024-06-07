@@ -1,6 +1,6 @@
 import type { EnvBuilder } from "../lib/env-builder";
 import { type UpgradeChanges, UpgradeImporter, ZkSyncEraState } from "../lib/index";
-import { MemoryMap } from "../lib/memory-map/memory-map";
+import { StorageChanges } from "../lib/memory-map/storage-changes";
 import type { Hex } from "viem";
 import { StringMemoryReport } from "../lib/reports/memory-report";
 import type { Option } from "nochoices";
@@ -62,7 +62,7 @@ export async function storageChangeCommand(
     facets.add(addr);
   }
 
-  const memoryMap = new MemoryMap(
+  const memoryMap = new StorageChanges(
     rawMap,
     state.addr,
     [...selectors],
