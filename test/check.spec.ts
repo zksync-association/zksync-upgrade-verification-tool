@@ -1,11 +1,11 @@
-import {describe, expect, it} from "vitest";
+import { describe, expect, it } from "vitest";
 import "dotenv/config";
-import {execAsync, expectToFailAsync} from "./util";
+import { execAsync, expectToFailAsync } from "./util";
 
 describe("validate check", () => {
   describe("test-mini-upgrade", () => {
     it("prints all the information for the mini upgrade", async () => {
-      const {stdout} = await execAsync("pnpm validate check reference/test-upgrade-mini");
+      const { stdout } = await execAsync("pnpm validate check reference/test-upgrade-mini");
 
       expect(stdout).toMatch(/Current protocol version.+\d+/);
       expect(stdout).toMatch(/Proposed protocol version.+1337/);
@@ -14,9 +14,13 @@ describe("validate check", () => {
       expect(stdout).toContain("No diamond changes");
 
       expect(stdout).toMatch(/Addres.+?0x[0-9a-fA-F]{40}.+?No changes/);
-      expect(stdout).toMatch(/Recursion node level VkHash.+?0x[0-9a-fA-F]{64}.+?0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080/);
+      expect(stdout).toMatch(
+        /Recursion node level VkHash.+?0x[0-9a-fA-F]{64}.+?0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080/
+      );
       expect(stdout).toMatch(/Recursion circuits set VksHash.+?0x[0-9a-fA-F]{64}.+?No changes/);
-      expect(stdout).toMatch(/Recursion leaf level VkHash.+?0x[0-9a-fA-F]{64}.+?0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a/);
+      expect(stdout).toMatch(
+        /Recursion leaf level VkHash.+?0x[0-9a-fA-F]{64}.+?0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a/
+      );
 
       expect(stdout).toContain("System contracts:");
       expect(stdout).toContain("No changes in system contracts");
@@ -29,7 +33,7 @@ describe("validate check", () => {
 
   describe("1699353977-boojum", () => {
     it("prints all the information for this upgrade", async () => {
-      const {stdout} = await execAsync(
+      const { stdout } = await execAsync(
         "pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0"
       );
 
@@ -39,30 +43,25 @@ describe("validate check", () => {
       expect(stdout).toMatch(/Proposed protocol version.+18/);
       expect(stdout).toContain("L1 Main contract Diamond upgrades:");
 
-      function validateFacet (
-        facetName: string,
-        facetAddress: string
-      ) {
+      function validateFacet(facetName: string, facetAddress: string) {
         const adminFacetStartIndex = lines.findIndex((line) => line.includes(facetName));
         const facetLines = lines.slice(adminFacetStartIndex);
-        const lastIndex = facetLines.findIndex(l => l.includes("To compare code")) + 1
+        const lastIndex = facetLines.findIndex((l) => l.includes("To compare code")) + 1;
         expect(adminFacetStartIndex).not.toBe(-1);
         expect(lastIndex).not.toBe(0);
         expect(facetLines[2]).toContain("Current address");
-        expect(facetLines[3]).toMatch(
-          new RegExp(`Upgrade address.*${facetAddress}`)
-        );
+        expect(facetLines[3]).toMatch(new RegExp(`Upgrade address.*${facetAddress}`));
         expect(facetLines[4]).toContain("Proposed contract verified etherscan");
         expect(facetLines[4]).toContain("Yes");
 
-        const newFunctionsLine = facetLines.findIndex(l => l.includes("New functions"));
-        expect(newFunctionsLine).toBeLessThan(lastIndex)
+        const newFunctionsLine = facetLines.findIndex((l) => l.includes("New functions"));
+        expect(newFunctionsLine).toBeLessThan(lastIndex);
 
-        const removedFunctionsLine = facetLines.findIndex(l => l.includes("Removed functions"));
-        expect(removedFunctionsLine).toBeLessThan(lastIndex)
+        const removedFunctionsLine = facetLines.findIndex((l) => l.includes("Removed functions"));
+        expect(removedFunctionsLine).toBeLessThan(lastIndex);
 
-        const compareLine = facetLines.findIndex(l => l.includes("To compare code"));
-        expect(compareLine).toBeLessThan(lastIndex)
+        const compareLine = facetLines.findIndex((l) => l.includes("To compare code"));
+        expect(compareLine).toBeLessThan(lastIndex);
 
         expect(facetLines[compareLine]).toContain(
           `pnpm validate facet-diff reference/1699353977-boojum ${facetName}`
@@ -82,7 +81,9 @@ describe("validate check", () => {
 
       expect(stdout).toMatch(/Address.*0xB465882F67d236DcC0D090F78ebb0d838e9719D8/);
 
-      expect(stdout).toMatch(/Recursion node level VkHash.*0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080/);
+      expect(stdout).toMatch(
+        /Recursion node level VkHash.*0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080/
+      );
 
       expect(stdout).toMatch(/Recursion circuits set VksHash.*No changes/);
 
@@ -222,8 +223,8 @@ describe("validate check", () => {
       }
     });
 
-    it("should match snapshot", async ({expect}) => {
-      const {stdout} = await execAsync(
+    it("should match snapshot", async ({ expect }) => {
+      const { stdout } = await execAsync(
         "pnpm validate check reference/1699353977-boojum --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0"
       );
       expect(stdout).toMatchSnapshot();
@@ -232,7 +233,7 @@ describe("validate check", () => {
 
   describe("1710255955-no-verified-contract", () => {
     it("returns that the contract is not verified on etherscan.", async () => {
-      const {stdout} = await execAsync(
+      const { stdout } = await execAsync(
         "pnpm validate check reference/1710255955-no-verified-contract"
       );
       expect(stdout).to.match(/Proposed contract verified etherscan.*NO!/);
@@ -245,7 +246,7 @@ describe("validate check", () => {
 
   describe("when the directory is not a valid upgrade", () => {
     it("fails", async () => {
-      const {stdout} = await expectToFailAsync(() =>
+      const { stdout } = await expectToFailAsync(() =>
         execAsync("pnpm validate check reference/not_an_upgrade")
       );
       expect(stdout).to.contain(
@@ -265,7 +266,7 @@ describe("validate check", () => {
 
   describe("when directory does not exists", () => {
     it("fails", async () => {
-      const {stdout} = await expectToFailAsync(() =>
+      const { stdout } = await expectToFailAsync(() =>
         execAsync("pnpm validate check reference/not_a_directory")
       );
       expect(stdout).toContain(
@@ -276,7 +277,7 @@ describe("validate check", () => {
 
   describe("when the upgrade is malformed", () => {
     it("fails with a propper error", async () => {
-      const {stdout} = await expectToFailAsync(() =>
+      const { stdout } = await expectToFailAsync(() =>
         execAsync("pnpm validate check reference/malformed-upgrade")
       );
       expect(stdout).toContain(
