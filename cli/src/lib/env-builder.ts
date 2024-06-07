@@ -14,6 +14,7 @@ export class EnvBuilder {
   private _l1Client?: BlockExplorerClient;
   private _l2Client?: BlockExplorerClient;
   private _repo?: EraContractsRepo;
+  colored: boolean = true;
 
   // Config
   private _rpcL1?: RpcClient;
@@ -97,5 +98,9 @@ export class EnvBuilder {
     }
 
     return this._repo;
+  }
+
+  withColored (colored: boolean) {
+    this.colored = colored
   }
 }

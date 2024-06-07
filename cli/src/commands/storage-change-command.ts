@@ -70,7 +70,7 @@ export async function storageChangeCommand(
   );
   const memoryChanges = memoryMap.allChanges();
 
-  const report = new StringMemoryReport();
+  const report = new StringMemoryReport(env.colored);
 
   for (const change of memoryChanges) {
     report.add(change);

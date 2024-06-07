@@ -22,13 +22,22 @@ export interface MemoryReport<T> {
 
 export class StringMemoryReport implements MemoryReport<string> {
   lines: string[];
-  constructor() {
+  private colored: boolean;
+  constructor(colored = true) {
     this.lines = [];
+    this.colored = colored
+  }
+
+  private bold(text: string): string {
+    if (this.colored) {
+      return chalk.bold(text)
+    }
+    return text
   }
 
   add(change: PropertyChange) {
     this.lines.push("--------------------------");
-    this.lines.push(`name: ${chalk.bold(change.prop.name)}`);
+    this.lines.push(`name: ${this.bold(change.prop.name)}`);
     this.lines.push(`description: ${change.prop.description}`);
     this.lines.push("");
     this.lines.push("before:");

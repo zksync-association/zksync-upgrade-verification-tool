@@ -50,11 +50,18 @@ export function buildCli(
       describe: "github ref for era contracts repo",
       default: "main",
     })
+    .option("noColor", {
+      alias: "noFormat",
+      type: "boolean",
+      describe: "Use colored output",
+      default: false,
+    })
     .middleware((yargs) => {
       env.withNetwork(NetworkSchema.parse(yargs.network));
       env.withL1RpcUrl(yargs.l1RpcUrl);
       env.withEtherscanApiKey(yargs.ethscankey);
       env.withRef(yargs.ref);
+      env.withColored(!yargs.noColor);
     })
     .command(
       "check <upgradeDirectory>",
@@ -112,7 +119,6 @@ export function buildCli(
             demandOption: true,
           })
           .option("precalculated", {
-            alias: "p",
             type: "string",
             demandOption: false,
           }),
