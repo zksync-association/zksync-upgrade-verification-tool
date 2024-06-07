@@ -42,8 +42,8 @@ export class MemoryMap {
       throw new Error("missing post");
     }
 
-    const preStorage = Option.fromNullable(pre.storage).unwrapOr({})
-    const postStorage = Option.fromNullable(post.storage).unwrapOr({})
+    const preStorage = pre.storage.unwrapOr({})
+    const postStorage = post.storage.unwrapOr({})
 
     this.pre = new MemorySnapshot(preStorage);
     this.post = new MemorySnapshot(postStorage);

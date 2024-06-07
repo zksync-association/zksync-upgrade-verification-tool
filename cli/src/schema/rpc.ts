@@ -1,13 +1,11 @@
-import {z, type ZodType} from "zod";
-import {Option} from "nochoices";
-
-const option = <T extends ZodType>(t: T) => z.optional(t).transform<Option<T>>(obj => Option.fromNullable(obj) )
+import {z} from "zod";
+import {zodOptional} from "./zod-optionals";
 
 const stateParser = z.record(
   z.string(),
   z.object({
-    nonce: z.optional(z.number()),
-    storage: z.optional(z.record(z.string(), z.string())),
+    nonce: zodOptional(z.number()),
+    storage: zodOptional(z.record(z.string(), z.string())),
   })
 );
 
