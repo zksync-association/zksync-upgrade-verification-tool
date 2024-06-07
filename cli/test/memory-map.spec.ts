@@ -293,7 +293,7 @@ describe("MemoryMap", () => {
       [],
       ["0x230214f0224c7e0485f348a79512ad00514db1f7"]
     );
-    console.log(test.before().unwrap());
+    expect(test.before().isSome()).toBe(true);
   });
 
   it("can display structs correctly", async () => {

@@ -34,16 +34,19 @@ export class MemoryMap {
     const pre = diff.result.pre[addr];
     const post = diff.result.post[addr];
 
-    if (!pre || !pre.storage) {
+    if (!pre) {
       throw new Error("missing pre");
     }
 
-    if (!post || !post.storage) {
+    if (!post) {
       throw new Error("missing post");
     }
 
-    this.pre = new MemorySnapshot(pre.storage);
-    this.post = new MemorySnapshot(post.storage);
+    const preStorage = Option.fromNullable(pre.storage).unwrapOr({})
+    const postStorage = Option.fromNullable(post.storage).unwrapOr({})
+
+    this.pre = new MemorySnapshot(preStorage);
+    this.post = new MemorySnapshot(postStorage);
     this.selectors = selectors;
     this.facets = facets;
     this.contractProps = contractProps.length === 0 ? this.allContractProps() : contractProps;
@@ -350,7 +353,8 @@ export class MemoryMap {
               name: "facetPosition",
               type: new BigNumberType(2),
             },
-          ])
+          ]),
+          true
         )
       ),
       new Property(

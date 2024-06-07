@@ -17,31 +17,32 @@ export class ArrayType implements MemoryDataType {
   extract(memory: MemorySnapshot, slot: bigint, _offset = 0): Option<MemoryValue> {
     const res: Option<MemoryValue>[] = [];
     const base = hexToBigInt(keccak256(numberToBytes(slot, { size: 32 })));
-    const length = memory
+    return memory
       .at(slot)
       .map((buf) => bytesToBigint(buf))
-      .unwrapOrElse(() => {
+      .orElse(() => {
         let res = 0n;
         while (memory.at(base + res).isSome()) {
           res += 1n;
         }
 
-        return res;
+        return Option.Some(res).filter(n => n !== 0n);
+      })
+      .map(length => {
+        let offset = 0;
+        let slotDelta = 0n;
+        for (let i = 0n; i < length; i++) {
+          if (offset + this.inner.evmSize > 32) {
+            offset = 0;
+            slotDelta += 1n;
+          }
+
+          res.push(this.inner.extract(memory, base + slotDelta, offset));
+          offset += this.inner.evmSize;
+        }
+
+        return new ArrayValue(res.map((v) => v.unwrapOr(new EmptyValue())))
       });
-
-    let offset = 0;
-    let slotDelta = 0n;
-    for (let i = 0n; i < length; i++) {
-      if (offset + this.inner.evmSize > 32) {
-        offset = 0;
-        slotDelta += 1n;
-      }
-
-      res.push(this.inner.extract(memory, base + slotDelta, offset));
-      offset += this.inner.evmSize;
-    }
-
-    return Option.Some(new ArrayValue(res.map((v) => v.unwrapOr(new EmptyValue()))));
   }
 
   get evmSize(): number {

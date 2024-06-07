@@ -76,5 +76,9 @@ export async function storageChangeCommand(
     report.add(change);
   }
 
-  console.log(report.format());
+  if (report.isEmpty()) {
+    console.log("No storage changes when executing upgrade.")
+  } else {
+    console.log(report.format());
+  }
 }
