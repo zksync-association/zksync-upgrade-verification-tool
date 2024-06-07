@@ -22,6 +22,9 @@ export function buildCli(
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
       }
+      if (!yargs.l1RpcUrl) {
+        yargs.l1RpcUrl = process.env.L1_RPC_CLI;
+      }
     }, true)
     .option("ethscankey", {
       describe: "Api key for etherscan",
@@ -36,8 +39,8 @@ export function buildCli(
       type: "string",
       default: "mainnet",
     })
-    .option("rpcUrl", {
-      alias: "rpc",
+    .option("l1RpcUrl", {
+      alias: "l1rpc",
       type: "string",
       describe: "Ethereum rpc url",
       demandOption: false,
@@ -49,7 +52,7 @@ export function buildCli(
     })
     .middleware((yargs) => {
       env.withNetwork(NetworkSchema.parse(yargs.network));
-      env.withRpcUrl(yargs.rpcUrl);
+      env.withL1RpcUrl(yargs.l1RpcUrl);
       env.withEtherscanApiKey(yargs.ethscankey);
       env.withRef(yargs.ref);
     })

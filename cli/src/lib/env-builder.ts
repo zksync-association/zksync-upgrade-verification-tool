@@ -30,7 +30,7 @@ export class EnvBuilder {
     this.ref = ref;
   }
 
-  withRpcUrl(maybeUrl: string | undefined): void {
+  withL1RpcUrl(maybeUrl: string | undefined): void {
     this.rpcUrl = maybeUrl;
   }
 

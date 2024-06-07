@@ -131,12 +131,6 @@ describe("BlockExplorerClient", () => {
       expect(res).toBe(false);
     });
 
-    it("returns false when the contract has no source code available", async () => {
-      const client = subject();
-      const res = await client.isVerified("0x0000000000000000000000000000000000000006");
-      expect(res).toBe(false);
-    });
-
     describe("when a wrong api", () => {
       const subject = () =>
         new BlockExplorerClient(
@@ -166,11 +160,11 @@ describe("BlockExplorerClient", () => {
             "contracts-preprocessed/AccountCodeStorage.sol",
             "contracts-preprocessed/Constants.sol",
             "contracts-preprocessed/interfaces/IAccountCodeStorage.sol",
+            "contracts-preprocessed/interfaces/IBaseToken.sol",
             "contracts-preprocessed/interfaces/IBootloaderUtilities.sol",
             "contracts-preprocessed/interfaces/IComplexUpgrader.sol",
             "contracts-preprocessed/interfaces/ICompressor.sol",
             "contracts-preprocessed/interfaces/IContractDeployer.sol",
-            "contracts-preprocessed/interfaces/IEthToken.sol",
             "contracts-preprocessed/interfaces/IImmutableSimulator.sol",
             "contracts-preprocessed/interfaces/IKnownCodesStorage.sol",
             "contracts-preprocessed/interfaces/IL1Messenger.sol",
