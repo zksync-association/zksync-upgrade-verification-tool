@@ -239,7 +239,7 @@ describe("validate check", () => {
 
   describe("when the directory is not a valid upgrade", () => {
     it("fails", async () => {
-      const { stdout, stderr } = await expectToFailAsync(() =>
+      const { stdout } = await expectToFailAsync(() =>
         execAsync("pnpm validate check reference/not_an_upgrade")
       );
       expect(stdout).to.contain(
@@ -259,7 +259,7 @@ describe("validate check", () => {
 
   describe("when directory does not exists", () => {
     it("fails", async () => {
-      const { stdout, stderr } = await expectToFailAsync(() =>
+      const { stdout } = await expectToFailAsync(() =>
         execAsync("pnpm validate check reference/not_a_directory")
       );
       expect(stdout).toContain(
@@ -276,6 +276,14 @@ describe("validate check", () => {
       expect(stdout).toContain(
         'Problem processing specified upgrade: "reference/malformed-upgrade/common.json" does not follow expected schema.'
       );
+    });
+  });
+
+  describe("when version is semver", () => {
+    it("execs ok and shows correct version", async () => {
+      const { stdout } = await execAsync("pnpm validate check reference/test-semver");
+      expect(stdout).toMatch(/Current protocol version.+\d+\.\d+\.\d+/);
+      expect(stdout).toMatch(/Proposed protocol version.*1.3.2009/);
     });
   });
 });
