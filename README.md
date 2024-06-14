@@ -19,16 +19,14 @@ The zkSync Era Upgrade Verification Tool is a **CLI tool crafted to decode and p
 
 <br>
 
-
-
-
 ## 🔍 **Prerequisites**
 
-### **1. Node.js & pnpm**
+### **1. Node.js, pnpm & yarn**
 
 ```bash
 node --version  # Checks the installed version of Node.js
 pnpm --version  # Checks the installed version of pnpm
+yarn --version  # Checks the installed version of yarn
 ```
 
 If you do not have Node.js installed, please install it from [nodejs.org](https://nodejs.org/en/download/package-manager). For example: 
@@ -41,6 +39,12 @@ If you do not have `pnpm` installed, please install it from [pnpm installation g
 
 ```bash
 npm install -g pnpm
+```
+
+If you do not have `yarn` installed, please install it from [yarn installation guide](https://classic.yarnpkg.com/en/docs/install). For example:
+
+```bash
+npm install -g yarn
 ```
 
 ### **2. Access to Upgrade Directory**
@@ -77,12 +81,10 @@ pnpm install
 pnpm build
 ```
 
-### **3. Etherscan & Github API Key setup**
+### **3. Etherscan Key setup**
 <br>
 
 >You can create an Etherscan API key at [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).
-
-> You can create an Github API key (access token) at [Github API Key](https://github.com/settings/tokens).
 
 <br>
 
@@ -90,9 +92,6 @@ pnpm build
 
 ```bash
 export ETHERSCAN_API_KEY="<your_etherscan_api_key>"
-```
-```bash
-export API_KEY_GITHUB="<your_github_api_key>"
 ```
 
 #### ***Option 2: Configuration Files***
@@ -106,7 +105,6 @@ This file should contain the following entries:
 ```bash
 # .env
 ETHERSCAN_API_KEY=your_etherscan_api_key
-API_KEY_GITHUB=your_github_api_key
 ```
 
 #### ***Option 3: CLI Argument***
@@ -114,13 +112,13 @@ API_KEY_GITHUB=your_github_api_key
  You can also specify your API keys directly as command line arguments when running commands that require them. For example:
 
 ```bash
-pnpm validate --ethscanApiKey=your_etherscan_api_key --githubApiKey=your_github_api_key
+pnpm validate --ethscanApiKey=your_etherscan_api_key
 ```
 
 ## 🛠️ **Usage**
 The zkSync Era Upgrade Verification Tool provides a range of commands for interacting with and verifying zkSync protocol upgrade data.
 
->**Etherscan & Github API Key required.*
+>**Etherscan API Key required.*
 
 ### **`check <upgradeDir>`**: 
 Checks the validity of the upgrade and prints a summary of the changes.
