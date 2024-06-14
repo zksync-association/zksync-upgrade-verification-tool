@@ -16,7 +16,7 @@ export class Property {
     this.slot = slot;
     this.description = description;
     this.type = type;
-    this.offset = offset
+    this.offset = offset;
   }
 
   extract(memory: MemorySnapshot): Option<MemoryValue> {

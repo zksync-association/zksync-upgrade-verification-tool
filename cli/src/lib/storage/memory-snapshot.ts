@@ -2,7 +2,7 @@ import { bytesToBigInt } from "viem";
 import { Option } from "nochoices";
 
 export interface MemorySnapshot {
-  at(pos: bigint): Option<Buffer>
+  at(pos: bigint): Option<Buffer>;
 }
 
 export class FileMemorySnapshot {

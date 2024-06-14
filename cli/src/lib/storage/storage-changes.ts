@@ -7,7 +7,7 @@ import { MappingType } from "./mapping-type";
 import { StructType } from "./types/struct-type";
 import { BigNumberType } from "./types/big-number-type";
 import { Property } from "./property";
-import {FileMemorySnapshot, type MemorySnapshot} from "./memory-snapshot";
+import { FileMemorySnapshot, type MemorySnapshot } from "./memory-snapshot";
 import { PropertyChange } from "./property-change";
 import { BooleanType } from "./types/boolean-type";
 import { FixedArrayType } from "./types/fixed-array-type";
@@ -42,8 +42,8 @@ export class StorageChanges {
       throw new Error("missing post");
     }
 
-    const preStorage = pre.storage.unwrapOr({})
-    const postStorage = post.storage.unwrapOr({})
+    const preStorage = pre.storage.unwrapOr({});
+    const postStorage = post.storage.unwrapOr({});
 
     this.pre = new FileMemorySnapshot(preStorage);
     this.post = new FileMemorySnapshot(postStorage);
@@ -318,18 +318,8 @@ export class StorageChanges {
         "Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.",
         new AddressType()
       ),
-      new Property(
-        "Base.s.chainId",
-        40n,
-        "The chainId of the chain",
-        new BigNumberType()
-      ),
-      new Property(
-        "Base.s.bridgehub",
-        41n,
-        "The address of the bridgehub",
-        new AddressType()
-      ),
+      new Property("Base.s.chainId", 40n, "The chainId of the chain", new BigNumberType()),
+      new Property("Base.s.bridgehub", 41n, "The address of the bridgehub", new AddressType()),
       new Property(
         "Base.s.stateTransitionManager",
         42n,

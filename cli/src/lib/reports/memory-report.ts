@@ -82,8 +82,8 @@ export class StringMemoryReport implements MemoryReport<string> {
   writeStruct(fields: ValueField[]): string {
     return fields
       .map(({ key, value }) => {
-        const lines = value.writeInto(this).split('\n')
-        return `.${key}: ${lines.join(`\n${" ".repeat(key.length + 3)}`)}`
+        const lines = value.writeInto(this).split("\n");
+        return `.${key}: ${lines.join(`\n${" ".repeat(key.length + 3)}`)}`;
       })
       .join("\n  ");
   }
@@ -98,7 +98,7 @@ export class StringMemoryReport implements MemoryReport<string> {
       .join("\n  ");
   }
 
-  isEmpty (): boolean {
-    return this.lines.length === 0
+  isEmpty(): boolean {
+    return this.lines.length === 0;
   }
 }

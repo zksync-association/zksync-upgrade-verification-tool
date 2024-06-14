@@ -91,7 +91,12 @@ describe("MemoryMap", () => {
   const subject = async (file: string, selectors: Hex[] = [], facets: Hex[] = []) => {
     const diff = await fs.readFile(path.join(import.meta.dirname, "data", file));
     const json = memoryDiffParser.parse(JSON.parse(diff.toString()));
-    return new StorageChanges(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", selectors, facets);
+    return new StorageChanges(
+      json,
+      "0x32400084c286cf3e17e7b677ea9583e60a000324",
+      selectors,
+      facets
+    );
   };
 
   const scenario = async (
@@ -321,7 +326,13 @@ describe("MemoryMap", () => {
       ])
     );
 
-    const map = new StorageChanges(json, "0x32400084c286cf3e17e7b677ea9583e60a000324", [], [], [prop]);
+    const map = new StorageChanges(
+      json,
+      "0x32400084c286cf3e17e7b677ea9583e60a000324",
+      [],
+      [],
+      [prop]
+    );
 
     const change = map.changeFor("myStruct").unwrap();
 

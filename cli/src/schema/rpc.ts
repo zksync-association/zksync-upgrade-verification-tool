@@ -1,5 +1,5 @@
-import {z} from "zod";
-import {zodOptional} from "./zod-optionals";
+import { z } from "zod";
+import { zodOptional } from "./zod-optionals";
 
 const stateParser = z.record(
   z.string(),

@@ -26,9 +26,9 @@ export class ArrayType implements MemoryDataType {
           res += 1n;
         }
 
-        return Option.Some(res).filter(n => n !== 0n);
+        return Option.Some(res).filter((n) => n !== 0n);
       })
-      .map(length => {
+      .map((length) => {
         let offset = 0;
         let slotDelta = 0n;
         for (let i = 0n; i < length; i++) {
@@ -41,7 +41,7 @@ export class ArrayType implements MemoryDataType {
           offset += this.inner.evmSize;
         }
 
-        return new ArrayValue(res.map((v) => v.unwrapOr(new EmptyValue())))
+        return new ArrayValue(res.map((v) => v.unwrapOr(new EmptyValue())));
       });
   }
 
