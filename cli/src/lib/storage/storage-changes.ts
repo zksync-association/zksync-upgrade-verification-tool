@@ -171,9 +171,9 @@ export class StorageChanges {
         new AddressType()
       ),
       new Property(
-        "Base.s.verifierParams",
+        "Base.s.__DEPRECATED_verifierParams",
         20n,
-        "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
+        "[DEPRECATED]",
         new StructType([
           {
             name: "recursionNodeLevelVkHash",
