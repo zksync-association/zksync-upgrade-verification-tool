@@ -72,10 +72,6 @@ export async function storageChangeCommand(
 
   const report = new StringStorageChangeReport(env.colored, memoryMap);
 
-  for (const change of memoryChanges) {
-    report.add(change.prop);
-  }
-
   if (report.isEmpty()) {
     console.log("No storage changes when executing upgrade.");
   } else {

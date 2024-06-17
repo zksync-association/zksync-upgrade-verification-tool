@@ -89,7 +89,6 @@ describe("MemoryMapReport", () => {
       );
 
       const report = new StringStorageChangeReport(true, memoryMap);
-      report.add(prop);
 
       expect(report.format()).toEqual(
         expectedReport(
@@ -112,7 +111,6 @@ describe("MemoryMapReport", () => {
       );
 
       const report = new StringStorageChangeReport(true, memoryMap);
-      report.add(prop);
 
       expect(report.format()).toEqual(expectedReport("numberProp", "it is a number", "10", "20"));
     });
@@ -128,7 +126,6 @@ describe("MemoryMapReport", () => {
       );
 
       const report = new StringStorageChangeReport(true, memoryMap);
-      report.add(prop);
 
       expect(report.format()).toEqual(
         expectedReport(
@@ -151,7 +148,6 @@ describe("MemoryMapReport", () => {
       );
 
       const report = new StringStorageChangeReport(true, memoryMap);
-      report.add(prop);
 
       expect(report.format()).toEqual(expectedReport("blobProp", "it is a blob", "true", "false"));
     });
@@ -167,7 +163,6 @@ describe("MemoryMapReport", () => {
       );
 
       const report = new StringStorageChangeReport(true, memoryMap);
-      report.add(prop);
 
       const before = ["- 100", "- 101", "- 102"].join("\n  ");
       const after = ["- 100", "- 201", "- 102", "- 103"].join("\n  ");
@@ -193,7 +188,6 @@ describe("MemoryMapReport", () => {
       );
 
       const report = new StringStorageChangeReport(true, memoryMap);
-      report.add(prop);
 
       const before = ["- 100", "- 101", "- 102"].join("\n  ");
       const after = ["- 100", "- 201", "- 102"].join("\n  ");
@@ -219,7 +213,6 @@ describe("MemoryMapReport", () => {
       );
 
       const report = new StringStorageChangeReport(true, memoryMap);
-      report.add(prop);
 
       const before = ["- 101", "- 102", "- Empty slot."].join("\n  ");
       const after = ["- 201", "- 102", "- 103"].join("\n  ");
@@ -262,7 +255,6 @@ describe("MemoryMapReport", () => {
       );
 
       const report = new StringStorageChangeReport(true, memoryMap);
-      report.add(prop);
 
       const before = [
         ".field1: 100",

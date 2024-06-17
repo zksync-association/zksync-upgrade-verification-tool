@@ -4,7 +4,6 @@ import type {ValueField} from "../storage/values/struct-value";
 import type {Property} from "../storage/property";
 
 export interface StorageReport<T> {
-  add(change: Property): void;
   addAddress(addr: Hex): T;
   addBigNumber(n: bigint): T;
   writeBuf(buf: Buffer): T;

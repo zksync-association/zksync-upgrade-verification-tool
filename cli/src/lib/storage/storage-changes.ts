@@ -60,7 +60,7 @@ export class StorageChanges {
   }
 
   allChanges(): PropertyChange[] {
-    return this.allContractProps()
+    return this.contractProps
       .map((prop) => {
         return new PropertyChange(prop, prop.extract(this.pre), prop.extract(this.post));
       })
@@ -250,7 +250,7 @@ export class StorageChanges {
         new MappingType([], new BigNumberType())
       ),
       new Property(
-        "ZkSyncHyperchainBase.s.protocolVersion",
+          "ZkSyncHyperchainBase.s.protocolVersion",
         33n,
         "Stores the protocol version. Note, that the protocol version may not only encompass changes to the smart contracts, but also to the node behavior.",
         new BigNumberType()

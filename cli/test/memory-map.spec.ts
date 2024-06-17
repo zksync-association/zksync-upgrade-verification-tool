@@ -32,7 +32,7 @@ class TestReport implements StorageReport<string> {
     return this.afterData;
   }
 
-  add(change: PropertyChange): void {
+  checkProp(change: PropertyChange): void {
     change.before
       .map((v) => v.writeInto(this))
       .ifSome((str) => {
@@ -109,7 +109,7 @@ describe("MemoryMap", () => {
     const maybeValue = memory.changeFor(changeName);
     const test = new TestReport();
     const value = maybeValue.unwrap();
-    test.add(value);
+    test.checkProp(value);
     return test;
   };
 
@@ -343,7 +343,7 @@ describe("MemoryMap", () => {
     const change = map.changeFor("myStruct").unwrap();
 
     const test = new TestReport();
-    test.add(change);
+    test.checkProp(change);
 
     expect(test.before().unwrap().toLowerCase()).toEqual(
       "facetAddress=>0xA57F9FFD65fC0F5792B5e958dF42399a114EC7e7, selectorPosition=>3, isFreezable=>true".toLowerCase()

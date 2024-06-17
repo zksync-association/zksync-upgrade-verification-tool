@@ -41,8 +41,28 @@ export class StringStorageChangeReport implements StorageReport<string> {
     this.lines.push("--------------------------");
   }
 
+  // private formatProperty (): string {
+  //
+  // }
+
   format (): string {
-    return this.lines.join("\n");
+    const changes = this.changes.allChanges()
+    const lines = []
+
+    for (const change of changes) {
+      lines.push("--------------------------");
+      lines.push(`name: ${this.bold(change.prop.name)}`);
+      lines.push(`description: ${change.prop.description}`);
+      lines.push("");
+      lines.push("before:");
+      lines.push(`  ${change.before.map((v) => v.writeInto(this)).unwrapOr("No content.")}`);
+      lines.push("");
+      lines.push("after:");
+      lines.push(`  ${change.after.map((v) => v.writeInto(this)).unwrapOr("No content.")}`);
+      lines.push("--------------------------");
+    }
+
+    return lines.join("\n");
   }
 
   addAddress (addr: Hex): string {
