@@ -6,12 +6,12 @@ import chalk from "chalk";
 import { AddressType } from "../src/lib/storage/types/address-type";
 import { Property } from "../src/lib/storage/property";
 import { BigNumberType } from "../src/lib/storage/types/big-number-type";
-import { StringStorageChangeReport } from "../src/lib/reports/storage-report";
 import { BlobType } from "../src/lib/storage/types/blob-type";
 import { BooleanType } from "../src/lib/storage/types/boolean-type";
 import { ArrayType } from "../src/lib/storage/types/array-type";
 import { FixedArrayType } from "../src/lib/storage/types/fixed-array-type";
 import { StructType } from "../src/lib/storage/types/struct-type";
+import {StringStorageChangeReport} from "../src/lib/reports/string-storage-change-report";
 
 describe("MemoryMapReport", () => {
   describe("For simple memory diff", () => {

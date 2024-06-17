@@ -2,10 +2,10 @@ import type { EnvBuilder } from "../lib/env-builder";
 import { type UpgradeChanges, UpgradeImporter, ZkSyncEraState } from "../lib/index";
 import { StorageChanges } from "../lib/storage/storage-changes";
 import type { Hex } from "viem";
-import { StringStorageChangeReport } from "../lib/reports/storage-report";
 import type { Option } from "nochoices";
 import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
 import { withSpinner } from "../lib/with-spinner";
+import {StringStorageChangeReport} from "../lib/reports/string-storage-change-report";
 
 async function getMemoryPath(
   preCalculatedPath: Option<string>,
