@@ -1,9 +1,9 @@
 import type { MemoryDataType } from "./data-type";
-import type { MemorySnapshot } from "../memory-snapshot";
+import type { StorageSnapshot } from "../storage-snapshot";
 import { Option } from "nochoices";
 import { bytesToBigint } from "viem/utils";
 import { hexToBigInt, keccak256, numberToBytes } from "viem";
-import type { MemoryValue } from "../values/memory-value";
+import type { StorageValue } from "../values/storage-value";
 import { ArrayValue } from "../values/array-value";
 import { EmptyValue } from "../values/empty-value";
 
@@ -14,8 +14,8 @@ export class ArrayType implements MemoryDataType {
     this.inner = inner;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint, _offset = 0): Option<MemoryValue> {
-    const res: Option<MemoryValue>[] = [];
+  extract(memory: StorageSnapshot, slot: bigint, _offset = 0): Option<StorageValue> {
+    const res: Option<StorageValue>[] = [];
     const base = hexToBigInt(keccak256(numberToBytes(slot, { size: 32 })));
     return memory
       .at(slot)

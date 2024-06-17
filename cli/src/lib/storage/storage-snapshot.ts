@@ -1,11 +1,11 @@
 import { bytesToBigInt } from "viem";
 import { Option } from "nochoices";
 
-export interface MemorySnapshot {
+export interface StorageSnapshot {
   at(pos: bigint): Option<Buffer>;
 }
 
-export class FileMemorySnapshot {
+export class FileStorageSnapshot implements StorageSnapshot {
   data: Map<bigint, Buffer>;
 
   constructor(raw: Record<string, string>) {

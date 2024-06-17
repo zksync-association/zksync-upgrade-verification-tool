@@ -1,17 +1,21 @@
 import chalk from "chalk";
 import type {PropertyChange} from "../storage/property-change";
 import {bytesToHex, type Hex} from "viem";
-import type {MemoryValue} from "../storage/values/memory-value";
+import type {StorageValue} from "../storage/values/storage-value";
 import type {ValueField} from "../storage/values/struct-value";
 import type {StorageReport} from "./storage-report";
+import {StorageChanges} from "../storage/storage-changes";
+import type {Property} from "../storage/property";
 
 export class StringStorageChangeReport implements StorageReport<string> {
   lines: string[];
   private colored: boolean;
+  private changes: StorageChanges;
 
-  constructor (colored = true) {
+  constructor (colored = true, memoryMap: StorageChanges) {
     this.lines = [];
     this.colored = colored;
+    this.changes = memoryMap
   }
 
   private bold (text: string): string {
@@ -21,7 +25,10 @@ export class StringStorageChangeReport implements StorageReport<string> {
     return text;
   }
 
-  add (change: PropertyChange) {
+  add (prop: Property) {
+    const change = this.changes.changeFor(prop.name)
+      .expect(new Error(`Unknown prop: ${prop.name}`));
+
     this.lines.push("--------------------------");
     this.lines.push(`name: ${this.bold(change.prop.name)}`);
     this.lines.push(`description: ${change.prop.description}`);
@@ -54,7 +61,7 @@ export class StringStorageChangeReport implements StorageReport<string> {
     return val ? "true" : "false";
   }
 
-  addArray (inner: MemoryValue[]): string {
+  addArray (inner: StorageValue[]): string {
     return inner
       .map((v) => v.writeInto(this))
       .map((str) => `- ${str}`)

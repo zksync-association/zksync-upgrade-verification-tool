@@ -1,8 +1,8 @@
 import type { MemoryDataType } from "./data-type";
 import { Option } from "nochoices";
 
-import type { MemorySnapshot } from "../memory-snapshot";
-import type { MemoryValue } from "../values/memory-value";
+import type { StorageSnapshot } from "../storage-snapshot";
+import type { StorageValue } from "../values/storage-value";
 import { StructValue } from "../values/struct-value";
 import { EmptyValue } from "../values/empty-value";
 
@@ -14,7 +14,7 @@ export class StructType implements MemoryDataType {
     this.fields = fields;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint, offset = 0): Option<MemoryValue> {
+  extract(memory: StorageSnapshot, slot: bigint, offset = 0): Option<StorageValue> {
     let acum = offset;
     // let current = memory.at(slot).unwrapOr(Buffer.alloc(32).fill(0))
     let slotPosition = 0n;

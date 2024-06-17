@@ -1,13 +1,13 @@
 import type { Property } from "./property";
 import type { Option } from "nochoices";
-import type { MemoryValue } from "./values/memory-value";
+import type { StorageValue } from "./values/storage-value";
 
 export class PropertyChange {
   prop: Property;
-  before: Option<MemoryValue>;
-  after: Option<MemoryValue>;
+  before: Option<StorageValue>;
+  after: Option<StorageValue>;
 
-  constructor(prop: Property, before: Option<MemoryValue>, after: Option<MemoryValue>) {
+  constructor(prop: Property, before: Option<StorageValue>, after: Option<StorageValue>) {
     this.prop = prop;
     this.before = before;
     this.after = after;

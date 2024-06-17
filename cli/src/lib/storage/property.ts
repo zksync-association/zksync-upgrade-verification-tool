@@ -1,8 +1,8 @@
 import type { MemoryDataType } from "./types/data-type";
 import type { Option } from "nochoices";
 
-import type { MemorySnapshot } from "./memory-snapshot";
-import type { MemoryValue } from "./values/memory-value";
+import type { StorageSnapshot } from "./storage-snapshot";
+import type { StorageValue } from "./values/storage-value";
 
 export class Property {
   name: string;
@@ -19,7 +19,7 @@ export class Property {
     this.offset = offset;
   }
 
-  extract(memory: MemorySnapshot): Option<MemoryValue> {
+  extract(memory: StorageSnapshot): Option<StorageValue> {
     return this.type.extract(memory, this.slot, this.offset);
   }
 }

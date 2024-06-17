@@ -11,7 +11,7 @@ import { Property } from "../src/lib/storage/property";
 import { BooleanType } from "../src/lib/storage/types/boolean-type";
 import type { StorageReport } from "../src/lib/reports/storage-report";
 import { type PropertyChange } from "../src/lib/storage/property-change";
-import type { MemoryValue } from "../src/lib/storage/values/memory-value";
+import type { StorageValue } from "../src/lib/storage/values/storage-value";
 import type { ValueField } from "../src/lib/storage/values/struct-value";
 import { Option } from "nochoices";
 
@@ -50,7 +50,7 @@ class TestReport implements StorageReport<string> {
     return addr.toLowerCase();
   }
 
-  addArray(inner: MemoryValue[]): string {
+  addArray(inner: StorageValue[]): string {
     return inner.map((v, i) => `[${i}]: ${v.writeInto(this)}`).join("\n");
   }
 

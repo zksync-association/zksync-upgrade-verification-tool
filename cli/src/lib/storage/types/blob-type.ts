@@ -1,8 +1,8 @@
 import type { MemoryDataType } from "./data-type";
 import type { Option } from "nochoices";
 
-import type { MemorySnapshot } from "../memory-snapshot";
-import type { MemoryValue } from "../values/memory-value";
+import type { StorageSnapshot } from "../storage-snapshot";
+import type { StorageValue } from "../values/storage-value";
 import { BlobValue } from "../values/blob-value";
 
 export class BlobType implements MemoryDataType {
@@ -11,7 +11,7 @@ export class BlobType implements MemoryDataType {
     this.size = size;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint, offset = 0): Option<MemoryValue> {
+  extract(memory: StorageSnapshot, slot: bigint, offset = 0): Option<StorageValue> {
     return memory
       .at(slot)
       .map((buf) => new BlobValue(buf.subarray(32 - offset - this.size, 32 - offset)));

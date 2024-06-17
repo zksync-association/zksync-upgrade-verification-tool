@@ -1,7 +1,7 @@
 import type { MemoryDataType } from "./data-type";
-import type { MemorySnapshot } from "../memory-snapshot";
+import type { StorageSnapshot } from "../storage-snapshot";
 import { Option } from "nochoices";
-import type { MemoryValue } from "../values/memory-value";
+import type { StorageValue } from "../values/storage-value";
 import { ArrayValue } from "../values/array-value";
 import { EmptyValue } from "../values/empty-value";
 
@@ -14,7 +14,7 @@ export class FixedArrayType implements MemoryDataType {
     this.inner = inner;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint, _offset: number): Option<MemoryValue> {
+  extract(memory: StorageSnapshot, slot: bigint, _offset: number): Option<StorageValue> {
     const slots = new Array(this.size).fill(0).map((_, i) => slot + BigInt(i));
 
     const content = slots.map((slot) => this.inner.extract(memory, slot, 0));

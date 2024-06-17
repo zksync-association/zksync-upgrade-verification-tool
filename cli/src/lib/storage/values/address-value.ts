@@ -1,8 +1,8 @@
 import type { StorageReport } from "../../reports/storage-report";
-import type { MemoryValue } from "./memory-value";
+import type { StorageValue } from "./storage-value";
 import type { Hex } from "viem";
 
-export class AddressValue implements MemoryValue {
+export class AddressValue implements StorageValue {
   addr: Hex;
 
   constructor(addr: Hex) {

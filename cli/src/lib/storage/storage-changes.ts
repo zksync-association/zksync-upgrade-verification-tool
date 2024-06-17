@@ -7,7 +7,7 @@ import { MappingType } from "./mapping-type";
 import { StructType } from "./types/struct-type";
 import { BigNumberType } from "./types/big-number-type";
 import { Property } from "./property";
-import { FileMemorySnapshot, type MemorySnapshot } from "./memory-snapshot";
+import { FileStorageSnapshot, type StorageSnapshot } from "./storage-snapshot";
 import { PropertyChange } from "./property-change";
 import { BooleanType } from "./types/boolean-type";
 import { FixedArrayType } from "./types/fixed-array-type";
@@ -18,8 +18,8 @@ const DIAMOND_STORAGE_SLOT = hexToBigInt(
 );
 
 export class StorageChanges {
-  pre: MemorySnapshot;
-  post: MemorySnapshot;
+  pre: StorageSnapshot;
+  post: StorageSnapshot;
   private selectors: Hex[];
   private contractProps: Property[];
   private facets: Hex[];
@@ -45,8 +45,8 @@ export class StorageChanges {
     const preStorage = pre.storage.unwrapOr({});
     const postStorage = post.storage.unwrapOr({});
 
-    this.pre = new FileMemorySnapshot(preStorage);
-    this.post = new FileMemorySnapshot(postStorage);
+    this.pre = new FileStorageSnapshot(preStorage);
+    this.post = new FileStorageSnapshot(postStorage);
     this.selectors = selectors;
     this.facets = facets;
     this.contractProps = contractProps.length === 0 ? this.allContractProps() : contractProps;

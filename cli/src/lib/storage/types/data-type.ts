@@ -1,10 +1,10 @@
 import type { Option } from "nochoices";
 
-import type { MemorySnapshot } from "../memory-snapshot";
-import type { MemoryValue } from "../values/memory-value";
+import type { StorageSnapshot } from "../storage-snapshot";
+import type { StorageValue } from "../values/storage-value";
 
 export interface MemoryDataType {
-  extract(memory: MemorySnapshot, slot: bigint, offset: number): Option<MemoryValue>;
+  extract(memory: StorageSnapshot, slot: bigint, offset: number): Option<StorageValue>;
 
   get evmSize(): number;
 }

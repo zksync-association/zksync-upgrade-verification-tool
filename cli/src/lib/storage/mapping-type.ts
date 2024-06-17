@@ -2,8 +2,8 @@ import type { MemoryDataType } from "./types/data-type";
 import { Option } from "nochoices";
 import { bytesToHex, hexToBigInt, keccak256, numberToBytes } from "viem";
 
-import type { MemorySnapshot } from "./memory-snapshot";
-import type { MemoryValue } from "./values/memory-value";
+import type { StorageSnapshot } from "./storage-snapshot";
+import type { StorageValue } from "./values/storage-value";
 import { EmptyValue } from "./values/empty-value";
 import { MappingValue } from "./values/mapping-value";
 
@@ -18,7 +18,7 @@ export class MappingType implements MemoryDataType {
     this.leftPadded = leftPadded;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint, _offset = 0): Option<MemoryValue> {
+  extract(memory: StorageSnapshot, slot: bigint, _offset = 0): Option<StorageValue> {
     const bufSlot = numberToBytes(slot, { size: 32 });
     const values = this.keys.map((key) => {
       const keyBuf = Buffer.alloc(32);
