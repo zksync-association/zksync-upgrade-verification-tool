@@ -11,7 +11,7 @@ import { BooleanType } from "../src/lib/storage/types/boolean-type";
 import { ArrayType } from "../src/lib/storage/types/array-type";
 import { FixedArrayType } from "../src/lib/storage/types/fixed-array-type";
 import { StructType } from "../src/lib/storage/types/struct-type";
-import {StringStorageChangeReport} from "../src/lib/reports/string-storage-change-report";
+import { StringStorageChangeReport } from "../src/lib/reports/string-storage-change-report";
 
 describe("MemoryMapReport", () => {
   describe("For simple memory diff", () => {
@@ -80,15 +80,9 @@ describe("MemoryMapReport", () => {
 
     it("can display address elements", () => {
       const prop = new Property("someProp", BigInt(0xa), "some description", new AddressType());
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [prop]
-      );
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const report = new StringStorageChangeReport(true, memoryMap);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
       expect(report.format()).toEqual(
         expectedReport(
@@ -102,30 +96,18 @@ describe("MemoryMapReport", () => {
 
     it("can display types elements", () => {
       const prop = new Property("numberProp", BigInt(0xa), "it is a number", new BigNumberType());
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [prop]
-      );
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const report = new StringStorageChangeReport(true, memoryMap);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
       expect(report.format()).toEqual(expectedReport("numberProp", "it is a number", "10", "20"));
     });
 
     it("can display blob elements", () => {
       const prop = new Property("blobProp", BigInt(0xa), "it is a blob", new BlobType());
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [prop]
-      );
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const report = new StringStorageChangeReport(true, memoryMap);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
       expect(report.format()).toEqual(
         expectedReport(
@@ -139,30 +121,23 @@ describe("MemoryMapReport", () => {
 
     it("can display boolean elements", () => {
       const prop = new Property("blobProp", boolSlot, "it is a blob", new BooleanType());
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [prop]
-      );
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const report = new StringStorageChangeReport(true, memoryMap);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
       expect(report.format()).toEqual(expectedReport("blobProp", "it is a blob", "true", "false"));
     });
 
     it("can display list elements", () => {
-      const prop = new Property("listProp", listSlot, "it is a list", new ArrayType(new BigNumberType()));
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [prop]
+      const prop = new Property(
+        "listProp",
+        listSlot,
+        "it is a list",
+        new ArrayType(new BigNumberType())
       );
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const report = new StringStorageChangeReport(true, memoryMap);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
       const before = ["- 100", "- 101", "- 102"].join("\n  ");
       const after = ["- 100", "- 201", "- 102", "- 103"].join("\n  ");
@@ -177,17 +152,9 @@ describe("MemoryMapReport", () => {
         "it is a list",
         new FixedArrayType(3, new BigNumberType())
       );
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [
-          prop
-        ]
-      );
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const report = new StringStorageChangeReport(true, memoryMap);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
       const before = ["- 100", "- 101", "- 102"].join("\n  ");
       const after = ["- 100", "- 201", "- 102"].join("\n  ");
@@ -202,17 +169,9 @@ describe("MemoryMapReport", () => {
         "it is a list",
         new FixedArrayType(3, new BigNumberType())
       );
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [
-          prop
-        ]
-      );
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const report = new StringStorageChangeReport(true, memoryMap);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
       const before = ["- 101", "- 102", "- Empty slot."].join("\n  ");
       const after = ["- 201", "- 102", "- 103"].join("\n  ");
@@ -244,17 +203,9 @@ describe("MemoryMapReport", () => {
           },
         ])
       );
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [
-          prop,
-        ]
-      );
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const report = new StringStorageChangeReport(true, memoryMap);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
       const before = [
         ".field1: 100",

@@ -1,32 +1,33 @@
 import chalk from "chalk";
-import type {PropertyChange} from "../storage/property-change";
-import {bytesToHex, type Hex} from "viem";
-import type {StorageValue} from "../storage/values/storage-value";
-import type {ValueField} from "../storage/values/struct-value";
-import type {StorageReport} from "./storage-report";
-import {StorageChanges} from "../storage/storage-changes";
-import type {Property} from "../storage/property";
+import type { PropertyChange } from "../storage/property-change";
+import { bytesToHex, type Hex } from "viem";
+import type { StorageValue } from "../storage/values/storage-value";
+import type { ValueField } from "../storage/values/struct-value";
+import type { StorageReport } from "./storage-report";
+import type { StorageChanges } from "../storage/storage-changes";
+import type { Property } from "../storage/property";
 
 export class StringStorageChangeReport implements StorageReport<string> {
   lines: string[];
   private colored: boolean;
   private changes: StorageChanges;
 
-  constructor (colored = true, memoryMap: StorageChanges) {
+  constructor (memoryMap: StorageChanges, colored = true) {
     this.lines = [];
     this.colored = colored;
-    this.changes = memoryMap
+    this.changes = memoryMap;
   }
 
-  private bold (text: string): string {
+  private bold(text: string): string {
     if (this.colored) {
       return chalk.bold(text);
     }
     return text;
   }
 
-  add (prop: Property) {
-    const change = this.changes.changeFor(prop.name)
+  add(prop: Property) {
+    const change = this.changes
+      .changeFor(prop.name)
       .expect(new Error(`Unknown prop: ${prop.name}`));
 
     this.lines.push("--------------------------");
@@ -45,9 +46,9 @@ export class StringStorageChangeReport implements StorageReport<string> {
   //
   // }
 
-  format (): string {
-    const changes = this.changes.allChanges()
-    const lines = []
+  format(): string {
+    const changes = this.changes.allChanges();
+    const lines = [];
 
     for (const change of changes) {
       lines.push("--------------------------");
@@ -65,45 +66,45 @@ export class StringStorageChangeReport implements StorageReport<string> {
     return lines.join("\n");
   }
 
-  addAddress (addr: Hex): string {
+  addAddress(addr: Hex): string {
     return addr;
   }
 
-  addBigNumber (n: bigint): string {
+  addBigNumber(n: bigint): string {
     return n.toString();
   }
 
-  writeBuf (buf: Buffer): string {
+  writeBuf(buf: Buffer): string {
     return bytesToHex(buf);
   }
 
-  addBoolean (val: boolean): string {
+  addBoolean(val: boolean): string {
     return val ? "true" : "false";
   }
 
-  addArray (inner: StorageValue[]): string {
+  addArray(inner: StorageValue[]): string {
     return inner
       .map((v) => v.writeInto(this))
       .map((str) => `- ${str}`)
       .join("\n  ");
   }
 
-  writeEmpty (): string {
+  writeEmpty(): string {
     return "Empty slot.";
   }
 
-  writeStruct (fields: ValueField[]): string {
+  writeStruct(fields: ValueField[]): string {
     return fields
-      .map(({key, value}) => {
+      .map(({ key, value }) => {
         const lines = value.writeInto(this).split("\n");
         return `.${key}: ${lines.join(`\n${" ".repeat(key.length + 3)}`)}`;
       })
       .join("\n  ");
   }
 
-  writeMapping (fields: ValueField[]): string {
+  writeMapping(fields: ValueField[]): string {
     return fields
-      .map(({key, value}) => {
+      .map(({ key, value }) => {
         const lines = value.writeInto(this).split("\n");
         const formated = lines.join(`\n${" ".repeat(key.length + 4)}`);
         return `[${key}]: ${formated}`;
@@ -111,7 +112,7 @@ export class StringStorageChangeReport implements StorageReport<string> {
       .join("\n  ");
   }
 
-  isEmpty (): boolean {
+  isEmpty(): boolean {
     return this.lines.length === 0;
   }
 }

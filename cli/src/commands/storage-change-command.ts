@@ -5,7 +5,7 @@ import type { Hex } from "viem";
 import type { Option } from "nochoices";
 import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
 import { withSpinner } from "../lib/with-spinner";
-import {StringStorageChangeReport} from "../lib/reports/string-storage-change-report";
+import { StringStorageChangeReport } from "../lib/reports/string-storage-change-report";
 
 async function getMemoryPath(
   preCalculatedPath: Option<string>,
@@ -70,7 +70,7 @@ export async function storageChangeCommand(
   );
   const memoryChanges = memoryMap.allChanges();
 
-  const report = new StringStorageChangeReport(env.colored, memoryMap);
+  const report = new StringStorageChangeReport(memoryMap, env.colored);
 
   if (report.isEmpty()) {
     console.log("No storage changes when executing upgrade.");
