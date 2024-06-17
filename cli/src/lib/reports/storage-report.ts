@@ -1,7 +1,6 @@
 import type { Hex } from "viem";
 import type { StorageValue } from "../storage/values/storage-value";
 import type { ValueField } from "../storage/values/struct-value";
-import type { Property } from "../storage/property";
 
 export interface StorageReport<T> {
   addAddress(addr: Hex): T;

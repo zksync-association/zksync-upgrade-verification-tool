@@ -1,5 +1,4 @@
 import chalk from "chalk";
-import type { PropertyChange } from "../storage/property-change";
 import { bytesToHex, type Hex } from "viem";
 import type { StorageValue } from "../storage/values/storage-value";
 import type { ValueField } from "../storage/values/struct-value";

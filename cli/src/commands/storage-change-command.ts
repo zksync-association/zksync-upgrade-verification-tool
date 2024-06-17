@@ -68,7 +68,6 @@ export async function storageChangeCommand(
     [...selectors],
     ["0x10113bb3a8e64f8ed67003126adc8ce74c34610c"]
   );
-  const memoryChanges = memoryMap.allChanges();
 
   const report = new StringStorageChangeReport(memoryMap, env.colored);
 
