@@ -18,9 +18,9 @@ export class MappingType implements MemoryDataType {
     this.leftPadded = leftPadded;
   }
 
-  extract(memory: StorageSnapshot, slot: bigint, _offset = 0): Option<StorageValue> {
+  async extract(memory: StorageSnapshot, slot: bigint, _offset = 0): Promise<Option<StorageValue>> {
     const bufSlot = numberToBytes(slot, { size: 32 });
-    const values = this.keys.map((key) => {
+    const values = await Promise.all(this.keys.map(async (key) => {
       const keyBuf = Buffer.alloc(32);
       if (this.leftPadded) {
         key.copy(keyBuf, keyBuf.length - key.length, 0);
@@ -33,9 +33,9 @@ export class MappingType implements MemoryDataType {
 
       return {
         key: bytesToHex(key),
-        values: this.valueType.extract(memory, hexToBigInt(hashed), 0),
+        values: await this.valueType.extract(memory, hexToBigInt(hashed), 0),
       };
-    });
+    }));
 
     if (values.every((v) => v.values.isNone())) {
       return Option.None();
@@ -47,13 +47,6 @@ export class MappingType implements MemoryDataType {
     }));
 
     return Option.Some(new MappingValue(res));
-
-    // return Option.Some(
-    //   values
-    //     .filter((o) => o.isSome())
-    //     .map((o) => o.unwrap())
-    //     .join("\n")
-    // );
   }
 
   get evmSize(): number {

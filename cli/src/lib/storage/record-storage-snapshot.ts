@@ -16,7 +16,7 @@ export class RecordStorageSnapshot implements StorageSnapshot {
     }
   }
 
-  at(pos: bigint): Option<Buffer> {
+  async at(pos: bigint): Promise<Option<Buffer>> {
     return Option.fromNullable(this.data.get(pos));
   }
 }

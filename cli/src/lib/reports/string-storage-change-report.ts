@@ -23,8 +23,8 @@ export class StringStorageChangeReport implements StorageReport<string> {
     return text;
   }
 
-  format(): string {
-    const changes = this.changes.allChanges();
+  async format(): Promise<string> {
+    const changes = await this.changes.allChanges();
     const lines = [];
 
     for (const change of changes) {

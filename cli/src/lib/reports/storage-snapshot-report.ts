@@ -14,11 +14,12 @@ export class SnapshotReport implements StorageReport<string> {
     this.props = props
   }
 
-  format(): string {
+  async format(): Promise<string> {
     const lines: string[] = []
 
     for (const prop of this.props) {
-      prop.extract(this.snapshot).ifSome((value) => {
+      let extracted = await prop.extract(this.snapshot);
+      extracted.ifSome((value) => {
         lines.push("----------");
         lines.push(`name: ${prop.name}`);
         lines.push(`description: ${prop.description}\n`);

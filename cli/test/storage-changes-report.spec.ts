@@ -78,13 +78,13 @@ describe("MemoryMapReport", () => {
       );
     }
 
-    it("can display address elements", () => {
+    it("can display address elements", async () => {
       const prop = new Property("someProp", BigInt(0xa), "some description", new AddressType());
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
-      expect(report.format()).toEqual(
+      expect(await report.format()).toEqual(
         expectedReport(
           "someProp",
           "some description",
@@ -94,22 +94,22 @@ describe("MemoryMapReport", () => {
       );
     });
 
-    it("can display types elements", () => {
+    it("can display types elements", async () => {
       const prop = new Property("numberProp", BigInt(0xa), "it is a number", new BigNumberType());
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
-      expect(report.format()).toEqual(expectedReport("numberProp", "it is a number", "10", "20"));
+      expect(await report.format()).toEqual(expectedReport("numberProp", "it is a number", "10", "20"));
     });
 
-    it("can display blob elements", () => {
+    it("can display blob elements", async () => {
       const prop = new Property("blobProp", BigInt(0xa), "it is a blob", new BlobType());
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
-      expect(report.format()).toEqual(
+      expect(await report.format()).toEqual(
         expectedReport(
           "blobProp",
           "it is a blob",
@@ -119,16 +119,16 @@ describe("MemoryMapReport", () => {
       );
     });
 
-    it("can display boolean elements", () => {
+    it("can display boolean elements", async () => {
       const prop = new Property("blobProp", boolSlot, "it is a blob", new BooleanType());
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
-      expect(report.format()).toEqual(expectedReport("blobProp", "it is a blob", "true", "false"));
+      expect(await report.format()).toEqual(expectedReport("blobProp", "it is a blob", "true", "false"));
     });
 
-    it("can display list elements", () => {
+    it("can display list elements", async () => {
       const prop = new Property(
         "listProp",
         listSlot,
@@ -142,10 +142,10 @@ describe("MemoryMapReport", () => {
       const before = ["- 100", "- 101", "- 102"].join("\n  ");
       const after = ["- 100", "- 201", "- 102", "- 103"].join("\n  ");
 
-      expect(report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
+      expect(await report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
     });
 
-    it("can display fixed array elements", () => {
+    it("can display fixed array elements", async () => {
       const prop = new Property(
         "listProp",
         hexToBigInt(hashedListSlot),
@@ -159,10 +159,10 @@ describe("MemoryMapReport", () => {
       const before = ["- 100", "- 101", "- 102"].join("\n  ");
       const after = ["- 100", "- 201", "- 102"].join("\n  ");
 
-      expect(report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
+      expect(await report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
     });
 
-    it("can display fixed array elements when some are not present", () => {
+    it("can display fixed array elements when some are not present", async () => {
       const prop = new Property(
         "listProp",
         hexToBigInt(hashedListSlot) + 1n,
@@ -176,10 +176,10 @@ describe("MemoryMapReport", () => {
       const before = ["- 101", "- 102", "- Empty slot."].join("\n  ");
       const after = ["- 201", "- 102", "- 103"].join("\n  ");
 
-      expect(report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
+      expect(await report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
     });
 
-    it("can display struct elements", () => {
+    it("can display struct elements", async () => {
       const prop = new Property(
         "listProp",
         hexToBigInt(hashedListSlot),
@@ -220,7 +220,7 @@ describe("MemoryMapReport", () => {
         ".field4: 103",
       ].join("\n  ");
 
-      expect(report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
+      expect(await report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
     });
   });
 });

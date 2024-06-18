@@ -11,9 +11,9 @@ export class BlobType implements MemoryDataType {
     this.size = size;
   }
 
-  extract(memory: StorageSnapshot, slot: bigint, offset = 0): Option<StorageValue> {
-    return memory
-      .at(slot)
+  async extract(memory: StorageSnapshot, slot: bigint, offset = 0): Promise<Option<StorageValue>> {
+    let maybe = await memory.at(slot);
+    return maybe
       .map((buf) => new BlobValue(buf.subarray(32 - offset - this.size, 32 - offset)));
   }
 

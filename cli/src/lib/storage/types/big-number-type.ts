@@ -13,10 +13,10 @@ export class BigNumberType implements MemoryDataType {
     this.size = size;
   }
 
-  extract(memory: StorageSnapshot, slot: bigint, offset = 0): Option<StorageValue> {
+  async extract(memory: StorageSnapshot, slot: bigint, offset = 0): Promise<Option<StorageValue>> {
     const start = 32 - offset - this.size;
-    return memory
-      .at(slot)
+    const maybe = await memory.at(slot);
+    return maybe
       .map((buf) => buf.subarray(start, start + this.size))
       .map(bytesToBigInt)
       .map((n) => new BigNumberValue(n));

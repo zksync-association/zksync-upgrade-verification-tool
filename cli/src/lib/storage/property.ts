@@ -19,7 +19,7 @@ export class Property {
     this.offset = offset;
   }
 
-  extract(memory: StorageSnapshot): Option<StorageValue> {
+  async extract(memory: StorageSnapshot): Promise<Option<StorageValue>> {
     return this.type.extract(memory, this.slot, this.offset);
   }
 }

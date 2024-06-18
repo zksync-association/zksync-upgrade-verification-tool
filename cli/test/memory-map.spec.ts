@@ -106,7 +106,7 @@ describe("MemoryMap", () => {
     facets: Hex[] = []
   ): Promise<TestReport> => {
     const memory = await subject(file, selectors, facets);
-    const maybeValue = memory.changeFor(changeName);
+    const maybeValue = await memory.changeFor(changeName);
     const test = new TestReport();
     const value = maybeValue.unwrap();
     test.checkProp(value);
@@ -340,7 +340,7 @@ describe("MemoryMap", () => {
       [prop]
     );
 
-    const change = map.changeFor("myStruct").unwrap();
+    const change = (await map.changeFor("myStruct")).unwrap();
 
     const test = new TestReport();
     test.checkProp(change);

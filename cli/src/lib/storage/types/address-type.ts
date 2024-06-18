@@ -7,9 +7,10 @@ import { AddressValue } from "../values/address-value";
 import type { StorageValue } from "../values/storage-value";
 
 export class AddressType implements MemoryDataType {
-  extract(memory: StorageSnapshot, slot: bigint, _offset = 0): Option<StorageValue> {
-    return memory
-      .at(slot)
+  async extract(memory: StorageSnapshot, slot: bigint, _offset = 0): Promise<Option<StorageValue>> {
+    let mayne = await memory
+      .at(slot);
+    return mayne
       .map(this.format)
       .map((str) => new AddressValue(str));
   }

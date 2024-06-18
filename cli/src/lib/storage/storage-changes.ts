@@ -1,17 +1,17 @@
-import type { MemoryDiffRaw } from "../../schema/rpc";
-import { Option } from "nochoices";
-import { type Hex, hexToBigInt, hexToBytes } from "viem";
-import { AddressType } from "./types/address-type";
-import { BlobType } from "./types/blob-type";
-import { MappingType } from "./mapping-type";
-import { StructType } from "./types/struct-type";
-import { BigNumberType } from "./types/big-number-type";
-import { Property } from "./property";
-import { type StorageSnapshot } from "./storage-snapshot";
-import { PropertyChange } from "./property-change";
-import { BooleanType } from "./types/boolean-type";
-import { FixedArrayType } from "./types/fixed-array-type";
-import { ArrayType } from "./types/array-type";
+import type {MemoryDiffRaw} from "../../schema/rpc";
+import {Option} from "nochoices";
+import {type Hex, hexToBigInt, hexToBytes} from "viem";
+import {AddressType} from "./types/address-type";
+import {BlobType} from "./types/blob-type";
+import {MappingType} from "./mapping-type";
+import {StructType} from "./types/struct-type";
+import {BigNumberType} from "./types/big-number-type";
+import {Property} from "./property";
+import {type StorageSnapshot} from "./storage-snapshot";
+import {PropertyChange} from "./property-change";
+import {BooleanType} from "./types/boolean-type";
+import {FixedArrayType} from "./types/fixed-array-type";
+import {ArrayType} from "./types/array-type";
 import {RecordStorageSnapshot} from "./record-storage-snapshot";
 
 const DIAMOND_STORAGE_SLOT = hexToBigInt(
@@ -53,18 +53,18 @@ export class StorageChanges {
     this.contractProps = contractProps.length === 0 ? this.allContractProps() : contractProps;
   }
 
-  changeFor(propName: string): Option<PropertyChange> {
-    const maybe = Option.fromNullable(this.contractProps.find((p) => p.name === propName));
-    return maybe.map(
-      (prop) => new PropertyChange(prop, prop.extract(this.pre), prop.extract(this.post))
-    );
+  async changeFor(propName: string): Promise<Option<PropertyChange>> {
+    const found = this.contractProps.find((p) => p.name === propName);
+    if (!found) { return Option.None() }
+    return Option.Some(new PropertyChange(found, await found.extract(this.pre), await found.extract(this.post)))
   }
 
-  allChanges(): PropertyChange[] {
-    return this.contractProps
-      .map((prop) => {
-        return new PropertyChange(prop, prop.extract(this.pre), prop.extract(this.post));
-      })
+  async allChanges(): Promise<PropertyChange[]> {
+    let all = await Promise.all(this.contractProps
+      .map(async (prop) => {
+        return new PropertyChange(prop, await prop.extract(this.pre), await prop.extract(this.post));
+      }));
+    return all
       .filter((change) => change.before.isSome() || change.after.isSome());
   }
 
@@ -206,15 +206,15 @@ export class StorageChanges {
         "ZkSyncHyperchainBase.s.zkPorterIsAvailable",
         25n,
         "Indicates that the porter may be touched on L2 transactions. " +
-          "Used as an input to zkp-circuit.",
+        "Used as an input to zkp-circuit.",
         new BooleanType()
       ),
       new Property(
         "ZkSyncHyperchainBase.s.priorityTxMaxGasLimit",
         26n,
         "The maximum number of the L2 gas that a user can request for L1 -> L2 transactions " +
-          'This is the maximum number of L2 gas that is available for the "body" of the transaction, i.e. ' +
-          "without overhead for proving the batch.",
+        'This is the maximum number of L2 gas that is available for the "body" of the transaction, i.e. ' +
+        "without overhead for proving the batch.",
         new BigNumberType()
       ),
       new Property(
@@ -227,9 +227,9 @@ export class StorageChanges {
         "ZkSyncHyperchainBase.s.isEthWithdrawalFinalized",
         29n,
         "A mapping L2 batch number => message number => flag. " +
-          "The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as " +
-          "a flag to indicate that the message was already processed. " +
-          "Used to indicate that eth withdrawal was already processed",
+        "The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as " +
+        "a flag to indicate that the message was already processed. " +
+        "Used to indicate that eth withdrawal was already processed",
         new MappingType([], new MappingType([], new BooleanType()))
       ),
       new Property(
@@ -266,7 +266,7 @@ export class StorageChanges {
         "ZkSyncHyperchainBase.s.l2SystemContractsUpgradeBatchNumber",
         35n,
         "Batch number where the upgrade transaction has happened. If 0, then no upgrade " +
-          "yet transaction has happened",
+        "yet transaction has happened",
         new BlobType()
       ),
       new Property(
@@ -285,7 +285,7 @@ export class StorageChanges {
         "ZkSyncHyperchainBase.s.feeParams",
         38n,
         "Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions, " +
-          "the bootloader gives enough freedom to the operator.",
+        "the bootloader gives enough freedom to the operator.",
         new StructType([
           {
             name: "pubdataPricingMode",

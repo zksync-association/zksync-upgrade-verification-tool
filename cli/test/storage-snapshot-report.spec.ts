@@ -11,7 +11,7 @@ import {StructType} from "../src/lib/storage/types/struct-type";
 import {MappingType} from "../src/lib/storage/mapping-type";
 
 describe("SnapshotReport", () => {
-  it('can return a number prop ', () => {
+  it('can return a number prop ', async () => {
     const data = new RecordStorageSnapshot({
       "0x0000000000000000000000000000000000000000000000000000000000000000": "0x0000000000000000000000000000000000000000000000000000000000000001"
     })
@@ -19,7 +19,7 @@ describe("SnapshotReport", () => {
       new Property("prop1", 0n, "desc1", new BigNumberType())
     ]
     const report = new SnapshotReport(data, props)
-    expect(report.format()).toEqual(`----------
+    expect(await report.format()).toEqual(`----------
 name: prop1
 description: desc1
 
@@ -27,7 +27,7 @@ value: 1
 ----------`)
   });
 
-  it('can return a hex prop ', () => {
+  it('can return a hex prop ', async () => {
     const data = new RecordStorageSnapshot({
       "0x0000000000000000000000000000000000000000000000000000000000000000": "0x0000000000000000000000000000000000000000000000000000000000000001"
     })
@@ -35,7 +35,7 @@ value: 1
       new Property("prop1", 0n, "desc1", new BlobType())
     ]
     const report = new SnapshotReport(data, props)
-    expect(report.format()).toEqual(`----------
+    expect(await report.format()).toEqual(`----------
 name: prop1
 description: desc1
 
@@ -43,7 +43,7 @@ value: 0x0000000000000000000000000000000000000000000000000000000000000001
 ----------`)
   });
 
-  it('can return a hex prop ', () => {
+  it('can return a hex prop ', async () => {
     const data = new RecordStorageSnapshot({
       "0x0000000000000000000000000000000000000000000000000000000000000000": "0x0000000000000000000000000000000000000000000000000000000000000001"
     })
@@ -51,7 +51,7 @@ value: 0x0000000000000000000000000000000000000000000000000000000000000001
       new Property("prop1", 0n, "desc1", new BlobType())
     ]
     const report = new SnapshotReport(data, props)
-    expect(report.format()).toEqual(`----------
+    expect(await report.format()).toEqual(`----------
 name: prop1
 description: desc1
 
@@ -59,7 +59,7 @@ value: 0x0000000000000000000000000000000000000000000000000000000000000001
 ----------`)
   });
 
-  it('can return an address prop ', () => {
+  it('can return an address prop ', async () => {
     const data = new RecordStorageSnapshot({
       "0x0000000000000000000000000000000000000000000000000000000000000000": "0x0000000000000000000000000000000000000000000000000000000000000001"
     })
@@ -67,7 +67,7 @@ value: 0x0000000000000000000000000000000000000000000000000000000000000001
       new Property("prop1", 0n, "desc1", new AddressType())
     ]
     const report = new SnapshotReport(data, props)
-    expect(report.format()).toEqual(`----------
+    expect(await report.format()).toEqual(`----------
 name: prop1
 description: desc1
 
@@ -75,7 +75,7 @@ value: 0x0000000000000000000000000000000000000001
 ----------`)
   })
 
-  it('can return a list prop ', () => {
+  it('can return a list prop ', async () => {
     const hashed = hexToBigInt(keccak256("0x000000000000000000000000000000000000000000000000000000000000000"))
     const data = new RecordStorageSnapshot({
       "0x000000000000000000000000000000000000000000000000000000000000000": "0x0000000000000000000000000000000000000000000000000000000000000003",
@@ -88,7 +88,7 @@ value: 0x0000000000000000000000000000000000000001
       new Property("prop1", 0n, "desc1", new ArrayType(new BlobType()))
     ]
     const report = new SnapshotReport(data, props)
-    expect(report.format()).toEqual(`----------
+    expect(await report.format()).toEqual(`----------
 name: prop1
 description: desc1
 
@@ -99,7 +99,7 @@ value:
 ----------`)
   })
 
-  it('can return a struct prop with only one attribute', () => {
+  it('can return a struct prop with only one attribute', async () => {
     const data = new RecordStorageSnapshot({
       "0x0000000000000000000000000000000000000000000000000000000000000000": "0x000000000000000000000000000000000000000000000000000000000000000a",
       "0x0000000000000000000000000000000000000000000000000000000000000001": "0x000000000000000000000000000000000000000000000000000000000000000b",
@@ -114,7 +114,7 @@ value:
       ]))
     ]
     const report = new SnapshotReport(data, props)
-    expect(report.format()).toEqual(`----------
+    expect(await report.format()).toEqual(`----------
 name: prop1
 description: desc1
 
@@ -123,7 +123,7 @@ value:
 ----------`)
   })
 
-  it('can return a struct prop ', () => {
+  it('can return a struct prop ', async () => {
     const data = new RecordStorageSnapshot({
       "0x0000000000000000000000000000000000000000000000000000000000000000": "0x000000000000000000000000000000000000000000000000000000000000000a",
       "0x0000000000000000000000000000000000000000000000000000000000000001": "0x000000000000000000000000000000000000000000000000000000000000000b",
@@ -146,7 +146,7 @@ value:
       ]))
     ]
     const report = new SnapshotReport(data, props)
-    expect(report.format()).toEqual(`----------
+    expect(await report.format()).toEqual(`----------
 name: prop1
 description: desc1
 
@@ -157,7 +157,7 @@ value:
 ----------`)
   })
 
-  it('can return a struct mapping', () => {
+  it('can return a struct mapping', async () => {
     let key = hexToBytes("0x0000000000000000000000000000000000000000000000000000000000000001");
     const hashed = keccak256(
       Buffer.concat([
@@ -177,7 +177,7 @@ value:
       )
     ]
     const report = new SnapshotReport(data, props)
-    expect(report.format()).toEqual(`----------
+    expect(await report.format()).toEqual(`----------
 name: prop1
 description: desc1
 
