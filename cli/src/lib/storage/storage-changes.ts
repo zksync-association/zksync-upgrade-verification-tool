@@ -7,11 +7,12 @@ import { MappingType } from "./mapping-type";
 import { StructType } from "./types/struct-type";
 import { BigNumberType } from "./types/big-number-type";
 import { Property } from "./property";
-import { FileStorageSnapshot, type StorageSnapshot } from "./storage-snapshot";
+import { type StorageSnapshot } from "./storage-snapshot";
 import { PropertyChange } from "./property-change";
 import { BooleanType } from "./types/boolean-type";
 import { FixedArrayType } from "./types/fixed-array-type";
 import { ArrayType } from "./types/array-type";
+import {FileStorageSnapshot} from "./map-storage-snapshot";
 
 const DIAMOND_STORAGE_SLOT = hexToBigInt(
   "0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b"

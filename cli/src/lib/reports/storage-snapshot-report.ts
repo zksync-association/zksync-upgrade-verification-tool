@@ -1,32 +1,42 @@
-import type { StorageReport } from "./storage-report";
-import type { StorageSnapshot } from "../storage/storage-snapshot";
-import type { Property } from "../storage/property";
-import { bytesToHex, type Hex } from "viem";
-import type { StorageValue } from "../storage/values/storage-value";
-import type { ValueField } from "../storage/values/struct-value";
+import type {StorageReport} from "./storage-report";
+import type {StorageSnapshot} from "../storage/storage-snapshot";
+import type {Property} from "../storage/property";
+import {bytesToHex, type Hex} from "viem";
+import type {StorageValue} from "../storage/values/storage-value";
+import type {ValueField} from "../storage/values/struct-value";
 
 export class SnapshotReport implements StorageReport<string> {
-  private lines: string[];
   private snapshot: StorageSnapshot;
+  private props: Property[];
 
-  constructor(snapshot: StorageSnapshot) {
+  constructor(snapshot: StorageSnapshot, props: Property[]) {
     this.snapshot = snapshot;
-    this.lines = [];
-  }
-
-  add(prop: Property): void {
-    prop.extract(this.snapshot).ifSome((value) => {
-      this.lines.push("----------");
-      this.lines.push(`name: ${prop.name}`);
-      this.lines.push(`description: ${prop.description}\n`);
-
-      this.lines.push(`value: ${value}`);
-      this.lines.push("----------");
-    });
+    this.props = props
   }
 
   format(): string {
-    return this.lines.join("\n");
+    const lines: string[] = []
+
+    for (const prop of this.props) {
+      prop.extract(this.snapshot).ifSome((value) => {
+        lines.push("----------");
+        lines.push(`name: ${prop.name}`);
+        lines.push(`description: ${prop.description}\n`);
+
+        lines.push(`value:${this.inlineValue(value.writeInto(this))}`);
+        lines.push("----------");
+      });
+    }
+
+    return lines.join("\n");
+  }
+
+  private inlineValue(value: string): string {
+    const tokens = ["\n", "[", "."]
+    if(tokens.some(token => value.includes(token))) {
+      return `\n  ${value}`
+    }
+    return ` ${value}`
   }
 
   addAddress(addr: Hex): string {
@@ -48,7 +58,7 @@ export class SnapshotReport implements StorageReport<string> {
   addArray(inner: StorageValue[]): string {
     return inner
       .map((v) => v.writeInto(this))
-      .map((str) => `- ${str}`)
+      .map((str) => `-${this.inlineValue(str)}`)
       .join("\n  ");
   }
 
@@ -58,19 +68,19 @@ export class SnapshotReport implements StorageReport<string> {
 
   writeStruct(fields: ValueField[]): string {
     return fields
-      .map(({ key, value }) => {
-        const lines = value.writeInto(this).split("\n");
-        return `.${key}: ${lines.join(`\n${" ".repeat(key.length + 3)}`)}`;
+      .map(({key, value}) => {
+        const lines = this.inlineValue(value.writeInto(this)).split("\n");
+        return `.${key}:${lines.join(`\n${" ".repeat(key.length + 3)}`)}`;
       })
       .join("\n  ");
   }
 
   writeMapping(fields: ValueField[]): string {
     return fields
-      .map(({ key, value }) => {
+      .map(({key, value}) => {
         const lines = value.writeInto(this).split("\n");
         const formated = lines.join(`\n${" ".repeat(key.length + 4)}`);
-        return `[${key}]: ${formated}`;
+        return `[${key}]:${this.inlineValue(formated)}`;
       })
       .join("\n  ");
   }
