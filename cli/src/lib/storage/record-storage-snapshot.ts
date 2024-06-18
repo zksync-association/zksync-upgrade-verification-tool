@@ -2,7 +2,7 @@ import {bytesToBigInt} from "viem";
 import {Option} from "nochoices";
 import type {StorageSnapshot} from "./storage-snapshot";
 
-export class FileStorageSnapshot implements StorageSnapshot {
+export class RecordStorageSnapshot implements StorageSnapshot {
   data: Map<bigint, Buffer>;
 
   constructor(raw: Record<string, string>) {

@@ -12,7 +12,7 @@ import { PropertyChange } from "./property-change";
 import { BooleanType } from "./types/boolean-type";
 import { FixedArrayType } from "./types/fixed-array-type";
 import { ArrayType } from "./types/array-type";
-import {FileStorageSnapshot} from "./map-storage-snapshot";
+import {RecordStorageSnapshot} from "./record-storage-snapshot";
 
 const DIAMOND_STORAGE_SLOT = hexToBigInt(
   "0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b"
@@ -46,8 +46,8 @@ export class StorageChanges {
     const preStorage = pre.storage.unwrapOr({});
     const postStorage = post.storage.unwrapOr({});
 
-    this.pre = new FileStorageSnapshot(preStorage);
-    this.post = new FileStorageSnapshot(postStorage);
+    this.pre = new RecordStorageSnapshot(preStorage);
+    this.post = new RecordStorageSnapshot(postStorage);
     this.selectors = selectors;
     this.facets = facets;
     this.contractProps = contractProps.length === 0 ? this.allContractProps() : contractProps;
