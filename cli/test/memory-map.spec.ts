@@ -116,7 +116,7 @@ describe("MemoryMap", () => {
   it("can extract value change for a simple hash value", async () => {
     const test = await scenario(
       "realistic-memory-diff.json",
-      "Base.s.l2DefaultAccountBytecodeHash"
+      "ZkSyncHyperchainBase.s.l2DefaultAccountBytecodeHash"
     );
 
     expect(test.before().unwrap()).to.eql(
@@ -128,7 +128,7 @@ describe("MemoryMap", () => {
   });
 
   it("can extract value change that is an address", async () => {
-    const test = await scenario("realistic-memory-diff.json", "Base.s.verifier");
+    const test = await scenario("realistic-memory-diff.json", "ZkSyncHyperchainBase.s.verifier");
 
     expect(test.before().unwrap().toLowerCase()).to.eql(
       "0xdd9C826196cf3510B040A8784D85aE36674c7Ed2".toLowerCase()
@@ -141,7 +141,7 @@ describe("MemoryMap", () => {
   it("can extract value change for fixed array", async () => {
     const test = await scenario(
       "change-in-deprecated-facets-array.json",
-      "Base.s.__DEPRECATED_diamondCutStorage"
+      "ZkSyncHyperchainBase.s.__DEPRECATED_diamondCutStorage"
     );
 
     const beforeLines = test.before().unwrap().split("\n");
@@ -169,7 +169,7 @@ describe("MemoryMap", () => {
   });
 
   it("can display verifier param changes", async () => {
-    const test = await scenario("realistic-memory-diff.json", "Base.s.verifierParams");
+    const test = await scenario("realistic-memory-diff.json", "ZkSyncHyperchainBase.s.__DEPRECATED_verifierParams");
 
     const beforeLines = test.before().unwrap();
     expect(beforeLines).toMatch(
@@ -191,7 +191,7 @@ describe("MemoryMap", () => {
   });
 
   it("can display big numbers", async () => {
-    const test = await scenario("realistic-memory-diff.json", "Base.s.protocolVersion");
+    const test = await scenario("realistic-memory-diff.json", "ZkSyncHyperchainBase.s.protocolVersion");
 
     expect(test.before().unwrap()).to.eql("22");
     expect(test.after().unwrap()).to.eql("24");
