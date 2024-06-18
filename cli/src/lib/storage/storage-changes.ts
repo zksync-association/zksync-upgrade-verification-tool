@@ -318,8 +318,18 @@ export class StorageChanges {
         "Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.",
         new AddressType()
       ),
-      new Property("ZkSyncHyperchainBase.s.chainId", 40n, "The chainId of the chain", new BigNumberType()),
-      new Property("ZkSyncHyperchainBase.s.bridgehub", 41n, "The address of the bridgehub", new AddressType()),
+      new Property(
+        "ZkSyncHyperchainBase.s.chainId",
+        40n,
+        "The chainId of the chain",
+        new BigNumberType()
+      ),
+      new Property(
+        "ZkSyncHyperchainBase.s.bridgehub",
+        41n,
+        "The address of the bridgehub",
+        new AddressType()
+      ),
       new Property(
         "ZkSyncHyperchainBase.s.stateTransitionManager",
         42n,

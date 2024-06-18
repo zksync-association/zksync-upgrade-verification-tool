@@ -169,7 +169,10 @@ describe("MemoryMap", () => {
   });
 
   it("can display verifier param changes", async () => {
-    const test = await scenario("realistic-memory-diff.json", "ZkSyncHyperchainBase.s.__DEPRECATED_verifierParams");
+    const test = await scenario(
+      "realistic-memory-diff.json",
+      "ZkSyncHyperchainBase.s.__DEPRECATED_verifierParams"
+    );
 
     const beforeLines = test.before().unwrap();
     expect(beforeLines).toMatch(
@@ -191,7 +194,10 @@ describe("MemoryMap", () => {
   });
 
   it("can display big numbers", async () => {
-    const test = await scenario("realistic-memory-diff.json", "ZkSyncHyperchainBase.s.protocolVersion");
+    const test = await scenario(
+      "realistic-memory-diff.json",
+      "ZkSyncHyperchainBase.s.protocolVersion"
+    );
 
     expect(test.before().unwrap()).to.eql("22");
     expect(test.after().unwrap()).to.eql("24");
