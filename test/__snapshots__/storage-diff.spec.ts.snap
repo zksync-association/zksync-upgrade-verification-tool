@@ -3,7 +3,7 @@
 exports[`storage-diff > matches snapshot 1`] = `
 "- Gathering contract data: OK
 --------------------------
-name: ZkSyncHyperchainBase.s.verifier
+name: [1mZkSyncHyperchainBase.s.verifier[22m
 description: Verifier contract. Used to verify aggregated proof for batches
 
 before:
@@ -13,7 +13,7 @@ after:
   0x9d6c59d9a234f585b367b4ba3c62e5ec7a6179fd
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.__DEPRECATED_verifierParams
+name: [1mZkSyncHyperchainBase.s.__DEPRECATED_verifierParams[22m
 description: [DEPRECATED]
 
 before:
@@ -27,7 +27,7 @@ after:
   .recursionCircuitsSetVksHash: Empty slot.
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.l2BootloaderBytecodeHash
+name: [1mZkSyncHyperchainBase.s.l2BootloaderBytecodeHash[22m
 description: Bytecode hash of bootloader program. Used as an input to zkp-circuit.
 
 before:
@@ -37,7 +37,7 @@ after:
   0x010008e742608b21bf7eb23c1a9d0602047e3618b464c9b59c0fba3b3d7ab66e
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.l2DefaultAccountBytecodeHash
+name: [1mZkSyncHyperchainBase.s.l2DefaultAccountBytecodeHash[22m
 description: Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.
 
 before:
@@ -47,7 +47,7 @@ after:
   0x01000563374c277a2c1e34659a2a1e87371bb6d852ce142022d497bfb50b9e32
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.protocolVersion
+name: [1mZkSyncHyperchainBase.s.protocolVersion[22m
 description: Stores the protocol version. Note, that the protocol version may not only encompass changes to the smart contracts, but also to the node behavior.
 
 before:
@@ -57,7 +57,7 @@ after:
   24
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.l2SystemContractsUpgradeTxHash
+name: [1mZkSyncHyperchainBase.s.l2SystemContractsUpgradeTxHash[22m
 description: Hash of the system contract upgrade transaction. If 0, then no upgrade transaction needs to be done.
 
 before:
@@ -67,7 +67,7 @@ after:
   0xb88380066d84222045097f0fad44e876c361dc27f5367d46decb294ba1a7d29c
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.admin
+name: [1mZkSyncHyperchainBase.s.admin[22m
 description: Address which will exercise non-critical changes to the Diamond Proxy (changing validator set & unfreezing)
 
 before:
@@ -77,7 +77,7 @@ after:
   0x0b622a2061eaccae1c664ebc3e868b8438e03f61
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.chainId
+name: [1mZkSyncHyperchainBase.s.chainId[22m
 description: The chainId of the chain
 
 before:
@@ -87,7 +87,7 @@ after:
   324
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.bridgehub
+name: [1mZkSyncHyperchainBase.s.bridgehub[22m
 description: The address of the bridgehub
 
 before:
@@ -97,7 +97,7 @@ after:
   0x5b5c82f4da996e118b127880492a23391376f65c
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.stateTransitionManager
+name: [1mZkSyncHyperchainBase.s.stateTransitionManager[22m
 description: The address of the StateTransitionManager
 
 before:
@@ -107,7 +107,7 @@ after:
   0x280372beaaf440c52a2ed893daa14cdacc0422b8
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.baseToken
+name: [1mZkSyncHyperchainBase.s.baseToken[22m
 description: The address of the baseToken contract. Eth is address(1)
 
 before:
@@ -117,7 +117,7 @@ after:
   0x0000000000000000000000000000000000000001
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.baseTokenBridge
+name: [1mZkSyncHyperchainBase.s.baseTokenBridge[22m
 description: The address of the baseTokenbridge. Eth also uses the shared bridge
 
 before:
@@ -127,7 +127,7 @@ after:
   0x241f19ea8ccd04515b309f1c9953a322f51891fc
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.baseTokenGasPriceMultiplierNominator
+name: [1mZkSyncHyperchainBase.s.baseTokenGasPriceMultiplierNominator[22m
 description: The chainId of the chain
 
 before:
@@ -137,7 +137,7 @@ after:
   1
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.baseTokenGasPriceMultiplierDenominator
+name: [1mZkSyncHyperchainBase.s.baseTokenGasPriceMultiplierDenominator[22m
 description: The chainId of the chain
 
 before:
@@ -147,7 +147,7 @@ after:
   1
 --------------------------
 --------------------------
-name: ZkSyncHyperchainBase.s.transactionFilterer
+name: [1mZkSyncHyperchainBase.s.transactionFilterer[22m
 description: The address of the baseTokenbridge. Eth also uses the shared bridge
 
 before:
@@ -157,7 +157,7 @@ after:
   0x0000000100000000000000000000000000000001
 --------------------------
 --------------------------
-name: DiamondStorage.selectorToFacet
+name: [1mDiamondStorage.selectorToFacet[22m
 description: A mapping from the selector to the facet address and its meta information
 
 before:
@@ -593,7 +593,7 @@ after:
   [0xa9a2d18a]: Empty slot.
 --------------------------
 --------------------------
-name: DiamondStorage.facetToSelectors
+name: [1mDiamondStorage.facetToSelectors[22m
 description: The array of all unique facet addresses that belong to the diamond proxy
 
 before:
@@ -636,7 +636,7 @@ after:
   No content.
 --------------------------
 --------------------------
-name: DiamondStorage.facets
+name: [1mDiamondStorage.facets[22m
 description: The array of all unique facet addresses that belong to the diamond proxy
 
 before:

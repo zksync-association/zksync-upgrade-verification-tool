@@ -4,8 +4,6 @@ import { NetworkSchema } from ".";
 import { downloadCode, checkCommand, contractDiff } from "../commands";
 import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
-import * as console from "node:console";
-import { printError } from "./errors.js";
 import { storageChangeCommand } from "../commands/storage-change-command";
 import { Option } from "nochoices";
 import {failHandler} from "../commands/fail-handler";
