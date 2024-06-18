@@ -71,7 +71,7 @@ export class SnapshotReport implements StorageReport<string> {
     return fields
       .map(({key, value}) => {
         const lines = this.inlineValue(value.writeInto(this)).split("\n");
-        return `.${key}:${lines.join(`\n${" ".repeat(key.length + 3)}`)}`;
+        return `.${key}:${lines.join("\n  ")}`;
       })
       .join("\n  ");
   }
@@ -80,7 +80,7 @@ export class SnapshotReport implements StorageReport<string> {
     return fields
       .map(({key, value}) => {
         const lines = value.writeInto(this).split("\n");
-        const formated = lines.join(`\n${" ".repeat(key.length + 4)}`);
+        const formated = lines.join("\n  ");
         return `[${key}]:${this.inlineValue(formated)}`;
       })
       .join("\n  ");
