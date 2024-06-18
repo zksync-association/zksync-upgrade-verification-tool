@@ -7,6 +7,7 @@ import { EnvBuilder } from "./env-builder.js";
 import { storageChangeCommand } from "../commands/storage-change-command";
 import { Option } from "nochoices";
 import {failHandler} from "../commands/fail-handler";
+import {storageSnapshotCommand} from "../commands/storage-snapshot-command";
 
 export function buildCli(
   args: string[],
@@ -125,6 +126,16 @@ export function buildCli(
       async (yargs) => {
         return storageDiffCbk(env, yargs.upgradeDir, Option.fromNullable(yargs.precalculated));
       }
+    )
+    .command(
+      "storage-snapshot",
+      "Shows a snapshot of the current state of the storage",
+      (yargs) => yargs,
+      async (yargs) => {
+        await storageSnapshotCommand(env)
+        // console.log('lalala')
+      }
+
     )
     .command(
       "download-diff <upgradeDir> <targetSourceCodeDir>",
