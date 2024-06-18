@@ -8,13 +8,15 @@ import * as console from "node:console";
 import { printError } from "./errors.js";
 import { storageChangeCommand } from "../commands/storage-change-command";
 import { Option } from "nochoices";
+import {failHandler} from "../commands/fail-handler";
 
 export function buildCli(
   args: string[],
   checkCbk: typeof checkCommand,
   diffCbk: typeof contractDiff,
   downloadCodeCbk: typeof downloadCode,
-  storageDiffCbk: typeof storageChangeCommand
+  storageDiffCbk: typeof storageChangeCommand,
+  failCbk: typeof failHandler
 ): Argv {
   const env = new EnvBuilder();
   const argParser = yargs(args)
@@ -182,17 +184,7 @@ export function buildCli(
     .wrap(100)
     .help()
     .fail(async (msg, err, _yargs) => {
-      if (msg) {
-        const help = await argParser.getHelp();
-        console.log(help);
-        console.log("");
-        console.log(msg);
-        // process.exit(1);
-        return;
-      }
-
-      printError(err);
-      // process.exit(1);
+      await failCbk(msg, err, argParser)
     })
     .strict();
 
@@ -205,7 +197,8 @@ export const cli = async () => {
     checkCommand,
     contractDiff,
     downloadCode,
-    storageChangeCommand
+    storageChangeCommand,
+    failHandler
   );
   await argParser.parseAsync();
 };

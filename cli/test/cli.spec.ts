@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCli } from "../src/lib/index";
+import { buildCli } from "../src/lib";
 import type { EnvBuilder } from "../src/lib/env-builder";
 import type { Option } from "nochoices";
 
@@ -17,6 +17,7 @@ describe("cli", () => {
       const cli = buildCli(
         ["check", "someDir", "--ethscankey=fakeKey"],
         fakeCheck,
+        fail,
         fail,
         fail,
         fail
@@ -44,6 +45,7 @@ describe("cli", () => {
         fail,
         fakeCheck,
         fail,
+        fail,
         fail
       );
       await cli.parseAsync();
@@ -68,6 +70,7 @@ describe("cli", () => {
         ["verifier-diff", "someDir", "--ethscankey=fakeKey"],
         fail,
         fakeCheck,
+        fail,
         fail,
         fail
       );
@@ -96,6 +99,7 @@ describe("cli", () => {
         fail,
         fail,
         fakeDownload,
+        fail,
         fail
       );
       await cli.parseAsync();
@@ -120,7 +124,8 @@ describe("cli", () => {
         fail,
         fail,
         fail,
-        fakeStorageDiff
+        fakeStorageDiff,
+        fail
       );
       await cli.parseAsync();
       expect(called).toBe(true);
@@ -142,7 +147,8 @@ describe("cli", () => {
         fail,
         fail,
         fail,
-        fakeStorageDiff
+        fakeStorageDiff,
+        fail
       );
       await cli.parseAsync();
       expect(called).toBe(true);
