@@ -6,18 +6,24 @@ import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
 import * as console from "node:console";
 import { printError } from "./errors.js";
+import { storageChangeCommand } from "../commands/storage-change-command";
+import { Option } from "nochoices";
 
 export function buildCli(
   args: string[],
   checkCbk: typeof checkCommand,
   diffCbk: typeof contractDiff,
-  downloadCodeCbk: typeof downloadCode
+  downloadCodeCbk: typeof downloadCode,
+  storageDiffCbk: typeof storageChangeCommand
 ): Argv {
   const env = new EnvBuilder();
   const argParser = yargs(args)
     .middleware((yargs) => {
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
+      }
+      if (!yargs.l1RpcUrl) {
+        yargs.l1RpcUrl = process.env.L1_RPC_CLI;
       }
     }, true)
     .option("ethscankey", {
@@ -33,8 +39,8 @@ export function buildCli(
       type: "string",
       default: "mainnet",
     })
-    .option("rpcUrl", {
-      alias: "rpc",
+    .option("l1RpcUrl", {
+      alias: "l1rpc",
       type: "string",
       describe: "Ethereum rpc url",
       demandOption: false,
@@ -44,11 +50,18 @@ export function buildCli(
       describe: "github ref for era contracts repo",
       default: "main",
     })
+    .option("noColor", {
+      alias: "noFormat",
+      type: "boolean",
+      describe: "Use colored output",
+      default: false,
+    })
     .middleware((yargs) => {
       env.withNetwork(NetworkSchema.parse(yargs.network));
-      env.withRpcUrl(yargs.rpcUrl);
+      env.withL1RpcUrl(yargs.l1RpcUrl);
       env.withEtherscanApiKey(yargs.ethscankey);
       env.withRef(yargs.ref);
+      env.withColored(!yargs.noColor);
     })
     .command(
       "check <upgradeDirectory>",
@@ -93,6 +106,24 @@ export function buildCli(
         }),
       async (yargs) => {
         await diffCbk(env, yargs.upgradeDir, "verifier");
+      }
+    )
+    .command(
+      "storage-diff <upgradeDir>",
+      "Executes the upgrade transaction in debug mode to analyze the changes in contract storage",
+      (yargs) =>
+        yargs
+          .positional("upgradeDir", {
+            describe: "FolderName of the upgrade to check",
+            type: "string",
+            demandOption: true,
+          })
+          .option("precalculated", {
+            type: "string",
+            demandOption: false,
+          }),
+      async (yargs) => {
+        return storageDiffCbk(env, yargs.upgradeDir, Option.fromNullable(yargs.precalculated));
       }
     )
     .command(
@@ -169,6 +200,12 @@ export function buildCli(
 }
 
 export const cli = async () => {
-  const argParser = buildCli(hideBin(process.argv), checkCommand, contractDiff, downloadCode);
+  const argParser = buildCli(
+    hideBin(process.argv),
+    checkCommand,
+    contractDiff,
+    downloadCode,
+    storageChangeCommand
+  );
   await argParser.parseAsync();
 };

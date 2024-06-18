@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { UpgradeImporter } from "../src/lib";
 import { FileSystem } from "../src/lib/file-system";
 import path from "node:path";
-import { ZodError } from "zod";
 import { MalformedUpgrade } from "../src/lib/errors";
 
 class TestFS extends FileSystem {
@@ -71,6 +70,9 @@ function registerFullUpgrade(baseDir: string, fs: TestFS) {
           },
         ],
       },
+      governanceOperation: {
+        calls: [{ target: "0x1", data: "0x2" }],
+      },
     })
   );
   fs.register(
@@ -131,6 +133,9 @@ describe("UpgradeImporter", () => {
           transparentUpgrade: {
             facetCuts: [],
           },
+          governanceOperation: {
+            calls: [{ target: "0x1", data: "0x2" }],
+          },
         })
       );
     });
@@ -138,7 +143,6 @@ describe("UpgradeImporter", () => {
     it<Ctx>("parse the data", async ({ importer }) => {
       const upgrades = await importer.readFromFiles(baseDir, "mainnet");
       expect(upgrades.facets).to.eql([]);
-      expect(upgrades.booloaderBytecodeHash).to.eql(repeated(1, 32));
       expect(upgrades.aaBytecodeHash).to.eql(repeated(2, 32));
       expect(upgrades.systemContractChanges).to.eql([]);
       expect(upgrades.verifier.address).to.eql(repeated(3, 20));
@@ -190,7 +194,7 @@ describe("UpgradeImporter", () => {
       );
     });
 
-    it<Ctx>("fails with proppr error", async ({ importer }) => {
+    it<Ctx>("fails with proper error", async ({ importer }) => {
       await expect(importer.readFromFiles(baseDir, "mainnet")).rejects.toThrow(MalformedUpgrade);
     });
   });

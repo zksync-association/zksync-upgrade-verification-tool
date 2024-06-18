@@ -33,12 +33,12 @@ const MAIN_CONTRACT_FUNCTIONS = {
  * ```
  */
 export class ZkSyncEraState {
-  private addr: string;
+  addr: string;
   private protocolVersion: bigint;
 
-  selectorToFacet: Map<string, string>;
-  facetToSelectors: Map<string, string[]>;
-  facetToContractData: Map<string, ContractData>;
+  selectorToFacet: Map<Hex, Hex>;
+  facetToSelectors: Map<Hex, Hex[]>;
+  facetToContractData: Map<Hex, ContractData>;
 
   private verifier?: VerifierContract;
   private l1Rpc: RpcClient;
@@ -87,7 +87,7 @@ export class ZkSyncEraState {
       this.aaBytecodeHash,
       changes.aaBytecodeHash,
       this.bootloaderStringHash,
-      changes.booloaderBytecodeHash
+      changes.bootloaderBytecodeHash
     );
 
     for (const [address, data] of this.facetToContractData.entries()) {
@@ -260,5 +260,13 @@ export class ZkSyncEraState {
       abi,
       z.string()
     );
+  }
+
+  allSelectors(): Hex[] {
+    return [...this.selectorToFacet.keys()];
+  }
+
+  allFacetsAddresses(): Hex[] {
+    return [...this.facetToSelectors.keys()];
   }
 }

@@ -1,10 +1,10 @@
 import { z } from "zod";
+import { zodHex } from "./hex-parser";
 
 export const facetsResponseSchema = z.array(
   z.object({
-    addr: z.string(),
-    selectors: z.array(z.string()),
+    addr: zodHex,
+    selectors: z.array(zodHex),
   })
 );
-
 // export type NewFacet = z.infer<typeof facetsResponseSchema>

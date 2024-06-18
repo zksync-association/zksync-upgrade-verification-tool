@@ -6,11 +6,12 @@ import type {
 } from "../schema/index.js";
 import { VerifierContract } from "./verifier.js";
 import type { Hex } from "viem";
+import { Option } from "nochoices";
 
 export type FacetData = {
   name: string;
-  address: string;
-  selectors: string[];
+  address: Hex;
+  selectors: Hex[];
 };
 
 export type SystemContractData = {
@@ -22,17 +23,19 @@ export type SystemContractData = {
 export class UpgradeChanges {
   newProtocolVersion: string;
   facets: FacetData[];
-  orphanedSelectors: string[];
+  orphanedSelectors: Hex[];
   verifier: VerifierContract;
   systemContractChanges: SystemContractData[];
   aaBytecodeHash: string;
-  booloaderBytecodeHash: string;
+  bootloaderBytecodeHash: string;
+  upgradeCalldataHex: Option<string>;
 
   constructor(
     newProtocolVersion: string,
     verifier: VerifierContract,
     aaBytecodeHash: string,
-    booloaderBytecodeHash: string
+    bootloaderBytecodeHash: string,
+    upgradeTxHex?: string
   ) {
     this.newProtocolVersion = newProtocolVersion;
     this.facets = [];
@@ -40,14 +43,15 @@ export class UpgradeChanges {
     this.systemContractChanges = [];
     this.verifier = verifier;
     this.aaBytecodeHash = aaBytecodeHash;
-    this.booloaderBytecodeHash = booloaderBytecodeHash;
+    this.bootloaderBytecodeHash = bootloaderBytecodeHash;
+    this.upgradeCalldataHex = Option.fromNullable(upgradeTxHex);
   }
 
   matchingFacet(targetSelectors: string[]): FacetData | undefined {
     return this.facets.find((f) => f.selectors.some((sel) => targetSelectors.includes(sel)));
   }
 
-  addFacet(facetName: string, facetAddr: string, selectors: string[]) {
+  addFacet(facetName: string, facetAddr: Hex, selectors: string[]) {
     this.orphanedSelectors = this.orphanedSelectors.filter(
       (selector) => !selectors.includes(selector)
     );
@@ -55,12 +59,12 @@ export class UpgradeChanges {
     this.facets.push({
       name: facetName,
       address: facetAddr,
-      selectors: selectors,
+      selectors: selectors as Hex[],
     });
   }
 
   removeFacet(selectors: string[]) {
-    this.orphanedSelectors.push(...selectors);
+    this.orphanedSelectors.push(...(selectors as Hex[]));
   }
 
   addSystemContract(change: SystemContractData) {
@@ -85,7 +89,8 @@ export class UpgradeChanges {
       common.protocolVersion.toString(),
       verifier,
       txFile.proposeUpgradeTx.defaultAccountHash,
-      txFile.proposeUpgradeTx.bootloaderHash
+      txFile.proposeUpgradeTx.bootloaderHash,
+      txFile.governanceOperation?.calls[0]?.data
     );
 
     if (facets) {
@@ -107,7 +112,7 @@ export class UpgradeChanges {
           instance.addFacet(facetDef.name, facetDef.address, cut.selectors);
         } else {
           // TODO: Handle upgrade
-          throw new Error("Upgrade action not suported yet");
+          throw new Error("Upgrade action not supported yet");
         }
       }
     }
@@ -122,5 +127,13 @@ export class UpgradeChanges {
     }
 
     return instance;
+  }
+
+  allSelectors(): Hex[] {
+    return this.facets.flatMap((f) => f.selectors).concat(this.orphanedSelectors);
+  }
+
+  allFacetsAddresses(): Hex[] {
+    return this.facets.map((f) => f.address);
   }
 }

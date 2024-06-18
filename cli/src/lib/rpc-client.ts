@@ -8,6 +8,8 @@ import {
   http,
 } from "viem";
 import type { TypeOf, ZodType } from "zod";
+import type { PublicClient, HttpTransport } from "viem";
+import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
 
 const L1_DEFAULT_URLS = {
   mainnet: "https://ethereum-rpc.publicnode.com",
@@ -20,7 +22,7 @@ const L2_DEFAULT_URLS = {
 };
 
 export class RpcClient {
-  private viemClient: ReturnType<typeof createPublicClient>;
+  private viemClient: PublicClient<HttpTransport>;
 
   constructor(url: string) {
     this.viemClient = createPublicClient({
@@ -78,5 +80,34 @@ export class RpcClient {
     });
 
     return parser.parse(rawValue);
+  }
+
+  async debugTraceCall(from: string, to: string, callData: string): Promise<MemoryDiffRaw> {
+    const res = await fetch(this.rpcUrl(), {
+      method: "POST",
+      body: JSON.stringify({
+        method: "debug_traceCall",
+        id: 1,
+        jsonrpc: "2.0",
+        params: [
+          {
+            from,
+            to,
+            data: callData,
+          },
+          "latest",
+          {
+            tracer: "prestateTracer",
+            tracerConfig: {
+              diffMode: true,
+            },
+          },
+        ],
+      }),
+    });
+
+    const data = await res.json();
+
+    return memoryDiffParser.parse(data);
   }
 }

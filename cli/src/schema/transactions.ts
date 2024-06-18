@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { account20String, bytes32Hash, hashString, transactionSchema } from "../schema";
+import { account20String, bytes32Hash } from "./common";
 import { facetCutsSchema } from "./facetCuts";
 
 export const verifierParamsSchema = z.object({
@@ -18,6 +18,16 @@ export const transactionsSchema = z.object({
   transparentUpgrade: z.object({
     facetCuts: facetCutsSchema,
   }),
+  governanceOperation: z.optional(
+    z.object({
+      calls: z.array(
+        z.object({
+          target: z.string(),
+          data: z.string(),
+        })
+      ),
+    })
+  ),
 });
 
 export type TransactionsJson = z.infer<typeof transactionsSchema>;

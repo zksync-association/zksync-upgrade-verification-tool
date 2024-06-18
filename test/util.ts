@@ -2,7 +2,10 @@ import { promisify } from "node:util";
 import { exec } from "node:child_process";
 import { expect } from "vitest";
 import { temporaryDirectory } from "tempy";
+import { config } from "dotenv";
+import * as path from "node:path";
 
+config({ path: path.join(import.meta.dirname, "../.env") });
 export const execAsync = promisify(exec);
 
 export const expectToFailAsync = async (

@@ -14,9 +14,13 @@ describe("validate check", () => {
       expect(stdout).toContain("No diamond changes");
 
       expect(stdout).toMatch(/Addres.+?0x[0-9a-fA-F]{40}.+?No changes/);
-      expect(stdout).toMatch(/Recursion node level VkHash.+?0x[0-9a-fA-F]{64}.+?No changes/);
+      expect(stdout).toMatch(
+        /Recursion node level VkHash.+?0x[0-9a-fA-F]{64}.+?0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080/
+      );
       expect(stdout).toMatch(/Recursion circuits set VksHash.+?0x[0-9a-fA-F]{64}.+?No changes/);
-      expect(stdout).toMatch(/Recursion leaf level VkHash.+?0x[0-9a-fA-F]{64}.+?No changes/);
+      expect(stdout).toMatch(
+        /Recursion leaf level VkHash.+?0x[0-9a-fA-F]{64}.+?0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a/
+      );
 
       expect(stdout).toContain("System contracts:");
       expect(stdout).toContain("No changes in system contracts");
@@ -39,26 +43,27 @@ describe("validate check", () => {
       expect(stdout).toMatch(/Proposed protocol version.+18/);
       expect(stdout).toContain("L1 Main contract Diamond upgrades:");
 
-      function validateFacet(
-        facetName: string,
-        facetAddress: string,
-        newFunctions: string,
-        removedFunctions: string
-      ) {
+      function validateFacet(facetName: string, facetAddress: string) {
         const adminFacetStartIndex = lines.findIndex((line) => line.includes(facetName));
+        const facetLines = lines.slice(adminFacetStartIndex);
+        const lastIndex = facetLines.findIndex((l) => l.includes("To compare code")) + 1;
         expect(adminFacetStartIndex).not.toBe(-1);
-        expect(lines[adminFacetStartIndex + 2]).toContain("Current address");
-        expect(lines[adminFacetStartIndex + 3]).toMatch(
-          new RegExp(`Upgrade address.*${facetAddress}`)
-        );
-        expect(lines[adminFacetStartIndex + 4]).toContain("Proposed contract verified etherscan");
-        expect(lines[adminFacetStartIndex + 4]).toContain("Yes");
-        expect(lines[adminFacetStartIndex + 5]).toContain("New functions");
-        expect(lines[adminFacetStartIndex + 5]).toContain(newFunctions);
-        expect(lines[adminFacetStartIndex + 6]).toContain("Removed functions");
-        expect(lines[adminFacetStartIndex + 6]).toContain(removedFunctions);
-        expect(lines[adminFacetStartIndex + 7]).toContain("To compare code");
-        expect(lines[adminFacetStartIndex + 7]).toContain(
+        expect(lastIndex).not.toBe(0);
+        expect(facetLines[2]).toContain("Current address");
+        expect(facetLines[3]).toMatch(new RegExp(`Upgrade address.*${facetAddress}`));
+        expect(facetLines[4]).toContain("Proposed contract verified etherscan");
+        expect(facetLines[4]).toContain("Yes");
+
+        const newFunctionsLine = facetLines.findIndex((l) => l.includes("New functions"));
+        expect(newFunctionsLine).toBeLessThan(lastIndex);
+
+        const removedFunctionsLine = facetLines.findIndex((l) => l.includes("Removed functions"));
+        expect(removedFunctionsLine).toBeLessThan(lastIndex);
+
+        const compareLine = facetLines.findIndex((l) => l.includes("To compare code"));
+        expect(compareLine).toBeLessThan(lastIndex);
+
+        expect(facetLines[compareLine]).toContain(
           `pnpm validate facet-diff reference/1699353977-boojum ${facetName}`
         );
       }
@@ -70,13 +75,15 @@ describe("validate check", () => {
         ["GettersFacet", "0xF3ACF6a03ea4a914B78Ec788624B25ceC37c14A4", "getAllowList()", "None"],
       ];
 
-      for (const [name, addr, added, removed] of facetData) {
-        validateFacet(name, addr, added, removed);
+      for (const [name, addr] of facetData) {
+        validateFacet(name, addr);
       }
 
       expect(stdout).toMatch(/Address.*0xB465882F67d236DcC0D090F78ebb0d838e9719D8/);
 
-      expect(stdout).toMatch(/Recursion node level VkHash.*No changes/);
+      expect(stdout).toMatch(
+        /Recursion node level VkHash.*0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080/
+      );
 
       expect(stdout).toMatch(/Recursion circuits set VksHash.*No changes/);
 
@@ -232,7 +239,7 @@ describe("validate check", () => {
       expect(stdout).to.match(/Proposed contract verified etherscan.*NO!/);
       expect(stdout).to.include("Warning!!:");
       expect(stdout).to.include(
-        "⚠️ L1 Contract not verified in therscan: 0x0011223344556677889900aabbccddeeff001122"
+        "⚠️ L1 Contract not verified in etherscan: 0x0011223344556677889900aabbccddeeff001122"
       );
     });
   });

@@ -14,8 +14,10 @@ export class EnvBuilder {
   private _l1Client?: BlockExplorerClient;
   private _l2Client?: BlockExplorerClient;
   private _repo?: EraContractsRepo;
+  colored = true;
 
   // Config
+  private _rpcL1?: RpcClient;
 
   withNetwork(n: Network): void {
     this._network = n;
@@ -29,7 +31,7 @@ export class EnvBuilder {
     this.ref = ref;
   }
 
-  withRpcUrl(maybeUrl: string | undefined): void {
+  withL1RpcUrl(maybeUrl: string | undefined): void {
     this.rpcUrl = maybeUrl;
   }
 
@@ -67,7 +69,11 @@ export class EnvBuilder {
   }
 
   rpcL1(): RpcClient {
-    return RpcClient.forL1(this.network);
+    if (!this._rpcL1) {
+      this._rpcL1 = this.rpcUrl ? new RpcClient(this.rpcUrl) : RpcClient.forL1(this.network);
+    }
+
+    return this._rpcL1;
   }
 
   rpcL2(): RpcClient {
@@ -92,5 +98,9 @@ export class EnvBuilder {
     }
 
     return this._repo;
+  }
+
+  withColored(colored: boolean) {
+    this.colored = colored;
   }
 }
