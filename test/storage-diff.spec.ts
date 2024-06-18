@@ -67,7 +67,7 @@ after:
 
   it("matches snapshot", async () => {
     const { stdout } = await execAsync(
-      "pnpm validate storage-diff reference/1699353977-boojum --precalculated=reference/realistic-memory-diff.json"
+      "pnpm validate storage-diff reference/1699353977-boojum --precalculated=reference/realistic-memory-diff.json --noColor"
     );
     expect(stdout).toMatchSnapshot();
   });
