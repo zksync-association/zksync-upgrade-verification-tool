@@ -80,7 +80,8 @@ export class StringStorageChangeReport implements StorageReport<string> {
   }
 
   writeMapping(fields: ValueField[]): string {
-    return fields
+    const sorted = fields.toSorted((a, b) => a.key.localeCompare(b.key))
+    return sorted
       .map(({ key, value }) => {
         const lines = value.writeInto(this).split("\n");
         const formated = lines.join(`\n${" ".repeat(key.length + 4)}`);

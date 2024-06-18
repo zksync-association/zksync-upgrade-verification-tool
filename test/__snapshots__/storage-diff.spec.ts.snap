@@ -3,7 +3,7 @@
 exports[`storage-diff > matches snapshot 1`] = `
 "- Gathering contract data: OK
 --------------------------
-name: [1mZkSyncHyperchainBase.s.verifier[22m
+name: ZkSyncHyperchainBase.s.verifier
 description: Verifier contract. Used to verify aggregated proof for batches
 
 before:
@@ -13,7 +13,7 @@ after:
   0x9d6c59d9a234f585b367b4ba3c62e5ec7a6179fd
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.__DEPRECATED_verifierParams[22m
+name: ZkSyncHyperchainBase.s.__DEPRECATED_verifierParams
 description: [DEPRECATED]
 
 before:
@@ -27,7 +27,7 @@ after:
   .recursionCircuitsSetVksHash: Empty slot.
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.l2BootloaderBytecodeHash[22m
+name: ZkSyncHyperchainBase.s.l2BootloaderBytecodeHash
 description: Bytecode hash of bootloader program. Used as an input to zkp-circuit.
 
 before:
@@ -37,7 +37,7 @@ after:
   0x010008e742608b21bf7eb23c1a9d0602047e3618b464c9b59c0fba3b3d7ab66e
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.l2DefaultAccountBytecodeHash[22m
+name: ZkSyncHyperchainBase.s.l2DefaultAccountBytecodeHash
 description: Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.
 
 before:
@@ -47,7 +47,7 @@ after:
   0x01000563374c277a2c1e34659a2a1e87371bb6d852ce142022d497bfb50b9e32
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.protocolVersion[22m
+name: ZkSyncHyperchainBase.s.protocolVersion
 description: Stores the protocol version. Note, that the protocol version may not only encompass changes to the smart contracts, but also to the node behavior.
 
 before:
@@ -57,7 +57,7 @@ after:
   24
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.l2SystemContractsUpgradeTxHash[22m
+name: ZkSyncHyperchainBase.s.l2SystemContractsUpgradeTxHash
 description: Hash of the system contract upgrade transaction. If 0, then no upgrade transaction needs to be done.
 
 before:
@@ -67,7 +67,7 @@ after:
   0xb88380066d84222045097f0fad44e876c361dc27f5367d46decb294ba1a7d29c
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.admin[22m
+name: ZkSyncHyperchainBase.s.admin
 description: Address which will exercise non-critical changes to the Diamond Proxy (changing validator set & unfreezing)
 
 before:
@@ -77,7 +77,7 @@ after:
   0x0b622a2061eaccae1c664ebc3e868b8438e03f61
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.chainId[22m
+name: ZkSyncHyperchainBase.s.chainId
 description: The chainId of the chain
 
 before:
@@ -87,7 +87,7 @@ after:
   324
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.bridgehub[22m
+name: ZkSyncHyperchainBase.s.bridgehub
 description: The address of the bridgehub
 
 before:
@@ -97,7 +97,7 @@ after:
   0x5b5c82f4da996e118b127880492a23391376f65c
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.stateTransitionManager[22m
+name: ZkSyncHyperchainBase.s.stateTransitionManager
 description: The address of the StateTransitionManager
 
 before:
@@ -107,7 +107,7 @@ after:
   0x280372beaaf440c52a2ed893daa14cdacc0422b8
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.baseToken[22m
+name: ZkSyncHyperchainBase.s.baseToken
 description: The address of the baseToken contract. Eth is address(1)
 
 before:
@@ -117,7 +117,7 @@ after:
   0x0000000000000000000000000000000000000001
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.baseTokenBridge[22m
+name: ZkSyncHyperchainBase.s.baseTokenBridge
 description: The address of the baseTokenbridge. Eth also uses the shared bridge
 
 before:
@@ -127,7 +127,7 @@ after:
   0x241f19ea8ccd04515b309f1c9953a322f51891fc
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.baseTokenGasPriceMultiplierNominator[22m
+name: ZkSyncHyperchainBase.s.baseTokenGasPriceMultiplierNominator
 description: The chainId of the chain
 
 before:
@@ -137,7 +137,7 @@ after:
   1
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.baseTokenGasPriceMultiplierDenominator[22m
+name: ZkSyncHyperchainBase.s.baseTokenGasPriceMultiplierDenominator
 description: The chainId of the chain
 
 before:
@@ -147,7 +147,7 @@ after:
   1
 --------------------------
 --------------------------
-name: [1mZkSyncHyperchainBase.s.transactionFilterer[22m
+name: ZkSyncHyperchainBase.s.transactionFilterer
 description: The address of the baseTokenbridge. Eth also uses the shared bridge
 
 before:
@@ -157,443 +157,443 @@ after:
   0x0000000100000000000000000000000000000001
 --------------------------
 --------------------------
-name: [1mDiamondStorage.selectorToFacet[22m
+name: DiamondStorage.selectorToFacet
 description: A mapping from the selector to the facet address and its meta information
 
 before:
+  [0x042901c7]: .facetAddress: 0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7
+                .selectorPosition: 2
+                .isFreezable: true
+  [0x0551448c]: Empty slot.
+  [0x06d49e5b]: Empty slot.
+  [0x086a56f8]: Empty slot.
+  [0x0c4dd810]: Empty slot.
   [0x0e18b681]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
                 .selectorPosition: 0
-                .isFreezable: false
-  [0x64bf8d66]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
-                .selectorPosition: 2
-                .isFreezable: false
-  [0xa9f6d941]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
-                .selectorPosition: 3
-                .isFreezable: false
-  [0x27ae4c16]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
-                .selectorPosition: 4
-                .isFreezable: false
-  [0x4dd18bf5]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
-                .selectorPosition: 5
-                .isFreezable: false
-  [0x1cc5d103]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
-                .selectorPosition: 7
-                .isFreezable: false
-  [0xbe6f11cf]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
-                .selectorPosition: 8
-                .isFreezable: false
-  [0xe76db865]: Empty slot.
-  [0x235d9eb5]: Empty slot.
-  [0x21f603d7]: Empty slot.
-  [0x4623c91d]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
-                .selectorPosition: 9
-                .isFreezable: false
-  [0x17338945]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
-                .selectorPosition: 10
-                .isFreezable: false
-  [0xfc57565f]: Empty slot.
-  [0x701f58c5]: .facetAddress: 0xfd3779e6214ebbd40f5f5890351298e123a46ba6
-                .selectorPosition: 0
-                .isFreezable: true
-  [0x6edd4f12]: Empty slot.
-  [0xc3d93e7c]: .facetAddress: 0xfd3779e6214ebbd40f5f5890351298e123a46ba6
-                .selectorPosition: 1
-                .isFreezable: true
-  [0x6f497ac6]: Empty slot.
-  [0x7f61885c]: .facetAddress: 0xfd3779e6214ebbd40f5f5890351298e123a46ba6
-                .selectorPosition: 2
-                .isFreezable: true
-  [0xc37533bb]: Empty slot.
-  [0x97c09d34]: .facetAddress: 0xfd3779e6214ebbd40f5f5890351298e123a46ba6
-                .selectorPosition: 3
-                .isFreezable: true
-  [0x0f23da43]: Empty slot.
-  [0x1de72e34]: Empty slot.
-  [0xea6c029c]: Empty slot.
-  [0xcdffacc6]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 0
-                .isFreezable: false
-  [0x52ef6b2c]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 1
-                .isFreezable: false
-  [0xadfca15e]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 2
-                .isFreezable: false
-  [0x7a0ed627]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 3
-                .isFreezable: false
-  [0x6e9960c3]: Empty slot.
-  [0x98acd7a6]: Empty slot.
-  [0x086a56f8]: Empty slot.
-  [0x3591c1a0]: Empty slot.
-  [0x79823c9a]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 4
-                .isFreezable: false
-  [0xd86970d8]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 6
-                .isFreezable: false
-  [0xfd791f3c]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 7
-                .isFreezable: false
-  [0xe5355c75]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 8
-                .isFreezable: false
-  [0x9d1b5a81]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 9
-                .isFreezable: false
-  [0x7b30c8da]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 10
-                .isFreezable: false
-  [0xd0468156]: Empty slot.
-  [0x631f4bac]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 12
                 .isFreezable: false
   [0x0ec6b0b7]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
                 .selectorPosition: 13
                 .isFreezable: false
-  [0x33ce93fe]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 14
-                .isFreezable: false
-  [0x06d49e5b]: Empty slot.
-  [0xf5c1182c]: Empty slot.
-  [0x5518c73b]: Empty slot.
-  [0xdb1f0bf9]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 15
-                .isFreezable: false
-  [0xb8c2f66f]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 16
-                .isFreezable: false
-  [0xef3f0bae]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 17
-                .isFreezable: false
-  [0xfe26699e]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 18
-                .isFreezable: false
-  [0x39607382]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 19
-                .isFreezable: false
-  [0xaf6a2dcd]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 20
-                .isFreezable: false
-  [0xa1954fc5]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 21
-                .isFreezable: false
-  [0x46657fe9]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 22
+  [0x0ef240a0]: Empty slot.
+  [0x0f23da43]: Empty slot.
+  [0x12f43dab]: Empty slot.
+  [0x17338945]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
+                .selectorPosition: 10
                 .isFreezable: false
   [0x18e3a941]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
                 .selectorPosition: 23
                 .isFreezable: false
+  [0x1b60e626]: Empty slot.
+  [0x1cc5d103]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
+                .selectorPosition: 7
+                .isFreezable: false
+  [0x1de72e34]: Empty slot.
+  [0x21f603d7]: Empty slot.
+  [0x235d9eb5]: Empty slot.
+  [0x263b7f8e]: .facetAddress: 0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7
+                .selectorPosition: 3
+                .isFreezable: true
+  [0x27ae4c16]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
+                .selectorPosition: 4
+                .isFreezable: false
   [0x29b98c67]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
                 .selectorPosition: 24
                 .isFreezable: false
-  [0xbd7c5412]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 25
+  [0x33ce93fe]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 14
                 .isFreezable: false
-  [0xc3bbd2d7]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 26
+  [0x3591c1a0]: Empty slot.
+  [0x36d4eb84]: Empty slot.
+  [0x39607382]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 19
                 .isFreezable: false
-  [0xe81e0ba1]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 27
+  [0x3db920ce]: Empty slot.
+  [0x4623c91d]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
+                .selectorPosition: 9
                 .isFreezable: false
-  [0xfacd743b]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 28
+  [0x46657fe9]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 22
                 .isFreezable: false
+  [0x4dd18bf5]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
+                .selectorPosition: 5
+                .isFreezable: false
+  [0x4fc07d75]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 5
+                .isFreezable: false
+  [0x52ef6b2c]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 1
+                .isFreezable: false
+  [0x5518c73b]: Empty slot.
+  [0x56142d7a]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 30
+                .isFreezable: false
+  [0x587809c7]: Empty slot.
+  [0x631f4bac]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 12
+                .isFreezable: false
+  [0x64bf8d66]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
+                .selectorPosition: 2
+                .isFreezable: false
+  [0x6c0960f9]: .facetAddress: 0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7
+                .selectorPosition: 0
+                .isFreezable: true
+  [0x6e9960c3]: Empty slot.
+  [0x6edd4f12]: Empty slot.
+  [0x6f497ac6]: Empty slot.
+  [0x701f58c5]: .facetAddress: 0xfd3779e6214ebbd40f5f5890351298e123a46ba6
+                .selectorPosition: 0
+                .isFreezable: true
+  [0x73fb9297]: Empty slot.
+  [0x74f4d30d]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 32
+                .isFreezable: false
+  [0x7739cbe7]: Empty slot.
+  [0x79823c9a]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 4
+                .isFreezable: false
+  [0x7a0ed627]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 3
+                .isFreezable: false
+  [0x7b30c8da]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 10
+                .isFreezable: false
+  [0x7f61885c]: .facetAddress: 0xfd3779e6214ebbd40f5f5890351298e123a46ba6
+                .selectorPosition: 2
+                .isFreezable: true
+  [0x8043760a]: Empty slot.
+  [0x8665b150]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 11
+                .isFreezable: false
+  [0x97c09d34]: .facetAddress: 0xfd3779e6214ebbd40f5f5890351298e123a46ba6
+                .selectorPosition: 3
+                .isFreezable: true
+  [0x98acd7a6]: Empty slot.
   [0x9cd939e4]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
                 .selectorPosition: 29
                 .isFreezable: false
-  [0x56142d7a]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 30
+  [0x9d1b5a81]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 9
+                .isFreezable: false
+  [0xa1954fc5]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 21
+                .isFreezable: false
+  [0xa39980a0]: Empty slot.
+  [0xa7cd63b7]: Empty slot.
+  [0xa9a2d18a]: Empty slot.
+  [0xa9f6d941]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
+                .selectorPosition: 3
+                .isFreezable: false
+  [0xadfca15e]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 2
+                .isFreezable: false
+  [0xaf6a2dcd]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 20
                 .isFreezable: false
   [0xb22dd78e]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
                 .selectorPosition: 31
                 .isFreezable: false
-  [0x74f4d30d]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 32
-                .isFreezable: false
-  [0x12f43dab]: Empty slot.
-  [0x6c0960f9]: .facetAddress: 0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7
-                .selectorPosition: 0
-                .isFreezable: true
   [0xb473318e]: .facetAddress: 0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7
                 .selectorPosition: 1
                 .isFreezable: true
-  [0x042901c7]: .facetAddress: 0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7
-                .selectorPosition: 2
+  [0xb8c2f66f]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 16
+                .isFreezable: false
+  [0xbd7c5412]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 25
+                .isFreezable: false
+  [0xbe6f11cf]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
+                .selectorPosition: 8
+                .isFreezable: false
+  [0xbeda4b12]: Empty slot.
+  [0xc37533bb]: Empty slot.
+  [0xc3bbd2d7]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 26
+                .isFreezable: false
+  [0xc3d93e7c]: .facetAddress: 0xfd3779e6214ebbd40f5f5890351298e123a46ba6
+                .selectorPosition: 1
                 .isFreezable: true
-  [0x263b7f8e]: .facetAddress: 0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7
-                .selectorPosition: 3
-                .isFreezable: true
+  [0xc924de35]: Empty slot.
+  [0xcdffacc6]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 0
+                .isFreezable: false
+  [0xce9dcf16]: Empty slot.
+  [0xd0468156]: Empty slot.
+  [0xd86970d8]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 6
+                .isFreezable: false
+  [0xdb1f0bf9]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 15
+                .isFreezable: false
+  [0xe39d3bff]: Empty slot.
   [0xe4948f43]: .facetAddress: 0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7
                 .selectorPosition: 4
                 .isFreezable: true
+  [0xe5355c75]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 8
+                .isFreezable: false
+  [0xe58bb639]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
+                .selectorPosition: 1
+                .isFreezable: false
+  [0xe76db865]: Empty slot.
+  [0xe81e0ba1]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 27
+                .isFreezable: false
+  [0xea6c029c]: Empty slot.
   [0xeb672419]: .facetAddress: 0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7
                 .selectorPosition: 5
                 .isFreezable: true
-  [0xc924de35]: Empty slot.
-  [0xe58bb639]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
-                .selectorPosition: 1
+  [0xef3f0bae]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 17
                 .isFreezable: false
   [0xf235757f]: .facetAddress: 0x230214f0224c7e0485f348a79512ad00514db1f7
                 .selectorPosition: 6
                 .isFreezable: false
-  [0xa7cd63b7]: Empty slot.
-  [0x4fc07d75]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 5
+  [0xf5c1182c]: Empty slot.
+  [0xfacd743b]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 28
                 .isFreezable: false
-  [0x8665b150]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
-                .selectorPosition: 11
+  [0xfc57565f]: Empty slot.
+  [0xfd791f3c]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 7
                 .isFreezable: false
-  [0x73fb9297]: Empty slot.
-  [0x36d4eb84]: Empty slot.
-  [0x0551448c]: Empty slot.
-  [0x8043760a]: Empty slot.
-  [0xbeda4b12]: Empty slot.
-  [0x587809c7]: Empty slot.
   [0xfe10226d]: Empty slot.
-  [0x1b60e626]: Empty slot.
-  [0xe39d3bff]: Empty slot.
-  [0x0ef240a0]: Empty slot.
-  [0xa39980a0]: Empty slot.
-  [0x3db920ce]: Empty slot.
-  [0x0c4dd810]: Empty slot.
-  [0xce9dcf16]: Empty slot.
-  [0x7739cbe7]: Empty slot.
-  [0xa9a2d18a]: Empty slot.
+  [0xfe26699e]: .facetAddress: 0x10113bb3a8e64f8ed67003126adc8ce74c34610c
+                .selectorPosition: 18
+                .isFreezable: false
 
 after:
-  [0x0e18b681]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 0
-                .isFreezable: false
-  [0x64bf8d66]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 1
-                .isFreezable: false
-  [0xa9f6d941]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 2
-                .isFreezable: false
-  [0x27ae4c16]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 3
-                .isFreezable: false
-  [0x4dd18bf5]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 4
-                .isFreezable: false
-  [0x1cc5d103]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 5
-                .isFreezable: false
-  [0xbe6f11cf]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 6
-                .isFreezable: false
-  [0xe76db865]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 7
-                .isFreezable: false
-  [0x235d9eb5]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 8
-                .isFreezable: false
-  [0x21f603d7]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 9
-                .isFreezable: false
-  [0x4623c91d]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 10
-                .isFreezable: false
-  [0x17338945]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 11
-                .isFreezable: false
-  [0xfc57565f]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
-                .selectorPosition: 12
-                .isFreezable: false
-  [0x701f58c5]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
-                .selectorPosition: 0
-                .isFreezable: true
-  [0x6edd4f12]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
-                .selectorPosition: 1
-                .isFreezable: true
-  [0xc3d93e7c]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
-                .selectorPosition: 2
-                .isFreezable: true
-  [0x6f497ac6]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
+  [0x042901c7]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
                 .selectorPosition: 3
                 .isFreezable: true
-  [0x7f61885c]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
-                .selectorPosition: 4
-                .isFreezable: true
-  [0xc37533bb]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
-                .selectorPosition: 5
-                .isFreezable: true
-  [0x97c09d34]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
-                .selectorPosition: 6
-                .isFreezable: true
-  [0x0f23da43]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
-                .selectorPosition: 7
-                .isFreezable: true
-  [0x1de72e34]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 0
-                .isFreezable: false
-  [0xea6c029c]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 1
-                .isFreezable: false
-  [0xcdffacc6]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 2
-                .isFreezable: false
-  [0x52ef6b2c]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 3
-                .isFreezable: false
-  [0xadfca15e]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 4
-                .isFreezable: false
-  [0x7a0ed627]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 5
-                .isFreezable: false
-  [0x6e9960c3]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 6
-                .isFreezable: false
-  [0x98acd7a6]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 7
+  [0x0551448c]: Empty slot.
+  [0x06d49e5b]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 20
                 .isFreezable: false
   [0x086a56f8]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
                 .selectorPosition: 8
                 .isFreezable: false
-  [0x3591c1a0]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 9
-                .isFreezable: false
-  [0x79823c9a]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 10
-                .isFreezable: false
-  [0xd86970d8]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 11
-                .isFreezable: false
-  [0xfd791f3c]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 12
-                .isFreezable: false
-  [0xe5355c75]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 13
-                .isFreezable: false
-  [0x9d1b5a81]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 14
-                .isFreezable: false
-  [0x7b30c8da]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 15
-                .isFreezable: false
-  [0xd0468156]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 16
-                .isFreezable: false
-  [0x631f4bac]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 17
+  [0x0c4dd810]: Empty slot.
+  [0x0e18b681]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 0
                 .isFreezable: false
   [0x0ec6b0b7]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
                 .selectorPosition: 18
                 .isFreezable: false
-  [0x33ce93fe]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 19
-                .isFreezable: false
-  [0x06d49e5b]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 20
-                .isFreezable: false
-  [0xf5c1182c]: Empty slot.
-  [0x5518c73b]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 21
-                .isFreezable: false
-  [0xdb1f0bf9]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 22
-                .isFreezable: false
-  [0xb8c2f66f]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 23
-                .isFreezable: false
-  [0xef3f0bae]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 24
-                .isFreezable: false
-  [0xfe26699e]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 25
-                .isFreezable: false
-  [0x39607382]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 26
-                .isFreezable: false
-  [0xaf6a2dcd]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 27
-                .isFreezable: false
-  [0xa1954fc5]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 28
-                .isFreezable: false
-  [0x46657fe9]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 29
+  [0x0ef240a0]: Empty slot.
+  [0x0f23da43]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
+                .selectorPosition: 7
+                .isFreezable: true
+  [0x12f43dab]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
+                .selectorPosition: 0
+                .isFreezable: true
+  [0x17338945]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 11
                 .isFreezable: false
   [0x18e3a941]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
                 .selectorPosition: 30
                 .isFreezable: false
+  [0x1b60e626]: Empty slot.
+  [0x1cc5d103]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 5
+                .isFreezable: false
+  [0x1de72e34]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 0
+                .isFreezable: false
+  [0x21f603d7]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 9
+                .isFreezable: false
+  [0x235d9eb5]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 8
+                .isFreezable: false
+  [0x263b7f8e]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
+                .selectorPosition: 4
+                .isFreezable: true
+  [0x27ae4c16]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 3
+                .isFreezable: false
   [0x29b98c67]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
                 .selectorPosition: 31
                 .isFreezable: false
-  [0xbd7c5412]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 32
+  [0x33ce93fe]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 19
                 .isFreezable: false
-  [0xc3bbd2d7]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 33
+  [0x3591c1a0]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 9
                 .isFreezable: false
-  [0xe81e0ba1]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 34
+  [0x36d4eb84]: Empty slot.
+  [0x39607382]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 26
                 .isFreezable: false
-  [0xfacd743b]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 35
+  [0x3db920ce]: Empty slot.
+  [0x4623c91d]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 10
                 .isFreezable: false
-  [0x9cd939e4]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 36
+  [0x46657fe9]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 29
+                .isFreezable: false
+  [0x4dd18bf5]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 4
+                .isFreezable: false
+  [0x4fc07d75]: Empty slot.
+  [0x52ef6b2c]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 3
+                .isFreezable: false
+  [0x5518c73b]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 21
                 .isFreezable: false
   [0x56142d7a]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
                 .selectorPosition: 37
                 .isFreezable: false
-  [0xb22dd78e]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 38
+  [0x587809c7]: Empty slot.
+  [0x631f4bac]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 17
                 .isFreezable: false
-  [0x74f4d30d]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
-                .selectorPosition: 39
+  [0x64bf8d66]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 1
                 .isFreezable: false
-  [0x12f43dab]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
-                .selectorPosition: 0
-                .isFreezable: true
   [0x6c0960f9]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
                 .selectorPosition: 1
                 .isFreezable: true
+  [0x6e9960c3]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 6
+                .isFreezable: false
+  [0x6edd4f12]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
+                .selectorPosition: 1
+                .isFreezable: true
+  [0x6f497ac6]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
+                .selectorPosition: 3
+                .isFreezable: true
+  [0x701f58c5]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
+                .selectorPosition: 0
+                .isFreezable: true
+  [0x73fb9297]: Empty slot.
+  [0x74f4d30d]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 39
+                .isFreezable: false
+  [0x7739cbe7]: Empty slot.
+  [0x79823c9a]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 10
+                .isFreezable: false
+  [0x7a0ed627]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 5
+                .isFreezable: false
+  [0x7b30c8da]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 15
+                .isFreezable: false
+  [0x7f61885c]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
+                .selectorPosition: 4
+                .isFreezable: true
+  [0x8043760a]: Empty slot.
+  [0x8665b150]: Empty slot.
+  [0x97c09d34]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
+                .selectorPosition: 6
+                .isFreezable: true
+  [0x98acd7a6]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 7
+                .isFreezable: false
+  [0x9cd939e4]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 36
+                .isFreezable: false
+  [0x9d1b5a81]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 14
+                .isFreezable: false
+  [0xa1954fc5]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 28
+                .isFreezable: false
+  [0xa39980a0]: Empty slot.
+  [0xa7cd63b7]: Empty slot.
+  [0xa9a2d18a]: Empty slot.
+  [0xa9f6d941]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 2
+                .isFreezable: false
+  [0xadfca15e]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 4
+                .isFreezable: false
+  [0xaf6a2dcd]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 27
+                .isFreezable: false
+  [0xb22dd78e]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 38
+                .isFreezable: false
   [0xb473318e]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
                 .selectorPosition: 2
                 .isFreezable: true
-  [0x042901c7]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
-                .selectorPosition: 3
-                .isFreezable: true
-  [0x263b7f8e]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
-                .selectorPosition: 4
-                .isFreezable: true
-  [0xe4948f43]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
+  [0xb8c2f66f]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 23
+                .isFreezable: false
+  [0xbd7c5412]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 32
+                .isFreezable: false
+  [0xbe6f11cf]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 6
+                .isFreezable: false
+  [0xbeda4b12]: Empty slot.
+  [0xc37533bb]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
                 .selectorPosition: 5
                 .isFreezable: true
-  [0xeb672419]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
-                .selectorPosition: 6
+  [0xc3bbd2d7]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 33
+                .isFreezable: false
+  [0xc3d93e7c]: .facetAddress: 0x1a451d9bfbd176321966e9bc540596ca9d39b4b1
+                .selectorPosition: 2
                 .isFreezable: true
   [0xc924de35]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
                 .selectorPosition: 7
                 .isFreezable: true
-  [0xe58bb639]: Empty slot.
-  [0xf235757f]: Empty slot.
-  [0xa7cd63b7]: Empty slot.
-  [0x4fc07d75]: Empty slot.
-  [0x8665b150]: Empty slot.
-  [0x73fb9297]: Empty slot.
-  [0x36d4eb84]: Empty slot.
-  [0x0551448c]: Empty slot.
-  [0x8043760a]: Empty slot.
-  [0xbeda4b12]: Empty slot.
-  [0x587809c7]: Empty slot.
-  [0xfe10226d]: Empty slot.
-  [0x1b60e626]: Empty slot.
-  [0xe39d3bff]: Empty slot.
-  [0x0ef240a0]: Empty slot.
-  [0xa39980a0]: Empty slot.
-  [0x3db920ce]: Empty slot.
-  [0x0c4dd810]: Empty slot.
+  [0xcdffacc6]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 2
+                .isFreezable: false
   [0xce9dcf16]: Empty slot.
-  [0x7739cbe7]: Empty slot.
-  [0xa9a2d18a]: Empty slot.
+  [0xd0468156]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 16
+                .isFreezable: false
+  [0xd86970d8]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 11
+                .isFreezable: false
+  [0xdb1f0bf9]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 22
+                .isFreezable: false
+  [0xe39d3bff]: Empty slot.
+  [0xe4948f43]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
+                .selectorPosition: 5
+                .isFreezable: true
+  [0xe5355c75]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 13
+                .isFreezable: false
+  [0xe58bb639]: Empty slot.
+  [0xe76db865]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 7
+                .isFreezable: false
+  [0xe81e0ba1]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 34
+                .isFreezable: false
+  [0xea6c029c]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 1
+                .isFreezable: false
+  [0xeb672419]: .facetAddress: 0x7814399116c17f2750ca99cbfd2b75ba9a0793d7
+                .selectorPosition: 6
+                .isFreezable: true
+  [0xef3f0bae]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 24
+                .isFreezable: false
+  [0xf235757f]: Empty slot.
+  [0xf5c1182c]: Empty slot.
+  [0xfacd743b]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 35
+                .isFreezable: false
+  [0xfc57565f]: .facetAddress: 0x342a09385e9bad4ad32a6220765a6c333552e565
+                .selectorPosition: 12
+                .isFreezable: false
+  [0xfd791f3c]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 12
+                .isFreezable: false
+  [0xfe10226d]: Empty slot.
+  [0xfe26699e]: .facetAddress: 0x345c6ca2f3e08445614f4299001418f125ad330a
+                .selectorPosition: 25
+                .isFreezable: false
 --------------------------
 --------------------------
-name: [1mDiamondStorage.facetToSelectors[22m
+name: DiamondStorage.facetToSelectors
 description: The array of all unique facet addresses that belong to the diamond proxy
 
 before:
@@ -636,7 +636,7 @@ after:
   No content.
 --------------------------
 --------------------------
-name: [1mDiamondStorage.facets[22m
+name: DiamondStorage.facets
 description: The array of all unique facet addresses that belong to the diamond proxy
 
 before:
