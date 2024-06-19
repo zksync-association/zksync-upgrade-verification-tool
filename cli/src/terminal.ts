@@ -20,18 +20,6 @@ export class Terminal {
     this.out.write("\n");
   }
 
-  // async line(data: string): Promise<void> {
-  //   return new Promise((resolve, reject) => {
-  //     this.out.write(data)
-  //     this.out.write("\n", (err) => {
-  //       if (err) {
-  //         return reject(err)
-  //       }
-  //       return resolve()
-  //     })
-  //   })
-  // }
-
   errAppend(data: string): void {
     this.err.write(data);
   }
