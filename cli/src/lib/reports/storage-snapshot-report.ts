@@ -24,7 +24,7 @@ export class SnapshotReport implements StorageReport<string> {
         lines.push(`name: ${prop.name}`);
         lines.push(`description: ${prop.description}\n`);
 
-        lines.push(`value:${this.inlineValue(value.writeInto(this))}`);
+        lines.push(`value:${value.writeInto(this)}`);
         lines.push("----------");
       });
     }
@@ -32,57 +32,52 @@ export class SnapshotReport implements StorageReport<string> {
     return lines.join("\n");
   }
 
-  private inlineValue(value: string): string {
-    const tokens = ["\n", "[", "."]
-    if(tokens.some(token => value.includes(token))) {
-      return `\n  ${value}`
-    }
-    return ` ${value}`
-  }
-
   addAddress(addr: Hex): string {
-    return addr;
+    return ` ${addr}`;
   }
 
   addBigNumber(n: bigint): string {
-    return n.toString();
+    return ` ${n.toString()}`;
   }
 
   writeBuf(buf: Buffer): string {
-    return bytesToHex(buf);
+    return ` ${bytesToHex(buf)}`;
   }
 
   addBoolean(val: boolean): string {
-    return val ? "true" : "false";
+    return val ? " true" : " false";
   }
 
   addArray(inner: StorageValue[]): string {
-    return inner
+    const lines = inner
       .map((v) => v.writeInto(this))
-      .map((str) => `-${this.inlineValue(str)}`)
+      .map((str) => `-${str}`);
+    return [" ", ...lines]
       .join("\n  ");
   }
 
   writeEmpty(): string {
-    return "Empty slot.";
+    return " Empty slot.";
   }
 
   writeStruct(fields: ValueField[]): string {
-    return fields
+    const lines = fields
       .map(({key, value}) => {
-        const lines = this.inlineValue(value.writeInto(this)).split("\n");
+        const lines = value.writeInto(this).split("\n");
         return `.${key}:${lines.join("\n  ")}`;
-      })
+      });
+    return ["", ...lines]
       .join("\n  ");
   }
 
   writeMapping(fields: ValueField[]): string {
-    return fields
+    const lines = fields
       .map(({key, value}) => {
         const lines = value.writeInto(this).split("\n");
         const formated = lines.join("\n  ");
-        return `[${key}]:${this.inlineValue(formated)}`;
-      })
+        return `[${key}]:${formated}`;
+      });
+    return ["", ...lines]
       .join("\n  ");
   }
 }

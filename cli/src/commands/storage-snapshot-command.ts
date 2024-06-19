@@ -8,7 +8,7 @@ export async function storageSnapshotCommand (env: EnvBuilder): Promise<void> {
   const rpc = env.rpcL1()
   const snapshot = new RpcStorageSnapshot(rpc, DIAMOND_ADDRS[env.network])
 
-  const state = await ZkSyncEraState.create(env.network, env.l1Client(), env.rpcL1(), env.rpcL2())
+  const state = await ZkSyncEraState.create(env.network, env.l1Client(), await env.newRpcL1(), env.rpcL2())
 
   const report = new SnapshotReport(snapshot, mainDiamondProps(state.allSelectors(), state.allFacetsAddresses()))
 
