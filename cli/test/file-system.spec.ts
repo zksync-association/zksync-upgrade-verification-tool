@@ -4,7 +4,7 @@ import path from "node:path";
 import { temporaryDirectory, temporaryFile } from "tempy";
 import { NotADir } from "../src/lib/errors";
 
-describe("FileSyste class", () => {
+describe("FileSystem class", () => {
   const subject = () => new FileSystem();
 
   describe("#readFile", () => {

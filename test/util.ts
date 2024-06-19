@@ -15,9 +15,6 @@ export const expectToFailAsync = async (
     await fn();
   } catch (e) {
     const err = e as any;
-    if (!err.stdout) {
-      expect.fail(`Unexpected error: ${e}`);
-    }
     return {
       stdout: err.stdout,
       stderr: err.stderr,

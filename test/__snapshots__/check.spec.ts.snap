@@ -1,11 +1,16 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`validate check > 1699353977-boojum > should match snapshot 1`] = `
-"- Reading proposed upgrade...: OK
-- Gathering contract data: OK
-- Checking differences between versions: OK
-- Compiling system contracts: OK
-- Generating report: OK
+"- Reading proposed upgrade......
+✔ Reading proposed upgrade...
+- Gathering contract data...
+✔ Gathering contract data
+- Checking differences between versions...
+✔ Checking differences between versions
+- Compiling system contracts...
+✔ Compiling system contracts
+- Generating report...
+✔ Generating report
 Upgrade report:
 ===============
 

@@ -1,7 +1,8 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`storage-diff > matches snapshot 1`] = `
-"- Gathering contract data: OK
+"- Gathering contract data...
+✔ Gathering contract data
 --------------------------
 name: ZkSyncHyperchainBase.s.verifier
 description: Verifier contract. Used to verify aggregated proof for batches
