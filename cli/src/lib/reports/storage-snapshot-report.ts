@@ -50,7 +50,7 @@ export class SnapshotReport implements StorageReport<string> {
 
   addArray(inner: StorageValue[]): string {
     const lines = inner.map((v) => v.writeInto(this)).map((str) => `-${str}`);
-    return [" ", ...lines].join("\n  ");
+    return ["", ...lines].join("\n  ");
   }
 
   writeEmpty(): string {

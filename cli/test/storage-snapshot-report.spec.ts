@@ -245,7 +245,7 @@ description: desc1
 
 value:
   [${bytesToHex(key)}]:
-    .selectors: 
+    .selectors:
       - 0x0e18b681
 ----------`);
   });
