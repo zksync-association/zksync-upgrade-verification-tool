@@ -124,4 +124,10 @@ export class RpcClient {
 
     return memoryDiffParser.parse(data);
   }
+
+  async netVersion(): Promise<string> {
+    return this.viemClient.request({
+      method: "net_version"
+    })
+  }
 }
