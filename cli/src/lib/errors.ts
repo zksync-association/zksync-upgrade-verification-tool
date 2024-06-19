@@ -1,6 +1,5 @@
-import * as console from "node:console";
 import type { Network } from "./constants.js";
-import type {Terminal} from "../terminal";
+import type { Terminal } from "../terminal";
 
 // export class FinishWithError extends Error {}
 

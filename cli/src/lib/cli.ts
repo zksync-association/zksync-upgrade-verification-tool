@@ -132,7 +132,7 @@ export function buildCli(
       "storage-snapshot",
       "Shows a snapshot of the current state of the storage",
       (yargs) => yargs,
-      async (yargs) => {
+      async (_yargs) => {
         await storageSnapshotCommand(env);
       }
     )

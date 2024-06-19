@@ -4,7 +4,7 @@ import { RpcClient } from "./rpc-client.js";
 import { EraContractsRepo } from "./era-contracts-repo";
 import { FileSystem } from "./file-system";
 import { UpgradeImporter } from "./importer";
-import {Terminal} from "../terminal";
+import { Terminal } from "../terminal";
 
 export class EnvBuilder {
   private _etherscanApiKey?: string;
@@ -16,7 +16,7 @@ export class EnvBuilder {
   private _l2Client?: BlockExplorerClient;
   private _repo?: EraContractsRepo;
   colored = true;
-  private terminal = Terminal.default()
+  private terminal = Terminal.default();
 
   // Config
   private _rpcL1?: RpcClient;
@@ -26,7 +26,7 @@ export class EnvBuilder {
   }
 
   withTerminal(term: Terminal) {
-    this.terminal = term
+    this.terminal = term;
   }
 
   withEtherscanApiKey(etherscanKey: string): void {
@@ -118,7 +118,7 @@ export class EnvBuilder {
     this.colored = colored;
   }
 
-  term () {
-    return this.terminal
+  term() {
+    return this.terminal;
   }
 }

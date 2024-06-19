@@ -6,24 +6,40 @@ export async function calculateDiffWithUpgrade(
   env: EnvBuilder,
   upgradeDirectory: string
 ): Promise<{ diff: ZkSyncEraDiff; state: ZkSyncEraState }> {
-  const changes = await withSpinner(async () => {
-    const importer = env.importer();
-    return importer.readFromFiles(upgradeDirectory, env.network);
-  }, "Reading proposed upgrade...", env);
+  const changes = await withSpinner(
+    async () => {
+      const importer = env.importer();
+      return importer.readFromFiles(upgradeDirectory, env.network);
+    },
+    "Reading proposed upgrade...",
+    env
+  );
 
-  const state = await withSpinner(async () => {
-    const l1Client = env.l1Client();
-    return ZkSyncEraState.create(env.network, l1Client, env.rpcL1(), env.rpcL2());
-  }, "Gathering contract data", env);
+  const state = await withSpinner(
+    async () => {
+      const l1Client = env.l1Client();
+      return ZkSyncEraState.create(env.network, l1Client, env.rpcL1(), env.rpcL2());
+    },
+    "Gathering contract data",
+    env
+  );
 
-  const diff = await withSpinner(async () => {
-    return state.calculateDiff(changes, env.l1Client());
-  }, "Checking differences between versions", env);
+  const diff = await withSpinner(
+    async () => {
+      return state.calculateDiff(changes, env.l1Client());
+    },
+    "Checking differences between versions",
+    env
+  );
 
-  await withSpinner(async () => {
-    const repo = await env.contractsRepo();
-    await repo.compileSystemContracts();
-  }, "Compiling system contracts", env);
+  await withSpinner(
+    async () => {
+      const repo = await env.contractsRepo();
+      await repo.compileSystemContracts();
+    },
+    "Compiling system contracts",
+    env
+  );
 
   return {
     diff,

@@ -1,24 +1,23 @@
 export class Terminal {
-  out: NodeJS.WritableStream
-  err: NodeJS.WritableStream
+  out: NodeJS.WritableStream;
+  err: NodeJS.WritableStream;
 
-
-  constructor (out: NodeJS.WritableStream, err: NodeJS.WritableStream) {
-    this.out = out
-    this.err = err
+  constructor(out: NodeJS.WritableStream, err: NodeJS.WritableStream) {
+    this.out = out;
+    this.err = err;
   }
 
   static default(): Terminal {
-    return new Terminal(process.stdout, process.stderr)
+    return new Terminal(process.stdout, process.stderr);
   }
 
-  append (data: string): void {
-    this.out.write(data)
+  append(data: string): void {
+    this.out.write(data);
   }
 
-  line (data: string): void {
-    this.out.write(data)
-    this.out.write("\n")
+  line(data: string): void {
+    this.out.write(data);
+    this.out.write("\n");
   }
 
   // async line(data: string): Promise<void> {
@@ -33,12 +32,12 @@ export class Terminal {
   //   })
   // }
 
-  errAppend (data: string): void {
-    this.err.write(data)
+  errAppend(data: string): void {
+    this.err.write(data);
   }
 
   errLine(data: string): void {
-    this.err.write(data)
-    this.err.write("\n")
+    this.err.write(data);
+    this.err.write("\n");
   }
 }

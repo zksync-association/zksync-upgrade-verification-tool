@@ -16,7 +16,11 @@ export async function downloadCode(
   const l2Client = env.l2Client();
   const repo = await env.contractsRepo();
 
-  await withSpinner(() => diff.writeCodeDiff(targetDir, l1Filter, env.l1Client(), l2Client, repo), "Downloading all source code", env);
+  await withSpinner(
+    () => diff.writeCodeDiff(targetDir, l1Filter, env.l1Client(), l2Client, repo),
+    "Downloading all source code",
+    env
+  );
 
   env.term().line(`✅ Source code successfully downloaded in: ${targetDir}`);
 }
