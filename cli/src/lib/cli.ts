@@ -19,6 +19,7 @@ export function buildCli(
 ): Argv {
   const env = new EnvBuilder();
   const argParser = yargs(args)
+    .scriptName("validate")
     .middleware((yargs) => {
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
