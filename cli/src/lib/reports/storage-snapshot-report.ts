@@ -1,9 +1,9 @@
-import type {StorageReport} from "./storage-report";
-import type {StorageSnapshot} from "../storage/storage-snapshot";
-import type {Property} from "../storage/property";
-import {bytesToHex, type Hex} from "viem";
-import type {StorageValue} from "../storage/values/storage-value";
-import type {ValueField} from "../storage/values/struct-value";
+import type { StorageReport } from "./storage-report";
+import type { StorageSnapshot } from "../storage/storage-snapshot";
+import type { Property } from "../storage/property";
+import { bytesToHex, type Hex } from "viem";
+import type { StorageValue } from "../storage/values/storage-value";
+import type { ValueField } from "../storage/values/struct-value";
 
 export class SnapshotReport implements StorageReport<string> {
   private snapshot: StorageSnapshot;
@@ -11,14 +11,14 @@ export class SnapshotReport implements StorageReport<string> {
 
   constructor(snapshot: StorageSnapshot, props: Property[]) {
     this.snapshot = snapshot;
-    this.props = props
+    this.props = props;
   }
 
   async format(): Promise<string> {
-    const lines: string[] = []
+    const lines: string[] = [];
 
     for (const prop of this.props) {
-      let extracted = await prop.extract(this.snapshot);
+      const extracted = await prop.extract(this.snapshot);
       extracted.ifSome((value) => {
         lines.push("----------");
         lines.push(`name: ${prop.name}`);
@@ -49,11 +49,8 @@ export class SnapshotReport implements StorageReport<string> {
   }
 
   addArray(inner: StorageValue[]): string {
-    const lines = inner
-      .map((v) => v.writeInto(this))
-      .map((str) => `-${str}`);
-    return [" ", ...lines]
-      .join("\n  ");
+    const lines = inner.map((v) => v.writeInto(this)).map((str) => `-${str}`);
+    return [" ", ...lines].join("\n  ");
   }
 
   writeEmpty(): string {
@@ -61,23 +58,19 @@ export class SnapshotReport implements StorageReport<string> {
   }
 
   writeStruct(fields: ValueField[]): string {
-    const lines = fields
-      .map(({key, value}) => {
-        const lines = value.writeInto(this).split("\n");
-        return `.${key}:${lines.join("\n  ")}`;
-      });
-    return ["", ...lines]
-      .join("\n  ");
+    const lines = fields.map(({ key, value }) => {
+      const lines = value.writeInto(this).split("\n");
+      return `.${key}:${lines.join("\n  ")}`;
+    });
+    return ["", ...lines].join("\n  ");
   }
 
   writeMapping(fields: ValueField[]): string {
-    const lines = fields
-      .map(({key, value}) => {
-        const lines = value.writeInto(this).split("\n");
-        const formated = lines.join("\n  ");
-        return `[${key}]:${formated}`;
-      });
-    return ["", ...lines]
-      .join("\n  ");
+    const lines = fields.map(({ key, value }) => {
+      const lines = value.writeInto(this).split("\n");
+      const formated = lines.join("\n  ");
+      return `[${key}]:${formated}`;
+    });
+    return ["", ...lines].join("\n  ");
   }
 }

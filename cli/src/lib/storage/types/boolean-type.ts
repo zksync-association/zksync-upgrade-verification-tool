@@ -6,7 +6,7 @@ import { BooleanValue } from "../values/boolean-value";
 
 export class BooleanType implements MemoryDataType {
   async extract(memory: StorageSnapshot, slot: bigint, offset = 0): Promise<Option<StorageValue>> {
-    let maybe = await memory.at(slot);
+    const maybe = await memory.at(slot);
     return maybe
       .map((buf) => buf[buf.length - offset - 1])
       .map((num) => new BooleanValue(num !== 0));

@@ -100,7 +100,9 @@ describe("MemoryMapReport", () => {
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
-      expect(await report.format()).toEqual(expectedReport("numberProp", "it is a number", "10", "20"));
+      expect(await report.format()).toEqual(
+        expectedReport("numberProp", "it is a number", "10", "20")
+      );
     });
 
     it("can display blob elements", async () => {
@@ -125,7 +127,9 @@ describe("MemoryMapReport", () => {
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
-      expect(await report.format()).toEqual(expectedReport("blobProp", "it is a blob", "true", "false"));
+      expect(await report.format()).toEqual(
+        expectedReport("blobProp", "it is a blob", "true", "false")
+      );
     });
 
     it("can display list elements", async () => {
@@ -142,7 +146,9 @@ describe("MemoryMapReport", () => {
       const before = ["- 100", "- 101", "- 102"].join("\n  ");
       const after = ["- 100", "- 201", "- 102", "- 103"].join("\n  ");
 
-      expect(await report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
+      expect(await report.format()).toEqual(
+        expectedReport("listProp", "it is a list", before, after)
+      );
     });
 
     it("can display fixed array elements", async () => {
@@ -159,7 +165,9 @@ describe("MemoryMapReport", () => {
       const before = ["- 100", "- 101", "- 102"].join("\n  ");
       const after = ["- 100", "- 201", "- 102"].join("\n  ");
 
-      expect(await report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
+      expect(await report.format()).toEqual(
+        expectedReport("listProp", "it is a list", before, after)
+      );
     });
 
     it("can display fixed array elements when some are not present", async () => {
@@ -176,7 +184,9 @@ describe("MemoryMapReport", () => {
       const before = ["- 101", "- 102", "- Empty slot."].join("\n  ");
       const after = ["- 201", "- 102", "- 103"].join("\n  ");
 
-      expect(await report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
+      expect(await report.format()).toEqual(
+        expectedReport("listProp", "it is a list", before, after)
+      );
     });
 
     it("can display struct elements", async () => {
@@ -220,7 +230,9 @@ describe("MemoryMapReport", () => {
         ".field4: 103",
       ].join("\n  ");
 
-      expect(await report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
+      expect(await report.format()).toEqual(
+        expectedReport("listProp", "it is a list", before, after)
+      );
     });
   });
 });

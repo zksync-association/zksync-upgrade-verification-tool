@@ -1,5 +1,5 @@
 import { BlockExplorerClient } from "./block-explorer-client.js";
-import {NET_VERSIONS, type Network} from "./constants.js";
+import { NET_VERSIONS, type Network } from "./constants.js";
 import { RpcClient } from "./rpc-client.js";
 import { EraContractsRepo } from "./era-contracts-repo";
 import { FileSystem } from "./file-system";
@@ -77,11 +77,11 @@ export class EnvBuilder {
   }
 
   async newRpcL1(): Promise<RpcClient> {
-    const rpc = this.rpcL1()
-    if (await rpc.netVersion() !== NET_VERSIONS[this.network]) {
+    const rpc = this.rpcL1();
+    if ((await rpc.netVersion()) !== NET_VERSIONS[this.network]) {
       throw new Error("Rpc network does not match with specified network");
     }
-    return rpc
+    return rpc;
   }
 
   rpcL2(): RpcClient {

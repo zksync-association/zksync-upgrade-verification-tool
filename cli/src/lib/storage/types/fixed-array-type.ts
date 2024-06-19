@@ -14,12 +14,14 @@ export class FixedArrayType implements MemoryDataType {
     this.inner = inner;
   }
 
-  async extract(memory: StorageSnapshot, slot: bigint, _offset: number): Promise<Option<StorageValue>> {
+  async extract(
+    memory: StorageSnapshot,
+    slot: bigint,
+    _offset: number
+  ): Promise<Option<StorageValue>> {
     const slots = new Array(this.size).fill(0).map((_, i) => slot + BigInt(i));
 
-    const content = await Promise.all(
-      slots.map((slot) => this.inner.extract(memory, slot, 0))
-    );
+    const content = await Promise.all(slots.map((slot) => this.inner.extract(memory, slot, 0)));
 
     if (content.every((s) => s.isNone())) {
       return Option.None();

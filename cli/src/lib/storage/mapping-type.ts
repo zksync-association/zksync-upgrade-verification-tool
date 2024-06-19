@@ -20,22 +20,24 @@ export class MappingType implements MemoryDataType {
 
   async extract(memory: StorageSnapshot, slot: bigint, _offset = 0): Promise<Option<StorageValue>> {
     const bufSlot = numberToBytes(slot, { size: 32 });
-    const values = await Promise.all(this.keys.map(async (key) => {
-      const keyBuf = Buffer.alloc(32);
-      if (this.leftPadded) {
-        key.copy(keyBuf, keyBuf.length - key.length, 0);
-      } else {
-        key.copy(keyBuf, 0, 0, key.length);
-      }
+    const values = await Promise.all(
+      this.keys.map(async (key) => {
+        const keyBuf = Buffer.alloc(32);
+        if (this.leftPadded) {
+          key.copy(keyBuf, keyBuf.length - key.length, 0);
+        } else {
+          key.copy(keyBuf, 0, 0, key.length);
+        }
 
-      const keySlot = Buffer.concat([keyBuf, bufSlot]);
-      const hashed = keccak256(keySlot);
+        const keySlot = Buffer.concat([keyBuf, bufSlot]);
+        const hashed = keccak256(keySlot);
 
-      return {
-        key: bytesToHex(key),
-        values: await this.valueType.extract(memory, hexToBigInt(hashed), 0),
-      };
-    }));
+        return {
+          key: bytesToHex(key),
+          values: await this.valueType.extract(memory, hexToBigInt(hashed), 0),
+        };
+      })
+    );
 
     if (values.every((v) => v.values.isNone())) {
       return Option.None();

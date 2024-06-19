@@ -14,22 +14,25 @@ export class ArrayType implements MemoryDataType {
     this.inner = inner;
   }
 
-  async extract(storage: StorageSnapshot, slot: bigint, _offset = 0): Promise<Option<StorageValue>> {
+  async extract(
+    storage: StorageSnapshot,
+    slot: bigint,
+    _offset = 0
+  ): Promise<Option<StorageValue>> {
     const res: Option<StorageValue>[] = [];
     const base = hexToBigInt(keccak256(numberToBytes(slot, { size: 32 })));
-    let lengthFromStorage = await storage.at(slot)
-      .then(opt =>
-        opt.map((buf) => bytesToBigint(buf))
-      );
+    const lengthFromStorage = await storage
+      .at(slot)
+      .then((opt) => opt.map((buf) => bytesToBigint(buf)));
     const maybeLength = lengthFromStorage.isSome()
-    ? lengthFromStorage
-    : await this.calculateLength(storage, base)
+      ? lengthFromStorage
+      : await this.calculateLength(storage, base);
 
     if (maybeLength.isNone()) {
-      return Option.None()
+      return Option.None();
     }
 
-    const length = maybeLength.unwrap()
+    const length = maybeLength.unwrap();
 
     let offset = 0;
     let slotDelta = 0n;
@@ -43,7 +46,7 @@ export class ArrayType implements MemoryDataType {
       offset += this.inner.evmSize;
     }
 
-    return Option.Some(new ArrayValue(res.map((v) => v.unwrapOr(new EmptyValue())))) ;
+    return Option.Some(new ArrayValue(res.map((v) => v.unwrapOr(new EmptyValue()))));
   }
 
   get evmSize(): number {

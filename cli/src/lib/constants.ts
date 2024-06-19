@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type {Hex} from "viem";
+import type { Hex } from "viem";
 
 export const ETHERSCAN_ENDPOINTS = {
   mainnet: "https://api.etherscan.io/api",
@@ -13,13 +13,13 @@ export const ERA_BLOCK_EXPLORER_ENDPOINTS = {
 
 export const DIAMOND_ADDRS: Record<Network, Hex> = {
   mainnet: "0x32400084c286cf3e17e7b677ea9583e60a000324",
-  sepolia: "0x9a6de0f62aa270a8bcb1e2610078650d539b1ef9"
-}
+  sepolia: "0x9a6de0f62aa270a8bcb1e2610078650d539b1ef9",
+};
 
 export const NET_VERSIONS = {
   mainnet: "1",
   sepolia: "11155111",
-}
+};
 
 export const NetworkSchema = z.enum(["mainnet", "sepolia"]);
 

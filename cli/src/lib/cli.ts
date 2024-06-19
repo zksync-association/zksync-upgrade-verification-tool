@@ -6,8 +6,8 @@ import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
 import { storageChangeCommand } from "../commands/storage-change-command";
 import { Option } from "nochoices";
-import {failHandler} from "../commands/fail-handler";
-import {storageSnapshotCommand} from "../commands/storage-snapshot-command";
+import { failHandler } from "../commands/fail-handler";
+import { storageSnapshotCommand } from "../commands/storage-snapshot-command";
 
 export function buildCli(
   args: string[],
@@ -133,10 +133,9 @@ export function buildCli(
       "Shows a snapshot of the current state of the storage",
       (yargs) => yargs,
       async (yargs) => {
-        await storageSnapshotCommand(env)
+        await storageSnapshotCommand(env);
         // console.log('lalala')
       }
-
     )
     .command(
       "download-diff <upgradeDir> <targetSourceCodeDir>",
@@ -194,7 +193,7 @@ export function buildCli(
     .wrap(100)
     .help()
     .fail(async (msg, err, _yargs) => {
-      await failCbk(msg, err, argParser)
+      await failCbk(msg, err, argParser);
     })
     .strict();
 

@@ -1,14 +1,14 @@
-import {Property} from "./property";
-import {FixedArrayType} from "./types/fixed-array-type";
-import {AddressType} from "./types/address-type";
-import {MappingType} from "./mapping-type";
-import {BooleanType} from "./types/boolean-type";
-import {BigNumberType} from "./types/big-number-type";
-import {StructType} from "./types/struct-type";
-import {BlobType} from "./types/blob-type";
-import {type Hex, hexToBytes} from "viem";
-import {ArrayType} from "./types/array-type";
-import {DIAMOND_STORAGE_SLOT} from "./storage-changes";
+import { Property } from "./property";
+import { FixedArrayType } from "./types/fixed-array-type";
+import { AddressType } from "./types/address-type";
+import { MappingType } from "./mapping-type";
+import { BooleanType } from "./types/boolean-type";
+import { BigNumberType } from "./types/big-number-type";
+import { StructType } from "./types/struct-type";
+import { BlobType } from "./types/blob-type";
+import { type Hex, hexToBytes } from "viem";
+import { ArrayType } from "./types/array-type";
+import { DIAMOND_STORAGE_SLOT } from "./storage-changes";
 
 export function mainDiamondProps(selectors: Hex[], facets: Hex[]): Property[] {
   return [
@@ -148,15 +148,15 @@ export function mainDiamondProps(selectors: Hex[], facets: Hex[]): Property[] {
       "ZkSyncHyperchainBase.s.zkPorterIsAvailable",
       25n,
       "Indicates that the porter may be touched on L2 transactions. " +
-      "Used as an input to zkp-circuit.",
+        "Used as an input to zkp-circuit.",
       new BooleanType()
     ),
     new Property(
       "ZkSyncHyperchainBase.s.priorityTxMaxGasLimit",
       26n,
       "The maximum number of the L2 gas that a user can request for L1 -> L2 transactions " +
-      'This is the maximum number of L2 gas that is available for the "body" of the transaction, i.e. ' +
-      "without overhead for proving the batch.",
+        'This is the maximum number of L2 gas that is available for the "body" of the transaction, i.e. ' +
+        "without overhead for proving the batch.",
       new BigNumberType()
     ),
     new Property(
@@ -169,9 +169,9 @@ export function mainDiamondProps(selectors: Hex[], facets: Hex[]): Property[] {
       "ZkSyncHyperchainBase.s.isEthWithdrawalFinalized",
       29n,
       "A mapping L2 batch number => message number => flag. " +
-      "The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as " +
-      "a flag to indicate that the message was already processed. " +
-      "Used to indicate that eth withdrawal was already processed",
+        "The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as " +
+        "a flag to indicate that the message was already processed. " +
+        "Used to indicate that eth withdrawal was already processed",
       new MappingType([], new MappingType([], new BooleanType()))
     ),
     new Property(
@@ -208,7 +208,7 @@ export function mainDiamondProps(selectors: Hex[], facets: Hex[]): Property[] {
       "ZkSyncHyperchainBase.s.l2SystemContractsUpgradeBatchNumber",
       35n,
       "Batch number where the upgrade transaction has happened. If 0, then no upgrade " +
-      "yet transaction has happened",
+        "yet transaction has happened",
       new BlobType()
     ),
     new Property(
@@ -227,7 +227,7 @@ export function mainDiamondProps(selectors: Hex[], facets: Hex[]): Property[] {
       "ZkSyncHyperchainBase.s.feeParams",
       38n,
       "Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions, " +
-      "the bootloader gives enough freedom to the operator.",
+        "the bootloader gives enough freedom to the operator.",
       new StructType([
         {
           name: "pubdataPricingMode",

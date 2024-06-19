@@ -8,11 +8,8 @@ import type { StorageValue } from "../values/storage-value";
 
 export class AddressType implements MemoryDataType {
   async extract(memory: StorageSnapshot, slot: bigint, _offset = 0): Promise<Option<StorageValue>> {
-    let mayne = await memory
-      .at(slot);
-    return mayne
-      .map(this.format)
-      .map((str) => new AddressValue(str));
+    const mayne = await memory.at(slot);
+    return mayne.map(this.format).map((str) => new AddressValue(str));
   }
 
   format(data: Buffer): Hex {

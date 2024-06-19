@@ -10,7 +10,7 @@ export class StringStorageChangeReport implements StorageReport<string> {
   private colored: boolean;
   private changes: StorageChanges;
 
-  constructor (memoryMap: StorageChanges, colored = true) {
+  constructor(memoryMap: StorageChanges, colored = true) {
     this.lines = [];
     this.colored = colored;
     this.changes = memoryMap;
@@ -80,7 +80,7 @@ export class StringStorageChangeReport implements StorageReport<string> {
   }
 
   writeMapping(fields: ValueField[]): string {
-    const sorted = fields.toSorted((a, b) => a.key.localeCompare(b.key))
+    const sorted = fields.toSorted((a, b) => a.key.localeCompare(b.key));
     return sorted
       .map(({ key, value }) => {
         const lines = value.writeInto(this).split("\n");
