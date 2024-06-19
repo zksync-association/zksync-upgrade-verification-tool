@@ -37,10 +37,7 @@ export async function storageChangeCommand(
   dir: string,
   preCalculatedPath: Option<string>
 ): Promise<void> {
-  const state = await withSpinner(
-    () => ZkSyncEraState.create(env.network, env.l1Client(), env.rpcL1(), env.rpcL2()),
-    "Gathering contract data"
-  );
+  const state = await withSpinner(() => ZkSyncEraState.create(env.network, env.l1Client(), env.rpcL1(), env.rpcL2()), "Gathering contract data", env);
   const importer = new UpgradeImporter(env.fs());
   const changes = await importer.readFromFiles(dir, env.network);
 
@@ -71,5 +68,5 @@ export async function storageChangeCommand(
 
   const report = new StringStorageChangeReport(memoryMap, env.colored);
 
-  console.log(await report.format());
+  env.term().line(await report.format());
 }

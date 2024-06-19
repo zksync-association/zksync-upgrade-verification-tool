@@ -5,10 +5,7 @@ import { withSpinner } from "../lib/with-spinner";
 export async function checkCommand(env: EnvBuilder, upgradeDirectory: string): Promise<void> {
   const { diff } = await calculateDiffWithUpgrade(env, upgradeDirectory);
 
-  const report = await withSpinner(
-    async () => diff.toCliReport(env.l1Client(), upgradeDirectory, await env.contractsRepo()),
-    "Generating report"
-  );
+  const report = await withSpinner(async () => diff.toCliReport(env.l1Client(), upgradeDirectory, await env.contractsRepo()), "Generating report", env);
 
-  console.log(report);
+  env.term().line(report)
 }

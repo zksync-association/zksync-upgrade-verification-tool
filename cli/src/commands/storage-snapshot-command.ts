@@ -20,5 +20,5 @@ export async function storageSnapshotCommand(env: EnvBuilder): Promise<void> {
     mainDiamondProps(state.allSelectors(), state.allFacetsAddresses())
   );
 
-  console.log(await report.format());
+  env.term().line(await report.format());
 }

@@ -24,7 +24,7 @@ export const contractDiff = async (
         if (stderr.length > 0) {
           return reject(new Error("Error generating diff"));
         }
-        console.log(stdout);
+        env.term().line(stdout);
       }
     );
 

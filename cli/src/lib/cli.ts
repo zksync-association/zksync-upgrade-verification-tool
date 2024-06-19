@@ -134,7 +134,6 @@ export function buildCli(
       (yargs) => yargs,
       async (yargs) => {
         await storageSnapshotCommand(env);
-        // console.log('lalala')
       }
     )
     .command(
