@@ -193,7 +193,7 @@ export function buildCli(
     .wrap(100)
     .help()
     .fail(async (msg, err, _yargs) => {
-      await failCbk(msg, err, argParser);
+      await failCbk(env, msg, err, argParser, () => process.exit(1));
     })
     .strict();
 

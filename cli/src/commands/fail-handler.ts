@@ -1,17 +1,19 @@
-import type { Argv } from "yargs";
-import console from "node:console";
+import { type Argv } from "yargs";
 import { printError } from "../lib/errors";
-import process from "node:process";
+import {EnvBuilder} from "../lib/env-builder";
 
-export async function failHandler(msg: string, err: Error, argParser: Argv) {
+export async function failHandler (env: EnvBuilder, msg: string | undefined, err: Error | undefined, argParser: Argv, onEnd: () => void) {
+  const term = env.term()
   if (msg) {
     const help = await argParser.getHelp();
-    console.log(help);
-    console.log("");
-    console.log(msg);
+    term.line(help);
+    term.line("");
+    term.line(msg);
+  } else if (err) {
+    printError(err, term);
   } else {
-    printError(err);
+    throw new Error("No error or message received")
   }
 
-  process.exit(1);
+  onEnd();
 }
