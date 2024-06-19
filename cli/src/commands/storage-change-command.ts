@@ -71,5 +71,5 @@ export async function storageChangeCommand(
 
   const report = new StringStorageChangeReport(memoryMap, env.colored);
 
-  console.log(report.format())
+  console.log(await report.format())
 }
