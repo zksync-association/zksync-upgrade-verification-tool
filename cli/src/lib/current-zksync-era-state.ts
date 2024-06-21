@@ -3,6 +3,7 @@ import type { FacetData, SystemContractData } from "./upgrade-changes";
 import { Option } from "nochoices";
 import { InconsistentData, MissingRequiredProp } from "./errors";
 import { undefined } from "zod";
+import {DIAMOND_ADDRS, type Network} from "./constants";
 
 export type L2ContractData = {
   address: Hex;
@@ -138,5 +139,10 @@ export class CurrentZksyncEraState {
 
   numberAttrValue(name: NumberEraPropNames): Option<bigint> {
     return Option.fromNullable(this.data[name]);
+  }
+
+  static fromCallData(bytes: Buffer, network: Network): CurrentZksyncEraState {
+    const addr = DIAMOND_ADDRS[network]
+    return new CurrentZksyncEraState({}, [], new SystemContractList([]))
   }
 }

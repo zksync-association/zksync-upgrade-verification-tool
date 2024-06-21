@@ -12,6 +12,8 @@ import {MissingRequiredProp} from "../src/lib/errors";
 import {bytesToHex, type Hex} from "viem";
 import type {FacetData} from "../src/lib";
 import {Option} from "nochoices";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): NewZkSyncEraDiff {
@@ -531,4 +533,14 @@ describe("NewZkSyncStateDiff", () => {
       expect(changes.length).to.eql(0);
     });
   });
+
+  describe("#createFromCallData", async () => {
+    it("coso", async () => {
+      const hexBuff = await fs.readFile(path.join(import.meta.dirname, "data", "upgrade-calldata.hex"));
+      const buff = Buffer.from(hexBuff.toString(), "hex") ;
+
+      const state = CurrentZksyncEraState.fromCallData(buff, "mainnet")
+      expect(state.allFacets()).toHaveLength(4)
+    })
+  })
 });
