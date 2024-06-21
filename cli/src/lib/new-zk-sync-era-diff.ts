@@ -6,6 +6,7 @@ import type {
 } from "./current-zksync-era-state";
 import { MissingRequiredProp } from "./errors";
 import { Option } from "nochoices";
+import type {FacetData} from "./upgrade-changes";
 
 export type FacetDataDiff = {
   name: string;
@@ -76,4 +77,28 @@ export class NewZkSyncEraDiff {
       newAddress: Option.None(),
     }));
   }
+
+  upgradedFacets(): FacetDataDiff[] {
+    const oldFacets = this.current.allFacets();
+    const newFacets = this.proposed.allFacets();
+    let upgradedFacets = newFacets.map(newFacet => {
+      return [newFacet, oldFacets.find(oldFacet => oldFacet.name === newFacet.name)] as const;
+    }).filter(([_newFacet, oldFacetOrNull]) => oldFacetOrNull) as [FacetData, FacetData][]
+    upgradedFacets = upgradedFacets.filter(([o, n]) => o.address !== n.address)
+
+    return upgradedFacets.map(([newFacet, oldFacet]) => {
+      const addedSelectors = newFacet.selectors.filter(sel => !oldFacet.selectors.includes(sel));
+      const removedSelectors = oldFacet.selectors.filter(sel => !newFacet.selectors.includes(sel));
+      return {
+        name: oldFacet.name,
+        oldAddress: Option.Some(oldFacet.address),
+        newAddress: Option.Some(newFacet.address),
+        addedSelectors,
+        removedSelectors,
+        preservedSelectors: oldFacet.selectors
+      }
+    })
+  }
 }
+
+

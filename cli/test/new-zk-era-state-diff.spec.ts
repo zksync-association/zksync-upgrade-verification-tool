@@ -315,5 +315,142 @@ describe("NewZkSyncStateDiff", () => {
         ]);
       });
     });
+
+    describe("#upgradedFacets", () => {
+      it("does not return facets that did not change", () => {
+        const facet: FacetData = {
+          address: "0x02",
+          name: "Facet",
+          selectors: ["0xaa", "0xab"],
+        };
+
+        const diff = diffWithFacets([facet], [facet]);
+
+        const removed = diff.upgradedFacets();
+        expect(removed).toEqual([]);
+      })
+
+      it("returns a facet that has same selectors but new address", () => {
+        const facet1: FacetData = {
+          address: "0x02",
+          name: "Facet",
+          selectors: ["0xaa", "0xab"],
+        };
+
+        const facet2: FacetData = {
+          address: "0x03",
+          name: "Facet",
+          selectors: ["0xaa", "0xab"],
+        };
+
+        const diff = diffWithFacets([facet1], [facet2]);
+
+        const removed = diff.upgradedFacets();
+        expect(removed).toEqual([{
+          name: facet1.name,
+          addedSelectors: [],
+          preservedSelectors: facet1.selectors,
+          removedSelectors: [],
+          oldAddress: Option.Some(facet1.address),
+          newAddress: Option.Some(facet2.address),
+        }]);
+      })
+
+      it("when the facet is moved to a new one and selectors are added those are returned", () => {
+        const facet1: FacetData = {
+          address: "0x02",
+          name: "Facet",
+          selectors: ["0xaa", "0xab"],
+        };
+
+        const facet2: FacetData = {
+          address: "0x03",
+          name: "Facet",
+          selectors: ["0xaa", "0xab", "0xac"],
+        };
+
+        const diff = diffWithFacets([facet1], [facet2]);
+
+        const removed = diff.upgradedFacets();
+        expect(removed).toEqual([{
+          name: facet1.name,
+          addedSelectors: ["0xac"],
+          preservedSelectors: facet1.selectors,
+          removedSelectors: [],
+          oldAddress: Option.Some(facet1.address),
+          newAddress: Option.Some(facet2.address),
+        }]);
+      })
+
+      it("shows which selectors were removed", () => {
+        const facet1: FacetData = {
+          address: "0x02",
+          name: "Facet",
+          selectors: ["0xaa", "0xab"],
+        };
+
+        const facet2: FacetData = {
+          address: "0x03",
+          name: "Facet",
+          selectors: ["0xaa"],
+        };
+
+        const diff = diffWithFacets([facet1], [facet2]);
+
+        const removed = diff.upgradedFacets();
+        expect(removed).toEqual([{
+          name: facet1.name,
+          addedSelectors: [],
+          preservedSelectors: facet1.selectors,
+          removedSelectors: ["0xab"],
+          oldAddress: Option.Some(facet1.address),
+          newAddress: Option.Some(facet2.address),
+        }]);
+      })
+    })
+
+    it('summarizes changes', () => {
+      const repeatedFacet: FacetData = {
+        address: "0x02",
+        name: "RepeatedFacet",
+        selectors: ["0x01", "0x02"],
+      };
+
+      const upgradedFacetPre: FacetData = {
+        address: "0x03",
+        name: "UpgradedFacet",
+        selectors: ["0xaa", "0xab", "0xac", "0xad"],
+      }
+
+      const upgradedFacetPost: FacetData = {
+        address: "0x04",
+        name: "UpgradedFacet",
+        selectors: ["0xaa", "0xab", "0xb1", "0xb2"],
+      };
+
+      const removedFacet: FacetData = {
+        address: "0x05",
+        name: "RemovedFacet",
+        selectors: ["0x03", "0x04"],
+      }
+
+      const createdFacet: FacetData = {
+        address: "0x06",
+        name: "CreatedFacets",
+        selectors: ["0x05", "0x06"],
+      }
+
+      const diff = diffWithFacets(
+        [repeatedFacet, upgradedFacetPre, removedFacet],
+        [repeatedFacet, upgradedFacetPost, createdFacet]
+      );
+
+      const added = diff.addedFacets();
+      const removed = diff.removedFacets();
+      const upgraded = diff.upgradedFacets();
+      expect(added.length).to.eql(1)
+      expect(removed.length).to.eql(1)
+      expect(upgraded.length).to.eql(1)
+    })
   });
 });
