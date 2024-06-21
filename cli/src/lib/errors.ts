@@ -3,6 +3,12 @@ import type { Terminal } from "../terminal";
 
 // export class FinishWithError extends Error {}
 
+export class InconsistentData extends Error {
+  constructor(msg: string) {
+    super(msg);
+  }
+}
+
 export class MissingRequiredProp extends Error {
   constructor(prop: string) {
     super(`Missing required prop: ${prop}`);

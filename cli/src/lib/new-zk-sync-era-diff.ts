@@ -6,7 +6,8 @@ import type {
 } from "./current-zksync-era-state";
 import { MissingRequiredProp } from "./errors";
 import { Option } from "nochoices";
-import type {FacetData} from "./upgrade-changes";
+import type { FacetData } from "./upgrade-changes";
+import { SystemContractChange } from "./system-contract-change";
 
 export type FacetDataDiff = {
   name: string;
@@ -20,10 +21,16 @@ export type FacetDataDiff = {
 export class NewZkSyncEraDiff {
   current: CurrentZksyncEraState;
   proposed: CurrentZksyncEraState;
+  private affectedSystemContracts: Hex[];
 
-  constructor(current: CurrentZksyncEraState, proposed: CurrentZksyncEraState) {
+  constructor(
+    current: CurrentZksyncEraState,
+    proposed: CurrentZksyncEraState,
+    sysContractsAddrs: Hex[]
+  ) {
     this.current = current;
     this.proposed = proposed;
+    this.affectedSystemContracts = sysContractsAddrs;
   }
 
   hexAttrDiff(prop: HexEraPropNames): [Hex, Option<Hex>] {
@@ -81,24 +88,43 @@ export class NewZkSyncEraDiff {
   upgradedFacets(): FacetDataDiff[] {
     const oldFacets = this.current.allFacets();
     const newFacets = this.proposed.allFacets();
-    let upgradedFacets = newFacets.map(newFacet => {
-      return [newFacet, oldFacets.find(oldFacet => oldFacet.name === newFacet.name)] as const;
-    }).filter(([_newFacet, oldFacetOrNull]) => oldFacetOrNull) as [FacetData, FacetData][]
-    upgradedFacets = upgradedFacets.filter(([o, n]) => o.address !== n.address)
+    let upgradedFacets = newFacets
+      .map((newFacet) => {
+        return [newFacet, oldFacets.find((oldFacet) => oldFacet.name === newFacet.name)] as const;
+      })
+      .filter(([_newFacet, oldFacetOrNull]) => oldFacetOrNull) as [FacetData, FacetData][];
+    upgradedFacets = upgradedFacets.filter(([o, n]) => o.address !== n.address);
 
     return upgradedFacets.map(([newFacet, oldFacet]) => {
-      const addedSelectors = newFacet.selectors.filter(sel => !oldFacet.selectors.includes(sel));
-      const removedSelectors = oldFacet.selectors.filter(sel => !newFacet.selectors.includes(sel));
+      const addedSelectors = newFacet.selectors.filter((sel) => !oldFacet.selectors.includes(sel));
+      const removedSelectors = oldFacet.selectors.filter(
+        (sel) => !newFacet.selectors.includes(sel)
+      );
       return {
         name: oldFacet.name,
         oldAddress: Option.Some(oldFacet.address),
         newAddress: Option.Some(newFacet.address),
         addedSelectors,
         removedSelectors,
-        preservedSelectors: oldFacet.selectors
-      }
-    })
+        preservedSelectors: oldFacet.selectors,
+      };
+    });
+  }
+
+  async systemContractChanges(): Promise<SystemContractChange[]> {
+    const changes = await Promise.all(
+      this.affectedSystemContracts.map(async (addr) => {
+        const current = await this.current.dataForL2Address(addr);
+        const proposed = await this.proposed.dataForL2Address(addr);
+
+        return new SystemContractChange(
+          addr,
+          current.name,
+          current.bytecodeHash,
+          proposed.bytecodeHash
+        );
+      })
+    );
+    return changes.filter((c) => c.currentBytecodeHash !== c.proposedBytecodeHash);
   }
 }
-
-

@@ -1,22 +1,24 @@
-import { describe, expect, it } from "vitest";
-import { NewZkSyncEraDiff } from "../src/lib/new-zk-sync-era-diff";
+import {describe, expect, it} from "vitest";
+import {NewZkSyncEraDiff} from "../src/lib/new-zk-sync-era-diff";
 import {
   type ZkEraStateData,
   CurrentZksyncEraState,
   type NumberEraPropNames,
   type HexEraPropNames,
+  SystemContractList,
+  type L2ContractData,
 } from "../src/lib/current-zksync-era-state";
-import { MissingRequiredProp } from "../src/lib/errors";
-import { bytesToHex, type Hex } from "viem";
-import type { FacetData } from "../src/lib";
-import { Option } from "nochoices";
+import {MissingRequiredProp} from "../src/lib/errors";
+import {bytesToHex, type Hex} from "viem";
+import type {FacetData} from "../src/lib";
+import {Option} from "nochoices";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): NewZkSyncEraDiff {
-    const current = new CurrentZksyncEraState(oldData, []);
-    const changes = new CurrentZksyncEraState(newData, []);
+    const current = new CurrentZksyncEraState(oldData, [], new SystemContractList([]));
+    const changes = new CurrentZksyncEraState(newData, [], new SystemContractList([]));
 
-    return new NewZkSyncEraDiff(current, changes);
+    return new NewZkSyncEraDiff(current, changes, []);
   }
 
   describe("hex property diffs", () => {
@@ -38,7 +40,7 @@ describe("NewZkSyncStateDiff", () => {
           const oldData = "0xaa";
           const newData = "0xcc";
 
-          const diff = diffWithDataChanges({ [propName]: oldData }, { [propName]: newData });
+          const diff = diffWithDataChanges({[propName]: oldData}, {[propName]: newData});
           const [old, proposed] = diff.hexAttrDiff(propName);
           expect(old).toEqual(oldData);
           expect(proposed.unwrap()).toEqual(newData);
@@ -47,7 +49,7 @@ describe("NewZkSyncStateDiff", () => {
         it("returns none in proposal when proposal is absent", () => {
           const oldData = "0xaa";
 
-          const diff = diffWithDataChanges({ [propName]: oldData }, {});
+          const diff = diffWithDataChanges({[propName]: oldData}, {});
           const [_old, proposed] = diff.hexAttrDiff(propName);
           expect(proposed.isNone()).toEqual(true);
         });
@@ -55,7 +57,7 @@ describe("NewZkSyncStateDiff", () => {
         it("throws when current admin is absent", () => {
           const newData = "0xcc";
 
-          const diff = diffWithDataChanges({}, { [propName]: newData });
+          const diff = diffWithDataChanges({}, {[propName]: newData});
           expect(() => diff.hexAttrDiff(propName)).toThrow(MissingRequiredProp);
         });
       });
@@ -74,8 +76,8 @@ describe("NewZkSyncStateDiff", () => {
           const newData = 10n;
 
           const diff = diffWithDataChanges(
-            { [propertyName]: oldData },
-            { [propertyName]: newData }
+            {[propertyName]: oldData},
+            {[propertyName]: newData}
           );
           const [old, proposed] = diff.numberAttrDiff(propertyName);
           expect(old).toEqual(oldData);
@@ -85,7 +87,7 @@ describe("NewZkSyncStateDiff", () => {
         it("returns none in proposal when proposal is absent", () => {
           const oldAdmin = 1n;
 
-          const diff = diffWithDataChanges({ [propertyName]: oldAdmin }, {});
+          const diff = diffWithDataChanges({[propertyName]: oldAdmin}, {});
           const [_old, proposed] = diff.numberAttrDiff(propertyName);
           expect(proposed.isNone()).toEqual(true);
         });
@@ -93,7 +95,7 @@ describe("NewZkSyncStateDiff", () => {
         it("throws when current is absent", () => {
           const newData = 10n;
 
-          const diff = diffWithDataChanges({}, { [propertyName]: newData });
+          const diff = diffWithDataChanges({}, {[propertyName]: newData});
           expect(() => diff.numberAttrDiff(propertyName)).toThrow(MissingRequiredProp);
         });
       });
@@ -106,8 +108,8 @@ describe("NewZkSyncStateDiff", () => {
       const newVersion = `0x${"0".repeat(62)}12` as Hex;
 
       const diff = diffWithDataChanges(
-        { protocolVersion: oldVersion },
-        { protocolVersion: newVersion }
+        {protocolVersion: oldVersion},
+        {protocolVersion: newVersion}
       );
       const [old, proposed] = diff.protocolVersion();
       expect(old).toEqual("10");
@@ -120,8 +122,8 @@ describe("NewZkSyncStateDiff", () => {
       const newVersion = `0x${"0".repeat(62)}12` as Hex;
 
       const diff = diffWithDataChanges(
-        { protocolVersion: bytesToHex(oldVersion) },
-        { protocolVersion: newVersion }
+        {protocolVersion: bytesToHex(oldVersion)},
+        {protocolVersion: newVersion}
       );
       const [old, proposed] = diff.protocolVersion();
       expect(old).toEqual("0.1.0");
@@ -137,8 +139,8 @@ describe("NewZkSyncStateDiff", () => {
       newVersion[31] = 1;
 
       const diff = diffWithDataChanges(
-        { protocolVersion: bytesToHex(oldVersion) },
-        { protocolVersion: bytesToHex(newVersion) }
+        {protocolVersion: bytesToHex(oldVersion)},
+        {protocolVersion: bytesToHex(newVersion)}
       );
       const [old, proposed] = diff.protocolVersion();
       expect(old).toEqual("0.1.0");
@@ -150,7 +152,7 @@ describe("NewZkSyncStateDiff", () => {
       newVersion[27] = 1;
       newVersion[31] = 1;
 
-      const diff = diffWithDataChanges({}, { protocolVersion: bytesToHex(newVersion) });
+      const diff = diffWithDataChanges({}, {protocolVersion: bytesToHex(newVersion)});
       expect(() => diff.protocolVersion()).toThrow(MissingRequiredProp);
     });
 
@@ -159,7 +161,7 @@ describe("NewZkSyncStateDiff", () => {
       oldVersion[27] = 1;
       oldVersion[31] = 1;
 
-      const diff = diffWithDataChanges({ protocolVersion: bytesToHex(oldVersion) }, {});
+      const diff = diffWithDataChanges({protocolVersion: bytesToHex(oldVersion)}, {});
       expect(() => diff.protocolVersion()).toThrow(MissingRequiredProp);
     });
   });
@@ -169,9 +171,9 @@ describe("NewZkSyncStateDiff", () => {
       currentFacets: FacetData[],
       proposedFacets: FacetData[]
     ): NewZkSyncEraDiff {
-      const current = new CurrentZksyncEraState({}, currentFacets);
-      const proposed = new CurrentZksyncEraState({}, proposedFacets);
-      return new NewZkSyncEraDiff(current, proposed);
+      const current = new CurrentZksyncEraState({}, currentFacets, new SystemContractList([]));
+      const proposed = new CurrentZksyncEraState({}, proposedFacets, new SystemContractList([]));
+      return new NewZkSyncEraDiff(current, proposed, []);
     }
 
     describe("#addedFacets", () => {
@@ -328,7 +330,7 @@ describe("NewZkSyncStateDiff", () => {
 
         const removed = diff.upgradedFacets();
         expect(removed).toEqual([]);
-      })
+      });
 
       it("returns a facet that has same selectors but new address", () => {
         const facet1: FacetData = {
@@ -346,15 +348,17 @@ describe("NewZkSyncStateDiff", () => {
         const diff = diffWithFacets([facet1], [facet2]);
 
         const removed = diff.upgradedFacets();
-        expect(removed).toEqual([{
-          name: facet1.name,
-          addedSelectors: [],
-          preservedSelectors: facet1.selectors,
-          removedSelectors: [],
-          oldAddress: Option.Some(facet1.address),
-          newAddress: Option.Some(facet2.address),
-        }]);
-      })
+        expect(removed).toEqual([
+          {
+            name: facet1.name,
+            addedSelectors: [],
+            preservedSelectors: facet1.selectors,
+            removedSelectors: [],
+            oldAddress: Option.Some(facet1.address),
+            newAddress: Option.Some(facet2.address),
+          },
+        ]);
+      });
 
       it("when the facet is moved to a new one and selectors are added those are returned", () => {
         const facet1: FacetData = {
@@ -372,15 +376,17 @@ describe("NewZkSyncStateDiff", () => {
         const diff = diffWithFacets([facet1], [facet2]);
 
         const removed = diff.upgradedFacets();
-        expect(removed).toEqual([{
-          name: facet1.name,
-          addedSelectors: ["0xac"],
-          preservedSelectors: facet1.selectors,
-          removedSelectors: [],
-          oldAddress: Option.Some(facet1.address),
-          newAddress: Option.Some(facet2.address),
-        }]);
-      })
+        expect(removed).toEqual([
+          {
+            name: facet1.name,
+            addedSelectors: ["0xac"],
+            preservedSelectors: facet1.selectors,
+            removedSelectors: [],
+            oldAddress: Option.Some(facet1.address),
+            newAddress: Option.Some(facet2.address),
+          },
+        ]);
+      });
 
       it("shows which selectors were removed", () => {
         const facet1: FacetData = {
@@ -398,18 +404,20 @@ describe("NewZkSyncStateDiff", () => {
         const diff = diffWithFacets([facet1], [facet2]);
 
         const removed = diff.upgradedFacets();
-        expect(removed).toEqual([{
-          name: facet1.name,
-          addedSelectors: [],
-          preservedSelectors: facet1.selectors,
-          removedSelectors: ["0xab"],
-          oldAddress: Option.Some(facet1.address),
-          newAddress: Option.Some(facet2.address),
-        }]);
-      })
-    })
+        expect(removed).toEqual([
+          {
+            name: facet1.name,
+            addedSelectors: [],
+            preservedSelectors: facet1.selectors,
+            removedSelectors: ["0xab"],
+            oldAddress: Option.Some(facet1.address),
+            newAddress: Option.Some(facet2.address),
+          },
+        ]);
+      });
+    });
 
-    it('summarizes changes', () => {
+    it("summarizes changes", () => {
       const repeatedFacet: FacetData = {
         address: "0x02",
         name: "RepeatedFacet",
@@ -420,7 +428,7 @@ describe("NewZkSyncStateDiff", () => {
         address: "0x03",
         name: "UpgradedFacet",
         selectors: ["0xaa", "0xab", "0xac", "0xad"],
-      }
+      };
 
       const upgradedFacetPost: FacetData = {
         address: "0x04",
@@ -432,13 +440,13 @@ describe("NewZkSyncStateDiff", () => {
         address: "0x05",
         name: "RemovedFacet",
         selectors: ["0x03", "0x04"],
-      }
+      };
 
       const createdFacet: FacetData = {
         address: "0x06",
         name: "CreatedFacets",
         selectors: ["0x05", "0x06"],
-      }
+      };
 
       const diff = diffWithFacets(
         [repeatedFacet, upgradedFacetPre, removedFacet],
@@ -448,9 +456,79 @@ describe("NewZkSyncStateDiff", () => {
       const added = diff.addedFacets();
       const removed = diff.removedFacets();
       const upgraded = diff.upgradedFacets();
-      expect(added.length).to.eql(1)
-      expect(removed.length).to.eql(1)
-      expect(upgraded.length).to.eql(1)
-    })
+      expect(added.length).to.eql(1);
+      expect(removed.length).to.eql(1);
+      expect(upgraded.length).to.eql(1);
+    });
+  });
+
+  describe("when changes are made in the l2 contracts", () => {
+    function diffWithSystemContracts(
+      sysContractsAddrs: Hex[],
+      currentList: L2ContractData[],
+      proposedList: L2ContractData[]
+    ) {
+      const current = new CurrentZksyncEraState({}, [], new SystemContractList(currentList));
+      const proposed = new CurrentZksyncEraState({}, [], new SystemContractList(proposedList));
+      return new NewZkSyncEraDiff(current, proposed, sysContractsAddrs);
+    }
+
+    it("returns changes for affected system contracts", async () => {
+      const currentSystemContracts: L2ContractData[] = [
+        {
+          address: "0x01",
+          name: "SystemContract01",
+          bytecodeHash: "0x000a",
+        },
+      ];
+
+      const proposedSystemContracts: L2ContractData[] = [
+        {
+          address: "0x01",
+          name: "SystemContract01",
+          bytecodeHash: "0x000b",
+        },
+      ];
+
+      const diff = diffWithSystemContracts(
+        ["0x01"],
+        currentSystemContracts,
+        proposedSystemContracts
+      );
+
+      const changes = await diff.systemContractChanges();
+      expect(changes.length).to.eql(1);
+      expect(changes[0].address).to.eql("0x01");
+      expect(changes[0].name).to.eql("SystemContract01");
+      expect(changes[0].currentBytecodeHash).to.eql("0x000a");
+      expect(changes[0].proposedBytecodeHash).to.eql("0x000b");
+    });
+
+    it("when hashes for old and new are the same is not returned", async () => {
+      const currentSystemContracts: L2ContractData[] = [
+        {
+          address: "0x01",
+          name: "SystemContract01",
+          bytecodeHash: "0x000a",
+        },
+      ];
+
+      const proposedSystemContracts: L2ContractData[] = [
+        {
+          address: "0x01",
+          name: "SystemContract01",
+          bytecodeHash: "0x000a",
+        },
+      ];
+
+      const diff = diffWithSystemContracts(
+        ["0x01"],
+        currentSystemContracts,
+        proposedSystemContracts
+      );
+
+      const changes = await diff.systemContractChanges();
+      expect(changes.length).to.eql(0);
+    });
   });
 });

@@ -1,7 +1,8 @@
 import { bytesToBigInt, bytesToNumber, type Hex, hexToBytes, hexToNumber } from "viem";
-import type { FacetData } from "./upgrade-changes";
+import type { FacetData, SystemContractData } from "./upgrade-changes";
 import { Option } from "nochoices";
-import { MissingRequiredProp } from "./errors";
+import { InconsistentData, MissingRequiredProp } from "./errors";
+import { undefined } from "zod";
 
 export type L2ContractData = {
   address: Hex;
@@ -53,13 +54,35 @@ export type ZkEraStateData = {
   baseTokenGasPriceMultiplierDenominator?: bigint;
 };
 
+export interface SystemContractProvider {
+  dataFor(addr: Hex): Promise<L2ContractData>;
+}
+
+export class SystemContractList implements SystemContractProvider {
+  private data: L2ContractData[];
+
+  constructor(data: L2ContractData[]) {
+    this.data = data;
+  }
+
+  async dataFor(addr: Hex): Promise<L2ContractData> {
+    const find = this.data.find((l2) => l2.address === addr);
+    if (!find) {
+      throw new InconsistentData(`Missing system contract data for "${addr}".`);
+    }
+    return find;
+  }
+}
+
 export class CurrentZksyncEraState {
   data: ZkEraStateData;
   private facets: FacetData[];
+  private systemContracts: SystemContractProvider;
 
-  constructor(data: ZkEraStateData, facets: FacetData[]) {
+  constructor(data: ZkEraStateData, facets: FacetData[], systemContracts: SystemContractProvider) {
     this.data = data;
     this.facets = facets;
+    this.systemContracts = systemContracts;
   }
 
   // METADATA
@@ -84,22 +107,6 @@ export class CurrentZksyncEraState {
 
   // DIAMOND DATA
 
-  facetAddressForSelector(selector: Hex): Hex {
-    return "0x0";
-  }
-
-  selectorsForFacet(addr: Hex): Hex[] {
-    return [];
-  }
-
-  allSelectors(): Hex[] {
-    return [];
-  }
-
-  allFacetsAddresses(): Hex[] {
-    return [];
-  }
-
   allFacets(): FacetData[] {
     return this.facets;
   }
@@ -119,12 +126,8 @@ export class CurrentZksyncEraState {
 
   // L2 CONTRACTS
 
-  dataForL2Address(addr: Hex): L2ContractData {
-    return {
-      address: addr,
-      bytecodeHash: "0x0",
-      name: "name",
-    };
+  async dataForL2Address(addr: Hex): Promise<L2ContractData> {
+    return this.systemContracts.dataFor(addr);
   }
 
   // SimpleProps
