@@ -55,9 +55,11 @@ export type ZkEraStateData = {
 
 export class CurrentZksyncEraState {
   data: ZkEraStateData
+  private facets: FacetData[];
 
-  constructor (data: ZkEraStateData) {
+  constructor (data: ZkEraStateData, facets: FacetData[]) {
     this.data = data
+    this.facets = facets
   }
 
   // METADATA
@@ -80,10 +82,6 @@ export class CurrentZksyncEraState {
     return `${major}.${minor}.${patch}`
   }
 
-  chainId(): Option<Hex> {
-    return Option.fromNullable(this.data.chainId)
-  }
-
   // DIAMOND DATA
 
   facetAddressForSelector(selector: Hex): Hex {
@@ -103,7 +101,7 @@ export class CurrentZksyncEraState {
   }
 
   allFacets(): FacetData[] {
-    return []
+    return this.facets
   }
 
 
