@@ -1,65 +1,65 @@
-import {bytesToBigInt, bytesToNumber, type Hex, hexToBytes, hexToNumber} from "viem";
-import type {FacetData} from "./upgrade-changes";
-import {Option} from "nochoices";
-import {MissingRequiredProp} from "./errors";
+import { bytesToBigInt, bytesToNumber, type Hex, hexToBytes, hexToNumber } from "viem";
+import type { FacetData } from "./upgrade-changes";
+import { Option } from "nochoices";
+import { MissingRequiredProp } from "./errors";
 
 export type L2ContractData = {
-  address: Hex,
-  bytecodeHash: Hex,
-  name: string
-}
+  address: Hex;
+  bytecodeHash: Hex;
+  name: string;
+};
 
 export enum PubdataPricingMode {
-  Rollup,
-  Validium
+  Rollup = 0,
+  Validium = 1,
 }
 
 export type FeeParams = {
-  pubdataPricingMode: PubdataPricingMode
-  batchOverheadL1Gas: bigint,
-  maxPubdataPerBatch: bigint,
-  maxL2GasPerBatch: bigint,
-  priorityTxMaxPubdata: bigint,
-  minimalL2GasPrice: bigint
-}
+  pubdataPricingMode: PubdataPricingMode;
+  batchOverheadL1Gas: bigint;
+  maxPubdataPerBatch: bigint;
+  maxL2GasPerBatch: bigint;
+  priorityTxMaxPubdata: bigint;
+  minimalL2GasPrice: bigint;
+};
 
 export type HexEraPropNames =
-  "admin" |
-  "pendingAdmin" |
-  "verifierAddress" |
-  "bridgeHubAddress" |
-  "blobVersionedHashRetriever" |
-  "stateTransitionManagerAddress" |
-  "l2DefaultAccountBytecodeHash" |
-  "l2BootloaderBytecodeHash" |
-  "chainId"
+  | "admin"
+  | "pendingAdmin"
+  | "verifierAddress"
+  | "bridgeHubAddress"
+  | "blobVersionedHashRetriever"
+  | "stateTransitionManagerAddress"
+  | "l2DefaultAccountBytecodeHash"
+  | "l2BootloaderBytecodeHash"
+  | "chainId";
 
 export type NumberEraPropNames =
-  "baseTokenGasPriceMultiplierNominator" |
-  "baseTokenGasPriceMultiplierDenominator"
+  | "baseTokenGasPriceMultiplierNominator"
+  | "baseTokenGasPriceMultiplierDenominator";
 
 export type ZkEraStateData = {
-  admin?: Hex,
-  pendingAdmin?: Hex,
-  verifierAddress?: Hex,
-  bridgeHubAddress?: Hex,
-  blobVersionedHashRetriever?: Hex,
-  stateTransitionManagerAddress?: Hex,
-  l2DefaultAccountBytecodeHash?: Hex,
-  l2BootloaderBytecodeHash?: Hex,
-  protocolVersion?: Hex,
-  chainId?: Hex,
-  baseTokenGasPriceMultiplierNominator?: bigint,
-  baseTokenGasPriceMultiplierDenominator?: bigint
-}
+  admin?: Hex;
+  pendingAdmin?: Hex;
+  verifierAddress?: Hex;
+  bridgeHubAddress?: Hex;
+  blobVersionedHashRetriever?: Hex;
+  stateTransitionManagerAddress?: Hex;
+  l2DefaultAccountBytecodeHash?: Hex;
+  l2BootloaderBytecodeHash?: Hex;
+  protocolVersion?: Hex;
+  chainId?: Hex;
+  baseTokenGasPriceMultiplierNominator?: bigint;
+  baseTokenGasPriceMultiplierDenominator?: bigint;
+};
 
 export class CurrentZksyncEraState {
-  data: ZkEraStateData
+  data: ZkEraStateData;
   private facets: FacetData[];
 
-  constructor (data: ZkEraStateData, facets: FacetData[]) {
-    this.data = data
-    this.facets = facets
+  constructor(data: ZkEraStateData, facets: FacetData[]) {
+    this.data = data;
+    this.facets = facets;
   }
 
   // METADATA
@@ -68,42 +68,41 @@ export class CurrentZksyncEraState {
     if (!this.data.protocolVersion) {
       throw new MissingRequiredProp("protocolVersion");
     }
-    const bytes = Buffer.from(hexToBytes(this.data.protocolVersion))
+    const bytes = Buffer.from(hexToBytes(this.data.protocolVersion));
 
-    const subarray = bytes.subarray(0, 28)
-    if (bytesToBigInt(subarray) === 0n  ) {
-      return hexToNumber(this.data.protocolVersion).toString()
+    const subarray = bytes.subarray(0, 28);
+    if (bytesToBigInt(subarray) === 0n) {
+      return hexToNumber(this.data.protocolVersion).toString();
     }
 
     const patch = bytesToNumber(bytes.subarray(28, 32));
     const minor = bytesToNumber(bytes.subarray(25, 28));
     const major = bytesToNumber(bytes.subarray(21, 25));
 
-    return `${major}.${minor}.${patch}`
+    return `${major}.${minor}.${patch}`;
   }
 
   // DIAMOND DATA
 
   facetAddressForSelector(selector: Hex): Hex {
-    return "0x0"
+    return "0x0";
   }
 
   selectorsForFacet(addr: Hex): Hex[] {
-    return []
+    return [];
   }
 
-  allSelectors (): Hex[] {
-    return []
+  allSelectors(): Hex[] {
+    return [];
   }
 
-  allFacetsAddresses (): Hex[] {
-    return []
+  allFacetsAddresses(): Hex[] {
+    return [];
   }
 
   allFacets(): FacetData[] {
-    return this.facets
+    return this.facets;
   }
-
 
   // FEE
 
@@ -114,8 +113,8 @@ export class CurrentZksyncEraState {
       maxPubdataPerBatch: 0n,
       minimalL2GasPrice: 0n,
       priorityTxMaxPubdata: 0n,
-      pubdataPricingMode: PubdataPricingMode.Rollup
-    }
+      pubdataPricingMode: PubdataPricingMode.Rollup,
+    };
   }
 
   // L2 CONTRACTS
@@ -124,17 +123,17 @@ export class CurrentZksyncEraState {
     return {
       address: addr,
       bytecodeHash: "0x0",
-      name: "name"
-    }
+      name: "name",
+    };
   }
 
   // SimpleProps
 
   hexAttrValue(prop: HexEraPropNames): Option<Hex> {
-    return Option.fromNullable(this.data[prop])
+    return Option.fromNullable(this.data[prop]);
   }
 
   numberAttrValue(name: NumberEraPropNames): Option<bigint> {
-    return Option.fromNullable(this.data[name])
+    return Option.fromNullable(this.data[name]);
   }
 }
