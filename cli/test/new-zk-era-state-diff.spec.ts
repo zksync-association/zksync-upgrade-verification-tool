@@ -130,5 +130,29 @@ describe("NewZkSyncStateDiff", () => {
       expect(old).toEqual("0.1.0")
       expect(proposed).toEqual("0.1.1")
     })
+
+    it("throws error if the current version is missing", () => {
+      const newVersion = Buffer.alloc(32).fill(0)
+      newVersion[27] = 1
+      newVersion[31] = 1
+
+      const diff = setUp(
+        {},
+        {protocolVersion: bytesToHex(newVersion)}
+      )
+      expect(() => diff.protocolVersion()).toThrow(MissingRequiredProp)
+    })
+
+    it("throws error if the proposed version is missing", () => {
+      const oldVersion = Buffer.alloc(32).fill(0)
+      oldVersion[27] = 1
+      oldVersion[31] = 1
+
+      const diff = setUp(
+        {protocolVersion: bytesToHex(oldVersion)},
+        {}
+      )
+      expect(() => diff.protocolVersion()).toThrow(MissingRequiredProp)
+    })
   })
 })
