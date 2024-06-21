@@ -3,6 +3,12 @@ import type { Terminal } from "../terminal";
 
 // export class FinishWithError extends Error {}
 
+export class MissingRequiredProp extends Error {
+  constructor(prop: string) {
+    super(`Missing required prop: ${prop}`);
+  }
+}
+
 export class ContracNotVerified extends Error {
   constructor(addr: string) {
     super(`Contract for ${addr} not verified in block explorer`);

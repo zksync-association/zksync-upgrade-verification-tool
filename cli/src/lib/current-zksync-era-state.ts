@@ -1,5 +1,6 @@
 import type {Hex} from "viem";
-import {undefined} from "zod";
+import type {FacetData} from "./upgrade-changes";
+import {Option} from "nochoices";
 
 export type L2ContractData = {
   address: Hex,
@@ -13,7 +14,7 @@ export enum PubdataPricingMode {
 }
 
 export type FeeParams = {
-  pubataPricingMode: PubdataPricingMode
+  pubdataPricingMode: PubdataPricingMode
   batchOverheadL1Gas: bigint,
   maxPubdataPerBatch: bigint,
   maxL2GasPerBatch: bigint,
@@ -21,24 +22,29 @@ export type FeeParams = {
   minimalL2GasPrice: bigint
 }
 
+export type HexEraPropNames =
+  "admin" |
+  "pendingAdmin"
+
+export type NumberEraPropNames =
+  "baseTokenGasPriceMultiplierNominator" |
+  "baseTokenGasPriceMultiplierDenominator"
+
+export type ZkEraStateData = {
+  admin?: Hex,
+  pendingAdmin?: Hex,
+  baseTokenGasPriceMultiplierNominator?: bigint,
+  baseTokenGasPriceMultiplierDenominator?: bigint
+}
+
 export class CurrentZksyncEraState {
-  constructor () {
+  data: ZkEraStateData
+
+  constructor (data: ZkEraStateData) {
+    this.data = data
   }
 
-  dataForL2Address(addr: Hex): L2ContractData {
-    return {
-      address: addr,
-      bytecodeHash: "0x0",
-      name: "name"
-    }
-  }
-
-  stateTransitionManagerAddress(addr: Hex): Hex {
-    return "0x0"
-  }
-
-  // baseToken
-  // baseTokenBridge
+  // METADATA
 
   protocolVersion(): string {
     return ""
@@ -48,52 +54,7 @@ export class CurrentZksyncEraState {
     return ""
   }
 
-  bridgeHubAddress(): Hex {
-    return "0x0"
-  }
-
-  blobVersionedHashRetriever(): Hex {
-    return "0x0"
-  }
-
-  feeParams(): FeeParams {
-    return {
-      batchOverheadL1Gas: 0n,
-      maxL2GasPerBatch: 0n,
-      maxPubdataPerBatch: 0n,
-      minimalL2GasPrice: 0n,
-      priorityTxMaxPubdata: 0n,
-      pubataPricingMode: PubdataPricingMode.Rollup
-    }
-  }
-
-  admin(): Hex {
-    return "0x0"
-  }
-
-  pendingAdmin(): Hex {
-    return "0x0"
-  }
-
-  l2DefaultAccountBytecodeHash(): Hex {
-    return "0x0"
-  }
-
-  l2BootloaderBytecodeHash(): Hex {
-     return "0x0"
-  }
-
-  baseTokenGasPriceMultiplierNominator(): bigint {
-    return 0n
-  }
-
-  baseTokenGasPriceMultiplierDenominator(): bigint {
-    return 0n
-  }
-
-  verifierAddress(): Hex {
-    return "0x0"
-  }
+  // DIAMOND DATA
 
   facetAddressForSelector(selector: Hex): Hex {
     return "0x0"
@@ -109,5 +70,76 @@ export class CurrentZksyncEraState {
 
   allFacetsAddresses (): Hex[] {
     return []
+  }
+
+  allFacets(): FacetData[] {
+    return []
+  }
+
+  // L1 CONTRACTS
+
+  bridgeHubAddress(): Hex {
+    return "0x0"
+  }
+
+  blobVersionedHashRetriever(): Hex {
+    return "0x0"
+  }
+
+  verifierAddress(): Hex {
+    return "0x0"
+  }
+
+  stateTransitionManagerAddress(addr: Hex): Hex {
+    return "0x0"
+  }
+
+  // FEE
+
+  feeParams(): FeeParams {
+    return {
+      batchOverheadL1Gas: 0n,
+      maxL2GasPerBatch: 0n,
+      maxPubdataPerBatch: 0n,
+      minimalL2GasPrice: 0n,
+      priorityTxMaxPubdata: 0n,
+      pubdataPricingMode: PubdataPricingMode.Rollup
+    }
+  }
+
+  baseTokenGasPriceMultiplierNominator(): Option<bigint> {
+    return Option.fromNullable(this.data.baseTokenGasPriceMultiplierNominator)
+  }
+
+  baseTokenGasPriceMultiplierDenominator(): Option<bigint> {
+    return Option.fromNullable(this.data.baseTokenGasPriceMultiplierDenominator)
+  }
+
+  // L2 CONTRACTS
+
+  l2DefaultAccountBytecodeHash(): Hex {
+    return "0x0"
+  }
+
+  l2BootloaderBytecodeHash(): Hex {
+    return "0x0"
+  }
+
+  dataForL2Address(addr: Hex): L2ContractData {
+    return {
+      address: addr,
+      bytecodeHash: "0x0",
+      name: "name"
+    }
+  }
+
+  // SimpleProps
+
+  hexAttrValue(prop: HexEraPropNames): Option<Hex> {
+    return Option.fromNullable(this.data[prop])
+  }
+
+  numberAttrValue(name: NumberEraPropNames): Option<bigint> {
+    return Option.fromNullable(this.data[name])
   }
 }
