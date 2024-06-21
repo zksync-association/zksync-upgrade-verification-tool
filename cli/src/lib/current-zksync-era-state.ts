@@ -31,7 +31,8 @@ export type HexEraPropNames =
   "blobVersionedHashRetriever" |
   "stateTransitionManagerAddress" |
   "l2DefaultAccountBytecodeHash" |
-  "l2BootloaderBytecodeHash"
+  "l2BootloaderBytecodeHash" |
+  "chainId"
 
 export type NumberEraPropNames =
   "baseTokenGasPriceMultiplierNominator" |
@@ -47,6 +48,7 @@ export type ZkEraStateData = {
   l2DefaultAccountBytecodeHash?: Hex,
   l2BootloaderBytecodeHash?: Hex,
   protocolVersion?: Hex,
+  chainId?: Hex,
   baseTokenGasPriceMultiplierNominator?: bigint,
   baseTokenGasPriceMultiplierDenominator?: bigint
 }
@@ -78,8 +80,8 @@ export class CurrentZksyncEraState {
     return `${major}.${minor}.${patch}`
   }
 
-  chainId(): string {
-    return ""
+  chainId(): Option<Hex> {
+    return Option.fromNullable(this.data.chainId)
   }
 
   // DIAMOND DATA

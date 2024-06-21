@@ -26,7 +26,8 @@ describe("NewZkSyncStateDiff", () => {
       "blobVersionedHashRetriever",
       "stateTransitionManagerAddress",
       "l2DefaultAccountBytecodeHash",
-      "l2BootloaderBytecodeHash"
+      "l2BootloaderBytecodeHash",
+      "chainId"
     ]
 
     for (const propName of propNames) {
