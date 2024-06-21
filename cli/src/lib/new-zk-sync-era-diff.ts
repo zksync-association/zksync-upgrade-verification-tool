@@ -25,20 +25,4 @@ export class NewZkSyncEraDiff {
       this.proposed.numberAttrValue(prop)
     ]
   }
-
-  admin(): [Hex, Option<Hex>] {
-    return this.hexAttrDiff("admin")
-  }
-
-  pendingAdmin(): [Hex, Option<Hex>] {
-    return this.hexAttrDiff("pendingAdmin")
-  }
-
-  baseTokenGasPriceMultiplierNominator(): [bigint, Option<bigint>] {
-    return this.numberAttrDiff("baseTokenGasPriceMultiplierNominator")
-  }
-
-  baseTokenGasPriceMultiplierDenominator(): [bigint, Option<bigint>] {
-    return this.numberAttrDiff("baseTokenGasPriceMultiplierDenominator")
-  }
 }

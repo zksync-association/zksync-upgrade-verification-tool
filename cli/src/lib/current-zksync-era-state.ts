@@ -24,7 +24,13 @@ export type FeeParams = {
 
 export type HexEraPropNames =
   "admin" |
-  "pendingAdmin"
+  "pendingAdmin" |
+  "verifierAddress" |
+  "bridgeHubAddress" |
+  "blobVersionedHashRetriever" |
+  "stateTransitionManagerAddress" |
+  "l2DefaultAccountBytecodeHash" |
+  "l2BootloaderBytecodeHash"
 
 export type NumberEraPropNames =
   "baseTokenGasPriceMultiplierNominator" |
@@ -33,6 +39,12 @@ export type NumberEraPropNames =
 export type ZkEraStateData = {
   admin?: Hex,
   pendingAdmin?: Hex,
+  verifierAddress?: Hex,
+  bridgeHubAddress?: Hex,
+  blobVersionedHashRetriever?: Hex,
+  stateTransitionManagerAddress?: Hex,
+  l2DefaultAccountBytecodeHash?: Hex,
+  l2BootloaderBytecodeHash?: Hex,
   baseTokenGasPriceMultiplierNominator?: bigint,
   baseTokenGasPriceMultiplierDenominator?: bigint
 }
@@ -76,23 +88,6 @@ export class CurrentZksyncEraState {
     return []
   }
 
-  // L1 CONTRACTS
-
-  bridgeHubAddress(): Hex {
-    return "0x0"
-  }
-
-  blobVersionedHashRetriever(): Hex {
-    return "0x0"
-  }
-
-  verifierAddress(): Hex {
-    return "0x0"
-  }
-
-  stateTransitionManagerAddress(addr: Hex): Hex {
-    return "0x0"
-  }
 
   // FEE
 
@@ -105,14 +100,6 @@ export class CurrentZksyncEraState {
       priorityTxMaxPubdata: 0n,
       pubdataPricingMode: PubdataPricingMode.Rollup
     }
-  }
-
-  baseTokenGasPriceMultiplierNominator(): Option<bigint> {
-    return Option.fromNullable(this.data.baseTokenGasPriceMultiplierNominator)
-  }
-
-  baseTokenGasPriceMultiplierDenominator(): Option<bigint> {
-    return Option.fromNullable(this.data.baseTokenGasPriceMultiplierDenominator)
   }
 
   // L2 CONTRACTS

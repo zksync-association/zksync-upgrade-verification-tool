@@ -17,7 +17,16 @@ describe("NewZkSyncStateDiff", () => {
   }
 
   describe('hex property diffs', () => {
-    const propNames: HexEraPropNames[] = ["admin", "pendingAdmin"]
+    const propNames: HexEraPropNames[] = [
+      "admin",
+      "pendingAdmin",
+      "verifierAddress",
+      "bridgeHubAddress",
+      "blobVersionedHashRetriever",
+      "stateTransitionManagerAddress",
+      "l2DefaultAccountBytecodeHash",
+      "l2BootloaderBytecodeHash"
+    ]
 
     for (const propName of propNames) {
       describe(propName, () => {
@@ -80,6 +89,4 @@ describe("NewZkSyncStateDiff", () => {
       });
     }
   })
-
-
 })
