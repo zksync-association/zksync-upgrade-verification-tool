@@ -2,7 +2,6 @@ import type {Hex} from "viem";
 import type {CurrentZksyncEraState, HexEraPropNames, NumberEraPropNames} from "./current-zksync-era-state";
 import {MissingRequiredProp} from "./errors";
 import {Option} from "nochoices";
-import type {FacetData} from "./upgrade-changes";
 
 export type FacetDataDiff = {
   name: string,
