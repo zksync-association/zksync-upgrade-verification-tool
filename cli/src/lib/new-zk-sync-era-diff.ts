@@ -25,4 +25,11 @@ export class NewZkSyncEraDiff {
       this.proposed.numberAttrValue(prop)
     ]
   }
+
+  protocolVersion(): [string, string] {
+    return [
+      this.current.protocolVersion(),
+      this.proposed.protocolVersion()
+    ]
+  }
 }

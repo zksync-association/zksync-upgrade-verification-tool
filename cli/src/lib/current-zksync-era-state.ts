@@ -1,6 +1,7 @@
-import type {Hex} from "viem";
+import {bytesToBigInt, bytesToNumber, type Hex, hexToBytes, hexToNumber} from "viem";
 import type {FacetData} from "./upgrade-changes";
 import {Option} from "nochoices";
+import {MissingRequiredProp} from "./errors";
 
 export type L2ContractData = {
   address: Hex,
@@ -45,6 +46,7 @@ export type ZkEraStateData = {
   stateTransitionManagerAddress?: Hex,
   l2DefaultAccountBytecodeHash?: Hex,
   l2BootloaderBytecodeHash?: Hex,
+  protocolVersion?: Hex,
   baseTokenGasPriceMultiplierNominator?: bigint,
   baseTokenGasPriceMultiplierDenominator?: bigint
 }
@@ -59,7 +61,21 @@ export class CurrentZksyncEraState {
   // METADATA
 
   protocolVersion(): string {
-    return ""
+    if (!this.data.protocolVersion) {
+      throw new MissingRequiredProp("protocolVersion");
+    }
+    const bytes = Buffer.from(hexToBytes(this.data.protocolVersion))
+
+    const subarray = bytes.subarray(0, 28)
+    if (bytesToBigInt(subarray) === 0n  ) {
+      return hexToNumber(this.data.protocolVersion).toString()
+    }
+
+    const patch = bytesToNumber(bytes.subarray(28, 32));
+    const minor = bytesToNumber(bytes.subarray(25, 28));
+    const major = bytesToNumber(bytes.subarray(21, 25));
+
+    return `${major}.${minor}.${patch}`
   }
 
   chainId(): string {
@@ -103,14 +119,6 @@ export class CurrentZksyncEraState {
   }
 
   // L2 CONTRACTS
-
-  l2DefaultAccountBytecodeHash(): Hex {
-    return "0x0"
-  }
-
-  l2BootloaderBytecodeHash(): Hex {
-    return "0x0"
-  }
 
   dataForL2Address(addr: Hex): L2ContractData {
     return {

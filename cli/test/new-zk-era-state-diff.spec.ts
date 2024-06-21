@@ -7,6 +7,7 @@ import {
   type HexEraPropNames
 } from "../src/lib/current-zksync-era-state";
 import {MissingRequiredProp} from "../src/lib/errors";
+import {bytesToHex, type Hex} from "viem";
 
 describe("NewZkSyncStateDiff", () => {
   function setUp(oldData: ZkEraStateData, newData: ZkEraStateData): NewZkSyncEraDiff {
@@ -88,5 +89,45 @@ describe("NewZkSyncStateDiff", () => {
         })
       });
     }
+  })
+
+  describe("#protocolVersion", () => {
+    it("returns simple format for both when both are present and are small numbers", () => {
+      const oldVersion = `0x${"0".repeat(63)}a` as Hex
+      const newVersion = `0x${"0".repeat(62)}12` as Hex
+
+      const diff = setUp({protocolVersion: oldVersion}, {protocolVersion: newVersion})
+      const [old, proposed] = diff.protocolVersion()
+      expect(old).toEqual("10")
+      expect(proposed).toEqual("18")
+    })
+
+    it("mixed formats when one has new format and another has old format", () => {
+      const oldVersion = Buffer.alloc(32).fill(0)
+      oldVersion[27] = 1
+      const newVersion = `0x${"0".repeat(62)}12` as Hex
+
+      const diff = setUp({protocolVersion: bytesToHex(oldVersion)}, {protocolVersion: newVersion})
+      const [old, proposed] = diff.protocolVersion()
+      expect(old).toEqual("0.1.0")
+      expect(proposed).toEqual("18")
+    })
+
+    it("if both use semver returns both semver", () => {
+      const oldVersion = Buffer.alloc(32).fill(0)
+      oldVersion[27] = 1
+
+      const newVersion = Buffer.alloc(32).fill(0)
+      newVersion[27] = 1
+      newVersion[31] = 1
+
+      const diff = setUp(
+        {protocolVersion: bytesToHex(oldVersion)},
+        {protocolVersion: bytesToHex(newVersion)}
+      )
+      const [old, proposed] = diff.protocolVersion()
+      expect(old).toEqual("0.1.0")
+      expect(proposed).toEqual("0.1.1")
+    })
   })
 })
