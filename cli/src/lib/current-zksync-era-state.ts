@@ -1,7 +1,7 @@
 import { bytesToBigInt, bytesToNumber, type Hex, hexToBytes, hexToNumber } from "viem";
 import type { FacetData } from "./upgrade-changes";
 import { Option } from "nochoices";
-import { InconsistentData, MissingRequiredProp } from "./errors";
+import { MissingRequiredProp } from "./errors";
 import { DIAMOND_ADDRS, type Network } from "./constants";
 import { Diamond } from "./diamond";
 import { BlockExplorerClient } from "./block-explorer-client";
@@ -10,6 +10,10 @@ import { zodHex } from "../schema/zod-optionals";
 import { RpcStorageSnapshot } from "./storage/rpc-storage-snapshot";
 import { StringStorageVisitor } from "./reports/string-storage-visitor";
 import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props";
+import {
+  RpcSystemContractProvider,
+  type SystemContractProvider,
+} from "./system-contract-providers";
 
 export type L2ContractData = {
   address: Hex;
@@ -60,26 +64,6 @@ export type ZkEraStateData = {
   baseTokenGasPriceMultiplierNominator?: bigint;
   baseTokenGasPriceMultiplierDenominator?: bigint;
 };
-
-export interface SystemContractProvider {
-  dataFor(addr: Hex): Promise<L2ContractData>;
-}
-
-export class SystemContractList implements SystemContractProvider {
-  private data: L2ContractData[];
-
-  constructor(data: L2ContractData[]) {
-    this.data = data;
-  }
-
-  async dataFor(addr: Hex): Promise<L2ContractData> {
-    const find = this.data.find((l2) => l2.address === addr);
-    if (!find) {
-      throw new InconsistentData(`Missing system contract data for "${addr}".`);
-    }
-    return find;
-  }
-}
 
 export class CurrentZksyncEraState {
   data: ZkEraStateData;
@@ -216,6 +200,10 @@ export class CurrentZksyncEraState {
       data.baseTokenGasPriceMultiplierDenominator = value;
     });
 
-    return new CurrentZksyncEraState(data, facets, new SystemContractList([]));
+    return new CurrentZksyncEraState(
+      data,
+      facets,
+      new RpcSystemContractProvider(RpcClient.forL2(network), BlockExplorerClient.forL2(network))
+    );
   }
 }

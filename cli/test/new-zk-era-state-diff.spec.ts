@@ -5,7 +5,6 @@ import {
   CurrentZksyncEraState,
   type NumberEraPropNames,
   type HexEraPropNames,
-  SystemContractList,
   type L2ContractData,
 } from "../src/lib/current-zksync-era-state";
 import { MissingRequiredProp } from "../src/lib/errors";
@@ -14,6 +13,7 @@ import type { FacetData } from "../src/lib";
 import { Option } from "nochoices";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { SystemContractList } from "../src/lib/system-contract-providers";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): NewZkSyncEraDiff {
@@ -554,6 +554,124 @@ describe("NewZkSyncStateDiff", () => {
       expect(state.numberAttrValue("chainId").unwrap()).not.toBe(0);
       expect(state.numberAttrValue("baseTokenGasPriceMultiplierNominator").unwrap()).not.toBe(0);
       expect(state.numberAttrValue("baseTokenGasPriceMultiplierDenominator").unwrap()).not.toBe(0);
+
+      const l2Contracts = [
+        {
+          addr: "0x0000000000000000000000000000000000000000",
+          name: /EmptyContract/,
+        },
+        {
+          addr: "0x0000000000000000000000000000000000000001",
+          name: /Ecrecover/,
+        },
+        {
+          addr: "0x0000000000000000000000000000000000000002",
+          name: /SHA256/,
+        },
+        {
+          addr: "0x0000000000000000000000000000000000000006",
+          name: /EcAdd/,
+        },
+        {
+          addr: "0x0000000000000000000000000000000000000007",
+          name: /EcMul/,
+        },
+        {
+          addr: "0x0000000000000000000000000000000000000008",
+          name: /EcPairing/,
+        },
+        {
+          addr: "0x0000000000000000000000000000000000008001",
+          name: /EmptyContract/,
+        },
+        {
+          addr: "0x0000000000000000000000000000000000008002",
+          name: /AccountCodeStorage/,
+        },
+        {
+          addr: "0x0000000000000000000000000000000000008003",
+          name: /NonceHolder/,
+        },
+        {
+          addr: "0x0000000000000000000000000000000000008004",
+          name: /KnownCodesStorage/,
+        },
+        {
+          addr: "0x0000000000000000000000000000000000008005",
+          name: /ImmutableSimulator/,
+        },
+        {
+          addr: "0x0000000000000000000000000000000000008006",
+          name: "ContractDeployer",
+        },
+
+        {
+          addr: "0x0000000000000000000000000000000000008006",
+          name: "ContractDeployer",
+        },
+        {
+          addr: "0x0000000000000000000000000000000000008008",
+          name: "L1Messenger",
+        },
+        {
+          addr: "0x0000000000000000000000000000000000008009",
+          name: "MsgValueSimulator",
+        },
+        {
+          addr: "0x000000000000000000000000000000000000800a",
+          name: "L2BaseToken",
+        },
+        {
+          addr: "0x0000000000000000000000000000000000008006",
+          name: "ContractDeployer",
+        },
+        {
+          addr: "0x000000000000000000000000000000000000800b",
+          name: "SystemContext",
+        },
+        {
+          addr: "0x000000000000000000000000000000000000800c",
+          name: "BootloaderUtilities",
+        },
+
+        {
+          addr: "0x000000000000000000000000000000000000800d",
+          name: "EventWriter",
+        },
+        {
+          addr: "0x000000000000000000000000000000000000800c",
+          name: "BootloaderUtilities",
+        },
+        {
+          addr: "0x000000000000000000000000000000000000800e",
+          name: "Compressor",
+        },
+        {
+          addr: "0x000000000000000000000000000000000000800f",
+          name: "ComplexUpgrader",
+        },
+        {
+          addr: "0x0000000000000000000000000000000000008010",
+          name: "Keccak256",
+        },
+        {
+          addr: "0x0000000000000000000000000000000000008012",
+          name: "CodeOracle",
+        },
+        {
+          addr: "0x0000000000000000000000000000000000000100",
+          name: "P256Verify",
+        },
+        {
+          addr: "0x0000000000000000000000000000000000008011",
+          name: "PubdataChunkPublisher",
+        },
+      ];
+
+      for (const { addr, name } of l2Contracts) {
+        const empty1 = await state.dataForL2Address(addr as Hex);
+        expect(empty1.name).toMatch(new RegExp(name));
+      }
     });
   });
 });
