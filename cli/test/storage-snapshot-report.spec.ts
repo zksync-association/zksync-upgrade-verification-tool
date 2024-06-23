@@ -5,7 +5,7 @@ import { BigNumberType } from "../src/lib/storage/types/big-number-type";
 import { ContractField } from "../src/lib/storage/contractField";
 import { BlobType } from "../src/lib/storage/types/blob-type";
 import { AddressType } from "../src/lib/storage/types/address-type";
-import { bytesToHex, hexToBigInt, hexToBytes, keccak256, numberToBytes, numberToHex } from "viem";
+import { bytesToHex, hexToBigInt, hexToBytes, keccak256, numberToHex } from "viem";
 import { ArrayType } from "../src/lib/storage/types/array-type";
 import { StructType } from "../src/lib/storage/types/struct-type";
 import { MappingType } from "../src/lib/storage/mapping-type";

@@ -1,5 +1,5 @@
-import {describe, expect, it} from "vitest";
-import {NewZkSyncEraDiff} from "../src/lib/new-zk-sync-era-diff";
+import { describe, expect, it } from "vitest";
+import { NewZkSyncEraDiff } from "../src/lib/new-zk-sync-era-diff";
 import {
   type ZkEraStateData,
   CurrentZksyncEraState,
@@ -8,10 +8,10 @@ import {
   SystemContractList,
   type L2ContractData,
 } from "../src/lib/current-zksync-era-state";
-import {MissingRequiredProp} from "../src/lib/errors";
-import {bytesToHex, type Hex} from "viem";
-import type {FacetData} from "../src/lib";
-import {Option} from "nochoices";
+import { MissingRequiredProp } from "../src/lib/errors";
+import { bytesToHex, type Hex } from "viem";
+import type { FacetData } from "../src/lib";
+import { Option } from "nochoices";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -41,7 +41,7 @@ describe("NewZkSyncStateDiff", () => {
           const oldData = "0xaa";
           const newData = "0xcc";
 
-          const diff = diffWithDataChanges({[propName]: oldData}, {[propName]: newData});
+          const diff = diffWithDataChanges({ [propName]: oldData }, { [propName]: newData });
           const [old, proposed] = diff.hexAttrDiff(propName);
           expect(old).toEqual(oldData);
           expect(proposed.unwrap()).toEqual(newData);
@@ -50,7 +50,7 @@ describe("NewZkSyncStateDiff", () => {
         it("returns none in proposal when proposal is absent", () => {
           const oldData = "0xaa";
 
-          const diff = diffWithDataChanges({[propName]: oldData}, {});
+          const diff = diffWithDataChanges({ [propName]: oldData }, {});
           const [_old, proposed] = diff.hexAttrDiff(propName);
           expect(proposed.isNone()).toEqual(true);
         });
@@ -58,7 +58,7 @@ describe("NewZkSyncStateDiff", () => {
         it("throws when current admin is absent", () => {
           const newData = "0xcc";
 
-          const diff = diffWithDataChanges({}, {[propName]: newData});
+          const diff = diffWithDataChanges({}, { [propName]: newData });
           expect(() => diff.hexAttrDiff(propName)).toThrow(MissingRequiredProp);
         });
       });
@@ -69,7 +69,7 @@ describe("NewZkSyncStateDiff", () => {
     const propertyNames: NumberEraPropNames[] = [
       "baseTokenGasPriceMultiplierNominator",
       "baseTokenGasPriceMultiplierDenominator",
-      "chainId"
+      "chainId",
     ];
     for (const propertyName of propertyNames) {
       describe(propertyName, () => {
@@ -78,8 +78,8 @@ describe("NewZkSyncStateDiff", () => {
           const newData = 10n;
 
           const diff = diffWithDataChanges(
-            {[propertyName]: oldData},
-            {[propertyName]: newData}
+            { [propertyName]: oldData },
+            { [propertyName]: newData }
           );
           const [old, proposed] = diff.numberAttrDiff(propertyName);
           expect(old).toEqual(oldData);
@@ -89,7 +89,7 @@ describe("NewZkSyncStateDiff", () => {
         it("returns none in proposal when proposal is absent", () => {
           const oldAdmin = 1n;
 
-          const diff = diffWithDataChanges({[propertyName]: oldAdmin}, {});
+          const diff = diffWithDataChanges({ [propertyName]: oldAdmin }, {});
           const [_old, proposed] = diff.numberAttrDiff(propertyName);
           expect(proposed.isNone()).toEqual(true);
         });
@@ -97,7 +97,7 @@ describe("NewZkSyncStateDiff", () => {
         it("throws when current is absent", () => {
           const newData = 10n;
 
-          const diff = diffWithDataChanges({}, {[propertyName]: newData});
+          const diff = diffWithDataChanges({}, { [propertyName]: newData });
           expect(() => diff.numberAttrDiff(propertyName)).toThrow(MissingRequiredProp);
         });
       });
@@ -110,8 +110,8 @@ describe("NewZkSyncStateDiff", () => {
       const newVersion = `0x${"0".repeat(62)}12` as Hex;
 
       const diff = diffWithDataChanges(
-        {protocolVersion: oldVersion},
-        {protocolVersion: newVersion}
+        { protocolVersion: oldVersion },
+        { protocolVersion: newVersion }
       );
       const [old, proposed] = diff.protocolVersion();
       expect(old).toEqual("10");
@@ -124,8 +124,8 @@ describe("NewZkSyncStateDiff", () => {
       const newVersion = `0x${"0".repeat(62)}12` as Hex;
 
       const diff = diffWithDataChanges(
-        {protocolVersion: bytesToHex(oldVersion)},
-        {protocolVersion: newVersion}
+        { protocolVersion: bytesToHex(oldVersion) },
+        { protocolVersion: newVersion }
       );
       const [old, proposed] = diff.protocolVersion();
       expect(old).toEqual("0.1.0");
@@ -141,8 +141,8 @@ describe("NewZkSyncStateDiff", () => {
       newVersion[31] = 1;
 
       const diff = diffWithDataChanges(
-        {protocolVersion: bytesToHex(oldVersion)},
-        {protocolVersion: bytesToHex(newVersion)}
+        { protocolVersion: bytesToHex(oldVersion) },
+        { protocolVersion: bytesToHex(newVersion) }
       );
       const [old, proposed] = diff.protocolVersion();
       expect(old).toEqual("0.1.0");
@@ -154,7 +154,7 @@ describe("NewZkSyncStateDiff", () => {
       newVersion[27] = 1;
       newVersion[31] = 1;
 
-      const diff = diffWithDataChanges({}, {protocolVersion: bytesToHex(newVersion)});
+      const diff = diffWithDataChanges({}, { protocolVersion: bytesToHex(newVersion) });
       expect(() => diff.protocolVersion()).toThrow(MissingRequiredProp);
     });
 
@@ -163,7 +163,7 @@ describe("NewZkSyncStateDiff", () => {
       oldVersion[27] = 1;
       oldVersion[31] = 1;
 
-      const diff = diffWithDataChanges({protocolVersion: bytesToHex(oldVersion)}, {});
+      const diff = diffWithDataChanges({ protocolVersion: bytesToHex(oldVersion) }, {});
       expect(() => diff.protocolVersion()).toThrow(MissingRequiredProp);
     });
   });
@@ -536,22 +536,24 @@ describe("NewZkSyncStateDiff", () => {
 
   describe("#createFromCallData", async () => {
     it("can be created from calldata", async () => {
-      const hexBuff = await fs.readFile(path.join(import.meta.dirname, "data", "upgrade-calldata.hex"));
+      const hexBuff = await fs.readFile(
+        path.join(import.meta.dirname, "data", "upgrade-calldata.hex")
+      );
       const buff = Buffer.from(hexBuff.toString(), "hex");
 
-      const state = await CurrentZksyncEraState.fromCallData(buff, "mainnet")
-      expect(state.allFacets()).toHaveLength(4)
-      expect(state.hexAttrValue("admin").unwrap()).toMatch(/0x.*/)
-      expect(state.hexAttrValue("pendingAdmin").unwrap()).toMatch(/0x.*/)
-      expect(state.hexAttrValue("verifierAddress").unwrap()).toMatch(/0x.*/)
-      expect(state.hexAttrValue("bridgeHubAddress").unwrap()).toMatch(/0x.*/)
-      expect(state.hexAttrValue("stateTransitionManagerAddress").unwrap()).toMatch(/0x.*/)
-      expect(state.hexAttrValue("l2DefaultAccountBytecodeHash").unwrap()).toMatch(/0x.*/)
-      expect(state.hexAttrValue("l2BootloaderBytecodeHash").unwrap()).toMatch(/0x.*/)
-      expect(state.hexAttrValue("blobVersionedHashRetriever").unwrap()).toMatch(/0x.*/)
-      expect(state.numberAttrValue("chainId").unwrap()).not.toBe(0)
-      expect(state.numberAttrValue("baseTokenGasPriceMultiplierNominator").unwrap()).not.toBe(0)
-      expect(state.numberAttrValue("baseTokenGasPriceMultiplierDenominator").unwrap()).not.toBe(0)
-    })
-  })
+      const state = await CurrentZksyncEraState.fromCallData(buff, "mainnet");
+      expect(state.allFacets()).toHaveLength(4);
+      expect(state.hexAttrValue("admin").unwrap()).toMatch(/0x.*/);
+      expect(state.hexAttrValue("pendingAdmin").unwrap()).toMatch(/0x.*/);
+      expect(state.hexAttrValue("verifierAddress").unwrap()).toMatch(/0x.*/);
+      expect(state.hexAttrValue("bridgeHubAddress").unwrap()).toMatch(/0x.*/);
+      expect(state.hexAttrValue("stateTransitionManagerAddress").unwrap()).toMatch(/0x.*/);
+      expect(state.hexAttrValue("l2DefaultAccountBytecodeHash").unwrap()).toMatch(/0x.*/);
+      expect(state.hexAttrValue("l2BootloaderBytecodeHash").unwrap()).toMatch(/0x.*/);
+      expect(state.hexAttrValue("blobVersionedHashRetriever").unwrap()).toMatch(/0x.*/);
+      expect(state.numberAttrValue("chainId").unwrap()).not.toBe(0);
+      expect(state.numberAttrValue("baseTokenGasPriceMultiplierNominator").unwrap()).not.toBe(0);
+      expect(state.numberAttrValue("baseTokenGasPriceMultiplierDenominator").unwrap()).not.toBe(0);
+    });
+  });
 });

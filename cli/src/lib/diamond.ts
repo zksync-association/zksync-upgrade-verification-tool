@@ -1,39 +1,41 @@
-import {type Abi, bytesToHex, toFunctionSelector, type Hex, hexToBytes} from "viem";
-import {BlockExplorerClient, ContractData, type FacetData} from "./index";
-import type {ContractAbi} from "./contract-abi";
-import type {RpcClient} from "./rpc-client";
-import {facetsResponseSchema} from "../schema/new-facets";
-import type {ZodType} from "zod";
+import { type Abi, bytesToHex, toFunctionSelector, type Hex, hexToBytes } from "viem";
+import type { BlockExplorerClient, ContractData, FacetData } from "./index";
+import type { ContractAbi } from "./contract-abi";
+import type { RpcClient } from "./rpc-client";
+import { facetsResponseSchema } from "../schema/new-facets";
+import type { ZodType } from "zod";
 
 const DIAMOND_FUNCTIONS = {
   facets: "facets",
 };
 
 export class Diamond {
-  address: Hex
-  facetToSelectors: Map<Hex, Hex[]>
-  selectorToFacet: Map<Hex, Hex>
-  abis: Map<Hex, ContractAbi>
-  facetToContractData: Map<Hex, ContractData>
-
+  address: Hex;
+  facetToSelectors: Map<Hex, Hex[]>;
+  selectorToFacet: Map<Hex, Hex>;
+  abis: Map<Hex, ContractAbi>;
+  facetToContractData: Map<Hex, ContractData>;
 
   constructor(address: Hex) {
-    this.address = address
-    this.facetToSelectors = new Map()
-    this.selectorToFacet = new Map()
-    this.abis = new Map()
-    this.facetToContractData = new Map()
+    this.address = address;
+    this.facetToSelectors = new Map();
+    this.selectorToFacet = new Map();
+    this.abis = new Map();
+    this.facetToContractData = new Map();
   }
 
   async init(client: BlockExplorerClient, rpc: RpcClient): Promise<void> {
     const abi = await this.findGetterFacetAbi(client, rpc);
 
-    await this.initializeFacets(abi.raw, client, rpc)
-    await this.initializeAbis(client)
-    await this.initializeContractData(client)
+    await this.initializeFacets(abi.raw, client, rpc);
+    await this.initializeAbis(client);
+    await this.initializeContractData(client);
   }
 
-  private async findGetterFacetAbi(client: BlockExplorerClient, rpc: RpcClient): Promise<ContractAbi> {
+  private async findGetterFacetAbi(
+    client: BlockExplorerClient,
+    rpc: RpcClient
+  ): Promise<ContractAbi> {
     // Manually encode calldata becasue at this stage there
     // is no address to get the abi
     const facetAddressSelector = "cdffacc6";
@@ -48,7 +50,11 @@ export class Diamond {
     return await client.getAbi(facetsAddr);
   }
 
-  private async initializeFacets(abi: Abi, _client: BlockExplorerClient, rpc: RpcClient): Promise<void> {
+  private async initializeFacets(
+    abi: Abi,
+    _client: BlockExplorerClient,
+    rpc: RpcClient
+  ): Promise<void> {
     const facets = await rpc.contractRead(
       this.address,
       DIAMOND_FUNCTIONS.facets,
@@ -69,52 +75,52 @@ export class Diamond {
 
   private async initializeAbis(client: BlockExplorerClient): Promise<void> {
     for (const address of this.facetToSelectors.keys()) {
-      const abi = await client.getAbi(address)
-      this.abis.set(this.sanitizeHex(address), abi)
+      const abi = await client.getAbi(address);
+      this.abis.set(this.sanitizeHex(address), abi);
     }
   }
 
   private async initializeContractData(client: BlockExplorerClient): Promise<void> {
     for (const address of this.facetToSelectors.keys()) {
-      const contractData = await client.getSourceCode(address)
-      this.facetToContractData.set(this.sanitizeHex(address), contractData)
+      const contractData = await client.getSourceCode(address);
+      this.facetToContractData.set(this.sanitizeHex(address), contractData);
     }
   }
 
   private sanitizeHex(data: Hex): Hex {
-    return bytesToHex(hexToBytes(data))
+    return bytesToHex(hexToBytes(data));
   }
 
   allFacets(): FacetData[] {
-    const res: FacetData[] = []
+    const res: FacetData[] = [];
     for (const [facet, selectors] of this.facetToSelectors.entries()) {
       res.push({
         address: facet,
         name: this.contractDataFor(facet).name,
-        selectors: selectors
-      })
+        selectors: selectors,
+      });
     }
-    return res
+    return res;
   }
 
   contractDataFor(facetAddr: Hex): ContractData {
-    const data = this.facetToContractData.get(this.sanitizeHex(facetAddr))
+    const data = this.facetToContractData.get(this.sanitizeHex(facetAddr));
     if (!data) {
-      throw new Error(`not a diamond facet: ${facetAddr}`)
+      throw new Error(`not a diamond facet: ${facetAddr}`);
     }
-    return data
+    return data;
   }
 
   async contractRead(rpc: RpcClient, fnName: string, schema: ZodType) {
-    const selector = toFunctionSelector(`${fnName}()`)
-    const facetAddr = this.selectorToFacet.get(this.sanitizeHex(selector))
+    const selector = toFunctionSelector(`${fnName}()`);
+    const facetAddr = this.selectorToFacet.get(this.sanitizeHex(selector));
     if (!facetAddr) {
-      throw new Error(`Function "${fnName}" does not belong to this diamond`)
+      throw new Error(`Function "${fnName}" does not belong to this diamond`);
     }
-    const abi = this.abis.get(this.sanitizeHex(facetAddr))
+    const abi = this.abis.get(this.sanitizeHex(facetAddr));
 
-    if(!abi) {
-      throw new Error("Inconsistent data")
+    if (!abi) {
+      throw new Error("Inconsistent data");
     }
 
     return rpc.contractRead(facetAddr, fnName, abi.raw, schema);

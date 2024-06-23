@@ -10,7 +10,6 @@ import { type Hex, hexToBytes } from "viem";
 import { ArrayType } from "./types/array-type";
 import { DIAMOND_STORAGE_SLOT } from "./storage-changes";
 
-
 export const MAIN_CONTRACT_FIELDS = {
   blobVersionedHashRetriever: new ContractField(
     "ZkSyncHyperchainBase.s.blobVersionedHashRetriever",
@@ -36,8 +35,8 @@ export const MAIN_CONTRACT_FIELDS = {
     "The chainId of the chain",
     new BigNumberType(16),
     16
-  )
-}
+  ),
+};
 
 export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractField[] {
   return [

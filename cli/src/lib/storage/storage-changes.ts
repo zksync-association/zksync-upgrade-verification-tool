@@ -1,6 +1,6 @@
 import type { MemoryDiffRaw } from "../../schema/rpc";
 import { Option } from "nochoices";
-import { type Hex, hexToBigInt, hexToBytes } from "viem";
+import { type Hex, hexToBigInt } from "viem";
 import type { ContractField } from "./contractField";
 import type { StorageSnapshot } from "./storage-snapshot";
 import { PropertyChange } from "./property-change";

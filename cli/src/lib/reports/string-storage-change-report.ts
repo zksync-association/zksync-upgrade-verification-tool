@@ -1,10 +1,6 @@
 import chalk from "chalk";
-import { bytesToHex, type Hex } from "viem";
-import type { StorageValue } from "../storage/values/storage-value";
-import type { ValueField } from "../storage/values/struct-value";
-import type { StorageVisitor } from "./storage-visitor";
 import type { StorageChanges } from "../storage/storage-changes";
-import {StringStorageVisitor} from "./string-storage-visitor";
+import { StringStorageVisitor } from "./string-storage-visitor";
 
 export class StringStorageChangeReport {
   lines: string[];

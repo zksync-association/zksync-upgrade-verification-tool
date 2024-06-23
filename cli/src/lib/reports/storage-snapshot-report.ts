@@ -1,6 +1,6 @@
 import type { StorageSnapshot } from "../storage/storage-snapshot";
 import type { ContractField } from "../storage/contractField";
-import {StringStorageVisitor} from "./string-storage-visitor";
+import { StringStorageVisitor } from "./string-storage-visitor";
 
 export class SnapshotReport {
   private snapshot: StorageSnapshot;
@@ -13,7 +13,7 @@ export class SnapshotReport {
 
   async format(): Promise<string> {
     const lines: string[] = [];
-    const visitor = new StringStorageVisitor()
+    const visitor = new StringStorageVisitor();
     for (const prop of this.props) {
       const extracted = await prop.extract(this.snapshot);
       extracted.ifSome((value) => {

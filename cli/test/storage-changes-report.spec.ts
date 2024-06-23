@@ -92,10 +92,13 @@ describe("MemoryMapReport", () => {
       );
     }
 
-
-
     it("can display address elements", async () => {
-      const prop = new ContractField("someProp", BigInt(0xa), "some description", new AddressType());
+      const prop = new ContractField(
+        "someProp",
+        BigInt(0xa),
+        "some description",
+        new AddressType()
+      );
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
@@ -111,7 +114,12 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display types elements", async () => {
-      const prop = new ContractField("numberProp", BigInt(0xa), "it is a number", new BigNumberType());
+      const prop = new ContractField(
+        "numberProp",
+        BigInt(0xa),
+        "it is a number",
+        new BigNumberType()
+      );
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);

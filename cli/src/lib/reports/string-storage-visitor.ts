@@ -1,7 +1,7 @@
-import type {StorageVisitor} from "./storage-visitor";
-import {bytesToHex, type Hex} from "viem";
-import type {StorageValue} from "../storage/values/storage-value";
-import type {ValueField} from "../storage/values/struct-value";
+import type { StorageVisitor } from "./storage-visitor";
+import { bytesToHex, type Hex } from "viem";
+import type { StorageValue } from "../storage/values/storage-value";
+import type { ValueField } from "../storage/values/struct-value";
 
 export class StringStorageVisitor implements StorageVisitor<string> {
   visitAddress(addr: Hex): string {
