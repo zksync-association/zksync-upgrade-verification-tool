@@ -4,7 +4,7 @@ import type { Option } from "nochoices";
 import type { StorageSnapshot } from "./storage-snapshot";
 import type { StorageValue } from "./values/storage-value";
 
-export class Property {
+export class ContractField {
   name: string;
   slot: bigint;
   description: string;

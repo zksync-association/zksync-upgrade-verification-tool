@@ -1,5 +1,5 @@
-import type { StorageReport } from "../../reports/storage-report";
+import type { StorageVisitor } from "../../reports/storage-visitor";
 
 export interface StorageValue {
-  writeInto<T>(report: StorageReport<T>): T;
+  accept<T>(report: StorageVisitor<T>): T;
 }

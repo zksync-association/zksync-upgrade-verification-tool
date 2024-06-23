@@ -1,5 +1,5 @@
 import type { StorageValue } from "./storage-value";
-import type { StorageReport } from "../../reports/storage-report";
+import type { StorageVisitor } from "../../reports/storage-visitor";
 import type { ValueField } from "./struct-value";
 
 export class MappingValue implements StorageValue {
@@ -8,7 +8,7 @@ export class MappingValue implements StorageValue {
     this.fields = fields;
   }
 
-  writeInto<T>(report: StorageReport<T>): T {
-    return report.writeMapping(this.fields);
+  accept<T>(report: StorageVisitor<T>): T {
+    return report.visitMapping(this.fields);
   }
 }

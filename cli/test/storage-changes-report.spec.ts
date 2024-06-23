@@ -4,7 +4,7 @@ import { memoryDiffParser, type MemoryDiffRaw } from "../src/schema/rpc";
 import { type Hex, hexToBigInt, keccak256, numberToBytes, numberToHex } from "viem";
 import chalk from "chalk";
 import { AddressType } from "../src/lib/storage/types/address-type";
-import { Property } from "../src/lib/storage/property";
+import { ContractField } from "../src/lib/storage/contractField";
 import { BigNumberType } from "../src/lib/storage/types/big-number-type";
 import { BlobType } from "../src/lib/storage/types/blob-type";
 import { BooleanType } from "../src/lib/storage/types/boolean-type";
@@ -79,7 +79,7 @@ describe("MemoryMapReport", () => {
     }
 
     it("can display address elements", async () => {
-      const prop = new Property("someProp", BigInt(0xa), "some description", new AddressType());
+      const prop = new ContractField("someProp", BigInt(0xa), "some description", new AddressType());
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
@@ -95,7 +95,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display types elements", async () => {
-      const prop = new Property("numberProp", BigInt(0xa), "it is a number", new BigNumberType());
+      const prop = new ContractField("numberProp", BigInt(0xa), "it is a number", new BigNumberType());
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
@@ -106,7 +106,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display blob elements", async () => {
-      const prop = new Property("blobProp", BigInt(0xa), "it is a blob", new BlobType());
+      const prop = new ContractField("blobProp", BigInt(0xa), "it is a blob", new BlobType());
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
@@ -122,7 +122,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display boolean elements", async () => {
-      const prop = new Property("blobProp", boolSlot, "it is a blob", new BooleanType());
+      const prop = new ContractField("blobProp", boolSlot, "it is a blob", new BooleanType());
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
@@ -133,7 +133,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display list elements", async () => {
-      const prop = new Property(
+      const prop = new ContractField(
         "listProp",
         listSlot,
         "it is a list",
@@ -152,7 +152,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display fixed array elements", async () => {
-      const prop = new Property(
+      const prop = new ContractField(
         "listProp",
         hexToBigInt(hashedListSlot),
         "it is a list",
@@ -171,7 +171,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display fixed array elements when some are not present", async () => {
-      const prop = new Property(
+      const prop = new ContractField(
         "listProp",
         hexToBigInt(hashedListSlot) + 1n,
         "it is a list",
@@ -190,7 +190,7 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display struct elements", async () => {
-      const prop = new Property(
+      const prop = new ContractField(
         "listProp",
         hexToBigInt(hashedListSlot),
         "it is a list",

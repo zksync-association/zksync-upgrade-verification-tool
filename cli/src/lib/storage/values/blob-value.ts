@@ -1,5 +1,5 @@
 import type { StorageValue } from "./storage-value";
-import type { StorageReport } from "../../reports/storage-report";
+import type { StorageVisitor } from "../../reports/storage-visitor";
 
 export class BlobValue implements StorageValue {
   private buf: Buffer;
@@ -8,7 +8,7 @@ export class BlobValue implements StorageValue {
     this.buf = buf;
   }
 
-  writeInto<T>(report: StorageReport<T>): T {
-    return report.writeBuf(this.buf);
+  accept<T>(report: StorageVisitor<T>): T {
+    return report.visitBuf(this.buf);
   }
 }

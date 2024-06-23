@@ -1,8 +1,8 @@
 import type { StorageValue } from "./storage-value";
-import type { StorageReport } from "../../reports/storage-report";
+import type { StorageVisitor } from "../../reports/storage-visitor";
 
 export class EmptyValue implements StorageValue {
-  writeInto<T>(report: StorageReport<T>): T {
-    return report.writeEmpty();
+  accept<T>(report: StorageVisitor<T>): T {
+    return report.visitEmpty();
   }
 }

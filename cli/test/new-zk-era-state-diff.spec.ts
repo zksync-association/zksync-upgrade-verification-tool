@@ -33,7 +33,6 @@ describe("NewZkSyncStateDiff", () => {
       "stateTransitionManagerAddress",
       "l2DefaultAccountBytecodeHash",
       "l2BootloaderBytecodeHash",
-      "chainId",
     ];
 
     for (const propName of propNames) {
@@ -70,6 +69,7 @@ describe("NewZkSyncStateDiff", () => {
     const propertyNames: NumberEraPropNames[] = [
       "baseTokenGasPriceMultiplierNominator",
       "baseTokenGasPriceMultiplierDenominator",
+      "chainId"
     ];
     for (const propertyName of propertyNames) {
       describe(propertyName, () => {
@@ -537,22 +537,21 @@ describe("NewZkSyncStateDiff", () => {
   describe("#createFromCallData", async () => {
     it("can be created from calldata", async () => {
       const hexBuff = await fs.readFile(path.join(import.meta.dirname, "data", "upgrade-calldata.hex"));
-      const buff = Buffer.from(hexBuff.toString(), "hex") ;
+      const buff = Buffer.from(hexBuff.toString(), "hex");
 
       const state = await CurrentZksyncEraState.fromCallData(buff, "mainnet")
       expect(state.allFacets()).toHaveLength(4)
       expect(state.hexAttrValue("admin").unwrap()).toMatch(/0x.*/)
-
-
-      // "pendingAdmin"
-      // "verifierAddress"
-      // "bridgeHubAddress"
-      // "blobVersionedHashRetriever"
-      // "stateTransitionManagerAddress"
-      // "l2DefaultAccountBytecodeHash"
-      // "l2BootloaderBytecodeHash"
-      // "chainId"
-
+      expect(state.hexAttrValue("pendingAdmin").unwrap()).toMatch(/0x.*/)
+      expect(state.hexAttrValue("verifierAddress").unwrap()).toMatch(/0x.*/)
+      expect(state.hexAttrValue("bridgeHubAddress").unwrap()).toMatch(/0x.*/)
+      expect(state.hexAttrValue("stateTransitionManagerAddress").unwrap()).toMatch(/0x.*/)
+      expect(state.hexAttrValue("l2DefaultAccountBytecodeHash").unwrap()).toMatch(/0x.*/)
+      expect(state.hexAttrValue("l2BootloaderBytecodeHash").unwrap()).toMatch(/0x.*/)
+      expect(state.hexAttrValue("blobVersionedHashRetriever").unwrap()).toMatch(/0x.*/)
+      expect(state.numberAttrValue("chainId").unwrap()).not.toBe(0)
+      expect(state.numberAttrValue("baseTokenGasPriceMultiplierNominator").unwrap()).not.toBe(0)
+      expect(state.numberAttrValue("baseTokenGasPriceMultiplierDenominator").unwrap()).not.toBe(0)
     })
   })
 });

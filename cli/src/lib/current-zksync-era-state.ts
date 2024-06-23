@@ -1,5 +1,5 @@
 import { bytesToBigInt, bytesToNumber, type Hex, hexToBytes, hexToNumber } from "viem";
-import type { FacetData, SystemContractData } from "./upgrade-changes";
+import type { FacetData } from "./upgrade-changes";
 import { Option } from "nochoices";
 import { InconsistentData, MissingRequiredProp } from "./errors";
 import {DIAMOND_ADDRS, type Network} from "./constants";
@@ -7,6 +7,9 @@ import {Diamond} from "./diamond";
 import {BlockExplorerClient} from "./block-explorer-client";
 import {RpcClient} from "./rpc-client";
 import {zodHex} from "../schema/zod-optionals";
+import {RpcStorageSnapshot} from "./storage/rpc-storage-snapshot";
+import {StringStorageVisitor} from "./reports/string-storage-visitor";
+import {MAIN_CONTRACT_FIELDS} from "./storage/storage-props";
 
 export type L2ContractData = {
   address: Hex;
@@ -36,12 +39,12 @@ export type HexEraPropNames =
   | "blobVersionedHashRetriever"
   | "stateTransitionManagerAddress"
   | "l2DefaultAccountBytecodeHash"
-  | "l2BootloaderBytecodeHash"
-  | "chainId";
+  | "l2BootloaderBytecodeHash";
 
 export type NumberEraPropNames =
   | "baseTokenGasPriceMultiplierNominator"
-  | "baseTokenGasPriceMultiplierDenominator";
+  | "baseTokenGasPriceMultiplierDenominator"
+  | "chainId";
 
 export type ZkEraStateData = {
   admin?: Hex;
@@ -53,7 +56,7 @@ export type ZkEraStateData = {
   l2DefaultAccountBytecodeHash?: Hex;
   l2BootloaderBytecodeHash?: Hex;
   protocolVersion?: Hex;
-  chainId?: Hex;
+  chainId?: bigint;
   baseTokenGasPriceMultiplierNominator?: bigint;
   baseTokenGasPriceMultiplierDenominator?: bigint;
 };
@@ -152,8 +155,50 @@ export class CurrentZksyncEraState {
     await diamond.init(explorer, rpc)
     await diamond.init(explorer, rpc)
     const facets = diamond.allFacets()
-    return new CurrentZksyncEraState({
-      admin: await diamond.contractRead(rpc,"getAdmin", zodHex)
-    }, facets, new SystemContractList([]))
+
+    const memorySnapshot = new RpcStorageSnapshot(rpc, addr)
+    const visitor = new StringStorageVisitor()
+
+    const blobVersionedHashRetrieverOpt = (await MAIN_CONTRACT_FIELDS.blobVersionedHashRetriever.extract(memorySnapshot))
+      .map(prop => prop.accept(visitor))
+      .map(prop => prop as Hex)
+    const chainIdOpt = (await MAIN_CONTRACT_FIELDS.chainId.extract(memorySnapshot))
+      .map(prop => prop.accept(visitor))
+      .map(prop => BigInt(prop))
+    const baseTokenGasPriceMultiplierNominatorOpt = (await MAIN_CONTRACT_FIELDS.baseTokenGasPriceMultiplierNominator.extract(memorySnapshot))
+      .map(prop => prop.accept(visitor))
+      .map(prop => BigInt(prop))
+    const baseTokenGasPriceMultiplierDenominatorOpt = (await MAIN_CONTRACT_FIELDS.baseTokenGasPriceMultiplierDenominator.extract(memorySnapshot))
+      .map(prop => prop.accept(visitor))
+      .map(prop => BigInt(prop))
+
+
+    const data: ZkEraStateData = {
+      admin: await diamond.contractRead(rpc, "getAdmin", zodHex),
+      pendingAdmin: await diamond.contractRead(rpc, "getPendingAdmin", zodHex),
+      verifierAddress: await diamond.contractRead(rpc, "getVerifier", zodHex),
+      bridgeHubAddress: await diamond.contractRead(rpc, "getBridgehub", zodHex),
+      stateTransitionManagerAddress: await diamond.contractRead(rpc, "getStateTransitionManager", zodHex),
+      l2DefaultAccountBytecodeHash: await diamond.contractRead(rpc, "getL2DefaultAccountBytecodeHash", zodHex),
+      l2BootloaderBytecodeHash: await diamond.contractRead(rpc, "getL2BootloaderBytecodeHash", zodHex),
+    };
+
+    blobVersionedHashRetrieverOpt.ifSome(value => {
+      data.blobVersionedHashRetriever = value
+    })
+
+    chainIdOpt.ifSome(value => {
+      data.chainId = value
+    })
+
+    baseTokenGasPriceMultiplierNominatorOpt.ifSome(value => {
+      data.baseTokenGasPriceMultiplierNominator = value
+    })
+
+    baseTokenGasPriceMultiplierDenominatorOpt.ifSome(value => {
+      data.baseTokenGasPriceMultiplierDenominator = value
+    })
+
+    return new CurrentZksyncEraState(data, facets, new SystemContractList([]))
   }
 }
