@@ -2,8 +2,11 @@ import { bytesToBigInt, bytesToNumber, type Hex, hexToBytes, hexToNumber } from 
 import type { FacetData, SystemContractData } from "./upgrade-changes";
 import { Option } from "nochoices";
 import { InconsistentData, MissingRequiredProp } from "./errors";
-import { undefined } from "zod";
 import {DIAMOND_ADDRS, type Network} from "./constants";
+import {Diamond} from "./diamond";
+import {BlockExplorerClient} from "./block-explorer-client";
+import {RpcClient} from "./rpc-client";
+import {zodHex} from "../schema/zod-optionals";
 
 export type L2ContractData = {
   address: Hex;
@@ -141,8 +144,16 @@ export class CurrentZksyncEraState {
     return Option.fromNullable(this.data[name]);
   }
 
-  static fromCallData(bytes: Buffer, network: Network): CurrentZksyncEraState {
+  static async fromCallData(bytes: Buffer, network: Network): Promise<CurrentZksyncEraState> {
     const addr = DIAMOND_ADDRS[network]
-    return new CurrentZksyncEraState({}, [], new SystemContractList([]))
+    const diamond = new Diamond(addr)
+    const explorer = BlockExplorerClient.forL1("IA817WPSNENBAK9EE3SNM1C5C31YUTZ4MV", network)
+    const rpc = RpcClient.forL1(network)
+    await diamond.init(explorer, rpc)
+    await diamond.init(explorer, rpc)
+    const facets = diamond.allFacets()
+    return new CurrentZksyncEraState({
+      admin: await diamond.contractRead(rpc,"getAdmin", zodHex)
+    }, facets, new SystemContractList([]))
   }
 }

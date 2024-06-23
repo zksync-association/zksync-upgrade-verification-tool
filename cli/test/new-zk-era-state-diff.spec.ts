@@ -535,12 +535,24 @@ describe("NewZkSyncStateDiff", () => {
   });
 
   describe("#createFromCallData", async () => {
-    it("coso", async () => {
+    it("can be created from calldata", async () => {
       const hexBuff = await fs.readFile(path.join(import.meta.dirname, "data", "upgrade-calldata.hex"));
       const buff = Buffer.from(hexBuff.toString(), "hex") ;
 
-      const state = CurrentZksyncEraState.fromCallData(buff, "mainnet")
+      const state = await CurrentZksyncEraState.fromCallData(buff, "mainnet")
       expect(state.allFacets()).toHaveLength(4)
+      expect(state.hexAttrValue("admin").unwrap()).toMatch(/0x.*/)
+
+
+      // "pendingAdmin"
+      // "verifierAddress"
+      // "bridgeHubAddress"
+      // "blobVersionedHashRetriever"
+      // "stateTransitionManagerAddress"
+      // "l2DefaultAccountBytecodeHash"
+      // "l2BootloaderBytecodeHash"
+      // "chainId"
+
     })
   })
 });
