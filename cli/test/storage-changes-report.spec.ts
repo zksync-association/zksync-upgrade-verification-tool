@@ -60,7 +60,7 @@ describe("MemoryMapReport", () => {
       },
     });
 
-    function expectedReport(
+    function expectedReportSingleLine(
       name: string,
       description: string,
       before: string,
@@ -70,13 +70,29 @@ describe("MemoryMapReport", () => {
         "--------------------------\n" +
         `name: ${chalk.bold(name)}\n` +
         `description: ${description}\n\n` +
-        `before:\n` +
-        `  ${before}\n\n` +
-        `after:\n` +
-        `  ${after}\n` +
+        `before: ${before}\n\n` +
+        `after: ${after}\n` +
         "--------------------------"
       );
     }
+
+    function expectedReportMultiLine(
+      name: string,
+      description: string,
+      before: string,
+      after: string
+    ): string {
+      return (
+        "--------------------------\n" +
+        `name: ${chalk.bold(name)}\n` +
+        `description: ${description}\n\n` +
+        `before:\n  ${before}\n\n` +
+        `after:\n  ${after}\n` +
+        "--------------------------"
+      );
+    }
+
+
 
     it("can display address elements", async () => {
       const prop = new ContractField("someProp", BigInt(0xa), "some description", new AddressType());
@@ -85,7 +101,7 @@ describe("MemoryMapReport", () => {
       const report = new StringStorageChangeReport(memoryMap, true);
 
       expect(await report.format()).toEqual(
-        expectedReport(
+        expectedReportSingleLine(
           "someProp",
           "some description",
           numberToHex(10, { size: 20 }),
@@ -101,7 +117,7 @@ describe("MemoryMapReport", () => {
       const report = new StringStorageChangeReport(memoryMap, true);
 
       expect(await report.format()).toEqual(
-        expectedReport("numberProp", "it is a number", "10", "20")
+        expectedReportSingleLine("numberProp", "it is a number", "10", "20")
       );
     });
 
@@ -112,7 +128,7 @@ describe("MemoryMapReport", () => {
       const report = new StringStorageChangeReport(memoryMap, true);
 
       expect(await report.format()).toEqual(
-        expectedReport(
+        expectedReportSingleLine(
           "blobProp",
           "it is a blob",
           numberToHex(10, { size: 32 }),
@@ -128,7 +144,7 @@ describe("MemoryMapReport", () => {
       const report = new StringStorageChangeReport(memoryMap, true);
 
       expect(await report.format()).toEqual(
-        expectedReport("blobProp", "it is a blob", "true", "false")
+        expectedReportSingleLine("blobProp", "it is a blob", "true", "false")
       );
     });
 
@@ -147,7 +163,7 @@ describe("MemoryMapReport", () => {
       const after = ["- 100", "- 201", "- 102", "- 103"].join("\n  ");
 
       expect(await report.format()).toEqual(
-        expectedReport("listProp", "it is a list", before, after)
+        expectedReportMultiLine("listProp", "it is a list", before, after)
       );
     });
 
@@ -166,7 +182,7 @@ describe("MemoryMapReport", () => {
       const after = ["- 100", "- 201", "- 102"].join("\n  ");
 
       expect(await report.format()).toEqual(
-        expectedReport("listProp", "it is a list", before, after)
+        expectedReportMultiLine("listProp", "it is a list", before, after)
       );
     });
 
@@ -185,7 +201,7 @@ describe("MemoryMapReport", () => {
       const after = ["- 201", "- 102", "- 103"].join("\n  ");
 
       expect(await report.format()).toEqual(
-        expectedReport("listProp", "it is a list", before, after)
+        expectedReportMultiLine("listProp", "it is a list", before, after)
       );
     });
 
@@ -231,7 +247,7 @@ describe("MemoryMapReport", () => {
       ].join("\n  ");
 
       expect(await report.format()).toEqual(
-        expectedReport("listProp", "it is a list", before, after)
+        expectedReportMultiLine("listProp", "it is a list", before, after)
       );
     });
   });
