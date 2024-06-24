@@ -14,7 +14,8 @@ import {
   RpcSystemContractProvider, SystemContractList,
   type SystemContractProvider,
 } from "./system-contract-providers";
-import {callDataSchema, type FacetCut, upgradeCallDataSchema} from "../schema/rpc";
+import {callDataSchema, type FacetCut, l2UpgradeSchema, upgradeCallDataSchema} from "../schema/rpc";
+import {z} from "zod";
 
 export type L2ContractData = {
   address: Hex;
@@ -208,22 +209,39 @@ export class CurrentZksyncEraState {
     );
   }
 
-  static async fromCalldata(buff: Buffer, network: Network, explorer: BlockExplorerClient, rpc: RpcClient): Promise<CurrentZksyncEraState> {
+  static async fromCalldata(buff: Buffer, network: Network, explorerL1: BlockExplorerClient, rpc: RpcClient, explorerL2: BlockExplorerClient): Promise<CurrentZksyncEraState> {
     const addr = DIAMOND_ADDRS[network];
     const diamond = new Diamond(addr);
 
-    await diamond.init(explorer, rpc);
+    await diamond.init(explorerL1, rpc);
 
     const decoded = diamond.decodeFunctionData(buff, callDataSchema)
-    const facets = await reduceFacetCuts(decoded.args[0].facetCuts, explorer)
+    const facets = await reduceFacetCuts(decoded.args[0].facetCuts, explorerL1)
 
     const upgradeAddr = decoded.args[0].initAddress
     const upgradeCalldata = decoded.args[0].initCalldata
-    const upgradeAbi = await explorer.getAbi(upgradeAddr)
+    const upgradeAbi = await explorerL1.getAbi(upgradeAddr)
     const decodedUpgrade = upgradeAbi.decodeCallData(upgradeCalldata, upgradeCallDataSchema)
+
+    const hex = decodedUpgrade.args[0].l2ProtocolUpgradeTx.to.toString(16);
+    const deployAddr = `0x${"0".repeat(40 - hex.length)}${hex}`;
+    const deploySysContractsAbi = await explorerL2.getAbi(deployAddr);
+    const decodedL2 = deploySysContractsAbi.decodeCallData(decodedUpgrade.args[0].l2ProtocolUpgradeTx.data, l2UpgradeSchema)
+
+    const systemContracts: L2ContractData[] = decodedL2.args[0].map(contract => {
+      const name = SYSTEM_CONTRACT_NAMES[contract.newAddress]
+      return {
+        name: name,
+        address: contract.newAddress,
+        bytecodeHash: contract.bytecodeHash
+      }
+    })
 
     const dataBlob = Buffer.from(hexToBytes(decodedUpgrade.args[0].postUpgradeCalldata))
 
+
+    // TODO: Just imposible to get baseTokenGasPriceMultiplierNominator and baseTokenGasPriceMultiplierDenominator
+    // from calldata. The only way is simulating the call.
     return new CurrentZksyncEraState({
       protocolVersion: numberToHex(decodedUpgrade.args[0].newProtocolVersion),
       verifierAddress: decodedUpgrade.args[0].verifier,
@@ -234,8 +252,35 @@ export class CurrentZksyncEraState {
       stateTransitionManagerAddress: bytesToHex(dataBlob.subarray(64 + 12, 96)),
       baseTokenBridgeAddress: bytesToHex(dataBlob.subarray(96 + 12, 128)),
       admin: bytesToHex(dataBlob.subarray(128 + 12, 160))
-    }, facets, new SystemContractList([]))
+    }, facets, new SystemContractList(systemContracts))
   }
+}
+
+const SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
+  "0x0000000000000000000000000000000000000000": "EmptyContract",
+  "0x0000000000000000000000000000000000000001": "Ecrecover",
+  "0x0000000000000000000000000000000000000002": "SHA256",
+  "0x0000000000000000000000000000000000000006": "EcAdd",
+  "0x0000000000000000000000000000000000000007": "EcMul",
+  "0x0000000000000000000000000000000000000008": "EcPairing",
+  "0x0000000000000000000000000000000000008001": "EmptyContract",
+  "0x0000000000000000000000000000000000008002": "AccountCodeStorage",
+  "0x0000000000000000000000000000000000008003": "NonceHolder",
+  "0x0000000000000000000000000000000000008004": "KnownCodesStorage",
+  "0x0000000000000000000000000000000000008005": "ImmutableSimulator",
+  "0x0000000000000000000000000000000000008006": "ContractDeployer",
+  "0x0000000000000000000000000000000000008008": "L1Messenger",
+  "0x0000000000000000000000000000000000008009": "MsgValueSimulator",
+  "0x000000000000000000000000000000000000800a": "L2BaseToken",
+  "0x000000000000000000000000000000000000800b": "SystemContext",
+  "0x000000000000000000000000000000000000800c": "BootloaderUtilities",
+  "0x000000000000000000000000000000000000800d": "EventWriter",
+  "0x000000000000000000000000000000000000800e": "Compressor",
+  "0x000000000000000000000000000000000000800f": "ComplexUpgrader",
+  "0x0000000000000000000000000000000000008010": "Keccak256",
+  "0x0000000000000000000000000000000000008012": "CodeOracle",
+  "0x0000000000000000000000000000000000000100": "P256Verify",
+  "0x0000000000000000000000000000000000008011": "PubdataChunkPublisher"
 }
 
 async function reduceFacetCuts(cuts: FacetCut[], explorer: BlockExplorerClient): Promise<FacetData[]> {

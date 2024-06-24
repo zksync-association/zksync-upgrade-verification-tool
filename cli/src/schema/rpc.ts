@@ -39,7 +39,11 @@ export const upgradeCallDataSchema = z.object({
   functionName: z.string(),
   args: z.tuple([
     z.object({
-      l2ProtocolUpgradeTx: z.any(),
+      l2ProtocolUpgradeTx: z.object({
+        to: z.bigint(),
+        from: z.bigint(),
+        data: zodHex
+      }),
       factoryDeps: z.array(z.any()),
       bootloaderHash: zodHex,
       defaultAccountHash: zodHex,
@@ -50,6 +54,19 @@ export const upgradeCallDataSchema = z.object({
       upgradeTimestamp: z.bigint(),
       newProtocolVersion: z.bigint()
     })
+  ])
+})
+
+export const l2UpgradeSchema = z.object({
+  functionName: z.string(),
+  args: z.tuple([
+    z.array(z.object({
+      bytecodeHash: zodHex,
+      newAddress: zodHex,
+      callConstructor: z.boolean(),
+      value: z.bigint(),
+      input: z.string()
+    }))
   ])
 })
 

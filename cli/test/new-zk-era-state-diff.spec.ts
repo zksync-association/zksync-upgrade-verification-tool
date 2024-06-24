@@ -542,10 +542,11 @@ describe("NewZkSyncStateDiff", () => {
       );
       const buff = Buffer.from(hexBuff.toString(), "hex");
 
-      const explorer = BlockExplorerClient.forL1("IA817WPSNENBAK9EE3SNM1C5C31YUTZ4MV", "mainnet")
+      const explorerL1 = BlockExplorerClient.forL1("IA817WPSNENBAK9EE3SNM1C5C31YUTZ4MV", "mainnet")
+      const explorerL2 = BlockExplorerClient.forL2("mainnet")
       const rpc = RpcClient.forL1("mainnet")
 
-      const state = await CurrentZksyncEraState.fromCalldata(buff, "mainnet", explorer, rpc)
+      const state = await CurrentZksyncEraState.fromCalldata(buff, "mainnet", explorerL1, rpc, explorerL2)
       const facets = state.allFacets()
       const admin = facets.find(f => f.name === "AdminFacet")
       if (!admin) {
