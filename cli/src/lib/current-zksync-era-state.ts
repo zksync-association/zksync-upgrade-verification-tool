@@ -131,11 +131,10 @@ export class CurrentZksyncEraState {
     return Option.fromNullable(this.data[name]);
   }
 
-  static async fromCallData(bytes: Buffer, network: Network): Promise<CurrentZksyncEraState> {
+  static async fromBlockchain(network: Network, explorer: BlockExplorerClient, rpc: RpcClient): Promise<CurrentZksyncEraState> {
     const addr = DIAMOND_ADDRS[network];
     const diamond = new Diamond(addr);
-    const explorer = BlockExplorerClient.forL1("IA817WPSNENBAK9EE3SNM1C5C31YUTZ4MV", network);
-    const rpc = RpcClient.forL1(network);
+
     await diamond.init(explorer, rpc);
     await diamond.init(explorer, rpc);
     const facets = diamond.allFacets();

@@ -9,11 +9,12 @@ import {
 } from "../src/lib/current-zksync-era-state";
 import { MissingRequiredProp } from "../src/lib/errors";
 import { bytesToHex, type Hex } from "viem";
-import type { FacetData } from "../src/lib";
+import {BlockExplorerClient, type FacetData} from "../src/lib";
 import { Option } from "nochoices";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { SystemContractList } from "../src/lib/system-contract-providers";
+import {RpcClient} from "../src/lib/rpc-client";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): NewZkSyncEraDiff {
@@ -535,13 +536,17 @@ describe("NewZkSyncStateDiff", () => {
   });
 
   describe("#createFromCallData", async () => {
-    it("can be created from calldata", async () => {
-      const hexBuff = await fs.readFile(
-        path.join(import.meta.dirname, "data", "upgrade-calldata.hex")
-      );
-      const buff = Buffer.from(hexBuff.toString(), "hex");
+    it("can be created from calldata", async (t) => {
+      const key = process.env.ETHERSCAN_API_KEY
+      if(!key) {
+        return t.skip()
+      }
 
-      const state = await CurrentZksyncEraState.fromCallData(buff, "mainnet");
+      const explorer = BlockExplorerClient.forL1(key, "mainnet")
+      const rpc = RpcClient.forL1("mainnet")
+
+
+      const state = await CurrentZksyncEraState.fromBlockchain("mainnet", explorer, rpc);
       expect(state.allFacets()).toHaveLength(4);
       expect(state.hexAttrValue("admin").unwrap()).toMatch(/0x.*/);
       expect(state.hexAttrValue("pendingAdmin").unwrap()).toMatch(/0x.*/);
