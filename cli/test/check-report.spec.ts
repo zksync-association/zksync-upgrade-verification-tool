@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import {describe, it, expect} from "vitest";
 import {CheckReport} from "../src/lib/reports/check-report";
 import {NewZkSyncEraDiff} from "../src/lib/new-zk-sync-era-diff";
-import {CurrentZksyncEraState} from "../src/lib/current-zksync-era-state";
+import {CurrentZksyncEraState, type L2ContractData} from "../src/lib/current-zksync-era-state";
 import {SystemContractList} from "../src/lib/system-contract-providers";
 import {EraContractsRepo} from "../src/lib/era-contracts-repo";
 import {TestBlockExplorer} from "./utilities/test-block-explorer";
@@ -54,54 +54,94 @@ const upgradedFacetAfter = new ContractAbi([
 
 describe('CheckReport', () => {
   it("works", async () => {
-    const current = new CurrentZksyncEraState({
-      protocolVersion: "0x000000000000000000000000000000000000000000000000000000000000000f",
-
-      admin: "0x010a",
-      pendingAdmin: "0x020a",
-      verifierAddress: "0x030a",
-      bridgeHubAddress: "0x040a",
-      blobVersionedHashRetriever: "0x050a",
-      stateTransitionManagerAddress: "0x060a",
-      l2DefaultAccountBytecodeHash: "0x070a",
-      l2BootloaderBytecodeHash: "0x080a",
-      baseTokenBridgeAddress: "0x090a",
-      chainId: 100n,
-      baseTokenGasPriceMultiplierNominator: 200n,
-      baseTokenGasPriceMultiplierDenominator: 300n,
-    }, [
+    const currentsysContracts: L2ContractData[] = [
       {
-        name: "RemovedFacet",
-        address: "0x0101010101",
-        selectors: removedFacetAbi.allSelectors()
+        name: "Ecrecover",
+        address: "0x0000000000000000000000000000000000000001",
+        bytecodeHash: "0x0100"
       },
       {
-        name: "UpgradedFacet",
-        address: "0x0202020202",
-        selectors: upgradedFacetBefore.allSelectors()
+        name: "EcAdd",
+        address: "0x0000000000000000000000000000000000000006",
+        bytecodeHash: "0x0200"
       }
-    ], new SystemContractList([]))
-    const proposed = new CurrentZksyncEraState({
-      protocolVersion: "0x0000000000000000000000000000000000000000000000000000001800000001",
+    ]
 
-      admin: "0x010b",
-      pendingAdmin: "0x020b",
-      verifierAddress: "0x030b",
-      bridgeHubAddress: "0x040b",
-      blobVersionedHashRetriever: "0x050b",
-      stateTransitionManagerAddress: "0x060b",
-      l2DefaultAccountBytecodeHash: "0x070b",
-      l2BootloaderBytecodeHash: "0x080b",
-      chainId: 101n,
-      baseTokenGasPriceMultiplierNominator: 201n,
-    }, [
+    const current = new CurrentZksyncEraState({
+        protocolVersion: "0x000000000000000000000000000000000000000000000000000000000000000f",
+
+        admin: "0x010a",
+        pendingAdmin: "0x020a",
+        verifierAddress: "0x030a",
+        bridgeHubAddress: "0x040a",
+        blobVersionedHashRetriever: "0x050a",
+        stateTransitionManagerAddress: "0x060a",
+        l2DefaultAccountBytecodeHash: "0x070a",
+        l2BootloaderBytecodeHash: "0x080a",
+        baseTokenBridgeAddress: "0x090a",
+        chainId: 100n,
+        baseTokenGasPriceMultiplierNominator: 200n,
+        baseTokenGasPriceMultiplierDenominator: 300n,
+      }, [
+        {
+          name: "RemovedFacet",
+          address: "0x0101010101",
+          selectors: removedFacetAbi.allSelectors()
+        },
+        {
+          name: "UpgradedFacet",
+          address: "0x0202020202",
+          selectors: upgradedFacetBefore.allSelectors()
+        }
+      ],
+      new SystemContractList(currentsysContracts)
+    )
+
+    const proposedSysContracts: L2ContractData[] = [
       {
-        name: "UpgradedFacet",
-        address: "0x0202020203",
-        selectors: upgradedFacetAfter.allSelectors()
+        name: "Ecrecover",
+        address: "0x0000000000000000000000000000000000000001",
+        bytecodeHash: "0x0101"
+      },
+      {
+        name: "EcAdd",
+        address: "0x0000000000000000000000000000000000000006",
+        bytecodeHash: "0x0201"
+      },
+      {
+        name: "EcMul",
+        address: "0x0000000000000000000000000000000000000007",
+        bytecodeHash: "0x0301"
       }
-    ], new SystemContractList([]))
-    const diff = new NewZkSyncEraDiff(current, proposed, [])
+    ]
+    const proposed = new CurrentZksyncEraState({
+        protocolVersion: "0x0000000000000000000000000000000000000000000000000000001800000001",
+
+        admin: "0x010b",
+        pendingAdmin: "0x020b",
+        verifierAddress: "0x030b",
+        bridgeHubAddress: "0x040b",
+        blobVersionedHashRetriever: "0x050b",
+        stateTransitionManagerAddress: "0x060b",
+        l2DefaultAccountBytecodeHash: "0x070b",
+        l2BootloaderBytecodeHash: "0x080b",
+        chainId: 101n,
+        baseTokenGasPriceMultiplierNominator: 201n,
+      }, [
+        {
+          name: "UpgradedFacet",
+          address: "0x0202020203",
+          selectors: upgradedFacetAfter.allSelectors()
+        }
+      ],
+      new SystemContractList(proposedSysContracts)
+    )
+
+    const diff = new NewZkSyncEraDiff(current, proposed, [
+      "0x0000000000000000000000000000000000000001",
+      "0x0000000000000000000000000000000000000006",
+      "0x0000000000000000000000000000000000000007"
+    ])
     const repo = await EraContractsRepo.default()
     const explorer = new TestBlockExplorer();
 

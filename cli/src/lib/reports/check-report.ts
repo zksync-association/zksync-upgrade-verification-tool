@@ -22,6 +22,7 @@ export class CheckReport {
     await this.addHeader(lines)
     await this.addFacets(lines)
     await this.addFields(lines)
+    await this.addSystemContracts(lines)
 
     return lines.join("\n")
   }
@@ -143,5 +144,30 @@ export class CheckReport {
     lines.push(title)
     lines.push("=".repeat(title.length))
     lines.push("")
+  }
+
+  private async addSystemContracts(lines: string[]) {
+    const changes = await this.diff.systemContractChanges()
+
+    if (changes.length === 0) {
+      return
+    }
+
+    this.addTitle(lines, "System contracts")
+
+    const table = new CliTable({head: ["System Contract", "Address", "Bytecode hash"]})
+
+    for (const contract of changes) {
+      table.push(
+        [
+          { content: contract.name, rowSpan: 2, vAlign: "center" },
+          { content: contract.address, rowSpan: 2, vAlign: "center" },
+          `Current: ${contract.currentBytecodeHash}`,
+        ],
+        [`Proposed: ${contract.proposedBytecodeHash}`]
+      )
+    }
+
+    lines.push(table.toString(), "")
   }
 }

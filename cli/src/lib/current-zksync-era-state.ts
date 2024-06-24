@@ -117,7 +117,7 @@ export class CurrentZksyncEraState {
 
   // L2 CONTRACTS
 
-  async dataForL2Address(addr: Hex): Promise<L2ContractData> {
+  async dataForL2Address(addr: Hex): Promise<Option<L2ContractData>> {
     return this.systemContracts.dataFor(addr);
   }
 

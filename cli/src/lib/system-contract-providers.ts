@@ -4,9 +4,11 @@ import { InconsistentData } from "./errors";
 import type { RpcClient } from "./rpc-client";
 import type { BlockExplorerClient } from "./block-explorer-client";
 import { utils } from "zksync-ethers";
+import {Option} from "nochoices";
+import type {ContractData} from "./contract-data";
 
 export interface SystemContractProvider {
-  dataFor(addr: Hex): Promise<L2ContractData>;
+  dataFor(addr: Hex): Promise<Option<L2ContractData>>;
 }
 
 export class SystemContractList implements SystemContractProvider {
@@ -19,12 +21,9 @@ export class SystemContractList implements SystemContractProvider {
     });
   }
 
-  async dataFor(addr: Hex): Promise<L2ContractData> {
+  async dataFor(addr: Hex): Promise<Option<L2ContractData>> {
     const find = this.data.get(addr.toLowerCase());
-    if (!find) {
-      throw new InconsistentData(`Missing system contract data for "${addr}".`);
-    }
-    return find;
+    return Option.fromNullable(find);
   }
 }
 
@@ -37,7 +36,7 @@ export class RpcSystemContractProvider implements SystemContractProvider {
     this.explorer = explorer;
   }
 
-  async dataFor(addr: Hex): Promise<L2ContractData> {
+  async dataFor(addr: Hex): Promise<Option<L2ContractData>> {
     const byteCode = await this.rpc.getByteCode(addr);
 
     if (!byteCode) {
@@ -46,12 +45,17 @@ export class RpcSystemContractProvider implements SystemContractProvider {
 
     const hex = Buffer.from(utils.hashBytecode(byteCode)).toString("hex");
 
-    const data = await this.explorer.getSourceCode(addr);
+    const data = await this.explorer.getSourceCode(addr).then(
+      (data) => Option.Some(data),
+      () => Option.None<ContractData>()
+    );
 
-    return {
-      name: data.name,
-      bytecodeHash: `0x${hex}`,
-      address: addr,
-    };
+    return data.map(d => {
+      return {
+        name: d.name,
+        bytecodeHash: `0x${hex}`,
+        address: addr,
+      }
+    }) ;
   }
 }
