@@ -535,7 +535,55 @@ describe("NewZkSyncStateDiff", () => {
     });
   });
 
-  describe("#createFromCallData", async () => {
+  describe("#createFromCallData", () => {
+    it("works", async () => {
+      const hexBuff = await fs.readFile(
+        path.join(import.meta.dirname, "data", "upgrade-calldata.hex")
+      );
+      const buff = Buffer.from(hexBuff.toString(), "hex");
+
+      const explorer = BlockExplorerClient.forL1("IA817WPSNENBAK9EE3SNM1C5C31YUTZ4MV", "mainnet")
+      const rpc = RpcClient.forL1("mainnet")
+
+      const state = await CurrentZksyncEraState.fromCalldata(buff, "mainnet", explorer, rpc)
+      const facets = state.allFacets()
+      const admin = facets.find(f => f.name === "AdminFacet")
+      if (!admin) {
+        return expect.fail("admin should be present")
+      }
+      expect(admin.address).toEqual("0xF6F26b416CE7AE5e5FE224Be332C7aE4e1f3450a")
+
+      const getters = facets.find(f => f.name === "GettersFacet")
+      if (!getters) {
+        return expect.fail("getters should be present")
+      }
+      expect(getters.address).toEqual("0xE60E94fCCb18a81D501a38959E532C0A85A1be89")
+
+      const mailbox = facets.find(f => f.name === "MailboxFacet")
+      if (!mailbox) {
+        return expect.fail("mailbox should be present")
+      }
+      expect(mailbox.address).toEqual("0xCDB6228b616EEf8Df47D69A372C4f725C43e718C")
+
+      const executor = facets.find(f => f.name === "ExecutorFacet")
+      if (!executor) {
+        return expect.fail("executor should be present")
+      }
+      expect(executor.address).toEqual("0xaD193aDe635576d8e9f7ada71Af2137b16c64075")
+
+      expect(state.numberAttrValue("chainId").unwrap()).toEqual(324n)
+      expect(state.hexAttrValue("bridgeHubAddress").unwrap().toLowerCase())
+        .toEqual("0x303a465B659cBB0ab36eE643eA362c509EEb5213".toLowerCase())
+      expect(state.hexAttrValue("stateTransitionManagerAddress").unwrap().toLowerCase())
+        .toEqual("0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C".toLowerCase())
+      expect(state.hexAttrValue("baseTokenBridgeAddress").unwrap().toLowerCase())
+        .toEqual("0xD7f9f54194C633F36CCD5F3da84ad4a1c38cB2cB".toLowerCase())
+      expect(state.hexAttrValue("admin").unwrap().toLowerCase())
+        .toEqual("0x0b622A2061EaccAE1c664eBC3E868b8438e03F61".toLowerCase())
+    })
+  })
+
+  describe("#createFromBlockchain", async () => {
     it("can be created from calldata", async (t) => {
       const key = process.env.ETHERSCAN_API_KEY
       if(!key) {
@@ -544,10 +592,9 @@ describe("NewZkSyncStateDiff", () => {
 
       const explorer = BlockExplorerClient.forL1(key, "mainnet")
       const rpc = RpcClient.forL1("mainnet")
-
-
       const state = await CurrentZksyncEraState.fromBlockchain("mainnet", explorer, rpc);
       expect(state.allFacets()).toHaveLength(4);
+
       expect(state.hexAttrValue("admin").unwrap()).toMatch(/0x.*/);
       expect(state.hexAttrValue("pendingAdmin").unwrap()).toMatch(/0x.*/);
       expect(state.hexAttrValue("verifierAddress").unwrap()).toMatch(/0x.*/);

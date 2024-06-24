@@ -1,4 +1,5 @@
-import { type Abi, type AbiFunction, toFunctionSelector } from "viem";
+import {type Abi, type AbiFunction, decodeFunctionData, type Hex, toFunctionSelector} from "viem";
+import {type TypeOf, z, type ZodType} from "zod";
 
 export class ContractAbi {
   raw: Abi;
@@ -22,5 +23,13 @@ export class ContractAbi {
     }
     const params = fn.inputs.map((i) => `${i.type} ${i.name}`);
     return `${fn.name}(${params.join(", ")})`;
+  }
+
+  decodeCallData<T extends z.ZodTypeAny>(callData: Hex, schema: T): z.infer<typeof schema> {
+    const raw = decodeFunctionData({
+      data: callData,
+      abi: this.raw
+    });
+    return schema.parse(raw)
   }
 }

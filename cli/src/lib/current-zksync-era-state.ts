@@ -1,4 +1,4 @@
-import { bytesToBigInt, bytesToNumber, type Hex, hexToBytes, hexToNumber } from "viem";
+import {bytesToBigInt, bytesToHex, bytesToNumber, type Hex, hexToBytes, hexToNumber, numberToHex} from "viem";
 import type { FacetData } from "./upgrade-changes";
 import { Option } from "nochoices";
 import { MissingRequiredProp } from "./errors";
@@ -11,9 +11,10 @@ import { RpcStorageSnapshot } from "./storage/rpc-storage-snapshot";
 import { StringStorageVisitor } from "./reports/string-storage-visitor";
 import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props";
 import {
-  RpcSystemContractProvider,
+  RpcSystemContractProvider, SystemContractList,
   type SystemContractProvider,
 } from "./system-contract-providers";
+import {callDataSchema, type FacetCut, upgradeCallDataSchema} from "../schema/rpc";
 
 export type L2ContractData = {
   address: Hex;
@@ -43,7 +44,8 @@ export type HexEraPropNames =
   | "blobVersionedHashRetriever"
   | "stateTransitionManagerAddress"
   | "l2DefaultAccountBytecodeHash"
-  | "l2BootloaderBytecodeHash";
+  | "l2BootloaderBytecodeHash"
+  | "baseTokenBridgeAddress";
 
 export type NumberEraPropNames =
   | "baseTokenGasPriceMultiplierNominator"
@@ -60,6 +62,7 @@ export type ZkEraStateData = {
   l2DefaultAccountBytecodeHash?: Hex;
   l2BootloaderBytecodeHash?: Hex;
   protocolVersion?: Hex;
+  baseTokenBridgeAddress?: Hex;
   chainId?: bigint;
   baseTokenGasPriceMultiplierNominator?: bigint;
   baseTokenGasPriceMultiplierDenominator?: bigint;
@@ -136,7 +139,6 @@ export class CurrentZksyncEraState {
     const diamond = new Diamond(addr);
 
     await diamond.init(explorer, rpc);
-    await diamond.init(explorer, rpc);
     const facets = diamond.allFacets();
 
     const memorySnapshot = new RpcStorageSnapshot(rpc, addr);
@@ -205,4 +207,48 @@ export class CurrentZksyncEraState {
       new RpcSystemContractProvider(RpcClient.forL2(network), BlockExplorerClient.forL2(network))
     );
   }
+
+  static async fromCalldata(buff: Buffer, network: Network, explorer: BlockExplorerClient, rpc: RpcClient): Promise<CurrentZksyncEraState> {
+    const addr = DIAMOND_ADDRS[network];
+    const diamond = new Diamond(addr);
+
+    await diamond.init(explorer, rpc);
+
+    const decoded = diamond.decodeFunctionData(buff, callDataSchema)
+    const facets = await reduceFacetCuts(decoded.args[0].facetCuts, explorer)
+
+    const upgradeAddr = decoded.args[0].initAddress
+    const upgradeCalldata = decoded.args[0].initCalldata
+    const upgradeAbi = await explorer.getAbi(upgradeAddr)
+    const decodedUpgrade = upgradeAbi.decodeCallData(upgradeCalldata, upgradeCallDataSchema)
+
+    const dataBlob = Buffer.from(hexToBytes(decodedUpgrade.args[0].postUpgradeCalldata))
+
+    return new CurrentZksyncEraState({
+      protocolVersion: numberToHex(decodedUpgrade.args[0].newProtocolVersion),
+      verifierAddress: decodedUpgrade.args[0].verifier,
+      l2DefaultAccountBytecodeHash: decodedUpgrade.args[0].defaultAccountHash,
+      l2BootloaderBytecodeHash: decodedUpgrade.args[0].bootloaderHash,
+      chainId: bytesToBigInt(dataBlob.subarray(0, 32)),
+      bridgeHubAddress: bytesToHex(dataBlob.subarray(32 + 12, 64)),
+      stateTransitionManagerAddress: bytesToHex(dataBlob.subarray(64 + 12, 96)),
+      baseTokenBridgeAddress: bytesToHex(dataBlob.subarray(96 + 12, 128)),
+      admin: bytesToHex(dataBlob.subarray(128 + 12, 160))
+    }, facets, new SystemContractList([]))
+  }
+}
+
+async function reduceFacetCuts(cuts: FacetCut[], explorer: BlockExplorerClient): Promise<FacetData[]> {
+  const selected = cuts.filter(cut => cut.action === 0)
+
+  return await Promise.all(
+    selected.map(async (cut) => {
+      const contract = await explorer.getSourceCode(cut.facet);
+      return {
+        name: contract.name,
+        address: cut.facet,
+        selectors: cut.selectors
+      }
+    })
+  )
 }
