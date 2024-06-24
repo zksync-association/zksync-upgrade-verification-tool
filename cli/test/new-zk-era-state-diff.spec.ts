@@ -591,6 +591,141 @@ describe("NewZkSyncStateDiff", () => {
       expect(state.hexAttrValue("admin").unwrap().toLowerCase()).toEqual(
         "0x0b622A2061EaccAE1c664eBC3E868b8438e03F61".toLowerCase()
       );
+
+      const l2Addresses = [
+        {
+          address: "0x0000000000000000000000000000000000000000",
+          name: "EmptyContract",
+          hash: "0x0100000781e55a60f3f14fd7dd67e3c8caab896b7b0fca4a662583959299eede"
+        },
+        {
+          address: "0x0000000000000000000000000000000000000001",
+          name: "Ecrecover",
+          hash: "0x0100001112e34172b2bc31574d155893a087a1cf4b608cf9895a2201ea7bd6ee"
+        },
+        {
+          address: "0x0000000000000000000000000000000000000002",
+          name: "SHA256",
+          hash: "0x0100001752dc8a1a374a6346781205017b7b594d97c28812265865f3a45fcb45"
+        },
+        {
+          address: "0x0000000000000000000000000000000000000006",
+          name: "EcAdd",
+          hash: "0x010000872dd7e2dc1b34416c174086aa84fd80c78acc7b670214da955bd55728"
+        },
+        {
+          address: "0x0000000000000000000000000000000000000007",
+          name: "EcMul",
+          hash: "0x010000bd8bd7ab008f76e359dc296ff5fe0e8a95fedce1d570943e90143acdfd"
+        },
+        {
+          address: "0x0000000000000000000000000000000000000008",
+          name: "EcPairing",
+          hash: "0x01000f1b3432a32f9fba2115f5dd3b0ee8127e7bf2c609d57d3e231f19119c43"
+        },
+        {
+          address: "0x0000000000000000000000000000000000008001",
+          name: "EmptyContract",
+          hash: "0x0100000781e55a60f3f14fd7dd67e3c8caab896b7b0fca4a662583959299eede"
+        },
+        {
+          address: "0x0000000000000000000000000000000000008002",
+          name: "AccountCodeStorage",
+          hash: "0x0100007549287362e4263ea5b204f01fc3c7f2ac09d71e6eb21029698220f01a"
+        },
+        {
+          address: "0x0000000000000000000000000000000000008003",
+          name: "NonceHolder",
+          hash: "0x010000e563d4ad7b4822cc19d8f74f2c41ee3d3153379be4b02b27d4498d52b6"
+        },
+        {
+          address: "0x0000000000000000000000000000000000008004",
+          name: "KnownCodesStorage",
+          hash: "0x0100007d82d4a2eb62e539e3c89cc641f507132b247022ba05ef1ddfed2b0073"
+        },
+        {
+          address: "0x0000000000000000000000000000000000008005",
+          name: "ImmutableSimulator",
+          hash: "0x0100003de00c5ceaa3fdf4566a9822ce94abe676f68b17a6ae11c453e14455fd"
+        },
+        {
+          address: "0x0000000000000000000000000000000000008006",
+          name: "ContractDeployer",
+          hash: "0x010005215fda00bfbf95847a13078bd16cdcb1b875534261c1dda9940c7754fe"
+        },
+        {
+          address: "0x0000000000000000000000000000000000008008",
+          name: "L1Messenger",
+          hash: "0x010002b97ebf3c481ead775617590ffca139bee428e443aa49eb38b6a5b83657"
+        },
+        {
+          address: "0x0000000000000000000000000000000000008009",
+          name: "MsgValueSimulator",
+          hash: "0x010000695a1e821b6d5fcb25e25793b81de0bdca3ff8277e3ac93a38e729e0a1"
+        },
+        {
+          address: "0x000000000000000000000000000000000000800a",
+          name: "L2BaseToken",
+          hash: "0x010001039329e4bb55b24531c7e7d27ed40d2c82ad145033fdd5ed5b8ea86cf3"
+        },
+        {
+          address: "0x000000000000000000000000000000000000800b",
+          name: "SystemContext",
+          hash: "0x010001b3f2c3a6bdd5ad00ae29a7cbbb32dca3c31fb608b5cd52f8f3056a3847"
+        },
+        {
+          address: "0x000000000000000000000000000000000000800c",
+          name: "BootloaderUtilities",
+          hash: "0x010007d1e53f2dca05f7e27ae5b7062291ed3a1470ca511140b8e786aae7eb77"
+        },
+        {
+          address: "0x000000000000000000000000000000000000800d",
+          name: "EventWriter",
+          hash: "0x010000159a3a08da3ac57cdefec0e9e30da60456bc5643134cf16d6957bcf1ac"
+        },
+        {
+          address: "0x000000000000000000000000000000000000800e",
+          name: "Compressor",
+          hash: "0x01000179842b5aa1c76036f5b90652fe614dacb28438a89649d6ca48131bd402"
+        },
+        {
+          address: "0x000000000000000000000000000000000000800f",
+          name: "ComplexUpgrader",
+          hash: "0x01000055c1f27b8316ba61bf07959b11cf3b2a418aa357ccc5531c0914a2da27"
+        },
+        {
+          address: "0x0000000000000000000000000000000000008010",
+          name: "Keccak256",
+          hash: "0x0100000f248e111a1b587fef850dc4585c39af2dd505bc8a0d5cc6d3fcc7ed3c"
+        },
+        {
+          address: "0x0000000000000000000000000000000000008012",
+          name: "CodeOracle",
+          hash: "0x01000023b02bbb21baf1367835e56ae17b82688527dc8f78caf34b12e670ee65"
+        },
+        {
+          address: "0x0000000000000000000000000000000000000100",
+          name: "P256Verify",
+          hash: "0x0100001169cd6aa311c1bc9bbe2e7dd085720c96bb197e3223be7e9c66e46ef9"
+        },
+        {
+          address: "0x0000000000000000000000000000000000008011",
+          name: "PubdataChunkPublisher",
+          hash: "0x01000049eb6d79244e74e5286ed4d3f6eef2b5eb746b67d98691dbc28fa16984"
+        },
+        {
+          address: "0x0000000000000000000000000000000000010000",
+          name: "Create2Factory",
+          hash: "0x0100004bc85f45ebf0f0bf004752bcbff1bb99792d6cc6494227970ec77fe53b"
+        },
+      ];
+
+      for (const { address, name, hash } of l2Addresses) {
+        const sysContractData = await state.dataForL2Address(address as Hex);
+        expect(sysContractData.address.toLowerCase()).toEqual(address.toLowerCase());
+        expect(sysContractData.name).toEqual(name);
+        expect(sysContractData.bytecodeHash).toEqual(hash)
+      }
     });
   });
 

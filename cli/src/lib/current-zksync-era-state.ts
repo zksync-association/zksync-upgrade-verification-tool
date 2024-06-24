@@ -255,9 +255,11 @@ export class CurrentZksyncEraState {
     );
 
     const systemContracts: L2ContractData[] = decodedL2.args[0].map((contract) => {
-      const name = SYSTEM_CONTRACT_NAMES[contract.newAddress];
+      const name = Option.fromNullable(
+        SYSTEM_CONTRACT_NAMES[contract.newAddress.toLowerCase() as Hex]
+      );
       return {
-        name: name,
+        name: name.unwrapOr("New contract."),
         address: contract.newAddress,
         bytecodeHash: contract.bytecodeHash,
       };
@@ -310,6 +312,7 @@ const SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
   "0x0000000000000000000000000000000000008012": "CodeOracle",
   "0x0000000000000000000000000000000000000100": "P256Verify",
   "0x0000000000000000000000000000000000008011": "PubdataChunkPublisher",
+  "0x0000000000000000000000000000000000010000": "Create2Factory",
 };
 
 async function reduceFacetCuts(

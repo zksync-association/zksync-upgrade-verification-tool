@@ -10,14 +10,17 @@ export interface SystemContractProvider {
 }
 
 export class SystemContractList implements SystemContractProvider {
-  private data: L2ContractData[];
+  private data: Map<string, L2ContractData>;
 
   constructor(data: L2ContractData[]) {
-    this.data = data;
+    this.data = new Map();
+    data.map((contract) => {
+      this.data.set(contract.address.toLowerCase(), contract);
+    });
   }
 
   async dataFor(addr: Hex): Promise<L2ContractData> {
-    const find = this.data.find((l2) => l2.address === addr);
+    const find = this.data.get(addr.toLowerCase());
     if (!find) {
       throw new InconsistentData(`Missing system contract data for "${addr}".`);
     }
