@@ -1,4 +1,12 @@
-import {bytesToBigInt, bytesToHex, bytesToNumber, type Hex, hexToBytes, hexToNumber, numberToHex} from "viem";
+import {
+  bytesToBigInt,
+  bytesToHex,
+  bytesToNumber,
+  type Hex,
+  hexToBytes,
+  hexToNumber,
+  numberToHex,
+} from "viem";
 import type { FacetData } from "./upgrade-changes";
 import { Option } from "nochoices";
 import { MissingRequiredProp } from "./errors";
@@ -11,11 +19,16 @@ import { RpcStorageSnapshot } from "./storage/rpc-storage-snapshot";
 import { StringStorageVisitor } from "./reports/string-storage-visitor";
 import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props";
 import {
-  RpcSystemContractProvider, SystemContractList,
+  RpcSystemContractProvider,
+  SystemContractList,
   type SystemContractProvider,
 } from "./system-contract-providers";
-import {callDataSchema, type FacetCut, l2UpgradeSchema, upgradeCallDataSchema} from "../schema/rpc";
-import {z} from "zod";
+import {
+  callDataSchema,
+  type FacetCut,
+  l2UpgradeSchema,
+  upgradeCallDataSchema,
+} from "../schema/rpc";
 
 export type L2ContractData = {
   address: Hex;
@@ -135,7 +148,11 @@ export class CurrentZksyncEraState {
     return Option.fromNullable(this.data[name]);
   }
 
-  static async fromBlockchain(network: Network, explorer: BlockExplorerClient, rpc: RpcClient): Promise<CurrentZksyncEraState> {
+  static async fromBlockchain(
+    network: Network,
+    explorer: BlockExplorerClient,
+    rpc: RpcClient
+  ): Promise<CurrentZksyncEraState> {
     const addr = DIAMOND_ADDRS[network];
     const diamond = new Diamond(addr);
 
@@ -209,50 +226,62 @@ export class CurrentZksyncEraState {
     );
   }
 
-  static async fromCalldata(buff: Buffer, network: Network, explorerL1: BlockExplorerClient, rpc: RpcClient, explorerL2: BlockExplorerClient): Promise<CurrentZksyncEraState> {
+  static async fromCalldata(
+    buff: Buffer,
+    network: Network,
+    explorerL1: BlockExplorerClient,
+    rpc: RpcClient,
+    explorerL2: BlockExplorerClient
+  ): Promise<CurrentZksyncEraState> {
     const addr = DIAMOND_ADDRS[network];
     const diamond = new Diamond(addr);
 
     await diamond.init(explorerL1, rpc);
 
-    const decoded = diamond.decodeFunctionData(buff, callDataSchema)
-    const facets = await reduceFacetCuts(decoded.args[0].facetCuts, explorerL1)
+    const decoded = diamond.decodeFunctionData(buff, callDataSchema);
+    const facets = await reduceFacetCuts(decoded.args[0].facetCuts, explorerL1);
 
-    const upgradeAddr = decoded.args[0].initAddress
-    const upgradeCalldata = decoded.args[0].initCalldata
-    const upgradeAbi = await explorerL1.getAbi(upgradeAddr)
-    const decodedUpgrade = upgradeAbi.decodeCallData(upgradeCalldata, upgradeCallDataSchema)
+    const upgradeAddr = decoded.args[0].initAddress;
+    const upgradeCalldata = decoded.args[0].initCalldata;
+    const upgradeAbi = await explorerL1.getAbi(upgradeAddr);
+    const decodedUpgrade = upgradeAbi.decodeCallData(upgradeCalldata, upgradeCallDataSchema);
 
     const hex = decodedUpgrade.args[0].l2ProtocolUpgradeTx.to.toString(16);
     const deployAddr = `0x${"0".repeat(40 - hex.length)}${hex}`;
     const deploySysContractsAbi = await explorerL2.getAbi(deployAddr);
-    const decodedL2 = deploySysContractsAbi.decodeCallData(decodedUpgrade.args[0].l2ProtocolUpgradeTx.data, l2UpgradeSchema)
+    const decodedL2 = deploySysContractsAbi.decodeCallData(
+      decodedUpgrade.args[0].l2ProtocolUpgradeTx.data,
+      l2UpgradeSchema
+    );
 
-    const systemContracts: L2ContractData[] = decodedL2.args[0].map(contract => {
-      const name = SYSTEM_CONTRACT_NAMES[contract.newAddress]
+    const systemContracts: L2ContractData[] = decodedL2.args[0].map((contract) => {
+      const name = SYSTEM_CONTRACT_NAMES[contract.newAddress];
       return {
         name: name,
         address: contract.newAddress,
-        bytecodeHash: contract.bytecodeHash
-      }
-    })
+        bytecodeHash: contract.bytecodeHash,
+      };
+    });
 
-    const dataBlob = Buffer.from(hexToBytes(decodedUpgrade.args[0].postUpgradeCalldata))
-
+    const dataBlob = Buffer.from(hexToBytes(decodedUpgrade.args[0].postUpgradeCalldata));
 
     // TODO: Just imposible to get baseTokenGasPriceMultiplierNominator and baseTokenGasPriceMultiplierDenominator
     // from calldata. The only way is simulating the call.
-    return new CurrentZksyncEraState({
-      protocolVersion: numberToHex(decodedUpgrade.args[0].newProtocolVersion),
-      verifierAddress: decodedUpgrade.args[0].verifier,
-      l2DefaultAccountBytecodeHash: decodedUpgrade.args[0].defaultAccountHash,
-      l2BootloaderBytecodeHash: decodedUpgrade.args[0].bootloaderHash,
-      chainId: bytesToBigInt(dataBlob.subarray(0, 32)),
-      bridgeHubAddress: bytesToHex(dataBlob.subarray(32 + 12, 64)),
-      stateTransitionManagerAddress: bytesToHex(dataBlob.subarray(64 + 12, 96)),
-      baseTokenBridgeAddress: bytesToHex(dataBlob.subarray(96 + 12, 128)),
-      admin: bytesToHex(dataBlob.subarray(128 + 12, 160))
-    }, facets, new SystemContractList(systemContracts))
+    return new CurrentZksyncEraState(
+      {
+        protocolVersion: numberToHex(decodedUpgrade.args[0].newProtocolVersion),
+        verifierAddress: decodedUpgrade.args[0].verifier,
+        l2DefaultAccountBytecodeHash: decodedUpgrade.args[0].defaultAccountHash,
+        l2BootloaderBytecodeHash: decodedUpgrade.args[0].bootloaderHash,
+        chainId: bytesToBigInt(dataBlob.subarray(0, 32)),
+        bridgeHubAddress: bytesToHex(dataBlob.subarray(32 + 12, 64)),
+        stateTransitionManagerAddress: bytesToHex(dataBlob.subarray(64 + 12, 96)),
+        baseTokenBridgeAddress: bytesToHex(dataBlob.subarray(96 + 12, 128)),
+        admin: bytesToHex(dataBlob.subarray(128 + 12, 160)),
+      },
+      facets,
+      new SystemContractList(systemContracts)
+    );
   }
 }
 
@@ -280,11 +309,14 @@ const SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
   "0x0000000000000000000000000000000000008010": "Keccak256",
   "0x0000000000000000000000000000000000008012": "CodeOracle",
   "0x0000000000000000000000000000000000000100": "P256Verify",
-  "0x0000000000000000000000000000000000008011": "PubdataChunkPublisher"
-}
+  "0x0000000000000000000000000000000000008011": "PubdataChunkPublisher",
+};
 
-async function reduceFacetCuts(cuts: FacetCut[], explorer: BlockExplorerClient): Promise<FacetData[]> {
-  const selected = cuts.filter(cut => cut.action === 0)
+async function reduceFacetCuts(
+  cuts: FacetCut[],
+  explorer: BlockExplorerClient
+): Promise<FacetData[]> {
+  const selected = cuts.filter((cut) => cut.action === 0);
 
   return await Promise.all(
     selected.map(async (cut) => {
@@ -292,8 +324,8 @@ async function reduceFacetCuts(cuts: FacetCut[], explorer: BlockExplorerClient):
       return {
         name: contract.name,
         address: cut.facet,
-        selectors: cut.selectors
-      }
+        selectors: cut.selectors,
+      };
     })
-  )
+  );
 }

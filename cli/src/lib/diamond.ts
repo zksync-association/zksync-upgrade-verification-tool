@@ -3,7 +3,7 @@ import type { BlockExplorerClient, ContractData, FacetData } from "./index";
 import type { ContractAbi } from "./contract-abi";
 import type { RpcClient } from "./rpc-client";
 import { facetsResponseSchema } from "../schema/new-facets";
-import type {ZodType, z, TypeOf} from "zod";
+import type { ZodType, z } from "zod";
 
 const DIAMOND_FUNCTIONS = {
   facets: "facets",
@@ -53,11 +53,11 @@ export class Diamond {
   }
 
   addressForSelector(selector: Hex): Hex {
-    const address = this.selectorToFacet.get(this.sanitizeHex(selector))
+    const address = this.selectorToFacet.get(this.sanitizeHex(selector));
     if (!address) {
-      throw new Error(`Unknown selector ${selector}`)
+      throw new Error(`Unknown selector ${selector}`);
     }
-    return address
+    return address;
   }
 
   private async findGetterFacetAbi(
@@ -135,18 +135,18 @@ export class Diamond {
   }
 
   decodeFunctionData<T extends z.ZodTypeAny>(buff: Buffer, schema: T): z.infer<typeof schema> {
-    const selector = buff.subarray(0, 4)
-    const facetAddr = this.addressForSelector(bytesToHex(selector))
-    const abi = this.abiFor(facetAddr)
+    const selector = buff.subarray(0, 4);
+    const facetAddr = this.addressForSelector(bytesToHex(selector));
+    const abi = this.abiFor(facetAddr);
 
-    return abi.decodeCallData(bytesToHex(buff), schema)
+    return abi.decodeCallData(bytesToHex(buff), schema);
   }
 
   private abiFor(facetAddr: Hex): ContractAbi {
-    const abi = this.abis.get(this.sanitizeHex(facetAddr))
+    const abi = this.abis.get(this.sanitizeHex(facetAddr));
     if (!abi) {
-      throw new Error(`Unknown facet: ${facetAddr}`)
+      throw new Error(`Unknown facet: ${facetAddr}`);
     }
-    return abi
+    return abi;
   }
 }

@@ -1,6 +1,6 @@
-import {z} from "zod";
+import { z } from "zod";
 import { zodOptional } from "./zod-optionals";
-import {zodHex} from "./hex-parser";
+import { zodHex } from "./hex-parser";
 
 const stateParser = z.record(
   z.string(),
@@ -30,10 +30,10 @@ export const callDataSchema = z.object({
     z.object({
       facetCuts: z.array(facetCutSchema),
       initAddress: zodHex,
-      initCalldata: zodHex
-    })
-  ])
-})
+      initCalldata: zodHex,
+    }),
+  ]),
+});
 
 export const upgradeCallDataSchema = z.object({
   functionName: z.string(),
@@ -42,7 +42,7 @@ export const upgradeCallDataSchema = z.object({
       l2ProtocolUpgradeTx: z.object({
         to: z.bigint(),
         from: z.bigint(),
-        data: zodHex
+        data: zodHex,
       }),
       factoryDeps: z.array(z.any()),
       bootloaderHash: zodHex,
@@ -52,23 +52,25 @@ export const upgradeCallDataSchema = z.object({
       l1ContractsUpgradeCalldata: z.string(),
       postUpgradeCalldata: zodHex,
       upgradeTimestamp: z.bigint(),
-      newProtocolVersion: z.bigint()
-    })
-  ])
-})
+      newProtocolVersion: z.bigint(),
+    }),
+  ]),
+});
 
 export const l2UpgradeSchema = z.object({
   functionName: z.string(),
   args: z.tuple([
-    z.array(z.object({
-      bytecodeHash: zodHex,
-      newAddress: zodHex,
-      callConstructor: z.boolean(),
-      value: z.bigint(),
-      input: z.string()
-    }))
-  ])
-})
+    z.array(
+      z.object({
+        bytecodeHash: zodHex,
+        newAddress: zodHex,
+        callConstructor: z.boolean(),
+        value: z.bigint(),
+        input: z.string(),
+      })
+    ),
+  ]),
+});
 
 export type MemoryDiffRaw = z.infer<typeof memoryDiffParser>;
-export type FacetCut = z.infer<typeof facetCutSchema>
+export type FacetCut = z.infer<typeof facetCutSchema>;
