@@ -1,9 +1,9 @@
-import { type Abi, bytesToHex, toFunctionSelector, type Hex, hexToBytes } from "viem";
-import type { BlockExplorerClient, ContractData, FacetData } from "./index";
-import type { ContractAbi } from "./contract-abi";
-import type { RpcClient } from "./rpc-client";
-import { facetsResponseSchema } from "../schema/new-facets";
-import type { ZodType, z } from "zod";
+import {type Abi, bytesToHex, type Hex, hexToBytes, toFunctionSelector} from "viem";
+import type {BlockExplorerClient, ContractData, FacetData, BlockExplorer} from "./index";
+import type {ContractAbi} from "./contract-abi";
+import type {RpcClient} from "./rpc-client";
+import {facetsResponseSchema} from "../schema/new-facets";
+import type {z, ZodType} from "zod";
 
 const DIAMOND_FUNCTIONS = {
   facets: "facets",
@@ -61,7 +61,7 @@ export class Diamond {
   }
 
   private async findGetterFacetAbi(
-    client: BlockExplorerClient,
+    client: BlockExplorer,
     rpc: RpcClient
   ): Promise<ContractAbi> {
     // Manually encode calldata becasue at this stage there
@@ -80,7 +80,7 @@ export class Diamond {
 
   private async initializeFacets(
     abi: Abi,
-    _client: BlockExplorerClient,
+    _client: BlockExplorer,
     rpc: RpcClient
   ): Promise<void> {
     const facets = await rpc.contractRead(
@@ -101,14 +101,14 @@ export class Diamond {
     );
   }
 
-  private async initializeAbis(client: BlockExplorerClient): Promise<void> {
+  private async initializeAbis(client: BlockExplorer): Promise<void> {
     for (const address of this.facetToSelectors.keys()) {
       const abi = await client.getAbi(address);
       this.abis.set(this.sanitizeHex(address), abi);
     }
   }
 
-  private async initializeContractData(client: BlockExplorerClient): Promise<void> {
+  private async initializeContractData(client: BlockExplorer): Promise<void> {
     for (const address of this.facetToSelectors.keys()) {
       const contractData = await client.getSourceCode(address);
       this.facetToContractData.set(this.sanitizeHex(address), contractData);

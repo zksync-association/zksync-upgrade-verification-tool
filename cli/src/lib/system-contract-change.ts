@@ -1,8 +1,8 @@
-import type { Hex } from "viem";
-import type { BlockExplorerClient } from "./block-explorer-client";
-import { ContractData } from "./contract-data.js";
-import { ContracNotVerified } from "./errors.js";
-import type { EraContractsRepo } from "./era-contracts-repo";
+import type {Hex} from "viem";
+import type {BlockExplorer} from "./block-explorer-client";
+import {ContractData} from "./contract-data.js";
+import {ContracNotVerified} from "./errors.js";
+import type {EraContractsRepo} from "./era-contracts-repo";
 
 export class SystemContractChange {
   address: Hex;
@@ -17,7 +17,7 @@ export class SystemContractChange {
     this.proposedBytecodeHash = proposedBytecodeHash;
   }
 
-  async downloadCurrentCode(client: BlockExplorerClient): Promise<ContractData> {
+  async downloadCurrentCode(client: BlockExplorer): Promise<ContractData> {
     try {
       const data = await client.getSourceCode(this.address);
       data.remapKeys("contracts-preprocessed", "");

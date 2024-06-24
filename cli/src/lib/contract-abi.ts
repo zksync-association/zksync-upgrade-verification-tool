@@ -3,7 +3,7 @@ import type { z } from "zod";
 
 export class ContractAbi {
   raw: Abi;
-  private selectors: Map<string, AbiFunction>;
+  private selectors: Map<Hex, AbiFunction>;
 
   constructor(raw: Abi) {
     this.raw = raw;
@@ -16,7 +16,11 @@ export class ContractAbi {
     }
   }
 
-  signatureForSelector(selector: string): string {
+  allSelectors (): Hex[] {
+    return [...this.selectors.keys()]
+  }
+
+  signatureForSelector(selector: Hex): string {
     const fn = this.selectors.get(selector);
     if (!fn) {
       return "unknown";

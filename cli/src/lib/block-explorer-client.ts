@@ -1,17 +1,18 @@
-import type { Abi } from "viem";
-import {
-  account20String,
-  getAbiSchema,
-  sourceCodeResponseSchema,
-  sourceCodeSchema,
-} from "../schema/index.js";
-import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
-import type { z, ZodType } from "zod";
-import { ContractData } from "./contract-data.js";
-import { ContracNotVerified, ExternalApiError } from "./errors.js";
-import { ContractAbi } from "./contract-abi";
+import {account20String, getAbiSchema, sourceCodeResponseSchema, sourceCodeSchema,} from "../schema/index.js";
+import {ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network} from "./constants.js";
+import type {z, ZodType} from "zod";
+import {ContractData} from "./contract-data.js";
+import {ContracNotVerified, ExternalApiError} from "./errors.js";
+import {ContractAbi} from "./contract-abi";
 
-export class BlockExplorerClient {
+
+export interface BlockExplorer {
+  getAbi(rawAddress: string): Promise<ContractAbi>;
+  getSourceCode(rawAddress: string): Promise<ContractData>;
+  isVerified(addr: string): Promise<boolean>;
+}
+
+export class BlockExplorerClient implements BlockExplorer {
   private apiKey: string;
   baseUri: string;
   private abiCache: Map<string, ContractAbi>;
@@ -62,7 +63,7 @@ export class BlockExplorerClient {
 
     const contractAddr = account20String.parse(rawAddress);
 
-    const { message, result } = await this.fetch(
+    const {message, result} = await this.fetch(
       {
         module: "contract",
         action: "getabi",
@@ -92,7 +93,7 @@ export class BlockExplorerClient {
 
     const contractAddr = account20String.parse(rawAddress);
 
-    const { message, result } = await this.fetch(
+    const {message, result} = await this.fetch(
       {
         module: "contract",
         action: "getsourcecode",
@@ -128,10 +129,10 @@ export class BlockExplorerClient {
       // This means that the response was not an object, instead it was a string with the source code.
       // We cannot recreate the dir structure in this case. We also don't know the right file name or file type.
       if (e instanceof SyntaxError) {
-        const content = { content: result[0].SourceCode };
+        const content = {content: result[0].SourceCode};
         const data = new ContractData(
           result[0].ContractName,
-          { "contract.sol": content },
+          {"contract.sol": content},
           contractAddr
         );
         this.sourceCache.set(rawAddress, data);

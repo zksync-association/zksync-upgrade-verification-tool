@@ -1,5 +1,5 @@
-import type { BlockExplorerClient } from "./block-explorer-client.js";
-import type { ContractData } from "./contract-data.js";
+import type {BlockExplorer} from "./block-explorer-client.js";
+import type {ContractData} from "./contract-data.js";
 
 export class VerifierContract {
   address: string;
@@ -19,7 +19,7 @@ export class VerifierContract {
     this.recursionNodeLevelVkHash = recursionNodeLevelVkHash;
   }
 
-  async getCode(client: BlockExplorerClient): Promise<ContractData> {
+  async getCode(client: BlockExplorer): Promise<ContractData> {
     return client.getSourceCode(this.address);
   }
 }

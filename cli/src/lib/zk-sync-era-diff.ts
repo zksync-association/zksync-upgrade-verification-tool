@@ -1,14 +1,15 @@
-import type { VerifierContract } from "./verifier.js";
+import type {VerifierContract} from "./verifier.js";
 import path from "node:path";
 import CliTable from "cli-table3";
-import type { BlockExplorerClient } from "./block-explorer-client.js";
-import type { SystemContractChange } from "./system-contract-change";
-import { systemContractHashesParser } from "../schema/github-schemas.js";
-import { ContractData } from "./contract-data.js";
-import { ADDRESS_ZERO, ZERO_U256 } from "./constants.js";
+import type {BlockExplorerClient, BlockExplorer} from "./block-explorer-client.js";
+import type {SystemContractChange} from "./system-contract-change";
+import {systemContractHashesParser} from "../schema/github-schemas.js";
+import {ContractData} from "./contract-data.js";
+import {ADDRESS_ZERO, ZERO_U256} from "./constants.js";
 import chalk from "chalk";
-import type { EraContractsRepo } from "./era-contracts-repo";
+import type {EraContractsRepo} from "./era-contracts-repo";
 import fs from "node:fs/promises";
+import type {Hex} from "viem";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -198,7 +199,7 @@ export class ZkSyncEraDiff {
   }
 
   async toCliReport(
-    client: BlockExplorerClient,
+    client: BlockExplorer,
     upgradeDir: string,
     repo: EraContractsRepo
   ): Promise<string> {
@@ -237,7 +238,7 @@ export class ZkSyncEraDiff {
         newFunctions = await Promise.all(
           newFunctions.map(async (selector) => {
             const abi = await client.getAbi(change.newAddress);
-            return abi.signatureForSelector(selector);
+            return abi.signatureForSelector(selector as Hex);
           })
         );
       }
@@ -248,7 +249,7 @@ export class ZkSyncEraDiff {
           .filter((s) => this.orphanedSelectors.includes(s))
           .map(async (selector) => {
             const abi = await client.getAbi(change.oldAddress);
-            return abi.signatureForSelector(selector);
+            return abi.signatureForSelector(selector as Hex);
           })
       );
 

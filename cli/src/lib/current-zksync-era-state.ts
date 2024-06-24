@@ -1,34 +1,17 @@
-import {
-  bytesToBigInt,
-  bytesToHex,
-  bytesToNumber,
-  type Hex,
-  hexToBytes,
-  hexToNumber,
-  numberToHex,
-} from "viem";
-import type { FacetData } from "./upgrade-changes";
-import { Option } from "nochoices";
-import { MissingRequiredProp } from "./errors";
-import { DIAMOND_ADDRS, type Network } from "./constants";
-import { Diamond } from "./diamond";
-import { BlockExplorerClient } from "./block-explorer-client";
-import { RpcClient } from "./rpc-client";
-import { zodHex } from "../schema/zod-optionals";
-import { RpcStorageSnapshot } from "./storage/rpc-storage-snapshot";
-import { StringStorageVisitor } from "./reports/string-storage-visitor";
-import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props";
-import {
-  RpcSystemContractProvider,
-  SystemContractList,
-  type SystemContractProvider,
-} from "./system-contract-providers";
-import {
-  callDataSchema,
-  type FacetCut,
-  l2UpgradeSchema,
-  upgradeCallDataSchema,
-} from "../schema/rpc";
+import {bytesToBigInt, bytesToHex, bytesToNumber, type Hex, hexToBytes, hexToNumber, numberToHex,} from "viem";
+import type {FacetData} from "./upgrade-changes";
+import {Option} from "nochoices";
+import {MissingRequiredProp} from "./errors";
+import {DIAMOND_ADDRS, type Network} from "./constants";
+import {Diamond} from "./diamond";
+import {BlockExplorerClient, type BlockExplorer} from "./block-explorer-client";
+import {RpcClient} from "./rpc-client";
+import {zodHex} from "../schema/zod-optionals";
+import {RpcStorageSnapshot} from "./storage/rpc-storage-snapshot";
+import {StringStorageVisitor} from "./reports/string-storage-visitor";
+import {MAIN_CONTRACT_FIELDS} from "./storage/storage-props";
+import {RpcSystemContractProvider, SystemContractList, type SystemContractProvider,} from "./system-contract-providers";
+import {callDataSchema, type FacetCut, l2UpgradeSchema, upgradeCallDataSchema,} from "../schema/rpc";
 
 export type L2ContractData = {
   address: Hex;
@@ -231,7 +214,7 @@ export class CurrentZksyncEraState {
     network: Network,
     explorerL1: BlockExplorerClient,
     rpc: RpcClient,
-    explorerL2: BlockExplorerClient
+    explorerL2: BlockExplorer
   ): Promise<CurrentZksyncEraState> {
     const addr = DIAMOND_ADDRS[network];
     const diamond = new Diamond(addr);
@@ -317,7 +300,7 @@ const SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
 
 async function reduceFacetCuts(
   cuts: FacetCut[],
-  explorer: BlockExplorerClient
+  explorer: BlockExplorer
 ): Promise<FacetData[]> {
   const selected = cuts.filter((cut) => cut.action === 0);
 
