@@ -140,6 +140,11 @@ export class EraContractsRepo {
   }
 
   async currentRef(): Promise<string> {
-    return this._currentRef.getOrInsert(this.git.revparse("--short HEAD"));
+    return this._currentRef.getOrInsert(this.git.revparse(["--short", "HEAD"]));
+  }
+
+  async currentBranch(): Promise<Option<string>> {
+    const branch = await this.git.branch()
+    return Option.fromNullable(branch.current)
   }
 }

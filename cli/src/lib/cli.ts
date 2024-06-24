@@ -8,6 +8,7 @@ import { storageChangeCommand } from "../commands/storage-change-command";
 import { Option } from "nochoices";
 import { failHandler } from "../commands/fail-handler";
 import { storageSnapshotCommand } from "../commands/storage-snapshot-command";
+import {checkCommand2} from "../commands/check-command-2";
 
 export function buildCli(
   args: string[],
@@ -76,6 +77,19 @@ export function buildCli(
         }),
       async (yargs) => {
         await checkCbk(env, yargs.upgradeDirectory);
+      }
+    )
+    .command(
+      "check2 <upgradeDirectory>",
+      "get current state of contracts",
+      (yargs) =>
+        yargs.positional("upgradeDirectory", {
+          describe: "FolderName of the upgrade to check",
+          type: "string",
+          demandOption: true,
+        }),
+      async (yargs) => {
+        await checkCommand2(env, yargs.upgradeDirectory);
       }
     )
     .command(
