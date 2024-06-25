@@ -60,7 +60,7 @@ export class CheckReport {
       const table = new CliTable({head: [facet.name]})
 
       table.push(["Old address", facet.oldAddress.unwrapOr("")])
-      table.push(["New address", facet.newAddress.unwrapOr("")])
+      table.push(["New address", facet.newAddress.unwrapOr("Facet removed")])
 
       if (facet.oldAddress.isSome()) {
         const oldAbi = await this.explorer.getAbi(facet.oldAddress.unwrap())
@@ -76,8 +76,8 @@ export class CheckReport {
         table.push(["New functions", newFunctions.join("\n")])
         table.push(["Upgraded functions", preserved.join("\n")])
       } else {
-        table.push(["New functions", "None."])
-        table.push(["Upgraded functions", "None."])
+        table.push(["New functions", "None"])
+        table.push(["Upgraded functions", "None"])
       }
 
       lines.push("", table.toString(), "")
