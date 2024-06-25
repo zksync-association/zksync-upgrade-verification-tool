@@ -3,7 +3,7 @@ import {
   getAbiSchema,
   sourceCodeResponseSchema,
   sourceCodeSchema,
-} from "../schema/index.js";
+} from "../schema";
 import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
 import type { z, ZodType } from "zod";
 import { ContractData } from "./contract-data.js";

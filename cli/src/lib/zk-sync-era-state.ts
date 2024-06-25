@@ -3,7 +3,7 @@ import type { UpgradeChanges } from "./upgrade-changes.js";
 import type { BlockExplorerClient, BlockExplorer } from "./block-explorer-client.js";
 import type { Network } from "./constants.js";
 import { VerifierContract } from "./verifier.js";
-import { verifierParamsSchema } from "../schema/index.js";
+import { verifierParamsSchema } from "../schema";
 import { z } from "zod";
 import { type Abi, bytesToNumber, type Hex, numberToBytes } from "viem";
 import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
