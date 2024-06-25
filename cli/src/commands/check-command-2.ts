@@ -31,6 +31,9 @@ export async function checkCommand2(env: EnvBuilder, upgradeDirectory: string) {
 
   const diff = new NewZkSyncEraDiff(current, proposed, systemContractsAddrs);
 
-  const report = new CheckReport(diff, await env.contractsRepo(), env.l1Client())
-  console.log(await report.format());
+  const repo = await env.contractsRepo();
+  await repo.compileSystemContracts();
+
+  const report = new CheckReport(diff, repo, env.l1Client())
+  env.term().line(await report.format())
 }

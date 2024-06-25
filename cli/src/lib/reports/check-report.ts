@@ -1,8 +1,9 @@
-import type {NewZkSyncEraDiff} from "../new-zk-sync-era-diff";
+import {hexAreEq, type NewZkSyncEraDiff} from "../new-zk-sync-era-diff";
 import type {ContractsRepo} from "../git-contracts-repo";
 import CliTable from "cli-table3";
 import type {BlockExplorer} from "../block-explorer-client";
 import {HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS} from "../current-zksync-era-state";
+import type {Hex} from "viem";
 
 export interface CheckReportOptions {
   shortOutput: boolean
@@ -175,9 +176,11 @@ export class CheckReport {
     const table = new CliTable({head: ["System Contract", "Address", "Bytecode hash"]});
 
     for (const contract of changes) {
-      const fromRepo = await this.repo.byteCodeHashFor(contract.name)
-        .then(o => o.map(hash => this.formatHex(hash)));
-      const bytecodeMatches = fromRepo.isSomeAnd((hash) => hash === contract.proposedBytecodeHash);
+      const fromRepo = await this.repo.byteCodeHashFor(contract.name);
+
+      const bytecodeMatches = fromRepo.isSomeAnd((hash) => {
+        return hexAreEq(hash as Hex, contract.proposedBytecodeHash)
+      });
       if (!bytecodeMatches) {
         warnings.push(
           `Bytecode for "${contract.name}" does not match after recompile from sources`
@@ -197,7 +200,7 @@ export class CheckReport {
   }
 
   private boolEmoji(value: boolean): string {
-    return value ? "✅" : "⚠️";
+    return value ? "✔" : "⚠️";
   }
 
   private async addWarnings(lines: string[], warnings: string[]): Promise<void> {

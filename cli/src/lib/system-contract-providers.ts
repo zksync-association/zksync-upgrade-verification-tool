@@ -51,7 +51,7 @@ export class RpcSystemContractProvider implements SystemContractProvider {
 
     return data.map((d) => {
       return {
-        name: d.name,
+        name: d.name.replace(/^.*:/, ""),
         bytecodeHash: `0x${hex}`,
         address: addr,
       };

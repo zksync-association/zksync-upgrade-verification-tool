@@ -18,7 +18,7 @@ export type FacetDataDiff = {
   preservedSelectors: Hex[];
 };
 
-function hexAreEq(hex1: Hex, hex2: Hex): boolean {
+export function hexAreEq(hex1: Hex, hex2: Hex): boolean {
   return hex1.toLowerCase() === hex2.toLowerCase()
 }
 
