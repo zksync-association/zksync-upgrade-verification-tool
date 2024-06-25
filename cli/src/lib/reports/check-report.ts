@@ -94,7 +94,6 @@ export class CheckReport {
       const [before, maybeAfter] = this.diff.hexAttrDiff(field);
 
       const after = maybeAfter
-        .filter((v) => v !== before)
         .map((v) => v.toString())
         .unwrapOr("No changes.");
       table.push(
@@ -107,7 +106,6 @@ export class CheckReport {
       const [before, maybeAfter] = this.diff.numberAttrDiff(field);
 
       const after = maybeAfter
-        .filter((v) => v !== before)
         .map((v) => v.toString())
         .unwrapOr("No changes.");
       table.push(

@@ -18,6 +18,10 @@ export type FacetDataDiff = {
   preservedSelectors: Hex[];
 };
 
+function hexAreEq(hex1: Hex, hex2: Hex): boolean {
+  return hex1.toLowerCase() === hex2.toLowerCase()
+}
+
 export class NewZkSyncEraDiff {
   current: CurrentZksyncEraState;
   proposed: CurrentZksyncEraState;
@@ -34,16 +38,18 @@ export class NewZkSyncEraDiff {
   }
 
   hexAttrDiff(prop: HexEraPropNames): [Hex, Option<Hex>] {
+    const current = this.current.hexAttrValue(prop).expect(new MissingRequiredProp(prop));
     return [
-      this.current.hexAttrValue(prop).expect(new MissingRequiredProp(prop)),
-      this.proposed.hexAttrValue(prop),
+      current,
+      this.proposed.hexAttrValue(prop).filter(proposed => !hexAreEq(current, proposed)),
     ];
   }
 
   numberAttrDiff(prop: NumberEraPropNames): [bigint, Option<bigint>] {
+    const current = this.current.numberAttrValue(prop).expect(new MissingRequiredProp(prop));
     return [
-      this.current.numberAttrValue(prop).expect(new MissingRequiredProp(prop)),
-      this.proposed.numberAttrValue(prop),
+      current,
+      this.proposed.numberAttrValue(prop).filter(proposed => proposed !== current),
     ];
   }
 
@@ -93,7 +99,7 @@ export class NewZkSyncEraDiff {
         return [newFacet, oldFacets.find((oldFacet) => oldFacet.name === newFacet.name)] as const;
       })
       .filter(([_newFacet, oldFacetOrNull]) => oldFacetOrNull) as [FacetData, FacetData][];
-    upgradedFacets = upgradedFacets.filter(([o, n]) => o.address !== n.address);
+    upgradedFacets = upgradedFacets.filter(([o, n]) => !hexAreEq(o.address, n.address));
 
     return upgradedFacets.map(([newFacet, oldFacet]) => {
       const addedSelectors = newFacet.selectors.filter((sel) => !oldFacet.selectors.includes(sel));

@@ -1,34 +1,17 @@
-import {
-  bytesToBigInt,
-  bytesToHex,
-  bytesToNumber,
-  type Hex,
-  hexToBytes,
-  hexToNumber,
-  numberToHex,
-} from "viem";
-import type { FacetData } from "./upgrade-changes";
-import { Option } from "nochoices";
-import { MissingRequiredProp } from "./errors";
-import { DIAMOND_ADDRS, type Network } from "./constants";
-import { Diamond } from "./diamond";
-import { BlockExplorerClient, type BlockExplorer } from "./block-explorer-client";
-import { RpcClient } from "./rpc-client";
-import { zodHex } from "../schema/zod-optionals";
-import { RpcStorageSnapshot } from "./storage/rpc-storage-snapshot";
-import { StringStorageVisitor } from "./reports/string-storage-visitor";
-import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props";
-import {
-  RpcSystemContractProvider,
-  SystemContractList,
-  type SystemContractProvider,
-} from "./system-contract-providers";
-import {
-  callDataSchema,
-  type FacetCut,
-  l2UpgradeSchema,
-  upgradeCallDataSchema,
-} from "../schema/rpc";
+import {bytesToBigInt, bytesToHex, bytesToNumber, type Hex, hexToBytes, hexToNumber, numberToHex,} from "viem";
+import type {FacetData} from "./upgrade-changes";
+import {Option} from "nochoices";
+import {MissingRequiredProp} from "./errors";
+import {DIAMOND_ADDRS, type Network} from "./constants";
+import {Diamond} from "./diamond";
+import {type BlockExplorer, BlockExplorerClient} from "./block-explorer-client";
+import {RpcClient} from "./rpc-client";
+import {zodHex} from "../schema/zod-optionals";
+import {RpcStorageSnapshot} from "./storage/rpc-storage-snapshot";
+import {StringStorageVisitor} from "./reports/string-storage-visitor";
+import {MAIN_CONTRACT_FIELDS} from "./storage/storage-props";
+import {RpcSystemContractProvider, SystemContractList, type SystemContractProvider,} from "./system-contract-providers";
+import {callDataSchema, type FacetCut, l2UpgradeSchema, upgradeCallDataSchema,} from "../schema/rpc";
 import {z} from "zod";
 
 export type L2ContractData = {
@@ -179,15 +162,13 @@ export class CurrentZksyncEraState {
       .map((prop) => prop.accept(visitor))
       .map((prop) => BigInt(prop));
 
-    const protocolVersion1 = await diamond.contractRead(rpc, "getProtocolVersion", z.bigint())
-      .then(n => numberToHex(n, { size: 32 }));
-    console.log("protocolVersion1", protocolVersion1)
     const data: ZkEraStateData = {
       admin: await diamond.contractRead(rpc, "getAdmin", zodHex),
       pendingAdmin: await diamond.contractRead(rpc, "getPendingAdmin", zodHex),
       verifierAddress: await diamond.contractRead(rpc, "getVerifier", zodHex),
       bridgeHubAddress: await diamond.contractRead(rpc, "getBridgehub", zodHex),
-      protocolVersion: protocolVersion1,
+      protocolVersion: await diamond.contractRead(rpc, "getProtocolVersion", z.bigint())
+        .then(n => numberToHex(n, {size: 32})),
       baseTokenBridgeAddress: await diamond.contractRead(rpc, "getBaseTokenBridge", zodHex),
       stateTransitionManagerAddress: await diamond.contractRead(
         rpc,
