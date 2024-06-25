@@ -20,13 +20,13 @@ export class ContractAbi {
     return [...this.selectors.keys()];
   }
 
-  signatureForSelector(selector: Hex): string {
+  signatureForSelector(selector: Hex, long = true): string {
     const fn = this.selectors.get(selector);
     if (!fn) {
       return "unknown";
     }
     const params = fn.inputs.map((i) => `${i.type} ${i.name}`);
-    return `${fn.name}(${params.join(", ")})`;
+    return `${fn.name}(${long ? params.join(", ") : "..."})`;
   }
 
   decodeCallData<T extends z.ZodTypeAny>(callData: Hex, schema: T): z.infer<typeof schema> {
