@@ -216,7 +216,7 @@ export class CurrentZksyncEraState {
     explorerL1: BlockExplorerClient,
     rpc: RpcClient,
     explorerL2: BlockExplorer
-  ): Promise<CurrentZksyncEraState> {
+  ): Promise<[CurrentZksyncEraState, Hex[]]> {
     const addr = DIAMOND_ADDRS[network];
     const diamond = new Diamond(addr);
 
@@ -253,7 +253,7 @@ export class CurrentZksyncEraState {
 
     // TODO: Just imposible to get baseTokenGasPriceMultiplierNominator and baseTokenGasPriceMultiplierDenominator
     // from calldata. The only way is simulating the call.
-    return new CurrentZksyncEraState(
+    const state = new CurrentZksyncEraState(
       {
         protocolVersion: numberToHex(decodedUpgrade.args[0].newProtocolVersion, { size: 32 }),
         verifierAddress: decodedUpgrade.args[0].verifier,
@@ -268,6 +268,7 @@ export class CurrentZksyncEraState {
       facets,
       new SystemContractList(systemContracts)
     );
+    return [state, systemContracts.map(l => l.address)];
   }
 }
 

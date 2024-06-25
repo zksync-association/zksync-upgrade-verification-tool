@@ -1,8 +1,8 @@
-import type { NewZkSyncEraDiff } from "../new-zk-sync-era-diff";
-import type { ContractsRepo } from "../git-contracts-repo";
+import type {NewZkSyncEraDiff} from "../new-zk-sync-era-diff";
+import type {ContractsRepo} from "../git-contracts-repo";
 import CliTable from "cli-table3";
-import type { BlockExplorer } from "../block-explorer-client";
-import { HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS } from "../current-zksync-era-state";
+import type {BlockExplorer} from "../block-explorer-client";
+import {HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS} from "../current-zksync-era-state";
 
 export interface CheckReportOptions {
   shortOutput: boolean
@@ -18,7 +18,7 @@ export class CheckReport {
     this.diff = diff;
     this.repo = repo;
     this.explorer = explorer;
-    this.opts = opts || { shortOutput: true }
+    this.opts = opts || {shortOutput: true}
   }
 
   private long(): boolean {
@@ -46,8 +46,18 @@ export class CheckReport {
     const title = "Upgrade metadata";
     lines.push(title);
     lines.push("=".repeat(title.length));
+    lines.push(
+      "This report shows a summary of what is changing with this upgrade.",
+      "The tool offers other reports to go more in depth, for example to analyze the changes",
+      "in the storage caused by the upgrade or check the difference in the code of the affected",
+      "contracts.",
+      "",
+      "This tool is downloading all the sources realated to system contracts, and compiling them",
+      "locally. This allows the tool to compare bytecode hashes for every l2 contract.",
+      ""
+    )
 
-    const table = new CliTable({ head: ["Name", "Value"], style: { compact: true } });
+    const table = new CliTable({head: ["Name", "Value"], style: {compact: true}});
     const [currentVersion, proposedVersion] = this.diff.protocolVersion();
     table.push(["Current version", currentVersion]);
     table.push(["Proposed version", proposedVersion]);
@@ -69,9 +79,14 @@ export class CheckReport {
     }
 
     this.addTitle(lines, "Facet changes");
+    lines.push(
+      "ZkSync Era main contract is a diamond. This a summary of how",
+      "their facets are being updated.",
+      ""
+    )
 
     for (const facet of facets) {
-      const table = new CliTable({ head: [facet.name] });
+      const table = new CliTable({head: [facet.name]});
 
       table.push(["Old address", facet.oldAddress.map(this.formatHex).unwrapOr("")]);
       table.push(["New address", facet.newAddress.unwrapOr("Facet removed")]);
@@ -103,7 +118,13 @@ export class CheckReport {
 
   private async addFields(lines: string[]): Promise<void> {
     this.addTitle(lines, "Contract fields");
-    const table = new CliTable({ head: ["Field name", "Field Values"] });
+    lines.push(
+      "Summary with the most important fields of ZkSync era main",
+      "contract affected by te upgrade.",
+      ""
+    )
+
+    const table = new CliTable({head: ["Field name", "Field Values"]});
     for (const field of HEX_ZKSYNC_FIELDS) {
       const [before, maybeAfter] = this.diff.hexAttrDiff(field);
 
@@ -111,7 +132,7 @@ export class CheckReport {
         .map((v) => this.formatHex(v))
         .unwrapOr("No changes.");
       table.push(
-        [{ content: field, rowSpan: 2, vAlign: "center" }, `Current: ${this.formatHex(before)}`],
+        [{content: field, rowSpan: 2, vAlign: "center"}, `Current: ${this.formatHex(before)}`],
         [`Proposed: ${after}`]
       );
     }
@@ -123,7 +144,7 @@ export class CheckReport {
         .map((v) => v.toString())
         .unwrapOr("No changes.");
       table.push(
-        [{ content: field, rowSpan: 2, vAlign: "center" }, `Current: ${before}`],
+        [{content: field, rowSpan: 2, vAlign: "center"}, `Current: ${before}`],
         [`Proposed: ${after}`]
       );
     }
@@ -145,8 +166,13 @@ export class CheckReport {
     }
 
     this.addTitle(lines, "System contracts");
+    lines.push(
+      "Summary of system contract affected by the upgrades.",
+      "Each system contract is recompiled locally to check that the bytecode hash matches",
+      ""
+    )
 
-    const table = new CliTable({ head: ["System Contract", "Address", "Bytecode hash"] });
+    const table = new CliTable({head: ["System Contract", "Address", "Bytecode hash"]});
 
     for (const contract of changes) {
       const fromRepo = await this.repo.byteCodeHashFor(contract.name)
@@ -159,16 +185,19 @@ export class CheckReport {
       }
       table.push(
         [
-          { content: contract.name, rowSpan: 3, vAlign: "center" },
-          { content: this.formatHex(contract.address), rowSpan: 3, vAlign: "center" },
+          {content: contract.name, rowSpan: 2, vAlign: "center"},
+          {content: this.formatHex(contract.address), rowSpan: 2, vAlign: "center"},
           `Current: ${this.formatHex(contract.currentBytecodeHash)}`,
         ],
-        [`Proposed: ${this.formatHex(contract.proposedBytecodeHash)}`],
-        [`Bytecode hash match with sources: ${bytecodeMatches}`]
+        [`Proposed: ${this.formatHex(contract.proposedBytecodeHash)} (${this.boolEmoji(bytecodeMatches)})`],
       );
     }
 
     lines.push(table.toString(), "");
+  }
+
+  private boolEmoji(value: boolean): string {
+    return value ? "✅" : "⚠️";
   }
 
   private async addWarnings(lines: string[], warnings: string[]): Promise<void> {

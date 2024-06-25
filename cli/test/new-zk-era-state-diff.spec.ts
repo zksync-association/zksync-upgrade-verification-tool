@@ -546,7 +546,7 @@ describe("NewZkSyncStateDiff", () => {
       const explorerL2 = BlockExplorerClient.forL2("mainnet");
       const rpc = RpcClient.forL1("mainnet");
 
-      const state = await CurrentZksyncEraState.fromCalldata(
+      const [state] = await CurrentZksyncEraState.fromCalldata(
         buff,
         "mainnet",
         explorerL1,

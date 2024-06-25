@@ -21,7 +21,7 @@ export async function checkCommand2(env: EnvBuilder, upgradeDirectory: string) {
     throw new Error("missing hex");
   }
 
-  const proposed = await CurrentZksyncEraState.fromCalldata(
+  const [proposed, systemContractsAddrs] = await CurrentZksyncEraState.fromCalldata(
     Buffer.from(hexToBytes(txFile.governanceOperation.calls[0].data)),
     env.network,
     env.l1Client(),
@@ -29,7 +29,7 @@ export async function checkCommand2(env: EnvBuilder, upgradeDirectory: string) {
     env.l2Client()
   );
 
-  const diff = new NewZkSyncEraDiff(current, proposed, []);
+  const diff = new NewZkSyncEraDiff(current, proposed, systemContractsAddrs);
 
   const report = new CheckReport(diff, await env.contractsRepo(), env.l1Client())
   console.log(await report.format());

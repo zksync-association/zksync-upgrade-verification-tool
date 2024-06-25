@@ -83,10 +83,12 @@ export class GitContractsRepo implements ContractsRepo {
   }
 
   async byteCodeHashFor(systemContractName: string): Promise<Option<string>> {
-    const byteCode = await this.byteCodeFor(systemContractName);
-    const rawHash = utils.hashBytecode(byteCode.unwrap());
-    const hex = Buffer.from(rawHash).toString("hex");
-    return Option.Some(`0x${hex}`);
+    const maybeByteCode = await this.byteCodeFor(systemContractName);
+    return maybeByteCode.map(byteCode => {
+      const rawHash = utils.hashBytecode(byteCode);
+      const hex = Buffer.from(rawHash).toString("hex");
+      return `0x${hex}`;
+    });
   }
 
   private async extractBytecodeFromFile(filePath: string): Promise<Buffer> {
