@@ -20,6 +20,8 @@ interface Ctx {
   sysAddr1: Hex,
   sysAddr2: Hex,
   sysAddr3: Hex,
+  sysContractsBefore: L2ContractData[],
+  sysContractsAfter: L2ContractData[],
   currentState: CurrentZksyncEraState,
   proposedState: CurrentZksyncEraState,
   explorer: BlockExplorer
@@ -85,7 +87,7 @@ describe('CheckReport', () => {
       }
     ])
 
-    const currentSysContracts: L2ContractData[] = [
+    ctx.sysContractsBefore = [
       {
         name: "Ecrecover",
         address: ctx.sysAddr1,
@@ -124,10 +126,10 @@ describe('CheckReport', () => {
           selectors: ctx.abi2.allSelectors()
         }
       ],
-      new SystemContractList(currentSysContracts)
+      new SystemContractList(ctx.sysContractsBefore)
     )
 
-    const proposedSysContracts: L2ContractData[] = [
+    ctx.sysContractsAfter = [
       {
         name: "Ecrecover",
         address: ctx.sysAddr1,
@@ -164,7 +166,7 @@ describe('CheckReport', () => {
           selectors: ctx.abi3.allSelectors()
         }
       ],
-      new SystemContractList(proposedSysContracts)
+      new SystemContractList(ctx.sysContractsAfter)
     )
 
     const explorer = new TestBlockExplorer()
@@ -240,5 +242,19 @@ describe('CheckReport', () => {
     expect(lines[upgradedFacetLine + 8]).toContain("f2()")
     expect(lines[upgradedFacetLine + 10]).toContain("Upgraded functions")
     expect(lines[upgradedFacetLine + 10]).toContain("f1()")
+
+    for (const {name, bytecodeHash, address} of ctx.sysContractsBefore) {
+      const line = lines.findIndex(l => l.includes(name))
+      expect(lines).not.toEqual(-1)
+      expect(lines[line]).toContain(address)
+      expect(lines[line - 1]).toContain(`Current: ${bytecodeHash}`)
+    }
+
+    for (const {name, bytecodeHash, address} of ctx.sysContractsAfter) {
+      const line = lines.findIndex(l => l.includes(name))
+      expect(lines).not.toEqual(-1)
+      expect(lines[line]).toContain(address)
+      expect(lines[line + 1]).toContain(`Proposed: ${bytecodeHash}`)
+    }
   })
 });
