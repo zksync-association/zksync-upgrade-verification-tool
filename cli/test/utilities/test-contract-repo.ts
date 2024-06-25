@@ -1,5 +1,5 @@
 import type {ContractsRepo} from "../../src/lib/git-contracts-repo";
-import type {Option} from "nochoices";
+import {Option} from "nochoices";
 
 export class TestContractRepo implements ContractsRepo {
   private gitsha: string;
@@ -16,12 +16,9 @@ export class TestContractRepo implements ContractsRepo {
     this.bytecodeHashes.set(name, hash)
   }
 
-  async byteCodeHashFor(systemContractName: string): Promise<string> {
+  async byteCodeHashFor(systemContractName: string): Promise<Option<string>> {
     const hash = this.bytecodeHashes.get(systemContractName);
-    if (!hash) {
-      throw new Error(`Not present: ${systemContractName}`)
-    }
-    return hash;
+    return Option.fromNullable(hash);
   }
 
   async currentBranch(): Promise<Option<string>> {

@@ -198,10 +198,7 @@ describe('CheckReport', () => {
   })
 
   beforeEach<Ctx>(ctx => {
-    const current = ctx.currentState
-    const proposed = ctx.proposedState
-
-    ctx.diff = new NewZkSyncEraDiff(current, proposed, [
+    ctx.diff = new NewZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
       ctx.sysAddr1,
       ctx.sysAddr2,
       ctx.sysAddr3
@@ -214,103 +211,171 @@ describe('CheckReport', () => {
     return string.split("\n")
   }
 
-  it<Ctx>("Prints all the data for the header", async (ctx) => {
-    const lines = await createReportLines(ctx)
+  describe("simple scenario", () => {
+    it<Ctx>("Prints all the data for the header", async (ctx) => {
+      const lines = await createReportLines(ctx)
 
-    const headerData = [
-      {
-        field: "Current version",
-        value: "15"
-      },
-      {
-        field: "Proposed version",
-        value: "0.24.1"
-      },{
-        field: "Taking l2 contracts from",
-        value: "https://github.com/matter-labs/era-contracts"
-      },{
-        field: "L2 contracts commit",
-        value: "main (somegitsha)"
+      const headerData = [
+        {
+          field: "Current version",
+          value: "15"
+        },
+        {
+          field: "Proposed version",
+          value: "0.24.1"
+        }, {
+          field: "Taking l2 contracts from",
+          value: "https://github.com/matter-labs/era-contracts"
+        }, {
+          field: "L2 contracts commit",
+          value: "main (somegitsha)"
+        }
+      ]
+
+      for (const {field, value} of headerData) {
+        const line = lines.find(l => l.includes(field))
+        expect(line).toBeDefined()
+        expect(line).toMatch(new RegExp(`${escape(field)}.*${escape(value)}`))
       }
-    ]
+    })
 
-    for (const { field, value } of headerData) {
-      const line = lines.find(l => l.includes(field))
-      expect(line).toBeDefined()
-      expect(line).toMatch(new RegExp(`${escape(field)}.*${escape(value)}`))
-    }
-  })
+    it<Ctx>("prints all data for facets", async (ctx) => {
+      const lines = await createReportLines(ctx)
 
-  it<Ctx>("prints all data for facets", async (ctx) => {
-    const lines = await createReportLines(ctx)
-
-    const removedFacetLine = lines.findIndex(l => l.includes("RemovedFacet"))
-    expect(removedFacetLine).not.toEqual(-1)
-    expect(lines[removedFacetLine + 2]).toContain("Old address")
-    expect(lines[removedFacetLine + 2]).toContain(ctx.address1)
-    expect(lines[removedFacetLine + 4]).toContain("New address")
-    expect(lines[removedFacetLine + 4]).toContain("Facet removed")
-    expect(lines[removedFacetLine + 6]).toContain("Removed functions")
-    expect(lines[removedFacetLine + 6]).toContain("removed1()")
-    expect(lines[removedFacetLine + 7]).toContain("removed2()")
-    expect(lines[removedFacetLine + 9]).toContain("New functions")
-    expect(lines[removedFacetLine + 9]).toContain("None")
-    expect(lines[removedFacetLine + 11]).toContain("Upgraded functions")
-    expect(lines[removedFacetLine + 11]).toContain("None")
+      const removedFacetLine = lines.findIndex(l => l.includes("RemovedFacet"))
+      expect(removedFacetLine).not.toEqual(-1)
+      expect(lines[removedFacetLine + 2]).toContain("Old address")
+      expect(lines[removedFacetLine + 2]).toContain(ctx.address1)
+      expect(lines[removedFacetLine + 4]).toContain("New address")
+      expect(lines[removedFacetLine + 4]).toContain("Facet removed")
+      expect(lines[removedFacetLine + 6]).toContain("Removed functions")
+      expect(lines[removedFacetLine + 6]).toContain("removed1()")
+      expect(lines[removedFacetLine + 7]).toContain("removed2()")
+      expect(lines[removedFacetLine + 9]).toContain("New functions")
+      expect(lines[removedFacetLine + 9]).toContain("None")
+      expect(lines[removedFacetLine + 11]).toContain("Upgraded functions")
+      expect(lines[removedFacetLine + 11]).toContain("None")
 
 
-    const upgradedFacetLine = lines.findIndex(l => l.includes("UpgradedFacet"))
-    expect(upgradedFacetLine).not.toEqual(-1)
-    expect(lines[upgradedFacetLine + 2]).toContain("Old address")
-    expect(lines[upgradedFacetLine + 2]).toContain(ctx.address2)
-    expect(lines[upgradedFacetLine + 4]).toContain("New address")
-    expect(lines[upgradedFacetLine + 4]).toContain(ctx.address3)
-    expect(lines[upgradedFacetLine + 6]).toContain("Removed functions")
-    expect(lines[upgradedFacetLine + 8]).toContain("New functions")
-    expect(lines[upgradedFacetLine + 8]).toContain("f2()")
-    expect(lines[upgradedFacetLine + 10]).toContain("Upgraded functions")
-    expect(lines[upgradedFacetLine + 10]).toContain("f1()")
-  })
+      const upgradedFacetLine = lines.findIndex(l => l.includes("UpgradedFacet"))
+      expect(upgradedFacetLine).not.toEqual(-1)
+      expect(lines[upgradedFacetLine + 2]).toContain("Old address")
+      expect(lines[upgradedFacetLine + 2]).toContain(ctx.address2)
+      expect(lines[upgradedFacetLine + 4]).toContain("New address")
+      expect(lines[upgradedFacetLine + 4]).toContain(ctx.address3)
+      expect(lines[upgradedFacetLine + 6]).toContain("Removed functions")
+      expect(lines[upgradedFacetLine + 8]).toContain("New functions")
+      expect(lines[upgradedFacetLine + 8]).toContain("f2()")
+      expect(lines[upgradedFacetLine + 10]).toContain("Upgraded functions")
+      expect(lines[upgradedFacetLine + 10]).toContain("f1()")
+    })
 
-  it<Ctx>("prints all the data for system contract changes", async (ctx) => {
-    const lines = await createReportLines(ctx)
+    it<Ctx>("prints all the data for system contract changes", async (ctx) => {
+      const lines = await createReportLines(ctx)
 
-    for (const {name, bytecodeHash, address} of ctx.sysContractsBefore) {
-      const line = lines.findIndex(l => l.includes(name))
-      expect(line).not.toEqual(-1)
-      expect(lines[line]).toContain(address)
-      expect(lines[line - 2]).toContain(`Current: ${bytecodeHash}`)
-      expect(lines[line + 2]).toContain("Bytecode hash match with sources: true")
-    }
-
-    for (const {name, bytecodeHash, address} of ctx.sysContractsAfter) {
-      const line = lines.findIndex(l => l.includes(name))
-      expect(line).not.toEqual(-1)
-      expect(lines[line]).toContain(address)
-      expect(lines[line]).toContain(`Proposed: ${bytecodeHash}`)
-      expect(lines[line + 2]).toContain("Bytecode hash match with sources: true")
-    }
-  })
-
-  it<Ctx>("prints all the field changes", async (ctx) => {
-    const lines = await createReportLines(ctx)
-
-    for (const field of HEX_ZKSYNC_FIELDS) {
-      const line = lines.findIndex(l => l.includes(field))
-      expect(line).not.toEqual(-1)
-      expect(lines[line - 1]).toContain(ctx.currentFields[field])
-    }
-
-    for (const field of HEX_ZKSYNC_FIELDS) {
-      const line = lines.findIndex(l => l.includes(field))
-      expect(line).not.toEqual(-1)
-      expect(lines[line - 1]).toContain(`Current: ${ctx.currentFields[field]}`)
-      const proposed = ctx.proposedFields[field]
-      if (proposed) {
-        expect(lines[line + 1]).toContain(`Proposed: ${ctx.proposedFields[field]}`)
-      } else {
-        expect(lines[line + 1]).toContain("No changes")
+      for (const {name, bytecodeHash, address} of ctx.sysContractsBefore) {
+        const line = lines.findIndex(l => l.includes(name))
+        expect(line).not.toEqual(-1)
+        expect(lines[line]).toContain(address)
+        expect(lines[line - 2]).toContain(`Current: ${bytecodeHash}`)
+        expect(lines[line + 2]).toContain("Bytecode hash match with sources: true")
       }
-    }
+
+      for (const {name, bytecodeHash, address} of ctx.sysContractsAfter) {
+        const line = lines.findIndex(l => l.includes(name))
+        expect(line).not.toEqual(-1)
+        expect(lines[line]).toContain(address)
+        expect(lines[line]).toContain(`Proposed: ${bytecodeHash}`)
+        expect(lines[line + 2]).toContain("Bytecode hash match with sources: true")
+      }
+    })
+
+    it<Ctx>("prints all the field changes", async (ctx) => {
+      const lines = await createReportLines(ctx)
+
+      for (const field of HEX_ZKSYNC_FIELDS) {
+        const line = lines.findIndex(l => l.includes(field))
+        expect(line).not.toEqual(-1)
+        expect(lines[line - 1]).toContain(ctx.currentFields[field])
+      }
+
+      for (const field of HEX_ZKSYNC_FIELDS) {
+        const line = lines.findIndex(l => l.includes(field))
+        expect(line).not.toEqual(-1)
+        expect(lines[line - 1]).toContain(`Current: ${ctx.currentFields[field]}`)
+        const proposed = ctx.proposedFields[field]
+        if (proposed) {
+          expect(lines[line + 1]).toContain(`Proposed: ${ctx.proposedFields[field]}`)
+        } else {
+          expect(lines[line + 1]).toContain("No changes")
+        }
+      }
+    })
+  })
+
+  describe('when a system contract is not find in the repo', () => {
+    beforeEach<Ctx>(ctx => {
+      const repo = new TestContractRepo("somegitsha", Option.Some("main"), {})
+      // Skipping last element
+      for (const a of ctx.sysContractsAfter.slice(0, 2)) {
+        repo.addHash(a.name, a.bytecodeHash)
+      }
+      ctx.contractsRepo = repo
+
+      ctx.diff = new NewZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
+        ctx.sysAddr1,
+        ctx.sysAddr2,
+        ctx.sysAddr3
+      ])
+    })
+
+    it<Ctx>('indicates that bytecode does not match', async (ctx) => {
+      const lines = await createReportLines(ctx)
+
+      const line = lines.findIndex(l => l.includes(ctx.sysAddr3))
+      expect(line).not.toEqual(-1)
+      expect(lines[line + 2]).toContain("Bytecode hash match with sources: false")
+    })
+
+    it<Ctx>('adds the warning', async (ctx) => {
+      const lines = await createReportLines(ctx)
+
+      const line = lines.findIndex(l => l.includes(`Bytecode for "EcMul" does not match after recompile from sources`))
+      expect(line).not.toEqual(-1)
+    })
+  });
+
+  describe('when a system contract returns a non matching bytecodehash', () => {
+    beforeEach<Ctx>(ctx => {
+      const repo = new TestContractRepo("somegitsha", Option.Some("main"), {})
+      // Skipping last element
+      for (const a of ctx.sysContractsAfter.slice(0, 2)) {
+        repo.addHash(a.name, a.bytecodeHash)
+      }
+      repo.addHash(ctx.sysContractsAfter[2].name, "WrongHash")
+
+      ctx.contractsRepo = repo
+
+      ctx.diff = new NewZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
+        ctx.sysAddr1,
+        ctx.sysAddr2,
+        ctx.sysAddr3
+      ])
+    })
+
+    it<Ctx>('indicates that bytecode does not match', async (ctx) => {
+      const lines = await createReportLines(ctx)
+
+      const line = lines.findIndex(l => l.includes(ctx.sysAddr3))
+      expect(line).not.toEqual(-1)
+      expect(lines[line + 2]).toContain("Bytecode hash match with sources: false")
+    })
+
+    it<Ctx>('adds the warning', async (ctx) => {
+      const lines = await createReportLines(ctx)
+
+      const line = lines.findIndex(l => l.includes(`Bytecode for "EcMul" does not match after recompile from sources`))
+      expect(line).not.toEqual(-1)
+    })
   })
 });

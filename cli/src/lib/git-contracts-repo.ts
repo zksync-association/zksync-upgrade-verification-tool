@@ -13,7 +13,7 @@ import {Option} from "nochoices";
 const execPromise = promisify(exec);
 
 export interface ContractsRepo {
-  byteCodeHashFor(systemContractName: string): Promise<string>;
+  byteCodeHashFor(systemContractName: string): Promise<Option<string>>;
 
   currentRef(): Promise<string>;
 
@@ -72,21 +72,21 @@ export class GitContractsRepo implements ContractsRepo {
     return systemContractHashesParser.parse(JSON.parse(hashesRaw));
   }
 
-  async byteCodeFor(systemContractName: string): Promise<Buffer> {
+  async byteCodeFor(systemContractName: string): Promise<Option<Buffer>> {
     const hashes = await this.systemContractHashes();
     const hashData = hashes.find((d) => d.contractName === systemContractName);
     if (!hashData) {
-      throw new Error(`Unknown contract: ${systemContractName}`);
+      return Option.None()
     }
 
-    return this.extractBytecodeFromFile(hashData.bytecodePath);
+    return Option.Some(await this.extractBytecodeFromFile(hashData.bytecodePath));
   }
 
-  async byteCodeHashFor(systemContractName: string): Promise<string> {
+  async byteCodeHashFor(systemContractName: string): Promise<Option<string>> {
     const byteCode = await this.byteCodeFor(systemContractName);
-    const rawHash = utils.hashBytecode(byteCode);
+    const rawHash = utils.hashBytecode(byteCode.unwrap());
     const hex = Buffer.from(rawHash).toString("hex");
-    return `0x${hex}`;
+    return Option.Some(`0x${hex}`);
   }
 
   private async extractBytecodeFromFile(filePath: string): Promise<Buffer> {

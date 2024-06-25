@@ -1,13 +1,8 @@
 import type {NewZkSyncEraDiff} from "../new-zk-sync-era-diff";
-import type {ContractsRepo, GitContractsRepo} from "../git-contracts-repo";
+import type {ContractsRepo} from "../git-contracts-repo";
 import CliTable from "cli-table3";
-import type {BlockExplorer, BlockExplorerClient} from "../block-explorer-client";
-import {
-  HEX_ZKSYNC_FIELDS,
-  type HexEraPropNames,
-  type NumberEraPropNames,
-  NUMERIC_ZKSYNC_FIELDS
-} from "../current-zksync-era-state";
+import type {BlockExplorer} from "../block-explorer-client";
+import {HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS} from "../current-zksync-era-state";
 
 export class CheckReport {
   private diff: NewZkSyncEraDiff;
@@ -23,11 +18,13 @@ export class CheckReport {
 
   async format(): Promise<string> {
     const lines: string[] = []
+    const warnings: string[] = []
 
     await this.addHeader(lines)
     await this.addFacets(lines)
     await this.addFields(lines)
-    await this.addSystemContracts(lines)
+    await this.addSystemContracts(lines, warnings)
+    await this.addWarnings(lines, warnings)
 
     return lines.join("\n")
   }
@@ -92,8 +89,7 @@ export class CheckReport {
   private async addFields(lines: string[]): Promise<void> {
     this.addTitle(lines, "Contract fields")
     const table = new CliTable({head: ["Field name", "Field Values"]})
-    const hexFields = HEX_ZKSYNC_FIELDS
-    for (const field of hexFields) {
+    for (const field of HEX_ZKSYNC_FIELDS) {
       const [before, maybeAfter] = this.diff.hexAttrDiff(field)
 
       const after = maybeAfter
@@ -109,8 +105,7 @@ export class CheckReport {
       )
     }
 
-    const numericFields = NUMERIC_ZKSYNC_FIELDS
-    for (const field of numericFields) {
+    for (const field of NUMERIC_ZKSYNC_FIELDS) {
       const [before, maybeAfter] = this.diff.numberAttrDiff(field)
 
       const after = maybeAfter
@@ -135,7 +130,7 @@ export class CheckReport {
     lines.push("")
   }
 
-  private async addSystemContracts(lines: string[]) {
+  private async addSystemContracts(lines: string[], warnings: string[]) {
     const changes = await this.diff.systemContractChanges()
 
     if (changes.length === 0) {
@@ -148,6 +143,10 @@ export class CheckReport {
 
     for (const contract of changes) {
       const fromRepo = await this.repo.byteCodeHashFor(contract.name)
+      const bytecodeMatches = fromRepo.isSomeAnd(hash => hash === contract.proposedBytecodeHash);
+      if (!bytecodeMatches) {
+        warnings.push(`Bytecode for "${contract.name}" does not match after recompile from sources`)
+      }
       table.push(
         [
           { content: contract.name, rowSpan: 3, vAlign: "center" },
@@ -155,10 +154,24 @@ export class CheckReport {
           `Current: ${contract.currentBytecodeHash}`,
         ],
         [`Proposed: ${contract.proposedBytecodeHash}`],
-        [`Bytecode hash match with sources: ${fromRepo === contract.proposedBytecodeHash}`]
+        [`Bytecode hash match with sources: ${bytecodeMatches}`]
       )
     }
 
     lines.push(table.toString(), "")
+  }
+
+  private async addWarnings(lines: string[], warnings: string[]): Promise<void> {
+    if (warnings.length === 0) {
+      return
+    }
+
+    this.addTitle(lines, "Warnings!")
+
+    for (const warning of warnings) {
+      lines.push(`⚠️ ${warning}`)
+    }
+    lines.push("")
+
   }
 }

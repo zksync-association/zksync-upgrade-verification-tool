@@ -359,21 +359,21 @@ export class ZkSyncEraDiff {
     const defaultAccountHash = await repo.byteCodeHashFor("DefaultAccount");
     const bootLoaderHash = await repo.byteCodeHashFor("proved_batch");
 
-    if (!defaultAccountHash) {
+    if (defaultAccountHash.isNone()) {
       throw new Error(`Missing default account hash for ref: ${await repo.currentRef()}`);
     }
-    if (!bootLoaderHash) {
+    if (bootLoaderHash.isNone()) {
       throw new Error(`Missing bootloader hash for ref: ${await repo.currentRef()}`);
     }
 
     const newAAMsg = this.newAA === ZERO_U256 ? "No changes" : this.newAA;
 
-    const aaBytecodeMatches = this.newAA === ZERO_U256 ? true : defaultAccountHash === this.newAA;
+    const aaBytecodeMatches = this.newAA === ZERO_U256 ? true : defaultAccountHash.unwrap() === this.newAA;
 
     const bootLoaderMsg = this.newBootLoader === ZERO_U256 ? "No changes" : this.newBootLoader;
 
     const bootLoaderBytecodeMatches =
-      this.newBootLoader === ZERO_U256 ? true : bootLoaderHash === this.newBootLoader;
+      this.newBootLoader === ZERO_U256 ? true : bootLoaderHash.unwrap() === this.newBootLoader;
 
     otherContractsTable.push([
       "Default Account",
