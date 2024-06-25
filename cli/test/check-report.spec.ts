@@ -39,7 +39,7 @@ interface Ctx {
 }
 
 function escape(str: string): string {
-  return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+  return str.replace(/[\-\[\]\/{}()*+?.\\^$|]/g, "\\$&");
 }
 
 describe('CheckReport', () => {
