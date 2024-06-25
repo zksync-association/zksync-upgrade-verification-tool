@@ -29,6 +29,7 @@ import {
   l2UpgradeSchema,
   upgradeCallDataSchema,
 } from "../schema/rpc";
+import {z} from "zod";
 
 export type L2ContractData = {
   address: Hex;
@@ -178,11 +179,16 @@ export class CurrentZksyncEraState {
       .map((prop) => prop.accept(visitor))
       .map((prop) => BigInt(prop));
 
+    const protocolVersion1 = await diamond.contractRead(rpc, "getProtocolVersion", z.bigint())
+      .then(n => numberToHex(n, { size: 32 }));
+    console.log("protocolVersion1", protocolVersion1)
     const data: ZkEraStateData = {
       admin: await diamond.contractRead(rpc, "getAdmin", zodHex),
       pendingAdmin: await diamond.contractRead(rpc, "getPendingAdmin", zodHex),
       verifierAddress: await diamond.contractRead(rpc, "getVerifier", zodHex),
       bridgeHubAddress: await diamond.contractRead(rpc, "getBridgehub", zodHex),
+      protocolVersion: protocolVersion1,
+      baseTokenBridgeAddress: await diamond.contractRead(rpc, "getBaseTokenBridge", zodHex),
       stateTransitionManagerAddress: await diamond.contractRead(
         rpc,
         "getStateTransitionManager",
@@ -268,7 +274,7 @@ export class CurrentZksyncEraState {
     // from calldata. The only way is simulating the call.
     return new CurrentZksyncEraState(
       {
-        protocolVersion: numberToHex(decodedUpgrade.args[0].newProtocolVersion),
+        protocolVersion: numberToHex(decodedUpgrade.args[0].newProtocolVersion, { size: 32 }),
         verifierAddress: decodedUpgrade.args[0].verifier,
         l2DefaultAccountBytecodeHash: decodedUpgrade.args[0].defaultAccountHash,
         l2BootloaderBytecodeHash: decodedUpgrade.args[0].bootloaderHash,

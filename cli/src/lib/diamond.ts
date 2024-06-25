@@ -124,7 +124,7 @@ export class Diamond {
       throw new Error("Inconsistent data");
     }
 
-    return rpc.contractRead(facetAddr, fnName, abi.raw, schema);
+    return rpc.contractRead(this.address, fnName, abi.raw, schema);
   }
 
   decodeFunctionData<T extends z.ZodTypeAny>(buff: Buffer, schema: T): z.infer<typeof schema> {

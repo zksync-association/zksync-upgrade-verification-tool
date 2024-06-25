@@ -721,7 +721,7 @@ describe("NewZkSyncStateDiff", () => {
       ];
 
       for (const { address, name, hash } of l2Addresses) {
-        const sysContractData = await state.dataForL2Address(address as Hex);
+        const sysContractData = await state.dataForL2Address(address as Hex).then(o => o.unwrap());
         expect(sysContractData.address.toLowerCase()).toEqual(address.toLowerCase());
         expect(sysContractData.name).toEqual(name);
         expect(sysContractData.bytecodeHash).toEqual(hash);
@@ -868,7 +868,7 @@ describe("NewZkSyncStateDiff", () => {
 
       for (const { addr, name } of l2Contracts) {
         const empty1 = await state.dataForL2Address(addr as Hex);
-        expect(empty1.name).toMatch(new RegExp(name));
+        expect(empty1.unwrap().name).toMatch(new RegExp(name));
       }
     });
   });

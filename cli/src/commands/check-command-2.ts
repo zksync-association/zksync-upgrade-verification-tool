@@ -5,6 +5,7 @@ import path from "node:path";
 import { transactionsSchema } from "../schema";
 import { hexToBytes } from "viem";
 import { NewZkSyncEraDiff } from "../lib/new-zk-sync-era-diff";
+import {CheckReport} from "../lib/reports/check-report";
 
 export async function checkCommand2(env: EnvBuilder, upgradeDirectory: string) {
   const current = await CurrentZksyncEraState.fromBlockchain(
@@ -30,5 +31,6 @@ export async function checkCommand2(env: EnvBuilder, upgradeDirectory: string) {
 
   const diff = new NewZkSyncEraDiff(current, proposed, []);
 
-  console.log(diff);
+  const report = new CheckReport(diff, await env.contractsRepo(), env.l1Client())
+  console.log(await report.format());
 }
