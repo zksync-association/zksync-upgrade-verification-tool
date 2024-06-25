@@ -1,14 +1,14 @@
-import {type SimpleGit, simpleGit} from "simple-git";
-import {cacheDir, directoryExists} from "./fs-utils";
+import { type SimpleGit, simpleGit } from "simple-git";
+import { cacheDir, directoryExists } from "./fs-utils";
 import path from "node:path";
 import fs from "node:fs/promises";
-import {exec} from "node:child_process";
-import {promisify} from "node:util";
-import {compiledArtifactParser} from "../schema/compiled";
-import {utils} from "zksync-ethers";
-import {type SystemContractHashes, systemContractHashesParser} from "../schema/github-schemas";
-import type {Sources} from "../schema";
-import {Option} from "nochoices";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+import { compiledArtifactParser } from "../schema/compiled";
+import { utils } from "zksync-ethers";
+import { type SystemContractHashes, systemContractHashesParser } from "../schema/github-schemas";
+import type { Sources } from "../schema";
+import { Option } from "nochoices";
 
 const execPromise = promisify(exec);
 
@@ -76,7 +76,7 @@ export class GitContractsRepo implements ContractsRepo {
     const hashes = await this.systemContractHashes();
     const hashData = hashes.find((d) => d.contractName === systemContractName);
     if (!hashData) {
-      return Option.None()
+      return Option.None();
     }
 
     return Option.Some(await this.extractBytecodeFromFile(hashData.bytecodePath));
@@ -152,7 +152,7 @@ export class GitContractsRepo implements ContractsRepo {
   }
 
   async currentBranch(): Promise<Option<string>> {
-    const branch = await this.git.branch()
-    return Option.fromNullable(branch.current)
+    const branch = await this.git.branch();
+    return Option.fromNullable(branch.current);
   }
 }

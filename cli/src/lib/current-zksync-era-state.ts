@@ -1,17 +1,34 @@
-import {bytesToBigInt, bytesToHex, bytesToNumber, type Hex, hexToBytes, hexToNumber, numberToHex,} from "viem";
-import type {FacetData} from "./upgrade-changes";
-import {Option} from "nochoices";
-import {MissingRequiredProp} from "./errors";
-import {DIAMOND_ADDRS, type Network} from "./constants";
-import {Diamond} from "./diamond";
-import {BlockExplorerClient, type BlockExplorer} from "./block-explorer-client";
-import {RpcClient} from "./rpc-client";
-import {zodHex} from "../schema/zod-optionals";
-import {RpcStorageSnapshot} from "./storage/rpc-storage-snapshot";
-import {StringStorageVisitor} from "./reports/string-storage-visitor";
-import {MAIN_CONTRACT_FIELDS} from "./storage/storage-props";
-import {RpcSystemContractProvider, SystemContractList, type SystemContractProvider,} from "./system-contract-providers";
-import {callDataSchema, type FacetCut, l2UpgradeSchema, upgradeCallDataSchema,} from "../schema/rpc";
+import {
+  bytesToBigInt,
+  bytesToHex,
+  bytesToNumber,
+  type Hex,
+  hexToBytes,
+  hexToNumber,
+  numberToHex,
+} from "viem";
+import type { FacetData } from "./upgrade-changes";
+import { Option } from "nochoices";
+import { MissingRequiredProp } from "./errors";
+import { DIAMOND_ADDRS, type Network } from "./constants";
+import { Diamond } from "./diamond";
+import { BlockExplorerClient, type BlockExplorer } from "./block-explorer-client";
+import { RpcClient } from "./rpc-client";
+import { zodHex } from "../schema/zod-optionals";
+import { RpcStorageSnapshot } from "./storage/rpc-storage-snapshot";
+import { StringStorageVisitor } from "./reports/string-storage-visitor";
+import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props";
+import {
+  RpcSystemContractProvider,
+  SystemContractList,
+  type SystemContractProvider,
+} from "./system-contract-providers";
+import {
+  callDataSchema,
+  type FacetCut,
+  l2UpgradeSchema,
+  upgradeCallDataSchema,
+} from "../schema/rpc";
 
 export type L2ContractData = {
   address: Hex;
@@ -43,24 +60,24 @@ export const HEX_ZKSYNC_FIELDS = [
   "l2DefaultAccountBytecodeHash",
   "l2BootloaderBytecodeHash",
   "baseTokenBridgeAddress",
-  "protocolVersion"
-] as const
+  "protocolVersion",
+] as const;
 
-export type HexEraPropNames = typeof HEX_ZKSYNC_FIELDS[number]
+export type HexEraPropNames = (typeof HEX_ZKSYNC_FIELDS)[number];
 
 export const NUMERIC_ZKSYNC_FIELDS = [
   "baseTokenGasPriceMultiplierNominator",
   "baseTokenGasPriceMultiplierDenominator",
-  "chainId"
-] as const
+  "chainId",
+] as const;
 
-export type NumberEraPropNames = typeof NUMERIC_ZKSYNC_FIELDS[number]
+export type NumberEraPropNames = (typeof NUMERIC_ZKSYNC_FIELDS)[number];
 
 export type ZkEraStateData = {
   [key in HexEraPropNames]?: Hex | undefined;
 } & {
-  [key in NumberEraPropNames]?: bigint | undefined
-}
+  [key in NumberEraPropNames]?: bigint | undefined;
+};
 
 export class CurrentZksyncEraState {
   data: ZkEraStateData;
@@ -295,10 +312,7 @@ const SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
   "0x0000000000000000000000000000000000010000": "Create2Factory",
 };
 
-async function reduceFacetCuts(
-  cuts: FacetCut[],
-  explorer: BlockExplorer
-): Promise<FacetData[]> {
+async function reduceFacetCuts(cuts: FacetCut[], explorer: BlockExplorer): Promise<FacetData[]> {
   const selected = cuts.filter((cut) => cut.action === 0);
 
   return await Promise.all(

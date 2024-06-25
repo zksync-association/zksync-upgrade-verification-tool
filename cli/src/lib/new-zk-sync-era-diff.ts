@@ -119,8 +119,14 @@ export class NewZkSyncEraDiff {
 
         return new SystemContractChange(
           addr,
-          current.or(proposed).map(c => c.name).unwrapOr("Unknown name"),
-          current.map(c => c.bytecodeHash).map(v => v.toString()).unwrapOr("Not found."),
+          current
+            .or(proposed)
+            .map((c) => c.name)
+            .unwrapOr("Unknown name"),
+          current
+            .map((c) => c.bytecodeHash)
+            .map((v) => v.toString())
+            .unwrapOr("Not found."),
           proposed.unwrap().bytecodeHash
         );
       })

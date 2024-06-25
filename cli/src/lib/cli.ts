@@ -8,7 +8,7 @@ import { storageChangeCommand } from "../commands/storage-change-command";
 import { Option } from "nochoices";
 import { failHandler } from "../commands/fail-handler";
 import { storageSnapshotCommand } from "../commands/storage-snapshot-command";
-import {checkCommand2} from "../commands/check-command-2";
+import { checkCommand2 } from "../commands/check-command-2";
 
 export function buildCli(
   args: string[],

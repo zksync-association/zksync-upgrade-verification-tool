@@ -1,17 +1,17 @@
-import {facetsResponseSchema} from "../schema/new-facets.js";
-import type {UpgradeChanges} from "./upgrade-changes.js";
-import type {BlockExplorerClient, BlockExplorer} from "./block-explorer-client.js";
-import type {Network} from "./constants.js";
-import {VerifierContract} from "./verifier.js";
-import {verifierParamsSchema} from "../schema/index.js";
-import {z} from "zod";
-import {type Abi, bytesToNumber, type Hex, numberToBytes} from "viem";
-import {ZkSyncEraDiff} from "./zk-sync-era-diff.js";
-import {utils} from "zksync-ethers";
-import {SystemContractChange} from "./system-contract-change";
-import type {RpcClient} from "./rpc-client.js";
-import type {ContractData} from "./contract-data.js";
-import type {ContractAbi} from "./contract-abi";
+import { facetsResponseSchema } from "../schema/new-facets.js";
+import type { UpgradeChanges } from "./upgrade-changes.js";
+import type { BlockExplorerClient, BlockExplorer } from "./block-explorer-client.js";
+import type { Network } from "./constants.js";
+import { VerifierContract } from "./verifier.js";
+import { verifierParamsSchema } from "../schema/index.js";
+import { z } from "zod";
+import { type Abi, bytesToNumber, type Hex, numberToBytes } from "viem";
+import { ZkSyncEraDiff } from "./zk-sync-era-diff.js";
+import { utils } from "zksync-ethers";
+import { SystemContractChange } from "./system-contract-change";
+import type { RpcClient } from "./rpc-client.js";
+import type { ContractData } from "./contract-data.js";
+import type { ContractAbi } from "./contract-abi";
 
 const MAIN_CONTRACT_FUNCTIONS = {
   facets: "facets",
@@ -70,10 +70,7 @@ export class ZkSyncEraState {
     return `${major}.${minor}.${patch}`;
   }
 
-  async calculateDiff(
-    changes: UpgradeChanges,
-    client: BlockExplorer
-  ): Promise<ZkSyncEraDiff> {
+  async calculateDiff(changes: UpgradeChanges, client: BlockExplorer): Promise<ZkSyncEraDiff> {
     if (!this.verifier) {
       throw new Error("Missing verifier data");
     }

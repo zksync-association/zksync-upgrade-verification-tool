@@ -1,9 +1,9 @@
-import {type Abi, bytesToHex, type Hex, hexToBytes, toFunctionSelector} from "viem";
-import type {BlockExplorerClient, ContractData, FacetData, BlockExplorer} from "./index";
-import type {ContractAbi} from "./contract-abi";
-import type {RpcClient} from "./rpc-client";
-import {facetsResponseSchema} from "../schema/new-facets";
-import type {z, ZodType} from "zod";
+import { type Abi, bytesToHex, type Hex, hexToBytes, toFunctionSelector } from "viem";
+import type { BlockExplorerClient, ContractData, FacetData, BlockExplorer } from "./index";
+import type { ContractAbi } from "./contract-abi";
+import type { RpcClient } from "./rpc-client";
+import { facetsResponseSchema } from "../schema/new-facets";
+import type { z, ZodType } from "zod";
 
 const DIAMOND_FUNCTIONS = {
   facets: "facets",
@@ -60,10 +60,7 @@ export class Diamond {
     return address;
   }
 
-  private async findGetterFacetAbi(
-    client: BlockExplorer,
-    rpc: RpcClient
-  ): Promise<ContractAbi> {
+  private async findGetterFacetAbi(client: BlockExplorer, rpc: RpcClient): Promise<ContractAbi> {
     // Manually encode calldata becasue at this stage there
     // is no address to get the abi
     const facetAddressSelector = "cdffacc6";
@@ -78,11 +75,7 @@ export class Diamond {
     return await client.getAbi(facetsAddr);
   }
 
-  private async initializeFacets(
-    abi: Abi,
-    _client: BlockExplorer,
-    rpc: RpcClient
-  ): Promise<void> {
+  private async initializeFacets(abi: Abi, _client: BlockExplorer, rpc: RpcClient): Promise<void> {
     const facets = await rpc.contractRead(
       this.address,
       DIAMOND_FUNCTIONS.facets,

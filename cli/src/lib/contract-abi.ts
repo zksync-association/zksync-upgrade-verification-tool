@@ -16,8 +16,8 @@ export class ContractAbi {
     }
   }
 
-  allSelectors (): Hex[] {
-    return [...this.selectors.keys()]
+  allSelectors(): Hex[] {
+    return [...this.selectors.keys()];
   }
 
   signatureForSelector(selector: Hex): string {

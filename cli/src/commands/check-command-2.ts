@@ -1,19 +1,23 @@
-import type {EnvBuilder} from "../lib/env-builder";
-import {CurrentZksyncEraState} from "../lib/current-zksync-era-state";
+import type { EnvBuilder } from "../lib/env-builder";
+import { CurrentZksyncEraState } from "../lib/current-zksync-era-state";
 import fs from "node:fs/promises";
 import path from "node:path";
-import {transactionsSchema} from "../schema";
-import {hexToBytes} from "viem";
-import {NewZkSyncEraDiff} from "../lib/new-zk-sync-era-diff";
+import { transactionsSchema } from "../schema";
+import { hexToBytes } from "viem";
+import { NewZkSyncEraDiff } from "../lib/new-zk-sync-era-diff";
 
 export async function checkCommand2(env: EnvBuilder, upgradeDirectory: string) {
-  const current = await CurrentZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1())
+  const current = await CurrentZksyncEraState.fromBlockchain(
+    env.network,
+    env.l1Client(),
+    env.rpcL1()
+  );
 
-  const bufFile = await fs.readFile(path.join(upgradeDirectory, env.network, "transactions.json"))
+  const bufFile = await fs.readFile(path.join(upgradeDirectory, env.network, "transactions.json"));
   const txFile = transactionsSchema.parse(JSON.parse(bufFile.toString()));
 
   if (!txFile.governanceOperation) {
-    throw new Error("missing hex")
+    throw new Error("missing hex");
   }
 
   const proposed = await CurrentZksyncEraState.fromCalldata(
@@ -22,9 +26,9 @@ export async function checkCommand2(env: EnvBuilder, upgradeDirectory: string) {
     env.l1Client(),
     env.rpcL1(),
     env.l2Client()
-  )
+  );
 
-  const diff = new NewZkSyncEraDiff(current, proposed, [])
+  const diff = new NewZkSyncEraDiff(current, proposed, []);
 
-  console.log(diff)
+  console.log(diff);
 }

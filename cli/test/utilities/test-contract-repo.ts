@@ -1,5 +1,5 @@
-import type {ContractsRepo} from "../../src/lib/git-contracts-repo";
-import {Option} from "nochoices";
+import type { ContractsRepo } from "../../src/lib/git-contracts-repo";
+import { Option } from "nochoices";
 
 export class TestContractRepo implements ContractsRepo {
   private gitsha: string;
@@ -7,13 +7,13 @@ export class TestContractRepo implements ContractsRepo {
   private bytecodeHashes: Map<string, string>;
 
   constructor(gitsha: string, branch: Option<string>, hashes: Record<string, string>) {
-    this.gitsha = gitsha
-    this.branch = branch
-    this.bytecodeHashes = new Map([...Object.entries(hashes)])
+    this.gitsha = gitsha;
+    this.branch = branch;
+    this.bytecodeHashes = new Map([...Object.entries(hashes)]);
   }
 
   addHash(name: string, hash: string): void {
-    this.bytecodeHashes.set(name, hash)
+    this.bytecodeHashes.set(name, hash);
   }
 
   async byteCodeHashFor(systemContractName: string): Promise<Option<string>> {
@@ -28,5 +28,4 @@ export class TestContractRepo implements ContractsRepo {
   async currentRef(): Promise<string> {
     return this.gitsha;
   }
-
 }

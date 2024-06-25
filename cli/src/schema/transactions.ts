@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { account20String, bytes32Hash } from "./common";
 import { facetCutsSchema } from "./facetCuts";
-import {zodHex} from "./hex-parser";
+import { zodHex } from "./hex-parser";
 
 export const verifierParamsSchema = z.object({
   recursionNodeLevelVkHash: bytes32Hash,

@@ -4,8 +4,8 @@ import { InconsistentData } from "./errors";
 import type { RpcClient } from "./rpc-client";
 import type { BlockExplorerClient } from "./block-explorer-client";
 import { utils } from "zksync-ethers";
-import {Option} from "nochoices";
-import type {ContractData} from "./contract-data";
+import { Option } from "nochoices";
+import type { ContractData } from "./contract-data";
 
 export interface SystemContractProvider {
   dataFor(addr: Hex): Promise<Option<L2ContractData>>;
@@ -50,12 +50,12 @@ export class RpcSystemContractProvider implements SystemContractProvider {
       () => Option.None<ContractData>()
     );
 
-    return data.map(d => {
+    return data.map((d) => {
       return {
         name: d.name,
         bytecodeHash: `0x${hex}`,
         address: addr,
-      }
-    }) ;
+      };
+    });
   }
 }

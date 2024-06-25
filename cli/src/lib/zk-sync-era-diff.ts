@@ -1,15 +1,15 @@
-import type {VerifierContract} from "./verifier.js";
+import type { VerifierContract } from "./verifier.js";
 import path from "node:path";
 import CliTable from "cli-table3";
-import type {BlockExplorer, BlockExplorerClient} from "./block-explorer-client.js";
-import type {SystemContractChange} from "./system-contract-change";
-import {systemContractHashesParser} from "../schema/github-schemas.js";
-import {ContractData} from "./contract-data.js";
-import {ADDRESS_ZERO, ZERO_U256} from "./constants.js";
+import type { BlockExplorer, BlockExplorerClient } from "./block-explorer-client.js";
+import type { SystemContractChange } from "./system-contract-change";
+import { systemContractHashesParser } from "../schema/github-schemas.js";
+import { ContractData } from "./contract-data.js";
+import { ADDRESS_ZERO, ZERO_U256 } from "./constants.js";
 import chalk from "chalk";
-import type {GitContractsRepo, ContractsRepo} from "./git-contracts-repo";
+import type { GitContractsRepo, ContractsRepo } from "./git-contracts-repo";
 import fs from "node:fs/promises";
-import type {Hex} from "viem";
+import type { Hex } from "viem";
 
 export class ZkSyncEraDiff {
   private oldVersion: string;
@@ -368,7 +368,8 @@ export class ZkSyncEraDiff {
 
     const newAAMsg = this.newAA === ZERO_U256 ? "No changes" : this.newAA;
 
-    const aaBytecodeMatches = this.newAA === ZERO_U256 ? true : defaultAccountHash.unwrap() === this.newAA;
+    const aaBytecodeMatches =
+      this.newAA === ZERO_U256 ? true : defaultAccountHash.unwrap() === this.newAA;
 
     const bootLoaderMsg = this.newBootLoader === ZERO_U256 ? "No changes" : this.newBootLoader;
 

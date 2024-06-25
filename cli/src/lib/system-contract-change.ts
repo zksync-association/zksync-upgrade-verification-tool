@@ -1,8 +1,8 @@
-import type {Hex} from "viem";
-import type {BlockExplorer} from "./block-explorer-client";
-import {ContractData} from "./contract-data.js";
-import {ContracNotVerified} from "./errors.js";
-import type {GitContractsRepo} from "./git-contracts-repo";
+import type { Hex } from "viem";
+import type { BlockExplorer } from "./block-explorer-client";
+import { ContractData } from "./contract-data.js";
+import { ContracNotVerified } from "./errors.js";
+import type { GitContractsRepo } from "./git-contracts-repo";
 
 export class SystemContractChange {
   address: Hex;
