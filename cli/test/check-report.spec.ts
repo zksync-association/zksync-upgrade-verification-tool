@@ -1,13 +1,20 @@
 import {beforeEach, describe, expect, it} from "vitest";
 import {CheckReport} from "../src/lib/reports/check-report";
 import {NewZkSyncEraDiff} from "../src/lib/new-zk-sync-era-diff";
-import {CurrentZksyncEraState, type L2ContractData} from "../src/lib/current-zksync-era-state";
+import {
+  CurrentZksyncEraState,
+  HEX_ZKSYNC_FIELDS,
+  type L2ContractData,
+  type ZkEraStateData
+} from "../src/lib/current-zksync-era-state";
 import {SystemContractList} from "../src/lib/system-contract-providers";
-import {EraContractsRepo} from "../src/lib/era-contracts-repo";
+import {type ContractsRepo} from "../src/lib/git-contracts-repo";
 import {TestBlockExplorer} from "./utilities/test-block-explorer";
 import {ContractAbi} from "../src/lib/contract-abi";
 import type {BlockExplorer} from "../src/lib";
 import type {Hex} from "viem";
+import {TestContractRepo} from "./utilities/test-contract-repo";
+import {Option} from "nochoices";
 
 
 interface Ctx {
@@ -22,9 +29,13 @@ interface Ctx {
   sysAddr3: Hex,
   sysContractsBefore: L2ContractData[],
   sysContractsAfter: L2ContractData[],
+  currentFields: ZkEraStateData,
+  proposedFields: ZkEraStateData,
   currentState: CurrentZksyncEraState,
   proposedState: CurrentZksyncEraState,
-  explorer: BlockExplorer
+  explorer: BlockExplorer,
+  contractsRepo: ContractsRepo,
+  diff: NewZkSyncEraDiff
 }
 
 function escape(str: string): string {
@@ -36,11 +47,13 @@ describe('CheckReport', () => {
     ctx.address1 = "0x0000000001"
     ctx.address2 = "0x0000000002"
     ctx.address3 = "0x0000000003"
-
     ctx.sysAddr1 = "0x0000000000000000000000000000000000000001";
     ctx.sysAddr2 = "0x0000000000000000000000000000000000000006";
     ctx.sysAddr3 = "0x0000000000000000000000000000000000000007";
+  })
 
+  beforeEach<Ctx>((ctx) => {
+    const repo = new TestContractRepo("somegitsha", Option.Some("main"), {})
 
     ctx.abi1 = new ContractAbi([
       {
@@ -100,21 +113,23 @@ describe('CheckReport', () => {
       }
     ]
 
-    ctx.currentState = new CurrentZksyncEraState({
-        protocolVersion: "0x000000000000000000000000000000000000000000000000000000000000000f",
-        admin: "0x010a",
-        pendingAdmin: "0x020a",
-        verifierAddress: "0x030a",
-        bridgeHubAddress: "0x040a",
-        blobVersionedHashRetriever: "0x050a",
-        stateTransitionManagerAddress: "0x060a",
-        l2DefaultAccountBytecodeHash: "0x070a",
-        l2BootloaderBytecodeHash: "0x080a",
-        baseTokenBridgeAddress: "0x090a",
-        chainId: 100n,
-        baseTokenGasPriceMultiplierNominator: 200n,
-        baseTokenGasPriceMultiplierDenominator: 300n,
-      }, [
+    ctx.currentFields = {
+      protocolVersion: "0x000000000000000000000000000000000000000000000000000000000000000f",
+      admin: "0x010a",
+      pendingAdmin: "0x020a",
+      verifierAddress: "0x030a",
+      bridgeHubAddress: "0x040a",
+      blobVersionedHashRetriever: "0x050a",
+      stateTransitionManagerAddress: "0x060a",
+      l2DefaultAccountBytecodeHash: "0x070a",
+      l2BootloaderBytecodeHash: "0x080a",
+      baseTokenBridgeAddress: "0x090a",
+      chainId: 100n,
+      baseTokenGasPriceMultiplierNominator: 200n,
+      baseTokenGasPriceMultiplierDenominator: 300n,
+    };
+
+    ctx.currentState = new CurrentZksyncEraState(ctx.currentFields, [
         {
           name: "RemovedFacet",
           address: ctx.address1,
@@ -146,20 +161,25 @@ describe('CheckReport', () => {
         bytecodeHash: "0x0301"
       }
     ]
-    ctx.proposedState = new CurrentZksyncEraState({
-        protocolVersion: "0x0000000000000000000000000000000000000000000000000000001800000001",
+    for (const a of ctx.sysContractsAfter) {
+      repo.addHash(a.name, a.bytecodeHash)
+    }
 
-        admin: "0x010b",
-        pendingAdmin: "0x020b",
-        verifierAddress: "0x030b",
-        bridgeHubAddress: "0x040b",
-        blobVersionedHashRetriever: "0x050b",
-        stateTransitionManagerAddress: "0x060b",
-        l2DefaultAccountBytecodeHash: "0x070b",
-        l2BootloaderBytecodeHash: "0x080b",
-        chainId: 101n,
-        baseTokenGasPriceMultiplierNominator: 201n,
-      }, [
+
+    ctx.proposedFields = {
+      protocolVersion: "0x0000000000000000000000000000000000000000000000000000001800000001",
+      admin: "0x010b",
+      pendingAdmin: "0x020b",
+      verifierAddress: "0x030b",
+      bridgeHubAddress: "0x040b",
+      blobVersionedHashRetriever: "0x050b",
+      stateTransitionManagerAddress: "0x060b",
+      l2DefaultAccountBytecodeHash: "0x070b",
+      l2BootloaderBytecodeHash: "0x080b",
+      chainId: 101n,
+      baseTokenGasPriceMultiplierNominator: 201n,
+    };
+    ctx.proposedState = new CurrentZksyncEraState(ctx.proposedFields, [
         {
           name: "UpgradedFacet",
           address: ctx.address3,
@@ -174,24 +194,28 @@ describe('CheckReport', () => {
     explorer.registerAbi(ctx.abi2, ctx.address2)
     explorer.registerAbi(ctx.abi3, ctx.address3)
     ctx.explorer = explorer
+    ctx.contractsRepo = repo
   })
 
-
-  it<Ctx>("prints all the data", async (ctx) => {
+  beforeEach<Ctx>(ctx => {
     const current = ctx.currentState
     const proposed = ctx.proposedState
 
-    const diff = new NewZkSyncEraDiff(current, proposed, [
+    ctx.diff = new NewZkSyncEraDiff(current, proposed, [
       ctx.sysAddr1,
       ctx.sysAddr2,
       ctx.sysAddr3
     ])
-    const repo = await EraContractsRepo.default()
-    const report = new CheckReport(diff, repo, ctx.explorer);
-    const string = await report.format();
-    console.log(string)
+  })
 
-    const lines = string.split("\n")
+  async function createReportLines(ctx: Ctx): Promise<string[]> {
+    const report = new CheckReport(ctx.diff, ctx.contractsRepo, ctx.explorer);
+    const string = await report.format();
+    return string.split("\n")
+  }
+
+  it<Ctx>("Prints all the data for the header", async (ctx) => {
+    const lines = await createReportLines(ctx)
 
     const headerData = [
       {
@@ -206,7 +230,7 @@ describe('CheckReport', () => {
         value: "https://github.com/matter-labs/era-contracts"
       },{
         field: "L2 contracts commit",
-        value: "main (db938769)"
+        value: "main (somegitsha)"
       }
     ]
 
@@ -215,6 +239,10 @@ describe('CheckReport', () => {
       expect(line).toBeDefined()
       expect(line).toMatch(new RegExp(`${escape(field)}.*${escape(value)}`))
     }
+  })
+
+  it<Ctx>("prints all data for facets", async (ctx) => {
+    const lines = await createReportLines(ctx)
 
     const removedFacetLine = lines.findIndex(l => l.includes("RemovedFacet"))
     expect(removedFacetLine).not.toEqual(-1)
@@ -242,19 +270,47 @@ describe('CheckReport', () => {
     expect(lines[upgradedFacetLine + 8]).toContain("f2()")
     expect(lines[upgradedFacetLine + 10]).toContain("Upgraded functions")
     expect(lines[upgradedFacetLine + 10]).toContain("f1()")
+  })
+
+  it<Ctx>("prints all the data for system contract changes", async (ctx) => {
+    const lines = await createReportLines(ctx)
 
     for (const {name, bytecodeHash, address} of ctx.sysContractsBefore) {
       const line = lines.findIndex(l => l.includes(name))
-      expect(lines).not.toEqual(-1)
+      expect(line).not.toEqual(-1)
       expect(lines[line]).toContain(address)
-      expect(lines[line - 1]).toContain(`Current: ${bytecodeHash}`)
+      expect(lines[line - 2]).toContain(`Current: ${bytecodeHash}`)
+      expect(lines[line + 2]).toContain("Bytecode hash match with sources: true")
     }
 
     for (const {name, bytecodeHash, address} of ctx.sysContractsAfter) {
       const line = lines.findIndex(l => l.includes(name))
-      expect(lines).not.toEqual(-1)
+      expect(line).not.toEqual(-1)
       expect(lines[line]).toContain(address)
-      expect(lines[line + 1]).toContain(`Proposed: ${bytecodeHash}`)
+      expect(lines[line]).toContain(`Proposed: ${bytecodeHash}`)
+      expect(lines[line + 2]).toContain("Bytecode hash match with sources: true")
+    }
+  })
+
+  it<Ctx>("prints all the field changes", async (ctx) => {
+    const lines = await createReportLines(ctx)
+
+    for (const field of HEX_ZKSYNC_FIELDS) {
+      const line = lines.findIndex(l => l.includes(field))
+      expect(line).not.toEqual(-1)
+      expect(lines[line - 1]).toContain(ctx.currentFields[field])
+    }
+
+    for (const field of HEX_ZKSYNC_FIELDS) {
+      const line = lines.findIndex(l => l.includes(field))
+      expect(line).not.toEqual(-1)
+      expect(lines[line - 1]).toContain(`Current: ${ctx.currentFields[field]}`)
+      const proposed = ctx.proposedFields[field]
+      if (proposed) {
+        expect(lines[line + 1]).toContain(`Proposed: ${ctx.proposedFields[field]}`)
+      } else {
+        expect(lines[line + 1]).toContain("No changes")
+      }
     }
   })
 });

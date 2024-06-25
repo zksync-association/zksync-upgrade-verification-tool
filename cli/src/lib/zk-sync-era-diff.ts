@@ -1,13 +1,13 @@
 import type {VerifierContract} from "./verifier.js";
 import path from "node:path";
 import CliTable from "cli-table3";
-import type {BlockExplorerClient, BlockExplorer} from "./block-explorer-client.js";
+import type {BlockExplorer, BlockExplorerClient} from "./block-explorer-client.js";
 import type {SystemContractChange} from "./system-contract-change";
 import {systemContractHashesParser} from "../schema/github-schemas.js";
 import {ContractData} from "./contract-data.js";
 import {ADDRESS_ZERO, ZERO_U256} from "./constants.js";
 import chalk from "chalk";
-import type {EraContractsRepo} from "./era-contracts-repo";
+import type {GitContractsRepo, ContractsRepo} from "./git-contracts-repo";
 import fs from "node:fs/promises";
 import type {Hex} from "viem";
 
@@ -105,7 +105,7 @@ export class ZkSyncEraDiff {
     filter: string[],
     l1Client: BlockExplorerClient,
     l2Client: BlockExplorerClient,
-    repo: EraContractsRepo
+    repo: GitContractsRepo
   ): Promise<void> {
     const baseDirOld = path.join(baseDirPath, "old");
     const baseDirNew = path.join(baseDirPath, "new");
@@ -119,7 +119,7 @@ export class ZkSyncEraDiff {
     await this.writeSpecialContracts(filter, baseDirNew, repo);
   }
 
-  private async writeSpecialContracts(filter: string[], dir: string, repo: EraContractsRepo) {
+  private async writeSpecialContracts(filter: string[], dir: string, repo: GitContractsRepo) {
     if (filter.length !== 0) {
       return;
     }
@@ -201,7 +201,7 @@ export class ZkSyncEraDiff {
   async toCliReport(
     client: BlockExplorer,
     upgradeDir: string,
-    repo: EraContractsRepo
+    repo: ContractsRepo
   ): Promise<string> {
     const title = "Upgrade report:";
     const strings = [`${title}`, "=".repeat(title.length), ""];
@@ -403,7 +403,7 @@ export class ZkSyncEraDiff {
     baseDirOld: string,
     baseDirNew: string,
     l2Client: BlockExplorerClient,
-    repo: EraContractsRepo
+    repo: GitContractsRepo
   ) {
     const rawHashes = await repo.readFile("system-contracts/SystemContractsHashes.json");
     const hashes = systemContractHashesParser.parse(JSON.parse(rawHashes));

@@ -1,15 +1,20 @@
 import type {NewZkSyncEraDiff} from "../new-zk-sync-era-diff";
-import type {EraContractsRepo} from "../era-contracts-repo";
+import type {ContractsRepo, GitContractsRepo} from "../git-contracts-repo";
 import CliTable from "cli-table3";
 import type {BlockExplorer, BlockExplorerClient} from "../block-explorer-client";
-import type {HexEraPropNames, NumberEraPropNames} from "../current-zksync-era-state";
+import {
+  HEX_ZKSYNC_FIELDS,
+  type HexEraPropNames,
+  type NumberEraPropNames,
+  NUMERIC_ZKSYNC_FIELDS
+} from "../current-zksync-era-state";
 
 export class CheckReport {
   private diff: NewZkSyncEraDiff;
-  private repo: EraContractsRepo;
+  private repo: ContractsRepo;
   private explorer: BlockExplorer
 
-  constructor(diff: NewZkSyncEraDiff, repo: EraContractsRepo, explorer: BlockExplorer) {
+  constructor(diff: NewZkSyncEraDiff, repo: ContractsRepo, explorer: BlockExplorer) {
     this.diff = diff
     this.repo = repo
     this.explorer = explorer
@@ -87,18 +92,7 @@ export class CheckReport {
   private async addFields(lines: string[]): Promise<void> {
     this.addTitle(lines, "Contract fields")
     const table = new CliTable({head: ["Field name", "Field Values"]})
-    const hexFields: HexEraPropNames[] = [
-      "admin",
-      "pendingAdmin",
-      "verifierAddress",
-      "bridgeHubAddress",
-      "blobVersionedHashRetriever",
-      "stateTransitionManagerAddress",
-      "l2DefaultAccountBytecodeHash",
-      "l2BootloaderBytecodeHash",
-      "baseTokenBridgeAddress"
-    ]
-
+    const hexFields = HEX_ZKSYNC_FIELDS
     for (const field of hexFields) {
       const [before, maybeAfter] = this.diff.hexAttrDiff(field)
 
@@ -115,12 +109,7 @@ export class CheckReport {
       )
     }
 
-    const numericFields: NumberEraPropNames[] = [
-      "baseTokenGasPriceMultiplierNominator",
-      "baseTokenGasPriceMultiplierDenominator",
-      "chainId"
-    ]
-
+    const numericFields = NUMERIC_ZKSYNC_FIELDS
     for (const field of numericFields) {
       const [before, maybeAfter] = this.diff.numberAttrDiff(field)
 
@@ -158,13 +147,15 @@ export class CheckReport {
     const table = new CliTable({head: ["System Contract", "Address", "Bytecode hash"]})
 
     for (const contract of changes) {
+      const fromRepo = await this.repo.byteCodeHashFor(contract.name)
       table.push(
         [
-          { content: contract.name, rowSpan: 2, vAlign: "center" },
-          { content: contract.address, rowSpan: 2, vAlign: "center" },
+          { content: contract.name, rowSpan: 3, vAlign: "center" },
+          { content: contract.address, rowSpan: 3, vAlign: "center" },
           `Current: ${contract.currentBytecodeHash}`,
         ],
-        [`Proposed: ${contract.proposedBytecodeHash}`]
+        [`Proposed: ${contract.proposedBytecodeHash}`],
+        [`Bytecode hash match with sources: ${fromRepo === contract.proposedBytecodeHash}`]
       )
     }
 

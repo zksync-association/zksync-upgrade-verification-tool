@@ -33,37 +33,34 @@ export type FeeParams = {
   minimalL2GasPrice: bigint;
 };
 
-export type HexEraPropNames =
-  | "admin"
-  | "pendingAdmin"
-  | "verifierAddress"
-  | "bridgeHubAddress"
-  | "blobVersionedHashRetriever"
-  | "stateTransitionManagerAddress"
-  | "l2DefaultAccountBytecodeHash"
-  | "l2BootloaderBytecodeHash"
-  | "baseTokenBridgeAddress";
+export const HEX_ZKSYNC_FIELDS = [
+  "admin",
+  "pendingAdmin",
+  "verifierAddress",
+  "bridgeHubAddress",
+  "blobVersionedHashRetriever",
+  "stateTransitionManagerAddress",
+  "l2DefaultAccountBytecodeHash",
+  "l2BootloaderBytecodeHash",
+  "baseTokenBridgeAddress",
+  "protocolVersion"
+] as const
 
-export type NumberEraPropNames =
-  | "baseTokenGasPriceMultiplierNominator"
-  | "baseTokenGasPriceMultiplierDenominator"
-  | "chainId";
+export type HexEraPropNames = typeof HEX_ZKSYNC_FIELDS[number]
+
+export const NUMERIC_ZKSYNC_FIELDS = [
+  "baseTokenGasPriceMultiplierNominator",
+  "baseTokenGasPriceMultiplierDenominator",
+  "chainId"
+] as const
+
+export type NumberEraPropNames = typeof NUMERIC_ZKSYNC_FIELDS[number]
 
 export type ZkEraStateData = {
-  admin?: Hex;
-  pendingAdmin?: Hex;
-  verifierAddress?: Hex;
-  bridgeHubAddress?: Hex;
-  blobVersionedHashRetriever?: Hex;
-  stateTransitionManagerAddress?: Hex;
-  l2DefaultAccountBytecodeHash?: Hex;
-  l2BootloaderBytecodeHash?: Hex;
-  protocolVersion?: Hex;
-  baseTokenBridgeAddress?: Hex;
-  chainId?: bigint;
-  baseTokenGasPriceMultiplierNominator?: bigint;
-  baseTokenGasPriceMultiplierDenominator?: bigint;
-};
+  [key in HexEraPropNames]?: Hex | undefined;
+} & {
+  [key in NumberEraPropNames]?: bigint | undefined
+}
 
 export class CurrentZksyncEraState {
   data: ZkEraStateData;

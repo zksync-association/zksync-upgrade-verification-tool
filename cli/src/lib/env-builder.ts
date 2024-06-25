@@ -1,7 +1,7 @@
 import { BlockExplorerClient } from "./block-explorer-client.js";
 import { NET_VERSIONS, type Network } from "./constants.js";
 import { RpcClient } from "./rpc-client.js";
-import { EraContractsRepo } from "./era-contracts-repo";
+import { GitContractsRepo } from "./git-contracts-repo";
 import { FileSystem } from "./file-system";
 import { UpgradeImporter } from "./importer";
 import { Terminal } from "../terminal";
@@ -14,7 +14,7 @@ export class EnvBuilder {
 
   private _l1Client?: BlockExplorerClient;
   private _l2Client?: BlockExplorerClient;
-  private _repo?: EraContractsRepo;
+  private _repo?: GitContractsRepo;
   colored = true;
   private terminal = Terminal.default();
 
@@ -102,9 +102,9 @@ export class EnvBuilder {
     return new UpgradeImporter(this.fs());
   }
 
-  async contractsRepo(): Promise<EraContractsRepo> {
+  async contractsRepo(): Promise<GitContractsRepo> {
     if (!this._repo) {
-      const repo = await EraContractsRepo.default();
+      const repo = await GitContractsRepo.default();
       await repo.init();
       this._repo = repo;
       await this._repo.setRevision(this.ref);

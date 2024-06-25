@@ -1,18 +1,26 @@
-import { type SimpleGit, simpleGit } from "simple-git";
-import { cacheDir, directoryExists } from "./fs-utils";
+import {type SimpleGit, simpleGit} from "simple-git";
+import {cacheDir, directoryExists} from "./fs-utils";
 import path from "node:path";
 import fs from "node:fs/promises";
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
-import { compiledArtifactParser } from "../schema/compiled";
-import { utils } from "zksync-ethers";
-import { type SystemContractHashes, systemContractHashesParser } from "../schema/github-schemas";
-import type { Sources } from "../schema";
-import { Option } from "nochoices";
+import {exec} from "node:child_process";
+import {promisify} from "node:util";
+import {compiledArtifactParser} from "../schema/compiled";
+import {utils} from "zksync-ethers";
+import {type SystemContractHashes, systemContractHashesParser} from "../schema/github-schemas";
+import type {Sources} from "../schema";
+import {Option} from "nochoices";
 
 const execPromise = promisify(exec);
 
-export class EraContractsRepo {
+export interface ContractsRepo {
+  byteCodeHashFor(systemContractName: string): Promise<string>;
+
+  currentRef(): Promise<string>;
+
+  currentBranch(): Promise<Option<string>>;
+}
+
+export class GitContractsRepo implements ContractsRepo {
   repoPath: string;
   git: SimpleGit;
   private _currentRef: Option<Promise<string>>;
@@ -25,11 +33,11 @@ export class EraContractsRepo {
     this._currentRef = Option.None();
   }
 
-  static async default(): Promise<EraContractsRepo> {
+  static async default(): Promise<GitContractsRepo> {
     const base = cacheDir();
     const repoDir = path.join(base, "era-contracts-repo");
     await fs.mkdir(repoDir, { recursive: true });
-    return new EraContractsRepo(repoDir);
+    return new GitContractsRepo(repoDir);
   }
 
   async init(): Promise<void> {

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { EraContractsRepo } from "../src/lib/era-contracts-repo";
+import { GitContractsRepo } from "../src/lib/git-contracts-repo";
 import { ContractData } from "../src/lib";
 import fs from "node:fs/promises";
 
@@ -28,11 +28,11 @@ SOFTWARE.
 
 describe("EraContractsRepo", () => {
   describe.skip("after compile for commit (a1a05513c110586f7a1d8b5fa46115cc7307587a)", () => {
-    let contractsRepo: EraContractsRepo;
+    let contractsRepo: GitContractsRepo;
 
     beforeAll(async () => {
       await fs.mkdir("/tmp/era-contract-repo-test", { recursive: true });
-      contractsRepo = new EraContractsRepo("/tmp/era-contract-repo-test");
+      contractsRepo = new GitContractsRepo("/tmp/era-contract-repo-test");
       await contractsRepo.init();
       await contractsRepo.setRevision("a1a05513c110586f7a1d8b5fa46115cc7307587a");
       await contractsRepo.compileSystemContracts();
