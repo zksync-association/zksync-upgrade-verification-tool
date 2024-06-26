@@ -61,13 +61,14 @@ const KNOWN_ERRORS = [
 ];
 
 export function printError(e: Error, term: Terminal): void {
-  const isKnown = KNOWN_ERRORS.some((kind) => e instanceof kind);
-
-  if (isKnown) {
-    term.errLine("");
-    term.errLine(`> ${e.message}`);
-  } else {
-    term.errLine("Unexpected error:");
-    term.errLine(`${e.constructor.name}: ${e.message}`);
-  }
+  console.error(e)
+  // const isKnown = KNOWN_ERRORS.some((kind) => e instanceof kind);
+  //
+  // if (isKnown) {
+  //   term.errLine("");
+  //   term.errLine(`> ${e.message}`);
+  // } else {
+  //   term.errLine("Unexpected error:");
+  //   term.errLine(`${e.constructor.name}: ${e.message}`);
+  // }
 }

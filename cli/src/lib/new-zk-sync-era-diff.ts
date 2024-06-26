@@ -1,7 +1,7 @@
 import type { Hex } from "viem";
 import type {
   CurrentZksyncEraState,
-  HexEraPropNames,
+  HexEraPropName,
   NumberEraPropNames,
 } from "./current-zksync-era-state";
 import { MissingRequiredProp } from "./errors";
@@ -37,7 +37,7 @@ export class NewZkSyncEraDiff {
     this.affectedSystemContracts = sysContractsAddrs;
   }
 
-  hexAttrDiff(prop: HexEraPropNames): [Hex, Option<Hex>] {
+  hexAttrDiff(prop: HexEraPropName): [Hex, Option<Hex>] {
     const current = this.current.hexAttrValue(prop).expect(new MissingRequiredProp(prop));
     return [
       current,

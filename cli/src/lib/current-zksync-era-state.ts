@@ -64,7 +64,7 @@ export const HEX_ZKSYNC_FIELDS = [
   "protocolVersion",
 ] as const;
 
-export type HexEraPropNames = (typeof HEX_ZKSYNC_FIELDS)[number];
+export type HexEraPropName = (typeof HEX_ZKSYNC_FIELDS)[number];
 
 export const NUMERIC_ZKSYNC_FIELDS = [
   "baseTokenGasPriceMultiplierNominator",
@@ -75,7 +75,7 @@ export const NUMERIC_ZKSYNC_FIELDS = [
 export type NumberEraPropNames = (typeof NUMERIC_ZKSYNC_FIELDS)[number];
 
 export type ZkEraStateData = {
-  [key in HexEraPropNames]?: Hex | undefined;
+  [key in HexEraPropName]?: Hex | undefined;
 } & {
   [key in NumberEraPropNames]?: bigint | undefined;
 };
@@ -138,7 +138,7 @@ export class CurrentZksyncEraState {
 
   // SimpleProps
 
-  hexAttrValue(prop: HexEraPropNames): Option<Hex> {
+  hexAttrValue(prop: HexEraPropName): Option<Hex> {
     return Option.fromNullable(this.data[prop]);
   }
 
@@ -277,11 +277,11 @@ export class CurrentZksyncEraState {
         verifierAddress: decodedUpgrade.args[0].verifier,
         l2DefaultAccountBytecodeHash: decodedUpgrade.args[0].defaultAccountHash,
         l2BootloaderBytecodeHash: decodedUpgrade.args[0].bootloaderHash,
-        chainId: bytesToBigInt(dataBlob.subarray(0, 32)),
-        bridgeHubAddress: bytesToHex(dataBlob.subarray(32 + 12, 64)),
-        stateTransitionManagerAddress: bytesToHex(dataBlob.subarray(64 + 12, 96)),
-        baseTokenBridgeAddress: bytesToHex(dataBlob.subarray(96 + 12, 128)),
-        admin: bytesToHex(dataBlob.subarray(128 + 12, 160)),
+        chainId: dataBlob.byteLength >= 32 ? bytesToBigInt(dataBlob.subarray(0, 32)): undefined,
+        bridgeHubAddress: dataBlob.byteLength >= 64 ? bytesToHex(dataBlob.subarray(32 + 12, 64)) : undefined,
+        stateTransitionManagerAddress: dataBlob.byteLength >= 96 ? bytesToHex(dataBlob.subarray(64 + 12, 96)) : undefined,
+        baseTokenBridgeAddress: dataBlob.byteLength >= 128 ? bytesToHex(dataBlob.subarray(96 + 12, 128)) : undefined,
+        admin: dataBlob.byteLength >= 128 ? bytesToHex(dataBlob.subarray(128 + 12, 160)) : undefined,
       },
       facets,
       new SystemContractList(systemContracts)

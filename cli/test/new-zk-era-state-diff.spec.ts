@@ -4,7 +4,7 @@ import {
   type ZkEraStateData,
   CurrentZksyncEraState,
   type NumberEraPropNames,
-  type HexEraPropNames,
+  type HexEraPropName,
   type L2ContractData,
 } from "../src/lib/current-zksync-era-state";
 import { MissingRequiredProp } from "../src/lib/errors";
@@ -25,7 +25,7 @@ describe("NewZkSyncStateDiff", () => {
   }
 
   describe("hex property diffs", () => {
-    const propNames: HexEraPropNames[] = [
+    const propNames: HexEraPropName[] = [
       "admin",
       "pendingAdmin",
       "verifierAddress",
