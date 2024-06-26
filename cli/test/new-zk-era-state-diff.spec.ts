@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { ZkSyncEraDiff } from "../src/lib/zk-sync-era-diff";
 import {
   type ZkEraStateData,
-  CurrentZksyncEraState,
+  ZksyncEraState,
   type NumberEraPropNames,
   type HexEraPropName,
   type L2ContractData,
-} from "../src/lib/current-zksync-era-state";
+} from "../src/lib/zksync-era-state";
 import { MissingRequiredProp } from "../src/lib/errors";
 import { bytesToHex, type Hex } from "viem";
 import { BlockExplorerClient, type FacetData } from "../src/lib";
@@ -18,8 +18,8 @@ import { RpcClient } from "../src/lib/rpc-client";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): ZkSyncEraDiff {
-    const current = new CurrentZksyncEraState(oldData, [], new SystemContractList([]));
-    const changes = new CurrentZksyncEraState(newData, [], new SystemContractList([]));
+    const current = new ZksyncEraState(oldData, [], new SystemContractList([]));
+    const changes = new ZksyncEraState(newData, [], new SystemContractList([]));
 
     return new ZkSyncEraDiff(current, changes, []);
   }
@@ -174,8 +174,8 @@ describe("NewZkSyncStateDiff", () => {
       currentFacets: FacetData[],
       proposedFacets: FacetData[]
     ): ZkSyncEraDiff {
-      const current = new CurrentZksyncEraState({}, currentFacets, new SystemContractList([]));
-      const proposed = new CurrentZksyncEraState({}, proposedFacets, new SystemContractList([]));
+      const current = new ZksyncEraState({}, currentFacets, new SystemContractList([]));
+      const proposed = new ZksyncEraState({}, proposedFacets, new SystemContractList([]));
       return new ZkSyncEraDiff(current, proposed, []);
     }
 
@@ -471,8 +471,8 @@ describe("NewZkSyncStateDiff", () => {
       currentList: L2ContractData[],
       proposedList: L2ContractData[]
     ) {
-      const current = new CurrentZksyncEraState({}, [], new SystemContractList(currentList));
-      const proposed = new CurrentZksyncEraState({}, [], new SystemContractList(proposedList));
+      const current = new ZksyncEraState({}, [], new SystemContractList(currentList));
+      const proposed = new ZksyncEraState({}, [], new SystemContractList(proposedList));
       return new ZkSyncEraDiff(current, proposed, sysContractsAddrs);
     }
 
@@ -546,7 +546,7 @@ describe("NewZkSyncStateDiff", () => {
       const explorerL2 = BlockExplorerClient.forL2("mainnet");
       const rpc = RpcClient.forL1("mainnet");
 
-      const [state] = await CurrentZksyncEraState.fromCalldata(
+      const [state] = await ZksyncEraState.fromCalldata(
         buff,
         "mainnet",
         explorerL1,
@@ -740,7 +740,7 @@ describe("NewZkSyncStateDiff", () => {
 
       const explorer = BlockExplorerClient.forL1(key, "mainnet");
       const rpc = RpcClient.forL1("mainnet");
-      const state = await CurrentZksyncEraState.fromBlockchain("mainnet", explorer, rpc);
+      const state = await ZksyncEraState.fromBlockchain("mainnet", explorer, rpc);
       expect(state.allFacets()).toHaveLength(4);
 
       expect(state.hexAttrValue("admin").unwrap()).toMatch(/0x.*/);

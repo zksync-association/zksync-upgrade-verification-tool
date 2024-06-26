@@ -1,9 +1,9 @@
 import type { Hex } from "viem";
 import type {
-  CurrentZksyncEraState,
+  ZksyncEraState,
   HexEraPropName,
   NumberEraPropNames,
-} from "./current-zksync-era-state";
+} from "./zksync-era-state";
 import { MissingRequiredProp } from "./errors";
 import { Option } from "nochoices";
 import type { FacetData } from "./upgrade-changes";
@@ -23,13 +23,13 @@ export function hexAreEq(hex1: Hex, hex2: Hex): boolean {
 }
 
 export class ZkSyncEraDiff {
-  current: CurrentZksyncEraState;
-  proposed: CurrentZksyncEraState;
+  current: ZksyncEraState;
+  proposed: ZksyncEraState;
   private affectedSystemContracts: Hex[];
 
   constructor(
-    current: CurrentZksyncEraState,
-    proposed: CurrentZksyncEraState,
+    current: ZksyncEraState,
+    proposed: ZksyncEraState,
     sysContractsAddrs: Hex[]
   ) {
     this.current = current;

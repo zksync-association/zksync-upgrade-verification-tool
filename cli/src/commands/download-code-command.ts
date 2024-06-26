@@ -1,6 +1,6 @@
 import type { EnvBuilder } from "../lib/env-builder.js";
 import { withSpinner } from "../lib/with-spinner";
-import { CurrentZksyncEraState, type HexEraPropName } from "../lib/current-zksync-era-state";
+import { ZksyncEraState, type HexEraPropName } from "../lib/zksync-era-state";
 import path from "node:path";
 import { hexToBigInt, hexToBytes } from "viem";
 import { hexAreEq, ZkSyncEraDiff } from "../lib/zk-sync-era-diff";
@@ -14,7 +14,7 @@ export const downloadCodeCommand = async (
   _l1Filter: string[]
 ) => {
   const current = await withSpinner(
-    async () => CurrentZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
+    async () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
     "Gathering current zksync state",
     env
   );
@@ -37,7 +37,7 @@ export const downloadCodeCommand = async (
 
   const [proposed, systemContractsAddrs] = await withSpinner(
     () =>
-      CurrentZksyncEraState.fromCalldata(
+      ZksyncEraState.fromCalldata(
         Buffer.from(hexToBytes(data)),
         env.network,
         env.l1Client(),

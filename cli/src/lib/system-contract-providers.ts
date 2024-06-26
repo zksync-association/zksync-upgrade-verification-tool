@@ -1,5 +1,5 @@
 import type { Hex } from "viem";
-import type { L2ContractData } from "./current-zksync-era-state";
+import type { L2ContractData } from "./zksync-era-state";
 import type { RpcClient } from "./rpc-client";
 import type { BlockExplorerClient } from "./block-explorer-client";
 import { utils } from "zksync-ethers";

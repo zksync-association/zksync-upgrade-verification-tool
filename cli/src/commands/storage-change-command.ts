@@ -6,7 +6,7 @@ import type { Option } from "nochoices";
 import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
 import { withSpinner } from "../lib/with-spinner";
 import { StringStorageChangeReport } from "../lib/reports/string-storage-change-report";
-import { CurrentZksyncEraState } from "../lib/current-zksync-era-state";
+import { ZksyncEraState } from "../lib/zksync-era-state";
 
 async function getMemoryPath(
   preCalculatedPath: Option<string>,
@@ -39,7 +39,7 @@ export async function storageChangeCommand(
   preCalculatedPath: Option<string>
 ): Promise<void> {
   const state = await withSpinner(
-    () => CurrentZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
+    () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
     "Gathering contract data",
     env
   );

@@ -1,5 +1,5 @@
 import type { EnvBuilder } from "../lib/env-builder";
-import { CurrentZksyncEraState } from "../lib/current-zksync-era-state";
+import { ZksyncEraState } from "../lib/zksync-era-state";
 import { hexToBytes } from "viem";
 import { ZkSyncEraDiff } from "../lib/zk-sync-era-diff";
 import { CheckReport } from "../lib/reports/check-report";
@@ -8,7 +8,7 @@ import { MalformedUpgrade } from "../lib/errors";
 
 export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
   const current = await withSpinner(
-    async () => CurrentZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
+    async () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
     "Gathering current zksync state",
     env
   );
@@ -30,7 +30,7 @@ export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
 
   const [proposed, systemContractsAddrs] = await withSpinner(
     () =>
-      CurrentZksyncEraState.fromCalldata(
+      ZksyncEraState.fromCalldata(
         Buffer.from(hexToBytes(data)),
         env.network,
         env.l1Client(),

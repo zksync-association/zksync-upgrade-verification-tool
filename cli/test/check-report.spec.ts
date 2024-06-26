@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { CheckReport } from "../src/lib/reports/check-report";
 import { ZkSyncEraDiff } from "../src/lib/zk-sync-era-diff";
 import {
-  CurrentZksyncEraState,
+  ZksyncEraState,
   HEX_ZKSYNC_FIELDS,
   type L2ContractData,
   type ZkEraStateData,
-} from "../src/lib/current-zksync-era-state";
+} from "../src/lib/zksync-era-state";
 import { SystemContractList } from "../src/lib/system-contract-providers";
 import { type ContractsRepo } from "../src/lib/git-contracts-repo";
 import { TestBlockExplorer } from "./utilities/test-block-explorer";
@@ -30,8 +30,8 @@ interface Ctx {
   sysContractsAfter: L2ContractData[];
   currentFields: ZkEraStateData;
   proposedFields: ZkEraStateData;
-  currentState: CurrentZksyncEraState;
-  proposedState: CurrentZksyncEraState;
+  currentState: ZksyncEraState;
+  proposedState: ZksyncEraState;
   explorer: BlockExplorer;
   contractsRepo: ContractsRepo;
   diff: ZkSyncEraDiff;
@@ -127,7 +127,7 @@ describe("CheckReport", () => {
       baseTokenGasPriceMultiplierDenominator: 300n,
     };
 
-    ctx.currentState = new CurrentZksyncEraState(
+    ctx.currentState = new ZksyncEraState(
       ctx.currentFields,
       [
         {
@@ -178,7 +178,7 @@ describe("CheckReport", () => {
       chainId: 101n,
       baseTokenGasPriceMultiplierNominator: 201n,
     };
-    ctx.proposedState = new CurrentZksyncEraState(
+    ctx.proposedState = new ZksyncEraState(
       ctx.proposedFields,
       [
         {

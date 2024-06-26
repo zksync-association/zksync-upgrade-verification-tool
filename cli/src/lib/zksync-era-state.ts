@@ -80,7 +80,7 @@ export type ZkEraStateData = {
   [key in NumberEraPropNames]?: bigint | undefined;
 };
 
-export class CurrentZksyncEraState {
+export class ZksyncEraState {
   data: ZkEraStateData;
   private facets: FacetData[];
   private systemContracts: SystemContractProvider;
@@ -154,7 +154,7 @@ export class CurrentZksyncEraState {
     network: Network,
     explorer: BlockExplorerClient,
     rpc: RpcClient
-  ): Promise<CurrentZksyncEraState> {
+  ): Promise<ZksyncEraState> {
     const addr = DIAMOND_ADDRS[network];
     const diamond = new Diamond(addr);
 
@@ -225,7 +225,7 @@ export class CurrentZksyncEraState {
       data.baseTokenGasPriceMultiplierDenominator = value;
     });
 
-    return new CurrentZksyncEraState(
+    return new ZksyncEraState(
       data,
       facets,
       new RpcSystemContractProvider(RpcClient.forL2(network), BlockExplorerClient.forL2(network))
@@ -238,7 +238,7 @@ export class CurrentZksyncEraState {
     explorerL1: BlockExplorerClient,
     rpc: RpcClient,
     explorerL2: BlockExplorer
-  ): Promise<[CurrentZksyncEraState, Hex[]]> {
+  ): Promise<[ZksyncEraState, Hex[]]> {
     const addr = DIAMOND_ADDRS[network];
     const diamond = new Diamond(addr);
 
@@ -275,7 +275,7 @@ export class CurrentZksyncEraState {
 
     // TODO: Just imposible to get baseTokenGasPriceMultiplierNominator and baseTokenGasPriceMultiplierDenominator
     // from calldata. The only way is simulating the call.
-    const state = new CurrentZksyncEraState(
+    const state = new ZksyncEraState(
       {
         protocolVersion: numberToHex(decodedUpgrade.args[0].newProtocolVersion, { size: 32 }),
         verifierAddress: decodedUpgrade.args[0].verifier,
