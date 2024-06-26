@@ -3,7 +3,7 @@ import { withSpinner } from "../lib/with-spinner";
 import { CurrentZksyncEraState, type HexEraPropName } from "../lib/current-zksync-era-state";
 import path from "node:path";
 import { hexToBigInt, hexToBytes } from "viem";
-import { hexAreEq, NewZkSyncEraDiff } from "../lib/new-zk-sync-era-diff";
+import { hexAreEq, ZkSyncEraDiff } from "../lib/zk-sync-era-diff";
 import { ADDRESS_ZERO, ContractData, OPEN_ZEP_PROXY_IMPL_SLOT } from "../lib";
 import { MalformedUpgrade } from "../lib/errors";
 
@@ -48,7 +48,7 @@ export const downloadCodeCommand = async (
     env
   );
 
-  const diff = new NewZkSyncEraDiff(current, proposed, systemContractsAddrs);
+  const diff = new ZkSyncEraDiff(current, proposed, systemContractsAddrs);
 
   const facets = [...diff.removedFacets(), ...diff.upgradedFacets(), ...diff.addedFacets()];
 

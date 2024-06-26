@@ -1,4 +1,4 @@
-import { hexAreEq, type NewZkSyncEraDiff } from "../new-zk-sync-era-diff";
+import { hexAreEq, type ZkSyncEraDiff } from "../zk-sync-era-diff";
 import type { ContractsRepo } from "../git-contracts-repo";
 import CliTable from "cli-table3";
 import type { BlockExplorer } from "../block-explorer-client";
@@ -11,13 +11,13 @@ export interface CheckReportOptions {
 }
 
 export class CheckReport {
-  private diff: NewZkSyncEraDiff;
+  private diff: ZkSyncEraDiff;
   private repo: ContractsRepo;
   private explorer: BlockExplorer;
   private opts: CheckReportOptions;
 
   constructor(
-    diff: NewZkSyncEraDiff,
+    diff: ZkSyncEraDiff,
     repo: ContractsRepo,
     explorer: BlockExplorer,
     opts?: CheckReportOptions

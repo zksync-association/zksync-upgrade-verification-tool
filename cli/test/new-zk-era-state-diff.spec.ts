@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NewZkSyncEraDiff } from "../src/lib/new-zk-sync-era-diff";
+import { ZkSyncEraDiff } from "../src/lib/zk-sync-era-diff";
 import {
   type ZkEraStateData,
   CurrentZksyncEraState,
@@ -17,11 +17,11 @@ import { SystemContractList } from "../src/lib/system-contract-providers";
 import { RpcClient } from "../src/lib/rpc-client";
 
 describe("NewZkSyncStateDiff", () => {
-  function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): NewZkSyncEraDiff {
+  function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): ZkSyncEraDiff {
     const current = new CurrentZksyncEraState(oldData, [], new SystemContractList([]));
     const changes = new CurrentZksyncEraState(newData, [], new SystemContractList([]));
 
-    return new NewZkSyncEraDiff(current, changes, []);
+    return new ZkSyncEraDiff(current, changes, []);
   }
 
   describe("hex property diffs", () => {
@@ -173,10 +173,10 @@ describe("NewZkSyncStateDiff", () => {
     function diffWithFacets(
       currentFacets: FacetData[],
       proposedFacets: FacetData[]
-    ): NewZkSyncEraDiff {
+    ): ZkSyncEraDiff {
       const current = new CurrentZksyncEraState({}, currentFacets, new SystemContractList([]));
       const proposed = new CurrentZksyncEraState({}, proposedFacets, new SystemContractList([]));
-      return new NewZkSyncEraDiff(current, proposed, []);
+      return new ZkSyncEraDiff(current, proposed, []);
     }
 
     describe("#addedFacets", () => {
@@ -473,7 +473,7 @@ describe("NewZkSyncStateDiff", () => {
     ) {
       const current = new CurrentZksyncEraState({}, [], new SystemContractList(currentList));
       const proposed = new CurrentZksyncEraState({}, [], new SystemContractList(proposedList));
-      return new NewZkSyncEraDiff(current, proposed, sysContractsAddrs);
+      return new ZkSyncEraDiff(current, proposed, sysContractsAddrs);
     }
 
     it("returns changes for affected system contracts", async () => {

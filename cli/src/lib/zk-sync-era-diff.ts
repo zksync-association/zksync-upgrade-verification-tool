@@ -22,7 +22,7 @@ export function hexAreEq(hex1: Hex, hex2: Hex): boolean {
   return hex1.toLowerCase() === hex2.toLowerCase();
 }
 
-export class NewZkSyncEraDiff {
+export class ZkSyncEraDiff {
   current: CurrentZksyncEraState;
   proposed: CurrentZksyncEraState;
   private affectedSystemContracts: Hex[];

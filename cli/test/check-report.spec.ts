@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { CheckReport } from "../src/lib/reports/check-report";
-import { NewZkSyncEraDiff } from "../src/lib/new-zk-sync-era-diff";
+import { ZkSyncEraDiff } from "../src/lib/zk-sync-era-diff";
 import {
   CurrentZksyncEraState,
   HEX_ZKSYNC_FIELDS,
@@ -34,7 +34,7 @@ interface Ctx {
   proposedState: CurrentZksyncEraState;
   explorer: BlockExplorer;
   contractsRepo: ContractsRepo;
-  diff: NewZkSyncEraDiff;
+  diff: ZkSyncEraDiff;
 }
 
 function escape(str: string): string {
@@ -199,7 +199,7 @@ describe("CheckReport", () => {
   });
 
   beforeEach<Ctx>((ctx) => {
-    ctx.diff = new NewZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
+    ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
       ctx.sysAddr1,
       ctx.sysAddr2,
       ctx.sysAddr3,
@@ -325,7 +325,7 @@ describe("CheckReport", () => {
       }
       ctx.contractsRepo = repo;
 
-      ctx.diff = new NewZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
+      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
         ctx.sysAddr1,
         ctx.sysAddr2,
         ctx.sysAddr3,
@@ -361,7 +361,7 @@ describe("CheckReport", () => {
 
       ctx.contractsRepo = repo;
 
-      ctx.diff = new NewZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
+      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
         ctx.sysAddr1,
         ctx.sysAddr2,
         ctx.sysAddr3,

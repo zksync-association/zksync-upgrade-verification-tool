@@ -1,7 +1,7 @@
 import type { EnvBuilder } from "../lib/env-builder";
 import { CurrentZksyncEraState } from "../lib/current-zksync-era-state";
 import { hexToBytes } from "viem";
-import { NewZkSyncEraDiff } from "../lib/new-zk-sync-era-diff";
+import { ZkSyncEraDiff } from "../lib/zk-sync-era-diff";
 import { CheckReport } from "../lib/reports/check-report";
 import { withSpinner } from "../lib/with-spinner";
 import { MalformedUpgrade } from "../lib/errors";
@@ -41,7 +41,7 @@ export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
     env
   );
 
-  const diff = new NewZkSyncEraDiff(current, proposed, systemContractsAddrs);
+  const diff = new ZkSyncEraDiff(current, proposed, systemContractsAddrs);
 
   const report = new CheckReport(diff, repo, env.l1Client());
   env.term().line(await report.format());
