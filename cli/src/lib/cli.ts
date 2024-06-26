@@ -1,18 +1,17 @@
 import yargs, { type Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
 import { NetworkSchema } from ".";
-import { downloadCode, checkCommand, contractDiff } from "../commands";
+import { downloadCode, checkCommand2, contractDiff } from "../commands";
 import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
 import { storageChangeCommand } from "../commands/storage-change-command";
 import { Option } from "nochoices";
 import { failHandler } from "../commands/fail-handler";
 import { storageSnapshotCommand } from "../commands/storage-snapshot-command";
-import { checkCommand2 } from "../commands/check-command-2";
 
 export function buildCli(
   args: string[],
-  checkCbk: typeof checkCommand,
+  checkCbk: typeof checkCommand2,
   diffCbk: typeof contractDiff,
   downloadCodeCbk: typeof downloadCode,
   storageDiffCbk: typeof storageChangeCommand,
@@ -77,19 +76,6 @@ export function buildCli(
         }),
       async (yargs) => {
         await checkCbk(env, yargs.upgradeDirectory);
-      }
-    )
-    .command(
-      "check2 <upgradeDirectory>",
-      "get current state of contracts",
-      (yargs) =>
-        yargs.positional("upgradeDirectory", {
-          describe: "FolderName of the upgrade to check",
-          type: "string",
-          demandOption: true,
-        }),
-      async (yargs) => {
-        await checkCommand2(env, yargs.upgradeDirectory);
       }
     )
     .command(
@@ -216,7 +202,7 @@ export function buildCli(
 export const cli = async () => {
   const argParser = buildCli(
     hideBin(process.argv),
-    checkCommand,
+    checkCommand2,
     contractDiff,
     downloadCode,
     storageChangeCommand,

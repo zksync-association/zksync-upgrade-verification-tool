@@ -211,7 +211,6 @@ describe("CheckReport", () => {
       shortOutput: false,
     });
     const string = await report.format();
-    console.log(string);
     return string.split("\n");
   }
 
@@ -290,6 +289,7 @@ describe("CheckReport", () => {
         expect(line).not.toEqual(-1);
         expect(lines[line]).toContain(address);
         expect(lines[line + 1]).toContain(`Proposed: ${bytecodeHash}`);
+        expect(lines[line + 1]).toContain(`✔`);
       }
     });
 

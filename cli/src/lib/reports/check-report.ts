@@ -4,6 +4,7 @@ import CliTable from "cli-table3";
 import type { BlockExplorer } from "../block-explorer-client";
 import { HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS } from "../current-zksync-era-state";
 import type { Hex } from "viem";
+import chalk from "chalk";
 
 export interface CheckReportOptions {
   shortOutput: boolean;
@@ -209,7 +210,7 @@ export class CheckReport {
   }
 
   private boolEmoji(value: boolean): string {
-    return value ? "✔" : "⚠️";
+    return value ? chalk.green("✔") : "⚠️";
   }
 
   private async addWarnings(lines: string[], warnings: string[]): Promise<void> {
