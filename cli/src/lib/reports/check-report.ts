@@ -89,7 +89,7 @@ export class CheckReport {
     for (const facet of facets) {
       const table = new CliTable({head: [facet.name]});
 
-      table.push(["Old address", facet.oldAddress.map(this.formatHex).unwrapOr("")]);
+      table.push(["Old address", facet.oldAddress.map(v => this.formatHex(v)).unwrapOr("")]);
       table.push(["New address", facet.newAddress.unwrapOr("Facet removed")]);
 
       if (facet.oldAddress.isSome()) {

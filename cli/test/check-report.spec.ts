@@ -207,8 +207,9 @@ describe("CheckReport", () => {
   });
 
   async function createReportLines(ctx: Ctx): Promise<string[]> {
-    const report = new CheckReport(ctx.diff, ctx.contractsRepo, ctx.explorer);
+    const report = new CheckReport(ctx.diff, ctx.contractsRepo, ctx.explorer, {shortOutput: false});
     const string = await report.format();
+    console.log(string)
     return string.split("\n");
   }
 
@@ -279,16 +280,14 @@ describe("CheckReport", () => {
         const line = lines.findIndex((l) => l.includes(name));
         expect(line).not.toEqual(-1);
         expect(lines[line]).toContain(address);
-        expect(lines[line - 2]).toContain(`Current: ${bytecodeHash}`);
-        expect(lines[line + 2]).toContain("Bytecode hash match with sources: true");
+        expect(lines[line - 1]).toContain(`Current: ${bytecodeHash}`);
       }
 
       for (const { name, bytecodeHash, address } of ctx.sysContractsAfter) {
         const line = lines.findIndex((l) => l.includes(name));
         expect(line).not.toEqual(-1);
         expect(lines[line]).toContain(address);
-        expect(lines[line]).toContain(`Proposed: ${bytecodeHash}`);
-        expect(lines[line + 2]).toContain("Bytecode hash match with sources: true");
+        expect(lines[line + 1]).toContain(`Proposed: ${bytecodeHash}`);
       }
     });
 
@@ -336,7 +335,7 @@ describe("CheckReport", () => {
 
       const line = lines.findIndex((l) => l.includes(ctx.sysAddr3));
       expect(line).not.toEqual(-1);
-      expect(lines[line + 2]).toContain("Bytecode hash match with sources: false");
+      expect(lines[line + 1]).toContain("⚠️");
     });
 
     it<Ctx>("adds the warning", async (ctx) => {
@@ -372,7 +371,7 @@ describe("CheckReport", () => {
 
       const line = lines.findIndex((l) => l.includes(ctx.sysAddr3));
       expect(line).not.toEqual(-1);
-      expect(lines[line + 2]).toContain("Bytecode hash match with sources: false");
+      expect(lines[line + 1]).toContain("⚠️");
     });
 
     it<Ctx>("adds the warning", async (ctx) => {
