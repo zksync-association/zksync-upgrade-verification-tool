@@ -16,7 +16,9 @@ export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
   const importer = env.importer();
   const upgrade = await importer.readFromFiles(upgradeDirectory, env.network);
 
-  const data = upgrade.upgradeCalldataHex.expect(new MalformedUpgrade("Missing calldata for governor operations"));
+  const data = upgrade.upgradeCalldataHex.expect(
+    new MalformedUpgrade("Missing calldata for governor operations")
+  );
 
   const repo = await withSpinner(
     async () => {

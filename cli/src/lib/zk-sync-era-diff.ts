@@ -1,9 +1,5 @@
 import type { Hex } from "viem";
-import type {
-  ZksyncEraState,
-  HexEraPropName,
-  NumberEraPropNames,
-} from "./zksync-era-state";
+import type { ZksyncEraState, HexEraPropName, NumberEraPropNames } from "./zksync-era-state";
 import { MissingRequiredProp } from "./errors";
 import { Option } from "nochoices";
 import type { FacetData } from "./upgrade-changes";
@@ -27,11 +23,7 @@ export class ZkSyncEraDiff {
   proposed: ZksyncEraState;
   private affectedSystemContracts: Hex[];
 
-  constructor(
-    current: ZksyncEraState,
-    proposed: ZksyncEraState,
-    sysContractsAddrs: Hex[]
-  ) {
+  constructor(current: ZksyncEraState, proposed: ZksyncEraState, sysContractsAddrs: Hex[]) {
     this.current = current;
     this.proposed = proposed;
     this.affectedSystemContracts = sysContractsAddrs;

@@ -94,7 +94,7 @@ export class ZksyncEraState {
   // METADATA
 
   allFacetsAddrs(): Hex[] {
-    return this.facets.map(f => f.address)
+    return this.facets.map((f) => f.address);
   }
 
   protocolVersion(): string {
@@ -299,7 +299,7 @@ export class ZksyncEraState {
   }
 
   allSelectors(): Hex[] {
-    return this.facets.reduce((a, b) => a.concat(b.selectors), new Array<Hex>())
+    return this.facets.reduce((a, b) => a.concat(b.selectors), new Array<Hex>());
   }
 }
 

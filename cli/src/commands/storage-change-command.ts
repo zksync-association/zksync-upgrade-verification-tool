@@ -66,7 +66,7 @@ export async function storageChangeCommand(
 
   const memoryMap = new StorageChanges(
     rawMap,
-    DIAMOND_ADDRS[env.network] ,
+    DIAMOND_ADDRS[env.network],
     [...selectors],
     ["0x10113bb3a8e64f8ed67003126adc8ce74c34610c"]
   );

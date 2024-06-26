@@ -1,6 +1,3 @@
-import type { BlockExplorer } from "./block-explorer-client.js";
-import type { ContractData } from "./contract-data.js";
-
 export class VerifierContract {
   address: string;
   recursionCircuitsSetVksHash: string;
