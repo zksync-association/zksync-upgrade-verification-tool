@@ -93,6 +93,10 @@ export class CurrentZksyncEraState {
 
   // METADATA
 
+  allFacetsAddrs(): Hex[] {
+    return this.facets.map(f => f.address)
+  }
+
   protocolVersion(): string {
     if (!this.data.protocolVersion) {
       throw new MissingRequiredProp("protocolVersion");
@@ -291,6 +295,10 @@ export class CurrentZksyncEraState {
       new SystemContractList(systemContracts)
     );
     return [state, systemContracts.map((l) => l.address)];
+  }
+
+  allSelectors(): Hex[] {
+    return this.facets.reduce((a, b) => a.concat(b.selectors), new Array<Hex>())
   }
 }
 
