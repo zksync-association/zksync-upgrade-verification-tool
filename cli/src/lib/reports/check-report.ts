@@ -1,12 +1,12 @@
-import {hexAreEq, type NewZkSyncEraDiff} from "../new-zk-sync-era-diff";
-import type {ContractsRepo} from "../git-contracts-repo";
+import { hexAreEq, type NewZkSyncEraDiff } from "../new-zk-sync-era-diff";
+import type { ContractsRepo } from "../git-contracts-repo";
 import CliTable from "cli-table3";
-import type {BlockExplorer} from "../block-explorer-client";
-import {HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS} from "../current-zksync-era-state";
-import type {Hex} from "viem";
+import type { BlockExplorer } from "../block-explorer-client";
+import { HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS } from "../current-zksync-era-state";
+import type { Hex } from "viem";
 
 export interface CheckReportOptions {
-  shortOutput: boolean
+  shortOutput: boolean;
 }
 
 export class CheckReport {
@@ -15,19 +15,24 @@ export class CheckReport {
   private explorer: BlockExplorer;
   private opts: CheckReportOptions;
 
-  constructor(diff: NewZkSyncEraDiff, repo: ContractsRepo, explorer: BlockExplorer, opts?: CheckReportOptions) {
+  constructor(
+    diff: NewZkSyncEraDiff,
+    repo: ContractsRepo,
+    explorer: BlockExplorer,
+    opts?: CheckReportOptions
+  ) {
     this.diff = diff;
     this.repo = repo;
     this.explorer = explorer;
-    this.opts = opts || {shortOutput: true}
+    this.opts = opts || { shortOutput: true };
   }
 
   private long(): boolean {
-    return !this.opts.shortOutput
+    return !this.opts.shortOutput;
   }
 
   private short(): boolean {
-    return this.opts.shortOutput
+    return this.opts.shortOutput;
   }
 
   async format(): Promise<string> {
@@ -56,9 +61,9 @@ export class CheckReport {
       "This tool is downloading all the sources realated to system contracts, and compiling them",
       "locally. This allows the tool to compare bytecode hashes for every l2 contract.",
       ""
-    )
+    );
 
-    const table = new CliTable({head: ["Name", "Value"], style: {compact: true}});
+    const table = new CliTable({ head: ["Name", "Value"], style: { compact: true } });
     const [currentVersion, proposedVersion] = this.diff.protocolVersion();
     table.push(["Current version", currentVersion]);
     table.push(["Proposed version", proposedVersion]);
@@ -84,12 +89,12 @@ export class CheckReport {
       "ZkSync Era main contract is a diamond. This a summary of how",
       "their facets are being updated.",
       ""
-    )
+    );
 
     for (const facet of facets) {
-      const table = new CliTable({head: [facet.name]});
+      const table = new CliTable({ head: [facet.name] });
 
-      table.push(["Old address", facet.oldAddress.map(v => this.formatHex(v)).unwrapOr("")]);
+      table.push(["Old address", facet.oldAddress.map((v) => this.formatHex(v)).unwrapOr("")]);
       table.push(["New address", facet.newAddress.unwrapOr("Facet removed")]);
 
       if (facet.oldAddress.isSome()) {
@@ -104,8 +109,12 @@ export class CheckReport {
 
       if (facet.newAddress.isSome()) {
         const abi = await this.explorer.getAbi(facet.newAddress.unwrap());
-        const newFunctions = facet.addedSelectors.map((s) => abi.signatureForSelector(s, this.long()));
-        const preserved = facet.preservedSelectors.map((s) => abi.signatureForSelector(s, this.long()));
+        const newFunctions = facet.addedSelectors.map((s) =>
+          abi.signatureForSelector(s, this.long())
+        );
+        const preserved = facet.preservedSelectors.map((s) =>
+          abi.signatureForSelector(s, this.long())
+        );
         table.push(["New functions", newFunctions.join("\n")]);
         table.push(["Upgraded functions", preserved.join("\n")]);
       } else {
@@ -123,17 +132,15 @@ export class CheckReport {
       "Summary with the most important fields of ZkSync era main",
       "contract affected by te upgrade.",
       ""
-    )
+    );
 
-    const table = new CliTable({head: ["Field name", "Field Values"]});
+    const table = new CliTable({ head: ["Field name", "Field Values"] });
     for (const field of HEX_ZKSYNC_FIELDS) {
       const [before, maybeAfter] = this.diff.hexAttrDiff(field);
 
-      const after = maybeAfter
-        .map((v) => this.formatHex(v))
-        .unwrapOr("No changes.");
+      const after = maybeAfter.map((v) => this.formatHex(v)).unwrapOr("No changes.");
       table.push(
-        [{content: field, rowSpan: 2, vAlign: "center"}, `Current: ${this.formatHex(before)}`],
+        [{ content: field, rowSpan: 2, vAlign: "center" }, `Current: ${this.formatHex(before)}`],
         [`Proposed: ${after}`]
       );
     }
@@ -141,11 +148,9 @@ export class CheckReport {
     for (const field of NUMERIC_ZKSYNC_FIELDS) {
       const [before, maybeAfter] = this.diff.numberAttrDiff(field);
 
-      const after = maybeAfter
-        .map((v) => v.toString())
-        .unwrapOr("No changes.");
+      const after = maybeAfter.map((v) => v.toString()).unwrapOr("No changes.");
       table.push(
-        [{content: field, rowSpan: 2, vAlign: "center"}, `Current: ${before}`],
+        [{ content: field, rowSpan: 2, vAlign: "center" }, `Current: ${before}`],
         [`Proposed: ${after}`]
       );
     }
@@ -171,15 +176,15 @@ export class CheckReport {
       "Summary of system contract affected by the upgrades.",
       "Each system contract is recompiled locally to check that the bytecode hash matches",
       ""
-    )
+    );
 
-    const table = new CliTable({head: ["System Contract", "Address", "Bytecode hash"]});
+    const table = new CliTable({ head: ["System Contract", "Address", "Bytecode hash"] });
 
     for (const contract of changes) {
       const fromRepo = await this.repo.byteCodeHashFor(contract.name);
 
       const bytecodeMatches = fromRepo.isSomeAnd((hash) => {
-        return hexAreEq(hash as Hex, contract.proposedBytecodeHash)
+        return hexAreEq(hash as Hex, contract.proposedBytecodeHash);
       });
       if (!bytecodeMatches) {
         warnings.push(
@@ -188,11 +193,15 @@ export class CheckReport {
       }
       table.push(
         [
-          {content: contract.name, rowSpan: 2, vAlign: "center"},
-          {content: this.formatHex(contract.address), rowSpan: 2, vAlign: "center"},
+          { content: contract.name, rowSpan: 2, vAlign: "center" },
+          { content: this.formatHex(contract.address), rowSpan: 2, vAlign: "center" },
           `Current: ${this.formatHex(contract.currentBytecodeHash)}`,
         ],
-        [`Proposed: ${this.formatHex(contract.proposedBytecodeHash)} (${this.boolEmoji(bytecodeMatches)})`],
+        [
+          `Proposed: ${this.formatHex(contract.proposedBytecodeHash)} (${this.boolEmoji(
+            bytecodeMatches
+          )})`,
+        ]
       );
     }
 
@@ -217,13 +226,10 @@ export class CheckReport {
   }
 
   private formatHex(hex: string): string {
-    const formated = hex
-      .toLowerCase()
-      .replace("e", "E")
-      .replace("d", "D");
+    const formated = hex.toLowerCase().replace("e", "E").replace("d", "D");
 
     if (this.short() && formated.length > 2 + 10 * 2) {
-      return `${formated.substring(0, 12)}...${formated.slice(-10)}`
+      return `${formated.substring(0, 12)}...${formated.slice(-10)}`;
     }
     return formated;
   }

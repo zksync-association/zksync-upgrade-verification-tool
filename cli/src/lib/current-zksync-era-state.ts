@@ -1,18 +1,35 @@
-import {bytesToBigInt, bytesToHex, bytesToNumber, type Hex, hexToBytes, hexToNumber, numberToHex,} from "viem";
-import type {FacetData} from "./upgrade-changes";
-import {Option} from "nochoices";
-import {MissingRequiredProp} from "./errors";
-import {DIAMOND_ADDRS, type Network} from "./constants";
-import {Diamond} from "./diamond";
-import {type BlockExplorer, BlockExplorerClient} from "./block-explorer-client";
-import {RpcClient} from "./rpc-client";
-import {zodHex} from "../schema/zod-optionals";
-import {RpcStorageSnapshot} from "./storage/rpc-storage-snapshot";
-import {StringStorageVisitor} from "./reports/string-storage-visitor";
-import {MAIN_CONTRACT_FIELDS} from "./storage/storage-props";
-import {RpcSystemContractProvider, SystemContractList, type SystemContractProvider,} from "./system-contract-providers";
-import {callDataSchema, type FacetCut, l2UpgradeSchema, upgradeCallDataSchema,} from "../schema/rpc";
-import {z} from "zod";
+import {
+  bytesToBigInt,
+  bytesToHex,
+  bytesToNumber,
+  type Hex,
+  hexToBytes,
+  hexToNumber,
+  numberToHex,
+} from "viem";
+import type { FacetData } from "./upgrade-changes";
+import { Option } from "nochoices";
+import { MissingRequiredProp } from "./errors";
+import { DIAMOND_ADDRS, type Network } from "./constants";
+import { Diamond } from "./diamond";
+import { type BlockExplorer, BlockExplorerClient } from "./block-explorer-client";
+import { RpcClient } from "./rpc-client";
+import { zodHex } from "../schema/zod-optionals";
+import { RpcStorageSnapshot } from "./storage/rpc-storage-snapshot";
+import { StringStorageVisitor } from "./reports/string-storage-visitor";
+import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props";
+import {
+  RpcSystemContractProvider,
+  SystemContractList,
+  type SystemContractProvider,
+} from "./system-contract-providers";
+import {
+  callDataSchema,
+  type FacetCut,
+  l2UpgradeSchema,
+  upgradeCallDataSchema,
+} from "../schema/rpc";
+import { z } from "zod";
 
 export type L2ContractData = {
   address: Hex;
@@ -167,8 +184,9 @@ export class CurrentZksyncEraState {
       pendingAdmin: await diamond.contractRead(rpc, "getPendingAdmin", zodHex),
       verifierAddress: await diamond.contractRead(rpc, "getVerifier", zodHex),
       bridgeHubAddress: await diamond.contractRead(rpc, "getBridgehub", zodHex),
-      protocolVersion: await diamond.contractRead(rpc, "getProtocolVersion", z.bigint())
-        .then(n => numberToHex(n, {size: 32})),
+      protocolVersion: await diamond
+        .contractRead(rpc, "getProtocolVersion", z.bigint())
+        .then((n) => numberToHex(n, { size: 32 })),
       baseTokenBridgeAddress: await diamond.contractRead(rpc, "getBaseTokenBridge", zodHex),
       stateTransitionManagerAddress: await diamond.contractRead(
         rpc,
@@ -268,7 +286,7 @@ export class CurrentZksyncEraState {
       facets,
       new SystemContractList(systemContracts)
     );
-    return [state, systemContracts.map(l => l.address)];
+    return [state, systemContracts.map((l) => l.address)];
   }
 }
 

@@ -19,7 +19,7 @@ export type FacetDataDiff = {
 };
 
 export function hexAreEq(hex1: Hex, hex2: Hex): boolean {
-  return hex1.toLowerCase() === hex2.toLowerCase()
+  return hex1.toLowerCase() === hex2.toLowerCase();
 }
 
 export class NewZkSyncEraDiff {
@@ -41,7 +41,7 @@ export class NewZkSyncEraDiff {
     const current = this.current.hexAttrValue(prop).expect(new MissingRequiredProp(prop));
     return [
       current,
-      this.proposed.hexAttrValue(prop).filter(proposed => !hexAreEq(current, proposed)),
+      this.proposed.hexAttrValue(prop).filter((proposed) => !hexAreEq(current, proposed)),
     ];
   }
 
@@ -49,7 +49,7 @@ export class NewZkSyncEraDiff {
     const current = this.current.numberAttrValue(prop).expect(new MissingRequiredProp(prop));
     return [
       current,
-      this.proposed.numberAttrValue(prop).filter(proposed => proposed !== current),
+      this.proposed.numberAttrValue(prop).filter((proposed) => proposed !== current),
     ];
   }
 

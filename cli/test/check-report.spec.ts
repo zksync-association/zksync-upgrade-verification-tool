@@ -207,9 +207,11 @@ describe("CheckReport", () => {
   });
 
   async function createReportLines(ctx: Ctx): Promise<string[]> {
-    const report = new CheckReport(ctx.diff, ctx.contractsRepo, ctx.explorer, {shortOutput: false});
+    const report = new CheckReport(ctx.diff, ctx.contractsRepo, ctx.explorer, {
+      shortOutput: false,
+    });
     const string = await report.format();
-    console.log(string)
+    console.log(string);
     return string.split("\n");
   }
 
