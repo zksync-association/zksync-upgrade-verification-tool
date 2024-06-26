@@ -123,16 +123,17 @@ export class ZksyncEraState {
 
   // FEE
 
-  feeParams(): FeeParams {
-    return {
-      batchOverheadL1Gas: 0n,
-      maxL2GasPerBatch: 0n,
-      maxPubdataPerBatch: 0n,
-      minimalL2GasPrice: 0n,
-      priorityTxMaxPubdata: 0n,
-      pubdataPricingMode: PubdataPricingMode.Rollup,
-    };
-  }
+  // TODO: Include fee params
+  // feeParams(): FeeParams {
+  //   return {
+  //     batchOverheadL1Gas: 0n,
+  //     maxL2GasPerBatch: 0n,
+  //     maxPubdataPerBatch: 0n,
+  //     minimalL2GasPrice: 0n,
+  //     priorityTxMaxPubdata: 0n,
+  //     pubdataPricingMode: PubdataPricingMode.Rollup,
+  //   };
+  // }
 
   // L2 CONTRACTS
 

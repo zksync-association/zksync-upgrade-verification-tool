@@ -34,7 +34,7 @@ export class GitContractsRepo implements ContractsRepo {
   }
 
   static async default(): Promise<GitContractsRepo> {
-    const base = cacheDir();
+    const base = await cacheDir();
     const repoDir = path.join(base, "era-contracts-repo");
     await fs.mkdir(repoDir, { recursive: true });
     return new GitContractsRepo(repoDir);

@@ -18,8 +18,4 @@ export class VerifierContract {
     this.recursionLeafLevelVkHash = recursionLeafLevelVkHash;
     this.recursionNodeLevelVkHash = recursionNodeLevelVkHash;
   }
-
-  async getCode(client: BlockExplorer): Promise<ContractData> {
-    return client.getSourceCode(this.address);
-  }
 }

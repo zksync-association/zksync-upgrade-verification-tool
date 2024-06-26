@@ -11,17 +11,9 @@ export class Terminal {
     return new Terminal(process.stdout, process.stderr);
   }
 
-  append(data: string): void {
-    this.out.write(data);
-  }
-
   line(data: string): void {
     this.out.write(data);
     this.out.write("\n");
-  }
-
-  errAppend(data: string): void {
-    this.err.write(data);
   }
 
   errLine(data: string): void {

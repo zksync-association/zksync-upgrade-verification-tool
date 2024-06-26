@@ -47,9 +47,9 @@ export class UpgradeChanges {
     this.upgradeCalldataHex = Option.fromNullable(upgradeTxHex);
   }
 
-  matchingFacet(targetSelectors: string[]): FacetData | undefined {
-    return this.facets.find((f) => f.selectors.some((sel) => targetSelectors.includes(sel)));
-  }
+  // matchingFacet(targetSelectors: string[]): FacetData | undefined {
+  //   return this.facets.find((f) => f.selectors.some((sel) => targetSelectors.includes(sel)));
+  // }
 
   addFacet(facetName: string, facetAddr: Hex, selectors: string[]) {
     this.orphanedSelectors = this.orphanedSelectors.filter(
