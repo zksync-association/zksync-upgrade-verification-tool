@@ -1,17 +1,21 @@
 import yargs, { type Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
 import { NetworkSchema } from ".";
-import { downloadCode, checkCommand2, contractDiff } from "../commands";
+import {
+  downloadCode,
+  checkCommand,
+  contractDiff,
+  storageChangeCommand,
+  storageSnapshotCommand,
+} from "../commands";
 import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
-import { storageChangeCommand } from "../commands/storage-change-command";
 import { Option } from "nochoices";
 import { failHandler } from "../commands/fail-handler";
-import { storageSnapshotCommand } from "../commands/storage-snapshot-command";
 
 export function buildCli(
   args: string[],
-  checkCbk: typeof checkCommand2,
+  checkCbk: typeof checkCommand,
   diffCbk: typeof contractDiff,
   downloadCodeCbk: typeof downloadCode,
   storageDiffCbk: typeof storageChangeCommand,
@@ -202,7 +206,7 @@ export function buildCli(
 export const cli = async () => {
   const argParser = buildCli(
     hideBin(process.argv),
-    checkCommand2,
+    checkCommand,
     contractDiff,
     downloadCode,
     storageChangeCommand,
