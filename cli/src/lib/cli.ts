@@ -2,9 +2,8 @@ import yargs, { type Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
 import { NetworkSchema } from ".";
 import {
-  type downloadCode,
   checkCommand,
-  downloadCode2,
+  downloadCodeCommand,
   storageChangeCommand,
   storageSnapshotCommand,
 } from "../commands";
@@ -16,7 +15,7 @@ import { failHandler } from "../commands/fail-handler";
 export function buildCli(
   args: string[],
   checkCbk: typeof checkCommand,
-  downloadCodeCbk: typeof downloadCode,
+  downloadCodeCbk: typeof downloadCodeCommand,
   storageDiffCbk: typeof storageChangeCommand,
   failCbk: typeof failHandler
 ): Argv {
@@ -174,7 +173,7 @@ export const cli = async () => {
   const argParser = buildCli(
     hideBin(process.argv),
     checkCommand,
-    downloadCode2,
+    downloadCodeCommand,
     storageChangeCommand,
     failHandler
   );
