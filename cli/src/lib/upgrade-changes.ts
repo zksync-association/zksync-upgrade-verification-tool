@@ -3,7 +3,7 @@ import type {
   L2UpgradeJson,
   TransactionsJson,
   UpgradeManifest,
-} from "../schema/index.js";
+} from "../schema";
 import { VerifierContract } from "./verifier.js";
 import type { Hex } from "viem";
 import { Option } from "nochoices";
@@ -28,14 +28,14 @@ export class UpgradeChanges {
   systemContractChanges: SystemContractData[];
   aaBytecodeHash: string;
   bootloaderBytecodeHash: string;
-  upgradeCalldataHex: Option<string>;
+  upgradeCalldataHex: Option<Hex>;
 
   constructor(
     newProtocolVersion: string,
     verifier: VerifierContract,
     aaBytecodeHash: string,
     bootloaderBytecodeHash: string,
-    upgradeTxHex?: string
+    upgradeTxHex?: Hex
   ) {
     this.newProtocolVersion = newProtocolVersion;
     this.facets = [];

@@ -1,12 +1,10 @@
 import type { EnvBuilder } from "../lib/env-builder";
 import { CurrentZksyncEraState } from "../lib/current-zksync-era-state";
-import fs from "node:fs/promises";
-import path from "node:path";
-import { transactionsSchema } from "../schema";
 import { hexToBytes } from "viem";
 import { NewZkSyncEraDiff } from "../lib/new-zk-sync-era-diff";
 import { CheckReport } from "../lib/reports/check-report";
 import { withSpinner } from "../lib/with-spinner";
+import { MalformedUpgrade } from "../lib/errors";
 
 export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
   const current = await withSpinner(
@@ -15,13 +13,10 @@ export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
     env
   );
 
-  const bufFile = await fs.readFile(path.join(upgradeDirectory, env.network, "transactions.json"));
-  const txFile = transactionsSchema.parse(JSON.parse(bufFile.toString()));
+  const importer = env.importer();
+  const upgrade = await importer.readFromFiles(upgradeDirectory, env.network);
 
-  if (!txFile.governanceOperation) {
-    throw new Error("Missing governance operation transaction");
-  }
-  const data = txFile.governanceOperation.calls[0].data;
+  const data = upgrade.upgradeCalldataHex.expect(new MalformedUpgrade("Missing calldata for governor operations"));
 
   const repo = await withSpinner(
     async () => {
