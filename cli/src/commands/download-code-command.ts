@@ -6,51 +6,9 @@ import { hexToBigInt, hexToBytes } from "viem";
 import { hexAreEq, ZkSyncEraDiff } from "../lib/zk-sync-era-diff";
 import { ADDRESS_ZERO, ContractData, OPEN_ZEP_PROXY_IMPL_SLOT } from "../lib";
 import { MalformedUpgrade } from "../lib/errors";
+import type {GitContractsRepo} from "../lib/git-contracts-repo";
 
-export const downloadCodeCommand = async (
-  env: EnvBuilder,
-  upgradeDirectory: string,
-  targetDir: string,
-  _l1Filter: string[]
-) => {
-  const current = await withSpinner(
-    async () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
-    "Gathering current zksync state",
-    env
-  );
-
-  const importer = env.importer();
-  const upgrade = await importer.readFromFiles(upgradeDirectory, env.network);
-
-  const data = upgrade.upgradeCalldataHex.expect(
-    new MalformedUpgrade("Missing calldata for governor operations")
-  );
-
-  const repo = await withSpinner(
-    async () => {
-      const repo = await env.contractsRepo();
-      await repo.compileSystemContracts();
-      return repo;
-    },
-    "Locally compiling system contracts",
-    env
-  );
-
-  const [proposed, systemContractsAddrs] = await withSpinner(
-    () =>
-      ZksyncEraState.fromCalldata(
-        Buffer.from(hexToBytes(data)),
-        env.network,
-        env.l1Client(),
-        env.rpcL1(),
-        env.l2Client()
-      ),
-    "Calculating upgrade changes",
-    env
-  );
-
-  const diff = new ZkSyncEraDiff(current, proposed, systemContractsAddrs);
-
+async function downloadAllCode (diff: ZkSyncEraDiff, env: EnvBuilder, targetDir: string, repo: GitContractsRepo) {
   const facets = [...diff.removedFacets(), ...diff.upgradedFacets(), ...diff.addedFacets()];
 
   for (const facet of facets) {
@@ -128,4 +86,56 @@ export const downloadCodeCommand = async (
       await proposed.writeSources(path.join(targetDir, "proposed", name.replace("Address", "")));
     }
   }
+}
+
+export const downloadCodeCommand = async (
+  env: EnvBuilder,
+  upgradeDirectory: string,
+  targetDir: string,
+  _l1Filter: string[]
+) => {
+  const current = await withSpinner(
+    async () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
+    "Gathering current zksync state",
+    env
+  );
+
+  const importer = env.importer();
+  const upgrade = await importer.readFromFiles(upgradeDirectory, env.network);
+
+  const data = upgrade.upgradeCalldataHex.expect(
+    new MalformedUpgrade("Missing calldata for governor operations")
+  );
+
+  const repo = await withSpinner(
+    async () => {
+      const repo = await env.contractsRepo();
+      await repo.compileSystemContracts();
+      return repo;
+    },
+    "Locally compiling system contracts",
+    env
+  );
+
+  const [proposed, systemContractsAddrs] = await withSpinner(
+    () =>
+      ZksyncEraState.fromCalldata(
+        Buffer.from(hexToBytes(data)),
+        env.network,
+        env.l1Client(),
+        env.rpcL1(),
+        env.l2Client()
+      ),
+    "Calculating upgrade changes",
+    env
+  );
+
+  const diff = new ZkSyncEraDiff(current, proposed, systemContractsAddrs);
+
+  await withSpinner(
+    async () => downloadAllCode(diff, env, targetDir, repo),
+    "Downloading all code",
+    env
+  );
+  env.term().line(`🎉 All code successfully downloaded into ${targetDir}`)
 };
