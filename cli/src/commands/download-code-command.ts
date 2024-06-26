@@ -6,9 +6,14 @@ import { hexToBigInt, hexToBytes } from "viem";
 import { hexAreEq, ZkSyncEraDiff } from "../lib/zk-sync-era-diff";
 import { ADDRESS_ZERO, ContractData, OPEN_ZEP_PROXY_IMPL_SLOT } from "../lib";
 import { MalformedUpgrade } from "../lib/errors";
-import type {GitContractsRepo} from "../lib/git-contracts-repo";
+import type { GitContractsRepo } from "../lib/git-contracts-repo";
 
-async function downloadAllCode (diff: ZkSyncEraDiff, env: EnvBuilder, targetDir: string, repo: GitContractsRepo) {
+async function downloadAllCode(
+  diff: ZkSyncEraDiff,
+  env: EnvBuilder,
+  targetDir: string,
+  repo: GitContractsRepo
+) {
   const facets = [...diff.removedFacets(), ...diff.upgradedFacets(), ...diff.addedFacets()];
 
   for (const facet of facets) {
@@ -137,5 +142,5 @@ export const downloadCodeCommand = async (
     "Downloading all code",
     env
   );
-  env.term().line(`🎉 All code successfully downloaded into ${targetDir}`)
+  env.term().line(`🎉 All code successfully downloaded into ${targetDir}`);
 };
