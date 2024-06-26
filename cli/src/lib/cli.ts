@@ -2,7 +2,7 @@ import yargs, { type Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
 import { NetworkSchema } from ".";
 import {
-  downloadCode,
+  type downloadCode,
   checkCommand,
   downloadCode2,
   storageChangeCommand,

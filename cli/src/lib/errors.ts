@@ -1,17 +1,13 @@
 import type { Network } from "./constants.js";
 import type { Terminal } from "../terminal";
 
-// export class FinishWithError extends Error {}
-
-export class InconsistentData extends Error {}
-
 export class MissingRequiredProp extends Error {
   constructor(prop: string) {
     super(`Missing required prop: ${prop}`);
   }
 }
 
-export class ContracNotVerified extends Error {
+export class ContractNotVerified extends Error {
   constructor(addr: string) {
     super(`Contract for ${addr} not verified in block explorer`);
   }
@@ -52,7 +48,7 @@ export class ExternalApiError extends Error {
 }
 
 const KNOWN_ERRORS = [
-  ContracNotVerified,
+  ContractNotVerified,
   NotAnUpgradeDir,
   NotADir,
   MalformedUpgrade,
@@ -61,14 +57,13 @@ const KNOWN_ERRORS = [
 ];
 
 export function printError(e: Error, term: Terminal): void {
-  console.error(e)
-  // const isKnown = KNOWN_ERRORS.some((kind) => e instanceof kind);
-  //
-  // if (isKnown) {
-  //   term.errLine("");
-  //   term.errLine(`> ${e.message}`);
-  // } else {
-  //   term.errLine("Unexpected error:");
-  //   term.errLine(`${e.constructor.name}: ${e.message}`);
-  // }
+  const isKnown = KNOWN_ERRORS.some((kind) => e instanceof kind);
+
+  if (isKnown) {
+    term.errLine("");
+    term.errLine(`> ${e.message}`);
+  } else {
+    term.errLine("Unexpected error:");
+    term.errLine(`${e.constructor.name}: ${e.message}`);
+  }
 }

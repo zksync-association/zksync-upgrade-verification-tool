@@ -277,11 +277,15 @@ export class CurrentZksyncEraState {
         verifierAddress: decodedUpgrade.args[0].verifier,
         l2DefaultAccountBytecodeHash: decodedUpgrade.args[0].defaultAccountHash,
         l2BootloaderBytecodeHash: decodedUpgrade.args[0].bootloaderHash,
-        chainId: dataBlob.byteLength >= 32 ? bytesToBigInt(dataBlob.subarray(0, 32)): undefined,
-        bridgeHubAddress: dataBlob.byteLength >= 64 ? bytesToHex(dataBlob.subarray(32 + 12, 64)) : undefined,
-        stateTransitionManagerAddress: dataBlob.byteLength >= 96 ? bytesToHex(dataBlob.subarray(64 + 12, 96)) : undefined,
-        baseTokenBridgeAddress: dataBlob.byteLength >= 128 ? bytesToHex(dataBlob.subarray(96 + 12, 128)) : undefined,
-        admin: dataBlob.byteLength >= 128 ? bytesToHex(dataBlob.subarray(128 + 12, 160)) : undefined,
+        chainId: dataBlob.byteLength >= 32 ? bytesToBigInt(dataBlob.subarray(0, 32)) : undefined,
+        bridgeHubAddress:
+          dataBlob.byteLength >= 64 ? bytesToHex(dataBlob.subarray(32 + 12, 64)) : undefined,
+        stateTransitionManagerAddress:
+          dataBlob.byteLength >= 96 ? bytesToHex(dataBlob.subarray(64 + 12, 96)) : undefined,
+        baseTokenBridgeAddress:
+          dataBlob.byteLength >= 128 ? bytesToHex(dataBlob.subarray(96 + 12, 128)) : undefined,
+        admin:
+          dataBlob.byteLength >= 128 ? bytesToHex(dataBlob.subarray(128 + 12, 160)) : undefined,
       },
       facets,
       new SystemContractList(systemContracts)
