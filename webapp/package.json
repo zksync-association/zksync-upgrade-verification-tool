@@ -17,7 +17,9 @@
   "dependencies": {
     "next": "14.2.4",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "validate-cli": "workspace:*",
+    "viem": "^2.9.15"
   },
   "devDependencies": {
     "@biomejs/biome": "1.6.4",
