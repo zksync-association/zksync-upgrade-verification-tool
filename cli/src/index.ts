@@ -12,5 +12,5 @@ export {
   GitContractsRepo,
   type ContractsRepo,
   CheckReport,
-  type CheckReportOptions
-} from "./lib"
+  type CheckReportOptions,
+} from "./lib";

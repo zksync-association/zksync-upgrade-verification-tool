@@ -1,16 +1,5 @@
 import { json, MetaFunction } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import {
-  ZksyncEraState,
-  ZkSyncEraDiff,
-  BlockExplorerClient,
-  RpcClient,
-  FileSystem,
-  UpgradeImporter,
-  CheckReport,
-  GitContractsRepo
-} from "validate-cli"
-import { hexToBytes } from "viem";
 
 export const meta: MetaFunction = () => {
   return [
