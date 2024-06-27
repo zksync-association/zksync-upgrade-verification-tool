@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "incremental": true,
+//    "incremental": true,
 
     // Enable latest features
     "lib": ["ESNext"],

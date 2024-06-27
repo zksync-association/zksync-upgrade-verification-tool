@@ -23,7 +23,7 @@ export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
   const repo = await withSpinner(
     async () => {
       const repo = await env.contractsRepo();
-      await repo.compileSystemContracts();
+      // await repo.compileSystemContracts();
       return repo;
     },
     "Locally compiling system contracts",

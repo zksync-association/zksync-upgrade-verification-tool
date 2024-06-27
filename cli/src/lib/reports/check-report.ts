@@ -64,7 +64,8 @@ export class CheckReport {
       ""
     );
 
-    const table = new CliTable({ head: ["Name", "Value"], style: { compact: true } });
+    const table = new CliTable({ style: { border: [] } });
+    table.push(["Name", "Value"])
     const [currentVersion, proposedVersion] = this.diff.protocolVersion();
     table.push(["Current version", currentVersion]);
     table.push(["Proposed version", proposedVersion]);
@@ -93,7 +94,8 @@ export class CheckReport {
     );
 
     for (const facet of facets) {
-      const table = new CliTable({ head: [facet.name] });
+      const table = new CliTable({style: { border: [] } });
+      table.push([ { content: facet.name, colSpan: 2 } ])
 
       table.push(["Old address", facet.oldAddress.map((v) => this.formatHex(v)).unwrapOr("")]);
       table.push(["New address", facet.newAddress.unwrapOr("Facet removed")]);
@@ -135,7 +137,8 @@ export class CheckReport {
       ""
     );
 
-    const table = new CliTable({ head: ["Field name", "Field Values"] });
+    const table = new CliTable({style: {border: []}});
+    table.push(["Field name", "Field Values"])
     for (const field of HEX_ZKSYNC_FIELDS) {
       const [before, maybeAfter] = this.diff.hexAttrDiff(field);
 
@@ -179,8 +182,8 @@ export class CheckReport {
       ""
     );
 
-    const table = new CliTable({ head: ["System Contract", "Address", "Bytecode hash"] });
-
+    const table = new CliTable({style: {border: []}});
+    table.push(["System Contract", "Address", "Bytecode hash"])
     for (const contract of changes) {
       const fromRepo = await this.repo.byteCodeHashFor(contract.name);
 
