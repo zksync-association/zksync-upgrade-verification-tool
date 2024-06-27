@@ -4,7 +4,7 @@ import { RpcClient } from "./rpc-client.js";
 import { GitContractsRepo } from "./git-contracts-repo";
 import { FileSystem } from "./file-system";
 import { UpgradeImporter } from "./importer";
-import { Terminal } from "../terminal";
+import { Terminal } from "./terminal";
 
 export class EnvBuilder {
   private _etherscanApiKey?: string;
