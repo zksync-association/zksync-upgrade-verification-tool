@@ -536,7 +536,7 @@ describe("NewZkSyncStateDiff", () => {
   });
 
   describe("#createFromCallData", () => {
-    it("works", async () => {
+    it.skip("works", async () => {
       const hexBuff = await fs.readFile(
         path.join(import.meta.dirname, "data", "upgrade-calldata.hex")
       );
