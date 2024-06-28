@@ -23,7 +23,7 @@ export class ContractAbi {
   signatureForSelector(selector: Hex, long = true): string {
     const fn = this.selectors.get(selector);
     if (!fn) {
-      return "unknown";
+      return selector;
     }
     const params = fn.inputs.map((i) => `${i.type} ${i.name}`);
     return `${fn.name}(${long ? params.join(", ") : "..."})`;

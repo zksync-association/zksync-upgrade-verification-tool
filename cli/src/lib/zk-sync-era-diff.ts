@@ -120,15 +120,15 @@ export class ZkSyncEraDiff {
           current
             .or(proposed)
             .map((c) => c.name)
-            .unwrapOr("Unknown name"),
-          current
-            .map((c) => c.bytecodeHash)
-            .map((v) => v.toString())
-            .unwrapOr("Not found."),
+            .unwrap(),
+          current.map((c) => c.bytecodeHash),
           proposed.unwrap().bytecodeHash
         );
       })
     );
-    return changes.filter((c) => c.currentBytecodeHash !== c.proposedBytecodeHash);
+
+    return changes.filter(
+      (c) => !c.currentBytecodeHash.isSomeAnd((current) => current === c.proposedBytecodeHash)
+    );
   }
 }

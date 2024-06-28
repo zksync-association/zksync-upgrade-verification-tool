@@ -199,7 +199,9 @@ export class StringCheckReport {
         [
           { content: contract.name, rowSpan: 2, vAlign: "center" },
           { content: this.formatHex(contract.address), rowSpan: 2, vAlign: "center" },
-          `Current: ${this.formatHex(contract.currentBytecodeHash)}`,
+          `Current: ${this.formatHex(
+            contract.currentBytecodeHash.map((v) => v.toString()).unwrapOr("Not found")
+          )}`,
         ],
         [
           `Proposed: ${this.formatHex(contract.proposedBytecodeHash)} (${this.boolEmoji(

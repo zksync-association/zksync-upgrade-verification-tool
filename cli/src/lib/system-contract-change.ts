@@ -3,14 +3,20 @@ import type { BlockExplorer } from "./block-explorer-client";
 import { ContractData } from "./contract-data.js";
 import { ContractNotVerified } from "./errors.js";
 import type { GitContractsRepo } from "./git-contracts-repo";
+import type { Option } from "nochoices";
 
 export class SystemContractChange {
   address: Hex;
   name: string;
-  currentBytecodeHash: string;
+  currentBytecodeHash: Option<Hex>;
   proposedBytecodeHash: Hex;
 
-  constructor(address: Hex, name: string, currentBytecodeHash: string, proposedBytecodeHash: Hex) {
+  constructor(
+    address: Hex,
+    name: string,
+    currentBytecodeHash: Option<Hex>,
+    proposedBytecodeHash: Hex
+  ) {
     this.address = address;
     this.name = name;
     this.currentBytecodeHash = currentBytecodeHash;
