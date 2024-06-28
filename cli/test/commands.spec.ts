@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { failHandler } from "../src/commands/fail-handler";
 import yargs from "yargs";
 import { EnvBuilder } from "../src/lib/env-builder";
-import { Terminal } from "../src/terminal";
+import { Terminal } from "../src/lib/terminal";
 import { Stream } from "node:stream";
 import {
   ContractNotVerified,

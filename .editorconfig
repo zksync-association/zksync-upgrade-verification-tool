@@ -1,3 +1,7 @@
 [*.ts]
 indent_size = 2
 max_line_length = 120
+
+[*.tsx]
+indent_size = 2
+max_line_length = 120

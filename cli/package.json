@@ -1,10 +1,10 @@
 {
   "name": "validate-cli",
   "version": "1.0.0",
-  "description": "",
+  "description": "cli tool to check details about zk-sync era upgrades.",
   "type": "module",
-  "main": "./dist/main.js.js",
-  "module": "./dist/main.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "bin": {
     "validate": "./bin/validate.js"
   },
@@ -24,8 +24,8 @@
     "lint": "pnpm biome lint ./src",
     "lint:fix": "pnpm biome lint ./src --apply",
     "start": "tsx src/entrypoint.ts",
-    "build": "tsup src --format esm --no-splitting --sourcemap ",
-    "watch": "tsup src --format esm --no-splitting --watch",
+    "build": "tsup src --format esm --dts --no-splitting --sourcemap",
+    "watch": "tsup src --format esm --sourcemap --no-splitting --watch",
     "test": "vitest run",
     "test:ci": "vitest run --coverage --coverage.reporter=lcov"
   },
