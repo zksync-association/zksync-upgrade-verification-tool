@@ -20,59 +20,6 @@ describe("cli", () => {
         fakeCheck,
         fail,
         fail,
-        fail,
-        fail
-      );
-      await cli.parseAsync();
-      expect(called).toBe(true);
-    });
-  });
-
-  describe("facet-diff", () => {
-    it("sends right arguments", async () => {
-      let called = false;
-      const fakeCheck = async (
-        env: EnvBuilder,
-        upgradeDirectory: string,
-        contractName: string
-      ): Promise<void> => {
-        expect(upgradeDirectory).to.equal("someDir");
-        expect(contractName).to.eql("facet:SomeFacet");
-        expect(env.etherscanApiKey).to.eql("fakeKey");
-        called = true;
-      };
-      const cli = buildCli(
-        ["facet-diff", "someDir", "SomeFacet", "--ethscankey=fakeKey"],
-        fail,
-        fakeCheck,
-        fail,
-        fail,
-        fail
-      );
-      await cli.parseAsync();
-      expect(called).toBe(true);
-    });
-  });
-
-  describe("verifier-diff", () => {
-    it("sends right arguments", async () => {
-      let called = false;
-      const fakeCheck = async (
-        env: EnvBuilder,
-        upgradeDirectory: string,
-        contractName: string
-      ): Promise<void> => {
-        expect(upgradeDirectory).to.equal("someDir");
-        expect(contractName).to.eql("verifier");
-        expect(env.etherscanApiKey).to.eql("fakeKey");
-        called = true;
-      };
-      const cli = buildCli(
-        ["verifier-diff", "someDir", "--ethscankey=fakeKey"],
-        fail,
-        fakeCheck,
-        fail,
-        fail,
         fail
       );
       await cli.parseAsync();
@@ -96,8 +43,7 @@ describe("cli", () => {
         called = true;
       };
       const cli = buildCli(
-        ["download-diff", "someDir", "targetDir", "--ethscankey=fakeKey"],
-        fail,
+        ["download-code", "someDir", "targetDir", "--ethscankey=fakeKey"],
         fail,
         fakeDownload,
         fail,
@@ -124,7 +70,6 @@ describe("cli", () => {
         ["storage-diff", "someDir", "--ethscankey=fakeKey"],
         fail,
         fail,
-        fail,
         fakeStorageDiff,
         fail
       );
@@ -145,7 +90,6 @@ describe("cli", () => {
       };
       const cli = buildCli(
         ["storage-diff", "someDir", "--ethscankey=fakeKey", "--precalculated=path/to/data.json"],
-        fail,
         fail,
         fail,
         fakeStorageDiff,
@@ -173,7 +117,7 @@ describe("cli", () => {
         error = err;
         called = true;
       };
-      const cli = buildCli(["unknown"], fail, fail, fail, fail, fakeErrorHandler);
+      const cli = buildCli(["unknown"], fail, fail, fail, fakeErrorHandler);
       await cli.parseAsync();
 
       expect(called).toBe(true);

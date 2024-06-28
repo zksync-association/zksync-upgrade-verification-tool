@@ -1,9 +1,4 @@
-import type {
-  FacetsJson,
-  L2UpgradeJson,
-  TransactionsJson,
-  UpgradeManifest,
-} from "../schema/index.js";
+import type { FacetsJson, L2UpgradeJson, TransactionsJson, UpgradeManifest } from "../schema";
 import { VerifierContract } from "./verifier.js";
 import type { Hex } from "viem";
 import { Option } from "nochoices";
@@ -28,14 +23,14 @@ export class UpgradeChanges {
   systemContractChanges: SystemContractData[];
   aaBytecodeHash: string;
   bootloaderBytecodeHash: string;
-  upgradeCalldataHex: Option<string>;
+  upgradeCalldataHex: Option<Hex>;
 
   constructor(
     newProtocolVersion: string,
     verifier: VerifierContract,
     aaBytecodeHash: string,
     bootloaderBytecodeHash: string,
-    upgradeTxHex?: string
+    upgradeTxHex?: Hex
   ) {
     this.newProtocolVersion = newProtocolVersion;
     this.facets = [];
@@ -47,9 +42,9 @@ export class UpgradeChanges {
     this.upgradeCalldataHex = Option.fromNullable(upgradeTxHex);
   }
 
-  matchingFacet(targetSelectors: string[]): FacetData | undefined {
-    return this.facets.find((f) => f.selectors.some((sel) => targetSelectors.includes(sel)));
-  }
+  // matchingFacet(targetSelectors: string[]): FacetData | undefined {
+  //   return this.facets.find((f) => f.selectors.some((sel) => targetSelectors.includes(sel)));
+  // }
 
   addFacet(facetName: string, facetAddr: Hex, selectors: string[]) {
     this.orphanedSelectors = this.orphanedSelectors.filter(

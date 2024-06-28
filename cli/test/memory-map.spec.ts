@@ -7,15 +7,15 @@ import { bytesToHex, type Hex, hexToBigInt } from "viem";
 import { AddressType } from "../src/lib/storage/types/address-type";
 import { StructType } from "../src/lib/storage/types/struct-type";
 import { BigNumberType } from "../src/lib/storage/types/big-number-type";
-import { Property } from "../src/lib/storage/property";
+import { ContractField } from "../src/lib/storage/contractField";
 import { BooleanType } from "../src/lib/storage/types/boolean-type";
-import type { StorageReport } from "../src/lib/reports/storage-report";
+import type { StorageVisitor } from "../src/lib/reports/storage-visitor";
 import { type PropertyChange } from "../src/lib/storage/property-change";
 import type { StorageValue } from "../src/lib/storage/values/storage-value";
 import type { ValueField } from "../src/lib/storage/values/struct-value";
 import { Option } from "nochoices";
 
-class TestReport implements StorageReport<string> {
+class TestReport implements StorageVisitor<string> {
   beforeData: Option<string>;
   afterData: Option<string>;
 
@@ -34,54 +34,54 @@ class TestReport implements StorageReport<string> {
 
   checkProp(change: PropertyChange): void {
     change.before
-      .map((v) => v.writeInto(this))
+      .map((v) => v.accept(this))
       .ifSome((str) => {
         this.beforeData.replace(str);
       });
 
     change.after
-      .map((v) => v.writeInto(this))
+      .map((v) => v.accept(this))
       .ifSome((str) => {
         this.afterData.replace(str);
       });
   }
 
-  addAddress(addr: Hex): string {
+  visitAddress(addr: Hex): string {
     return addr.toLowerCase();
   }
 
-  addArray(inner: StorageValue[]): string {
-    return inner.map((v, i) => `[${i}]: ${v.writeInto(this)}`).join("\n");
+  visitArray(inner: StorageValue[]): string {
+    return inner.map((v, i) => `[${i}]: ${v.accept(this)}`).join("\n");
   }
 
-  addBigNumber(n: bigint): string {
+  visitBigNumber(n: bigint): string {
     return n.toString();
   }
 
-  addBoolean(val: boolean): string {
+  visitBoolean(val: boolean): string {
     return val.toString();
   }
 
-  writeBuf(buf: Buffer): string {
+  visitBuf(buf: Buffer): string {
     return bytesToHex(buf);
   }
 
-  writeEmpty(): string {
+  visitEmpty(): string {
     return "No content.";
   }
 
-  writeStruct(fields: ValueField[]): string {
+  visitStruct(fields: ValueField[]): string {
     return fields
       .map(({ key, value }) => {
-        return `${key}=>${value.writeInto(this)}`;
+        return `${key}=>${value.accept(this)}`;
       })
       .join(", ");
   }
 
-  writeMapping(fields: ValueField[]): string {
+  visitMapping(fields: ValueField[]): string {
     return fields
       .map(({ key, value }) => {
-        return `[${key}]: ${value.writeInto(this)}`;
+        return `[${key}]: ${value.accept(this)}`;
       })
       .join("\n");
   }
@@ -312,7 +312,7 @@ describe("MemoryMap", () => {
       path.join(import.meta.dirname, "data", "realistic-memory-diff.json")
     );
     const json = memoryDiffParser.parse(JSON.parse(diff.toString()));
-    const prop = new Property(
+    const prop = new ContractField(
       "myStruct",
       hexToBigInt("0xf78707ba12ab026e6a86b731b9d6b0fc0e151ddd06be4f9f8e940a8fa89bb893"),
       "Some struct",

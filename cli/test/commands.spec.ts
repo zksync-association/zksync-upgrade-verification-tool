@@ -5,7 +5,7 @@ import { EnvBuilder } from "../src/lib/env-builder";
 import { Terminal } from "../src/terminal";
 import { Stream } from "node:stream";
 import {
-  ContracNotVerified,
+  ContractNotVerified,
   ExternalApiError,
   MalformedUpgrade,
   MissingNetwork,
@@ -77,7 +77,7 @@ describe("error handler", () => {
   it("when no message is sent and ContracNotVerified is sent it serializes the error", async () => {
     const { env, flushErr } = buildTestTerm();
 
-    await failHandler(env, undefined, new ContracNotVerified("0x01"), cli, doNothing);
+    await failHandler(env, undefined, new ContractNotVerified("0x01"), cli, doNothing);
     expect(flushErr()).toContain("Contract for 0x01 not verified in block explorer");
   });
 

@@ -1,19 +1,21 @@
 import yargs, { type Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
 import { NetworkSchema } from ".";
-import { downloadCode, checkCommand, contractDiff } from "../commands";
+import {
+  checkCommand,
+  downloadCodeCommand,
+  storageChangeCommand,
+  storageSnapshotCommand,
+} from "../commands";
 import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
-import { storageChangeCommand } from "../commands/storage-change-command";
 import { Option } from "nochoices";
 import { failHandler } from "../commands/fail-handler";
-import { storageSnapshotCommand } from "../commands/storage-snapshot-command";
 
 export function buildCli(
   args: string[],
   checkCbk: typeof checkCommand,
-  diffCbk: typeof contractDiff,
-  downloadCodeCbk: typeof downloadCode,
+  downloadCodeCbk: typeof downloadCodeCommand,
   storageDiffCbk: typeof storageChangeCommand,
   failCbk: typeof failHandler
 ): Argv {
@@ -79,38 +81,6 @@ export function buildCli(
       }
     )
     .command(
-      "facet-diff <upgradeDir> <facetName>",
-      "Shows the diff for an specific contract",
-      (yargs) =>
-        yargs
-          .positional("upgradeDir", {
-            describe: "FolderName of the upgrade to check",
-            type: "string",
-            demandOption: true,
-          })
-          .positional("facetName", {
-            describe: "Name of the facet to show diff",
-            type: "string",
-            demandOption: true,
-          }),
-      async (yargs) => {
-        await diffCbk(env, yargs.upgradeDir, `facet:${yargs.facetName}`);
-      }
-    )
-    .command(
-      "verifier-diff <upgradeDir>",
-      "Shows code diff between current verifier source code and the proposed one",
-      (yargs) =>
-        yargs.positional("upgradeDir", {
-          describe: "FolderName of the upgrade to check",
-          type: "string",
-          demandOption: true,
-        }),
-      async (yargs) => {
-        await diffCbk(env, yargs.upgradeDir, "verifier");
-      }
-    )
-    .command(
       "storage-diff <upgradeDir>",
       "Executes the upgrade transaction in debug mode to analyze the changes in contract storage",
       (yargs) =>
@@ -137,7 +107,7 @@ export function buildCli(
       }
     )
     .command(
-      "download-diff <upgradeDir> <targetSourceCodeDir>",
+      "download-code <upgradeDir> <targetSourceCodeDir>",
       "Download source code diff",
       (yargs) =>
         yargs
@@ -203,8 +173,7 @@ export const cli = async () => {
   const argParser = buildCli(
     hideBin(process.argv),
     checkCommand,
-    contractDiff,
-    downloadCode,
+    downloadCodeCommand,
     storageChangeCommand,
     failHandler
   );

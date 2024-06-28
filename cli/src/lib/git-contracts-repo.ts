@@ -12,7 +12,15 @@ import { Option } from "nochoices";
 
 const execPromise = promisify(exec);
 
-export class EraContractsRepo {
+export interface ContractsRepo {
+  byteCodeHashFor(systemContractName: string): Promise<Option<string>>;
+
+  currentRef(): Promise<string>;
+
+  currentBranch(): Promise<Option<string>>;
+}
+
+export class GitContractsRepo implements ContractsRepo {
   repoPath: string;
   git: SimpleGit;
   private _currentRef: Option<Promise<string>>;
@@ -25,11 +33,11 @@ export class EraContractsRepo {
     this._currentRef = Option.None();
   }
 
-  static async default(): Promise<EraContractsRepo> {
-    const base = cacheDir();
+  static async default(): Promise<GitContractsRepo> {
+    const base = await cacheDir();
     const repoDir = path.join(base, "era-contracts-repo");
     await fs.mkdir(repoDir, { recursive: true });
-    return new EraContractsRepo(repoDir);
+    return new GitContractsRepo(repoDir);
   }
 
   async init(): Promise<void> {
@@ -64,21 +72,23 @@ export class EraContractsRepo {
     return systemContractHashesParser.parse(JSON.parse(hashesRaw));
   }
 
-  async byteCodeFor(systemContractName: string): Promise<Buffer> {
+  async byteCodeFor(systemContractName: string): Promise<Option<Buffer>> {
     const hashes = await this.systemContractHashes();
     const hashData = hashes.find((d) => d.contractName === systemContractName);
     if (!hashData) {
-      throw new Error(`Unknown contract: ${systemContractName}`);
+      return Option.None();
     }
 
-    return this.extractBytecodeFromFile(hashData.bytecodePath);
+    return Option.Some(await this.extractBytecodeFromFile(hashData.bytecodePath));
   }
 
-  async byteCodeHashFor(systemContractName: string): Promise<string> {
-    const byteCode = await this.byteCodeFor(systemContractName);
-    const rawHash = utils.hashBytecode(byteCode);
-    const hex = Buffer.from(rawHash).toString("hex");
-    return `0x${hex}`;
+  async byteCodeHashFor(systemContractName: string): Promise<Option<string>> {
+    const maybeByteCode = await this.byteCodeFor(systemContractName);
+    return maybeByteCode.map((byteCode) => {
+      const rawHash = utils.hashBytecode(byteCode);
+      const hex = Buffer.from(rawHash).toString("hex");
+      return `0x${hex}`;
+    });
   }
 
   private async extractBytecodeFromFile(filePath: string): Promise<Buffer> {
@@ -140,6 +150,11 @@ export class EraContractsRepo {
   }
 
   async currentRef(): Promise<string> {
-    return this._currentRef.getOrInsert(this.git.revparse("--short HEAD"));
+    return this._currentRef.getOrInsert(this.git.revparse(["--short", "HEAD"]));
+  }
+
+  async currentBranch(): Promise<Option<string>> {
+    const branch = await this.git.branch();
+    return Option.fromNullable(branch.current);
   }
 }

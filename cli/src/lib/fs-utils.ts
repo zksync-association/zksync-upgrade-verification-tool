@@ -23,9 +23,9 @@ export async function assertDirectoryExists(
   }
 }
 
-export function cacheDir(): string {
+export async function cacheDir(): Promise<string> {
   const cacheDir = path.join(os.homedir(), ".cache", "zksync-era-validate");
 
-  fs.mkdir(cacheDir, { recursive: true });
+  await fs.mkdir(cacheDir, { recursive: true });
   return cacheDir;
 }

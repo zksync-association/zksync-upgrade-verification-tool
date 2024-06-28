@@ -1,9 +1,13 @@
 import type { Network } from "./constants.js";
 import type { Terminal } from "../terminal";
 
-// export class FinishWithError extends Error {}
+export class MissingRequiredProp extends Error {
+  constructor(prop: string) {
+    super(`Missing required prop: ${prop}`);
+  }
+}
 
-export class ContracNotVerified extends Error {
+export class ContractNotVerified extends Error {
   constructor(addr: string) {
     super(`Contract for ${addr} not verified in block explorer`);
   }
@@ -44,7 +48,7 @@ export class ExternalApiError extends Error {
 }
 
 const KNOWN_ERRORS = [
-  ContracNotVerified,
+  ContractNotVerified,
   NotAnUpgradeDir,
   NotADir,
   MalformedUpgrade,

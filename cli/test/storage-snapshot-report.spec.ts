@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { SnapshotReport } from "../src/lib/reports/storage-snapshot-report";
 import { RecordStorageSnapshot } from "../src/lib/storage/record-storage-snapshot";
 import { BigNumberType } from "../src/lib/storage/types/big-number-type";
-import { Property } from "../src/lib/storage/property";
+import { ContractField } from "../src/lib/storage/contractField";
 import { BlobType } from "../src/lib/storage/types/blob-type";
 import { AddressType } from "../src/lib/storage/types/address-type";
-import { bytesToHex, hexToBigInt, hexToBytes, keccak256, numberToBytes, numberToHex } from "viem";
+import { bytesToHex, hexToBigInt, hexToBytes, keccak256, numberToHex } from "viem";
 import { ArrayType } from "../src/lib/storage/types/array-type";
 import { StructType } from "../src/lib/storage/types/struct-type";
 import { MappingType } from "../src/lib/storage/mapping-type";
@@ -16,7 +16,7 @@ describe("SnapshotReport", () => {
       "0x0000000000000000000000000000000000000000000000000000000000000000":
         "0x0000000000000000000000000000000000000000000000000000000000000001",
     });
-    const props = [new Property("prop1", 0n, "desc1", new BigNumberType())];
+    const props = [new ContractField("prop1", 0n, "desc1", new BigNumberType())];
     const report = new SnapshotReport(data, props);
     expect(await report.format()).toEqual(`----------
 name: prop1
@@ -31,7 +31,7 @@ value: 1
       "0x0000000000000000000000000000000000000000000000000000000000000000":
         "0x0000000000000000000000000000000000000000000000000000000000000001",
     });
-    const props = [new Property("prop1", 0n, "desc1", new BlobType())];
+    const props = [new ContractField("prop1", 0n, "desc1", new BlobType())];
     const report = new SnapshotReport(data, props);
     expect(await report.format()).toEqual(`----------
 name: prop1
@@ -46,7 +46,7 @@ value: 0x0000000000000000000000000000000000000000000000000000000000000001
       "0x0000000000000000000000000000000000000000000000000000000000000000":
         "0x0000000000000000000000000000000000000000000000000000000000000001",
     });
-    const props = [new Property("prop1", 0n, "desc1", new BlobType())];
+    const props = [new ContractField("prop1", 0n, "desc1", new BlobType())];
     const report = new SnapshotReport(data, props);
     expect(await report.format()).toEqual(`----------
 name: prop1
@@ -61,7 +61,7 @@ value: 0x0000000000000000000000000000000000000000000000000000000000000001
       "0x0000000000000000000000000000000000000000000000000000000000000000":
         "0x0000000000000000000000000000000000000000000000000000000000000001",
     });
-    const props = [new Property("prop1", 0n, "desc1", new AddressType())];
+    const props = [new ContractField("prop1", 0n, "desc1", new AddressType())];
     const report = new SnapshotReport(data, props);
     expect(await report.format()).toEqual(`----------
 name: prop1
@@ -86,7 +86,7 @@ value: 0x0000000000000000000000000000000000000001
       [numberToHex(hashed + 2n)]:
         "0x0000000000000000000000000000000000000000000000000000000000000003",
     });
-    const props = [new Property("prop1", 0n, "desc1", new ArrayType(new BlobType()))];
+    const props = [new ContractField("prop1", 0n, "desc1", new ArrayType(new BlobType()))];
     const report = new SnapshotReport(data, props);
     expect(await report.format()).toEqual(`----------
 name: prop1
@@ -109,7 +109,7 @@ value:
         "0x000000000000000000000000000000000000000000000000000000000000000c",
     });
     const props = [
-      new Property(
+      new ContractField(
         "prop1",
         0n,
         "desc1",
@@ -141,7 +141,7 @@ value:
         "0x000000000000000000000000000000000000000000000000000000000000000c",
     });
     const props = [
-      new Property(
+      new ContractField(
         "prop1",
         0n,
         "desc1",
@@ -187,7 +187,7 @@ value:
       [hashed]: "0x000000000000000000000000000000000000000000000000000000000000000a",
     });
     const props = [
-      new Property(
+      new ContractField(
         "prop1",
         0n,
         "desc1",
@@ -221,7 +221,7 @@ value:
     });
 
     const props = [
-      new Property(
+      new ContractField(
         "prop1",
         0n,
         "desc1",

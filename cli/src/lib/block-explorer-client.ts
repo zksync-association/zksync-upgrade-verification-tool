@@ -1,17 +1,22 @@
-import type { Abi } from "viem";
 import {
   account20String,
   getAbiSchema,
   sourceCodeResponseSchema,
   sourceCodeSchema,
-} from "../schema/index.js";
+} from "../schema";
 import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
 import type { z, ZodType } from "zod";
 import { ContractData } from "./contract-data.js";
-import { ContracNotVerified, ExternalApiError } from "./errors.js";
+import { ContractNotVerified, ExternalApiError } from "./errors.js";
 import { ContractAbi } from "./contract-abi";
 
-export class BlockExplorerClient {
+export interface BlockExplorer {
+  getAbi(rawAddress: string): Promise<ContractAbi>;
+  getSourceCode(rawAddress: string): Promise<ContractData>;
+  isVerified(addr: string): Promise<boolean>;
+}
+
+export class BlockExplorerClient implements BlockExplorer {
   private apiKey: string;
   baseUri: string;
   private abiCache: Map<string, ContractAbi>;
@@ -87,7 +92,7 @@ export class BlockExplorerClient {
       return existing;
     }
     if (this.contractsNotVerified.has(rawAddress)) {
-      throw new ContracNotVerified(rawAddress);
+      throw new ContractNotVerified(rawAddress);
     }
 
     const contractAddr = account20String.parse(rawAddress);
@@ -111,7 +116,7 @@ export class BlockExplorerClient {
     }
 
     if (result[0].SourceCode === "" || result[0].ABI === "Contract source code not verified") {
-      throw new ContracNotVerified(rawAddress);
+      throw new ContractNotVerified(rawAddress);
     }
 
     const abi = new ContractAbi(JSON.parse(result[0].ABI));
@@ -148,7 +153,7 @@ export class BlockExplorerClient {
       await this.getSourceCode(addr);
       return true;
     } catch (e) {
-      if (e instanceof ContracNotVerified) {
+      if (e instanceof ContractNotVerified) {
         return false;
       }
       throw e;

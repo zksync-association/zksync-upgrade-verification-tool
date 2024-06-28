@@ -1,5 +1,5 @@
 import type { StorageValue } from "./storage-value";
-import type { StorageReport } from "../../reports/storage-report";
+import type { StorageVisitor } from "../../reports/storage-visitor";
 
 export type ValueField = {
   key: string;
@@ -12,7 +12,7 @@ export class StructValue implements StorageValue {
     this.fields = fields;
   }
 
-  writeInto<T>(report: StorageReport<T>): T {
-    return report.writeStruct(this.fields);
+  accept<T>(report: StorageVisitor<T>): T {
+    return report.visitStruct(this.fields);
   }
 }

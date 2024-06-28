@@ -1,11 +1,8 @@
 import chalk from "chalk";
-import { bytesToHex, type Hex } from "viem";
-import type { StorageValue } from "../storage/values/storage-value";
-import type { ValueField } from "../storage/values/struct-value";
-import type { StorageReport } from "./storage-report";
 import type { StorageChanges } from "../storage/storage-changes";
+import { StringStorageVisitor } from "./string-storage-visitor";
 
-export class StringStorageChangeReport implements StorageReport<string> {
+export class StringStorageChangeReport {
   lines: string[];
   private colored: boolean;
   private changes: StorageChanges;
@@ -25,6 +22,7 @@ export class StringStorageChangeReport implements StorageReport<string> {
 
   async format(): Promise<string> {
     const changes = await this.changes.allChanges();
+    const visitor = new StringStorageVisitor();
     const lines = [];
 
     for (const change of changes) {
@@ -32,61 +30,12 @@ export class StringStorageChangeReport implements StorageReport<string> {
       lines.push(`name: ${this.bold(change.prop.name)}`);
       lines.push(`description: ${change.prop.description}`);
       lines.push("");
-      lines.push("before:");
-      lines.push(`  ${change.before.map((v) => v.writeInto(this)).unwrapOr("No content.")}`);
+      lines.push(`before:${change.before.map((v) => v.accept(visitor)).unwrapOr("No content.")}`);
       lines.push("");
-      lines.push("after:");
-      lines.push(`  ${change.after.map((v) => v.writeInto(this)).unwrapOr("No content.")}`);
+      lines.push(`after:${change.after.map((v) => v.accept(visitor)).unwrapOr("No content.")}`);
       lines.push("--------------------------");
     }
 
     return lines.join("\n");
-  }
-
-  addAddress(addr: Hex): string {
-    return addr;
-  }
-
-  addBigNumber(n: bigint): string {
-    return n.toString();
-  }
-
-  writeBuf(buf: Buffer): string {
-    return bytesToHex(buf);
-  }
-
-  addBoolean(val: boolean): string {
-    return val ? "true" : "false";
-  }
-
-  addArray(inner: StorageValue[]): string {
-    return inner
-      .map((v) => v.writeInto(this))
-      .map((str) => `- ${str}`)
-      .join("\n  ");
-  }
-
-  writeEmpty(): string {
-    return "Empty slot.";
-  }
-
-  writeStruct(fields: ValueField[]): string {
-    return fields
-      .map(({ key, value }) => {
-        const lines = value.writeInto(this).split("\n");
-        return `.${key}: ${lines.join(`\n${" ".repeat(key.length + 3)}`)}`;
-      })
-      .join("\n  ");
-  }
-
-  writeMapping(fields: ValueField[]): string {
-    const sorted = fields.toSorted((a, b) => a.key.localeCompare(b.key));
-    return sorted
-      .map(({ key, value }) => {
-        const lines = value.writeInto(this).split("\n");
-        const formated = lines.join(`\n${" ".repeat(key.length + 4)}`);
-        return `[${key}]: ${formated}`;
-      })
-      .join("\n  ");
   }
 }

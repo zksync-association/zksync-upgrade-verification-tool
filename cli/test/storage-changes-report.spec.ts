@@ -4,7 +4,7 @@ import { memoryDiffParser, type MemoryDiffRaw } from "../src/schema/rpc";
 import { type Hex, hexToBigInt, keccak256, numberToBytes, numberToHex } from "viem";
 import chalk from "chalk";
 import { AddressType } from "../src/lib/storage/types/address-type";
-import { Property } from "../src/lib/storage/property";
+import { ContractField } from "../src/lib/storage/contractField";
 import { BigNumberType } from "../src/lib/storage/types/big-number-type";
 import { BlobType } from "../src/lib/storage/types/blob-type";
 import { BooleanType } from "../src/lib/storage/types/boolean-type";
@@ -60,7 +60,7 @@ describe("MemoryMapReport", () => {
       },
     });
 
-    function expectedReport(
+    function expectedReportSingleLine(
       name: string,
       description: string,
       before: string,
@@ -70,22 +70,41 @@ describe("MemoryMapReport", () => {
         "--------------------------\n" +
         `name: ${chalk.bold(name)}\n` +
         `description: ${description}\n\n` +
-        `before:\n` +
-        `  ${before}\n\n` +
-        `after:\n` +
-        `  ${after}\n` +
+        `before: ${before}\n\n` +
+        `after: ${after}\n` +
+        "--------------------------"
+      );
+    }
+
+    function expectedReportMultiLine(
+      name: string,
+      description: string,
+      before: string,
+      after: string
+    ): string {
+      return (
+        "--------------------------\n" +
+        `name: ${chalk.bold(name)}\n` +
+        `description: ${description}\n\n` +
+        `before:\n  ${before}\n\n` +
+        `after:\n  ${after}\n` +
         "--------------------------"
       );
     }
 
     it("can display address elements", async () => {
-      const prop = new Property("someProp", BigInt(0xa), "some description", new AddressType());
+      const prop = new ContractField(
+        "someProp",
+        BigInt(0xa),
+        "some description",
+        new AddressType()
+      );
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
       expect(await report.format()).toEqual(
-        expectedReport(
+        expectedReportSingleLine(
           "someProp",
           "some description",
           numberToHex(10, { size: 20 }),
@@ -95,24 +114,29 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display types elements", async () => {
-      const prop = new Property("numberProp", BigInt(0xa), "it is a number", new BigNumberType());
+      const prop = new ContractField(
+        "numberProp",
+        BigInt(0xa),
+        "it is a number",
+        new BigNumberType()
+      );
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
       expect(await report.format()).toEqual(
-        expectedReport("numberProp", "it is a number", "10", "20")
+        expectedReportSingleLine("numberProp", "it is a number", "10", "20")
       );
     });
 
     it("can display blob elements", async () => {
-      const prop = new Property("blobProp", BigInt(0xa), "it is a blob", new BlobType());
+      const prop = new ContractField("blobProp", BigInt(0xa), "it is a blob", new BlobType());
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
       expect(await report.format()).toEqual(
-        expectedReport(
+        expectedReportSingleLine(
           "blobProp",
           "it is a blob",
           numberToHex(10, { size: 32 }),
@@ -122,18 +146,18 @@ describe("MemoryMapReport", () => {
     });
 
     it("can display boolean elements", async () => {
-      const prop = new Property("blobProp", boolSlot, "it is a blob", new BooleanType());
+      const prop = new ContractField("blobProp", boolSlot, "it is a blob", new BooleanType());
       const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
       expect(await report.format()).toEqual(
-        expectedReport("blobProp", "it is a blob", "true", "false")
+        expectedReportSingleLine("blobProp", "it is a blob", "true", "false")
       );
     });
 
     it("can display list elements", async () => {
-      const prop = new Property(
+      const prop = new ContractField(
         "listProp",
         listSlot,
         "it is a list",
@@ -147,12 +171,12 @@ describe("MemoryMapReport", () => {
       const after = ["- 100", "- 201", "- 102", "- 103"].join("\n  ");
 
       expect(await report.format()).toEqual(
-        expectedReport("listProp", "it is a list", before, after)
+        expectedReportMultiLine("listProp", "it is a list", before, after)
       );
     });
 
     it("can display fixed array elements", async () => {
-      const prop = new Property(
+      const prop = new ContractField(
         "listProp",
         hexToBigInt(hashedListSlot),
         "it is a list",
@@ -166,12 +190,12 @@ describe("MemoryMapReport", () => {
       const after = ["- 100", "- 201", "- 102"].join("\n  ");
 
       expect(await report.format()).toEqual(
-        expectedReport("listProp", "it is a list", before, after)
+        expectedReportMultiLine("listProp", "it is a list", before, after)
       );
     });
 
     it("can display fixed array elements when some are not present", async () => {
-      const prop = new Property(
+      const prop = new ContractField(
         "listProp",
         hexToBigInt(hashedListSlot) + 1n,
         "it is a list",
@@ -185,12 +209,12 @@ describe("MemoryMapReport", () => {
       const after = ["- 201", "- 102", "- 103"].join("\n  ");
 
       expect(await report.format()).toEqual(
-        expectedReport("listProp", "it is a list", before, after)
+        expectedReportMultiLine("listProp", "it is a list", before, after)
       );
     });
 
     it("can display struct elements", async () => {
-      const prop = new Property(
+      const prop = new ContractField(
         "listProp",
         hexToBigInt(hashedListSlot),
         "it is a list",
@@ -231,7 +255,7 @@ describe("MemoryMapReport", () => {
       ].join("\n  ");
 
       expect(await report.format()).toEqual(
-        expectedReport("listProp", "it is a list", before, after)
+        expectedReportMultiLine("listProp", "it is a list", before, after)
       );
     });
   });

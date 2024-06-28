@@ -1,5 +1,5 @@
 import type { StorageValue } from "./storage-value";
-import type { StorageReport } from "../../reports/storage-report";
+import type { StorageVisitor } from "../../reports/storage-visitor";
 
 export class ArrayValue implements StorageValue {
   inner: StorageValue[];
@@ -8,7 +8,7 @@ export class ArrayValue implements StorageValue {
     this.inner = inner;
   }
 
-  writeInto<T>(report: StorageReport<T>): T {
-    return report.addArray(this.inner);
+  accept<T>(report: StorageVisitor<T>): T {
+    return report.visitArray(this.inner);
   }
 }
