@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { CheckReport } from "../src/lib/reports/check-report";
+import { StringCheckReport } from "../src/lib/reports/string-check-report";
 import { ZkSyncEraDiff } from "../src/lib/zk-sync-era-diff";
 import {
   ZksyncEraState,
@@ -207,7 +207,7 @@ describe("CheckReport", () => {
   });
 
   async function createReportLines(ctx: Ctx): Promise<string[]> {
-    const report = new CheckReport(ctx.diff, ctx.contractsRepo, ctx.explorer, {
+    const report = new StringCheckReport(ctx.diff, ctx.contractsRepo, ctx.explorer, {
       shortOutput: false,
     });
     const string = await report.format();

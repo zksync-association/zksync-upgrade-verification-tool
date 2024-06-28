@@ -10,7 +10,7 @@ export interface CheckReportOptions {
   shortOutput: boolean;
 }
 
-export class CheckReport {
+export class StringCheckReport {
   private diff: ZkSyncEraDiff;
   private repo: ContractsRepo;
   private explorer: BlockExplorer;

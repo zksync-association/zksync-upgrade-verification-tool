@@ -11,6 +11,6 @@ export {
   FileSystem,
   GitContractsRepo,
   type ContractsRepo,
-  CheckReport,
+  StringCheckReport,
   type CheckReportOptions,
 } from "./lib";
