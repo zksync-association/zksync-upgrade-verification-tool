@@ -14,7 +14,7 @@ jobs:
           version: 8
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.11.1
+          node-version: 20.15.0
           cache: "pnpm"
       - run: pnpm install
       - run: pnpm run build
@@ -28,7 +28,7 @@ jobs:
           version: 8
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.11.1
+          node-version: 20.15.0
           cache: "pnpm"
       - run: pnpm install
       - run: pnpm run lint
@@ -42,7 +42,7 @@ jobs:
           version: 8
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.11.1
+          node-version: 20.15.0
           cache: "pnpm"
       - run: pnpm install
       - run: pnpm run fmt
