@@ -6,12 +6,12 @@ import chalk from "chalk";
 import { AddressType } from "../src/lib/storage/types/address-type";
 import { Property } from "../src/lib/storage/property";
 import { BigNumberType } from "../src/lib/storage/types/big-number-type";
-import { StringStorageChangeReport } from "../src/lib/reports/storage-report";
 import { BlobType } from "../src/lib/storage/types/blob-type";
 import { BooleanType } from "../src/lib/storage/types/boolean-type";
 import { ArrayType } from "../src/lib/storage/types/array-type";
 import { FixedArrayType } from "../src/lib/storage/types/fixed-array-type";
 import { StructType } from "../src/lib/storage/types/struct-type";
+import { StringStorageChangeReport } from "../src/lib/reports/string-storage-change-report";
 
 describe("MemoryMapReport", () => {
   describe("For simple memory diff", () => {
@@ -78,20 +78,13 @@ describe("MemoryMapReport", () => {
       );
     }
 
-    it("can display address elements", () => {
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [new Property("someProp", BigInt(0xa), "some description", new AddressType())]
-      );
+    it("can display address elements", async () => {
+      const prop = new Property("someProp", BigInt(0xa), "some description", new AddressType());
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const change = memoryMap.changeFor("someProp").unwrap();
-      const report = new StringStorageChangeReport();
-      report.add(change);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
-      expect(report.format()).toEqual(
+      expect(await report.format()).toEqual(
         expectedReport(
           "someProp",
           "some description",
@@ -101,36 +94,24 @@ describe("MemoryMapReport", () => {
       );
     });
 
-    it("can display types elements", () => {
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [new Property("numberProp", BigInt(0xa), "it is a number", new BigNumberType())]
+    it("can display types elements", async () => {
+      const prop = new Property("numberProp", BigInt(0xa), "it is a number", new BigNumberType());
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+
+      const report = new StringStorageChangeReport(memoryMap, true);
+
+      expect(await report.format()).toEqual(
+        expectedReport("numberProp", "it is a number", "10", "20")
       );
-
-      const change = memoryMap.changeFor("numberProp").unwrap();
-      const report = new StringStorageChangeReport();
-      report.add(change);
-
-      expect(report.format()).toEqual(expectedReport("numberProp", "it is a number", "10", "20"));
     });
 
-    it("can display blob elements", () => {
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [new Property("blobProp", BigInt(0xa), "it is a blob", new BlobType())]
-      );
+    it("can display blob elements", async () => {
+      const prop = new Property("blobProp", BigInt(0xa), "it is a blob", new BlobType());
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const change = memoryMap.changeFor("blobProp").unwrap();
-      const report = new StringStorageChangeReport();
-      report.add(change);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
-      expect(report.format()).toEqual(
+      expect(await report.format()).toEqual(
         expectedReport(
           "blobProp",
           "it is a blob",
@@ -140,129 +121,101 @@ describe("MemoryMapReport", () => {
       );
     });
 
-    it("can display boolean elements", () => {
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [new Property("blobProp", boolSlot, "it is a blob", new BooleanType())]
+    it("can display boolean elements", async () => {
+      const prop = new Property("blobProp", boolSlot, "it is a blob", new BooleanType());
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+
+      const report = new StringStorageChangeReport(memoryMap, true);
+
+      expect(await report.format()).toEqual(
+        expectedReport("blobProp", "it is a blob", "true", "false")
       );
-
-      const change = memoryMap.changeFor("blobProp").unwrap();
-      const report = new StringStorageChangeReport();
-      report.add(change);
-
-      expect(report.format()).toEqual(expectedReport("blobProp", "it is a blob", "true", "false"));
     });
 
-    it("can display list elements", () => {
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [new Property("listProp", listSlot, "it is a list", new ArrayType(new BigNumberType()))]
+    it("can display list elements", async () => {
+      const prop = new Property(
+        "listProp",
+        listSlot,
+        "it is a list",
+        new ArrayType(new BigNumberType())
       );
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const change = memoryMap.changeFor("listProp").unwrap();
-      const report = new StringStorageChangeReport();
-      report.add(change);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
       const before = ["- 100", "- 101", "- 102"].join("\n  ");
       const after = ["- 100", "- 201", "- 102", "- 103"].join("\n  ");
 
-      expect(report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
+      expect(await report.format()).toEqual(
+        expectedReport("listProp", "it is a list", before, after)
+      );
     });
 
-    it("can display fixed array elements", () => {
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [
-          new Property(
-            "listProp",
-            hexToBigInt(hashedListSlot),
-            "it is a list",
-            new FixedArrayType(3, new BigNumberType())
-          ),
-        ]
+    it("can display fixed array elements", async () => {
+      const prop = new Property(
+        "listProp",
+        hexToBigInt(hashedListSlot),
+        "it is a list",
+        new FixedArrayType(3, new BigNumberType())
       );
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const change = memoryMap.changeFor("listProp").unwrap();
-      const report = new StringStorageChangeReport();
-      report.add(change);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
       const before = ["- 100", "- 101", "- 102"].join("\n  ");
       const after = ["- 100", "- 201", "- 102"].join("\n  ");
 
-      expect(report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
+      expect(await report.format()).toEqual(
+        expectedReport("listProp", "it is a list", before, after)
+      );
     });
 
-    it("can display fixed array elements when some are not present", () => {
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [
-          new Property(
-            "listProp",
-            hexToBigInt(hashedListSlot) + 1n,
-            "it is a list",
-            new FixedArrayType(3, new BigNumberType())
-          ),
-        ]
+    it("can display fixed array elements when some are not present", async () => {
+      const prop = new Property(
+        "listProp",
+        hexToBigInt(hashedListSlot) + 1n,
+        "it is a list",
+        new FixedArrayType(3, new BigNumberType())
       );
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const change = memoryMap.changeFor("listProp").unwrap();
-      const report = new StringStorageChangeReport();
-      report.add(change);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
       const before = ["- 101", "- 102", "- Empty slot."].join("\n  ");
       const after = ["- 201", "- 102", "- 103"].join("\n  ");
 
-      expect(report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
+      expect(await report.format()).toEqual(
+        expectedReport("listProp", "it is a list", before, after)
+      );
     });
 
-    it("can display struct elements", () => {
-      const memoryMap = new StorageChanges(
-        diff,
-        "addr",
-        [],
-        [],
-        [
-          new Property(
-            "listProp",
-            hexToBigInt(hashedListSlot),
-            "it is a list",
-            new StructType([
-              {
-                name: "field1",
-                type: new BigNumberType(),
-              },
-              {
-                name: "field2",
-                type: new AddressType(),
-              },
-              {
-                name: "field3",
-                type: new BlobType(),
-              },
-              {
-                name: "field4",
-                type: new BigNumberType(),
-              },
-            ])
-          ),
-        ]
+    it("can display struct elements", async () => {
+      const prop = new Property(
+        "listProp",
+        hexToBigInt(hashedListSlot),
+        "it is a list",
+        new StructType([
+          {
+            name: "field1",
+            type: new BigNumberType(),
+          },
+          {
+            name: "field2",
+            type: new AddressType(),
+          },
+          {
+            name: "field3",
+            type: new BlobType(),
+          },
+          {
+            name: "field4",
+            type: new BigNumberType(),
+          },
+        ])
       );
+      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
 
-      const change = memoryMap.changeFor("listProp").unwrap();
-      const report = new StringStorageChangeReport();
-      report.add(change);
+      const report = new StringStorageChangeReport(memoryMap, true);
 
       const before = [
         ".field1: 100",
@@ -277,7 +230,9 @@ describe("MemoryMapReport", () => {
         ".field4: 103",
       ].join("\n  ");
 
-      expect(report.format()).toEqual(expectedReport("listProp", "it is a list", before, after));
+      expect(await report.format()).toEqual(
+        expectedReport("listProp", "it is a list", before, after)
+      );
     });
   });
 });

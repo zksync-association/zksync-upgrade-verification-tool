@@ -1,5 +1,5 @@
-import * as console from "node:console";
 import type { Network } from "./constants.js";
+import type { Terminal } from "../terminal";
 
 // export class FinishWithError extends Error {}
 
@@ -32,14 +32,14 @@ export class MalformedUpgrade extends Error {
 export class MissingNetwork extends Error {
   constructor(path: string, network: Network) {
     super(
-      `Upgrade inside ${path} does not contain information for "${network}". Maybe you can try with a different network.`
+      `Upgrade inside "${path}" does not contain information for "${network}". Maybe you can try with a different network.`
     );
   }
 }
 
 export class ExternalApiError extends Error {
   constructor(apiName: string, details: string) {
-    super(`Error consuming data from ${apiName}: ${details}`);
+    super(`Error consuming data from "${apiName}": ${details}`);
   }
 }
 
@@ -52,15 +52,14 @@ const KNOWN_ERRORS = [
   ExternalApiError,
 ];
 
-export function printError(e: Error): void {
+export function printError(e: Error, term: Terminal): void {
   const isKnown = KNOWN_ERRORS.some((kind) => e instanceof kind);
 
-  console.error(e);
   if (isKnown) {
-    console.log("");
-    console.log(`> ${e.message}`);
+    term.errLine("");
+    term.errLine(`> ${e.message}`);
   } else {
-    console.log("Unexpected error:");
-    console.error(e);
+    term.errLine("Unexpected error:");
+    term.errLine(`${e.constructor.name}: ${e.message}`);
   }
 }

@@ -9,7 +9,7 @@ describe("storage-diff", () => {
 
     // Check an address
     expect(stdout).toContain(`--------------------------
-name: Base.s.verifier
+name: ZkSyncHyperchainBase.s.verifier
 description: Verifier contract. Used to verify aggregated proof for batches
 
 before:
@@ -21,8 +21,8 @@ after:
 
     // Check a struct
     expect(stdout).toContain(`--------------------------
-name: Base.s.verifierParams
-description: Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.
+name: ZkSyncHyperchainBase.s.__DEPRECATED_verifierParams
+description: [DEPRECATED]
 
 before:
   .recursionNodeLevelVkHash: 0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080
@@ -67,7 +67,7 @@ after:
 
   it("matches snapshot", async () => {
     const { stdout } = await execAsync(
-      "pnpm validate storage-diff reference/1699353977-boojum --precalculated=reference/realistic-memory-diff.json"
+      "pnpm validate storage-diff reference/1699353977-boojum --precalculated=reference/realistic-memory-diff.json --noColor"
     );
     expect(stdout).toMatchSnapshot();
   });

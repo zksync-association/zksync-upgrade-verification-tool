@@ -1,8 +1,8 @@
 import type { MemoryDataType } from "./data-type";
 import { Option } from "nochoices";
 
-import type { MemorySnapshot } from "../memory-snapshot";
-import type { MemoryValue } from "../values/memory-value";
+import type { StorageSnapshot } from "../storage-snapshot";
+import type { StorageValue } from "../values/storage-value";
 import { StructValue } from "../values/struct-value";
 import { EmptyValue } from "../values/empty-value";
 
@@ -14,23 +14,23 @@ export class StructType implements MemoryDataType {
     this.fields = fields;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint, offset = 0): Option<MemoryValue> {
-    let acum = offset;
+  async extract(memory: StorageSnapshot, slot: bigint, offset = 0): Promise<Option<StorageValue>> {
+    let propOffset = offset;
     // let current = memory.at(slot).unwrapOr(Buffer.alloc(32).fill(0))
     let slotPosition = 0n;
     const extractedValues = [];
     for (const { name, type } of this.fields) {
-      if (acum + type.evmSize > 32) {
+      if (propOffset + type.evmSize > 32) {
         slotPosition += 1n;
-        acum = 0;
+        propOffset = 0;
       }
 
       extractedValues.push({
         key: name,
-        value: type.extract(memory, slot + slotPosition, acum),
+        value: await type.extract(memory, slot + slotPosition, propOffset),
       });
 
-      acum += type.evmSize;
+      propOffset += type.evmSize;
     }
 
     if (extractedValues.map((r) => r.value).every((r) => r.isNone())) {

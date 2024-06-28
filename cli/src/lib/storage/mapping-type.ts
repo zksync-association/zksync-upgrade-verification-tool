@@ -2,8 +2,8 @@ import type { MemoryDataType } from "./types/data-type";
 import { Option } from "nochoices";
 import { bytesToHex, hexToBigInt, keccak256, numberToBytes } from "viem";
 
-import type { MemorySnapshot } from "./memory-snapshot";
-import type { MemoryValue } from "./values/memory-value";
+import type { StorageSnapshot } from "./storage-snapshot";
+import type { StorageValue } from "./values/storage-value";
 import { EmptyValue } from "./values/empty-value";
 import { MappingValue } from "./values/mapping-value";
 
@@ -18,24 +18,26 @@ export class MappingType implements MemoryDataType {
     this.leftPadded = leftPadded;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint, _offset = 0): Option<MemoryValue> {
+  async extract(memory: StorageSnapshot, slot: bigint, _offset = 0): Promise<Option<StorageValue>> {
     const bufSlot = numberToBytes(slot, { size: 32 });
-    const values = this.keys.map((key) => {
-      const keyBuf = Buffer.alloc(32);
-      if (this.leftPadded) {
-        key.copy(keyBuf, keyBuf.length - key.length, 0);
-      } else {
-        key.copy(keyBuf, 0, 0, key.length);
-      }
+    const values = await Promise.all(
+      this.keys.map(async (key) => {
+        const keyBuf = Buffer.alloc(32);
+        if (this.leftPadded) {
+          key.copy(keyBuf, keyBuf.length - key.length, 0);
+        } else {
+          key.copy(keyBuf, 0, 0, key.length);
+        }
 
-      const keySlot = Buffer.concat([keyBuf, bufSlot]);
-      const hashed = keccak256(keySlot);
+        const keySlot = Buffer.concat([keyBuf, bufSlot]);
+        const hashed = keccak256(keySlot);
 
-      return {
-        key: bytesToHex(key),
-        values: this.valueType.extract(memory, hexToBigInt(hashed), 0),
-      };
-    });
+        return {
+          key: bytesToHex(key),
+          values: await this.valueType.extract(memory, hexToBigInt(hashed), 0),
+        };
+      })
+    );
 
     if (values.every((v) => v.values.isNone())) {
       return Option.None();
@@ -47,13 +49,6 @@ export class MappingType implements MemoryDataType {
     }));
 
     return Option.Some(new MappingValue(res));
-
-    // return Option.Some(
-    //   values
-    //     .filter((o) => o.isSome())
-    //     .map((o) => o.unwrap())
-    //     .join("\n")
-    // );
   }
 
   get evmSize(): number {

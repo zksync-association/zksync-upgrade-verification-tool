@@ -7,8 +7,9 @@ export async function checkCommand(env: EnvBuilder, upgradeDirectory: string): P
 
   const report = await withSpinner(
     async () => diff.toCliReport(env.l1Client(), upgradeDirectory, await env.contractsRepo()),
-    "Generating report"
+    "Generating report",
+    env
   );
 
-  console.log(report);
+  env.term().line(report);
 }

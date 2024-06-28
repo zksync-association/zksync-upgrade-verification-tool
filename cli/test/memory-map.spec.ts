@@ -11,7 +11,7 @@ import { Property } from "../src/lib/storage/property";
 import { BooleanType } from "../src/lib/storage/types/boolean-type";
 import type { StorageReport } from "../src/lib/reports/storage-report";
 import { type PropertyChange } from "../src/lib/storage/property-change";
-import type { MemoryValue } from "../src/lib/storage/values/memory-value";
+import type { StorageValue } from "../src/lib/storage/values/storage-value";
 import type { ValueField } from "../src/lib/storage/values/struct-value";
 import { Option } from "nochoices";
 
@@ -32,7 +32,7 @@ class TestReport implements StorageReport<string> {
     return this.afterData;
   }
 
-  add(change: PropertyChange): void {
+  checkProp(change: PropertyChange): void {
     change.before
       .map((v) => v.writeInto(this))
       .ifSome((str) => {
@@ -50,7 +50,7 @@ class TestReport implements StorageReport<string> {
     return addr.toLowerCase();
   }
 
-  addArray(inner: MemoryValue[]): string {
+  addArray(inner: StorageValue[]): string {
     return inner.map((v, i) => `[${i}]: ${v.writeInto(this)}`).join("\n");
   }
 
@@ -106,10 +106,10 @@ describe("MemoryMap", () => {
     facets: Hex[] = []
   ): Promise<TestReport> => {
     const memory = await subject(file, selectors, facets);
-    const maybeValue = memory.changeFor(changeName);
+    const maybeValue = await memory.changeFor(changeName);
     const test = new TestReport();
     const value = maybeValue.unwrap();
-    test.add(value);
+    test.checkProp(value);
     return test;
   };
 
@@ -340,10 +340,10 @@ describe("MemoryMap", () => {
       [prop]
     );
 
-    const change = map.changeFor("myStruct").unwrap();
+    const change = (await map.changeFor("myStruct")).unwrap();
 
     const test = new TestReport();
-    test.add(change);
+    test.checkProp(change);
 
     expect(test.before().unwrap().toLowerCase()).toEqual(
       "facetAddress=>0xA57F9FFD65fC0F5792B5e958dF42399a114EC7e7, selectorPosition=>3, isFreezable=>true".toLowerCase()

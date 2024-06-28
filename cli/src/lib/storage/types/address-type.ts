@@ -2,16 +2,14 @@ import type { MemoryDataType } from "./data-type";
 import type { Option } from "nochoices";
 import { bytesToHex, type Hex } from "viem";
 
-import type { MemorySnapshot } from "../memory-snapshot";
+import type { StorageSnapshot } from "../storage-snapshot";
 import { AddressValue } from "../values/address-value";
-import type { MemoryValue } from "../values/memory-value";
+import type { StorageValue } from "../values/storage-value";
 
 export class AddressType implements MemoryDataType {
-  extract(memory: MemorySnapshot, slot: bigint, _offset = 0): Option<MemoryValue> {
-    return memory
-      .at(slot)
-      .map(this.format)
-      .map((str) => new AddressValue(str));
+  async extract(memory: StorageSnapshot, slot: bigint, _offset = 0): Promise<Option<StorageValue>> {
+    const mayne = await memory.at(slot);
+    return mayne.map(this.format).map((str) => new AddressValue(str));
   }
 
   format(data: Buffer): Hex {

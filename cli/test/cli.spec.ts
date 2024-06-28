@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildCli } from "../src/lib/index";
+import { buildCli } from "../src/lib";
 import type { EnvBuilder } from "../src/lib/env-builder";
 import type { Option } from "nochoices";
+import type { Argv } from "yargs";
 
 const fail = () => expect.fail("should not be called");
 
@@ -17,6 +18,7 @@ describe("cli", () => {
       const cli = buildCli(
         ["check", "someDir", "--ethscankey=fakeKey"],
         fakeCheck,
+        fail,
         fail,
         fail,
         fail
@@ -44,6 +46,7 @@ describe("cli", () => {
         fail,
         fakeCheck,
         fail,
+        fail,
         fail
       );
       await cli.parseAsync();
@@ -68,6 +71,7 @@ describe("cli", () => {
         ["verifier-diff", "someDir", "--ethscankey=fakeKey"],
         fail,
         fakeCheck,
+        fail,
         fail,
         fail
       );
@@ -96,6 +100,7 @@ describe("cli", () => {
         fail,
         fail,
         fakeDownload,
+        fail,
         fail
       );
       await cli.parseAsync();
@@ -120,7 +125,8 @@ describe("cli", () => {
         fail,
         fail,
         fail,
-        fakeStorageDiff
+        fakeStorageDiff,
+        fail
       );
       await cli.parseAsync();
       expect(called).toBe(true);
@@ -142,10 +148,37 @@ describe("cli", () => {
         fail,
         fail,
         fail,
-        fakeStorageDiff
+        fakeStorageDiff,
+        fail
       );
       await cli.parseAsync();
       expect(called).toBe(true);
+    });
+  });
+
+  describe("fail handler", () => {
+    it("sends right arguments", async () => {
+      let called = false;
+      let receivedMsg: string | undefined;
+      let error: Error | undefined;
+
+      const fakeErrorHandler = async (
+        _env: EnvBuilder,
+        msg: string | undefined,
+        err: Error | undefined,
+        _argParser: Argv,
+        _cbk: () => void
+      ): Promise<void> => {
+        receivedMsg = msg;
+        error = err;
+        called = true;
+      };
+      const cli = buildCli(["unknown"], fail, fail, fail, fail, fakeErrorHandler);
+      await cli.parseAsync();
+
+      expect(called).toBe(true);
+      expect(receivedMsg).to.eql("Unknown argument: unknown");
+      expect(error).toBe(undefined);
     });
   });
 });

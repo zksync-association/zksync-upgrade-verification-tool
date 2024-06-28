@@ -1,12 +1,12 @@
-import type { MemoryValue } from "./memory-value";
+import type { StorageValue } from "./storage-value";
 import type { StorageReport } from "../../reports/storage-report";
 
 export type ValueField = {
   key: string;
-  value: MemoryValue;
+  value: StorageValue;
 };
 
-export class StructValue implements MemoryValue {
+export class StructValue implements StorageValue {
   fields: ValueField[];
   constructor(fields: ValueField[]) {
     this.fields = fields;

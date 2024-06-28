@@ -1,11 +1,8 @@
 import { bytesToBigInt } from "viem";
 import { Option } from "nochoices";
+import type { StorageSnapshot } from "./storage-snapshot";
 
-export interface MemorySnapshot {
-  at(pos: bigint): Option<Buffer>;
-}
-
-export class FileMemorySnapshot {
+export class RecordStorageSnapshot implements StorageSnapshot {
   data: Map<bigint, Buffer>;
 
   constructor(raw: Record<string, string>) {
@@ -19,7 +16,7 @@ export class FileMemorySnapshot {
     }
   }
 
-  at(pos: bigint): Option<Buffer> {
+  async at(pos: bigint): Promise<Option<Buffer>> {
     return Option.fromNullable(this.data.get(pos));
   }
 }

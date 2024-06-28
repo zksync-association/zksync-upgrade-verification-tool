@@ -8,10 +8,10 @@ describe("validate download-diff", () => {
   it("fails when target path does not exists", async () => {
     const temp = createTempDir();
     await fs.rmdir(temp);
-    const { stdout } = await expectToFailAsync(() =>
+    const { stderr } = await expectToFailAsync(() =>
       execAsync(`pnpm validate download-diff reference/test-upgrade-mini ${temp}`)
     );
-    expect(stdout).toContain(
+    expect(stderr).toContain(
       `Specified path "${temp}" is not a directory or there are no permissions to access it.`
     );
   });

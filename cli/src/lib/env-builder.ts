@@ -1,9 +1,10 @@
 import { BlockExplorerClient } from "./block-explorer-client.js";
-import type { Network } from "./constants.js";
+import { NET_VERSIONS, type Network } from "./constants.js";
 import { RpcClient } from "./rpc-client.js";
 import { EraContractsRepo } from "./era-contracts-repo";
 import { FileSystem } from "./file-system";
 import { UpgradeImporter } from "./importer";
+import { Terminal } from "../terminal";
 
 export class EnvBuilder {
   private _etherscanApiKey?: string;
@@ -15,12 +16,17 @@ export class EnvBuilder {
   private _l2Client?: BlockExplorerClient;
   private _repo?: EraContractsRepo;
   colored = true;
+  private terminal = Terminal.default();
 
   // Config
   private _rpcL1?: RpcClient;
 
   withNetwork(n: Network): void {
     this._network = n;
+  }
+
+  withTerminal(term: Terminal) {
+    this.terminal = term;
   }
 
   withEtherscanApiKey(etherscanKey: string): void {
@@ -76,6 +82,14 @@ export class EnvBuilder {
     return this._rpcL1;
   }
 
+  async newRpcL1(): Promise<RpcClient> {
+    const rpc = this.rpcL1();
+    if ((await rpc.netVersion()) !== NET_VERSIONS[this.network]) {
+      throw new Error("Rpc network does not match with specified network");
+    }
+    return rpc;
+  }
+
   rpcL2(): RpcClient {
     return RpcClient.forL2(this.network);
   }
@@ -102,5 +116,9 @@ export class EnvBuilder {
 
   withColored(colored: boolean) {
     this.colored = colored;
+  }
+
+  term() {
+    return this.terminal;
   }
 }

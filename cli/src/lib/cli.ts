@@ -4,20 +4,22 @@ import { NetworkSchema } from ".";
 import { downloadCode, checkCommand, contractDiff } from "../commands";
 import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
-import * as console from "node:console";
-import { printError } from "./errors.js";
 import { storageChangeCommand } from "../commands/storage-change-command";
 import { Option } from "nochoices";
+import { failHandler } from "../commands/fail-handler";
+import { storageSnapshotCommand } from "../commands/storage-snapshot-command";
 
 export function buildCli(
   args: string[],
   checkCbk: typeof checkCommand,
   diffCbk: typeof contractDiff,
   downloadCodeCbk: typeof downloadCode,
-  storageDiffCbk: typeof storageChangeCommand
+  storageDiffCbk: typeof storageChangeCommand,
+  failCbk: typeof failHandler
 ): Argv {
   const env = new EnvBuilder();
   const argParser = yargs(args)
+    .scriptName("validate")
     .middleware((yargs) => {
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
@@ -127,6 +129,14 @@ export function buildCli(
       }
     )
     .command(
+      "storage-snapshot",
+      "Shows a snapshot of the current state of the storage",
+      (yargs) => yargs,
+      async (_yargs) => {
+        await storageSnapshotCommand(env);
+      }
+    )
+    .command(
       "download-diff <upgradeDir> <targetSourceCodeDir>",
       "Download source code diff",
       (yargs) =>
@@ -182,17 +192,7 @@ export function buildCli(
     .wrap(100)
     .help()
     .fail(async (msg, err, _yargs) => {
-      if (msg) {
-        const help = await argParser.getHelp();
-        console.log(help);
-        console.log("");
-        console.log(msg);
-        // process.exit(1);
-        return;
-      }
-
-      printError(err);
-      // process.exit(1);
+      await failCbk(env, msg, err, argParser, () => process.exit(1));
     })
     .strict();
 
@@ -205,7 +205,8 @@ export const cli = async () => {
     checkCommand,
     contractDiff,
     downloadCode,
-    storageChangeCommand
+    storageChangeCommand,
+    failHandler
   );
   await argParser.parseAsync();
 };

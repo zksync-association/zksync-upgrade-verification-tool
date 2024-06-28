@@ -2,9 +2,9 @@ import type { MemoryDataType } from "./data-type";
 import type { Option } from "nochoices";
 import { bytesToBigInt } from "viem";
 
-import type { MemorySnapshot } from "../memory-snapshot";
+import type { StorageSnapshot } from "../storage-snapshot";
 import { BigNumberValue } from "../values/big-number-value";
-import type { MemoryValue } from "../values/memory-value";
+import type { StorageValue } from "../values/storage-value";
 
 export class BigNumberType implements MemoryDataType {
   private size: number;
@@ -13,10 +13,10 @@ export class BigNumberType implements MemoryDataType {
     this.size = size;
   }
 
-  extract(memory: MemorySnapshot, slot: bigint, offset = 0): Option<MemoryValue> {
+  async extract(memory: StorageSnapshot, slot: bigint, offset = 0): Promise<Option<StorageValue>> {
     const start = 32 - offset - this.size;
-    return memory
-      .at(slot)
+    const maybe = await memory.at(slot);
+    return maybe
       .map((buf) => buf.subarray(start, start + this.size))
       .map(bytesToBigInt)
       .map((n) => new BigNumberValue(n));

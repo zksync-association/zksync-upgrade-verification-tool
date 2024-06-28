@@ -1,10 +1,10 @@
-import type { MemoryValue } from "./memory-value";
+import type { StorageValue } from "./storage-value";
 import type { StorageReport } from "../../reports/storage-report";
 
-export class ArrayValue implements MemoryValue {
-  inner: MemoryValue[];
+export class ArrayValue implements StorageValue {
+  inner: StorageValue[];
 
-  constructor(inner: MemoryValue[]) {
+  constructor(inner: StorageValue[]) {
     this.inner = inner;
   }
 

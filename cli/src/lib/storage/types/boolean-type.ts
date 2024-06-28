@@ -1,13 +1,13 @@
 import type { MemoryDataType } from "./data-type";
-import type { MemorySnapshot } from "../memory-snapshot";
+import type { StorageSnapshot } from "../storage-snapshot";
 import type { Option } from "nochoices";
-import type { MemoryValue } from "../values/memory-value";
+import type { StorageValue } from "../values/storage-value";
 import { BooleanValue } from "../values/boolean-value";
 
 export class BooleanType implements MemoryDataType {
-  extract(memory: MemorySnapshot, slot: bigint, offset = 0): Option<MemoryValue> {
-    return memory
-      .at(slot)
+  async extract(memory: StorageSnapshot, slot: bigint, offset = 0): Promise<Option<StorageValue>> {
+    const maybe = await memory.at(slot);
+    return maybe
       .map((buf) => buf[buf.length - offset - 1])
       .map((num) => new BooleanValue(num !== 0));
   }

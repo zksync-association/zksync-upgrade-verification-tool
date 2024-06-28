@@ -1,7 +1,7 @@
-import type { MemoryValue } from "./memory-value";
+import type { StorageValue } from "./storage-value";
 import type { StorageReport } from "../../reports/storage-report";
 
-export class BlobValue implements MemoryValue {
+export class BlobValue implements StorageValue {
   private buf: Buffer;
 
   constructor(buf: Buffer) {

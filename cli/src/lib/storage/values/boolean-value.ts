@@ -1,7 +1,7 @@
 import type { StorageReport } from "../../reports/storage-report";
-import type { MemoryValue } from "./memory-value";
+import type { StorageValue } from "./storage-value";
 
-export class BooleanValue implements MemoryValue {
+export class BooleanValue implements StorageValue {
   val: boolean;
 
   constructor(val: boolean) {

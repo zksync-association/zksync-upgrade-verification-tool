@@ -6,10 +6,12 @@ import {
   encodeFunctionData,
   type Hex,
   http,
+  numberToHex,
 } from "viem";
 import type { TypeOf, ZodType } from "zod";
 import type { PublicClient, HttpTransport } from "viem";
 import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
+import { getStorageAt } from "viem/actions";
 
 const L1_DEFAULT_URLS = {
   mainnet: "https://ethereum-rpc.publicnode.com",
@@ -61,6 +63,19 @@ export class RpcClient {
     return this.viemClient.getBytecode({ address: addr });
   }
 
+  async storageRead(addr: Hex, position: bigint): Promise<Hex> {
+    const readedValue = await getStorageAt(this.viemClient, {
+      address: addr,
+      slot: numberToHex(position, { size: 32 }),
+    });
+
+    if (!readedValue) {
+      throw new Error("Error reading storage");
+    }
+
+    return readedValue;
+  }
+
   async contractRead<T extends ZodType>(
     target: string,
     fnName: string,
@@ -109,5 +124,11 @@ export class RpcClient {
     const data = await res.json();
 
     return memoryDiffParser.parse(data);
+  }
+
+  async netVersion(): Promise<string> {
+    return this.viemClient.request({
+      method: "net_version",
+    });
   }
 }

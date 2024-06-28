@@ -1,11 +1,11 @@
 import type { EnvBuilder } from "../lib/env-builder";
-import { type UpgradeChanges, UpgradeImporter, ZkSyncEraState } from "../lib/index";
+import { type UpgradeChanges, UpgradeImporter, ZkSyncEraState } from "../lib";
 import { StorageChanges } from "../lib/storage/storage-changes";
 import type { Hex } from "viem";
-import { StringStorageChangeReport } from "../lib/reports/storage-report";
 import type { Option } from "nochoices";
 import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
 import { withSpinner } from "../lib/with-spinner";
+import { StringStorageChangeReport } from "../lib/reports/string-storage-change-report";
 
 async function getMemoryPath(
   preCalculatedPath: Option<string>,
@@ -39,7 +39,8 @@ export async function storageChangeCommand(
 ): Promise<void> {
   const state = await withSpinner(
     () => ZkSyncEraState.create(env.network, env.l1Client(), env.rpcL1(), env.rpcL2()),
-    "Gathering contract data"
+    "Gathering contract data",
+    env
   );
   const importer = new UpgradeImporter(env.fs());
   const changes = await importer.readFromFiles(dir, env.network);
@@ -68,17 +69,8 @@ export async function storageChangeCommand(
     [...selectors],
     ["0x10113bb3a8e64f8ed67003126adc8ce74c34610c"]
   );
-  const memoryChanges = memoryMap.allChanges();
 
-  const report = new StringStorageChangeReport(env.colored);
+  const report = new StringStorageChangeReport(memoryMap, env.colored);
 
-  for (const change of memoryChanges) {
-    report.add(change);
-  }
-
-  if (report.isEmpty()) {
-    console.log("No storage changes when executing upgrade.");
-  } else {
-    console.log(report.format());
-  }
+  env.term().line(await report.format());
 }
