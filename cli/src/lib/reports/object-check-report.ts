@@ -1,4 +1,4 @@
-import type { FacetDataDiff, ZkSyncEraDiff } from "../zk-sync-era-diff";
+import type { ZkSyncEraDiff } from "../zk-sync-era-diff";
 import type { BlockExplorer } from "../block-explorer-client";
 import {
   HEX_ZKSYNC_FIELDS,
