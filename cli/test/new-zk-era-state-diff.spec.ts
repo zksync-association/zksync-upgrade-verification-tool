@@ -503,7 +503,7 @@ describe("NewZkSyncStateDiff", () => {
       expect(changes.length).to.eql(1);
       expect(changes[0].address).to.eql("0x01");
       expect(changes[0].name).to.eql("SystemContract01");
-      expect(changes[0].currentBytecodeHash).to.eql("0x000a");
+      expect(changes[0].currentBytecodeHash.unwrap()).to.eql("0x000a");
       expect(changes[0].proposedBytecodeHash).to.eql("0x000b");
     });
 
