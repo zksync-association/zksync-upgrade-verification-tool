@@ -1,8 +1,6 @@
 import type { EnvBuilder } from "../lib/env-builder";
-import { ZksyncEraState } from "../lib/index";
+import { StringCheckReport, ZkSyncEraDiff, ZksyncEraState } from "../lib/index";
 import { hexToBytes } from "viem";
-import { ZkSyncEraDiff } from "../lib/index";
-import { StringCheckReport } from "../lib/index";
 import { withSpinner } from "../lib/with-spinner";
 import { MalformedUpgrade } from "../lib/errors";
 
@@ -22,9 +20,8 @@ export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
 
   const repo = await withSpinner(
     async () => {
-      const repo = await env.contractsRepo();
-      // await repo.compileSystemContracts();
-      return repo;
+      await repo.compileSystemContracts();
+      return await env.contractsRepo();
     },
     "Locally compiling system contracts",
     env
