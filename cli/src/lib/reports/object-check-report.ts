@@ -1,4 +1,4 @@
-import { type FacetDataDiff, type ZkSyncEraDiff } from "../zk-sync-era-diff";
+import type { FacetDataDiff, ZkSyncEraDiff } from "../zk-sync-era-diff";
 import type { BlockExplorer } from "../block-explorer-client";
 import {
   HEX_ZKSYNC_FIELDS,
@@ -133,12 +133,6 @@ export class ObjectCheckReport {
 
   private orUndefined<T>(opt: Option<T>): T | undefined {
     return opt.map((v): T | undefined => v).unwrapOr(undefined);
-  }
-
-  private addTitle(lines: string[], title: string): void {
-    lines.push(title);
-    lines.push("=".repeat(title.length));
-    lines.push("");
   }
 
   private async addSystemContracts(): Promise<SystemContractChange[]> {

@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { StringCheckReport } from "../src/lib/reports/string-check-report";
-import { ZkSyncEraDiff } from "../src/lib/zk-sync-era-diff";
 import {
-  ZksyncEraState,
+  type ContractsRepo,
+  StringCheckReport,
+  SystemContractList,
+  ZkSyncEraDiff,
+} from "../src/index";
+import {
   HEX_ZKSYNC_FIELDS,
   type L2ContractData,
   type ZkEraStateData,
+  ZksyncEraState,
 } from "../src/lib/zksync-era-state";
-import { SystemContractList } from "../src/lib/system-contract-providers";
-import { type ContractsRepo } from "../src/lib/git-contracts-repo";
 import { TestBlockExplorer } from "./utilities/test-block-explorer";
 import { ContractAbi } from "../src/lib/contract-abi";
 import type { BlockExplorer } from "../src/lib";
@@ -319,8 +321,7 @@ describe("CheckReport", () => {
     describe("ObjectCheckReport", () => {
       async function createObject(ctx: Ctx): Promise<CheckReportObj> {
         const report = new ObjectCheckReport(ctx.diff, ctx.explorer);
-        const obj = await report.format();
-        return obj;
+        return report.format();
       }
 
       it<Ctx>("returns the correct object", async (ctx: Ctx) => {

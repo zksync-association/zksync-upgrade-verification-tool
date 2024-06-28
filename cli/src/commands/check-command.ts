@@ -1,8 +1,8 @@
 import type { EnvBuilder } from "../lib/env-builder";
-import { ZksyncEraState } from "../lib/zksync-era-state";
+import { ZksyncEraState } from "../lib/index";
 import { hexToBytes } from "viem";
-import { ZkSyncEraDiff } from "../lib/zk-sync-era-diff";
-import { StringCheckReport } from "../lib/reports/string-check-report";
+import { ZkSyncEraDiff } from "../lib/index";
+import { StringCheckReport } from "../lib/index";
 import { withSpinner } from "../lib/with-spinner";
 import { MalformedUpgrade } from "../lib/errors";
 
