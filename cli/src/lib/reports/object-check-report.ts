@@ -2,8 +2,6 @@ import type { ZkSyncEraDiff } from "../zk-sync-era-diff";
 import type { BlockExplorer } from "../block-explorer-client";
 import {
   HEX_ZKSYNC_FIELDS,
-  type HexEraPropName,
-  type NumberEraPropNames,
   NUMERIC_ZKSYNC_FIELDS,
 } from "../zksync-era-state";
 import type { Hex } from "viem";
@@ -22,18 +20,6 @@ export type ContractFieldChange = {
   current?: string;
   proposed?: string;
 }
-
-export type ContractFieldChanges = {
-  [key in HexEraPropName]?: {
-    current?: string;
-    proposed?: string;
-  };
-} & {
-  [key in NumberEraPropNames]?: {
-    current?: string;
-    proposed?: string;
-  };
-};
 
 export type FacetDataReportDiff = {
   name: string;
