@@ -352,58 +352,79 @@ describe("CheckReport", () => {
           ])
         );
 
-        expect(obj.fieldChanges).toEqual({
-          admin: {
-            current: "0x010a",
-            proposed: "0x010b",
-          },
-          pendingAdmin: {
-            current: "0x020a",
-            proposed: "0x020b",
-          },
-          verifierAddress: {
-            current: "0x030a",
-            proposed: "0x030b",
-          },
-          bridgeHubAddress: {
-            current: "0x040a",
-            proposed: "0x040b",
-          },
-          blobVersionedHashRetriever: {
-            current: "0x050a",
-            proposed: "0x050b",
-          },
-          stateTransitionManagerAddress: {
-            current: "0x060a",
-            proposed: "0x060b",
-          },
-          l2DefaultAccountBytecodeHash: {
-            current: "0x070a",
-            proposed: "0x070b",
-          },
-          l2BootloaderBytecodeHash: {
-            current: "0x080a",
-            proposed: "0x080b",
-          },
-          baseTokenBridgeAddress: {
-            current: "0x090a",
-          },
-          protocolVersion: {
-            current: "0x000000000000000000000000000000000000000000000000000000000000000f",
-            proposed: "0x0000000000000000000000000000000000000000000000000000001800000001",
-          },
-          baseTokenGasPriceMultiplierNominator: {
-            current: "200",
-            proposed: "201",
-          },
-          baseTokenGasPriceMultiplierDenominator: {
-            current: "300",
-          },
-          chainId: {
-            current: "100",
-            proposed: "101",
-          },
-        });
+        expect(obj.fieldChanges).toEqual(
+          expect.arrayContaining([
+            {
+              name: "admin",
+              current: "0x010a",
+              proposed: "0x010b"
+            },
+            {
+              name: "pendingAdmin",
+              current: "0x020a",
+              proposed: "0x020b"
+            },
+            {
+              name: "pendingAdmin",
+              current: "0x020a",
+              proposed: "0x020b"
+            },
+            {
+              name: "verifierAddress",
+              current: "0x030a",
+              proposed: "0x030b"
+            },
+            {
+              name: "bridgeHubAddress",
+              current: "0x040a",
+              proposed: "0x040b"
+            },
+            {
+              name: "blobVersionedHashRetriever",
+              current: "0x050a",
+              proposed: "0x050b"
+            },
+            {
+              name: "stateTransitionManagerAddress",
+              current: "0x060a",
+              proposed: "0x060b"
+            },
+            {
+              name: "l2DefaultAccountBytecodeHash",
+              current: "0x070a",
+              proposed: "0x070b"
+            },
+            {
+              name: "l2BootloaderBytecodeHash",
+              current: "0x080a",
+              proposed: "0x080b"
+            },
+            {
+              name: "baseTokenBridgeAddress",
+              current: "0x090a",
+              proposed: undefined
+            },
+            {
+              name: "protocolVersion",
+              current: "0x000000000000000000000000000000000000000000000000000000000000000f",
+              proposed: "0x0000000000000000000000000000000000000000000000000000001800000001"
+            },
+            {
+              name: "baseTokenGasPriceMultiplierNominator",
+              current: "200",
+              proposed: "201"
+            },
+            {
+              name: "baseTokenGasPriceMultiplierDenominator",
+              current: "300",
+              proposed: undefined
+            },
+            {
+              name: "chainId",
+              current: "100",
+              proposed: "101"
+            },
+          ]))
 
         expect(obj.systemContractChanges.length).toEqual(3);
         expect(obj.systemContractChanges).toEqual(

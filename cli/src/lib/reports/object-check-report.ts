@@ -17,6 +17,12 @@ export type SystemContractChange = {
   recompileMatches: boolean;
 };
 
+export type ContractFieldChange = {
+  name: string;
+  current?: string;
+  proposed?: string;
+}
+
 export type ContractFieldChanges = {
   [key in HexEraPropName]?: {
     current?: string;
@@ -45,7 +51,7 @@ export type CheckReportObj = {
   };
   facetChanges: FacetDataReportDiff[];
   systemContractChanges: SystemContractChange[];
-  fieldChanges: ContractFieldChanges;
+  fieldChanges: ContractFieldChange[];
 };
 
 export class ObjectCheckReport {
@@ -105,27 +111,25 @@ export class ObjectCheckReport {
     return Promise.all(promises);
   }
 
-  private addFields(): ContractFieldChanges {
-    const res: ContractFieldChanges = {};
+  private addFields(): ContractFieldChange[] {
+    const res: ContractFieldChange[] = [];
     for (const field of HEX_ZKSYNC_FIELDS) {
       const [before, maybeAfter] = this.diff.hexAttrDiff(field);
 
-      const after: Hex | undefined = maybeAfter
-        .map((v): Hex | undefined => v || undefined)
-        .unwrapOr(undefined);
-      res[field] = {
+      res.push({
+        name: field,
         current: before,
-        proposed: after,
-      };
+        proposed: this.orUndefined(maybeAfter),
+      });
     }
 
     for (const field of NUMERIC_ZKSYNC_FIELDS) {
       const [before, maybeAfter] = this.diff.numberAttrDiff(field);
-
-      res[field] = {
+      res.push({
+        name: field,
         current: before.toString(),
-        proposed: this.orUndefined(maybeAfter.map((v) => v.toString())),
-      };
+        proposed: this.orUndefined(maybeAfter.map(v => v.toString())),
+      });
     }
 
     return res;
