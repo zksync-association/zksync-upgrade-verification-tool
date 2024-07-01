@@ -4,7 +4,7 @@ set -eo pipefail
 # Check if custom values set, otherwise use defaults
 DB_USER=${POSTGRES_USER:=user}
 DB_PASS=${POSTGRES_PASSWORD:=password}
-DB_NAME=${POSTGRES_DB:=postgres}
+DB_NAME=${POSTGRES_DB:=webapp}
 DB_PORT=${POSTGRES_PORT:=5432}
 
 # Container name
