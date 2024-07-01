@@ -4,6 +4,7 @@ import { z } from "zod";
 export const env = createEnv({
   server: {
     ALLOW_INDEXING: z.coerce.boolean().default(false),
+    DATABASE_URL: z.string(),
     LOG_LEVEL: z.enum(["debug", "info"]).default("info"),
     NODE_ENV: z.enum(["development", "test", "production"]),
     SERVER_PORT: z.coerce.number().default(3000),

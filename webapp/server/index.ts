@@ -69,10 +69,7 @@ async function getBuild() {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const build = viteDevServer
     ? () => viteDevServer.ssrLoadModule("virtual:remix/server-build")
-    : // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore-error  this should exist before running the server
-      // but it may not exist just yet.
-      // eslint-disable-next-line import/no-unresolved
+    : // @ts-ignore-error  this should exist before running the server
       await import("../build/server/index.js");
   return build as unknown as ServerBuild;
 }

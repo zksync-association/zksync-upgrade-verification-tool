@@ -2,12 +2,12 @@
   "$schema": "https://biomejs.dev/schemas/1.8.3/schema.json",
   "extends": ["../biome.json"],
   "files": {
-    "include": ["*.js", "*.ts", "*.tsx", "*.json", "*.yml", "*.md"],
     "ignore": [
       "./.cache/*",
       "./build/*",
       "./node_modules/*",
-      "./server-build/*"
+      "./server-build/*",
+      "remix-routes.d.ts"
     ]
   },
   "organizeImports": {
