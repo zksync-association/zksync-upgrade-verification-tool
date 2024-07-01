@@ -1,9 +1,12 @@
+import { Separator } from "@/components/ui/separator";
 import {
   type ErrorResponse,
   isRouteErrorResponse,
   useParams,
   useRouteError,
+  Link,
 } from "@remix-run/react";
+import { $path } from "remix-routes";
 
 type StatusHandler = (info: {
   error: ErrorResponse;
@@ -17,7 +20,7 @@ export function GeneralErrorBoundary({
     </p>
   ),
   statusHandlers,
-  unexpectedErrorHandler = () => <p>Se produjo un error</p>,
+  unexpectedErrorHandler = defaultErrorHandler,
 }: {
   defaultStatusHandler?: StatusHandler;
   statusHandlers?: Record<number, StatusHandler>;
@@ -31,13 +34,30 @@ export function GeneralErrorBoundary({
   }
 
   return (
-    <div className="text-h2 container flex items-center justify-center p-20">
+    <div className="text-h2 container flex items-center justify-center p-20 min-h-screen">
       {isRouteErrorResponse(error)
         ? (statusHandlers?.[error.status] ?? defaultStatusHandler)({
             error,
             params,
           })
         : unexpectedErrorHandler(error)}
+    </div>
+  );
+}
+
+function defaultErrorHandler() {
+  return (
+    <div>
+      <div className="flex items-center space-x-4">
+        <h1 className="text-3xl font-semibold md:text-5xl">500</h1>
+        <Separator orientation="vertical" className="h-20 bg-border" />
+        <p>Unexpected error</p>
+      </div>
+      <div className="mt-10 text-center">
+        <Link to={$path("/")} className="text-body-md underline">
+          Go back to the home page
+        </Link>
+      </div>
     </div>
   );
 }

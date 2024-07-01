@@ -15,10 +15,16 @@ export function helmet() {
           env.NODE_ENV === "development" ? "ws:" : null,
           "*.sentry.io",
           "'self'",
+          "https://explorer-api.walletconnect.com",
         ].filter(Boolean) as string[],
         "font-src": ["'self'"],
-        "frame-src": ["'self'"],
-        "img-src": ["'self'", "data:"],
+        "frame-src": ["'self'", "https://verify.walletconnect.com"],
+        "img-src": [
+          "'self'",
+          "data:",
+          "https://explorer-api.walletconnect.com",
+          "https://verify.walletconnect.com",
+        ],
         "script-src": [
           "'strict-dynamic'",
           "'self'",
