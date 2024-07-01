@@ -1,20 +1,23 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { CheckReport } from "../src/lib/reports/check-report";
-import { ZkSyncEraDiff } from "../src/lib/zk-sync-era-diff";
 import {
-  ZksyncEraState,
+  type ContractsRepo,
+  StringCheckReport,
+  SystemContractList,
+  ZkSyncEraDiff,
+} from "../src/index";
+import {
   HEX_ZKSYNC_FIELDS,
   type L2ContractData,
   type ZkEraStateData,
+  ZksyncEraState,
 } from "../src/lib/zksync-era-state";
-import { SystemContractList } from "../src/lib/system-contract-providers";
-import { type ContractsRepo } from "../src/lib/git-contracts-repo";
 import { TestBlockExplorer } from "./utilities/test-block-explorer";
 import { ContractAbi } from "../src/lib/contract-abi";
 import type { BlockExplorer } from "../src/lib";
 import type { Hex } from "viem";
 import { TestContractRepo } from "./utilities/test-contract-repo";
 import { Option } from "nochoices";
+import { type CheckReportObj, ObjectCheckReport } from "../src/lib/reports/object-check-report";
 
 interface Ctx {
   abi1: ContractAbi;
@@ -207,7 +210,7 @@ describe("CheckReport", () => {
   });
 
   async function createReportLines(ctx: Ctx): Promise<string[]> {
-    const report = new CheckReport(ctx.diff, ctx.contractsRepo, ctx.explorer, {
+    const report = new StringCheckReport(ctx.diff, ctx.contractsRepo, ctx.explorer, {
       shortOutput: false,
     });
     const string = await report.format();
@@ -313,6 +316,144 @@ describe("CheckReport", () => {
           expect(lines[line + 1]).toContain("No changes");
         }
       }
+    });
+
+    describe("ObjectCheckReport", () => {
+      async function createObject(ctx: Ctx): Promise<CheckReportObj> {
+        const report = new ObjectCheckReport(ctx.diff, ctx.explorer);
+        return report.format();
+      }
+
+      it<Ctx>("returns the correct object", async (ctx: Ctx) => {
+        const obj = await createObject(ctx);
+        expect(obj.metadata).toEqual({
+          currentVersion: "15",
+          proposedVersion: "0.24.1",
+        });
+        expect(obj.facetChanges.length).toEqual(2);
+        expect(obj.facetChanges).toEqual(
+          expect.arrayContaining([
+            {
+              name: "RemovedFacet",
+              oldAddress: ctx.address1,
+              newAddress: undefined,
+              addedFunctions: [],
+              removedFunctions: ["removed1()", "removed2()"],
+              preservedFunctions: [],
+            },
+            {
+              name: "UpgradedFacet",
+              oldAddress: ctx.address2,
+              newAddress: ctx.address3,
+              addedFunctions: ["f2()"],
+              removedFunctions: [],
+              preservedFunctions: ["f1()"],
+            },
+          ])
+        );
+
+        expect(obj.fieldChanges).toEqual(
+          expect.arrayContaining([
+            {
+              name: "admin",
+              current: "0x010a",
+              proposed: "0x010b",
+            },
+            {
+              name: "pendingAdmin",
+              current: "0x020a",
+              proposed: "0x020b",
+            },
+            {
+              name: "pendingAdmin",
+              current: "0x020a",
+              proposed: "0x020b",
+            },
+            {
+              name: "verifierAddress",
+              current: "0x030a",
+              proposed: "0x030b",
+            },
+            {
+              name: "bridgeHubAddress",
+              current: "0x040a",
+              proposed: "0x040b",
+            },
+            {
+              name: "blobVersionedHashRetriever",
+              current: "0x050a",
+              proposed: "0x050b",
+            },
+            {
+              name: "stateTransitionManagerAddress",
+              current: "0x060a",
+              proposed: "0x060b",
+            },
+            {
+              name: "l2DefaultAccountBytecodeHash",
+              current: "0x070a",
+              proposed: "0x070b",
+            },
+            {
+              name: "l2BootloaderBytecodeHash",
+              current: "0x080a",
+              proposed: "0x080b",
+            },
+            {
+              name: "baseTokenBridgeAddress",
+              current: "0x090a",
+              proposed: undefined,
+            },
+            {
+              name: "protocolVersion",
+              current: "0x000000000000000000000000000000000000000000000000000000000000000f",
+              proposed: "0x0000000000000000000000000000000000000000000000000000001800000001",
+            },
+            {
+              name: "baseTokenGasPriceMultiplierNominator",
+              current: "200",
+              proposed: "201",
+            },
+            {
+              name: "baseTokenGasPriceMultiplierDenominator",
+              current: "300",
+              proposed: undefined,
+            },
+            {
+              name: "chainId",
+              current: "100",
+              proposed: "101",
+            },
+          ])
+        );
+
+        expect(obj.systemContractChanges.length).toEqual(3);
+        expect(obj.systemContractChanges).toEqual(
+          expect.arrayContaining([
+            {
+              name: "Ecrecover",
+              address: ctx.sysAddr1,
+              currentBytecodeHash: "0x0100",
+              proposedBytecodeHash: "0x0101",
+              recompileMatches: true,
+            },
+            {
+              name: "EcAdd",
+              address: ctx.sysAddr2,
+              currentBytecodeHash: "0x0200",
+              proposedBytecodeHash: "0x0201",
+              recompileMatches: true,
+            },
+            {
+              name: "EcMul",
+              address: ctx.sysAddr3,
+              currentBytecodeHash: undefined,
+              proposedBytecodeHash: "0x0301",
+              recompileMatches: true,
+            },
+          ])
+        );
+      });
     });
   });
 
