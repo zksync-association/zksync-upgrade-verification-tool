@@ -1,9 +1,6 @@
 import type { ZkSyncEraDiff } from "../zk-sync-era-diff";
 import type { BlockExplorer } from "../block-explorer-client";
-import {
-  HEX_ZKSYNC_FIELDS,
-  NUMERIC_ZKSYNC_FIELDS,
-} from "../zksync-era-state";
+import { HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS } from "../zksync-era-state";
 import type { Hex } from "viem";
 import type { Option } from "nochoices";
 
@@ -19,7 +16,7 @@ export type ContractFieldChange = {
   name: string;
   current?: string;
   proposed?: string;
-}
+};
 
 export type FacetDataReportDiff = {
   name: string;
@@ -114,7 +111,7 @@ export class ObjectCheckReport {
       res.push({
         name: field,
         current: before.toString(),
-        proposed: this.orUndefined(maybeAfter.map(v => v.toString())),
+        proposed: this.orUndefined(maybeAfter.map((v) => v.toString())),
       });
     }
 

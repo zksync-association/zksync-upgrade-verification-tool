@@ -357,74 +357,75 @@ describe("CheckReport", () => {
             {
               name: "admin",
               current: "0x010a",
-              proposed: "0x010b"
+              proposed: "0x010b",
             },
             {
               name: "pendingAdmin",
               current: "0x020a",
-              proposed: "0x020b"
+              proposed: "0x020b",
             },
             {
               name: "pendingAdmin",
               current: "0x020a",
-              proposed: "0x020b"
+              proposed: "0x020b",
             },
             {
               name: "verifierAddress",
               current: "0x030a",
-              proposed: "0x030b"
+              proposed: "0x030b",
             },
             {
               name: "bridgeHubAddress",
               current: "0x040a",
-              proposed: "0x040b"
+              proposed: "0x040b",
             },
             {
               name: "blobVersionedHashRetriever",
               current: "0x050a",
-              proposed: "0x050b"
+              proposed: "0x050b",
             },
             {
               name: "stateTransitionManagerAddress",
               current: "0x060a",
-              proposed: "0x060b"
+              proposed: "0x060b",
             },
             {
               name: "l2DefaultAccountBytecodeHash",
               current: "0x070a",
-              proposed: "0x070b"
+              proposed: "0x070b",
             },
             {
               name: "l2BootloaderBytecodeHash",
               current: "0x080a",
-              proposed: "0x080b"
+              proposed: "0x080b",
             },
             {
               name: "baseTokenBridgeAddress",
               current: "0x090a",
-              proposed: undefined
+              proposed: undefined,
             },
             {
               name: "protocolVersion",
               current: "0x000000000000000000000000000000000000000000000000000000000000000f",
-              proposed: "0x0000000000000000000000000000000000000000000000000000001800000001"
+              proposed: "0x0000000000000000000000000000000000000000000000000000001800000001",
             },
             {
               name: "baseTokenGasPriceMultiplierNominator",
               current: "200",
-              proposed: "201"
+              proposed: "201",
             },
             {
               name: "baseTokenGasPriceMultiplierDenominator",
               current: "300",
-              proposed: undefined
+              proposed: undefined,
             },
             {
               name: "chainId",
               current: "100",
-              proposed: "101"
+              proposed: "101",
             },
-          ]))
+          ])
+        );
 
         expect(obj.systemContractChanges.length).toEqual(3);
         expect(obj.systemContractChanges).toEqual(
