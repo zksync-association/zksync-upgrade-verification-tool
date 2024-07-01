@@ -4,7 +4,7 @@ import { HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS } from "../zksync-era-state";
 import type { Hex } from "viem";
 import type { Option } from "nochoices";
 
-export type SystemContractChange = {
+export type SystemContractUpgrade = {
   name: string;
   address: Hex;
   currentBytecodeHash?: string;
@@ -33,7 +33,7 @@ export type CheckReportObj = {
     proposedVersion: string;
   };
   facetChanges: FacetDataReportDiff[];
-  systemContractChanges: SystemContractChange[];
+  systemContractChanges: SystemContractUpgrade[];
   fieldChanges: ContractFieldChange[];
 };
 
@@ -122,7 +122,7 @@ export class ObjectCheckReport {
     return opt.map((v): T | undefined => v).unwrapOr(undefined);
   }
 
-  private async addSystemContracts(): Promise<SystemContractChange[]> {
+  private async addSystemContracts(): Promise<SystemContractUpgrade[]> {
     const changes = await this.diff.systemContractChanges();
 
     return changes.map((c) => ({

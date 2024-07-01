@@ -13,4 +13,6 @@ export {
   type ContractsRepo,
   StringCheckReport,
   type CheckReportOptions,
+  ObjectStorageChangeReport,
+  ObjectCheckReport
 } from "./lib";

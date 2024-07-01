@@ -15,3 +15,5 @@ export { UpgradeImporter } from "./importer";
 export { FileSystem } from "./file-system";
 export * from "./git-contracts-repo";
 export * from "./reports/string-check-report";
+export * from "./reports/object-storage-change-report";
+export * from "./reports/object-check-report";
