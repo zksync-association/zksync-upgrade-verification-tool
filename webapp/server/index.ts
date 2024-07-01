@@ -13,6 +13,7 @@ import { logger } from "./middlewares/logger";
 import { rateLimit } from "./middlewares/rate-limit";
 import { removeTrailingSlash } from "./middlewares/remove-trailing-slash";
 import { requireHttps } from "./middlewares/require-https";
+import { cspNonce } from "@server/middlewares/csp-nonce";
 
 installGlobals();
 
@@ -55,6 +56,7 @@ app.get(["/img/*", "/favicons/*"], (_req, res) => {
 });
 
 app.use(logger);
+app.use(cspNonce);
 app.use(helmet());
 app.use(rateLimit);
 
@@ -73,13 +75,6 @@ async function getBuild() {
       await import("../build/server/index.js");
   return build as unknown as ServerBuild;
 }
-
-// Express.json is used by Inngest
-app.use(
-  express.json({
-    limit: "3mb",
-  })
-);
 
 app.all(
   "*",

@@ -45,8 +45,8 @@ function Document({
             __html: `window.ENV = ${JSON.stringify(env)}`,
           }}
         />
-        <ScrollRestoration />
-        <Scripts />
+        <ScrollRestoration nonce={nonce} />
+        <Scripts nonce={nonce} />
       </body>
     </html>
   );
