@@ -7,13 +7,13 @@ import compression from "compression";
 import express, { type RequestHandler, type Request, type Response } from "express";
 import getPort, { portNumbers } from "get-port";
 
+import { cspNonce } from "@server/middlewares/csp-nonce";
 import { env } from "../config/env.server";
 import { helmet } from "./middlewares/helmet";
 import { logger } from "./middlewares/logger";
 import { rateLimit } from "./middlewares/rate-limit";
 import { removeTrailingSlash } from "./middlewares/remove-trailing-slash";
 import { requireHttps } from "./middlewares/require-https";
-import { cspNonce } from "@server/middlewares/csp-nonce";
 
 installGlobals();
 
