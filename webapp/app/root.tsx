@@ -28,7 +28,7 @@ function Document({
   allowIndexing,
 }: { children: React.ReactNode; nonce: string; env?: typeof clientEnv; allowIndexing?: boolean }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -36,7 +36,7 @@ function Document({
         <Meta />
         <Links />
       </head>
-      <body>
+      <body className="min-h-screen">
         {children}
         <script
           nonce={nonce}
