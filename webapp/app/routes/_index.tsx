@@ -8,6 +8,10 @@ export const meta: MetaFunction = () => {
   ];
 };
 
+export function loader() {
+  throw new Error("AAAAAAAAAAA");
+}
+
 export default function Index() {
   return (
     <main>

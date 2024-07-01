@@ -53,5 +53,11 @@ function Document({
 }
 
 export function ErrorBoundary() {
-  return <GeneralErrorBoundary />;
+  const nonce = useNonce();
+
+  return (
+    <Document nonce={nonce}>
+      <GeneralErrorBoundary />
+    </Document>
+  );
 }
