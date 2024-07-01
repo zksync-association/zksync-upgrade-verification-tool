@@ -1,6 +1,6 @@
 import type { MetaFunction } from "@remix-run/node";
 import zksync from "@/images/zksync.svg";
-import { Button } from "@/components/ui/button";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 
 export const meta: MetaFunction = () => {
   return [
@@ -20,7 +20,9 @@ export default function Index() {
         Analyze upgrade proposal transaction call data in human-readble format and cast your vote.
       </p>
       <p className="mt-1 text-lg">Please connect your wallet to continue.</p>
-      <Button className="mt-10">Connect Wallet</Button>
+      <div className="mt-10">
+        <ConnectButton />
+      </div>
     </main>
   );
 }
