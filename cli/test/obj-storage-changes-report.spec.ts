@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { StorageChanges } from "../src/lib/storage/storage-changes";
 import { memoryDiffParser, type MemoryDiffRaw } from "../src/schema/rpc";
 import { type Hex, hexToBigInt, keccak256, numberToBytes, numberToHex } from "viem";
-import chalk from "chalk";
 import { AddressType } from "../src/lib/storage/types/address-type";
 import { ContractField } from "../src/lib/storage/contractField";
 import { BigNumberType } from "../src/lib/storage/types/big-number-type";
@@ -11,8 +10,7 @@ import { BooleanType } from "../src/lib/storage/types/boolean-type";
 import { ArrayType } from "../src/lib/storage/types/array-type";
 import { FixedArrayType } from "../src/lib/storage/types/fixed-array-type";
 import { StructType } from "../src/lib/storage/types/struct-type";
-import { StringStorageChangeReport } from "../src/lib/reports/string-storage-change-report";
-import { ObjectStorageChangeReport } from "../src/lib/reports/object-storage-change-report";
+import { ObjectStorageChangeReport } from "../src/index";
 
 describe("MemoryMapReport", () => {
   describe("For simple memory diff", () => {
@@ -76,13 +74,13 @@ describe("MemoryMapReport", () => {
           description: "some description",
           currentValue: {
             type: "address",
-            value: "0x000000000000000000000000000000000000000a"
+            value: "0x000000000000000000000000000000000000000a",
           },
           proposedValue: {
             type: "address",
-            value: "0x0000000000000000000000000000000000000014"
-          }
-        }
+            value: "0x0000000000000000000000000000000000000014",
+          },
+        },
       ]);
     });
 
@@ -102,13 +100,13 @@ describe("MemoryMapReport", () => {
           description: "it is a number",
           currentValue: {
             type: "numeric",
-            value: "10"
+            value: "10",
           },
           proposedValue: {
             type: "numeric",
-            value: "20"
-          }
-        }
+            value: "20",
+          },
+        },
       ]);
     });
 
@@ -123,13 +121,13 @@ describe("MemoryMapReport", () => {
           description: "it is a blob",
           currentValue: {
             type: "blob",
-            value: "0x000000000000000000000000000000000000000000000000000000000000000a"
+            value: "0x000000000000000000000000000000000000000000000000000000000000000a",
           },
           proposedValue: {
             type: "blob",
-            value: "0x0000000000000000000000000000000000000000000000000000000000000014"
-          }
-        }
+            value: "0x0000000000000000000000000000000000000000000000000000000000000014",
+          },
+        },
       ]);
     });
 
@@ -144,13 +142,13 @@ describe("MemoryMapReport", () => {
           description: "true or false",
           currentValue: {
             type: "boolean",
-            value: true
+            value: true,
           },
           proposedValue: {
             type: "boolean",
-            value: false
-          }
-        }
+            value: false,
+          },
+        },
       ]);
     });
 
@@ -173,40 +171,40 @@ describe("MemoryMapReport", () => {
             value: [
               {
                 type: "numeric",
-                value: "100"
+                value: "100",
               },
               {
                 type: "numeric",
-                value: "101"
+                value: "101",
               },
               {
                 type: "numeric",
-                value: "102"
-              }
-            ]
+                value: "102",
+              },
+            ],
           },
           proposedValue: {
             type: "array",
             value: [
               {
                 type: "numeric",
-                value: "100"
+                value: "100",
               },
               {
                 type: "numeric",
-                value: "201"
+                value: "201",
               },
               {
                 type: "numeric",
-                value: "102"
+                value: "102",
               },
               {
                 type: "numeric",
-                value: "103"
-              }
-            ]
-          }
-        }
+                value: "103",
+              },
+            ],
+          },
+        },
       ]);
     });
 
@@ -230,36 +228,36 @@ describe("MemoryMapReport", () => {
             value: [
               {
                 type: "numeric",
-                value: "100"
+                value: "100",
               },
               {
                 type: "numeric",
-                value: "101"
+                value: "101",
               },
               {
                 type: "numeric",
-                value: "102"
-              }
-            ]
+                value: "102",
+              },
+            ],
           },
           proposedValue: {
             type: "array",
             value: [
               {
                 type: "numeric",
-                value: "100"
+                value: "100",
               },
               {
                 type: "numeric",
-                value: "201"
+                value: "201",
               },
               {
                 type: "numeric",
-                value: "102"
-              }
-            ]
-          }
-        }
+                value: "102",
+              },
+            ],
+          },
+        },
       ]);
     });
 
@@ -283,35 +281,35 @@ describe("MemoryMapReport", () => {
             value: [
               {
                 type: "numeric",
-                value: "101"
+                value: "101",
               },
               {
                 type: "numeric",
-                value: "102"
+                value: "102",
               },
               {
-                type: "empty"
-              }
-            ]
+                type: "empty",
+              },
+            ],
           },
           proposedValue: {
             type: "array",
             value: [
               {
                 type: "numeric",
-                value: "201"
+                value: "201",
               },
               {
                 type: "numeric",
-                value: "102"
+                value: "102",
               },
               {
                 type: "numeric",
-                value: "103"
-              }
-            ]
-          }
-        }
+                value: "103",
+              },
+            ],
+          },
+        },
       ]);
     });
 
@@ -343,83 +341,72 @@ describe("MemoryMapReport", () => {
 
       const report = new ObjectStorageChangeReport(memoryMap);
 
-      const before = [
-        ".field1: 100",
-        ".field2: 0x0000000000000000000000000000000000000065",
-        ".field3: 0x0000000000000000000000000000000000000000000000000000000000000066",
-        ".field4: Empty slot.",
-      ].join("\n  ");
-      const after = [
-        ".field1: 100",
-        ".field2: 0x00000000000000000000000000000000000000c9",
-        ".field3: 0x0000000000000000000000000000000000000000000000000000000000000066",
-        ".field4: 103",
-      ].join("\n  ");
-
-      expect(await report.format()).toEqual([{
-        name: "structProp",
-        description: "so many fields",
-        currentValue: {
-          type: "struct",
-          fields: [
-            {
-              key: "field1",
-              value: {
-                type: "numeric",
-                value: "100"
-              }
-            },
-            {
-              key: "field2",
-              value: {
-                type: "address",
-                value: "0x0000000000000000000000000000000000000065",
-              }
-            },
-            {
-              key: "field3",
-              value: {
-                type: "blob",
-                value: "0x0000000000000000000000000000000000000000000000000000000000000066"
-              }
-            },
-            {
-              key: "field4",
-              value: { type: "empty" }
-            }
-          ]
+      expect(await report.format()).toEqual([
+        {
+          name: "structProp",
+          description: "so many fields",
+          currentValue: {
+            type: "struct",
+            fields: [
+              {
+                key: "field1",
+                value: {
+                  type: "numeric",
+                  value: "100",
+                },
+              },
+              {
+                key: "field2",
+                value: {
+                  type: "address",
+                  value: "0x0000000000000000000000000000000000000065",
+                },
+              },
+              {
+                key: "field3",
+                value: {
+                  type: "blob",
+                  value: "0x0000000000000000000000000000000000000000000000000000000000000066",
+                },
+              },
+              {
+                key: "field4",
+                value: { type: "empty" },
+              },
+            ],
+          },
+          proposedValue: {
+            type: "struct",
+            fields: [
+              {
+                key: "field1",
+                value: {
+                  type: "numeric",
+                  value: "100",
+                },
+              },
+              {
+                key: "field2",
+                value: {
+                  type: "address",
+                  value: "0x00000000000000000000000000000000000000c9",
+                },
+              },
+              {
+                key: "field3",
+                value: {
+                  type: "blob",
+                  value: "0x0000000000000000000000000000000000000000000000000000000000000066",
+                },
+              },
+              {
+                key: "field4",
+                value: { type: "numeric", value: "103" },
+              },
+            ],
+          },
         },
-        proposedValue: {
-          type: "struct",
-          fields: [
-            {
-              key: "field1",
-              value: {
-                type: "numeric",
-                value: "100"
-              }
-            },
-            {
-              key: "field2",
-              value: {
-                type: "address",
-                value: "0x00000000000000000000000000000000000000c9",
-              }
-            },
-            {
-              key: "field3",
-              value: {
-                type: "blob",
-                value: "0x0000000000000000000000000000000000000000000000000000000000000066"
-              }
-            },
-            {
-              key: "field4",
-              value: { type: "numeric", value: "103" }
-            }
-          ]
-        }
-      }]);
+      ]);
     });
   });
 });

@@ -24,12 +24,16 @@ export class ObjectStorageChangeReport {
       res.push({
         name: change.prop.name,
         description: change.prop.description,
-        currentValue: change.before.map((v) => v.accept(visitor)).unwrapOr({
-          type: "empty",
-        }),
-        proposedValue: change.after.map((v) => v.accept(visitor)).unwrapOr({
-          type: "empty",
-        }),
+        currentValue: change.before
+          .map((v) => v.accept(visitor))
+          .unwrapOr({
+            type: "empty",
+          }),
+        proposedValue: change.after
+          .map((v) => v.accept(visitor))
+          .unwrapOr({
+            type: "empty",
+          }),
       });
     }
 

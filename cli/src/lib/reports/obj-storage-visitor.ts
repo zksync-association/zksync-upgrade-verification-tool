@@ -3,88 +3,87 @@ import { bytesToHex, type Hex } from "viem";
 import type { StorageValue } from "../storage/values/storage-value";
 import type { ValueField } from "../storage/values/struct-value";
 
-
 export type ExtractedMapping = {
   type: "mapping";
   entries: {
-    key: string,
-    value: ExtractedValue
-  }[]
-}
+    key: string;
+    value: ExtractedValue;
+  }[];
+};
 
 export type ExtractedStruct = {
-  type: "struct",
+  type: "struct";
   fields: {
-    key: string,
-    value: ExtractedValue
-  }[]
-}
+    key: string;
+    value: ExtractedValue;
+  }[];
+};
 
 export type ExtractedAddress = {
-  type: "address",
-  value: string
-}
+  type: "address";
+  value: string;
+};
 
 export type ExtractedNumber = {
-  type: "numeric",
-  value: string
-}
+  type: "numeric";
+  value: string;
+};
 
 export type ExtractedBlob = {
-  type: "blob",
-  value: string
-}
+  type: "blob";
+  value: string;
+};
 
 export type ExtractedArray = {
-  type: "array",
-  value: ExtractedValue[]
-}
+  type: "array";
+  value: ExtractedValue[];
+};
 
 export type ExtractedBoolean = {
-  type: "boolean",
-  value: boolean
-}
+  type: "boolean";
+  value: boolean;
+};
 
 export type ExtractedEmpty = {
-  type: "empty",
-}
+  type: "empty";
+};
 
-
-export type ExtractedValue = ExtractedAddress |
-    ExtractedNumber |
-  ExtractedBlob |
-  ExtractedArray |
-  ExtractedMapping |
-  ExtractedStruct |
-  ExtractedBoolean |
-  ExtractedEmpty
+export type ExtractedValue =
+  | ExtractedAddress
+  | ExtractedNumber
+  | ExtractedBlob
+  | ExtractedArray
+  | ExtractedMapping
+  | ExtractedStruct
+  | ExtractedBoolean
+  | ExtractedEmpty;
 
 export class ObjStorageVisitor implements StorageVisitor<ExtractedValue> {
   visitAddress(addr: Hex): ExtractedValue {
     return {
       type: "address",
-      value: addr
+      value: addr,
     };
   }
 
   visitBigNumber(n: bigint): ExtractedValue {
     return {
       type: "numeric",
-      value: n.toString()
+      value: n.toString(),
     };
   }
 
   visitBuf(buf: Buffer): ExtractedValue {
     return {
       type: "blob",
-      value: bytesToHex(buf)
+      value: bytesToHex(buf),
     };
   }
 
   visitBoolean(val: boolean): ExtractedValue {
     return {
       type: "boolean",
-      value: val
+      value: val,
     };
   }
 
@@ -95,8 +94,8 @@ export class ObjStorageVisitor implements StorageVisitor<ExtractedValue> {
   visitArray(inner: StorageValue[]): ExtractedValue {
     return {
       type: "array",
-      value: inner.map((v) => v.accept(this))
-    }
+      value: inner.map((v) => v.accept(this)),
+    };
   }
 
   visitStruct(fields: ValueField[]): ExtractedValue {
