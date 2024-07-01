@@ -1,5 +1,5 @@
-import { json, MetaFunction } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import type { MetaFunction } from "@remix-run/node";
+import zksync from "@/images/zksync.svg";
 
 export const meta: MetaFunction = () => {
   return [
@@ -8,17 +8,10 @@ export const meta: MetaFunction = () => {
   ];
 };
 
-export async function loader() {
-  return json({text: "report"})
-}
-
 export default function Index() {
-  const data = useLoaderData<typeof loader>()
   return (
-    <main className="font-sans p-4">
-      <pre>
-        {data.text}
-      </pre>
+    <main>
+      <img src={zksync} alt="zkSync" className="w-64 h-64 mx-auto" />
     </main>
   );
 }

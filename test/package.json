@@ -27,7 +27,7 @@
   "author": "moonsong-labs",
   "license": "GPL-3.0-only",
   "devDependencies": {
-    "@biomejs/biome": "1.6.4",
+    "@biomejs/biome": "1.8.3",
     "@types/node": "^20.12.6",
     "typescript": "^5.4.4"
   },

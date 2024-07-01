@@ -1,0 +1,16 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.8.3/schema.json",
+  "extends": ["../biome.json"],
+  "files": {
+    "ignore": [
+      "./.cache/*",
+      "./build/*",
+      "./node_modules/*",
+      "./server-build/*",
+      "remix-routes.d.ts"
+    ]
+  },
+  "organizeImports": {
+    "enabled": true
+  }
+}

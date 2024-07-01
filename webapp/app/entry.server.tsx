@@ -6,7 +6,14 @@
 
 import { PassThrough } from "node:stream";
 
-import type { AppLoadContext, EntryContext } from "@remix-run/node";
+import { NonceProvider } from "@/utils/nonce-provider";
+import { defaultLogger } from "@config/log.server";
+import type {
+  ActionFunctionArgs,
+  AppLoadContext,
+  EntryContext,
+  LoaderFunctionArgs,
+} from "@remix-run/node";
 import { createReadableStreamFromReadable } from "@remix-run/node";
 import { RemixServer } from "@remix-run/react";
 import { isbot } from "isbot";
@@ -14,74 +21,44 @@ import { renderToPipeableStream } from "react-dom/server";
 
 const ABORT_DELAY = 5_000;
 
+const logger = defaultLogger.child({ module: "remix" });
+
 export default function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
   remixContext: EntryContext,
-  // This is ignored so we can keep it in the template for visibility.  Feel
-  // free to delete this parameter in your app if you're not using it!
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   loadContext: AppLoadContext
 ) {
-  return isbot(request.headers.get("user-agent") || "")
-    ? handleBotRequest(
-        request,
-        responseStatusCode,
-        responseHeaders,
-        remixContext
-      )
-    : handleBrowserRequest(
-        request,
-        responseStatusCode,
-        responseHeaders,
-        remixContext
-      );
-}
+  const callbackName = isbot(request.headers.get("user-agent")) ? "onAllReady" : "onShellReady";
 
-function handleBotRequest(
-  request: Request,
-  responseStatusCode: number,
-  responseHeaders: Headers,
-  remixContext: EntryContext
-) {
-  return new Promise((resolve, reject) => {
-    let shellRendered = false;
+  const nonce = loadContext.cspNonce?.toString() ?? "";
+
+  return new Promise(async (resolve, reject) => {
+    let didError = false;
     const { pipe, abort } = renderToPipeableStream(
-      <RemixServer
-        context={remixContext}
-        url={request.url}
-        abortDelay={ABORT_DELAY}
-      />,
+      <NonceProvider value={nonce}>
+        <RemixServer context={remixContext} url={request.url} />
+      </NonceProvider>,
       {
-        onAllReady() {
-          shellRendered = true;
+        [callbackName]: () => {
           const body = new PassThrough();
-          const stream = createReadableStreamFromReadable(body);
-
           responseHeaders.set("Content-Type", "text/html");
-
           resolve(
-            new Response(stream, {
+            new Response(createReadableStreamFromReadable(body), {
               headers: responseHeaders,
-              status: responseStatusCode,
+              status: didError ? 500 : responseStatusCode,
             })
           );
-
           pipe(body);
         },
-        onShellError(error: unknown) {
-          reject(error);
+        onShellError: (err: unknown) => {
+          reject(err);
         },
-        onError(error: unknown) {
-          responseStatusCode = 500;
-          // Log streaming rendering errors from inside the shell.  Don't log
-          // errors encountered during initial shell rendering since they'll
-          // reject and get logged in handleDocumentRequest.
-          if (shellRendered) {
-            console.error(error);
-          }
+        onError: () => {
+          didError = true;
         },
+        nonce,
       }
     );
 
@@ -89,52 +66,11 @@ function handleBotRequest(
   });
 }
 
-function handleBrowserRequest(
-  request: Request,
-  responseStatusCode: number,
-  responseHeaders: Headers,
-  remixContext: EntryContext
+export function handleError(
+  err: unknown,
+  { request, params, context }: LoaderFunctionArgs | ActionFunctionArgs
 ) {
-  return new Promise((resolve, reject) => {
-    let shellRendered = false;
-    const { pipe, abort } = renderToPipeableStream(
-      <RemixServer
-        context={remixContext}
-        url={request.url}
-        abortDelay={ABORT_DELAY}
-      />,
-      {
-        onShellReady() {
-          shellRendered = true;
-          const body = new PassThrough();
-          const stream = createReadableStreamFromReadable(body);
-
-          responseHeaders.set("Content-Type", "text/html");
-
-          resolve(
-            new Response(stream, {
-              headers: responseHeaders,
-              status: responseStatusCode,
-            })
-          );
-
-          pipe(body);
-        },
-        onShellError(error: unknown) {
-          reject(error);
-        },
-        onError(error: unknown) {
-          responseStatusCode = 500;
-          // Log streaming rendering errors from inside the shell.  Don't log
-          // errors encountered during initial shell rendering since they'll
-          // reject and get logged in handleDocumentRequest.
-          if (shellRendered) {
-            console.error(error);
-          }
-        },
-      }
-    );
-
-    setTimeout(abort, ABORT_DELAY);
-  });
+  if (!request.signal.aborted) {
+    logger.error({ err, request, params, context }, "Error rendering Remix app.");
+  }
 }
