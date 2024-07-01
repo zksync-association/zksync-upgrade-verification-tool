@@ -10,7 +10,7 @@ import { cookieToInitialState } from "wagmi";
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export function loader({ request }: LoaderFunctionArgs) {
   const cookies = request.headers.get("Cookie");
   return json({ env: clientEnv, cookies });
 }
@@ -60,6 +60,7 @@ function Document({
           dangerouslySetInnerHTML={{
             __html: `window.ENV = ${JSON.stringify(env)}`,
           }}
+          suppressHydrationWarning
         />
         <ScrollRestoration nonce={nonce} />
         <Scripts nonce={nonce} />
