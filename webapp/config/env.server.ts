@@ -11,7 +11,7 @@ export const env = createEnv({
     WALLET_CONNECT_PROJECT_ID: z.string(),
     L1_RPC_CLI: z.string(),
     ETH_NETWORK: z.enum(["mainnet", "sepolia"]).default("mainnet"),
-    ETHERSCAN_API_KEY: z.string()
+    ETHERSCAN_API_KEY: z.string(),
   },
   // eslint-disable-next-line n/no-process-env
   runtimeEnv: process.env,

@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { env } from "@config/env.server";
 import {
   BlockExplorerClient,
   type CheckReportObj,
@@ -9,8 +10,6 @@ import {
   ZkSyncEraDiff,
   ZksyncEraState,
 } from "validate-cli";
-import { env } from "@config/env.server";
-
 
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
