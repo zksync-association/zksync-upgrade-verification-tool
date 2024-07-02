@@ -9,6 +9,8 @@ import {
   ZkSyncEraDiff,
   ZksyncEraState,
 } from "validate-cli";
+import { env } from "@config/env.server";
+
 
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,10 +44,7 @@ async function calculateBeforeAndAfter(
 
 export async function checkReport(_reportId: string): Promise<CheckReportObj> {
   const network = "mainnet";
-  const apiKey = process.env.ETHERSCAN_API_KEY;
-  if (!apiKey) {
-    throw new Error("No api key");
-  }
+  const apiKey = env.ETHERSCAN_API_KEY;
   const l1Explorer = BlockExplorerClient.forL1(apiKey, network);
   const l2Explorer = BlockExplorerClient.forL2(network);
 
@@ -63,16 +62,12 @@ export async function checkReport(_reportId: string): Promise<CheckReportObj> {
 export async function storageChangeReport(_reportId: string): Promise<FieldStorageChange[]> {
   const network = "mainnet";
   const diamondAddress = DIAMOND_ADDRS[network];
-  const apiKey = process.env.ETHERSCAN_API_KEY;
-  if (!apiKey) {
-    throw new Error("No api key");
-  }
+  const apiKey = env.ETHERSCAN_API_KEY;
+
   const l1Explorer = BlockExplorerClient.forL1(apiKey, network);
   const l2Explorer = BlockExplorerClient.forL2(network);
-  if (!process.env.L1_RPC_CLI) {
-    throw new Error("No api key");
-  }
-  const l1Rpc = new RpcClient(process.env.L1_RPC_CLI);
+
+  const l1Rpc = new RpcClient(env.L1_RPC_CLI);
 
   const {
     current,
