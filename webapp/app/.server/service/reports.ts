@@ -19,7 +19,6 @@ import { bytesToHex } from "viem";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-
 async function calculateBeforeAndAfter(network: Network, l1Explorer: BlockExplorerClient, l2Explorer: BlockExplorerClient) {
   const l1Rpc = RpcClient.forL1(network);
   const current = await ZksyncEraState.fromBlockchain(network, l1Explorer, l1Rpc);
