@@ -5,27 +5,38 @@ import { type LoaderFunctionArgs, json } from "@remix-run/node";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "@remix-run/react";
 
 import { WalletProvider, web3ModalConfig } from "@/components/providers/wallet-provider";
-import { cookieToInitialState } from "wagmi";
+import {
+  type State,
+  deserialize as deserializeWagmiCookie,
+  parseCookie as parseWagmiCookie,
+} from "wagmi";
 
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
 
 export function loader({ request }: LoaderFunctionArgs) {
   const cookies = request.headers.get("Cookie");
-  return json({ env: clientEnv, cookies });
+  const wagmiConfig = web3ModalConfig(clientEnv.WALLET_CONNECT_PROJECT_ID);
+  const wagmiCookie = cookies
+    ? parseWagmiCookie(cookies, `${wagmiConfig.storage?.key}.store`)
+    : undefined;
+  return json({ env: clientEnv, wagmiCookie });
 }
 
 export default function App() {
   const nonce = useNonce();
-  const { env, cookies } = useLoaderData<typeof loader>();
-  const initialState = cookieToInitialState(
-    web3ModalConfig(env.WALLET_CONNECT_PROJECT_ID),
-    cookies
-  );
+  const { env, wagmiCookie } = useLoaderData<typeof loader>();
+
+  const walletProviderInitialState = wagmiCookie
+    ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
+    : undefined;
 
   return (
     <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
-      <WalletProvider initialState={initialState} projectId={env.WALLET_CONNECT_PROJECT_ID}>
+      <WalletProvider
+        initialState={walletProviderInitialState}
+        projectId={env.WALLET_CONNECT_PROJECT_ID}
+      >
         <Outlet />
       </WalletProvider>
     </Document>
