@@ -2,6 +2,30 @@
 
 - 📖 [Remix docs](https://remix.run/docs)
 
+## Setup
+
+Install dependencies:
+
+``` bash
+pnpm install
+```
+
+Build the entire workspace
+
+``` bash
+pnpm build # at top level
+```
+
+Setup environmment variables:
+
+``` bash
+cp .env.example .env
+```
+
+Now edit .env file and fill with working values.
+`L1_RPC_CLI` should ideally be an rpc able to execute `debug_call`. A good free option
+is tenderly.
+
 ## Development
 
 Run the dev server:
