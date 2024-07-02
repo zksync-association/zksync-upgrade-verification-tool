@@ -44,7 +44,7 @@ function Document({
   allowIndexing?: boolean;
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark flex justify-center">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -52,7 +52,7 @@ function Document({
         <Meta />
         <Links />
       </head>
-      <body className="min-h-screen">
+      <body className="relative min-h-screen max-w-screen-md">
         {children}
         <script
           nonce={nonce}

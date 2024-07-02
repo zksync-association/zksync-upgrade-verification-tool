@@ -1,8 +1,8 @@
-import { defaultLogger } from "@config/log.server";
 import * as schema from "@/.server/db/schema";
 import { env } from "@config/env.server";
-import postgres from "postgres";
+import { defaultLogger } from "@config/log.server";
 import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
 const logger = defaultLogger.child({ module: "db" });
 

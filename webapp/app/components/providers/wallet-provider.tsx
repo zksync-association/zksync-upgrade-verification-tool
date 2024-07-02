@@ -1,8 +1,8 @@
-import { type State, WagmiProvider, createStorage, cookieStorage } from "wagmi";
+import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { type State, WagmiProvider, cookieStorage, createStorage } from "wagmi";
 import { mainnet } from "wagmi/chains";
-import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
 
 export const web3ModalConfig = (projectId: string) =>
   getDefaultConfig({

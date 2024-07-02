@@ -12,5 +12,16 @@
   },
   "organizeImports": {
     "enabled": true
+  },
+  "linter": {
+    "rules": {
+      "nursery": {
+        "useSortedClasses": {
+          "fix": "safe",
+          "level": "info",
+          "options": {}
+        }
+      }
+    }
   }
 }

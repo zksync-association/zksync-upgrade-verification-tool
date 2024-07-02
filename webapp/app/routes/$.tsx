@@ -27,7 +27,7 @@ export function ErrorBoundary() {
         404: () => (
           <div>
             <div className="flex items-center space-x-4">
-              <h1 className="text-3xl font-semibold md:text-5xl">404</h1>
+              <h1 className="font-semibold text-3xl md:text-5xl">404</h1>
               <Separator orientation="vertical" className="h-20 bg-border" />
               <p>Page not found</p>
             </div>
