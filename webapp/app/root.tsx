@@ -1,10 +1,11 @@
+import { type AuthContextInitialState, AuthProvider } from "@/components/context/auth-context";
 import { GeneralErrorBoundary } from "@/components/error-boundary";
+import { WalletProvider } from "@/components/providers/wallet-provider";
+import { getUserFromHeader } from "@/utils/auth-headers";
 import { useNonce } from "@/utils/nonce-provider";
 import { clientEnv } from "@config/env.server";
 import { type LoaderFunctionArgs, json } from "@remix-run/node";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "@remix-run/react";
-
-import { WalletProvider, web3ModalConfig } from "@/components/providers/wallet-provider";
 import {
   type State,
   deserialize as deserializeWagmiCookie,
@@ -13,16 +14,11 @@ import {
 
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
-import { type AuthContextInitialState, AuthProvider } from "@/components/context/auth-context";
-import { getUserFromHeader } from "@/utils/auth-headers";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Get wagmi cookie for SSR
   const cookies = request.headers.get("Cookie");
-  const wagmiConfig = web3ModalConfig(clientEnv.WALLET_CONNECT_PROJECT_ID);
-  const wagmiCookie = cookies
-    ? parseWagmiCookie(cookies, `${wagmiConfig.storage?.key}.store`)
-    : undefined;
+  const wagmiCookie = cookies ? parseWagmiCookie(cookies, "wagmi.store") : undefined;
 
   // Parse authentication status from session
   const user = getUserFromHeader(request);

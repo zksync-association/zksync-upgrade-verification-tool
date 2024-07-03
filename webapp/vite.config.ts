@@ -2,6 +2,7 @@ import { vitePlugin as remix } from "@remix-run/dev";
 import { flatRoutes } from "remix-flat-routes";
 import { remixRoutes } from "remix-routes/vite";
 import { defineConfig } from "vite";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
@@ -12,6 +13,9 @@ export default defineConfig({
     },
   },
   plugins: [
+    nodePolyfills({
+      include: ["buffer", "events", "http"],
+    }),
     remix({
       ignoredRouteFiles: ["**/*"],
       serverModuleFormat: "esm",
