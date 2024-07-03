@@ -3,7 +3,6 @@ export {
   DIAMOND_ADDRS,
   FileSystem,
   GitContractsRepo,
-  type Network,
   ObjectCheckReport,
   ObjectStorageChangeReport,
   RpcClient,
@@ -18,5 +17,10 @@ export {
   type CheckReportOptions,
   type ContractsRepo,
   type FieldStorageChange,
+  type Network,
   type SystemContractProvider,
 } from "./lib";
+
+export {
+  memoryDiffParser,
+} from "./schema/rpc"

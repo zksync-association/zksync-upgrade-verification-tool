@@ -9,6 +9,7 @@ import {
   RpcClient,
   ZkSyncEraDiff,
   ZksyncEraState,
+  memoryDiffParser
 } from "validate-cli";
 
 import { dirname } from "node:path";
@@ -66,20 +67,22 @@ export async function storageChangeReport(_reportId: string): Promise<FieldStora
   const l1Explorer = BlockExplorerClient.forL1(apiKey, network);
   const l2Explorer = BlockExplorerClient.forL2(network);
 
-  const l1Rpc = new RpcClient(env.L1_RPC_CLI);
+  // const l1Rpc = new RpcClient(env.L1_RPC_CLI);
 
   const {
     current,
     proposed,
     // sysAddresses,
-    callData,
+    // callData,
   } = await calculateBeforeAndAfter(network, l1Explorer, l2Explorer);
 
-  const rawMap = await l1Rpc.debugTraceCall(
-    current.hexAttrValue("admin").unwrap(),
-    diamondAddress,
-    bytesToHex(callData)
-  );
+  // const rawMap = await l1Rpc.debugTraceCall(
+  //   current.hexAttrValue("admin").unwrap(),
+  //   diamondAddress,
+  //   bytesToHex(callData)
+  // );
+  const memoryMapBuf = await fs.readFile(path.join(__dirname, "mock-memory-map.json"))
+  const rawMap = memoryDiffParser.parse(JSON.parse(memoryMapBuf.toString()))
 
   const selectors = [...new Set([...current.allSelectors(), ...proposed.allSelectors()])];
 
