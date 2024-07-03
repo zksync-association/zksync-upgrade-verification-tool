@@ -13,19 +13,35 @@ import {
 
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
+import { type AuthContextInitialState, AuthProvider } from "@/components/context/auth-context";
+import { getUserFromHeader } from "@/utils/auth-headers";
 
-export function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {
+  // Get wagmi cookie for SSR
   const cookies = request.headers.get("Cookie");
   const wagmiConfig = web3ModalConfig(clientEnv.WALLET_CONNECT_PROJECT_ID);
   const wagmiCookie = cookies
     ? parseWagmiCookie(cookies, `${wagmiConfig.storage?.key}.store`)
     : undefined;
-  return json({ env: clientEnv, wagmiCookie });
+
+  // Parse authentication status from session
+  const user = getUserFromHeader(request);
+  let authStatus: AuthContextInitialState;
+  if (user.address) {
+    authStatus = {
+      isAuthenticated: true,
+      address: user.address,
+    };
+  } else {
+    authStatus = { isAuthenticated: false };
+  }
+
+  return json({ env: clientEnv, wagmiCookie, authStatus });
 }
 
 export default function App() {
   const nonce = useNonce();
-  const { env, wagmiCookie } = useLoaderData<typeof loader>();
+  const { env, wagmiCookie, authStatus } = useLoaderData<typeof loader>();
 
   const walletProviderInitialState = wagmiCookie
     ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
@@ -33,12 +49,14 @@ export default function App() {
 
   return (
     <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
-      <WalletProvider
-        initialState={walletProviderInitialState}
-        projectId={env.WALLET_CONNECT_PROJECT_ID}
-      >
-        <Outlet />
-      </WalletProvider>
+      <AuthProvider initialValue={authStatus}>
+        <WalletProvider
+          initialState={walletProviderInitialState}
+          projectId={env.WALLET_CONNECT_PROJECT_ID}
+        >
+          <Outlet />
+        </WalletProvider>
+      </AuthProvider>
     </Document>
   );
 }

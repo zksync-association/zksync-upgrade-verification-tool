@@ -12,6 +12,7 @@ export const env = createEnv({
     L1_RPC_CLI: z.string(),
     ETH_NETWORK: z.enum(["mainnet", "sepolia"]).default("mainnet"),
     ETHERSCAN_API_KEY: z.string(),
+    AUTH_SECRET: z.string(),
   },
   // eslint-disable-next-line n/no-process-env
   runtimeEnv: process.env,

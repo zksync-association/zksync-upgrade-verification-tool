@@ -1,3 +1,4 @@
+import WalletAuthProvider from "@/components/providers/wallet-auth-provider";
 import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -29,7 +30,9 @@ export function WalletProvider({
   return (
     <WagmiProvider config={web3ModalConfig(projectId)} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>{children}</RainbowKitProvider>
+        <WalletAuthProvider>
+          <RainbowKitProvider>{children}</RainbowKitProvider>
+        </WalletAuthProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );
