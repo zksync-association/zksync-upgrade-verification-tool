@@ -9,14 +9,13 @@ import {
   RpcClient,
   ZkSyncEraDiff,
   ZksyncEraState,
-  memoryDiffParser
+  memoryDiffParser,
 } from "validate-cli";
 
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DIAMOND_ADDRS, type Network, ObjectStorageChangeReport } from "validate-cli/src/index";
 import { StorageChanges } from "validate-cli/src/lib/storage/storage-changes";
-import { bytesToHex } from "viem";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -81,8 +80,8 @@ export async function storageChangeReport(_reportId: string): Promise<FieldStora
   //   diamondAddress,
   //   bytesToHex(callData)
   // );
-  const memoryMapBuf = await fs.readFile(path.join(__dirname, "mock-memory-map.json"))
-  const rawMap = memoryDiffParser.parse(JSON.parse(memoryMapBuf.toString()))
+  const memoryMapBuf = await fs.readFile(path.join(__dirname, "mock-memory-map.json"));
+  const rawMap = memoryDiffParser.parse(JSON.parse(memoryMapBuf.toString()));
 
   const selectors = [...new Set([...current.allSelectors(), ...proposed.allSelectors()])];
 

@@ -21,6 +21,4 @@ export {
   type SystemContractProvider,
 } from "./lib";
 
-export {
-  memoryDiffParser,
-} from "./schema/rpc"
+export { memoryDiffParser } from "./schema/rpc";
