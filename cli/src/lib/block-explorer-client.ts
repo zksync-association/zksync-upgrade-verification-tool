@@ -9,6 +9,7 @@ import type { z, ZodType } from "zod";
 import { ContractData } from "./contract-data.js";
 import { ContractNotVerified, ExternalApiError } from "./errors.js";
 import { ContractAbi } from "./contract-abi";
+import fetch from "node-fetch"
 
 export interface BlockExplorer {
   getAbi(rawAddress: string): Promise<ContractAbi>;
