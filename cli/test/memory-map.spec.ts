@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { StorageChanges } from "../src/lib/storage/storage-changes";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { memoryDiffParser } from "../src/schema/rpc";
+import { memoryDiffParser } from "../src/index";
 import { bytesToHex, encodeAbiParameters, hashTypedData, type Hex, hexToBigInt, numberToHex } from "viem";
 import { AddressType } from "../src/lib/storage/types/address-type";
 import { StructType } from "../src/lib/storage/types/struct-type";
