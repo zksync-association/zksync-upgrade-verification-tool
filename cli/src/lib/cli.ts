@@ -27,7 +27,7 @@ export function buildCli(
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
       }
       if (!yargs.l1RpcUrl) {
-        yargs.l1RpcUrl = process.env.L1_RPC_CLI;
+        yargs.l1RpcUrl = process.env.L1_RPC_URL;
       }
     }, true)
     .option("ethscankey", {

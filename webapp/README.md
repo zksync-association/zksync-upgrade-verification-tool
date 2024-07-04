@@ -23,7 +23,7 @@ cp .env.example .env
 ```
 
 Now edit .env file and fill with working values.
-`L1_RPC_CLI` should ideally be an rpc able to execute `debug_call`. A good free option
+`L1_RPC_URL` should ideally be an rpc able to execute `debug_call`. A good free option
 is tenderly.
 
 ## Development
