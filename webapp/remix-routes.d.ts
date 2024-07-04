@@ -25,6 +25,11 @@ declare module "remix-routes" {
       query: ExportedQuery<import('app/routes/$').SearchParams>,
     };
   
+    "/test": {
+      params: never,
+      query: ExportedQuery<import('app/routes/test/_index').SearchParams>,
+    };
+  
   }
 
   type RoutesWithParams = Pick<
@@ -37,7 +42,8 @@ declare module "remix-routes" {
   export type RouteId =
     | 'root'
     | 'routes/_index'
-    | 'routes/$';
+    | 'routes/$'
+    | 'routes/test/_index';
 
   export function $path<
     Route extends keyof Routes,

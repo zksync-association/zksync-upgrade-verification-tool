@@ -1,20 +1,26 @@
-import {
-  account20String,
-  getAbiSchema,
-  sourceCodeResponseSchema,
-  sourceCodeSchema,
-} from "../schema";
+import { account20String, getAbiSchema, sourceCodeResponseSchema, sourceCodeSchema, } from "../schema";
 import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
-import type { z, ZodType } from "zod";
+import { z, type ZodType } from "zod";
 import { ContractData } from "./contract-data.js";
 import { ContractNotVerified, ExternalApiError } from "./errors.js";
 import { ContractAbi } from "./contract-abi";
+import type { Hex } from "viem";
+import { zodHex } from "../schema/hex-parser";
 
 export interface BlockExplorer {
   getAbi(rawAddress: string): Promise<ContractAbi>;
   getSourceCode(rawAddress: string): Promise<ContractData>;
   isVerified(addr: string): Promise<boolean>;
 }
+
+const contractEventSchema = z.object({
+  topics: z.array(zodHex),
+  data: zodHex,
+  transactionHash: zodHex,
+  blockNumber: zodHex
+})
+
+export type ContractEvent = z.infer<typeof contractEventSchema>
 
 export class BlockExplorerClient implements BlockExplorer {
   private apiKey: string;
@@ -56,7 +62,10 @@ export class BlockExplorerClient implements BlockExplorer {
 
     this.callCount++;
 
-    return parser.parse(await response.json());
+    const data = await response.json();
+
+
+    return parser.parse(data);
   }
 
   async getAbi(rawAddress: string): Promise<ContractAbi> {
@@ -146,6 +155,42 @@ export class BlockExplorerClient implements BlockExplorer {
       // Any other error cannot be handled
       throw e;
     }
+  }
+
+  async getLogs(addr: Hex, fromBlock: bigint, topic?: string, indexes?: Hex[]): Promise<ContractEvent[]> {
+    const params: Record<string, string> = {
+      module: "logs",
+      action: "getlogs",
+      address: addr,
+      fromBlock: fromBlock.toString()
+    };
+
+    if (topic) {
+      const abi = await this.getAbi(addr)
+      params["topic0"] = abi.eventIdFor(topic)
+    }
+
+    if (indexes && indexes[0]) {
+      params["topic1"] = indexes[0]
+    }
+
+    if (indexes && indexes[1]) {
+      params["topic2"] = indexes[1]
+    }
+
+    if (indexes && indexes[2]) {
+      params["topic3"] = indexes[2]
+    }
+
+    const events = await this.fetch(params,
+      z.object({
+        status: z.string(),
+        message: z.string(),
+        result: z.array(contractEventSchema)
+      })
+    );
+
+    return events.result
   }
 
   async isVerified(addr: string): Promise<boolean> {

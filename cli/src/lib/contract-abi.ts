@@ -1,4 +1,12 @@
-import { type Abi, type AbiFunction, decodeFunctionData, type Hex, toFunctionSelector } from "viem";
+import {
+  type Abi,
+  type AbiEvent,
+  type AbiFunction,
+  decodeFunctionData,
+  type Hex,
+  toEventSelector,
+  toFunctionSelector
+} from "viem";
 import type { z } from "zod";
 
 export class ContractAbi {
@@ -35,5 +43,13 @@ export class ContractAbi {
       abi: this.raw,
     });
     return schema.parse(raw);
+  }
+
+  eventIdFor(eventName: string): Hex {
+    const abiElem = this.raw.find(e => e.type === "event" && e.name === eventName)
+    if (!abiElem) {
+      throw new Error(`Event "${eventName}" not present in abi.`)
+    }
+    return toEventSelector(abiElem as AbiEvent)
   }
 }

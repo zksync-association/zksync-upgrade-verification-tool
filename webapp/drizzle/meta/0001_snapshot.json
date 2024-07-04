@@ -1,0 +1,72 @@
+{
+  "id": "0cdc779f-43fe-4d92-9182-a809b18afdd3",
+  "prevId": "ea461c62-b060-4d8c-b1aa-30449afa3cd6",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.upgrades": {
+      "name": "upgrades",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "upgrade_id": {
+          "name": "upgrade_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calldata": {
+          "name": "calldata",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "started_txid": {
+          "name": "started_txid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "finished_txid": {
+          "name": "finished_txid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "upgrades_upgrade_id_unique": {
+          "name": "upgrades_upgrade_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "upgrade_id"
+          ]
+        }
+      }
+    }
+  },
+  "enums": {
+    "public.status": {
+      "name": "status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "completed"
+      ]
+    }
+  },
+  "schemas": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

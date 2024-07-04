@@ -236,4 +236,12 @@ describe("BlockExplorerClient", () => {
       expect(client.baseUri).to.eql("https://block-explorer-api.sepolia.zksync.dev/api");
     });
   });
+
+  // describe("logs", () => {
+  //   it("works", async () => {
+  //     const client = BlockExplorerClient.forL1("IA817WPSNENBAK9EE3SNM1C5C31YUTZ4MV", "mainnet");
+  //     const logs = await client.getLogs("0x0b622A2061EaccAE1c664eBC3E868b8438e03F61", 20009750n, "TransparentOperationScheduled")
+  //     console.log(logs.length)
+  //   })
+  // })
 });
