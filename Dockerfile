@@ -1,9 +1,12 @@
-FROM node:20-slim
+FROM node:20-alpine
 
 # Configure pnpm
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN npm i -g pnpm
+
+# install git (needed to compile system contracts)
+RUN apk add git
 
 # Setup working dir
 RUN mkdir /app
