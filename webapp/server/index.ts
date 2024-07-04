@@ -8,16 +8,16 @@ import express, { type RequestHandler, type Request, type Response } from "expre
 import getPort, { portNumbers } from "get-port";
 import apiRouter from "./api";
 
+import { auth } from "@server/middlewares/auth";
 import { cspNonce } from "@server/middlewares/csp-nonce";
+import { AUTH_COOKIE_NAME } from "@server/utils/auth-session";
+import cookieSession from "cookie-session";
 import { env } from "../config/env.server";
 import { helmet } from "./middlewares/helmet";
 import { logger } from "./middlewares/logger";
 import { rateLimit } from "./middlewares/rate-limit";
 import { removeTrailingSlash } from "./middlewares/remove-trailing-slash";
 import { requireHttps } from "./middlewares/require-https";
-import { auth } from "@server/middlewares/auth";
-import cookieSession from "cookie-session";
-import { AUTH_COOKIE_NAME } from "@server/utils/auth-session";
 
 installGlobals();
 
