@@ -1,0 +1,33 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres
+    # set shared memory limit when using docker-compose
+    shm_size: 128mb
+    # or set shared memory limit when deploy via swarm stack
+    # volumes:
+    #  - type: tmpfs
+    #    target: /dev/shm
+    #    tmpfs:
+    #      size: 134217728 # 128*2^20 bytes = 128Mb
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+
+
+
+  webapp:
+    image: coso
+    environment:
+      DATABASE_URL: "postgresql://user:password@db:5432/webapp"
+      NODE_ENV: "production"
+      WALLET_CONNECT_PROJECT_ID: "a769cc69b7350ab9fb7fcf35b9c509da"
+      L1_RPC_URL: "https://mainnet.gateway.tenderly.co/1ooZXz5grkFD15LMjKrVC0"
+      ETHERSCAN_API_KEY: "IA817WPSNENBAK9EE3SNM1C5C31YUTZ4MV"
+      AUTH_SECRET: "sososecret"
+      ETH_NETWORK: "mainnet"
+    ports:
+      - 3000:3000
+
+
