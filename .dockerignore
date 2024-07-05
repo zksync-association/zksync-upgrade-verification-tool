@@ -3,5 +3,9 @@ node_modules
 .gitignore
 *.md
 dist
+
+# avoid sending dotenv files
 .env
+.env.*
 **/.env
+**/.env.*
