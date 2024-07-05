@@ -47,7 +47,6 @@
     "cli-table3": "^0.6.4",
     "dotenv": "^16.4.5",
     "nochoices": "^1.1.4",
-    "node-fetch": "^3.3.2",
     "ora": "^8.0.1",
     "simple-git": "^3.24.0",
     "tempy": "^3.1.0",

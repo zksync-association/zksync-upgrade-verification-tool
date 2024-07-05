@@ -12,7 +12,6 @@ import type { TypeOf, ZodType } from "zod";
 import type { PublicClient, HttpTransport } from "viem";
 import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
 import { getStorageAt } from "viem/actions";
-import fetch from "node-fetch";
 
 const L1_DEFAULT_URLS = {
   mainnet: "https://ethereum-rpc.publicnode.com",
