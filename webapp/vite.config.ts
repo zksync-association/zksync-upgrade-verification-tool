@@ -16,8 +16,8 @@ export default defineConfig({
     nodePolyfills({
       include: ["buffer", "events", "http"],
       globals: {
-        process: false
-      }
+        process: false,
+      },
     }),
     remix({
       ignoredRouteFiles: ["**/*"],
