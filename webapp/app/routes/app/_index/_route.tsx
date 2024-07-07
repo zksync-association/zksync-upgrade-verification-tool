@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { displayAddress } from "@/utils/address";
 import { useNavigate } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
@@ -91,7 +92,7 @@ export default function Index() {
         </p>
       </Card>
       <Card className="flex flex-col items-center space-y-4 pt-4 pb-10 text-center">
-        <p>0x00000...000Tomi</p>
+        <p className="font-bold">{auth.isAuthenticated && displayAddress(auth.address)}</p>
         <h3 className="text-3xl">
           <span className="font-semibold">Your Vote:</span> Pending
         </h3>
