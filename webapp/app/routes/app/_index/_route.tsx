@@ -1,9 +1,22 @@
+import { useAuth } from "@/components/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useNavigate } from "@remix-run/react";
+import { useEffect } from "react";
+import { $path } from "remix-routes";
 
 export default function Index() {
+  const auth = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!auth.isAuthenticated) {
+      navigate($path("/"));
+    }
+  }, [auth.isAuthenticated, navigate]);
+
   const proposal = {
     version: "23",
     proposedBy: "0x23",
