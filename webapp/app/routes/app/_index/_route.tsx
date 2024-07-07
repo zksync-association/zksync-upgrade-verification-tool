@@ -13,9 +13,6 @@ export default function Index() {
 
   return (
     <div className="flex flex-col space-y-4">
-      <div className="w-full text-center">
-        <h1 className="mt-20 font-bold text-3xl md:text-5xl">Upgrade Analysis & Voting Tool</h1>
-      </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card className="mt-10">
           <CardHeader>
@@ -93,7 +90,7 @@ export default function Index() {
       </Card>
       <div className="pt-4">
         <h2 className="font-bold text-3xl">Upgrade Analysis</h2>
-        <Tabs className="mt-4 flex">
+        <Tabs className="mt-4 flex" defaultValue="facet-changes">
           <TabsList className="mt-12 mr-6">
             <TabsTrigger value="facet-changes">Facet Changes</TabsTrigger>
             <TabsTrigger value="system-contract-changes">System Contract Changes</TabsTrigger>

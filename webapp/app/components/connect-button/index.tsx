@@ -1,10 +1,10 @@
+import Avatar from "@/components/connect-button/avatar";
 import { Button } from "@/components/ui/button";
+import Loading from "@/components/ui/loading";
 import { ConnectButton as RainbowConnectButton } from "@rainbow-me/rainbowkit";
+import { ChevronDown } from "lucide-react";
 
-export default function ConnectButton({
-  authorized,
-  loading,
-}: { authorized: boolean; loading?: boolean }) {
+export default function ConnectButton({ loading }: { loading?: boolean }) {
   return (
     <RainbowConnectButton.Custom>
       {({
@@ -34,12 +34,25 @@ export default function ConnectButton({
                 return <Button onClick={openChainModal}>Wrong network</Button>;
               }
               if (loading) {
-                return <Button disabled>Loading...</Button>;
+                return (
+                  <Button disabled>
+                    <Loading className="mr-2 h-5 w-5" />
+                    Loading...
+                  </Button>
+                );
               }
-              if (!authorized) {
-                return <Button disabled>Unauthorized</Button>;
-              }
-              return <Button onClick={openAccountModal}>Authorized</Button>;
+              return (
+                <Button onClick={openAccountModal} type="button" className="px-5 font-bold">
+                  <Avatar
+                    className="mr-2"
+                    address={account.address}
+                    ensImage={account.ensAvatar}
+                    size={24}
+                  />
+                  {account.displayName}
+                  <ChevronDown className="ml-2" />
+                </Button>
+              );
             })()}
           </div>
         );

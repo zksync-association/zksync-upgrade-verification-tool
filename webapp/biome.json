@@ -7,7 +7,8 @@
       "./build/*",
       "./node_modules/*",
       "./server-build/*",
-      "remix-routes.d.ts"
+      "remix-routes.d.ts",
+      "vite.config.ts.timestamp-*"
     ]
   },
   "organizeImports": {

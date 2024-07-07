@@ -14,8 +14,6 @@ import {
 
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
-import Logo from "@/components/logo";
-import { $path } from "remix-routes";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Get wagmi cookie for SSR
@@ -53,13 +51,6 @@ export default function App() {
           projectId={env.WALLET_CONNECT_PROJECT_ID}
         >
           <div className="flex min-h-screen flex-col px-10 py-10 lg:px-40">
-            <header className="w-full">
-              <nav>
-                <a href={$path("/")}>
-                  <Logo />
-                </a>
-              </nav>
-            </header>
             <Outlet />
           </div>
         </WalletProvider>

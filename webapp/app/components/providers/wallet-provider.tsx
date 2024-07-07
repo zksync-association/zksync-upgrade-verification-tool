@@ -1,3 +1,4 @@
+import Avatar from "@/components/connect-button/avatar";
 import WalletAuthProvider from "@/components/providers/wallet-auth-provider";
 import { RainbowKitProvider, darkTheme, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -37,6 +38,7 @@ export function WalletProvider({
               accentColor: "#1755F4",
               borderRadius: "large",
             })}
+            avatar={Avatar}
           >
             {children}
           </RainbowKitProvider>
