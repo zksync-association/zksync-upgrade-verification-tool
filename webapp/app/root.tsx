@@ -14,6 +14,8 @@ import {
 
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
+import Logo from "@/components/logo";
+import { $path } from "remix-routes";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Get wagmi cookie for SSR
@@ -50,7 +52,16 @@ export default function App() {
           initialState={walletProviderInitialState}
           projectId={env.WALLET_CONNECT_PROJECT_ID}
         >
-          <Outlet />
+          <div className="flex min-h-screen flex-col px-10 py-10 lg:px-40">
+            <header className="w-full">
+              <nav>
+                <a href={$path("/")}>
+                  <Logo />
+                </a>
+              </nav>
+            </header>
+            <Outlet />
+          </div>
         </WalletProvider>
       </AuthProvider>
     </Document>
@@ -69,7 +80,7 @@ function Document({
   allowIndexing?: boolean;
 }) {
   return (
-    <html lang="en" className="dark flex justify-center">
+    <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -77,7 +88,7 @@ function Document({
         <Meta />
         <Links />
       </head>
-      <body className="relative min-h-screen max-w-screen-md">
+      <body className="relative mx-auto min-h-screen w-full max-w-[1500px]">
         {children}
         <script
           nonce={nonce}

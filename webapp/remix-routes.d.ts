@@ -10,7 +10,7 @@ declare module "remix-routes" {
   
     "": {
       params: never,
-      query: ExportedQuery<import('app/routes/_index').SearchParams>,
+      query: ExportedQuery<import('app/routes/index').SearchParams>,
     };
   
     "/": {
@@ -25,6 +25,11 @@ declare module "remix-routes" {
       query: ExportedQuery<import('app/routes/$').SearchParams>,
     };
   
+    "/app": {
+      params: never,
+      query: ExportedQuery<import('app/routes/app/_index/_route').SearchParams>,
+    };
+  
   }
 
   type RoutesWithParams = Pick<
@@ -36,8 +41,10 @@ declare module "remix-routes" {
 
   export type RouteId =
     | 'root'
-    | 'routes/_index'
-    | 'routes/$';
+    | 'routes/$'
+    | 'routes/app/_index/_route'
+    | 'routes/app/_layout'
+    | 'routes/index';
 
   export function $path<
     Route extends keyof Routes,

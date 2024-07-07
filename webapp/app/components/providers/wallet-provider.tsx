@@ -1,5 +1,5 @@
 import WalletAuthProvider from "@/components/providers/wallet-auth-provider";
-import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider, darkTheme, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
 import { type State, WagmiProvider, cookieStorage, createStorage } from "wagmi";
@@ -32,7 +32,14 @@ export function WalletProvider({
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
         <WalletAuthProvider>
-          <RainbowKitProvider>{children}</RainbowKitProvider>
+          <RainbowKitProvider
+            theme={darkTheme({
+              accentColor: "#1755F4",
+              borderRadius: "large",
+            })}
+          >
+            {children}
+          </RainbowKitProvider>
         </WalletAuthProvider>
       </QueryClientProvider>
     </WagmiProvider>
