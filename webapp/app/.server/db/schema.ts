@@ -5,9 +5,7 @@ export const upgradesTableStatus = pgEnum("status", ["pending", "completed"]);
 
 export const upgradesTable = pgTable("upgrades", {
   id: serial("id").primaryKey(),
-  upgradeId: text("upgrade_id").notNull().unique(),
+  name: text("name").notNull(),
   calldata: bytea("calldata").notNull(),
-
-  startedTxHash: text("started_tx_hash"),
-  finishedTxHash: text("finished_tx_hash"),
+  status: upgradesTableStatus("status").notNull().default("pending"),
 });

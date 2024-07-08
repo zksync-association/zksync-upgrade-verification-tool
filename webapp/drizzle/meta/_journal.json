@@ -8,13 +8,6 @@
       "when": 1719856194933,
       "tag": "0000_uneven_zarek",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1720446953808,
-      "tag": "0001_white_pyro",
-      "breakpoints": true
     }
   ]
 }
