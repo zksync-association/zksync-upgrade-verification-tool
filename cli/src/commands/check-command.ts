@@ -1,5 +1,5 @@
 import type { EnvBuilder } from "../lib/env-builder";
-import { StringCheckReport, ZkSyncEraDiff, ZksyncEraState } from "../lib/index";
+import { StringCheckReport, ZkSyncEraDiff, ZksyncEraState } from "../lib";
 import { hexToBytes } from "viem";
 import { withSpinner } from "../lib/with-spinner";
 import { MalformedUpgrade } from "../lib/errors";
