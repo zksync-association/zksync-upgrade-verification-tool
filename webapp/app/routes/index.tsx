@@ -4,7 +4,7 @@ import { useAuth } from "@/components/context/auth-context";
 import Navbar from "@/components/navbar";
 import { getUserFromHeader } from "@/utils/auth-headers";
 import { type ActionFunctionArgs, redirect } from "@remix-run/node";
-import { useFetcher } from "@remix-run/react";
+import { useFetcher, useNavigation } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
 
@@ -23,6 +23,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function Index() {
   const auth = useAuth();
   const fetcher = useFetcher<typeof action>();
+  const navigation = useNavigation();
 
   useEffect(() => {
     if (auth.isAuthenticated) {
@@ -42,9 +43,13 @@ export default function Index() {
               Analyze upgrade proposal transaction call data in human-readable format and cast your
               vote.
             </p>
-            <p className="mt-5 text-lg md:max-w-xl">Please connect your wallet to continue.</p>
             <div className="mt-10">
-              <ConnectButton loading={fetcher.state === "submitting"} />
+              <ConnectButton
+                loading={
+                  fetcher.state === "submitting" ||
+                  (navigation.state === "loading" && navigation.location.pathname === $path("/app"))
+                }
+              />
             </div>
           </div>
         </main>
