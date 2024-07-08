@@ -6,19 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { displayAddress } from "@/utils/address";
 import { displayBytes32 } from "@/utils/bytes32";
 import { notFound } from "@/utils/http";
-import { type LoaderFunctionArgs, type SerializeFrom, json } from "@remix-run/node";
+import { type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
-import { $path } from "remix-routes";
 import { z } from "zod";
-
-export const handle = {
-  breadcrumb: (data: SerializeFrom<typeof loader>) => ({
-    path: $path("/app/proposals/:id", { id: data.proposal.id }),
-    label: displayBytes32(data.proposal.id),
-  }),
-};
 
 export function loader({ params: remixParams }: LoaderFunctionArgs) {
   const params = getParams(remixParams, z.object({ id: z.string() }));
