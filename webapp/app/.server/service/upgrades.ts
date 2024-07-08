@@ -1,14 +1,14 @@
 import { upgradeHandlerAbi } from "@/.server/service/protocol-upgrade-handler-abi";
 import { env } from "@config/env.server";
+import { RpcClient } from "validate-cli";
 import { type Hex, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
-import { RpcClient } from "validate-cli";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 
 const bigIntMax = (...args: bigint[]) => args.reduce((m, e) => (e > m ? e : m));
 
-const rpc = new RpcClient(env.L1_RPC_URL_FOR_UPGRADES)
+const rpc = new RpcClient(env.L1_RPC_URL_FOR_UPGRADES);
 
 enum UPGRADE_STATES {
   None = 0,
