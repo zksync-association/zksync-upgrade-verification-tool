@@ -15,6 +15,6 @@ export const bytea = customType<{
     return Buffer.from(newVal, "hex");
   },
   fromDriver(val) {
-    return val.toString("hex");
+    return `0x${val.toString("hex")}`;
   },
 });

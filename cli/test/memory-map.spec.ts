@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { StorageChanges } from "../src/lib/storage/storage-changes";
+import { StorageChanges } from "../src";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { memoryDiffParser } from "../src/schema/rpc";
+import { memoryDiffParser } from "../src";
 import { bytesToHex, type Hex, hexToBigInt } from "viem";
 import { AddressType } from "../src/lib/storage/types/address-type";
 import { StructType } from "../src/lib/storage/types/struct-type";
