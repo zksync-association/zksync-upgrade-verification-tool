@@ -86,7 +86,7 @@ export class RpcClient {
     const callData = encodeFunctionData({
       abi,
       functionName: fnName,
-      args: args
+      args: args,
     });
 
     const hexValue = await this.contractReadRaw(target, callData);
@@ -150,7 +150,7 @@ export class RpcClient {
       fromBlock,
       toBlock: toBLock,
       address,
-      topics
+      topics,
     };
 
     const data = await this.rawCall("eth_getLogs", [arg]);
@@ -169,14 +169,11 @@ export class RpcClient {
   }
 
   async getLatestBlockNumber(): Promise<Hex> {
-    const block = await this.viemClient.request({
+    const block = (await this.viemClient.request({
       method: "eth_getBlockByNumber",
-      params: [
-        "latest",
-        false
-      ]
-    }) as any
+      params: ["latest", false],
+    })) as any;
 
-    return block.number
+    return block.number;
   }
 }

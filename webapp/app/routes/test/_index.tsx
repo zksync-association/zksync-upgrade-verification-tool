@@ -1,6 +1,6 @@
+import { queryNewUpgrades } from "@/.server/service/upgrades";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { queryNewUpgrades } from "@/.server/service/upgrades";
 
 export async function loader() {
   return json(await queryNewUpgrades());

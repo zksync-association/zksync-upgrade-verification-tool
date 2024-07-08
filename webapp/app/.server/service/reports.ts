@@ -2,21 +2,21 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { l1Explorer, l1Rpc, l2Explorer } from "@/.server/service/clients";
 import { env } from "@config/env.server";
 import {
-  BlockExplorerClient,
+  type BlockExplorerClient,
   type CheckReportObj,
   DIAMOND_ADDRS,
   type FieldStorageChange,
-  memoryDiffParser,
   type Network,
   ObjectCheckReport,
   ObjectStorageChangeReport,
   StorageChanges,
   ZkSyncEraDiff,
   ZksyncEraState,
+  memoryDiffParser,
 } from "validate-cli";
-import { l1Explorer, l1Rpc, l2Explorer } from "@/.server/service/clients";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
