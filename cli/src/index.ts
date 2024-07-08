@@ -1,5 +1,6 @@
 export {
   BlockExplorerClient,
+  ContractAbi,
   DIAMOND_ADDRS,
   FileSystem,
   GitContractsRepo,
@@ -12,6 +13,7 @@ export {
   UpgradeImporter,
   ZkSyncEraDiff,
   ZksyncEraState,
+  StorageChanges,
   type BlockExplorer,
   type CheckReportObj,
   type CheckReportOptions,
@@ -22,3 +24,4 @@ export {
 } from "./lib";
 
 export { memoryDiffParser } from "./schema/rpc";
+export { zodHex } from "./schema/hex-parser";

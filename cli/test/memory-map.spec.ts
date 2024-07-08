@@ -3,7 +3,14 @@ import { StorageChanges } from "../src/lib/storage/storage-changes";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { memoryDiffParser } from "../src/index";
-import { bytesToHex, encodeAbiParameters, hashTypedData, type Hex, hexToBigInt, numberToHex } from "viem";
+import {
+  bytesToHex,
+  encodeAbiParameters,
+  hashTypedData,
+  type Hex,
+  hexToBigInt,
+  numberToHex,
+} from "viem";
 import { AddressType } from "../src/lib/storage/types/address-type";
 import { StructType } from "../src/lib/storage/types/struct-type";
 import { BigNumberType } from "../src/lib/storage/types/big-number-type";
@@ -358,23 +365,27 @@ describe("MemoryMap", () => {
     //   [{ type: "bytes32" }, { type: "bytes32" }],
     //   [numberToHex(1, { size: 32 }), numberToHex(10, { size: 32 })]
     // )
-      console.log(hashTypedData({
+    console.log(
+      hashTypedData({
         domain: {
           name: "Guardians",
           version: "1",
           chainId: 1,
-          verifyingContract: numberToHex(1, {size: 20}),
+          verifyingContract: numberToHex(1, { size: 20 }),
         },
         primaryType: "ApproveUpgradeGuardians",
         message: {
-                id: numberToHex(1, {size: 32})
+          id: numberToHex(1, { size: 32 }),
         },
         types: {
-          ApproveUpgradeGuardians: [{
-            name: "id",
-            type: "bytes32"
-          }]
-        }
-      }))
-  })
+          ApproveUpgradeGuardians: [
+            {
+              name: "id",
+              type: "bytes32",
+            },
+          ],
+        },
+      })
+    );
+  });
 });

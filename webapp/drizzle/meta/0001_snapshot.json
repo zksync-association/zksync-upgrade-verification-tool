@@ -1,5 +1,5 @@
 {
-  "id": "0cdc779f-43fe-4d92-9182-a809b18afdd3",
+  "id": "efcad278-3cf9-4823-9e7a-c76534240a5c",
   "prevId": "ea461c62-b060-4d8c-b1aa-30449afa3cd6",
   "version": "7",
   "dialect": "postgresql",
@@ -26,14 +26,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "started_txid": {
-          "name": "started_txid",
+        "started_tx_hash": {
+          "name": "started_tx_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "finished_txid": {
-          "name": "finished_txid",
+        "finished_tx_hash": {
+          "name": "finished_tx_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -46,9 +46,7 @@
         "upgrades_upgrade_id_unique": {
           "name": "upgrades_upgrade_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "upgrade_id"
-          ]
+          "columns": ["upgrade_id"]
         }
       }
     }
@@ -57,10 +55,7 @@
     "public.status": {
       "name": "status",
       "schema": "public",
-      "values": [
-        "pending",
-        "completed"
-      ]
+      "values": ["pending", "completed"]
     }
   },
   "schemas": {},

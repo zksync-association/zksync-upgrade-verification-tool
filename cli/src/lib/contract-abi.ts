@@ -5,7 +5,7 @@ import {
   decodeFunctionData,
   type Hex,
   toEventSelector,
-  toFunctionSelector
+  toFunctionSelector,
 } from "viem";
 import type { z } from "zod";
 
@@ -46,10 +46,10 @@ export class ContractAbi {
   }
 
   eventIdFor(eventName: string): Hex {
-    const abiElem = this.raw.find(e => e.type === "event" && e.name === eventName)
+    const abiElem = this.raw.find((e) => e.type === "event" && e.name === eventName);
     if (!abiElem) {
-      throw new Error(`Event "${eventName}" not present in abi.`)
+      throw new Error(`Event "${eventName}" not present in abi.`);
     }
-    return toEventSelector(abiElem as AbiEvent)
+    return toEventSelector(abiElem as AbiEvent);
   }
 }

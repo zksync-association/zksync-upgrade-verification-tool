@@ -7,6 +7,7 @@ export const upgradesTable = pgTable("upgrades", {
   id: serial("id").primaryKey(),
   upgradeId: text("upgrade_id").notNull().unique(),
   calldata: bytea("calldata").notNull(),
-  startedTxid: text("started_txid"),
-  finishedTxid: text("finished_txid")
+
+  startedTxHash: text("started_tx_hash"),
+  finishedTxHash: text("finished_tx_hash"),
 });
