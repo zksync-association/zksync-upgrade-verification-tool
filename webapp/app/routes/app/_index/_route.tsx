@@ -10,13 +10,6 @@ import { $path } from "remix-routes";
 
 export default function Index() {
   const auth = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!auth.isAuthenticated) {
-      navigate($path("/"));
-    }
-  }, [auth.isAuthenticated, navigate]);
 
   const proposal = {
     version: "23",

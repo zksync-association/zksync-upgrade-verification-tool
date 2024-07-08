@@ -3,11 +3,22 @@ import {
   RainbowKitAuthenticationProvider,
   createAuthenticationAdapter,
 } from "@rainbow-me/rainbowkit";
-import { type ReactNode, useMemo } from "react";
+import { useLocation, useNavigate } from "@remix-run/react";
+import { type ReactNode, useEffect, useMemo } from "react";
+import { $path } from "remix-routes";
 import { SiweMessage } from "siwe";
 
 export default function WalletAuthProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Redirect to login page if not authenticated
+  useEffect(() => {
+    if (!auth.isAuthenticated && location.pathname !== "/") {
+      navigate($path("/"));
+    }
+  }, [auth.isAuthenticated, navigate, location.pathname]);
 
   const adapter = useMemo(
     () =>
