@@ -212,6 +212,9 @@ importers:
       react-dom:
         specifier: ^18.2.0
         version: 18.3.1(react@18.3.1)
+      remix-params-helper:
+        specifier: ^0.5.1
+        version: 0.5.1(zod@3.23.8)
       siwe:
         specifier: ^2.3.2
         version: 2.3.2(ethers@6.13.1(bufferutil@4.0.8)(utf-8-validate@5.0.10))
@@ -231,7 +234,7 @@ importers:
         specifier: ^2.10.8
         version: 2.10.9(@tanstack/query-core@5.49.1)(@tanstack/react-query@5.49.2(react@18.3.1))(@types/react@18.3.3)(bufferutil@4.0.8)(react-dom@18.3.1(react@18.3.1))(react-native@0.74.3(@babel/core@7.24.7)(@babel/preset-env@7.24.7(@babel/core@7.24.7))(@types/react@18.3.3)(bufferutil@4.0.8)(react@18.3.1)(utf-8-validate@5.0.10))(react@18.3.1)(rollup@4.18.0)(typescript@5.4.4)(utf-8-validate@5.0.10)(viem@2.16.5(bufferutil@4.0.8)(typescript@5.4.4)(utf-8-validate@5.0.10)(zod@3.23.8))(zod@3.23.8)
       zod:
-        specifier: ^3.22.4
+        specifier: ^3.23.8
         version: 3.23.8
     devDependencies:
       '@biomejs/biome':
@@ -6383,6 +6386,11 @@ packages:
     hasBin: true
     peerDependencies:
       '@remix-run/dev': ^1.15.0 || ^2
+
+  remix-params-helper@0.5.1:
+    resolution: {integrity: sha512-aYn//NPpVD5igSbn04QLTfHkxjoDCW2SbArfaAxczW2MNvwV+ow0nDDpBsVRDQJE3UajeINVMXIgdO8JxL8RdQ==}
+    peerDependencies:
+      zod: ^3.11.6
 
   remix-routes@1.7.6:
     resolution: {integrity: sha512-Ubcx3WLoraVAd4nGsJyTkbgTMD//ZTHziCY9HsBk1z9k4LPGIGWIsfR9yzZ1djImlODwhk4R+SziYXRmTYHn6w==}
@@ -14969,6 +14977,10 @@ snapshots:
       '@remix-run/v1-route-convention': 0.1.4(@remix-run/dev@2.10.0(@remix-run/react@2.10.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.4.4))(@remix-run/serve@2.10.0(typescript@5.4.4))(@types/node@20.12.6)(bufferutil@4.0.8)(terser@5.31.1)(typescript@5.4.4)(utf-8-validate@5.0.10)(vite@5.3.2(@types/node@20.12.6)(terser@5.31.1)))
       fs-extra: 11.2.0
       minimatch: 5.1.6
+
+  remix-params-helper@0.5.1(zod@3.23.8):
+    dependencies:
+      zod: 3.23.8
 
   remix-routes@1.7.6:
     dependencies:

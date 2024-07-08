@@ -52,13 +52,14 @@
     "postgres": "^3.4.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "remix-params-helper": "^0.5.1",
     "siwe": "^2.3.2",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
     "validate-cli": "workspace:*",
     "viem": "^2.13.1",
     "wagmi": "^2.10.8",
-    "zod": "^3.22.4"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@biomejs/biome": "1.8.3",
