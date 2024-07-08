@@ -79,8 +79,8 @@ function Document({
         <Meta />
         <Links />
       </head>
-      <body className="relative mx-auto min-h-screen w-full max-w-[1500px]">
-        {children}
+      <body>
+        <div className="relative mx-auto min-h-screen w-full max-w-[1500px]">{children}</div>
         <script
           nonce={nonce}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
