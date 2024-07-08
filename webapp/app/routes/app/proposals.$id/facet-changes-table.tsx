@@ -1,0 +1,103 @@
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Separator } from "@/components/ui/separator";
+import { removeFunctionParams } from "@/routes/app/proposals.$id/common-tables";
+import { cn } from "@/utils/cn";
+import type { FacetDataReportDiff } from "validate-cli/src/lib";
+
+export default function FacetChangesTable({
+  className,
+  data,
+}: { className?: string; data: FacetDataReportDiff[] }) {
+  return (
+    <div className="flex flex-col space-y-2">
+      {data.map((diff, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
+        <div key={i}>
+          <div className="space-y-6">
+            <h3 className="font-semibold text-muted-foreground">{diff.name}</h3>
+            <div>
+              <h4 className="mb-1 text-sm">OLD ADDRESS</h4>
+              <p className="text-xl">{diff.oldAddress}</p>
+            </div>
+
+            <div>
+              <h4 className="mb-1 text-sm">NEW ADDRESS</h4>
+              <p className="text-xl">{diff.newAddress}</p>
+            </div>
+
+            <Accordion className="" type="multiple">
+              <AccordionItem value="item-1">
+                <AccordionTrigger
+                  className={cn(
+                    "py-0 font-normal text-sm",
+                    diff.removedFunctions.length === 0 && "opacity-50 hover:no-underline"
+                  )}
+                  disabled={diff.removedFunctions.length === 0}
+                >
+                  REMOVED FUNCTIONS
+                </AccordionTrigger>
+                <AccordionContent>
+                  {diff.removedFunctions.map((fn, i) => (
+                    <div key={fn} className="mt-4 rounded-2xl border p-4">
+                      {removeFunctionParams(fn)}
+                    </div>
+                  ))}
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-2">
+                <AccordionTrigger
+                  className={cn(
+                    "py-0 pt-8 font-normal text-sm",
+                    diff.addedFunctions.length === 0 && "opacity-50 hover:no-underline"
+                  )}
+                  disabled={diff.addedFunctions.length === 0}
+                >
+                  ADDED FUNCTIONS
+                </AccordionTrigger>
+                <AccordionContent>
+                  {diff.addedFunctions.map((fn, i) => (
+                    <div key={fn} className="mt-4 rounded-2xl border p-4">
+                      {removeFunctionParams(fn)}
+                    </div>
+                  ))}
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+
+          {i !== data.length - 1 && <Separator className="my-10 bg-gray-500" />}
+        </div>
+      ))}
+    </div>
+
+    // <Table className={className}>
+    //   <TableHeader>
+    //     <TableRow>
+    //       <TableHead>Name</TableHead>
+    //       <TableHead>Old address</TableHead>
+    //       <TableHead>New address</TableHead>
+    //       <TableHead>Added functions</TableHead>
+    //       <TableHead>Removed functions</TableHead>
+    //       <TableHead>Preserved functions</TableHead>
+    //     </TableRow>
+    //   </TableHeader>
+    //   <TableBody>
+    //     {data.map((diff) => (
+    //       <TableRow key={diff.name}>
+    //         <TableCell>{diff.name}</TableCell>
+    //         <TableCell>{diff.oldAddress}</TableCell>
+    //         <TableCell>{diff.newAddress}</TableCell>
+    //         <TableCell>{diff.addedFunctions.join("\n")}</TableCell>
+    //         <TableCell>{diff.removedFunctions.join("\n")}</TableCell>
+    //         <TableCell>{diff.preservedFunctions.join("\n")}</TableCell>
+    //       </TableRow>
+    //     ))}
+    //   </TableBody>
+    // </Table>
+  );
+}

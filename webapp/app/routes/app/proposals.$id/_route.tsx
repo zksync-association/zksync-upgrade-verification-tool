@@ -1,22 +1,31 @@
+import type { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { useAuth } from "@/components/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import FacetChangesTable from "@/routes/app/proposals.$id/facet-changes-table";
+import FieldChangesTable from "@/routes/app/proposals.$id/field-changes-table";
+import FieldStorageChangesTable from "@/routes/app/proposals.$id/field-storage-changes-table";
+import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contract-changes-table";
 import { displayAddress } from "@/utils/address";
 import { displayBytes32 } from "@/utils/bytes32";
 import { notFound } from "@/utils/http";
-import { type LoaderFunctionArgs, json } from "@remix-run/node";
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { z } from "zod";
 
-export function loader({ params: remixParams }: LoaderFunctionArgs) {
+export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const params = getParams(remixParams, z.object({ id: z.string() }));
   if (params.success === false) {
     throw notFound();
   }
+
+  const checkReport = await getCheckReport(params.data.id);
+  const storageChangeReport = await getStorageChangeReport(params.data.id);
   return json({
     proposal: {
       id: params.data.id,
@@ -24,11 +33,17 @@ export function loader({ params: remixParams }: LoaderFunctionArgs) {
       proposedBy: "0x23",
       proposedOn: "July 23, 2024",
     },
+    reports: {
+      facetChanges: checkReport.facetChanges,
+      systemContractChanges: checkReport.systemContractChanges,
+      fieldChanges: checkReport.fieldChanges,
+      fieldStorageChanges: storageChangeReport,
+    },
   });
 }
 
 export default function Proposals() {
-  const { proposal } = useLoaderData<typeof loader>();
+  const { proposal, reports } = useLoaderData<typeof loader>();
   const auth = useAuth();
   const navigate = useNavigate();
 
@@ -129,36 +144,44 @@ export default function Proposals() {
             <TabsTrigger value="field-changes">Field Changes</TabsTrigger>
             <TabsTrigger value="field-storage-changes">Field Storage Changes</TabsTrigger>
           </TabsList>
-          <TabsContent value="facet-changes" className="flex-1">
-            <Card>
+          <TabsContent value="facet-changes" className="w-full">
+            <Card className="pb-8">
               <CardHeader>
                 <CardTitle>Facet Changes</CardTitle>
               </CardHeader>
-              <CardContent>Facet Changes.</CardContent>
+              <CardContent className="pt-4">
+                <FacetChangesTable data={reports.facetChanges} />
+              </CardContent>
             </Card>
           </TabsContent>
-          <TabsContent value="system-contract-changes">
-            <Card>
+          <TabsContent value="system-contract-changes" className="w-full">
+            <Card className="pb-8">
               <CardHeader>
                 <CardTitle>System Contract Changes</CardTitle>
               </CardHeader>
-              <CardContent>System Contract Changes.</CardContent>
+              <CardContent className="pt-4">
+                <SystemContractChangesTable data={reports.systemContractChanges} />
+              </CardContent>
             </Card>
           </TabsContent>
-          <TabsContent value="field-changes">
-            <Card>
+          <TabsContent value="field-changes" className="w-full">
+            <Card className="pb-8">
               <CardHeader>
                 <CardTitle>Field Changes</CardTitle>
               </CardHeader>
-              <CardContent>Field Changes.</CardContent>
+              <CardContent className="pt-4">
+                <FieldChangesTable data={reports.fieldChanges} />
+              </CardContent>
             </Card>
           </TabsContent>
-          <TabsContent value="field-storage-changes">
-            <Card>
+          <TabsContent value="field-storage-changes" className="w-full">
+            <Card className="pb-8">
               <CardHeader>
                 <CardTitle>Field Storage Changes</CardTitle>
               </CardHeader>
-              <CardContent>Field Storage Changes.</CardContent>
+              <CardContent className="pt-4">
+                <FieldStorageChangesTable data={reports.fieldStorageChanges} />{" "}
+              </CardContent>
             </Card>
           </TabsContent>
         </Tabs>

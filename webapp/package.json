@@ -19,6 +19,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-aspect-ratio": "^1.1.0",
     "@radix-ui/react-progress": "^1.1.0",
     "@radix-ui/react-separator": "^1.1.0",
@@ -80,7 +81,6 @@
     "tsx": "^4.7.2",
     "typescript": "^5.1.6",
     "vite": "^5.1.0",
-    "vite-plugin-node-polyfills": "^0.22.0",
     "vite-tsconfig-paths": "^4.2.1"
   },
   "engines": {

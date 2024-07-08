@@ -4,7 +4,7 @@ import { WalletProvider } from "@/components/providers/wallet-provider";
 import { getUserFromHeader } from "@/utils/auth-headers";
 import { useNonce } from "@/utils/nonce-provider";
 import { clientEnv } from "@config/env.server";
-import { type LoaderFunctionArgs, json } from "@remix-run/node";
+import { type LinksFunction, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "@remix-run/react";
 import {
   type State,
@@ -14,6 +14,10 @@ import {
 
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
+
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: "https://rsms.me/inter/inter.css" },
+];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Get wagmi cookie for SSR
