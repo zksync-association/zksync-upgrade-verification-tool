@@ -1,33 +1,58 @@
+import { type AuthContextInitialState, AuthProvider } from "@/components/context/auth-context";
 import { GeneralErrorBoundary } from "@/components/error-boundary";
+import { WalletProvider } from "@/components/providers/wallet-provider";
+import { getUserFromHeader } from "@/utils/auth-headers";
 import { useNonce } from "@/utils/nonce-provider";
 import { clientEnv } from "@config/env.server";
 import { type LoaderFunctionArgs, json } from "@remix-run/node";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "@remix-run/react";
-
-import { WalletProvider, web3ModalConfig } from "@/components/providers/wallet-provider";
-import { cookieToInitialState } from "wagmi";
+import {
+  type State,
+  deserialize as deserializeWagmiCookie,
+  parseCookie as parseWagmiCookie,
+} from "wagmi";
 
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
 
-export function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {
+  // Get wagmi cookie for SSR
   const cookies = request.headers.get("Cookie");
-  return json({ env: clientEnv, cookies });
+  const wagmiCookie = cookies ? parseWagmiCookie(cookies, "wagmi.store") : undefined;
+
+  // Parse authentication status from session
+  const user = getUserFromHeader(request);
+  let authStatus: AuthContextInitialState;
+  if (user.address) {
+    authStatus = {
+      isAuthenticated: true,
+      address: user.address,
+    };
+  } else {
+    authStatus = { isAuthenticated: false };
+  }
+
+  return json({ env: clientEnv, wagmiCookie, authStatus });
 }
 
 export default function App() {
   const nonce = useNonce();
-  const { env, cookies } = useLoaderData<typeof loader>();
-  const initialState = cookieToInitialState(
-    web3ModalConfig(env.WALLET_CONNECT_PROJECT_ID),
-    cookies
-  );
+  const { env, wagmiCookie, authStatus } = useLoaderData<typeof loader>();
+
+  const walletProviderInitialState = wagmiCookie
+    ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
+    : undefined;
 
   return (
     <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
-      <WalletProvider initialState={initialState} projectId={env.WALLET_CONNECT_PROJECT_ID}>
-        <Outlet />
-      </WalletProvider>
+      <AuthProvider initialValue={authStatus}>
+        <WalletProvider
+          initialState={walletProviderInitialState}
+          projectId={env.WALLET_CONNECT_PROJECT_ID}
+        >
+          <Outlet />
+        </WalletProvider>
+      </AuthProvider>
     </Document>
   );
 }

@@ -21,10 +21,10 @@ const pinoLogger = pinoHttp<Request, Response>({
     req: () => undefined,
     res: () => undefined,
   },
-  customSuccessMessage: (req) => `${req.method} ${req.url} completed`,
+  customSuccessMessage: (req) => `${req.method} ${req.originalUrl} completed`,
   customSuccessObject: (req, res, val) => ({
     method: req.method,
-    url: req.url,
+    url: req.originalUrl,
     statusCode: res.statusCode,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     responseTime: val.responseTime as number,
