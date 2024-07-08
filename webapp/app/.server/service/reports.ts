@@ -66,7 +66,7 @@ export async function storageChangeReport(_reportId: string): Promise<FieldStora
   const l1Explorer = BlockExplorerClient.forL1(apiKey, network);
   const l2Explorer = BlockExplorerClient.forL2(network);
 
-  // const l1Rpc = new RpcClient(env.L1_RPC_CLI);
+  // const l1Rpc = new RpcClient(env.L1_RPC_URL);
 
   const {
     current,
