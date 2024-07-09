@@ -17,6 +17,9 @@ import {
   ZksyncEraState,
   memoryDiffParser,
 } from "validate-cli";
+import { db } from "@/.server/db";
+import { upgradesTable } from "@/.server/db/schema";
+import { eq } from "drizzle-orm";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -55,11 +58,7 @@ async function calculateCheckReport(_reportId: string): Promise<CheckReportObj> 
   return report.format();
 }
 
-export async function getCheckReport(_reportId: string): Promise<CheckReportObj> {
-  return calculateCheckReport(_reportId)
-}
-
-export async function getStorageChangeReport(_reportId: string): Promise<FieldStorageChange[]> {
+async function calculateStorageChangeReport(proposalId: string): Promise<FieldStorageChange[]> {
   const network = "mainnet";
   const diamondAddress = DIAMOND_ADDRS[network];
 
@@ -81,4 +80,41 @@ export async function getStorageChangeReport(_reportId: string): Promise<FieldSt
   const report = new ObjectStorageChangeReport(memoryMap);
 
   return report.format();
+}
+
+
+export async function getCheckReport(proposalId: string): Promise<CheckReportObj> {
+  const proposal = await db.query.upgradesTable.findFirst({
+    where: eq(upgradesTable.proposalId, proposalId)
+  })
+
+  if (!proposal) {
+    throw new Error("Unknown proposal")
+  }
+
+  if (!proposal.checkReport) {
+    const report = await calculateCheckReport(proposalId)
+    proposal.checkReport = report
+    await db.update(upgradesTable).set(proposal).where(eq(upgradesTable.proposalId, proposalId));
+  }
+
+  return proposal.checkReport as CheckReportObj
+}
+
+export async function getStorageChangeReport(proposalId: string): Promise<FieldStorageChange[]> {
+  const proposal = await db.query.upgradesTable.findFirst({
+    where: eq(upgradesTable.proposalId, proposalId)
+  })
+
+  if (!proposal) {
+    throw new Error("Unknown proposal")
+  }
+
+  if (!proposal.storageDiffReport) {
+    const report = await calculateStorageChangeReport(proposalId)
+    proposal.storageDiffReport = report
+    await db.update(upgradesTable).set(proposal)
+  }
+
+  return proposal.storageDiffReport as FieldStorageChange[];
 }
