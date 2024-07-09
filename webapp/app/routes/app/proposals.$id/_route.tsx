@@ -1,4 +1,5 @@
-import { getCheckReport, getProposal, getStorageChangeReport } from "@/.server/service/reports";
+import { getProposalByExternalId } from "@/.server/db/dto/proposals";
+import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -24,7 +25,8 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     throw notFound();
   }
 
-  const proposal = await getProposal(params.data.id);
+  // Id is external_id coming from the smart contract
+  const proposal = await getProposalByExternalId(params.data.id);
   if (!proposal) {
     throw notFound();
   }

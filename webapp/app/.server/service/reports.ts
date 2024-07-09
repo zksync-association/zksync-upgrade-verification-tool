@@ -2,11 +2,9 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { db } from "@/.server/db";
-import { upgradesTable } from "@/.server/db/schema";
+import { getProposalByExternalId, updateProposal } from "@/.server/db/dto/proposals";
 import { l1Explorer, l1Rpc, l2Explorer } from "@/.server/service/clients";
 import { env } from "@config/env.server";
-import { eq } from "drizzle-orm";
 import {
   type BlockExplorerClient,
   type CheckReportObj,
@@ -87,26 +85,17 @@ async function generateReportIfNotInDb<T>(
   propName: "checkReport" | "storageDiffReport",
   generator: (t: string) => Promise<T>
 ): Promise<T> {
-  const proposal = await db.query.upgradesTable.findFirst({
-    where: eq(upgradesTable.proposalId, proposalId),
-  });
-
+  const proposal = await getProposalByExternalId(proposalId);
   if (!proposal) {
     throw new Error("Unknown proposal");
   }
 
   if (!proposal[propName]) {
     proposal[propName] = await generator(proposalId);
-    await db.update(upgradesTable).set(proposal).where(eq(upgradesTable.proposalId, proposalId));
+    await updateProposal(proposal);
   }
 
   return proposal[propName] as T;
-}
-
-export async function getProposal(proposalId: string) {
-  return await db.query.upgradesTable.findFirst({
-    where: eq(upgradesTable.proposalId, proposalId),
-  });
 }
 
 export async function getCheckReport(proposalId: string): Promise<CheckReportObj> {
