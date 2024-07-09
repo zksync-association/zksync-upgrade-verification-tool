@@ -13,6 +13,9 @@ const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 
 const range = (l: number): number[] => new Array(l).fill(0).map((_, i) => i);
 
+export const UserRole = z.enum(["guardian", "security_council"]);
+export type UserRole = z.infer<typeof UserRole>;
+
 export async function isUserAuthorized(address: Hex) {
   const [guardiansAddr, securityCouncilAddr] = await Promise.all([
     rpc.contractRead(upgradeHandlerAddress, "guardians", upgradeHandlerAbi.raw, zodHex),
@@ -32,5 +35,18 @@ export async function isUserAuthorized(address: Hex) {
     ),
   ]);
 
-  return [...scMembers, ...guardianMembers].includes(address);
+  const isGuardian = guardianMembers.includes(address);
+  const isSecurityCouncil = scMembers.includes(address);
+
+  if (isGuardian || isSecurityCouncil) {
+    return {
+      authorized: true,
+      role: isGuardian ? UserRole.enum.guardian : UserRole.enum.security_council,
+    } as const;
+  }
+
+  return {
+    authorized: false,
+    role: null,
+  } as const;
 }

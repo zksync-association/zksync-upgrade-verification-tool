@@ -19,8 +19,8 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!parsedAddress.success) {
     throw redirect($path("/"));
   }
-  const authorized = await isUserAuthorized(parsedAddress.data);
-  if (!authorized) {
+  const auth = await isUserAuthorized(parsedAddress.data);
+  if (!auth.authorized) {
     throw redirect($path("/app/denied"));
   }
   throw redirect($path("/app"));

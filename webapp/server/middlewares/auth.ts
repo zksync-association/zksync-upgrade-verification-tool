@@ -5,6 +5,7 @@ import { $path, type Routes } from "remix-routes";
 import { zodHex } from "validate-cli/src";
 
 export const USER_ADDRESS_HEADER = "x-user-address";
+export const USER_ROLE_HEADER = "x-user-role";
 
 const protectedRoutes = ["/app"] satisfies (keyof Routes)[];
 const unprotectedRoutes = ["/", "/app/denied"] satisfies (keyof Routes)[];
@@ -26,14 +27,14 @@ export async function auth(req: Request, res: Response, next: NextFunction) {
       return res.redirect($path("/"));
     }
 
-    const authorized = await isUserAuthorized(zodHex.parse(session.siwe.data.address));
+    const auth = await isUserAuthorized(zodHex.parse(session.siwe.data.address));
 
     // Session headers are set for all requests, authorized or not,
     // to be used by Remix loaders
-    setUserHeaders(req, { address: session.siwe.data.address });
+    setUserHeaders(req, { address: session.siwe.data.address, role: auth.role });
 
     // If user is logged in but not authorized, redirect to denied page
-    if (!authorized) {
+    if (!auth.authorized) {
       return res.redirect($path("/app/denied"));
     }
 
@@ -42,7 +43,7 @@ export async function auth(req: Request, res: Response, next: NextFunction) {
 
   // If route is not protected, Remix might still need user information
   if (session?.siwe?.success) {
-    setUserHeaders(req, { address: session.siwe.data.address });
+    setUserHeaders(req, { address: session.siwe.data.address, role: null });
   } else {
     clearUserHeaders(req);
   }
@@ -50,10 +51,12 @@ export async function auth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-function setUserHeaders(req: Request, { address }: { address: string }) {
+function setUserHeaders(req: Request, { address, role }: { address: string; role: string | null }) {
   req.headers[USER_ADDRESS_HEADER] = address;
+  req.headers[USER_ROLE_HEADER] = role || "";
 }
 
 function clearUserHeaders(req: Request) {
   delete req.headers[USER_ADDRESS_HEADER];
+  delete req.headers[USER_ROLE_HEADER];
 }
