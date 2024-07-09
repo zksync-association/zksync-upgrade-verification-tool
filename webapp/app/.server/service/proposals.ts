@@ -1,3 +1,5 @@
+import { db } from "@/.server/db";
+import { upgradesTable } from "@/.server/db/schema";
 import { upgradeHandlerAbi } from "@/.server/service/protocol-upgrade-handler-abi";
 import { env } from "@config/env.server";
 import { RpcClient } from "validate-cli";
@@ -21,10 +23,10 @@ enum PROPOSAL_STATES {
 }
 
 export type Proposal = {
-  id: Hex
-}
+  id: Hex;
+};
 
-export async function queryPendingProposals(): Promise<Proposal[]> {
+export async function getPendingProposals(): Promise<Proposal[]> {
   const currentBlock = await rpc.getLatestBlockNumber();
   const currentHeight = hexToBigInt(currentBlock);
   const maxUpgradeLiftimeInBlocks = BigInt(40 * 24 * 360); // conservative estimation of latest block with a valid upgrade
@@ -51,9 +53,15 @@ export async function queryPendingProposals(): Promise<Proposal[]> {
 
     if (stateNumber !== PROPOSAL_STATES.Expired && stateNumber !== PROPOSAL_STATES.Done) {
       nonResolvedUpgrades.push({id});
+      await db
+        .insert(upgradesTable)
+        .values({
+          proposalId: id,
+          calldata: log.data,
+        })
+        .onConflictDoNothing({ target: upgradesTable.proposalId });
     }
   }
 
   return nonResolvedUpgrades;
 }
-

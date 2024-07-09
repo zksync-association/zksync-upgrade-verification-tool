@@ -22,8 +22,8 @@ import { Hex } from "viem";
 import { guardianAddress } from "@/.server/service/authorized-users";
 import { useCallback } from "react";
 
-export async function loader({params: remixParams}: LoaderFunctionArgs) {
-  const params = getParams(remixParams, z.object({id: z.string()}));
+export async function loader({ params: remixParams }: LoaderFunctionArgs) {
+  const params = getParams(remixParams, z.object({ id: z.string() }));
   if (!params.success) {
     throw notFound();
   }
@@ -107,50 +107,39 @@ export default function Proposals() {
         </Card>
         <Card>
           <CardHeader className="pt-7">
-            <p className="text-primary">ACTIVE</p>
-            <CardTitle>Current Votes</CardTitle>
+            <p className="text-orange-400">WAITING</p>
+            <CardTitle>Proposal Status</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span>Approve</span>
-                <span className="text-muted-foreground">8/10</span>
+                <span>Security Council Approvals</span>
+                <span className="text-muted-foreground">5/6</span>
               </div>
-              <Progress value={80}/>
+              <Progress value={80} />
               <div className="flex justify-between">
-                <span>Abstain</span>
-                <span className="text-muted-foreground">2</span>
+                <span>Guardian Approvals</span>
+                <span className="text-muted-foreground">2/5</span>
               </div>
-              <Progress value={20}/>
+              <Progress value={20} />
               <div className="flex justify-between">
-                <span>Reject</span>
-                <span className="text-muted-foreground">2/6</span>
+                <span>Extend Legal Veto Approvals</span>
+                <span className="text-muted-foreground">1/2</span>
               </div>
-              <Progress value={20}/>
+              <Progress value={50} />
             </div>
           </CardContent>
           <CardFooter className="justify-end">
-            <Button>Execute Transaction</Button>
+            <Button disabled>Execute Transaction</Button>
           </CardFooter>
         </Card>
       </div>
-      <Card className="py-10 text-center">
-        <h3 className="">VOTING ENDS IN</h3>
-        <p className="text-4xl">
-          1 <span className="text-muted-foreground">day</span> : 23{" "}
-          <span className="text-muted-foreground">hrs</span> : 10{" "}
-          <span className="text-muted-foreground">mins</span> : 30{" "}
-          <span className="text-muted-foreground">seconds</span>
-        </p>
-      </Card>
       <Card className="flex flex-col items-center space-y-4 pt-4 pb-10 text-center">
         <p className="font-bold">{auth.isAuthenticated && displayAddress(auth.address)}</p>
         <h3 className="text-3xl">
           <span className="font-semibold">Your Vote:</span> Pending
         </h3>
         <div className="flex space-x-4">
-          <Button>Approve</Button>
-          <Button>Abstain</Button>
           <SignButton
             proposalId={proposal.id}
             contractData={{actionName: "ExtendLegalVetoPeriod", address: addresses.guardian, name: "Guardians"}}
@@ -174,7 +163,7 @@ export default function Proposals() {
                 <CardTitle>Facet Changes</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <FacetChangesTable data={reports.facetChanges}/>
+                <FacetChangesTable data={reports.facetChanges} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -184,7 +173,7 @@ export default function Proposals() {
                 <CardTitle>System Contract Changes</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <SystemContractChangesTable data={reports.systemContractChanges}/>
+                <SystemContractChangesTable data={reports.systemContractChanges} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -194,7 +183,7 @@ export default function Proposals() {
                 <CardTitle>Field Changes</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <FieldChangesTable data={reports.fieldChanges}/>
+                <FieldChangesTable data={reports.fieldChanges} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -204,7 +193,7 @@ export default function Proposals() {
                 <CardTitle>Field Storage Changes</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <FieldStorageChangesTable data={reports.fieldStorageChanges}/>{" "}
+                <FieldStorageChangesTable data={reports.fieldStorageChanges} />{" "}
               </CardContent>
             </Card>
           </TabsContent>

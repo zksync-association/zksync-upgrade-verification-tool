@@ -8,3 +8,10 @@ export function badRequest(body: string) {
     statusText: "Bad Request",
   });
 }
+
+export function unauthorized() {
+  return new Response("Unauthorized", {
+    status: 401,
+    statusText: "Unauthorized",
+  });
+}

@@ -15,9 +15,18 @@ type StatusHandler = (info: {
 
 export function GeneralErrorBoundary({
   defaultStatusHandler = ({ error }) => (
-    <p>
-      {error.status} {error.data}
-    </p>
+    <div>
+      <div className="flex items-center space-x-4">
+        <h1 className="font-semibold text-3xl md:text-5xl">{error.status}</h1>
+        <Separator orientation="vertical" className="h-20 bg-border" />
+        <p>{error.data}</p>
+      </div>
+      <div className="mt-10 text-center">
+        <Link to={$path("/")} className="text-body-md underline">
+          Go back to the home page
+        </Link>
+      </div>
+    </div>
   ),
   statusHandlers,
   unexpectedErrorHandler = defaultErrorHandler,

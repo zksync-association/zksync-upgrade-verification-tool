@@ -16,8 +16,7 @@ export default function FacetChangesTable({
   return (
     <div className="flex flex-col space-y-2">
       {data.map((diff, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
-        <div key={i}>
+        <div key={diff.name}>
           <div className="space-y-6">
             <h3 className="font-semibold text-muted-foreground">{diff.name}</h3>
             <div>
@@ -74,30 +73,5 @@ export default function FacetChangesTable({
         </div>
       ))}
     </div>
-
-    // <Table className={className}>
-    //   <TableHeader>
-    //     <TableRow>
-    //       <TableHead>Name</TableHead>
-    //       <TableHead>Old address</TableHead>
-    //       <TableHead>New address</TableHead>
-    //       <TableHead>Added functions</TableHead>
-    //       <TableHead>Removed functions</TableHead>
-    //       <TableHead>Preserved functions</TableHead>
-    //     </TableRow>
-    //   </TableHeader>
-    //   <TableBody>
-    //     {data.map((diff) => (
-    //       <TableRow key={diff.name}>
-    //         <TableCell>{diff.name}</TableCell>
-    //         <TableCell>{diff.oldAddress}</TableCell>
-    //         <TableCell>{diff.newAddress}</TableCell>
-    //         <TableCell>{diff.addedFunctions.join("\n")}</TableCell>
-    //         <TableCell>{diff.removedFunctions.join("\n")}</TableCell>
-    //         <TableCell>{diff.preservedFunctions.join("\n")}</TableCell>
-    //       </TableRow>
-    //     ))}
-    //   </TableBody>
-    // </Table>
   );
 }
