@@ -18,22 +18,14 @@ type SignButtonProps = {
 }
 
 export default function SignButton({children, proposalId, contractData, onSuccess, onError}: SignButtonProps) {
-  const {data, signTypedData, error, isSuccess} = useSignTypedData()
+  const {signTypedDataAsync} = useSignTypedData()
 
-  if (error) {
-    onError(error)
-  }
-
-  if (isSuccess) {
-    onSuccess(data)
-  }
 
   const [chain] = useChains()
 
   const onClick = useCallback(
     () => {
-      console.log("onClick")
-      signTypedData({
+      signTypedDataAsync({
         domain: {
           name: contractData.name,
           version: "1",
@@ -50,7 +42,7 @@ export default function SignButton({children, proposalId, contractData, onSucces
             type: "bytes32"
           }]
         }
-      })
+      }).then(onSuccess, onError)
     }, [
       contractData.name,
       contractData.actionName,
