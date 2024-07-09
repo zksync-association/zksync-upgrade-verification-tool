@@ -7,13 +7,14 @@ import { type ActionFunctionArgs, redirect } from "@remix-run/node";
 import { useFetcher, useNavigation } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
+import { zodHex } from "validate-cli/src";
 
 export async function action({ request }: ActionFunctionArgs) {
   const { address } = getUserFromHeader(request);
   if (!address) {
     throw redirect($path("/"));
   }
-  const authorized = await isUserAuthorized(address);
+  const authorized = await isUserAuthorized(zodHex.parse(address));
   if (!authorized) {
     throw redirect($path("/app/denied"));
   }

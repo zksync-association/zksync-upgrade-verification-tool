@@ -1,7 +1,7 @@
 import { ContractAbi } from "validate-cli/src/lib/contract-abi";
 import type { Abi } from "viem";
 
-export const PROTOCOL_UPGRADE_HANDLER_RAW_ABI: Abi = [
+const PROTOCOL_UPGRADE_HANDLER_RAW_ABI: Abi = [
   {
     type: "constructor",
     inputs: [
@@ -774,4 +774,942 @@ export const PROTOCOL_UPGRADE_HANDLER_RAW_ABI: Abi = [
   },
 ];
 
+const GUARDIANS_RAW_ABI: Abi = [
+  {
+    type: "constructor",
+    inputs: [
+      {
+        name: "_protocolUpgradeHandler",
+        type: "address",
+        internalType: "contract IProtocolUpgradeHandler"
+      },
+      {
+        name: "_ZKsyncEra",
+        type: "address",
+        internalType: "contract IZKsyncEra"
+      },
+      {
+        name: "_members",
+        type: "address[]",
+        internalType: "address[]"
+      }
+    ],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "APPROVE_UPGRADE_GUARDIANS_THRESHOLD",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "CANCEL_L2_GOVERNOR_PROPOSAL_THRESHOLD",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "EIP1271_THRESHOLD",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "EXTEND_LEGAL_VETO_THRESHOLD",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "PROPOSE_L2_GOVERNOR_PROPOSAL_THRESHOLD",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "PROTOCOL_UPGRADE_HANDLER",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "address",
+        internalType: "contract IProtocolUpgradeHandler"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "ZKSYNC_ERA",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "address",
+        internalType: "contract IZKsyncEra"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "approveUpgradeGuardians",
+    inputs: [
+      {
+        name: "_id",
+        type: "bytes32",
+        internalType: "bytes32"
+      },
+      {
+        name: "_signers",
+        type: "address[]",
+        internalType: "address[]"
+      },
+      {
+        name: "_signatures",
+        type: "bytes[]",
+        internalType: "bytes[]"
+      }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "cancelL2GovernorProposal",
+    inputs: [
+      {
+        name: "_l2Proposal",
+        type: "tuple",
+        internalType: "struct IGuardians.L2GovernorProposal",
+        components: [
+          {
+            name: "targets",
+            type: "address[]",
+            internalType: "address[]"
+          },
+          {
+            name: "values",
+            type: "uint256[]",
+            internalType: "uint256[]"
+          },
+          {
+            name: "calldatas",
+            type: "bytes[]",
+            internalType: "bytes[]"
+          },
+          {
+            name: "description",
+            type: "string",
+            internalType: "string"
+          }
+        ]
+      },
+      {
+        name: "_txRequest",
+        type: "tuple",
+        internalType: "struct IGuardians.TxRequest",
+        components: [
+          {
+            name: "to",
+            type: "address",
+            internalType: "address"
+          },
+          {
+            name: "l2GasLimit",
+            type: "uint256",
+            internalType: "uint256"
+          },
+          {
+            name: "l2GasPerPubdataByteLimit",
+            type: "uint256",
+            internalType: "uint256"
+          },
+          {
+            name: "refundRecipient",
+            type: "address",
+            internalType: "address"
+          },
+          {
+            name: "txMintValue",
+            type: "uint256",
+            internalType: "uint256"
+          }
+        ]
+      },
+      {
+        name: "_signers",
+        type: "address[]",
+        internalType: "address[]"
+      },
+      {
+        name: "_signatures",
+        type: "bytes[]",
+        internalType: "bytes[]"
+      }
+    ],
+    outputs: [],
+    stateMutability: "payable"
+  },
+  {
+    type: "function",
+    name: "checkSignatures",
+    inputs: [
+      {
+        name: "_digest",
+        type: "bytes32",
+        internalType: "bytes32"
+      },
+      {
+        name: "_signers",
+        type: "address[]",
+        internalType: "address[]"
+      },
+      {
+        name: "_signatures",
+        type: "bytes[]",
+        internalType: "bytes[]"
+      },
+      {
+        name: "_threshold",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    outputs: [],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "eip712Domain",
+    inputs: [],
+    outputs: [
+      {
+        name: "fields",
+        type: "bytes1",
+        internalType: "bytes1"
+      },
+      {
+        name: "name",
+        type: "string",
+        internalType: "string"
+      },
+      {
+        name: "version",
+        type: "string",
+        internalType: "string"
+      },
+      {
+        name: "chainId",
+        type: "uint256",
+        internalType: "uint256"
+      },
+      {
+        name: "verifyingContract",
+        type: "address",
+        internalType: "address"
+      },
+      {
+        name: "salt",
+        type: "bytes32",
+        internalType: "bytes32"
+      },
+      {
+        name: "extensions",
+        type: "uint256[]",
+        internalType: "uint256[]"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "extendLegalVeto",
+    inputs: [
+      {
+        name: "_id",
+        type: "bytes32",
+        internalType: "bytes32"
+      },
+      {
+        name: "_signers",
+        type: "address[]",
+        internalType: "address[]"
+      },
+      {
+        name: "_signatures",
+        type: "bytes[]",
+        internalType: "bytes[]"
+      }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "hashL2Proposal",
+    inputs: [
+      {
+        name: "_l2Proposal",
+        type: "tuple",
+        internalType: "struct IGuardians.L2GovernorProposal",
+        components: [
+          {
+            name: "targets",
+            type: "address[]",
+            internalType: "address[]"
+          },
+          {
+            name: "values",
+            type: "uint256[]",
+            internalType: "uint256[]"
+          },
+          {
+            name: "calldatas",
+            type: "bytes[]",
+            internalType: "bytes[]"
+          },
+          {
+            name: "description",
+            type: "string",
+            internalType: "string"
+          }
+        ]
+      }
+    ],
+    outputs: [
+      {
+        name: "proposalId",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "pure"
+  },
+  {
+    type: "function",
+    name: "isValidSignature",
+    inputs: [
+      {
+        name: "_digest",
+        type: "bytes32",
+        internalType: "bytes32"
+      },
+      {
+        name: "_signature",
+        type: "bytes",
+        internalType: "bytes"
+      }
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "bytes4",
+        internalType: "bytes4"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "members",
+    inputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "address",
+        internalType: "address"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "nonce",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "proposeL2GovernorProposal",
+    inputs: [
+      {
+        name: "_l2Proposal",
+        type: "tuple",
+        internalType: "struct IGuardians.L2GovernorProposal",
+        components: [
+          {
+            name: "targets",
+            type: "address[]",
+            internalType: "address[]"
+          },
+          {
+            name: "values",
+            type: "uint256[]",
+            internalType: "uint256[]"
+          },
+          {
+            name: "calldatas",
+            type: "bytes[]",
+            internalType: "bytes[]"
+          },
+          {
+            name: "description",
+            type: "string",
+            internalType: "string"
+          }
+        ]
+      },
+      {
+        name: "_txRequest",
+        type: "tuple",
+        internalType: "struct IGuardians.TxRequest",
+        components: [
+          {
+            name: "to",
+            type: "address",
+            internalType: "address"
+          },
+          {
+            name: "l2GasLimit",
+            type: "uint256",
+            internalType: "uint256"
+          },
+          {
+            name: "l2GasPerPubdataByteLimit",
+            type: "uint256",
+            internalType: "uint256"
+          },
+          {
+            name: "refundRecipient",
+            type: "address",
+            internalType: "address"
+          },
+          {
+            name: "txMintValue",
+            type: "uint256",
+            internalType: "uint256"
+          }
+        ]
+      },
+      {
+        name: "_signers",
+        type: "address[]",
+        internalType: "address[]"
+      },
+      {
+        name: "_signatures",
+        type: "bytes[]",
+        internalType: "bytes[]"
+      }
+    ],
+    outputs: [],
+    stateMutability: "payable"
+  },
+  {
+    type: "event",
+    name: "EIP712DomainChanged",
+    inputs: [],
+    anonymous: false
+  },
+  {
+    type: "error",
+    name: "InvalidShortString",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "StringTooLong",
+    inputs: [
+      {
+        name: "str",
+        type: "string",
+        internalType: "string"
+      }
+    ]
+  }
+]
+
+const SEC_COUNCIL_RAW_ABI: Abi = [
+  {
+    type: "constructor",
+    inputs: [
+      {
+        name: "_protocolUpgradeHandler",
+        type: "address",
+        internalType: "contract IProtocolUpgradeHandler"
+      },
+      {
+        name: "_members",
+        type: "address[]",
+        internalType: "address[]"
+      }
+    ],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "APPROVE_UPGRADE_SECURITY_COUNCIL_THRESHOLD",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "EIP1271_THRESHOLD",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "HARD_FREEZE_THRESHOLD",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "PROTOCOL_UPGRADE_HANDLER",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "address",
+        internalType: "contract IProtocolUpgradeHandler"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "RECOMMENDED_SOFT_FREEZE_THRESHOLD",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "SOFT_FREEZE_CONSERVATIVE_THRESHOLD",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "UNFREEZE_THRESHOLD",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "approveUpgradeSecurityCouncil",
+    inputs: [
+      {
+        name: "_id",
+        type: "bytes32",
+        internalType: "bytes32"
+      },
+      {
+        name: "_signers",
+        type: "address[]",
+        internalType: "address[]"
+      },
+      {
+        name: "_signatures",
+        type: "bytes[]",
+        internalType: "bytes[]"
+      }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "checkSignatures",
+    inputs: [
+      {
+        name: "_digest",
+        type: "bytes32",
+        internalType: "bytes32"
+      },
+      {
+        name: "_signers",
+        type: "address[]",
+        internalType: "address[]"
+      },
+      {
+        name: "_signatures",
+        type: "bytes[]",
+        internalType: "bytes[]"
+      },
+      {
+        name: "_threshold",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    outputs: [],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "eip712Domain",
+    inputs: [],
+    outputs: [
+      {
+        name: "fields",
+        type: "bytes1",
+        internalType: "bytes1"
+      },
+      {
+        name: "name",
+        type: "string",
+        internalType: "string"
+      },
+      {
+        name: "version",
+        type: "string",
+        internalType: "string"
+      },
+      {
+        name: "chainId",
+        type: "uint256",
+        internalType: "uint256"
+      },
+      {
+        name: "verifyingContract",
+        type: "address",
+        internalType: "address"
+      },
+      {
+        name: "salt",
+        type: "bytes32",
+        internalType: "bytes32"
+      },
+      {
+        name: "extensions",
+        type: "uint256[]",
+        internalType: "uint256[]"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "hardFreeze",
+    inputs: [
+      {
+        name: "_validUntil",
+        type: "uint256",
+        internalType: "uint256"
+      },
+      {
+        name: "_signers",
+        type: "address[]",
+        internalType: "address[]"
+      },
+      {
+        name: "_signatures",
+        type: "bytes[]",
+        internalType: "bytes[]"
+      }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "hardFreezeNonce",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "isValidSignature",
+    inputs: [
+      {
+        name: "_digest",
+        type: "bytes32",
+        internalType: "bytes32"
+      },
+      {
+        name: "_signature",
+        type: "bytes",
+        internalType: "bytes"
+      }
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "bytes4",
+        internalType: "bytes4"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "members",
+    inputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "address",
+        internalType: "address"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "setSoftFreezeThreshold",
+    inputs: [
+      {
+        name: "_threshold",
+        type: "uint256",
+        internalType: "uint256"
+      },
+      {
+        name: "_validUntil",
+        type: "uint256",
+        internalType: "uint256"
+      },
+      {
+        name: "_signers",
+        type: "address[]",
+        internalType: "address[]"
+      },
+      {
+        name: "_signatures",
+        type: "bytes[]",
+        internalType: "bytes[]"
+      }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "softFreeze",
+    inputs: [
+      {
+        name: "_validUntil",
+        type: "uint256",
+        internalType: "uint256"
+      },
+      {
+        name: "_signers",
+        type: "address[]",
+        internalType: "address[]"
+      },
+      {
+        name: "_signatures",
+        type: "bytes[]",
+        internalType: "bytes[]"
+      }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "softFreezeNonce",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "softFreezeThreshold",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "softFreezeThresholdSettingNonce",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "unfreeze",
+    inputs: [
+      {
+        name: "_validUntil",
+        type: "uint256",
+        internalType: "uint256"
+      },
+      {
+        name: "_signers",
+        type: "address[]",
+        internalType: "address[]"
+      },
+      {
+        name: "_signatures",
+        type: "bytes[]",
+        internalType: "bytes[]"
+      }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "unfreezeNonce",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "uint256",
+        internalType: "uint256"
+      }
+    ],
+    stateMutability: "view"
+  },
+  {
+    type: "event",
+    name: "EIP712DomainChanged",
+    inputs: [],
+    anonymous: false
+  },
+  {
+    type: "error",
+    name: "InvalidShortString",
+    inputs: []
+  },
+  {
+    type: "error",
+    name: "StringTooLong",
+    inputs: [
+      {
+        name: "str",
+        type: "string",
+        internalType: "string"
+      }
+    ]
+  }
+]
+
 export const upgradeHandlerAbi = new ContractAbi(PROTOCOL_UPGRADE_HANDLER_RAW_ABI);
+export const guardiansAbi = new ContractAbi(GUARDIANS_RAW_ABI)
+export const scAbi = new ContractAbi(SEC_COUNCIL_RAW_ABI)
