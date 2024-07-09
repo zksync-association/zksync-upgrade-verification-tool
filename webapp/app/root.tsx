@@ -53,7 +53,7 @@ export default function App() {
         <WalletProvider
           initialState={walletProviderInitialState}
           projectId={env.WALLET_CONNECT_PROJECT_ID}
-          devNetwork={env.DEV_NETWORK}
+          devNetwork={env.NODE_ENV === "development"}
         >
           <div className="flex min-h-screen flex-col px-10 py-10 lg:px-40">
             <Outlet />
