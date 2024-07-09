@@ -1,0 +1,67 @@
+{
+  "id": "8c93dc65-1c7b-4714-bbcf-092b843da7a1",
+  "prevId": "ea461c62-b060-4d8c-b1aa-30449afa3cd6",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.upgrades": {
+      "name": "upgrades",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "proposal_id": {
+          "name": "proposal_id",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calldata": {
+          "name": "calldata",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "check_report": {
+          "name": "check_report",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "storage_diff_report": {
+          "name": "storage_diff_report",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "upgrades_proposal_id_unique": {
+          "name": "upgrades_proposal_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["proposal_id"]
+        }
+      }
+    }
+  },
+  "enums": {
+    "public.status": {
+      "name": "status",
+      "schema": "public",
+      "values": ["pending", "completed"]
+    }
+  },
+  "schemas": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

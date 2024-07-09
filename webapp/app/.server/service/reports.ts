@@ -2,8 +2,11 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { db } from "@/.server/db";
+import { upgradesTable } from "@/.server/db/schema";
 import { l1Explorer, l1Rpc, l2Explorer } from "@/.server/service/clients";
 import { env } from "@config/env.server";
+import { eq } from "drizzle-orm";
 import {
   type BlockExplorerClient,
   type CheckReportObj,
@@ -43,7 +46,7 @@ async function calculateBeforeAndAfter(
   return { current, proposed, sysAddresses, callData: decodedBuf };
 }
 
-export async function getCheckReport(_reportId: string): Promise<CheckReportObj> {
+async function calculateCheckReport(_reportId: string): Promise<CheckReportObj> {
   const { current, proposed, sysAddresses } = await calculateBeforeAndAfter(
     network,
     l1Explorer,
@@ -55,7 +58,7 @@ export async function getCheckReport(_reportId: string): Promise<CheckReportObj>
   return report.format();
 }
 
-export async function getStorageChangeReport(_reportId: string): Promise<FieldStorageChange[]> {
+async function calculateStorageChangeReport(_proposalId: string): Promise<FieldStorageChange[]> {
   const network = "mainnet";
   const diamondAddress = DIAMOND_ADDRS[network];
 
@@ -77,4 +80,33 @@ export async function getStorageChangeReport(_reportId: string): Promise<FieldSt
   const report = new ObjectStorageChangeReport(memoryMap);
 
   return report.format();
+}
+
+async function generateReportIfNotInDb<T>(
+  proposalId: string,
+  propName: "checkReport" | "storageDiffReport",
+  generator: (t: string) => Promise<T>
+): Promise<T> {
+  const proposal = await db.query.upgradesTable.findFirst({
+    where: eq(upgradesTable.proposalId, proposalId),
+  });
+
+  if (!proposal) {
+    throw new Error("Unknown proposal");
+  }
+
+  if (!proposal[propName]) {
+    proposal[propName] = await generator(proposalId);
+    await db.update(upgradesTable).set(proposal).where(eq(upgradesTable.proposalId, proposalId));
+  }
+
+  return proposal[propName] as T;
+}
+
+export async function getCheckReport(proposalId: string): Promise<CheckReportObj> {
+  return generateReportIfNotInDb(proposalId, "checkReport", calculateCheckReport);
+}
+
+export async function getStorageChangeReport(proposalId: string): Promise<FieldStorageChange[]> {
+  return generateReportIfNotInDb(proposalId, "storageDiffReport", calculateStorageChangeReport);
 }
