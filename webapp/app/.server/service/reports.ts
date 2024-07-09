@@ -9,13 +9,13 @@ import {
   type CheckReportObj,
   DIAMOND_ADDRS,
   type FieldStorageChange,
+  memoryDiffParser,
   type Network,
   ObjectCheckReport,
   ObjectStorageChangeReport,
   StorageChanges,
   ZkSyncEraDiff,
   ZksyncEraState,
-  memoryDiffParser,
 } from "validate-cli";
 import { db } from "@/.server/db";
 import { upgradesTable } from "@/.server/db/schema";
@@ -58,7 +58,7 @@ async function calculateCheckReport(_reportId: string): Promise<CheckReportObj> 
   return report.format();
 }
 
-async function calculateStorageChangeReport(proposalId: string): Promise<FieldStorageChange[]> {
+async function calculateStorageChangeReport(_proposalId: string): Promise<FieldStorageChange[]> {
   const network = "mainnet";
   const diamondAddress = DIAMOND_ADDRS[network];
 
@@ -92,8 +92,7 @@ async function generateReportIfNotInDb<T>(proposalId: string, propName: "checkRe
   }
 
   if (!proposal[propName]) {
-    const report = await generator(proposalId)
-    proposal[propName] = report
+    proposal[propName] = await generator(proposalId)
     await db.update(upgradesTable).set(proposal).where(eq(upgradesTable.proposalId, proposalId));
   }
 
