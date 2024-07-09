@@ -1,11 +1,12 @@
 import { bytea } from "@/.server/db/custom-types";
-import { pgEnum, pgTable, serial, text } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, serial, text, json } from "drizzle-orm/pg-core";
 
 export const upgradesTableStatus = pgEnum("status", ["pending", "completed"]);
 
 export const upgradesTable = pgTable("upgrades", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
+  proposalId: bytea("proposal_id").notNull().unique(),
   calldata: bytea("calldata").notNull(),
-  status: upgradesTableStatus("status").notNull().default("pending"),
+  checkReport: json("check_report"),
+  storageDiffReport: json("storage_diff_report")
 });

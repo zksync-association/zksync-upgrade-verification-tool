@@ -3,6 +3,8 @@ import { env } from "@config/env.server";
 import { RpcClient } from "validate-cli";
 import { type Hex, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
+import { db } from "@/.server/db";
+import { upgradesTable } from "@/.server/db/schema";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 
@@ -50,7 +52,11 @@ export async function getPendingProposals(): Promise<Proposal[]> {
     );
 
     if (stateNumber !== PROPOSAL_STATES.Expired && stateNumber !== PROPOSAL_STATES.Done) {
-      nonResolvedUpgrades.push({ id });
+      nonResolvedUpgrades.push({id});
+      await db.insert(upgradesTable).values({
+        proposalId: id,
+        calldata: log.data
+      }).onConflictDoNothing({ target: upgradesTable.proposalId })
     }
   }
 

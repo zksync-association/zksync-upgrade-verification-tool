@@ -43,7 +43,7 @@ async function calculateBeforeAndAfter(
   return { current, proposed, sysAddresses, callData: decodedBuf };
 }
 
-export async function getCheckReport(_reportId: string): Promise<CheckReportObj> {
+async function calculateCheckReport(_reportId: string): Promise<CheckReportObj> {
   const { current, proposed, sysAddresses } = await calculateBeforeAndAfter(
     network,
     l1Explorer,
@@ -53,6 +53,10 @@ export async function getCheckReport(_reportId: string): Promise<CheckReportObj>
   const diff = new ZkSyncEraDiff(current, proposed, sysAddresses);
   const report = new ObjectCheckReport(diff, l1Explorer);
   return report.format();
+}
+
+export async function getCheckReport(_reportId: string): Promise<CheckReportObj> {
+  return calculateCheckReport(_reportId)
 }
 
 export async function getStorageChangeReport(_reportId: string): Promise<FieldStorageChange[]> {
