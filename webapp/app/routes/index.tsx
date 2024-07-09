@@ -10,11 +10,16 @@ import { $path } from "remix-routes";
 import { zodHex } from "validate-cli/src";
 
 export async function action({ request }: ActionFunctionArgs) {
+  // On error redirect to the home page, address should be set by the backend
   const { address } = getUserFromHeader(request);
   if (!address) {
     throw redirect($path("/"));
   }
-  const authorized = await isUserAuthorized(zodHex.parse(address));
+  const parsedAddress = zodHex.safeParse(address);
+  if (!parsedAddress.success) {
+    throw redirect($path("/"));
+  }
+  const authorized = await isUserAuthorized(parsedAddress.data);
   if (!authorized) {
     throw redirect($path("/app/denied"));
   }
