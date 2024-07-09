@@ -13,9 +13,10 @@ export const env = createEnv({
     L1_RPC_URL: z.string(),
     L1_RPC_URL_FOR_UPGRADES: z.string(),
     ETH_NETWORK: z.enum(["mainnet", "sepolia"]).default("mainnet"),
-    DEV_NETWORK: z.string()
+    DEV_NETWORK: z
+      .string()
       .default("false")
-      .transform(v => v === "true"),
+      .transform((v) => v === "true"),
     ETHERSCAN_API_KEY: z.string(),
     AUTH_SECRET: z.string(),
     UPGRADE_HANDLER_ADDRESS: zodHex,

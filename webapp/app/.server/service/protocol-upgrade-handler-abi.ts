@@ -781,20 +781,20 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "_protocolUpgradeHandler",
         type: "address",
-        internalType: "contract IProtocolUpgradeHandler"
+        internalType: "contract IProtocolUpgradeHandler",
       },
       {
         name: "_ZKsyncEra",
         type: "address",
-        internalType: "contract IZKsyncEra"
+        internalType: "contract IZKsyncEra",
       },
       {
         name: "_members",
         type: "address[]",
-        internalType: "address[]"
-      }
+        internalType: "address[]",
+      },
     ],
-    stateMutability: "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -804,10 +804,10 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -817,10 +817,10 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -830,10 +830,10 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -843,10 +843,10 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -856,10 +856,10 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -869,10 +869,10 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "",
         type: "address",
-        internalType: "contract IProtocolUpgradeHandler"
-      }
+        internalType: "contract IProtocolUpgradeHandler",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -882,10 +882,10 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "",
         type: "address",
-        internalType: "contract IZKsyncEra"
-      }
+        internalType: "contract IZKsyncEra",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -894,21 +894,21 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "_id",
         type: "bytes32",
-        internalType: "bytes32"
+        internalType: "bytes32",
       },
       {
         name: "_signers",
         type: "address[]",
-        internalType: "address[]"
+        internalType: "address[]",
       },
       {
         name: "_signatures",
         type: "bytes[]",
-        internalType: "bytes[]"
-      }
+        internalType: "bytes[]",
+      },
     ],
     outputs: [],
-    stateMutability: "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -922,24 +922,24 @@ const GUARDIANS_RAW_ABI: Abi = [
           {
             name: "targets",
             type: "address[]",
-            internalType: "address[]"
+            internalType: "address[]",
           },
           {
             name: "values",
             type: "uint256[]",
-            internalType: "uint256[]"
+            internalType: "uint256[]",
           },
           {
             name: "calldatas",
             type: "bytes[]",
-            internalType: "bytes[]"
+            internalType: "bytes[]",
           },
           {
             name: "description",
             type: "string",
-            internalType: "string"
-          }
-        ]
+            internalType: "string",
+          },
+        ],
       },
       {
         name: "_txRequest",
@@ -949,43 +949,43 @@ const GUARDIANS_RAW_ABI: Abi = [
           {
             name: "to",
             type: "address",
-            internalType: "address"
+            internalType: "address",
           },
           {
             name: "l2GasLimit",
             type: "uint256",
-            internalType: "uint256"
+            internalType: "uint256",
           },
           {
             name: "l2GasPerPubdataByteLimit",
             type: "uint256",
-            internalType: "uint256"
+            internalType: "uint256",
           },
           {
             name: "refundRecipient",
             type: "address",
-            internalType: "address"
+            internalType: "address",
           },
           {
             name: "txMintValue",
             type: "uint256",
-            internalType: "uint256"
-          }
-        ]
+            internalType: "uint256",
+          },
+        ],
       },
       {
         name: "_signers",
         type: "address[]",
-        internalType: "address[]"
+        internalType: "address[]",
       },
       {
         name: "_signatures",
         type: "bytes[]",
-        internalType: "bytes[]"
-      }
+        internalType: "bytes[]",
+      },
     ],
     outputs: [],
-    stateMutability: "payable"
+    stateMutability: "payable",
   },
   {
     type: "function",
@@ -994,26 +994,26 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "_digest",
         type: "bytes32",
-        internalType: "bytes32"
+        internalType: "bytes32",
       },
       {
         name: "_signers",
         type: "address[]",
-        internalType: "address[]"
+        internalType: "address[]",
       },
       {
         name: "_signatures",
         type: "bytes[]",
-        internalType: "bytes[]"
+        internalType: "bytes[]",
       },
       {
         name: "_threshold",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
     outputs: [],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1023,40 +1023,40 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "fields",
         type: "bytes1",
-        internalType: "bytes1"
+        internalType: "bytes1",
       },
       {
         name: "name",
         type: "string",
-        internalType: "string"
+        internalType: "string",
       },
       {
         name: "version",
         type: "string",
-        internalType: "string"
+        internalType: "string",
       },
       {
         name: "chainId",
         type: "uint256",
-        internalType: "uint256"
+        internalType: "uint256",
       },
       {
         name: "verifyingContract",
         type: "address",
-        internalType: "address"
+        internalType: "address",
       },
       {
         name: "salt",
         type: "bytes32",
-        internalType: "bytes32"
+        internalType: "bytes32",
       },
       {
         name: "extensions",
         type: "uint256[]",
-        internalType: "uint256[]"
-      }
+        internalType: "uint256[]",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1065,21 +1065,21 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "_id",
         type: "bytes32",
-        internalType: "bytes32"
+        internalType: "bytes32",
       },
       {
         name: "_signers",
         type: "address[]",
-        internalType: "address[]"
+        internalType: "address[]",
       },
       {
         name: "_signatures",
         type: "bytes[]",
-        internalType: "bytes[]"
-      }
+        internalType: "bytes[]",
+      },
     ],
     outputs: [],
-    stateMutability: "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -1093,34 +1093,34 @@ const GUARDIANS_RAW_ABI: Abi = [
           {
             name: "targets",
             type: "address[]",
-            internalType: "address[]"
+            internalType: "address[]",
           },
           {
             name: "values",
             type: "uint256[]",
-            internalType: "uint256[]"
+            internalType: "uint256[]",
           },
           {
             name: "calldatas",
             type: "bytes[]",
-            internalType: "bytes[]"
+            internalType: "bytes[]",
           },
           {
             name: "description",
             type: "string",
-            internalType: "string"
-          }
-        ]
-      }
+            internalType: "string",
+          },
+        ],
+      },
     ],
     outputs: [
       {
         name: "proposalId",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "pure"
+    stateMutability: "pure",
   },
   {
     type: "function",
@@ -1129,22 +1129,22 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "_digest",
         type: "bytes32",
-        internalType: "bytes32"
+        internalType: "bytes32",
       },
       {
         name: "_signature",
         type: "bytes",
-        internalType: "bytes"
-      }
+        internalType: "bytes",
+      },
     ],
     outputs: [
       {
         name: "",
         type: "bytes4",
-        internalType: "bytes4"
-      }
+        internalType: "bytes4",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1153,17 +1153,17 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
     outputs: [
       {
         name: "",
         type: "address",
-        internalType: "address"
-      }
+        internalType: "address",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1173,10 +1173,10 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1190,24 +1190,24 @@ const GUARDIANS_RAW_ABI: Abi = [
           {
             name: "targets",
             type: "address[]",
-            internalType: "address[]"
+            internalType: "address[]",
           },
           {
             name: "values",
             type: "uint256[]",
-            internalType: "uint256[]"
+            internalType: "uint256[]",
           },
           {
             name: "calldatas",
             type: "bytes[]",
-            internalType: "bytes[]"
+            internalType: "bytes[]",
           },
           {
             name: "description",
             type: "string",
-            internalType: "string"
-          }
-        ]
+            internalType: "string",
+          },
+        ],
       },
       {
         name: "_txRequest",
@@ -1217,54 +1217,54 @@ const GUARDIANS_RAW_ABI: Abi = [
           {
             name: "to",
             type: "address",
-            internalType: "address"
+            internalType: "address",
           },
           {
             name: "l2GasLimit",
             type: "uint256",
-            internalType: "uint256"
+            internalType: "uint256",
           },
           {
             name: "l2GasPerPubdataByteLimit",
             type: "uint256",
-            internalType: "uint256"
+            internalType: "uint256",
           },
           {
             name: "refundRecipient",
             type: "address",
-            internalType: "address"
+            internalType: "address",
           },
           {
             name: "txMintValue",
             type: "uint256",
-            internalType: "uint256"
-          }
-        ]
+            internalType: "uint256",
+          },
+        ],
       },
       {
         name: "_signers",
         type: "address[]",
-        internalType: "address[]"
+        internalType: "address[]",
       },
       {
         name: "_signatures",
         type: "bytes[]",
-        internalType: "bytes[]"
-      }
+        internalType: "bytes[]",
+      },
     ],
     outputs: [],
-    stateMutability: "payable"
+    stateMutability: "payable",
   },
   {
     type: "event",
     name: "EIP712DomainChanged",
     inputs: [],
-    anonymous: false
+    anonymous: false,
   },
   {
     type: "error",
     name: "InvalidShortString",
-    inputs: []
+    inputs: [],
   },
   {
     type: "error",
@@ -1273,11 +1273,11 @@ const GUARDIANS_RAW_ABI: Abi = [
       {
         name: "str",
         type: "string",
-        internalType: "string"
-      }
-    ]
-  }
-]
+        internalType: "string",
+      },
+    ],
+  },
+];
 
 const SEC_COUNCIL_RAW_ABI: Abi = [
   {
@@ -1286,15 +1286,15 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "_protocolUpgradeHandler",
         type: "address",
-        internalType: "contract IProtocolUpgradeHandler"
+        internalType: "contract IProtocolUpgradeHandler",
       },
       {
         name: "_members",
         type: "address[]",
-        internalType: "address[]"
-      }
+        internalType: "address[]",
+      },
     ],
-    stateMutability: "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -1304,10 +1304,10 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1317,10 +1317,10 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1330,10 +1330,10 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1343,10 +1343,10 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "address",
-        internalType: "contract IProtocolUpgradeHandler"
-      }
+        internalType: "contract IProtocolUpgradeHandler",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1356,10 +1356,10 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1369,10 +1369,10 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1382,10 +1382,10 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1394,21 +1394,21 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "_id",
         type: "bytes32",
-        internalType: "bytes32"
+        internalType: "bytes32",
       },
       {
         name: "_signers",
         type: "address[]",
-        internalType: "address[]"
+        internalType: "address[]",
       },
       {
         name: "_signatures",
         type: "bytes[]",
-        internalType: "bytes[]"
-      }
+        internalType: "bytes[]",
+      },
     ],
     outputs: [],
-    stateMutability: "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -1417,26 +1417,26 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "_digest",
         type: "bytes32",
-        internalType: "bytes32"
+        internalType: "bytes32",
       },
       {
         name: "_signers",
         type: "address[]",
-        internalType: "address[]"
+        internalType: "address[]",
       },
       {
         name: "_signatures",
         type: "bytes[]",
-        internalType: "bytes[]"
+        internalType: "bytes[]",
       },
       {
         name: "_threshold",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
     outputs: [],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1446,40 +1446,40 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "fields",
         type: "bytes1",
-        internalType: "bytes1"
+        internalType: "bytes1",
       },
       {
         name: "name",
         type: "string",
-        internalType: "string"
+        internalType: "string",
       },
       {
         name: "version",
         type: "string",
-        internalType: "string"
+        internalType: "string",
       },
       {
         name: "chainId",
         type: "uint256",
-        internalType: "uint256"
+        internalType: "uint256",
       },
       {
         name: "verifyingContract",
         type: "address",
-        internalType: "address"
+        internalType: "address",
       },
       {
         name: "salt",
         type: "bytes32",
-        internalType: "bytes32"
+        internalType: "bytes32",
       },
       {
         name: "extensions",
         type: "uint256[]",
-        internalType: "uint256[]"
-      }
+        internalType: "uint256[]",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1488,21 +1488,21 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "_validUntil",
         type: "uint256",
-        internalType: "uint256"
+        internalType: "uint256",
       },
       {
         name: "_signers",
         type: "address[]",
-        internalType: "address[]"
+        internalType: "address[]",
       },
       {
         name: "_signatures",
         type: "bytes[]",
-        internalType: "bytes[]"
-      }
+        internalType: "bytes[]",
+      },
     ],
     outputs: [],
-    stateMutability: "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -1512,10 +1512,10 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1524,22 +1524,22 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "_digest",
         type: "bytes32",
-        internalType: "bytes32"
+        internalType: "bytes32",
       },
       {
         name: "_signature",
         type: "bytes",
-        internalType: "bytes"
-      }
+        internalType: "bytes",
+      },
     ],
     outputs: [
       {
         name: "",
         type: "bytes4",
-        internalType: "bytes4"
-      }
+        internalType: "bytes4",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1548,17 +1548,17 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
     outputs: [
       {
         name: "",
         type: "address",
-        internalType: "address"
-      }
+        internalType: "address",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1567,26 +1567,26 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "_threshold",
         type: "uint256",
-        internalType: "uint256"
+        internalType: "uint256",
       },
       {
         name: "_validUntil",
         type: "uint256",
-        internalType: "uint256"
+        internalType: "uint256",
       },
       {
         name: "_signers",
         type: "address[]",
-        internalType: "address[]"
+        internalType: "address[]",
       },
       {
         name: "_signatures",
         type: "bytes[]",
-        internalType: "bytes[]"
-      }
+        internalType: "bytes[]",
+      },
     ],
     outputs: [],
-    stateMutability: "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -1595,21 +1595,21 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "_validUntil",
         type: "uint256",
-        internalType: "uint256"
+        internalType: "uint256",
       },
       {
         name: "_signers",
         type: "address[]",
-        internalType: "address[]"
+        internalType: "address[]",
       },
       {
         name: "_signatures",
         type: "bytes[]",
-        internalType: "bytes[]"
-      }
+        internalType: "bytes[]",
+      },
     ],
     outputs: [],
-    stateMutability: "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -1619,10 +1619,10 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1632,10 +1632,10 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1645,10 +1645,10 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -1657,21 +1657,21 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "_validUntil",
         type: "uint256",
-        internalType: "uint256"
+        internalType: "uint256",
       },
       {
         name: "_signers",
         type: "address[]",
-        internalType: "address[]"
+        internalType: "address[]",
       },
       {
         name: "_signatures",
         type: "bytes[]",
-        internalType: "bytes[]"
-      }
+        internalType: "bytes[]",
+      },
     ],
     outputs: [],
-    stateMutability: "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
     type: "function",
@@ -1681,21 +1681,21 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "uint256",
-        internalType: "uint256"
-      }
+        internalType: "uint256",
+      },
     ],
-    stateMutability: "view"
+    stateMutability: "view",
   },
   {
     type: "event",
     name: "EIP712DomainChanged",
     inputs: [],
-    anonymous: false
+    anonymous: false,
   },
   {
     type: "error",
     name: "InvalidShortString",
-    inputs: []
+    inputs: [],
   },
   {
     type: "error",
@@ -1704,12 +1704,12 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "str",
         type: "string",
-        internalType: "string"
-      }
-    ]
-  }
-]
+        internalType: "string",
+      },
+    ],
+  },
+];
 
 export const upgradeHandlerAbi = new ContractAbi(PROTOCOL_UPGRADE_HANDLER_RAW_ABI);
-export const guardiansAbi = new ContractAbi(GUARDIANS_RAW_ABI)
-export const scAbi = new ContractAbi(SEC_COUNCIL_RAW_ABI)
+export const guardiansAbi = new ContractAbi(GUARDIANS_RAW_ABI);
+export const scAbi = new ContractAbi(SEC_COUNCIL_RAW_ABI);
