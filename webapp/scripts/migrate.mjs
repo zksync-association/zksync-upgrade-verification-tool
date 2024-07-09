@@ -5,7 +5,7 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 if (!process.env.DATABASE_URL) {
-    throw new Error("Database url env var not defined")
+  throw new Error("Database url env var not defined");
 }
 
 const migrationClient = postgres(process.env.DATABASE_URL, { max: 1 });

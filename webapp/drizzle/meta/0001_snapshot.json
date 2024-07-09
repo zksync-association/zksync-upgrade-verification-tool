@@ -46,9 +46,7 @@
         "upgrades_proposal_id_unique": {
           "name": "upgrades_proposal_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "proposal_id"
-          ]
+          "columns": ["proposal_id"]
         }
       }
     }
@@ -57,10 +55,7 @@
     "public.status": {
       "name": "status",
       "schema": "public",
-      "values": [
-        "pending",
-        "completed"
-      ]
+      "values": ["pending", "completed"]
     }
   },
   "schemas": {},
