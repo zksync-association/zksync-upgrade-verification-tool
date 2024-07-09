@@ -115,15 +115,6 @@ export default function Proposals() {
           </CardFooter>
         </Card>
       </div>
-      <Card className="py-10 text-center">
-        <h3 className="">VOTING ENDS IN</h3>
-        <p className="text-4xl">
-          1 <span className="text-muted-foreground">day</span> : 23{" "}
-          <span className="text-muted-foreground">hrs</span> : 10{" "}
-          <span className="text-muted-foreground">mins</span> : 30{" "}
-          <span className="text-muted-foreground">seconds</span>
-        </p>
-      </Card>
       <Card className="flex flex-col items-center space-y-4 pt-4 pb-10 text-center">
         <p className="font-bold">{auth.isAuthenticated && displayAddress(auth.address)}</p>
         <h3 className="text-3xl">
