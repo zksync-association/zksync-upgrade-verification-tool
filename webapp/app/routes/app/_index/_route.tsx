@@ -1,15 +1,13 @@
+import { getPendingProposals } from "@/.server/service/upgrades";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link, json, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { $path } from "remix-routes";
 
-export function loader() {
+export async function loader() {
   return json({
-    proposals: [
-      { id: "11db41f5d1671deb24fa9b7a1ab486c4fd474c986f1feda58ea7de5f474c5316" },
-      { id: "def0f467480cea0211e937f75b00219cac6e8d21b0535acf70e402e33ebc81e8" },
-    ],
+    proposals: await getPendingProposals(),
   });
 }
 

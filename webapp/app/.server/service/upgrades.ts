@@ -10,7 +10,7 @@ const bigIntMax = (...args: bigint[]) => args.reduce((m, e) => (e > m ? e : m));
 
 const rpc = new RpcClient(env.L1_RPC_URL_FOR_UPGRADES);
 
-enum UPGRADE_STATES {
+enum PROPOSAL_STATES {
   None = 0,
   // LegalVetoPeriod,
   // Waiting,
@@ -20,7 +20,11 @@ enum UPGRADE_STATES {
   Done = 6,
 }
 
-export async function queryNewUpgrades(): Promise<Hex[]> {
+export type Proposal = {
+  id: Hex;
+};
+
+export async function getPendingProposals(): Promise<Proposal[]> {
   const currentBlock = await rpc.getLatestBlockNumber();
   const currentHeight = hexToBigInt(currentBlock);
   const maxUpgradeLiftimeInBlocks = BigInt(40 * 24 * 360); // conservative estimation of latest block with a valid upgrade
@@ -33,7 +37,7 @@ export async function queryNewUpgrades(): Promise<Hex[]> {
     abi.eventIdFor("UpgradeStarted"),
   ]);
 
-  const nonResolvedUpgrades: Hex[] = [];
+  const nonResolvedUpgrades: Proposal[] = [];
 
   for (const log of logs) {
     const [_, id] = log.topics;
@@ -45,8 +49,8 @@ export async function queryNewUpgrades(): Promise<Hex[]> {
       [id]
     );
 
-    if (stateNumber !== UPGRADE_STATES.Expired && stateNumber !== UPGRADE_STATES.Done) {
-      nonResolvedUpgrades.push(id);
+    if (stateNumber !== PROPOSAL_STATES.Expired && stateNumber !== PROPOSAL_STATES.Done) {
+      nonResolvedUpgrades.push({ id });
     }
   }
 
