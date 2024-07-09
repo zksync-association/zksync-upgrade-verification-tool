@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  type ContractsRepo,
-  StringCheckReport,
-  SystemContractList,
-  ZkSyncEraDiff,
-} from "../src";
+import { type ContractsRepo, StringCheckReport, SystemContractList, ZkSyncEraDiff } from "../src";
 import {
   HEX_ZKSYNC_FIELDS,
   type L2ContractData,
