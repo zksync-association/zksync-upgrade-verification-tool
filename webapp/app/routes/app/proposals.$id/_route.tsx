@@ -88,30 +88,30 @@ export default function Proposals() {
         </Card>
         <Card>
           <CardHeader className="pt-7">
-            <p className="text-primary">ACTIVE</p>
-            <CardTitle>Current Votes</CardTitle>
+            <p className="text-orange-400">WAITING</p>
+            <CardTitle>Proposal Status</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span>Approve</span>
-                <span className="text-muted-foreground">8/10</span>
+                <span>Security Council Approvals</span>
+                <span className="text-muted-foreground">5/6</span>
               </div>
               <Progress value={80} />
               <div className="flex justify-between">
-                <span>Abstain</span>
-                <span className="text-muted-foreground">2</span>
+                <span>Guardian Approvals</span>
+                <span className="text-muted-foreground">2/5</span>
               </div>
               <Progress value={20} />
               <div className="flex justify-between">
-                <span>Reject</span>
-                <span className="text-muted-foreground">2/6</span>
+                <span>Extend Legal Veto Approvals</span>
+                <span className="text-muted-foreground">1/2</span>
               </div>
-              <Progress value={20} />
+              <Progress value={50} />
             </div>
           </CardContent>
           <CardFooter className="justify-end">
-            <Button>Execute Transaction</Button>
+            <Button disabled>Execute Transaction</Button>
           </CardFooter>
         </Card>
       </div>
@@ -122,8 +122,6 @@ export default function Proposals() {
         </h3>
         <div className="flex space-x-4">
           <Button>Approve</Button>
-          <Button>Abstain</Button>
-          <Button>Reject</Button>
         </div>
       </Card>
       <div className="pt-4">

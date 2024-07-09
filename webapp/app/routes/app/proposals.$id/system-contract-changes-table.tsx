@@ -6,7 +6,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { displayAddress, displayBytecodeHash } from "@/routes/app/proposals.$id/common-tables";
+import {
+  displayAddress,
+  displayBytes32,
+  displayEmpty,
+} from "@/routes/app/proposals.$id/common-tables";
 import type { SystemContractUpgrade } from "validate-cli/src/lib";
 
 export default function SystemContractChangesTable({
@@ -16,35 +20,39 @@ export default function SystemContractChangesTable({
   return (
     <Table className={className}>
       <TableHeader>
-        <TableRow className="text-base hover:bg-transparent">
+        <TableRow>
           <TableHead>System Contract</TableHead>
           <TableHead className="px-0">Address</TableHead>
           <TableHead className="px-0">Bytecode hash</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((diff, i) => (
-          <>
-            {/* biome-ignore lint/suspicious/noArrayIndexKey: <explanation> */}
-            <TableRow key={`a${i}`} className="hover:bg-transparent">
-              <TableCell className="pr-4" rowSpan={2}>
-                {diff.name}
-              </TableCell>
-              <TableCell className="px-0" rowSpan={2}>
-                {displayAddress(diff.address)}
-              </TableCell>
-              <TableCell className="px-0">
-                Current: {displayBytecodeHash(diff.currentBytecodeHash ?? "")}
-              </TableCell>
-            </TableRow>
-            {/* biome-ignore lint/suspicious/noArrayIndexKey: <explanation> */}
-            <TableRow key={`b${i}`} className="hover:bg-transparent">
-              <TableCell className="px-0">
-                Proposed: {displayBytecodeHash(diff.proposedBytecodeHash ?? "")}
-              </TableCell>
-            </TableRow>
-          </>
-        ))}
+        {data.map((diff, i) => {
+          const address = displayAddress(diff.address);
+          const current = diff.currentBytecodeHash
+            ? displayBytes32(diff.currentBytecodeHash)
+            : displayEmpty();
+          const proposed = diff.proposedBytecodeHash
+            ? displayBytes32(diff.proposedBytecodeHash)
+            : displayEmpty();
+
+          return (
+            <>
+              <TableRow key={diff.name}>
+                <TableCell className="pr-4" rowSpan={2}>
+                  {diff.name}
+                </TableCell>
+                <TableCell className="px-0" rowSpan={2}>
+                  {address}
+                </TableCell>
+                <TableCell className="px-0">Current: {current}</TableCell>
+              </TableRow>
+              <TableRow key={proposed}>
+                <TableCell className="px-0">Proposed: {proposed}</TableCell>
+              </TableRow>
+            </>
+          );
+        })}
       </TableBody>
     </Table>
   );
