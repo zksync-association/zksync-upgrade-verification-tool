@@ -20,7 +20,7 @@
     "fmt": "biome format .",
     "fmt:fix": "biome format . --write",
     "lint": "pnpm biome lint .",
-    "lint:fix": "pnpm biome lint . --apply",
+    "lint:fix": "pnpm biome lint . --write",
     "test": "vitest run --maxWorkers=1"
   },
   "keywords": [],

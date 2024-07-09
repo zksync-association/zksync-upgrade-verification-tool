@@ -3,7 +3,7 @@ import type { BlockExplorer } from "../block-explorer-client";
 import {
   ADDR_ZKSYNC_FIELDS,
   BYTES32_ZKSYNC_FIELDS,
-  NUMERIC_ZKSYNC_FIELDS
+  NUMERIC_ZKSYNC_FIELDS,
 } from "../zksync-era-state";
 import type { Hex } from "viem";
 import type { Option } from "nochoices";
@@ -16,7 +16,7 @@ export type SystemContractUpgrade = {
   recompileMatches: boolean;
 };
 
-type FieldChangeType = "number" | "address" | "bytes32"
+type FieldChangeType = "number" | "address" | "bytes32";
 
 export type ContractFieldChange = {
   name: string;

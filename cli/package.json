@@ -23,7 +23,7 @@
     "fmt": "biome format .",
     "fmt:fix": "biome format . --write",
     "lint": "pnpm biome lint ./src",
-    "lint:fix": "pnpm biome lint ./src --apply",
+    "lint:fix": "pnpm biome lint ./src --write",
     "start": "tsx src/entrypoint.ts",
     "build": "tsup src --format esm --dts --no-splitting --sourcemap",
     "watch": "tsup src --format esm --sourcemap --no-splitting --watch",

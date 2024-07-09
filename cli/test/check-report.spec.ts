@@ -4,7 +4,7 @@ import {
   StringCheckReport,
   SystemContractList,
   ZkSyncEraDiff,
-} from "../src/index";
+} from "../src";
 import {
   HEX_ZKSYNC_FIELDS,
   type L2ContractData,
@@ -13,11 +13,11 @@ import {
 } from "../src/lib/zksync-era-state";
 import { TestBlockExplorer } from "./utilities/test-block-explorer";
 import { ContractAbi } from "../src/lib/contract-abi";
-import type { BlockExplorer } from "../src/lib";
+import type { BlockExplorer } from "../src";
 import type { Hex } from "viem";
 import { TestContractRepo } from "./utilities/test-contract-repo";
 import { Option } from "nochoices";
-import { type CheckReportObj, ObjectCheckReport } from "../src/lib/reports/object-check-report";
+import { type CheckReportObj, ObjectCheckReport } from "../src";
 
 interface Ctx {
   abi1: ContractAbi;
@@ -358,79 +358,79 @@ describe("CheckReport", () => {
               name: "admin",
               current: "0x010a",
               proposed: "0x010b",
-              type: "address"
+              type: "address",
             },
             {
               name: "pendingAdmin",
               current: "0x020a",
               proposed: "0x020b",
-              type: "address"
+              type: "address",
             },
             {
               name: "verifierAddress",
               current: "0x030a",
               proposed: "0x030b",
-              type: "address"
+              type: "address",
             },
             {
               name: "bridgeHubAddress",
               current: "0x040a",
               proposed: "0x040b",
-              type: "address"
+              type: "address",
             },
             {
               name: "blobVersionedHashRetriever",
               current: "0x050a",
               proposed: "0x050b",
-              type: "address"
+              type: "address",
             },
             {
               name: "stateTransitionManagerAddress",
               current: "0x060a",
               proposed: "0x060b",
-              type: "address"
+              type: "address",
             },
             {
               name: "l2DefaultAccountBytecodeHash",
               current: "0x070a",
               proposed: "0x070b",
-              type: "bytes32"
+              type: "bytes32",
             },
             {
               name: "l2BootloaderBytecodeHash",
               current: "0x080a",
               proposed: "0x080b",
-              type: "bytes32"
+              type: "bytes32",
             },
             {
               name: "baseTokenBridgeAddress",
               current: "0x090a",
               proposed: null,
-              type: "address"
+              type: "address",
             },
             {
               name: "protocolVersion",
               current: "0x000000000000000000000000000000000000000000000000000000000000000f",
               proposed: "0x0000000000000000000000000000000000000000000000000000001800000001",
-              type: "bytes32"
+              type: "bytes32",
             },
             {
               name: "baseTokenGasPriceMultiplierNominator",
               current: "200",
               proposed: "201",
-              type: "number"
+              type: "number",
             },
             {
               name: "baseTokenGasPriceMultiplierDenominator",
               current: "300",
               proposed: null,
-              type: "number"
+              type: "number",
             },
             {
               name: "chainId",
               current: "100",
               proposed: "101",
-              type: "number"
+              type: "number",
             },
           ])
         );
