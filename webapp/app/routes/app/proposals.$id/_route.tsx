@@ -20,7 +20,7 @@ import { getCheckReport, getStorageChangeReport } from "@/.server/service/report
 
 export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const params = getParams(remixParams, z.object({ id: z.string() }));
-  if (params.success === false) {
+  if (!params.success) {
     throw notFound();
   }
 
