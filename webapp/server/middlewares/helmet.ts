@@ -13,11 +13,13 @@ export function helmet() {
       directives: {
         "connect-src": [
           env.NODE_ENV === "development" ? "ws:" : null,
+          env.NODE_ENV === "development" ? env.L1_RPC_URL_FOR_UPGRADES : null,
           "*.sentry.io",
           "'self'",
           "https://explorer-api.walletconnect.com",
+          "https://enhanced-provider.rainbow.me",
         ].filter(Boolean) as string[],
-        "font-src": ["'self'"],
+        "font-src": ["'self'", "https://rsms.me"],
         "frame-src": ["'self'", "https://verify.walletconnect.com"],
         "img-src": [
           "'self'",
