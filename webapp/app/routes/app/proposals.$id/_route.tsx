@@ -1,4 +1,3 @@
-import type { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { useAuth } from "@/components/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +16,7 @@ import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { z } from "zod";
+import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 
 export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const params = getParams(remixParams, z.object({ id: z.string() }));
