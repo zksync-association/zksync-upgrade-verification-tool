@@ -1,5 +1,4 @@
 import { getCheckReport, getProposal, getStorageChangeReport } from "@/.server/service/reports";
-import { useAuth } from "@/components/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -8,6 +7,7 @@ import FacetChangesTable from "@/routes/app/proposals.$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals.$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals.$id/field-storage-changes-table";
 import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contract-changes-table";
+import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { notFound } from "@/utils/http";
 import type { LoaderFunctionArgs } from "@remix-run/node";
@@ -17,7 +17,8 @@ import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { z } from "zod";
 
-export async function loader({ params: remixParams }: LoaderFunctionArgs) {
+export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
+  const user = requireUserFromHeader(request);
   const params = getParams(remixParams, z.object({ id: z.string() }));
   if (!params.success) {
     throw notFound();
@@ -43,12 +44,12 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
       fieldChanges: checkReport.fieldChanges,
       fieldStorageChanges: storageChangeReport,
     },
+    user,
   });
 }
 
 export default function Proposals() {
-  const { proposal, reports } = useLoaderData<typeof loader>();
-  const auth = useAuth();
+  const { proposal, reports, user } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
 
   return (
@@ -120,11 +121,13 @@ export default function Proposals() {
         </Card>
         <Card className="pb-10">
           <CardHeader>
-            <CardTitle>Guardian Actions</CardTitle>
+            <CardTitle>
+              {user.role === "guardian" ? "Guardian" : "Security Council"} Actions
+            </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
             <Button>Approve proposal</Button>
-            <Button>Approve veto extension</Button>
+            {user.role === "guardian" && <Button>Approve veto extension</Button>}
           </CardContent>
         </Card>
         <Card className="pb-10">

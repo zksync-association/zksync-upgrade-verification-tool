@@ -13,7 +13,7 @@ const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 
 const range = (l: number): number[] => new Array(l).fill(0).map((_, i) => i);
 
-export const UserRole = z.enum(["guardian", "security_council"]);
+export const UserRole = z.enum(["guardian", "securityCouncil"]);
 export type UserRole = z.infer<typeof UserRole>;
 
 export async function isUserAuthorized(address: Hex) {
@@ -41,7 +41,7 @@ export async function isUserAuthorized(address: Hex) {
   if (isGuardian || isSecurityCouncil) {
     return {
       authorized: true,
-      role: isGuardian ? UserRole.enum.guardian : UserRole.enum.security_council,
+      role: isGuardian ? UserRole.enum.guardian : UserRole.enum.securityCouncil,
     } as const;
   }
 

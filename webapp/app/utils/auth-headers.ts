@@ -5,7 +5,8 @@ import { USER_ADDRESS_HEADER, USER_ROLE_HEADER } from "@server/middlewares/auth"
 export function getUserFromHeader(request: Request) {
   const address = request.headers.get(USER_ADDRESS_HEADER);
   const role = request.headers.get(USER_ROLE_HEADER);
-  return { address, role };
+  const parsedRole = UserRole.optional().safeParse(role);
+  return { address, role: parsedRole.data ?? null };
 }
 
 export function requireUserFromHeader(request: Request) {
