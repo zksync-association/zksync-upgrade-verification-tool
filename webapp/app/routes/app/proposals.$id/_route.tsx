@@ -11,17 +11,19 @@ import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contra
 import { displayAddress } from "@/utils/address";
 import { displayBytes32 } from "@/utils/bytes32";
 import { notFound } from "@/utils/http";
-import type { LoaderFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, useNavigate } from "@remix-run/react";
+import { useFetcher, useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { z } from "zod";
 import SignButton from "@/routes/app/proposals.$id/sign-button";
 import { Hex } from "viem";
+import { guardianAddress } from "@/.server/service/authorized-users";
+import { useCallback } from "react";
 
-export async function loader({ params: remixParams }: LoaderFunctionArgs) {
-  const params = getParams(remixParams, z.object({ id: z.string() }));
+export async function loader({params: remixParams}: LoaderFunctionArgs) {
+  const params = getParams(remixParams, z.object({id: z.string()}));
   if (!params.success) {
     throw notFound();
   }
@@ -42,15 +44,27 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
       fieldStorageChanges: storageChangeReport,
     },
     addresses: {
-      guardian:
+      guardian: await guardianAddress()
     }
   });
 }
 
+export async function action({ request }: ActionFunctionArgs) {
+  console.log("Me llamaron!")
+}
+
 export default function Proposals() {
-  const { proposal, reports } = useLoaderData<typeof loader>();
+  const {proposal, reports, addresses} = useLoaderData<typeof loader>();
   const auth = useAuth();
   const navigate = useNavigate();
+  const fetcher = useFetcher({ key: "sign" });
+
+
+  console.log("rendering")
+  const blah = useCallback((signature: string) => {
+    console.log("blaaaaaaaaaaaaaaaaaaaaaaaaaaaaaah", signature)
+  }, [fetcher])
+
 
   return (
     <div className="mt-10 flex flex-col space-y-4">
@@ -61,7 +75,7 @@ export default function Proposals() {
           onClick={() => navigate(-1)}
           className="mr-2 hover:bg-transparent"
         >
-          <ArrowLeft />
+          <ArrowLeft/>
         </Button>
         <h2 className="font-semibold">Proposal {displayBytes32(proposal.id)}</h2>
       </div>
@@ -102,17 +116,17 @@ export default function Proposals() {
                 <span>Approve</span>
                 <span className="text-muted-foreground">8/10</span>
               </div>
-              <Progress value={80} />
+              <Progress value={80}/>
               <div className="flex justify-between">
                 <span>Abstain</span>
                 <span className="text-muted-foreground">2</span>
               </div>
-              <Progress value={20} />
+              <Progress value={20}/>
               <div className="flex justify-between">
                 <span>Reject</span>
                 <span className="text-muted-foreground">2/6</span>
               </div>
-              <Progress value={20} />
+              <Progress value={20}/>
             </div>
           </CardContent>
           <CardFooter className="justify-end">
@@ -139,9 +153,9 @@ export default function Proposals() {
           <Button>Abstain</Button>
           <SignButton
             proposalId={proposal.id}
-            contractData={{actionName: "ExtendLegalVetoPeriod", address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512", name: "Guardians"}}
+            contractData={{actionName: "ExtendLegalVetoPeriod", address: addresses.guardian, name: "Guardians"}}
             onError={console.error}
-            onSuccess={console.log}
+            onSuccess={blah}
           >Extend</SignButton>
         </div>
       </Card>
@@ -160,7 +174,7 @@ export default function Proposals() {
                 <CardTitle>Facet Changes</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <FacetChangesTable data={reports.facetChanges} />
+                <FacetChangesTable data={reports.facetChanges}/>
               </CardContent>
             </Card>
           </TabsContent>
@@ -170,7 +184,7 @@ export default function Proposals() {
                 <CardTitle>System Contract Changes</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <SystemContractChangesTable data={reports.systemContractChanges} />
+                <SystemContractChangesTable data={reports.systemContractChanges}/>
               </CardContent>
             </Card>
           </TabsContent>
@@ -180,7 +194,7 @@ export default function Proposals() {
                 <CardTitle>Field Changes</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <FieldChangesTable data={reports.fieldChanges} />
+                <FieldChangesTable data={reports.fieldChanges}/>
               </CardContent>
             </Card>
           </TabsContent>
@@ -190,7 +204,7 @@ export default function Proposals() {
                 <CardTitle>Field Storage Changes</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <FieldStorageChangesTable data={reports.fieldStorageChanges} />{" "}
+                <FieldStorageChangesTable data={reports.fieldStorageChanges}/>{" "}
               </CardContent>
             </Card>
           </TabsContent>

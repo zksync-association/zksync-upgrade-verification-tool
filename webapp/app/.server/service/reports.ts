@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { l1Explorer, l1Rpc, l2Explorer } from "@/.server/service/clients";
+import { l1Explorer, l1Rpc, l1RpcProposals, l2Explorer } from "@/.server/service/clients";
 import { env } from "@config/env.server";
 import {
   type BlockExplorerClient,
@@ -17,6 +17,7 @@ import {
   ZksyncEraState,
   memoryDiffParser,
 } from "validate-cli";
+import { Hex } from "viem";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -78,3 +79,7 @@ export async function getStorageChangeReport(_reportId: string): Promise<FieldSt
 
   return report.format();
 }
+
+// export async function guardiansAddress (): Promise<Hex> {
+//   l1RpcProposals.
+// }
