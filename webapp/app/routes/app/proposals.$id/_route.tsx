@@ -1,4 +1,4 @@
-import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
+import { getCheckReport, getProposal, getStorageChangeReport } from "@/.server/service/reports";
 import { useAuth } from "@/components/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,11 @@ import { z } from "zod";
 export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const params = getParams(remixParams, z.object({ id: z.string() }));
   if (!params.success) {
+    throw notFound();
+  }
+
+  const proposal = await getProposal(params.data.id);
+  if (!proposal) {
     throw notFound();
   }
 

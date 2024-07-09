@@ -103,6 +103,12 @@ async function generateReportIfNotInDb<T>(
   return proposal[propName] as T;
 }
 
+export async function getProposal(proposalId: string) {
+  return await db.query.upgradesTable.findFirst({
+    where: eq(upgradesTable.proposalId, proposalId),
+  });
+}
+
 export async function getCheckReport(proposalId: string): Promise<CheckReportObj> {
   return generateReportIfNotInDb(proposalId, "checkReport", calculateCheckReport);
 }
