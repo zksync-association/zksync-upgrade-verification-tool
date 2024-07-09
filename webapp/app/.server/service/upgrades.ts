@@ -56,3 +56,4 @@ export async function queryPendingProposals(): Promise<Proposal[]> {
 
   return nonResolvedUpgrades;
 }
+

@@ -17,6 +17,8 @@ import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { z } from "zod";
+import SignButton from "@/routes/app/proposals.$id/sign-button";
+import { Hex } from "viem";
 
 export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const params = getParams(remixParams, z.object({ id: z.string() }));
@@ -28,7 +30,7 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const storageChangeReport = await getStorageChangeReport(params.data.id);
   return json({
     proposal: {
-      id: params.data.id,
+      id: params.data.id as Hex,
       version: "23",
       proposedBy: "0x23",
       proposedOn: "July 23, 2024",
@@ -39,6 +41,9 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
       fieldChanges: checkReport.fieldChanges,
       fieldStorageChanges: storageChangeReport,
     },
+    addresses: {
+      guardian:
+    }
   });
 }
 
@@ -132,7 +137,12 @@ export default function Proposals() {
         <div className="flex space-x-4">
           <Button>Approve</Button>
           <Button>Abstain</Button>
-          <Button>Reject</Button>
+          <SignButton
+            proposalId={proposal.id}
+            contractData={{actionName: "ExtendLegalVetoPeriod", address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512", name: "Guardians"}}
+            onError={console.error}
+            onSuccess={console.log}
+          >Extend</SignButton>
         </div>
       </Card>
       <div className="pt-4">
