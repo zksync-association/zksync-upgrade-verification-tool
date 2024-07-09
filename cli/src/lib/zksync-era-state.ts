@@ -51,18 +51,25 @@ export type FeeParams = {
   minimalL2GasPrice: bigint;
 };
 
-export const HEX_ZKSYNC_FIELDS = [
+export const ADDR_ZKSYNC_FIELDS = [
   "admin",
   "pendingAdmin",
   "verifierAddress",
   "bridgeHubAddress",
   "blobVersionedHashRetriever",
-  "stateTransitionManagerAddress",
+  "stateTransitionManagerAddress"
+] as const
+
+export const BYTES32_ZKSYNC_FIELDS = [
   "l2DefaultAccountBytecodeHash",
   "l2BootloaderBytecodeHash",
   "baseTokenBridgeAddress",
   "protocolVersion",
-] as const;
+] as const
+
+export const HEX_ZKSYNC_FIELDS = [
+  ...ADDR_ZKSYNC_FIELDS,
+  ...BYTES32_ZKSYNC_FIELDS] as const;
 
 export type HexEraPropName = (typeof HEX_ZKSYNC_FIELDS)[number];
 

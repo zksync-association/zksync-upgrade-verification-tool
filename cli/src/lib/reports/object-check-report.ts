@@ -1,6 +1,10 @@
 import type { ZkSyncEraDiff } from "../zk-sync-era-diff";
 import type { BlockExplorer } from "../block-explorer-client";
-import { HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS } from "../zksync-era-state";
+import {
+  ADDR_ZKSYNC_FIELDS,
+  BYTES32_ZKSYNC_FIELDS,
+  NUMERIC_ZKSYNC_FIELDS
+} from "../zksync-era-state";
 import type { Hex } from "viem";
 import type { Option } from "nochoices";
 
@@ -12,10 +16,13 @@ export type SystemContractUpgrade = {
   recompileMatches: boolean;
 };
 
+type FieldChangeType = "number" | "address" | "bytes32"
+
 export type ContractFieldChange = {
   name: string;
-  current?: string;
-  proposed?: string;
+  type: FieldChangeType;
+  current: string | null;
+  proposed: string | null;
 };
 
 export type FacetDataReportDiff = {
@@ -96,13 +103,23 @@ export class ObjectCheckReport {
 
   private addFields(): ContractFieldChange[] {
     const res: ContractFieldChange[] = [];
-    for (const field of HEX_ZKSYNC_FIELDS) {
+    for (const field of ADDR_ZKSYNC_FIELDS) {
       const [before, maybeAfter] = this.diff.hexAttrDiff(field);
-
       res.push({
         name: field,
         current: before,
-        proposed: this.orUndefined(maybeAfter),
+        type: "address",
+        proposed: this.orNull(maybeAfter),
+      });
+    }
+
+    for (const field of BYTES32_ZKSYNC_FIELDS) {
+      const [before, maybeAfter] = this.diff.hexAttrDiff(field);
+      res.push({
+        name: field,
+        current: before,
+        type: "bytes32",
+        proposed: this.orNull(maybeAfter),
       });
     }
 
@@ -111,7 +128,8 @@ export class ObjectCheckReport {
       res.push({
         name: field,
         current: before.toString(),
-        proposed: this.orUndefined(maybeAfter.map((v) => v.toString())),
+        type: "number",
+        proposed: this.orNull(maybeAfter.map((v) => v.toString())),
       });
     }
 
@@ -120,6 +138,10 @@ export class ObjectCheckReport {
 
   private orUndefined<T>(opt: Option<T>): T | undefined {
     return opt.map((v): T | undefined => v).unwrapOr(undefined);
+  }
+
+  private orNull<T>(opt: Option<T>): T | null {
+    return opt.map((v): T | null => v).unwrapOr(null);
   }
 
   private async addSystemContracts(): Promise<SystemContractUpgrade[]> {
