@@ -57,14 +57,14 @@ export const ADDR_ZKSYNC_FIELDS = [
   "verifierAddress",
   "bridgeHubAddress",
   "blobVersionedHashRetriever",
-  "stateTransitionManagerAddress"
+  "stateTransitionManagerAddress",
+  "baseTokenBridgeAddress"
 ] as const
 
 export const BYTES32_ZKSYNC_FIELDS = [
   "l2DefaultAccountBytecodeHash",
   "l2BootloaderBytecodeHash",
-  "baseTokenBridgeAddress",
-  "protocolVersion",
+  "protocolVersion"
 ] as const
 
 export const HEX_ZKSYNC_FIELDS = [
