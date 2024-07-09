@@ -82,8 +82,7 @@ async function calculateStorageChangeReport(proposalId: string): Promise<FieldSt
   return report.format();
 }
 
-
-export async function getCheckReport(proposalId: string): Promise<CheckReportObj> {
+async function generateReportIfNotInDb<T>(proposalId: string, propName: "checkReport" | "storageDiffReport", generator: (t: string) => Promise<T>): Promise<T> {
   const proposal = await db.query.upgradesTable.findFirst({
     where: eq(upgradesTable.proposalId, proposalId)
   })
@@ -92,29 +91,20 @@ export async function getCheckReport(proposalId: string): Promise<CheckReportObj
     throw new Error("Unknown proposal")
   }
 
-  if (!proposal.checkReport) {
-    const report = await calculateCheckReport(proposalId)
-    proposal.checkReport = report
+  if (!proposal[propName]) {
+    const report = await generator(proposalId)
+    proposal[propName] = report
     await db.update(upgradesTable).set(proposal).where(eq(upgradesTable.proposalId, proposalId));
   }
 
-  return proposal.checkReport as CheckReportObj
+  return proposal[propName] as T
+}
+
+
+export async function getCheckReport(proposalId: string): Promise<CheckReportObj> {
+  return generateReportIfNotInDb(proposalId, "checkReport", calculateCheckReport)
 }
 
 export async function getStorageChangeReport(proposalId: string): Promise<FieldStorageChange[]> {
-  const proposal = await db.query.upgradesTable.findFirst({
-    where: eq(upgradesTable.proposalId, proposalId)
-  })
-
-  if (!proposal) {
-    throw new Error("Unknown proposal")
-  }
-
-  if (!proposal.storageDiffReport) {
-    const report = await calculateStorageChangeReport(proposalId)
-    proposal.storageDiffReport = report
-    await db.update(upgradesTable).set(proposal)
-  }
-
-  return proposal.storageDiffReport as FieldStorageChange[];
+  return generateReportIfNotInDb(proposalId, "storageDiffReport", calculateStorageChangeReport)
 }
