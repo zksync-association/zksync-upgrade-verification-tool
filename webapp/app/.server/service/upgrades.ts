@@ -21,8 +21,8 @@ enum PROPOSAL_STATES {
 }
 
 export type Proposal = {
-  id: Hex
-}
+  id: Hex;
+};
 
 export async function getPendingProposals(): Promise<Proposal[]> {
   const currentBlock = await rpc.getLatestBlockNumber();
@@ -50,7 +50,7 @@ export async function getPendingProposals(): Promise<Proposal[]> {
     );
 
     if (stateNumber !== PROPOSAL_STATES.Expired && stateNumber !== PROPOSAL_STATES.Done) {
-      nonResolvedUpgrades.push({id});
+      nonResolvedUpgrades.push({ id });
     }
   }
 
