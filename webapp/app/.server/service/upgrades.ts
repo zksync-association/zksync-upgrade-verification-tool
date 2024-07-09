@@ -24,7 +24,7 @@ export type Proposal = {
   id: Hex
 }
 
-export async function queryPendingProposals(): Promise<Proposal[]> {
+export async function getPendingProposals(): Promise<Proposal[]> {
   const currentBlock = await rpc.getLatestBlockNumber();
   const currentHeight = hexToBigInt(currentBlock);
   const maxUpgradeLiftimeInBlocks = BigInt(40 * 24 * 360); // conservative estimation of latest block with a valid upgrade

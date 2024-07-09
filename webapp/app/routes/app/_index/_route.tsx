@@ -3,11 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { json, Link, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { $path } from "remix-routes";
-import { queryPendingProposals } from "@/.server/service/upgrades";
+import { getPendingProposals } from "@/.server/service/upgrades";
 
 export async function loader() {
   return json({
-    proposals: await queryPendingProposals(),
+    proposals: await getPendingProposals(),
   });
 }
 
