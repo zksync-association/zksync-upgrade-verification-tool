@@ -43,7 +43,7 @@ async function calculateBeforeAndAfter(
   return { current, proposed, sysAddresses, callData: decodedBuf };
 }
 
-export async function checkReport(_reportId: string): Promise<CheckReportObj> {
+export async function getCheckReport(_reportId: string): Promise<CheckReportObj> {
   const { current, proposed, sysAddresses } = await calculateBeforeAndAfter(
     network,
     l1Explorer,
@@ -55,7 +55,7 @@ export async function checkReport(_reportId: string): Promise<CheckReportObj> {
   return report.format();
 }
 
-export async function storageChangeReport(_reportId: string): Promise<FieldStorageChange[]> {
+export async function getStorageChangeReport(_reportId: string): Promise<FieldStorageChange[]> {
   const network = "mainnet";
   const diamondAddress = DIAMOND_ADDRS[network];
 

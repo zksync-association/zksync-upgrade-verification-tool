@@ -4,7 +4,7 @@ import { WalletProvider } from "@/components/providers/wallet-provider";
 import { getUserFromHeader } from "@/utils/auth-headers";
 import { useNonce } from "@/utils/nonce-provider";
 import { clientEnv } from "@config/env.server";
-import { type LoaderFunctionArgs, json } from "@remix-run/node";
+import { type LinksFunction, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "@remix-run/react";
 import {
   type State,
@@ -14,6 +14,10 @@ import {
 
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
+
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: "https://rsms.me/inter/inter.css" },
+];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Get wagmi cookie for SSR
@@ -49,8 +53,11 @@ export default function App() {
         <WalletProvider
           initialState={walletProviderInitialState}
           projectId={env.WALLET_CONNECT_PROJECT_ID}
+          devNetwork={env.DEV_NETWORK}
         >
-          <Outlet />
+          <div className="flex min-h-screen flex-col px-10 py-10 lg:px-40">
+            <Outlet />
+          </div>
         </WalletProvider>
       </AuthProvider>
     </Document>
@@ -69,7 +76,7 @@ function Document({
   allowIndexing?: boolean;
 }) {
   return (
-    <html lang="en" className="dark flex justify-center">
+    <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -77,8 +84,8 @@ function Document({
         <Meta />
         <Links />
       </head>
-      <body className="relative min-h-screen max-w-screen-md">
-        {children}
+      <body>
+        <div className="relative mx-auto min-h-screen w-full max-w-[1500px]">{children}</div>
         <script
           nonce={nonce}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>

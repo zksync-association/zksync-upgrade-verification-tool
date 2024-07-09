@@ -13,6 +13,10 @@ export const env = createEnv({
     L1_RPC_URL: z.string(),
     L1_RPC_URL_FOR_UPGRADES: z.string(),
     ETH_NETWORK: z.enum(["mainnet", "sepolia"]).default("mainnet"),
+    DEV_NETWORK: z
+      .string()
+      .default("false")
+      .transform((v) => v === "true"),
     ETHERSCAN_API_KEY: z.string(),
     AUTH_SECRET: z.string(),
     UPGRADE_HANDLER_ADDRESS: zodHex,
@@ -26,6 +30,7 @@ export const clientEnv = {
   ALLOW_INDEXING: env.ALLOW_INDEXING,
   NODE_ENV: env.NODE_ENV,
   WALLET_CONNECT_PROJECT_ID: env.WALLET_CONNECT_PROJECT_ID,
+  DEV_NETWORK: env.DEV_NETWORK,
 };
 
 declare global {

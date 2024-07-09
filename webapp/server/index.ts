@@ -32,6 +32,8 @@ const viteDevServer =
 
 const app = express();
 
+app.set("trust proxy", true);
+
 app.use(requireHttps);
 app.get("*", removeTrailingSlash);
 app.use(compression());
@@ -44,7 +46,6 @@ app.use(
     secure: env.NODE_ENV === "production",
   })
 );
-app.use(auth);
 
 // http://expressjs.com/en/advanced/best-practice-security.html#at-a-minimum-disable-x-powered-by-header
 app.disable("x-powered-by");
@@ -67,6 +68,7 @@ app.get(["/img/*", "/favicons/*"], (_req, res) => {
 });
 
 app.use(logger);
+app.use(auth);
 app.use(cspNonce);
 app.use(helmet());
 app.use(rateLimit);
