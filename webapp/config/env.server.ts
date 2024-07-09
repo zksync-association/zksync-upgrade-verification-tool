@@ -1,4 +1,5 @@
 import { createEnv } from "@t3-oss/env-core";
+import { zodHex } from "validate-cli";
 import { z } from "zod";
 
 export const env = createEnv({
@@ -10,9 +11,15 @@ export const env = createEnv({
     SERVER_PORT: z.coerce.number().default(3000),
     WALLET_CONNECT_PROJECT_ID: z.string(),
     L1_RPC_URL: z.string(),
+    L1_RPC_URL_FOR_UPGRADES: z.string(),
     ETH_NETWORK: z.enum(["mainnet", "sepolia"]).default("mainnet"),
+    DEV_NETWORK: z
+      .string()
+      .default("false")
+      .transform((v) => v === "true"),
     ETHERSCAN_API_KEY: z.string(),
     AUTH_SECRET: z.string(),
+    UPGRADE_HANDLER_ADDRESS: zodHex,
   },
   // eslint-disable-next-line n/no-process-env
   runtimeEnv: process.env,
@@ -23,6 +30,7 @@ export const clientEnv = {
   ALLOW_INDEXING: env.ALLOW_INDEXING,
   NODE_ENV: env.NODE_ENV,
   WALLET_CONNECT_PROJECT_ID: env.WALLET_CONNECT_PROJECT_ID,
+  DEV_NETWORK: env.DEV_NETWORK,
 };
 
 declare global {

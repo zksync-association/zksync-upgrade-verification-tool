@@ -72,5 +72,14 @@ export const l2UpgradeSchema = z.object({
   ]),
 });
 
+export const contractEventSchema = z.object({
+  address: zodHex,
+  topics: z.array(zodHex),
+  data: zodHex,
+  transactionHash: zodHex,
+  blockNumber: zodHex,
+});
+
 export type MemoryDiffRaw = z.infer<typeof memoryDiffParser>;
 export type FacetCut = z.infer<typeof facetCutSchema>;
+export type ContractEvent = z.infer<typeof contractEventSchema>;

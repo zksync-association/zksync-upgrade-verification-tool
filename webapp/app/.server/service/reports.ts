@@ -1,31 +1,33 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { l1Explorer, l1Rpc, l2Explorer } from "@/.server/service/clients";
 import { env } from "@config/env.server";
 import {
-  BlockExplorerClient,
+  type BlockExplorerClient,
   type CheckReportObj,
+  DIAMOND_ADDRS,
   type FieldStorageChange,
+  type Network,
   ObjectCheckReport,
-  RpcClient,
+  ObjectStorageChangeReport,
+  StorageChanges,
   ZkSyncEraDiff,
   ZksyncEraState,
   memoryDiffParser,
 } from "validate-cli";
 
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { DIAMOND_ADDRS, type Network, ObjectStorageChangeReport } from "validate-cli/src/index";
-import { StorageChanges } from "validate-cli/src/lib/storage/storage-changes";
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const network = env.ETH_NETWORK;
 
 async function calculateBeforeAndAfter(
   network: Network,
   l1Explorer: BlockExplorerClient,
   l2Explorer: BlockExplorerClient
 ) {
-  const l1Rpc = RpcClient.forL1(network);
   const current = await ZksyncEraState.fromBlockchain(network, l1Explorer, l1Rpc);
 
   const rawBuf = await fs.readFile(path.join(__dirname, "mock-upgrade.hex"));
@@ -42,11 +44,6 @@ async function calculateBeforeAndAfter(
 }
 
 export async function getCheckReport(_reportId: string): Promise<CheckReportObj> {
-  const network = "mainnet";
-  const apiKey = env.ETHERSCAN_API_KEY;
-  const l1Explorer = BlockExplorerClient.forL1(apiKey, network);
-  const l2Explorer = BlockExplorerClient.forL2(network);
-
   const { current, proposed, sysAddresses } = await calculateBeforeAndAfter(
     network,
     l1Explorer,
@@ -61,25 +58,9 @@ export async function getCheckReport(_reportId: string): Promise<CheckReportObj>
 export async function getStorageChangeReport(_reportId: string): Promise<FieldStorageChange[]> {
   const network = "mainnet";
   const diamondAddress = DIAMOND_ADDRS[network];
-  const apiKey = env.ETHERSCAN_API_KEY;
 
-  const l1Explorer = BlockExplorerClient.forL1(apiKey, network);
-  const l2Explorer = BlockExplorerClient.forL2(network);
+  const { current, proposed } = await calculateBeforeAndAfter(network, l1Explorer, l2Explorer);
 
-  // const l1Rpc = new RpcClient(env.L1_RPC_URL);
-
-  const {
-    current,
-    proposed,
-    // sysAddresses,
-    // callData,
-  } = await calculateBeforeAndAfter(network, l1Explorer, l2Explorer);
-
-  // const rawMap = await l1Rpc.debugTraceCall(
-  //   current.hexAttrValue("admin").unwrap(),
-  //   diamondAddress,
-  //   bytesToHex(callData)
-  // );
   const memoryMapBuf = await fs.readFile(path.join(__dirname, "mock-memory-map.json"));
   const rawMap = memoryDiffParser.parse(JSON.parse(memoryMapBuf.toString()));
 

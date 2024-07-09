@@ -2,6 +2,7 @@ import { isUserAuthorized } from "@/.server/service/authorized-users";
 import { readAuthSession } from "@server/utils/auth-session";
 import type { NextFunction, Request, Response } from "express";
 import { $path, type Routes } from "remix-routes";
+import { zodHex } from "validate-cli/src";
 
 export const USER_ADDRESS_HEADER = "x-user-address";
 
@@ -25,7 +26,7 @@ export async function auth(req: Request, res: Response, next: NextFunction) {
       return res.redirect($path("/"));
     }
 
-    const authorized = await isUserAuthorized(session.siwe.data.address);
+    const authorized = await isUserAuthorized(zodHex.parse(session.siwe.data.address));
 
     // Session headers are set for all requests, authorized or not,
     // to be used by Remix loaders

@@ -8,9 +8,9 @@ import {
   http,
   numberToHex,
 } from "viem";
-import type { TypeOf, ZodType } from "zod";
+import { type TypeOf, z, type ZodType } from "zod";
 import type { PublicClient, HttpTransport } from "viem";
-import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
+import { contractEventSchema, memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
 import { getStorageAt } from "viem/actions";
 
 const L1_DEFAULT_URLS = {
@@ -80,11 +80,13 @@ export class RpcClient {
     target: string,
     fnName: string,
     abi: Abi,
-    parser: T
+    parser: T,
+    args: any[] = []
   ): Promise<TypeOf<typeof parser>> {
     const callData = encodeFunctionData({
       abi,
       functionName: fnName,
+      args: args,
     });
 
     const hexValue = await this.contractReadRaw(target, callData);
@@ -97,31 +99,42 @@ export class RpcClient {
     return parser.parse(rawValue);
   }
 
-  async debugTraceCall(from: string, to: string, callData: string): Promise<MemoryDiffRaw> {
+  private async rawCall(method: string, params: any[]): Promise<any> {
     const res = await fetch(this.rpcUrl(), {
       method: "POST",
       body: JSON.stringify({
-        method: "debug_traceCall",
+        method: method,
         id: 1,
         jsonrpc: "2.0",
-        params: [
-          {
-            from,
-            to,
-            data: callData,
-          },
-          "latest",
-          {
-            tracer: "prestateTracer",
-            tracerConfig: {
-              diffMode: true,
-            },
-          },
-        ],
+        params: params,
       }),
+      headers: {
+        "Content-Type": "application/json",
+      },
     });
 
-    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(`Error with rpc method "${method}".`);
+    }
+
+    return res.json();
+  }
+
+  async debugTraceCall(from: string, to: string, callData: string): Promise<MemoryDiffRaw> {
+    const data = await this.rawCall("debug_traceCall", [
+      {
+        from,
+        to,
+        data: callData,
+      },
+      "latest",
+      {
+        tracer: "prestateTracer",
+        tracerConfig: {
+          diffMode: true,
+        },
+      },
+    ]);
 
     return memoryDiffParser.parse(data);
   }
@@ -130,5 +143,37 @@ export class RpcClient {
     return this.viemClient.request({
       method: "net_version",
     });
+  }
+
+  async getLogs(address: Hex, fromBlock: string, toBLock: string, topics: Hex[] = []) {
+    const arg = {
+      fromBlock,
+      toBlock: toBLock,
+      address,
+      topics,
+    };
+
+    const data = await this.rawCall("eth_getLogs", [arg]);
+
+    if (data.error) {
+      throw new Error(`Error getting logs: ${data.error?.message}`);
+    }
+
+    const parsed = z
+      .object({
+        result: z.array(contractEventSchema),
+      })
+      .parse(data);
+
+    return parsed.result;
+  }
+
+  async getLatestBlockNumber(): Promise<Hex> {
+    const block = (await this.viemClient.request({
+      method: "eth_getBlockByNumber",
+      params: ["latest", false],
+    })) as any;
+
+    return block.number;
   }
 }
