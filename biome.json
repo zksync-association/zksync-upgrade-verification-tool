@@ -18,7 +18,8 @@
       "./node_modules/*",
       "package.json",
       "**/__snapshots__/*",
-      "**/coverage/*"
+      "**/coverage/*",
+      "./webapp/drizzle/*"
     ]
   },
   "organizeImports": {

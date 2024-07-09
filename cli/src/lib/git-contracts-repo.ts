@@ -143,6 +143,9 @@ export class GitContractsRepo implements ContractsRepo {
 
     const res: string[] = [];
     for (const match of matches) {
+      if (!match[1]) {
+        throw new Error(`Invalid import statement: ${match[1]}`);
+      }
       res.push(match[1]);
     }
 

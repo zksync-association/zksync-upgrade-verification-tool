@@ -15,6 +15,7 @@
 
     "strict": true,
     "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
     "noFallthroughCasesInSwitch": true
   },
   "include": ["cli/**/*.ts"],

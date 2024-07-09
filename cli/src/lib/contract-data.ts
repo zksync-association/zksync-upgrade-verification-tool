@@ -14,8 +14,7 @@ export class ContractData {
   }
 
   async writeSources(targetDir: string): Promise<void> {
-    for (const fileName in this.sources) {
-      const { content } = this.sources[fileName];
+    for (const [fileName, { content }] of Object.entries(this.sources)) {
       const filePath = path.join(targetDir, fileName);
       await fs.mkdir(path.parse(filePath).dir, { recursive: true });
       await fs.writeFile(filePath, content);
@@ -23,13 +22,10 @@ export class ContractData {
   }
 
   remapKeys(oldPrefix: string, newPrefix: string): void {
-    const record = this.sources;
-    const keys = Object.keys(record);
     const newRecord: Sources = {};
-    for (const key of keys) {
+    for (const [key, value] of Object.entries(this.sources)) {
       const newKey = key.startsWith(oldPrefix) ? key.replace(oldPrefix, newPrefix) : key;
-
-      newRecord[newKey] = record[key];
+      newRecord[newKey] = value;
     }
 
     this.sources = newRecord;
