@@ -32,6 +32,8 @@ const viteDevServer =
 
 const app = express();
 
+app.set("trust proxy", true);
+
 app.use(requireHttps);
 app.get("*", removeTrailingSlash);
 app.use(compression());
