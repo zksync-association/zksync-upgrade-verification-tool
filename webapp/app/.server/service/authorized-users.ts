@@ -53,11 +53,6 @@ export const UserRole = z.enum(["guardian", "security_council"]);
 export type UserRole = z.infer<typeof UserRole>;
 
 export async function isUserAuthorized(address: Hex) {
-  const [guardiansAddr, securityCouncilAddr] = await Promise.all([
-    guardiansAddress(),
-    councilAddress(),
-  ]);
-
   const [guardianAddresses, scAddresses] = await Promise.all([guardianMembers(), councilMembers()]);
 
   const isGuardian = guardianAddresses.includes(address);
