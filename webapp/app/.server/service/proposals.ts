@@ -3,6 +3,7 @@ import {
   PROTOCOL_UPGRADE_HANDLER_RAW_ABI,
   upgradeHandlerAbi,
 } from "@/.server/service/protocol-upgrade-handler-abi";
+import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
 import { RpcClient } from "validate-cli";
 import { type Hex, decodeEventLog, hexToBigInt, hexToNumber, numberToHex } from "viem";
@@ -13,16 +14,6 @@ const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 const bigIntMax = (...args: bigint[]) => args.reduce((m, e) => (e > m ? e : m));
 
 const rpc = new RpcClient(env.L1_RPC_URL_FOR_UPGRADES);
-
-enum PROPOSAL_STATES {
-  None = 0,
-  // LegalVetoPeriod,
-  // Waiting,
-  // ExecutionPending,
-  // Ready,
-  Expired = 5,
-  Done = 6,
-}
 
 export type Proposal = {
   id: Hex;
@@ -49,13 +40,7 @@ export async function getPendingProposals(): Promise<Proposal[]> {
     if (!signature || !id) {
       throw new Error("Invalid log");
     }
-    const stateNumber = await rpc.contractRead(
-      upgradeHandlerAddress,
-      "upgradeState",
-      abi.raw,
-      z.number(),
-      [id]
-    );
+    const stateNumber = await getProposalStatus(id);
 
     const proposal = decodeEventLog({
       abi: PROTOCOL_UPGRADE_HANDLER_RAW_ABI,
@@ -76,4 +61,15 @@ export async function getPendingProposals(): Promise<Proposal[]> {
   }
 
   return nonResolvedUpgrades;
+}
+
+export async function getProposalStatus(id: Hex) {
+  const stateNumber = await rpc.contractRead(
+    upgradeHandlerAddress,
+    "upgradeState",
+    upgradeHandlerAbi.raw,
+    z.number(),
+    [id]
+  );
+  return stateNumber;
 }

@@ -1,6 +1,8 @@
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
+import { getSignaturesByExternalProposalid } from "@/.server/db/dto/signatures";
 import { actionSchema } from "@/.server/db/schema";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
+import { getProposalStatus } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
 import { Button } from "@/components/ui/button";
@@ -15,7 +17,9 @@ import SignButton from "@/routes/app/proposals.$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
+import { cn } from "@/utils/cn";
 import { badRequest, notFound } from "@/utils/http";
+import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { defer, json } from "@remix-run/node";
 import { Await, useLoaderData, useNavigate } from "@remix-run/react";
@@ -43,7 +47,12 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   const getAsyncData = async () => {
     const checkReport = await getCheckReport(params.data.id);
     const storageChangeReport = await getStorageChangeReport(params.data.id);
-    const [guardians, council] = await Promise.all([guardiansAddress(), councilAddress()]);
+    const [guardians, council, proposalStatus, signatures] = await Promise.all([
+      guardiansAddress(),
+      councilAddress(),
+      getProposalStatus(params.data.id),
+      getSignaturesByExternalProposalid(params.data.id),
+    ]);
 
     return {
       proposal: {
@@ -51,6 +60,18 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         proposedVersion: checkReport.metadata.proposedVersion,
         proposedOn: proposal.proposedOn,
         executor: proposal.executor,
+        status: proposalStatus,
+        signatures: {
+          extendLegalVetoPeriod: signatures.filter(
+            (signature) => signature.action === "ExtendLegalVetoPeriod"
+          ).length,
+          approveUpgradeGuardians: signatures.filter(
+            (signature) => signature.action === "ApproveUpgradeGuardians"
+          ).length,
+          approveUpgradeSecurityCouncil: signatures.filter(
+            (signature) => signature.action === "ApproveUpgradeSecurityCouncil"
+          ).length,
+        },
       },
       reports: {
         facetChanges: checkReport.facetChanges,
@@ -59,6 +80,16 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         fieldStorageChanges: storageChangeReport,
       },
       addresses: { guardians, council },
+      userSignedProposal: signatures
+        .filter((s) =>
+          user.role === "guardian"
+            ? s.action === "ApproveUpgradeGuardians"
+            : s.action === "ApproveUpgradeSecurityCouncil"
+        )
+        .some((s) => isAddressEqual(s.signer as Hex, user.address as Hex)),
+      userSignedLegalVeto: signatures
+        .filter((s) => s.action === "ExtendLegalVetoPeriod")
+        .some((s) => isAddressEqual(s.signer as Hex, user.address as Hex)),
     };
   };
 
@@ -92,6 +123,10 @@ export async function action({ request }: ActionFunctionArgs) {
   return json({ ok: true });
 }
 
+const NECESSARY_SECURITY_COUNCIL_SIGNATURES = 6;
+const NECESSARY_GUARDIAN_SIGNATURES = 5;
+const NECESSARY_LEGAL_VETO_SIGNATURES = 2;
+
 export default function Proposals() {
   const { user, asyncData, proposalId } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
@@ -119,198 +154,284 @@ export default function Proposals() {
         }
       >
         <Await resolve={asyncData}>
-          {({ addresses, proposal, reports }) => (
-            <>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Card className="pb-10">
-                  <CardHeader>
-                    <CardTitle>Proposal Details</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      <div className="flex justify-between">
-                        <span>Current Version:</span>
-                        <span className="w-1/2 break-words text-right">
-                          {proposal.currentVersion}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Proposed Version:</span>
-                        <span className="w-1/2 break-words text-right">
-                          {proposal.proposedVersion}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Executor:</span>
-                        <span className="w-1/2 break-words text-right">
-                          {isAddressEqual(proposal.executor as `0x${string}`, zeroAddress)
-                            ? "Anyone"
-                            : proposal.executor}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Proposal ID:</span>
-                        <span className="w-1/2 break-words text-right">{proposalId}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Proposed On:</span>
-                        <div className="flex w-1/2 flex-col break-words text-right">
-                          <span className="">{new Date(proposal.proposedOn).toISOString()}</span>
-                          <span className="">
-                            ({Math.floor(new Date(proposal.proposedOn).getTime() / 1000)})
+          {({ addresses, proposal, reports, userSignedLegalVeto, userSignedProposal }) => {
+            const securityCouncilSignaturesReached =
+              proposal.signatures.approveUpgradeSecurityCouncil >=
+              NECESSARY_SECURITY_COUNCIL_SIGNATURES;
+            const guardiansSignaturesReached =
+              proposal.signatures.approveUpgradeGuardians >= NECESSARY_GUARDIAN_SIGNATURES;
+            const legalVetoSignaturesReached =
+              proposal.signatures.extendLegalVetoPeriod >= NECESSARY_LEGAL_VETO_SIGNATURES;
+
+            return (
+              <>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <Card className="pb-10">
+                    <CardHeader>
+                      <CardTitle>Proposal Details</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-6">
+                        <div className="flex justify-between">
+                          <span>Current Version:</span>
+                          <span className="w-1/2 break-words text-right">
+                            {proposal.currentVersion}
                           </span>
                         </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="pb-14">
-                  <CardHeader className="pt-7">
-                    <p className="text-orange-400">WAITING</p>
-                    <CardTitle>Proposal Status</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-5">
-                      <div className="space-y-3">
                         <div className="flex justify-between">
-                          <span>Security Council Approvals</span>
-                          <span className="text-muted-foreground">5/6</span>
+                          <span>Proposed Version:</span>
+                          <span className="w-1/2 break-words text-right">
+                            {proposal.proposedVersion}
+                          </span>
                         </div>
-                        <Progress value={80} />
-                      </div>
-                      <div className="space-y-3">
                         <div className="flex justify-between">
-                          <span>Guardian Approvals</span>
-                          <span className="text-muted-foreground">2/5</span>
+                          <span>Executor:</span>
+                          <span className="w-1/2 break-words text-right">
+                            {isAddressEqual(proposal.executor as `0x${string}`, zeroAddress)
+                              ? "Anyone"
+                              : proposal.executor}
+                          </span>
                         </div>
-                        <Progress value={20} />
-                      </div>
-                      <div className="space-y-3">
                         <div className="flex justify-between">
-                          <span>Extend Legal Veto Approvals</span>
-                          <span className="text-muted-foreground">1/2</span>
+                          <span>Proposal ID:</span>
+                          <span className="w-1/2 break-words text-right">{proposalId}</span>
                         </div>
-                        <Progress value={50} />
+                        <div className="flex justify-between">
+                          <span>Proposed On:</span>
+                          <div className="flex w-1/2 flex-col break-words text-right">
+                            <span className="">{new Date(proposal.proposedOn).toISOString()}</span>
+                            <span className="">
+                              ({Math.floor(new Date(proposal.proposedOn).getTime() / 1000)})
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="pb-10">
-                  <CardHeader>
-                    <CardTitle>
-                      {user.role === "guardian" ? "Guardian" : "Security Council"} Actions
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col space-y-3">
-                    {user.role === "guardian" && (
-                      <SignButton
-                        proposalId={proposalId}
-                        contractData={{
-                          actionName: "ExtendLegalVetoPeriod",
-                          address: addresses.guardians,
-                          name: "Guardians",
-                        }}
-                      >
-                        Approve extend veto period
-                      </SignButton>
-                    )}
+                    </CardContent>
+                  </Card>
+                  <Card className="pb-14">
+                    <CardHeader className="pt-7">
+                      {displayProposalState(proposal.status)}
+                      <CardTitle>Proposal Status</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-5">
+                        <StatusIndicator
+                          label="Security Council Approvals"
+                          signatures={proposal.signatures.approveUpgradeSecurityCouncil}
+                          necessarySignatures={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
+                        />
+                        <StatusIndicator
+                          label="Guardian Approvals"
+                          signatures={proposal.signatures.approveUpgradeGuardians}
+                          necessarySignatures={NECESSARY_GUARDIAN_SIGNATURES}
+                        />
+                        <StatusIndicator
+                          label="Extend Legal Veto Approvals"
+                          signatures={proposal.signatures.extendLegalVetoPeriod}
+                          necessarySignatures={NECESSARY_LEGAL_VETO_SIGNATURES}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="pb-10">
+                    <CardHeader>
+                      <CardTitle>
+                        {user.role === "guardian" ? "Guardian" : "Security Council"} Actions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col space-y-3">
+                      {user.role === "guardian" && (
+                        <SignButton
+                          proposalId={proposalId}
+                          contractData={{
+                            actionName: "ExtendLegalVetoPeriod",
+                            address: addresses.guardians,
+                            name: "Guardians",
+                          }}
+                          disabled={userSignedLegalVeto}
+                        >
+                          Approve extend veto period
+                        </SignButton>
+                      )}
 
-                    {user.role === "guardian" && (
-                      <SignButton
-                        proposalId={proposalId}
-                        contractData={{
-                          actionName: "ApproveUpgradeGuardians",
-                          address: addresses.guardians,
-                          name: "Guardians",
-                        }}
-                      >
-                        Approve proposal
-                      </SignButton>
-                    )}
+                      {user.role === "guardian" && (
+                        <SignButton
+                          proposalId={proposalId}
+                          contractData={{
+                            actionName: "ApproveUpgradeGuardians",
+                            address: addresses.guardians,
+                            name: "Guardians",
+                          }}
+                          disabled={userSignedProposal}
+                        >
+                          Approve proposal
+                        </SignButton>
+                      )}
 
-                    {user.role === "securityCouncil" && (
-                      <SignButton
-                        proposalId={proposalId}
-                        contractData={{
-                          actionName: "ApproveUpgradeSecurityCouncil",
-                          address: addresses.council,
-                          name: "SecurityCouncil",
-                        }}
+                      {user.role === "securityCouncil" && (
+                        <SignButton
+                          proposalId={proposalId}
+                          contractData={{
+                            actionName: "ApproveUpgradeSecurityCouncil",
+                            address: addresses.council,
+                            name: "SecurityCouncil",
+                          }}
+                          disabled={userSignedProposal}
+                        >
+                          Approve proposal
+                        </SignButton>
+                      )}
+                    </CardContent>
+                  </Card>
+                  <Card className="pb-10">
+                    <CardHeader>
+                      <CardTitle>Proposal Actions</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col space-y-3">
+                      <Button disabled={!securityCouncilSignaturesReached}>
+                        Execute security council approval
+                      </Button>
+                      <Button disabled={!guardiansSignaturesReached}>
+                        Execute guardian approval
+                      </Button>
+                      <Button disabled={!legalVetoSignaturesReached}>
+                        Execute legal veto extension
+                      </Button>
+                      <Button
+                        disabled={
+                          !(proposal.status === PROPOSAL_STATES.Ready) &&
+                          !(
+                            isAddressEqual(proposal.executor as Hex, user.address as Hex) ||
+                            isAddressEqual(proposal.executor as Hex, zeroAddress)
+                          )
+                        }
                       >
-                        Approve proposal
-                      </SignButton>
-                    )}
-                  </CardContent>
-                </Card>
-                <Card className="pb-10">
-                  <CardHeader>
-                    <CardTitle>Proposal Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col space-y-3">
-                    <Button>Execute security council approval</Button>
-                    <Button>Execute guardian approval</Button>
-                    <Button>Execute legal veto extension</Button>
-                    <Button>Execute upgrade</Button>
-                  </CardContent>
-                </Card>
-              </div>
-              <div className="pt-4">
-                <h2 className="font-bold text-3xl">Upgrade Analysis</h2>
-                <Tabs className="mt-4 flex" defaultValue="facet-changes">
-                  <TabsList className="mt-12 mr-6">
-                    <TabsTrigger value="facet-changes">Facet Changes</TabsTrigger>
-                    <TabsTrigger value="system-contract-changes">
-                      System Contract Changes
-                    </TabsTrigger>
-                    <TabsTrigger value="field-changes">Field Changes</TabsTrigger>
-                    <TabsTrigger value="field-storage-changes">Field Storage Changes</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="facet-changes" className="w-full">
-                    <Card className="pb-8">
-                      <CardHeader>
-                        <CardTitle>Facet Changes</CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-4">
-                        <FacetChangesTable data={reports.facetChanges} />
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                  <TabsContent value="system-contract-changes" className="w-full">
-                    <Card className="pb-8">
-                      <CardHeader>
-                        <CardTitle>System Contract Changes</CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-4">
-                        <SystemContractChangesTable data={reports.systemContractChanges} />
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                  <TabsContent value="field-changes" className="w-full">
-                    <Card className="pb-8">
-                      <CardHeader>
-                        <CardTitle>Field Changes</CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-4">
-                        <FieldChangesTable data={reports.fieldChanges} />
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                  <TabsContent value="field-storage-changes" className="w-full">
-                    <Card className="pb-8">
-                      <CardHeader>
-                        <CardTitle>Field Storage Changes</CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-4">
-                        <FieldStorageChangesTable data={reports.fieldStorageChanges} />{" "}
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </>
-          )}
+                        Execute upgrade
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="pt-4">
+                  <h2 className="font-bold text-3xl">Upgrade Analysis</h2>
+                  <Tabs className="mt-4 flex" defaultValue="facet-changes">
+                    <TabsList className="mt-12 mr-6">
+                      <TabsTrigger value="facet-changes">Facet Changes</TabsTrigger>
+                      <TabsTrigger value="system-contract-changes">
+                        System Contract Changes
+                      </TabsTrigger>
+                      <TabsTrigger value="field-changes">Field Changes</TabsTrigger>
+                      <TabsTrigger value="field-storage-changes">Field Storage Changes</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="facet-changes" className="w-full">
+                      <Card className="pb-8">
+                        <CardHeader>
+                          <CardTitle>Facet Changes</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <FacetChangesTable data={reports.facetChanges} />
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                    <TabsContent value="system-contract-changes" className="w-full">
+                      <Card className="pb-8">
+                        <CardHeader>
+                          <CardTitle>System Contract Changes</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <SystemContractChangesTable data={reports.systemContractChanges} />
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                    <TabsContent value="field-changes" className="w-full">
+                      <Card className="pb-8">
+                        <CardHeader>
+                          <CardTitle>Field Changes</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <FieldChangesTable data={reports.fieldChanges} />
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                    <TabsContent value="field-storage-changes" className="w-full">
+                      <Card className="pb-8">
+                        <CardHeader>
+                          <CardTitle>Field Storage Changes</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <FieldStorageChangesTable data={reports.fieldStorageChanges} />{" "}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              </>
+            );
+          }}
         </Await>
       </Suspense>
     </div>
   );
+}
+
+function StatusIndicator({
+  signatures,
+  necessarySignatures,
+  label,
+}: { signatures: number; necessarySignatures: number; label: string }) {
+  const necessarySignaturesReached = signatures >= necessarySignatures;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between">
+        <span>{label}</span>
+        <span
+          className={cn("text-muted-foreground", necessarySignaturesReached && "text-green-400")}
+        >
+          {signatures}/{necessarySignatures}
+        </span>
+      </div>
+      <Progress
+        indicatorClassName={cn(necessarySignaturesReached && "bg-green-500")}
+        value={(signatures / necessarySignatures) * 100}
+      />
+    </div>
+  );
+}
+
+function displayProposalState(state: PROPOSAL_STATES) {
+  let color: string;
+  let label: string;
+
+  switch (state) {
+    case PROPOSAL_STATES.None:
+      color = "text-red-400";
+      label = "NONE";
+      break;
+    case PROPOSAL_STATES.LegalVetoPeriod:
+      color = "text-yellow-400";
+      label = "LEGAL VETO PERIOD";
+      break;
+    case PROPOSAL_STATES.Waiting:
+      color = "text-yellow-400";
+      label = "WAITING";
+      break;
+    case PROPOSAL_STATES.ExecutionPending:
+      color = "text-yellow-400";
+      label = "EXECUTION PENDING";
+      break;
+    case PROPOSAL_STATES.Ready:
+      color = "text-green-400";
+      label = "READY";
+      break;
+    case PROPOSAL_STATES.Expired:
+      color = "text-red-400";
+      label = "EXPIRED";
+      break;
+    case PROPOSAL_STATES.Done:
+      color = "text-green-400";
+      label = "DONE";
+      break;
+  }
+
+  return <p className={color}>{label}</p>;
 }
