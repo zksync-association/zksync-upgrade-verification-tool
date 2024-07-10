@@ -1277,7 +1277,7 @@ export const GUARDIANS_RAW_ABI: Abi = [
       },
     ],
   },
-];
+] as const;
 
 export const SEC_COUNCIL_RAW_ABI: Abi = [
   {
@@ -1708,7 +1708,7 @@ export const SEC_COUNCIL_RAW_ABI: Abi = [
       },
     ],
   },
-] satisfies Abi;
+] as const;
 
 export const upgradeHandlerAbi = new ContractAbi(PROTOCOL_UPGRADE_HANDLER_RAW_ABI);
 export const guardiansAbi = new ContractAbi(GUARDIANS_RAW_ABI);
