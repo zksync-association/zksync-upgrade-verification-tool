@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import type { action } from "@/routes/app/proposals.$id/_route";
 import { useFetcher } from "@remix-run/react";
-import type { MouseEvent } from "react";
+import { type MouseEvent, useEffect } from "react";
+import { toast } from "react-hot-toast";
 import type { Hex } from "viem";
 import { useChains, useSignTypedData } from "wagmi";
 
@@ -21,6 +22,15 @@ export default function SignButton({ children, proposalId, contractData }: SignB
   const { signTypedDataAsync: signTypedData, isPending } = useSignTypedData();
   const [chain] = useChains();
   const fetcher = useFetcher<typeof action>();
+
+  useEffect(() => {
+    if (fetcher.state === "submitting") {
+      toast.loading("Signing...", { id: "sign_button" });
+    }
+    if (fetcher.state === "idle" && fetcher.data?.ok) {
+      toast.success("Signed successfully", { id: "sign_button" });
+    }
+  }, [fetcher.state, fetcher.data]);
 
   async function onClick(e: MouseEvent) {
     e.preventDefault();
