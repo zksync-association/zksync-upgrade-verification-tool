@@ -11,8 +11,8 @@ import { guardiansAbi } from "@/.server/service/protocol-upgrade-handler-abi";
 import { badRequest } from "@/utils/http";
 import { env } from "@config/env.server";
 import { type Hex, hashTypedData } from "viem";
-import { type TypeOf, type ZodType, z } from "zod";
 import { mainnet, sepolia } from "wagmi/chains";
+import { type TypeOf, type ZodType, z } from "zod";
 
 type ProposalAction = z.infer<typeof actionSchema>;
 

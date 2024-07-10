@@ -51,5 +51,9 @@ export default function SignButton({ children, proposalId, contractData }: SignB
     );
   }
 
-  return <Button disabled={isPending} onClick={onClick}>{children}</Button>;
+  return (
+    <Button disabled={isPending} onClick={onClick}>
+      {children}
+    </Button>
+  );
 }
