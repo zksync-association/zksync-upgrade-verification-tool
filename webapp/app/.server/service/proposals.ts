@@ -1,8 +1,11 @@
 import { createOrIgnoreProposal } from "@/.server/db/dto/proposals";
-import { upgradeHandlerAbi } from "@/.server/service/protocol-upgrade-handler-abi";
+import {
+  PROTOCOL_UPGRADE_HANDLER_RAW_ABI,
+  upgradeHandlerAbi,
+} from "@/.server/service/protocol-upgrade-handler-abi";
 import { env } from "@config/env.server";
 import { RpcClient } from "validate-cli";
-import { type Hex, hexToBigInt, numberToHex } from "viem";
+import { type Hex, decodeEventLog, hexToBigInt, hexToNumber, numberToHex } from "viem";
 import { z } from "zod";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
@@ -33,6 +36,7 @@ export async function getPendingProposals(): Promise<Proposal[]> {
   const from = bigIntMax(currentHeight - maxUpgradeLiftimeInBlocks, 1n);
   const abi = upgradeHandlerAbi;
 
+  //FIXME: remove
   await new Promise((resolve) => setTimeout(resolve, 5)); // Avoid anvil crushing for mysterious reasons
   const logs = await rpc.getLogs(upgradeHandlerAddress, numberToHex(from), "latest", [
     abi.eventIdFor("UpgradeStarted"),
@@ -41,8 +45,8 @@ export async function getPendingProposals(): Promise<Proposal[]> {
   const nonResolvedUpgrades: Proposal[] = [];
 
   for (const log of logs) {
-    const [_, id] = log.topics;
-    if (!id) {
+    const [signature, id] = log.topics;
+    if (!signature || !id) {
       throw new Error("Invalid log");
     }
     const stateNumber = await rpc.contractRead(
@@ -53,11 +57,20 @@ export async function getPendingProposals(): Promise<Proposal[]> {
       [id]
     );
 
+    const proposal = decodeEventLog({
+      abi: PROTOCOL_UPGRADE_HANDLER_RAW_ABI,
+      eventName: "UpgradeStarted",
+      data: log.data,
+      topics: [signature, id],
+    });
+
     if (stateNumber !== PROPOSAL_STATES.Expired && stateNumber !== PROPOSAL_STATES.Done) {
       nonResolvedUpgrades.push({ id });
       await createOrIgnoreProposal({
         externalId: id,
         calldata: log.data,
+        proposedOn: new Date(hexToNumber(log.blockTimestamp) * 1000),
+        executor: proposal.args._proposal.executor,
       });
     }
   }

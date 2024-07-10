@@ -16,6 +16,7 @@ import { json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
+import { isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
@@ -36,9 +37,10 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   return json({
     proposal: {
       id: params.data.id,
-      version: "23",
-      proposedBy: "0x23",
-      proposedOn: "July 23, 2024",
+      currentVersion: checkReport.metadata.currentVersion,
+      proposedVersion: checkReport.metadata.proposedVersion,
+      proposedOn: proposal.proposedOn,
+      executor: proposal.executor,
     },
     reports: {
       facetChanges: checkReport.facetChanges,
@@ -68,15 +70,27 @@ export default function Proposals() {
         <h2 className="font-semibold">Proposal {displayBytes32(proposal.id)}</h2>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="pb-10">
           <CardHeader>
             <CardTitle>Proposal Details</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
               <div className="flex justify-between">
-                <span>Version:</span>
-                <span className="w-1/2 break-words text-right">{proposal.version}</span>
+                <span>Current Version:</span>
+                <span className="w-1/2 break-words text-right">{proposal.currentVersion}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Proposed Version:</span>
+                <span className="w-1/2 break-words text-right">{proposal.proposedVersion}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Executor:</span>
+                <span className="w-1/2 break-words text-right">
+                  {isAddressEqual(proposal.executor as `0x${string}`, zeroAddress)
+                    ? "Anyone"
+                    : proposal.executor}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Proposal ID:</span>
@@ -84,7 +98,12 @@ export default function Proposals() {
               </div>
               <div className="flex justify-between">
                 <span>Proposed On:</span>
-                <span className="w-1/2 break-words text-right">{proposal.proposedOn}</span>
+                <div className="flex w-1/2 flex-col break-words text-right">
+                  <span className="">{new Date(proposal.proposedOn).toISOString()}</span>
+                  <span className="">
+                    ({Math.floor(new Date(proposal.proposedOn).getTime() / 1000)})
+                  </span>
+                </div>
               </div>
             </div>
           </CardContent>

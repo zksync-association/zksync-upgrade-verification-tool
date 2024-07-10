@@ -1,7 +1,7 @@
 import { ContractAbi } from "validate-cli/src/lib/contract-abi";
 import type { Abi } from "viem";
 
-const PROTOCOL_UPGRADE_HANDLER_RAW_ABI: Abi = [
+export const PROTOCOL_UPGRADE_HANDLER_RAW_ABI = [
   {
     type: "constructor",
     inputs: [
@@ -772,9 +772,9 @@ const PROTOCOL_UPGRADE_HANDLER_RAW_ABI: Abi = [
     ],
     anonymous: false,
   },
-];
+] as const;
 
-const GUARDIANS_RAW_ABI: Abi = [
+export const GUARDIANS_RAW_ABI: Abi = [
   {
     type: "constructor",
     inputs: [
@@ -1279,7 +1279,7 @@ const GUARDIANS_RAW_ABI: Abi = [
   },
 ];
 
-const SEC_COUNCIL_RAW_ABI: Abi = [
+export const SEC_COUNCIL_RAW_ABI: Abi = [
   {
     type: "constructor",
     inputs: [
@@ -1708,7 +1708,7 @@ const SEC_COUNCIL_RAW_ABI: Abi = [
       },
     ],
   },
-];
+] satisfies Abi;
 
 export const upgradeHandlerAbi = new ContractAbi(PROTOCOL_UPGRADE_HANDLER_RAW_ABI);
 export const guardiansAbi = new ContractAbi(GUARDIANS_RAW_ABI);
