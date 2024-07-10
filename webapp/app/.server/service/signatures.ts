@@ -1,18 +1,17 @@
-import { db } from "@/.server/db";
-import { signaturesTable } from "@/.server/db/schema";
+import { createOrIgnoreSignature } from "@/.server/db/dto/signatures";
 import {
-  councilAddress, councilMembers,
+  councilAddress,
+  councilMembers,
   guardianMembers,
   guardiansAddress,
 } from "@/.server/service/authorized-users";
 import { l1RpcProposals } from "@/.server/service/clients";
 import { guardiansAbi } from "@/.server/service/protocol-upgrade-handler-abi";
 import { badRequest } from "@/utils/http";
+import { env } from "@config/env.server";
 import { zodHex } from "validate-cli/src";
 import { type Hex, hashTypedData } from "viem";
 import { z } from "zod";
-import { createOrIgnoreSignature } from "@/.server/db/dto/signatures";
-import { env } from "@config/env.server";
 
 const actionSchema = z.enum([
   "ExtendLegalVetoPeriod",
@@ -27,8 +26,9 @@ async function verifySignature(
   signature: Hex,
   verifierAddr: Hex,
   action: ProposalAction,
-  proposalId: Hex
-  , contractName: string) {
+  proposalId: Hex,
+  contractName: string
+) {
   const digest = hashTypedData({
     domain: {
       name: contractName,
@@ -59,7 +59,7 @@ async function verifySignature(
     ]);
     return true;
   } catch (e) {
-    console.log(e)
+    console.log(e);
     return false;
   }
 }
@@ -75,7 +75,7 @@ export async function validateAndSaveSignature(
   const proposalIdHex = zodHex.parse(proposalId);
   const parsedAction = actionSchema.parse(action);
 
-  console.log(signatureHex, signerHex, proposalIdHex, parsedAction)
+  console.log(signatureHex, signerHex, proposalIdHex, parsedAction);
 
   let validSignature: boolean;
   if (parsedAction === "ExtendLegalVetoPeriod" || parsedAction === "ApproveUpgradeGuardians") {
@@ -87,7 +87,14 @@ export async function validateAndSaveSignature(
     }
 
     const addr = await guardiansAddress();
-    validSignature = await verifySignature(signerHex, signatureHex, addr, parsedAction, proposalIdHex, "Guardians");
+    validSignature = await verifySignature(
+      signerHex,
+      signatureHex,
+      addr,
+      parsedAction,
+      proposalIdHex,
+      "Guardians"
+    );
   } else {
     const members = await councilMembers();
     if (!members.includes(signerHex)) {
@@ -97,7 +104,14 @@ export async function validateAndSaveSignature(
     }
 
     const addr = await councilAddress();
-    validSignature = await verifySignature(signerHex, signatureHex, addr, parsedAction, proposalIdHex, "SecurityCouncil");
+    validSignature = await verifySignature(
+      signerHex,
+      signatureHex,
+      addr,
+      parsedAction,
+      proposalIdHex,
+      "SecurityCouncil"
+    );
   }
 
   if (!validSignature) {
@@ -109,7 +123,7 @@ export async function validateAndSaveSignature(
     signature: signatureHex,
     proposal: proposalIdHex,
     signer: signerHex,
-  }
+  };
 
-  await createOrIgnoreSignature(dto)
+  await createOrIgnoreSignature(dto);
 }

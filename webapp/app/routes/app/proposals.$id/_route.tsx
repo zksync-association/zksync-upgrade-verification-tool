@@ -1,5 +1,7 @@
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
+import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
+import { validateAndSaveSignature } from "@/.server/service/signatures";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -7,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FacetChangesTable from "@/routes/app/proposals.$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals.$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals.$id/field-storage-changes-table";
+import SignButton from "@/routes/app/proposals.$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
@@ -16,11 +19,8 @@ import { json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
+import type { Hex } from "viem";
 import { z } from "zod";
-import { validateAndSaveSignature } from "@/.server/service/signatures";
-import SignButton from "@/routes/app/proposals.$id/sign-button";
-import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
-import { Hex } from "viem";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -53,28 +53,28 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     user,
     addresses: {
       guardians: await guardiansAddress(),
-      council: await councilAddress()
-    }
+      council: await councilAddress(),
+    },
   });
 }
 
 function getOrBadRequest(data: FormData, key: string): string {
-  const value = data.get(key)
+  const value = data.get(key);
   if (typeof value !== "string") {
-    throw badRequest(`${key} should be present`)
+    throw badRequest(`${key} should be present`);
   }
 
-  return value
+  return value;
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const data = await request.formData()
-  const signature = getOrBadRequest(data, "signature")
-  const address = getOrBadRequest(data, "address")
-  const actionName = getOrBadRequest(data, "actionName")
-  const proposalId = getOrBadRequest(data, "proposalId")
+  const data = await request.formData();
+  const signature = getOrBadRequest(data, "signature");
+  const address = getOrBadRequest(data, "address");
+  const actionName = getOrBadRequest(data, "actionName");
+  const proposalId = getOrBadRequest(data, "proposalId");
   await validateAndSaveSignature(signature, address, actionName, proposalId);
-  return "ok"
+  return "ok";
 }
 
 export default function Proposals() {
@@ -155,20 +155,44 @@ export default function Proposals() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            {user.role === "guardian" && <SignButton
-              proposalId={proposal.id}
-              contractData={{ actionName: "ExtendLegalVetoPeriod", address: addresses.guardians, name: "Guardians" }}
-            >Approve extend veto period </SignButton>}
+            {user.role === "guardian" && (
+              <SignButton
+                proposalId={proposal.id}
+                contractData={{
+                  actionName: "ExtendLegalVetoPeriod",
+                  address: addresses.guardians,
+                  name: "Guardians",
+                }}
+              >
+                Approve extend veto period{" "}
+              </SignButton>
+            )}
 
-            {user.role === "guardian" && <SignButton
-              proposalId={proposal.id}
-              contractData={{ actionName: "ApproveUpgradeGuardians", address: addresses.guardians, name: "Guardians" }}
-            >Approve proposal</SignButton>}
+            {user.role === "guardian" && (
+              <SignButton
+                proposalId={proposal.id}
+                contractData={{
+                  actionName: "ApproveUpgradeGuardians",
+                  address: addresses.guardians,
+                  name: "Guardians",
+                }}
+              >
+                Approve proposal
+              </SignButton>
+            )}
 
-            {user.role === "securityCouncil" && <SignButton
-              proposalId={proposal.id}
-              contractData={{ actionName: "ApproveUpgradeSecurityCouncil", address: addresses.council, name: "SecurityCouncil" }}
-            >Approve veto extension</SignButton>}
+            {user.role === "securityCouncil" && (
+              <SignButton
+                proposalId={proposal.id}
+                contractData={{
+                  actionName: "ApproveUpgradeSecurityCouncil",
+                  address: addresses.council,
+                  name: "SecurityCouncil",
+                }}
+              >
+                Approve veto extension
+              </SignButton>
+            )}
           </CardContent>
         </Card>
         <Card className="pb-10">

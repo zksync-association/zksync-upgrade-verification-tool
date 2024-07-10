@@ -7,7 +7,7 @@ export async function createOrIgnoreProposal(
   data: InferInsertModel<typeof proposalsTable>,
   { tx }: { tx?: typeof db } = {}
 ) {
-  await createOrIgnoreRecord(proposalsTable, data, { tx })
+  await createOrIgnoreRecord(proposalsTable, data, { tx });
 }
 
 export async function getProposalByExternalId(externalId: string) {
