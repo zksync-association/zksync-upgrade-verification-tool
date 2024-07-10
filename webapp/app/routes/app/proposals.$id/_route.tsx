@@ -1,5 +1,5 @@
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
-import { getSignaturesByExternalProposalid } from "@/.server/db/dto/signatures";
+import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { actionSchema } from "@/.server/db/schema";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
 import { getProposalStatus } from "@/.server/service/proposals";
@@ -51,7 +51,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       guardiansAddress(),
       councilAddress(),
       getProposalStatus(params.data.id),
-      getSignaturesByExternalProposalid(params.data.id),
+      getSignaturesByExternalProposalId(params.data.id),
     ]);
 
     return {
