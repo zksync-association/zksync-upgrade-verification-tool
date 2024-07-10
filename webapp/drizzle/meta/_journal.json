@@ -15,6 +15,13 @@
       "when": 1720581776954,
       "tag": "0001_youthful_gargoyle",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1720628726537,
+      "tag": "0002_mixed_makkari",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { bytea } from "@/.server/db/custom-types";
-import { index, json, pgTable, serial, text, unique } from "drizzle-orm/pg-core";
+import { index, json, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 export const proposalsTable = pgTable(
@@ -10,6 +10,8 @@ export const proposalsTable = pgTable(
     calldata: bytea("calldata").notNull(),
     checkReport: json("check_report"),
     storageDiffReport: json("storage_diff_report"),
+    proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
+    executor: bytea("executor").notNull(),
   },
   (table) => ({
     externalIdIdx: index("external_id_idx").on(table.externalId),

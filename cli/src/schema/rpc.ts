@@ -78,6 +78,7 @@ export const contractEventSchema = z.object({
   data: zodHex,
   transactionHash: zodHex,
   blockNumber: zodHex,
+  blockTimestamp: zodHex,
 });
 
 export type MemoryDiffRaw = z.infer<typeof memoryDiffParser>;
