@@ -1,14 +1,14 @@
+import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
-import { useAuth } from "@/components/context/auth-context";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FacetChangesTable from "@/routes/app/proposals.$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals.$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals.$id/field-storage-changes-table";
 import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contract-changes-table";
-import { displayAddress } from "@/utils/address";
+import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { notFound } from "@/utils/http";
 import type { LoaderFunctionArgs } from "@remix-run/node";
@@ -18,9 +18,16 @@ import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { z } from "zod";
 
-export async function loader({ params: remixParams }: LoaderFunctionArgs) {
+export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
+  const user = requireUserFromHeader(request);
   const params = getParams(remixParams, z.object({ id: z.string() }));
   if (!params.success) {
+    throw notFound();
+  }
+
+  // Id is external_id coming from the smart contract
+  const proposal = await getProposalByExternalId(params.data.id);
+  if (!proposal) {
     throw notFound();
   }
 
@@ -39,12 +46,12 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
       fieldChanges: checkReport.fieldChanges,
       fieldStorageChanges: storageChangeReport,
     },
+    user,
   });
 }
 
 export default function Proposals() {
-  const { proposal, reports } = useLoaderData<typeof loader>();
-  const auth = useAuth();
+  const { proposal, reports, user } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
 
   return (
@@ -72,10 +79,6 @@ export default function Proposals() {
                 <span className="w-1/2 break-words text-right">{proposal.version}</span>
               </div>
               <div className="flex justify-between">
-                <span>Proposed By:</span>
-                <span className="w-1/2 break-words text-right">{proposal.proposedBy}</span>
-              </div>
-              <div className="flex justify-between">
                 <span>Proposal ID:</span>
                 <span className="w-1/2 break-words text-right">{proposal.id}</span>
               </div>
@@ -86,44 +89,61 @@ export default function Proposals() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="pb-14">
           <CardHeader className="pt-7">
             <p className="text-orange-400">WAITING</p>
             <CardTitle>Proposal Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span>Security Council Approvals</span>
-                <span className="text-muted-foreground">5/6</span>
+            <div className="space-y-5">
+              {/* fixear espacio */}
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span>Security Council Approvals</span>
+                  <span className="text-muted-foreground">5/6</span>
+                </div>
+                <Progress value={80} />
               </div>
-              <Progress value={80} />
-              <div className="flex justify-between">
-                <span>Guardian Approvals</span>
-                <span className="text-muted-foreground">2/5</span>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span>Guardian Approvals</span>
+                  <span className="text-muted-foreground">2/5</span>
+                </div>
+                <Progress value={20} />
               </div>
-              <Progress value={20} />
-              <div className="flex justify-between">
-                <span>Extend Legal Veto Approvals</span>
-                <span className="text-muted-foreground">1/2</span>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span>Extend Legal Veto Approvals</span>
+                  <span className="text-muted-foreground">1/2</span>
+                </div>
+                <Progress value={50} />
               </div>
-              <Progress value={50} />
             </div>
           </CardContent>
-          <CardFooter className="justify-end">
-            <Button disabled>Execute Transaction</Button>
-          </CardFooter>
+        </Card>
+        <Card className="pb-10">
+          <CardHeader>
+            <CardTitle>
+              {user.role === "guardian" ? "Guardian" : "Security Council"} Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col space-y-3">
+            <Button>Approve proposal</Button>
+            {user.role === "guardian" && <Button>Approve veto extension</Button>}
+          </CardContent>
+        </Card>
+        <Card className="pb-10">
+          <CardHeader>
+            <CardTitle>Proposal Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col space-y-3">
+            <Button>Execute security council approval</Button>
+            <Button>Execute guardian approval</Button>
+            <Button>Execute legal veto extension</Button>
+            <Button>Execute upgrade</Button>
+          </CardContent>
         </Card>
       </div>
-      <Card className="flex flex-col items-center space-y-4 pt-4 pb-10 text-center">
-        <p className="font-bold">{auth.isAuthenticated && displayAddress(auth.address)}</p>
-        <h3 className="text-3xl">
-          <span className="font-semibold">Your Vote:</span> Pending
-        </h3>
-        <div className="flex space-x-4">
-          <Button>Approve</Button>
-        </div>
-      </Card>
       <div className="pt-4">
         <h2 className="font-bold text-3xl">Upgrade Analysis</h2>
         <Tabs className="mt-4 flex" defaultValue="facet-changes">

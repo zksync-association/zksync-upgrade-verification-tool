@@ -101,7 +101,7 @@ export class UpgradeChanges {
           instance.removeFacet(cut.selectors);
         } else if (cut.action === 0) {
           const facetDef = facetDefs.find((f) => f.address === cut.facet);
-          if (!facetDef) {
+          if (!facetDef || !facetDef.address) {
             throw new Error(`Inconsistent data. ${cut.facet} not present in facets.json`);
           }
           instance.addFacet(facetDef.name, facetDef.address, cut.selectors);
