@@ -4,6 +4,7 @@ import { useNonce } from "@/utils/nonce-provider";
 import { clientEnv } from "@config/env.server";
 import { type LinksFunction, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "@remix-run/react";
+import { Toaster } from "react-hot-toast";
 import {
   type State,
   deserialize as deserializeWagmiCookie,
@@ -72,6 +73,7 @@ function Document({
       </head>
       <body>
         <div className="relative mx-auto min-h-screen w-full max-w-[1500px]">{children}</div>
+        <Toaster position="bottom-center" />
         <script
           nonce={nonce}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>

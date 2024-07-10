@@ -14,6 +14,7 @@ export function helmet() {
         "connect-src": [
           env.NODE_ENV === "development" ? "ws:" : null,
           env.NODE_ENV === "development" ? env.L1_RPC_URL_FOR_UPGRADES : null,
+          env.NODE_ENV === "development" ? "https://rpc.sepolia.org" : null,
           "*.sentry.io",
           "'self'",
           "https://explorer-api.walletconnect.com",
