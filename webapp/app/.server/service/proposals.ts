@@ -1,11 +1,9 @@
 import { createOrIgnoreProposal } from "@/.server/db/dto/proposals";
-import {
-  upgradeHandlerAbi,
-} from "@/.server/service/contract-abis";
+import { upgradeHandlerAbi, } from "@/.server/service/contract-abis";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
 import { RpcClient } from "validate-cli";
-import { type Hex, decodeEventLog, hexToBigInt, hexToNumber, numberToHex } from "viem";
+import { decodeEventLog, type Hex, hexToBigInt, hexToNumber, numberToHex } from "viem";
 import { z } from "zod";
 import { PROTOCOL_UPGRADE_HANDLER_RAW_ABI } from "@/utils/raw-abis";
 
@@ -63,13 +61,44 @@ export async function getPendingProposals(): Promise<Proposal[]> {
   return nonResolvedUpgrades;
 }
 
+export type ProposalData = {
+  creationTimestamp: number;
+  securityCouncilApprovalTimestamp: number;
+  guardiansApproval: boolean;
+  guardiansExtendedLegalVeto: boolean;
+  executed: boolean;
+}
+
+export async function getProposalData(id: Hex): Promise<ProposalData> {
+  const [
+    creationTimestamp,
+    securityCouncilApprovalTimestamp,
+    guardiansApproval,
+    guardiansExtendedLegalVeto,
+    executed
+  ] = await rpc.contractRead(
+    upgradeHandlerAddress,
+    "upgradeStatus",
+    upgradeHandlerAbi.raw,
+    z.tuple([z.number(), z.number(), z.boolean(), z.boolean(), z.boolean()]) ,
+    [id]
+  );
+
+  return {
+    creationTimestamp,
+    executed,
+    guardiansApproval,
+    guardiansExtendedLegalVeto,
+    securityCouncilApprovalTimestamp,
+  }
+}
+
 export async function getProposalStatus(id: Hex) {
-  const stateNumber = await rpc.contractRead(
+  return await rpc.contractRead(
     upgradeHandlerAddress,
     "upgradeState",
     upgradeHandlerAbi.raw,
     z.number(),
     [id]
   );
-  return stateNumber;
 }

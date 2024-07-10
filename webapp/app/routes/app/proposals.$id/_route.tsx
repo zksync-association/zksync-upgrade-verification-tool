@@ -2,7 +2,7 @@ import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { actionSchema } from "@/.server/db/schema";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
-import { getProposalStatus } from "@/.server/service/proposals";
+import { getProposalData, getProposalStatus } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
+import ContractWriteButton from "@/routes/app/proposals.$id/contract-write-button";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -47,11 +48,12 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   const getAsyncData = async () => {
     const checkReport = await getCheckReport(params.data.id);
     const storageChangeReport = await getStorageChangeReport(params.data.id);
-    const [guardians, council, proposalStatus, signatures] = await Promise.all([
+    const [guardians, council, proposalStatus, signatures, proposalData] = await Promise.all([
       guardiansAddress(),
       councilAddress(),
       getProposalStatus(params.data.id),
       getSignaturesByExternalProposalId(params.data.id),
+      getProposalData(params.data.id)
     ]);
 
     return {
@@ -61,16 +63,17 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         proposedOn: proposal.proposedOn,
         executor: proposal.executor,
         status: proposalStatus,
+        extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         signatures: {
           extendLegalVetoPeriod: signatures.filter(
             (signature) => signature.action === "ExtendLegalVetoPeriod"
-          ).length,
+          ),
           approveUpgradeGuardians: signatures.filter(
             (signature) => signature.action === "ApproveUpgradeGuardians"
-          ).length,
+          ),
           approveUpgradeSecurityCouncil: signatures.filter(
             (signature) => signature.action === "ApproveUpgradeSecurityCouncil"
-          ).length,
+          ),
         },
       },
       reports: {
@@ -156,12 +159,12 @@ export default function Proposals() {
         <Await resolve={asyncData}>
           {({ addresses, proposal, reports, userSignedLegalVeto, userSignedProposal }) => {
             const securityCouncilSignaturesReached =
-              proposal.signatures.approveUpgradeSecurityCouncil >=
+              proposal.signatures.approveUpgradeSecurityCouncil.length >=
               NECESSARY_SECURITY_COUNCIL_SIGNATURES;
             const guardiansSignaturesReached =
-              proposal.signatures.approveUpgradeGuardians >= NECESSARY_GUARDIAN_SIGNATURES;
+              proposal.signatures.approveUpgradeGuardians.length >= NECESSARY_GUARDIAN_SIGNATURES;
             const legalVetoSignaturesReached =
-              proposal.signatures.extendLegalVetoPeriod >= NECESSARY_LEGAL_VETO_SIGNATURES;
+              proposal.signatures.extendLegalVetoPeriod.length >= NECESSARY_LEGAL_VETO_SIGNATURES;
 
             return (
               <>
@@ -217,17 +220,17 @@ export default function Proposals() {
                       <div className="space-y-5">
                         <StatusIndicator
                           label="Security Council Approvals"
-                          signatures={proposal.signatures.approveUpgradeSecurityCouncil}
+                          signatures={proposal.signatures.approveUpgradeSecurityCouncil.length}
                           necessarySignatures={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
                         />
                         <StatusIndicator
                           label="Guardian Approvals"
-                          signatures={proposal.signatures.approveUpgradeGuardians}
+                          signatures={proposal.signatures.approveUpgradeGuardians.length}
                           necessarySignatures={NECESSARY_GUARDIAN_SIGNATURES}
                         />
                         <StatusIndicator
                           label="Extend Legal Veto Approvals"
-                          signatures={proposal.signatures.extendLegalVetoPeriod}
+                          signatures={proposal.signatures.extendLegalVetoPeriod.length}
                           necessarySignatures={NECESSARY_LEGAL_VETO_SIGNATURES}
                         />
                       </div>
@@ -294,9 +297,21 @@ export default function Proposals() {
                       <Button disabled={!guardiansSignaturesReached}>
                         Execute guardian approval
                       </Button>
-                      <Button disabled={!legalVetoSignaturesReached}>
+
+                      <ContractWriteButton
+                        target={addresses.guardians}
+                        signatures={proposal.signatures.extendLegalVetoPeriod}
+                        proposalId={proposalId}
+                        functionName={"extendLegalVeto"}
+                        threshold={2}
+                        disabled={proposal.extendedLegalVeto}
+                      >
                         Execute legal veto extension
-                      </Button>
+                      </ContractWriteButton>
+
+                      {/*<Button disabled={!legalVetoSignaturesReached}>*/}
+                      {/*  */}
+                      {/*</Button>*/}
                       <Button
                         disabled={
                           !(proposal.status === PROPOSAL_STATES.Ready) &&

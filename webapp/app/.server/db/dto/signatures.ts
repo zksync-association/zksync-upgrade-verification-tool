@@ -13,5 +13,5 @@ export async function createOrIgnoreSignature(
 export async function getSignaturesByExternalProposalId(
   id: InferSelectModel<typeof proposalsTable>["externalId"]
 ) {
-  return await db.select().from(signaturesTable).where(eq(signaturesTable.proposal, id));
+  return db.select().from(signaturesTable).where(eq(signaturesTable.proposal, id));
 }
