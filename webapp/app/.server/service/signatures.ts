@@ -11,6 +11,7 @@ import { guardiansAbi } from "@/.server/service/protocol-upgrade-handler-abi";
 import { badRequest } from "@/utils/http";
 import { env } from "@config/env.server";
 import { type Hex, hashTypedData } from "viem";
+import { mainnet, sepolia } from "wagmi/chains";
 import { type TypeOf, type ZodType, z } from "zod";
 
 type ProposalAction = z.infer<typeof actionSchema>;
@@ -27,7 +28,7 @@ async function verifySignature(
     domain: {
       name: contractName,
       version: "1",
-      chainId: env.NODE_ENV === "development" ? 31337 : 1,
+      chainId: env.NODE_ENV === "development" ? sepolia.id : mainnet.id,
       verifyingContract: verifierAddr,
     },
     primaryType: action,
