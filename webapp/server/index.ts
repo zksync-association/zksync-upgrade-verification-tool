@@ -6,12 +6,9 @@ import closeWithGrace from "close-with-grace";
 import compression from "compression";
 import express, { type RequestHandler, type Request, type Response } from "express";
 import getPort, { portNumbers } from "get-port";
-import apiRouter from "./api";
 
 import { auth } from "@server/middlewares/auth";
 import { cspNonce } from "@server/middlewares/csp-nonce";
-import { AUTH_COOKIE_NAME } from "@server/utils/auth-session";
-import cookieSession from "cookie-session";
 import { env } from "../config/env.server";
 import { helmet } from "./middlewares/helmet";
 import { logger } from "./middlewares/logger";
@@ -38,14 +35,6 @@ app.use(requireHttps);
 app.get("*", removeTrailingSlash);
 app.use(compression());
 app.use(express.json());
-app.use(
-  cookieSession({
-    name: AUTH_COOKIE_NAME,
-    secret: env.AUTH_SECRET,
-    sameSite: "strict",
-    secure: env.NODE_ENV === "production",
-  })
-);
 
 // http://expressjs.com/en/advanced/best-practice-security.html#at-a-minimum-disable-x-powered-by-header
 app.disable("x-powered-by");
@@ -88,8 +77,6 @@ async function getBuild() {
       await import("../build/server/index.js");
   return build as unknown as ServerBuild;
 }
-
-app.use("/api", apiRouter);
 
 app.all(
   "*",

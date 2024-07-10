@@ -152,9 +152,6 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.49.2
         version: 5.49.2(react@18.3.1)
-      '@types/cookie-session':
-        specifier: ^2.0.49
-        version: 2.0.49
       address:
         specifier: ^2.0.3
         version: 2.0.3
@@ -173,9 +170,6 @@ importers:
       compression:
         specifier: ^1.7.4
         version: 1.7.4
-      cookie-session:
-        specifier: ^2.1.0
-        version: 2.1.0
       dotenv:
         specifier: ^16.4.5
         version: 16.4.5
@@ -2783,9 +2777,6 @@ packages:
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
 
-  '@types/cookie-session@2.0.49':
-    resolution: {integrity: sha512-4E/bBjlqLhU5l4iGPR+NkVJH593hpNsT4dC3DJDr+ODm6Qpe13kZQVkezRIb+TYDXaBMemS3yLQ+0leba3jlkQ==}
-
   '@types/cookie@0.6.0':
     resolution: {integrity: sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA==}
 
@@ -2821,9 +2812,6 @@ packages:
 
   '@types/istanbul-reports@3.0.4':
     resolution: {integrity: sha512-pk2B1NWalF9toCRu6gjBzR69syFjP4Od8WRAX+0mmf9lAjCRicLOWc+ZrxZHx/0XRjotgkF9t6iaMJ+aXcOdZQ==}
-
-  '@types/keygrip@1.0.6':
-    resolution: {integrity: sha512-lZuNAY9xeJt7Bx4t4dx0rYCDqGPW8RXhQZK1td7d4H6E9zYbLoOtjBvfwdTKpsyxQI/2jv+armjX/RW+ZNpXOQ==}
 
   '@types/mdast@3.0.15':
     resolution: {integrity: sha512-LnwD+mUEfxWMa1QpDraczIn6k0Ee3SMicuYSSzS6ZYl2gKS09EClnJYGd8Du6rfc5r/GZEk5o1mRb8TaTj03sQ==}
@@ -3569,10 +3557,6 @@ packages:
   cookie-es@1.1.0:
     resolution: {integrity: sha512-L2rLOcK0wzWSfSDA33YR+PUHDG10a8px7rUHKWbGLP4YfbsMed2KFUw5fczvDPbT98DDe3LEzviswl810apTEw==}
 
-  cookie-session@2.1.0:
-    resolution: {integrity: sha512-u73BDmR8QLGcs+Lprs0cfbcAPKl2HnPcjpwRXT41sEV4DRJ2+W0vJEEZkG31ofkx+HZflA70siRIjiTdIodmOQ==}
-    engines: {node: '>= 0.10'}
-
   cookie-signature@1.0.6:
     resolution: {integrity: sha512-QADzlaHc8icV8I7vbaJXJwod9HWYp8uCqf1xa4OfNu1T7JVxQIrUgOWtHdNDtPiywmFbiS12VjotIXLrKM3orQ==}
 
@@ -3583,10 +3567,6 @@ packages:
   cookie@0.6.0:
     resolution: {integrity: sha512-U71cyTamuh1CRNCfpGY6to28lxvNwPG4Guz/EVjgf3Jmzv0vlDp1atT9eS5dDjMYHucpHbWns6Lwf3BKz6svdw==}
     engines: {node: '>= 0.6'}
-
-  cookies@0.9.1:
-    resolution: {integrity: sha512-TG2hpqe4ELx54QER/S3HQ9SRVnQnGBtKUz5bLQWtYAQ+o6GpgMs6sYUvaiJjVxb+UXwhRhAEP3m7LbsIZ77Hmw==}
-    engines: {node: '>= 0.8'}
 
   core-js-compat@3.37.1:
     resolution: {integrity: sha512-9TNiImhKvQqSUkOvk/mMRZzOANTiEVC7WaBNhHcKM7x+/5E1l5NvsysR19zuDQScE8k+kfQXWRN3AtS/eOSHpg==}
@@ -3669,14 +3649,6 @@ packages:
 
   debug@2.6.9:
     resolution: {integrity: sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==}
-    peerDependencies:
-      supports-color: '*'
-    peerDependenciesMeta:
-      supports-color:
-        optional: true
-
-  debug@3.2.7:
-    resolution: {integrity: sha512-CFjzYYAi4ThfiQvizrFQevTTXHtnCqWfe7x1AhgEscTz6ZbLbfoLRLPugTQyBth6f8ZERVUSyWHFD/7Wu4t1XQ==}
     peerDependencies:
       supports-color: '*'
     peerDependenciesMeta:
@@ -4914,10 +4886,6 @@ packages:
   keccak@3.0.4:
     resolution: {integrity: sha512-3vKuW0jV8J3XNTzvfyicFR5qvxrSAGl7KIhvgOu5cmWwM7tZRj3fMbj/pfIf4be7aznbc+prBWGjywox/g2Y6Q==}
     engines: {node: '>=10.0.0'}
-
-  keygrip@1.1.0:
-    resolution: {integrity: sha512-iYSchDJ+liQ8iwbSI2QqsQOvqv58eJCEanyJPJi+Khyu8smkcKSFUCbPwzFcL7YVtZ6eONjqRX/38caJ7QjRAQ==}
-    engines: {node: '>= 0.6'}
 
   keyvaluestorage-interface@1.0.0:
     resolution: {integrity: sha512-8t6Q3TclQ4uZynJY9IGr2+SsIGwK9JHcO6ootkHCGA0CrQCRy+VkouYNO2xicET6b9al7QKzpebNow+gkpCL8g==}
@@ -6832,10 +6800,6 @@ packages:
 
   tslib@2.6.3:
     resolution: {integrity: sha512-xNvxJEOUiWPGhUuUdQgAJPKOOJfGnIyKySOc09XkKsgdUV/3E2zvwZYdejjmRgPCgcym1juLH3226yA7sEFJKQ==}
-
-  tsscmp@1.0.6:
-    resolution: {integrity: sha512-LxhtAkPDTkVCMQjt2h6eBVY28KCjikZqZfMcC15YBeNjkgUpdCfBu5HoiOTDu86v6smE8yOjyEktJ8hlbANHQA==}
-    engines: {node: '>=0.6.x'}
 
   tsup@8.1.0:
     resolution: {integrity: sha512-UFdfCAXukax+U6KzeTNO2kAARHcWxmKsnvSPXUcfA1D+kU05XDccCrkffCQpFaWDsZfV0jMyTsxU39VfCp6EOg==}
@@ -10228,11 +10192,6 @@ snapshots:
     dependencies:
       '@types/node': 20.12.6
 
-  '@types/cookie-session@2.0.49':
-    dependencies:
-      '@types/express': 4.17.21
-      '@types/keygrip': 1.0.6
-
   '@types/cookie@0.6.0': {}
 
   '@types/debug@4.1.12':
@@ -10276,8 +10235,6 @@ snapshots:
   '@types/istanbul-reports@3.0.4':
     dependencies:
       '@types/istanbul-lib-report': 3.0.3
-
-  '@types/keygrip@1.0.6': {}
 
   '@types/mdast@3.0.15':
     dependencies:
@@ -11371,25 +11328,11 @@ snapshots:
 
   cookie-es@1.1.0: {}
 
-  cookie-session@2.1.0:
-    dependencies:
-      cookies: 0.9.1
-      debug: 3.2.7
-      on-headers: 1.0.2
-      safe-buffer: 5.2.1
-    transitivePeerDependencies:
-      - supports-color
-
   cookie-signature@1.0.6: {}
 
   cookie-signature@1.2.1: {}
 
   cookie@0.6.0: {}
-
-  cookies@0.9.1:
-    dependencies:
-      depd: 2.0.0
-      keygrip: 1.1.0
 
   core-js-compat@3.37.1:
     dependencies:
@@ -11475,10 +11418,6 @@ snapshots:
   debug@2.6.9:
     dependencies:
       ms: 2.0.0
-
-  debug@3.2.7:
-    dependencies:
-      ms: 2.1.3
 
   debug@4.3.5:
     dependencies:
@@ -12848,10 +12787,6 @@ snapshots:
       node-addon-api: 2.0.2
       node-gyp-build: 4.8.1
       readable-stream: 3.6.2
-
-  keygrip@1.1.0:
-    dependencies:
-      tsscmp: 1.0.6
 
   keyvaluestorage-interface@1.0.0: {}
 
@@ -15204,8 +15139,6 @@ snapshots:
   tslib@2.4.0: {}
 
   tslib@2.6.3: {}
-
-  tsscmp@1.0.6: {}
 
   tsup@8.1.0(postcss@8.4.39)(typescript@5.4.4):
     dependencies:
