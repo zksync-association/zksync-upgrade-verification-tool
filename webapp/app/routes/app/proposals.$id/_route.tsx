@@ -26,7 +26,7 @@ import { z } from "zod";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const params = getParams(remixParams, z.object({ id: z.string() }));
+  const params = getParams(remixParams, z.object({ id: zodHex }));
   if (!params.success) {
     throw notFound();
   }
