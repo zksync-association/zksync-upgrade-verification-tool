@@ -3,7 +3,7 @@ import {
   guardiansAbi,
   scAbi,
   upgradeHandlerAbi,
-} from "@/.server/service/protocol-upgrade-handler-abi";
+} from "@/.server/service/contract-abis";
 import { env } from "@config/env.server";
 import { zodHex } from "validate-cli";
 import type { Hex } from "viem";

@@ -1,5 +1,5 @@
 import { createOrIgnoreSignature } from "@/.server/db/dto/signatures";
-import type { Action, actionSchema } from "@/.server/db/schema";
+import { Action, actionSchema, signaturesTable } from "@/.server/db/schema";
 import {
   councilAddress,
   councilMembers,
@@ -7,12 +7,14 @@ import {
   guardiansAddress,
 } from "@/.server/service/authorized-users";
 import { l1RpcProposals } from "@/.server/service/clients";
-import { guardiansAbi } from "@/.server/service/protocol-upgrade-handler-abi";
+import { guardiansAbi } from "@/.server/service/contract-abis";
 import { badRequest } from "@/utils/http";
 import { env } from "@config/env.server";
 import { type Hex, hashTypedData } from "viem";
 import { mainnet, sepolia } from "wagmi/chains";
 import { type TypeOf, type ZodType, z } from "zod";
+import { db } from "@/.server/db/index";
+import { and, asc, eq } from "drizzle-orm";
 
 type ProposalAction = z.infer<typeof actionSchema>;
 
@@ -56,14 +58,6 @@ async function verifySignature(
   } catch (e) {
     return false;
   }
-}
-
-function parseOrBadRequest<T extends ZodType>(value: any, parser: T): TypeOf<typeof parser> {
-  const parsed = parser.safeParse(value);
-  if (!parsed.success) {
-    throw badRequest(parsed.error.message);
-  }
-  return parsed.data;
 }
 
 export async function validateAndSaveSignature(
@@ -121,4 +115,21 @@ export async function validateAndSaveSignature(
   };
 
   await createOrIgnoreSignature(dto);
+}
+
+
+export async function buildExtendVetoArgs(proposalId: Hex): Promise<null | any[]> {
+  const records = await db.query.signaturesTable.findMany({
+    where: and(
+      eq(signaturesTable.proposal, proposalId),
+      eq(signaturesTable.action, "ExtendLegalVetoPeriod")
+    ),
+    orderBy: asc(signaturesTable.signer)
+  })
+
+  if (records.length < 2) {
+    return null;
+  }
+
+  return [proposalId, records.map(r => r.signer), records.map(r => r.signature)]
 }
