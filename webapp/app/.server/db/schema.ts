@@ -1,5 +1,6 @@
 import { bytea } from "@/.server/db/custom-types";
 import { index, json, pgTable, serial, text, unique } from "drizzle-orm/pg-core";
+import { z } from "zod";
 
 export const proposalsTable = pgTable(
   "proposals",
@@ -15,6 +16,12 @@ export const proposalsTable = pgTable(
   })
 );
 
+export const actionSchema = z.enum([
+  "ExtendLegalVetoPeriod",
+  "ApproveUpgradeGuardians",
+  "ApproveUpgradeSecurityCouncil",
+]);
+
 export const signaturesTable = pgTable(
   "signatures",
   {
@@ -25,7 +32,7 @@ export const signaturesTable = pgTable(
     signer: bytea("signer").notNull(),
     signature: bytea("signature").notNull(),
     action: text("action", {
-      enum: ["ExtendLegalVetoPeriod", "ApproveUpgradeGuardians", "ApproveUpgradeSecurityCouncil"],
+      enum: actionSchema.options,
     }).notNull(),
   },
   (t) => ({
