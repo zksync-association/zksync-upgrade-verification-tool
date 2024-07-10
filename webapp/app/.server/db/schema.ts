@@ -12,6 +12,7 @@ export const proposalsTable = pgTable(
     storageDiffReport: json("storage_diff_report"),
     proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
     executor: bytea("executor").notNull(),
+    transactionHash: bytea("transaction_hash").notNull(),
   },
   (table) => ({
     externalIdIdx: index("external_id_idx").on(table.externalId),

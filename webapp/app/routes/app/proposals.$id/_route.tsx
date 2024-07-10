@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { displayBytes32 } from "@/routes/app/proposals.$id/common-tables";
 import ContractWriteButton from "@/routes/app/proposals.$id/contract-write-button";
 import FacetChangesTable from "@/routes/app/proposals.$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals.$id/field-changes-table";
@@ -17,14 +18,14 @@ import FieldStorageChangesTable from "@/routes/app/proposals.$id/field-storage-c
 import SignButton from "@/routes/app/proposals.$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
-import { displayBytes32 } from "@/utils/bytes32";
 import { cn } from "@/utils/cn";
+import { getTransactionUrl } from "@/utils/etherscan";
 import { badRequest, notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { defer, json } from "@remix-run/node";
 import { Await, useLoaderData, useNavigate } from "@remix-run/react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, SquareArrowOutUpRight } from "lucide-react";
 import { Suspense } from "react";
 import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
@@ -75,6 +76,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
             (signature) => signature.action === "ApproveUpgradeSecurityCouncil"
           ),
         },
+        transactionHash: proposal.transactionHash,
       },
       reports: {
         facetChanges: checkReport.facetChanges,
@@ -186,6 +188,19 @@ export default function Proposals() {
                           </span>
                         </div>
                         <div className="flex justify-between">
+                          <span>Proposal ID:</span>
+                          <span className="w-1/2 justify-end break-words">{proposalId}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Proposed On:</span>
+                          <div className="flex w-1/2 flex-col break-words text-right">
+                            <span>{new Date(proposal.proposedOn).toISOString()}</span>
+                            <span>
+                              ({Math.floor(new Date(proposal.proposedOn).getTime() / 1000)})
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex justify-between">
                           <span>Executor:</span>
                           <span className="w-1/2 break-words text-right">
                             {isAddressEqual(proposal.executor as `0x${string}`, zeroAddress)
@@ -194,17 +209,14 @@ export default function Proposals() {
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Proposal ID:</span>
-                          <span className="w-1/2 break-words text-right">{proposalId}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Proposed On:</span>
-                          <div className="flex w-1/2 flex-col break-words text-right">
-                            <span className="">{new Date(proposal.proposedOn).toISOString()}</span>
-                            <span className="">
-                              ({Math.floor(new Date(proposal.proposedOn).getTime() / 1000)})
-                            </span>
-                          </div>
+                          <span>Transaction hash:</span>
+                          <a
+                            href={getTransactionUrl(proposal.transactionHash as Hex)}
+                            className="flex w-1/2 items-center justify-end break-words underline"
+                          >
+                            <span>{displayBytes32(proposal.transactionHash)}</span>
+                            <SquareArrowOutUpRight className="ml-1" width={12} height={12} />
+                          </a>
                         </div>
                       </div>
                     </CardContent>
