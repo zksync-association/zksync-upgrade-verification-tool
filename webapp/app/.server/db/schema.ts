@@ -22,6 +22,8 @@ export const actionSchema = z.enum([
   "ApproveUpgradeSecurityCouncil",
 ]);
 
+export type Action = z.infer<typeof actionSchema>;
+
 export const signaturesTable = pgTable(
   "signatures",
   {

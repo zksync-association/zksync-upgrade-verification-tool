@@ -1,5 +1,5 @@
 import { createOrIgnoreSignature } from "@/.server/db/dto/signatures";
-import { actionSchema } from "@/.server/db/schema";
+import type { Action, actionSchema } from "@/.server/db/schema";
 import {
   councilAddress,
   councilMembers,
@@ -10,7 +10,6 @@ import { l1RpcProposals } from "@/.server/service/clients";
 import { guardiansAbi } from "@/.server/service/protocol-upgrade-handler-abi";
 import { badRequest } from "@/utils/http";
 import { env } from "@config/env.server";
-import { zodHex } from "validate-cli/src";
 import { type Hex, hashTypedData } from "viem";
 import { type TypeOf, type ZodType, z } from "zod";
 
@@ -67,49 +66,44 @@ function parseOrBadRequest<T extends ZodType>(value: any, parser: T): TypeOf<typ
 }
 
 export async function validateAndSaveSignature(
-  signature: string,
-  signer: string,
-  action: string,
-  proposalId: string
+  signature: Hex,
+  signer: Hex,
+  action: Action,
+  proposalId: Hex
 ) {
-  const signatureHex = parseOrBadRequest(signature, zodHex);
-  const signerHex = parseOrBadRequest(signer, zodHex);
-  const parsedAction = parseOrBadRequest(action, actionSchema);
-  const proposalIdHex = parseOrBadRequest(proposalId, zodHex);
-
   let validSignature: boolean;
-  if (parsedAction === "ExtendLegalVetoPeriod" || parsedAction === "ApproveUpgradeGuardians") {
+  if (action === "ExtendLegalVetoPeriod" || action === "ApproveUpgradeGuardians") {
     const guardians = await guardianMembers();
-    if (!guardians.includes(signerHex)) {
+    if (!guardians.includes(signer)) {
       throw badRequest(
-        `Signer is not a guardian. Only guardians can execute this action: ${parsedAction}`
+        `Signer is not a guardian. Only guardians can execute this action: ${action}`
       );
     }
 
     const addr = await guardiansAddress();
     validSignature = await verifySignature(
-      signerHex,
-      signatureHex,
+      signer,
+      signature,
       addr,
-      parsedAction,
-      proposalIdHex,
+      action,
+      proposalId,
       "Guardians"
     );
   } else {
     const members = await councilMembers();
-    if (!members.includes(signerHex)) {
+    if (!members.includes(signer)) {
       throw badRequest(
-        `Signer is not a security council member. Only the security council can execute this action: ${parsedAction}`
+        `Signer is not a security council member. Only the security council can execute this action: ${action}`
       );
     }
 
     const addr = await councilAddress();
     validSignature = await verifySignature(
-      signerHex,
-      signatureHex,
+      signer,
+      signature,
       addr,
-      parsedAction,
-      proposalIdHex,
+      action,
+      proposalId,
       "SecurityCouncil"
     );
   }
@@ -119,10 +113,10 @@ export async function validateAndSaveSignature(
   }
 
   const dto = {
-    action: parsedAction,
-    signature: signatureHex,
-    proposal: proposalIdHex,
-    signer: signerHex,
+    action,
+    signature,
+    proposal: proposalId,
+    signer,
   };
 
   await createOrIgnoreSignature(dto);

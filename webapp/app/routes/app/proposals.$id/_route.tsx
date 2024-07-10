@@ -18,7 +18,8 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
-import { getParams } from "remix-params-helper";
+import { getFormData, getParams } from "remix-params-helper";
+import { zodHex } from "validate-cli";
 import type { Hex } from "viem";
 import { z } from "zod";
 
@@ -58,23 +59,28 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   });
 }
 
-function getOrBadRequest(data: FormData, key: string): string {
-  const value = data.get(key);
-  if (typeof value !== "string") {
-    throw badRequest(`${key} should be present`);
+export async function action({ request }: ActionFunctionArgs) {
+  const user = requireUserFromHeader(request);
+
+  const data = await getFormData(
+    request,
+    z.object({
+      signature: zodHex,
+      proposalId: zodHex,
+      actionName: actionSchema,
+    })
+  );
+  if (!data.success) {
+    throw badRequest("Failed to parse signature data");
   }
 
-  return value;
-}
-
-export async function action({ request }: ActionFunctionArgs) {
-  const data = await request.formData();
-  const signature = getOrBadRequest(data, "signature");
-  const address = getOrBadRequest(data, "address");
-  const actionName = getOrBadRequest(data, "actionName");
-  const proposalId = getOrBadRequest(data, "proposalId");
-  await validateAndSaveSignature(signature, address, actionName, proposalId);
-  return "ok";
+  await validateAndSaveSignature(
+    data.data.signature,
+    user.address as Hex,
+    data.data.actionName,
+    data.data.proposalId
+  );
+  return new Response(null, { status: 204 });
 }
 
 export default function Proposals() {
@@ -164,7 +170,7 @@ export default function Proposals() {
                   name: "Guardians",
                 }}
               >
-                Approve extend veto period{" "}
+                Approve extend veto period
               </SignButton>
             )}
 
@@ -190,7 +196,7 @@ export default function Proposals() {
                   name: "SecurityCouncil",
                 }}
               >
-                Approve veto extension
+                Approve proposal
               </SignButton>
             )}
           </CardContent>
