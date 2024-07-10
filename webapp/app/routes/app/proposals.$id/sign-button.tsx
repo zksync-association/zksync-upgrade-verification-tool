@@ -18,7 +18,7 @@ type SignButtonProps = {
 };
 
 export default function SignButton({ children, proposalId, contractData }: SignButtonProps) {
-  const { signTypedDataAsync: signTypedData, data } = useSignTypedData();
+  const { signTypedDataAsync: signTypedData, isPending } = useSignTypedData();
   const [chain] = useChains();
   const fetcher = useFetcher<typeof action>();
 
@@ -51,5 +51,5 @@ export default function SignButton({ children, proposalId, contractData }: SignB
     );
   }
 
-  return <Button onClick={onClick}>{children}</Button>;
+  return <Button disabled={isPending} onClick={onClick}>{children}</Button>;
 }

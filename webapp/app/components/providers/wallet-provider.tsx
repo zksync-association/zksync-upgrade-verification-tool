@@ -2,21 +2,8 @@ import Avatar from "@/components/connect-button/avatar";
 import { RainbowKitProvider, darkTheme, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
-import { defineChain } from "viem";
 import { type State, WagmiProvider, cookieStorage, createStorage } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
-
-const devChain = defineChain({
-  id: 31337,
-  name: "EthereumDev",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: {
-    default: {
-      http: ["http://localhost:8545"],
-    },
-  },
-  contracts: {},
-});
 
 const queryClient = new QueryClient();
 
@@ -34,7 +21,7 @@ export function WalletProvider({
   const config = useMemo(() => {
     return getDefaultConfig({
       appName: "zkSync Upgrade Verification Tool",
-      chains: devNetwork ? [devChain, sepolia] : [mainnet],
+      chains: devNetwork ? [sepolia] : [mainnet],
       projectId,
       ssr: true,
       storage: createStorage({
