@@ -167,7 +167,7 @@ export default function Proposals() {
 
             {user.role === "securityCouncil" && <SignButton
               proposalId={proposal.id}
-              contractData={{ actionName: "Approve    UpgradeSecurityCouncil", address: addresses.council, name: "SecurityCouncil" }}
+              contractData={{ actionName: "ApproveUpgradeSecurityCouncil", address: addresses.council, name: "SecurityCouncil" }}
             >Approve veto extension</SignButton>}
           </CardContent>
         </Card>

@@ -1,19 +1,13 @@
 import { db } from "@/.server/db";
-import { getFirst, getFirstOrThrow } from "@/.server/db/dto/utils/common";
+import { createOrIgnoreRecord, getFirst, getFirstOrThrow } from "@/.server/db/dto/utils/common";
 import { signaturesTable } from "@/.server/db/schema";
 import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
 
 export async function createOrIgnoreSignature(
   data: InferInsertModel<typeof signaturesTable>,
   { tx }: { tx?: typeof db } = {}
-) {
-  return getFirst(
-    await (tx ?? db)
-      .insert(signaturesTable)
-      .values(data)
-      .returning()
-      .onConflictDoNothing()
-  );
+): Promise<void> {
+  await createOrIgnoreRecord(signaturesTable, data, { tx })
 }
 
 // export async function getProposalByExternalId(externalId: string) {

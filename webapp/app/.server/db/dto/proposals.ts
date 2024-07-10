@@ -1,5 +1,5 @@
 import { db } from "@/.server/db";
-import { getFirst, getFirstOrThrow } from "@/.server/db/dto/utils/common";
+import { createOrIgnoreRecord, getFirst, getFirstOrThrow } from "@/.server/db/dto/utils/common";
 import { proposalsTable } from "@/.server/db/schema";
 import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
 
@@ -7,13 +7,7 @@ export async function createOrIgnoreProposal(
   data: InferInsertModel<typeof proposalsTable>,
   { tx }: { tx?: typeof db } = {}
 ) {
-  return getFirst(
-    await (tx ?? db)
-      .insert(proposalsTable)
-      .values(data)
-      .returning()
-      .onConflictDoNothing({ target: proposalsTable.externalId })
-  );
+  await createOrIgnoreRecord(proposalsTable, data, { tx })
 }
 
 export async function getProposalByExternalId(externalId: string) {
