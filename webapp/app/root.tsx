@@ -1,7 +1,5 @@
-import { type AuthContextInitialState, AuthProvider } from "@/components/context/auth-context";
 import { GeneralErrorBoundary } from "@/components/error-boundary";
 import { WalletProvider } from "@/components/providers/wallet-provider";
-import { getUserFromHeader } from "@/utils/auth-headers";
 import { useNonce } from "@/utils/nonce-provider";
 import { clientEnv } from "@config/env.server";
 import { type LinksFunction, type LoaderFunctionArgs, json } from "@remix-run/node";
@@ -14,6 +12,7 @@ import {
 
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
+import ConnectRedirectProvider from "@/components/providers/connect-redirect-provider";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: "https://rsms.me/inter/inter.css" },
@@ -23,25 +22,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Get wagmi cookie for SSR
   const cookies = request.headers.get("Cookie");
   const wagmiCookie = cookies ? parseWagmiCookie(cookies, "wagmi.store") : undefined;
-
-  // Parse authentication status from session
-  const user = getUserFromHeader(request);
-  let authStatus: AuthContextInitialState;
-  if (user.address) {
-    authStatus = {
-      isAuthenticated: true,
-      address: user.address,
-    };
-  } else {
-    authStatus = { isAuthenticated: false };
-  }
-
-  return json({ env: clientEnv, wagmiCookie, authStatus });
+  return json({ env: clientEnv, wagmiCookie });
 }
 
 export default function App() {
   const nonce = useNonce();
-  const { env, wagmiCookie, authStatus } = useLoaderData<typeof loader>();
+  const { env, wagmiCookie } = useLoaderData<typeof loader>();
 
   const walletProviderInitialState = wagmiCookie
     ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
@@ -49,17 +35,17 @@ export default function App() {
 
   return (
     <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
-      <AuthProvider initialValue={authStatus}>
-        <WalletProvider
-          initialState={walletProviderInitialState}
-          projectId={env.WALLET_CONNECT_PROJECT_ID}
-          devNetwork={env.NODE_ENV === "development"}
-        >
+      <WalletProvider
+        initialState={walletProviderInitialState}
+        projectId={env.WALLET_CONNECT_PROJECT_ID}
+        devNetwork={env.NODE_ENV === "development"}
+      >
+        <ConnectRedirectProvider>
           <div className="flex min-h-screen flex-col px-10 py-10 lg:px-40">
             <Outlet />
           </div>
-        </WalletProvider>
-      </AuthProvider>
+        </ConnectRedirectProvider>
+      </WalletProvider>
     </Document>
   );
 }

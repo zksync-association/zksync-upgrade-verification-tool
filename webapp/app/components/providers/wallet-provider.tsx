@@ -1,5 +1,4 @@
 import Avatar from "@/components/connect-button/avatar";
-import WalletAuthProvider from "@/components/providers/wallet-auth-provider";
 import { RainbowKitProvider, darkTheme, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
@@ -47,17 +46,15 @@ export function WalletProvider({
   return (
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
-        <WalletAuthProvider>
-          <RainbowKitProvider
-            theme={darkTheme({
-              accentColor: "#1755F4",
-              borderRadius: "large",
-            })}
-            avatar={Avatar}
-          >
-            {children}
-          </RainbowKitProvider>
-        </WalletAuthProvider>
+        <RainbowKitProvider
+          theme={darkTheme({
+            accentColor: "#1755F4",
+            borderRadius: "large",
+          })}
+          avatar={Avatar}
+        >
+          {children}
+        </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );
