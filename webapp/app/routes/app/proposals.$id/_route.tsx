@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ContractWriteButton from "@/routes/app/proposals.$id/contract-write-button";
 import FacetChangesTable from "@/routes/app/proposals.$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals.$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals.$id/field-storage-changes-table";
@@ -29,7 +30,6 @@ import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
-import ContractWriteButton from "@/routes/app/proposals.$id/contract-write-button";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -53,7 +53,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       councilAddress(),
       getProposalStatus(params.data.id),
       getSignaturesByExternalProposalId(params.data.id),
-      getProposalData(params.data.id)
+      getProposalData(params.data.id),
     ]);
 
     return {
@@ -163,8 +163,6 @@ export default function Proposals() {
               NECESSARY_SECURITY_COUNCIL_SIGNATURES;
             const guardiansSignaturesReached =
               proposal.signatures.approveUpgradeGuardians.length >= NECESSARY_GUARDIAN_SIGNATURES;
-            const legalVetoSignaturesReached =
-              proposal.signatures.extendLegalVetoPeriod.length >= NECESSARY_LEGAL_VETO_SIGNATURES;
 
             return (
               <>
@@ -303,7 +301,7 @@ export default function Proposals() {
                         signatures={proposal.signatures.extendLegalVetoPeriod}
                         proposalId={proposalId}
                         functionName={"extendLegalVeto"}
-                        threshold={2}
+                        threshold={NECESSARY_LEGAL_VETO_SIGNATURES}
                         disabled={proposal.extendedLegalVeto}
                       >
                         Execute legal veto extension

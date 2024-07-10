@@ -1,11 +1,11 @@
 import { createOrIgnoreProposal } from "@/.server/db/dto/proposals";
-import { upgradeHandlerAbi, } from "@/.server/service/contract-abis";
+import { upgradeHandlerAbi } from "@/.server/service/contract-abis";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
+import { PROTOCOL_UPGRADE_HANDLER_RAW_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 import { RpcClient } from "validate-cli";
-import { decodeEventLog, type Hex, hexToBigInt, hexToNumber, numberToHex } from "viem";
+import { type Hex, decodeEventLog, hexToBigInt, hexToNumber, numberToHex } from "viem";
 import { z } from "zod";
-import { PROTOCOL_UPGRADE_HANDLER_RAW_ABI } from "@/utils/raw-abis";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 
@@ -67,7 +67,7 @@ export type ProposalData = {
   guardiansApproval: boolean;
   guardiansExtendedLegalVeto: boolean;
   executed: boolean;
-}
+};
 
 export async function getProposalData(id: Hex): Promise<ProposalData> {
   const [
@@ -75,12 +75,12 @@ export async function getProposalData(id: Hex): Promise<ProposalData> {
     securityCouncilApprovalTimestamp,
     guardiansApproval,
     guardiansExtendedLegalVeto,
-    executed
+    executed,
   ] = await rpc.contractRead(
     upgradeHandlerAddress,
     "upgradeStatus",
     upgradeHandlerAbi.raw,
-    z.tuple([z.number(), z.number(), z.boolean(), z.boolean(), z.boolean()]) ,
+    z.tuple([z.number(), z.number(), z.boolean(), z.boolean(), z.boolean()]),
     [id]
   );
 
@@ -90,7 +90,7 @@ export async function getProposalData(id: Hex): Promise<ProposalData> {
     guardiansApproval,
     guardiansExtendedLegalVeto,
     securityCouncilApprovalTimestamp,
-  }
+  };
 }
 
 export async function getProposalStatus(id: Hex) {
