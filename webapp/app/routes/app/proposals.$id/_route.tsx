@@ -22,6 +22,7 @@ import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import type { Hex } from "viem";
 import { z } from "zod";
+import { actionSchema } from "@/.server/db/schema";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
