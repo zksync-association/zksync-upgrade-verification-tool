@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
 import { defineChain } from "viem";
 import { type State, WagmiProvider, cookieStorage, createStorage } from "wagmi";
-import { mainnet } from "wagmi/chains";
+import { mainnet, sepolia } from "wagmi/chains";
 
 const devChain = defineChain({
   id: 31337,
@@ -35,7 +35,7 @@ export function WalletProvider({
   const config = useMemo(() => {
     return getDefaultConfig({
       appName: "zkSync Upgrade Verification Tool",
-      chains: devNetwork ? [devChain] : [mainnet],
+      chains: devNetwork ? [devChain, sepolia] : [mainnet],
       projectId,
       ssr: true,
       storage: createStorage({
