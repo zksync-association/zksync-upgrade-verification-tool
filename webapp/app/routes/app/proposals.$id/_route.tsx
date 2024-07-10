@@ -1,4 +1,6 @@
+import { guardiansAddress } from "@/.server/service/authorized-users";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
+import { validateAndSaveSignature } from "@/.server/service/signatures";
 import { useAuth } from "@/components/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,20 +9,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FacetChangesTable from "@/routes/app/proposals.$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals.$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals.$id/field-storage-changes-table";
+import SignButton from "@/routes/app/proposals.$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contract-changes-table";
 import { displayAddress } from "@/utils/address";
 import { displayBytes32 } from "@/utils/bytes32";
-import { notFound } from "@/utils/http";
+import { badRequest, notFound } from "@/utils/http";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useFetcher, useLoaderData, useNavigate } from "@remix-run/react";
+import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
+import type { Hex } from "viem";
 import { z } from "zod";
-import SignButton from "@/routes/app/proposals.$id/sign-button";
-import { Hex } from "viem";
-import { guardianAddress } from "@/.server/service/authorized-users";
-import { useCallback } from "react";
 
 export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const params = getParams(remixParams, z.object({ id: z.string() }));
@@ -44,27 +44,33 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
       fieldStorageChanges: storageChangeReport,
     },
     addresses: {
-      guardian: await guardianAddress()
-    }
+      guardian: await guardiansAddress(),
+    },
   });
 }
 
+function strOrBadRequest(data: FormData, key: string): string {
+  const value = data.get(key);
+  if (typeof value !== "string") {
+    throw badRequest(`${key} was not present`);
+  }
+  return value;
+}
+
 export async function action({ request }: ActionFunctionArgs) {
-  console.log("Me llamaron!")
+  const data = await request.formData();
+  const signature = strOrBadRequest(data, "signature");
+  const address = strOrBadRequest(data, "address");
+  const actionName = strOrBadRequest(data, "actionName");
+  const proposalId = strOrBadRequest(data, "proposalId");
+  await validateAndSaveSignature(signature, address, actionName, proposalId);
+  return {};
 }
 
 export default function Proposals() {
-  const {proposal, reports, addresses} = useLoaderData<typeof loader>();
+  const { proposal, reports, addresses } = useLoaderData<typeof loader>();
   const auth = useAuth();
   const navigate = useNavigate();
-  const fetcher = useFetcher({ key: "sign" });
-
-
-  console.log("rendering")
-  const blah = useCallback((signature: string) => {
-    console.log("blaaaaaaaaaaaaaaaaaaaaaaaaaaaaaah", signature)
-  }, [fetcher])
-
 
   return (
     <div className="mt-10 flex flex-col space-y-4">
@@ -75,7 +81,7 @@ export default function Proposals() {
           onClick={() => navigate(-1)}
           className="mr-2 hover:bg-transparent"
         >
-          <ArrowLeft/>
+          <ArrowLeft />
         </Button>
         <h2 className="font-semibold">Proposal {displayBytes32(proposal.id)}</h2>
       </div>
@@ -142,10 +148,14 @@ export default function Proposals() {
         <div className="flex space-x-4">
           <SignButton
             proposalId={proposal.id}
-            contractData={{actionName: "ExtendLegalVetoPeriod", address: addresses.guardian, name: "Guardians"}}
-            onError={console.error}
-            onSuccess={blah}
-          >Extend</SignButton>
+            contractData={{
+              actionName: "ExtendLegalVetoPeriod",
+              address: addresses.guardian,
+              name: "Guardians",
+            }}
+          >
+            Extend
+          </SignButton>
         </div>
       </Card>
       <div className="pt-4">

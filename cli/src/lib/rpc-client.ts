@@ -53,7 +53,7 @@ export class RpcClient {
     });
 
     if (!data) {
-      throw new Error("Unexpected response from RPC");
+      return "0x";
     }
 
     return data;

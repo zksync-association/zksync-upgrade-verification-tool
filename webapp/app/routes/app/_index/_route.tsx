@@ -26,12 +26,12 @@ export default function Index() {
               <Link
                 key={proposal.id}
                 className="flex"
-                to={$path("/app/proposals/:id", {id: proposal.id})}
+                to={$path("/app/proposals/:id", { id: proposal.id })}
               >
                 <Button className="flex flex-1 justify-between pr-4" variant="outline">
-                  <span/>
+                  <span />
                   <span>{proposal.id}</span>
-                  <ArrowRight/>
+                  <ArrowRight />
                 </Button>
               </Link>
             ))}
