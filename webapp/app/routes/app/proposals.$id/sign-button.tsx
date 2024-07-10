@@ -16,9 +16,15 @@ type SignButtonProps = {
   proposalId: Hex;
   contractData: ContractData;
   children?: React.ReactNode;
+  disabled?: boolean;
 };
 
-export default function SignButton({ children, proposalId, contractData }: SignButtonProps) {
+export default function SignButton({
+  children,
+  proposalId,
+  contractData,
+  disabled,
+}: SignButtonProps) {
   const { signTypedDataAsync: signTypedData, isPending } = useSignTypedData();
   const [chain] = useChains();
   const fetcher = useFetcher<typeof action>();
@@ -62,7 +68,7 @@ export default function SignButton({ children, proposalId, contractData }: SignB
   }
 
   return (
-    <Button disabled={isPending} onClick={onClick}>
+    <Button disabled={isPending || disabled} onClick={onClick}>
       {children}
     </Button>
   );
