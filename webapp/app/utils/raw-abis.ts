@@ -1,4 +1,3 @@
-import { ContractAbi } from "validate-cli/src/lib/contract-abi";
 import type { Abi } from "viem";
 
 export const PROTOCOL_UPGRADE_HANDLER_RAW_ABI = [
@@ -1709,7 +1708,3 @@ export const SEC_COUNCIL_RAW_ABI: Abi = [
     ],
   },
 ] as const;
-
-export const upgradeHandlerAbi = new ContractAbi(PROTOCOL_UPGRADE_HANDLER_RAW_ABI);
-export const guardiansAbi = new ContractAbi(GUARDIANS_RAW_ABI);
-export const scAbi = new ContractAbi(SEC_COUNCIL_RAW_ABI);

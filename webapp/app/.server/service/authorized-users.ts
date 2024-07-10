@@ -1,9 +1,5 @@
 import { l1RpcProposals } from "@/.server/service/clients";
-import {
-  guardiansAbi,
-  scAbi,
-  upgradeHandlerAbi,
-} from "@/.server/service/protocol-upgrade-handler-abi";
+import { guardiansAbi, scAbi, upgradeHandlerAbi } from "@/.server/service/contract-abis";
 import { env } from "@config/env.server";
 import { zodHex } from "validate-cli";
 import type { Hex } from "viem";
