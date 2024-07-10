@@ -1,11 +1,10 @@
 import Avatar from "@/components/connect-button/avatar";
-import WalletAuthProvider from "@/components/providers/wallet-auth-provider";
 import { RainbowKitProvider, darkTheme, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
 import { defineChain } from "viem";
 import { type State, WagmiProvider, cookieStorage, createStorage } from "wagmi";
-import { mainnet } from "wagmi/chains";
+import { mainnet, sepolia } from "wagmi/chains";
 
 const devChain = defineChain({
   id: 31337,
@@ -35,7 +34,7 @@ export function WalletProvider({
   const config = useMemo(() => {
     return getDefaultConfig({
       appName: "zkSync Upgrade Verification Tool",
-      chains: devNetwork ? [devChain] : [mainnet],
+      chains: devNetwork ? [devChain, sepolia] : [mainnet],
       projectId,
       ssr: true,
       storage: createStorage({
@@ -47,17 +46,15 @@ export function WalletProvider({
   return (
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
-        <WalletAuthProvider>
-          <RainbowKitProvider
-            theme={darkTheme({
-              accentColor: "#1755F4",
-              borderRadius: "large",
-            })}
-            avatar={Avatar}
-          >
-            {children}
-          </RainbowKitProvider>
-        </WalletAuthProvider>
+        <RainbowKitProvider
+          theme={darkTheme({
+            accentColor: "#1755F4",
+            borderRadius: "large",
+          })}
+          avatar={Avatar}
+        >
+          {children}
+        </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

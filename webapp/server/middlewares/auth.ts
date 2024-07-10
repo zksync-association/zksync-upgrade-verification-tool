@@ -22,16 +22,16 @@ export async function auth(req: Request, res: Response, next: NextFunction) {
 
   if (isProtectedRoute(req)) {
     // If user is not logged in, redirect to home page
-    if (!session?.siwe?.success) {
+    if (!session?.address) {
       clearUserHeaders(req);
       return res.redirect($path("/"));
     }
 
-    const auth = await isUserAuthorized(zodHex.parse(session.siwe.data.address));
+    const auth = await isUserAuthorized(zodHex.parse(session.address));
 
     // Session headers are set for all requests, authorized or not,
     // to be used by Remix loaders
-    setUserHeaders(req, { address: session.siwe.data.address, role: auth.role });
+    setUserHeaders(req, { address: session.address, role: auth.role });
 
     // If user is logged in but not authorized, redirect to denied page
     if (!auth.authorized) {
@@ -42,8 +42,8 @@ export async function auth(req: Request, res: Response, next: NextFunction) {
   }
 
   // If route is not protected, Remix might still need user information
-  if (session?.siwe?.success) {
-    setUserHeaders(req, { address: session.siwe.data.address, role: null });
+  if (session?.address) {
+    setUserHeaders(req, { address: session.address, role: null });
   } else {
     clearUserHeaders(req);
   }

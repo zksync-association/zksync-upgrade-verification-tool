@@ -1555,7 +1555,7 @@ export const SEC_COUNCIL_RAW_ABI: Abi = [
       {
         name: "",
         type: "address",
-        internalType: "address",
+        internalType: "address  ",
       },
     ],
     stateMutability: "view",

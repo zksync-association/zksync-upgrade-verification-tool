@@ -7,17 +7,9 @@ import { ChevronDown } from "lucide-react";
 export default function ConnectButton({ loading }: { loading?: boolean }) {
   return (
     <RainbowConnectButton.Custom>
-      {({
-        account,
-        chain,
-        openAccountModal,
-        openChainModal,
-        openConnectModal,
-        authenticationStatus,
-        mounted,
-      }) => {
-        const ready = mounted && authenticationStatus !== "loading";
-        const connected = ready && account && chain && authenticationStatus === "authenticated";
+      {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
+        const ready = mounted;
+        const connected = ready && account && chain;
 
         return (
           <div
@@ -31,7 +23,7 @@ export default function ConnectButton({ loading }: { loading?: boolean }) {
                 return <Button onClick={openConnectModal}>Connect Wallet</Button>;
               }
               if (chain.unsupported) {
-                return <Button onClick={openChainModal}>Wrong network</Button>;
+                return <Button onClick={openChainModal}>Unsupported network</Button>;
               }
               if (loading) {
                 return (

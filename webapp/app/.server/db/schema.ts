@@ -1,7 +1,6 @@
 import { bytea } from "@/.server/db/custom-types";
-import { index, json, pgEnum, pgTable, serial, timestamp } from "drizzle-orm/pg-core";
-
-export const proposalTableStatus = pgEnum("status", ["pending", "completed"]);
+import { index, json, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { z } from "zod";
 
 export const proposalsTable = pgTable(
   "proposals",
@@ -16,5 +15,31 @@ export const proposalsTable = pgTable(
   },
   (table) => ({
     externalIdIdx: index("external_id_idx").on(table.externalId),
+  })
+);
+
+export const actionSchema = z.enum([
+  "ExtendLegalVetoPeriod",
+  "ApproveUpgradeGuardians",
+  "ApproveUpgradeSecurityCouncil",
+]);
+
+export type Action = z.infer<typeof actionSchema>;
+
+export const signaturesTable = pgTable(
+  "signatures",
+  {
+    id: serial("id").primaryKey(),
+    proposal: bytea("proposal_id")
+      .references(() => proposalsTable.externalId)
+      .notNull(),
+    signer: bytea("signer").notNull(),
+    signature: bytea("signature").notNull(),
+    action: text("action", {
+      enum: actionSchema.options,
+    }).notNull(),
+  },
+  (t) => ({
+    uniqueSigner: unique().on(t.proposal, t.signer, t.action),
   })
 );

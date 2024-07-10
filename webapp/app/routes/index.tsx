@@ -1,6 +1,5 @@
 import { isUserAuthorized } from "@/.server/service/authorized-users";
 import ConnectButton from "@/components/connect-button";
-import { useAuth } from "@/components/context/auth-context";
 import Navbar from "@/components/navbar";
 import { getUserFromHeader } from "@/utils/auth-headers";
 import { type ActionFunctionArgs, redirect } from "@remix-run/node";
@@ -8,6 +7,7 @@ import { useFetcher, useNavigation } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
 import { zodHex } from "validate-cli/src";
+import { useAccount } from "wagmi";
 
 export async function action({ request }: ActionFunctionArgs) {
   // On error redirect to the home page, address should be set by the backend
@@ -27,15 +27,15 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Index() {
-  const auth = useAuth();
+  const account = useAccount();
   const fetcher = useFetcher<typeof action>();
   const navigation = useNavigation();
 
   useEffect(() => {
-    if (auth.isAuthenticated) {
+    if (account.isConnected) {
       fetcher.submit({}, { method: "POST" });
     }
-  }, [auth.isAuthenticated, fetcher.submit]);
+  }, [account.isConnected, fetcher.submit]);
 
   return (
     <>
