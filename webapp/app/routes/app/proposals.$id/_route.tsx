@@ -1,5 +1,8 @@
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
+import { actionSchema } from "@/.server/db/schema";
+import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
+import { validateAndSaveSignature } from "@/.server/service/signatures";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -7,15 +10,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FacetChangesTable from "@/routes/app/proposals.$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals.$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals.$id/field-storage-changes-table";
+import SignButton from "@/routes/app/proposals.$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
-import { notFound } from "@/utils/http";
-import type { LoaderFunctionArgs } from "@remix-run/node";
+import { badRequest, notFound } from "@/utils/http";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
-import { getParams } from "remix-params-helper";
+import { getFormData, getParams } from "remix-params-helper";
+import { zodHex } from "validate-cli";
+import type { Hex } from "viem";
 import { z } from "zod";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
@@ -35,7 +41,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   const storageChangeReport = await getStorageChangeReport(params.data.id);
   return json({
     proposal: {
-      id: params.data.id,
+      id: params.data.id as Hex,
       version: "23",
       proposedBy: "0x23",
       proposedOn: "July 23, 2024",
@@ -47,11 +53,39 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       fieldStorageChanges: storageChangeReport,
     },
     user,
+    addresses: {
+      guardians: await guardiansAddress(),
+      council: await councilAddress(),
+    },
   });
 }
 
+export async function action({ request }: ActionFunctionArgs) {
+  const user = requireUserFromHeader(request);
+
+  const data = await getFormData(
+    request,
+    z.object({
+      signature: zodHex,
+      proposalId: zodHex,
+      actionName: actionSchema,
+    })
+  );
+  if (!data.success) {
+    throw badRequest("Failed to parse signature data");
+  }
+
+  await validateAndSaveSignature(
+    data.data.signature,
+    user.address as Hex,
+    data.data.actionName,
+    data.data.proposalId
+  );
+  return new Response(null, { status: 204 });
+}
+
 export default function Proposals() {
-  const { proposal, reports, user } = useLoaderData<typeof loader>();
+  const { proposal, reports, user, addresses } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
 
   return (
@@ -128,8 +162,44 @@ export default function Proposals() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            <Button>Approve proposal</Button>
-            {user.role === "guardian" && <Button>Approve veto extension</Button>}
+            {user.role === "guardian" && (
+              <SignButton
+                proposalId={proposal.id}
+                contractData={{
+                  actionName: "ExtendLegalVetoPeriod",
+                  address: addresses.guardians,
+                  name: "Guardians",
+                }}
+              >
+                Approve extend veto period
+              </SignButton>
+            )}
+
+            {user.role === "guardian" && (
+              <SignButton
+                proposalId={proposal.id}
+                contractData={{
+                  actionName: "ApproveUpgradeGuardians",
+                  address: addresses.guardians,
+                  name: "Guardians",
+                }}
+              >
+                Approve proposal
+              </SignButton>
+            )}
+
+            {user.role === "securityCouncil" && (
+              <SignButton
+                proposalId={proposal.id}
+                contractData={{
+                  actionName: "ApproveUpgradeSecurityCouncil",
+                  address: addresses.council,
+                  name: "SecurityCouncil",
+                }}
+              >
+                Approve proposal
+              </SignButton>
+            )}
           </CardContent>
         </Card>
         <Card className="pb-10">
