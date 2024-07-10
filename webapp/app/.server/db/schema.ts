@@ -29,6 +29,6 @@ export const signaturesTable = pgTable(
     }).notNull(),
   },
   (t) => ({
-    uniqueSigner: unique().on(t.proposal, t.signer),
+    uniqueSigner: unique().on(t.proposal, t.signer, t.action),
   })
 );

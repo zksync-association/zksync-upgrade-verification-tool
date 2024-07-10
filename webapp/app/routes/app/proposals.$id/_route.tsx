@@ -10,13 +10,17 @@ import FieldStorageChangesTable from "@/routes/app/proposals.$id/field-storage-c
 import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
-import { notFound } from "@/utils/http";
-import type { LoaderFunctionArgs } from "@remix-run/node";
+import { badRequest, notFound } from "@/utils/http";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { z } from "zod";
+import { validateAndSaveSignature } from "@/.server/service/signatures";
+import SignButton from "@/routes/app/proposals.$id/sign-button";
+import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
+import { Hex } from "viem";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -35,7 +39,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   const storageChangeReport = await getStorageChangeReport(params.data.id);
   return json({
     proposal: {
-      id: params.data.id,
+      id: params.data.id as Hex,
       version: "23",
       proposedBy: "0x23",
       proposedOn: "July 23, 2024",
@@ -47,11 +51,34 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       fieldStorageChanges: storageChangeReport,
     },
     user,
+    addresses: {
+      guardians: await guardiansAddress(),
+      council: await councilAddress()
+    }
   });
 }
 
+function getOrBadRequest(data: FormData, key: string): string {
+  const value = data.get(key)
+  if (typeof value !== "string") {
+    throw badRequest(`${key} should be present`)
+  }
+
+  return value
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  const data = await request.formData()
+  const signature = getOrBadRequest(data, "signature")
+  const address = getOrBadRequest(data, "address")
+  const actionName = getOrBadRequest(data, "actionName")
+  const proposalId = getOrBadRequest(data, "proposalId")
+  await validateAndSaveSignature(signature, address, actionName, proposalId);
+  return "ok"
+}
+
 export default function Proposals() {
-  const { proposal, reports, user } = useLoaderData<typeof loader>();
+  const { proposal, reports, user, addresses } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
 
   return (
@@ -128,8 +155,20 @@ export default function Proposals() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            <Button>Approve proposal</Button>
-            {user.role === "guardian" && <Button>Approve veto extension</Button>}
+            {user.role === "guardian" && <SignButton
+              proposalId={proposal.id}
+              contractData={{ actionName: "ExtendLegalVetoPeriod", address: addresses.guardians, name: "Guardians" }}
+            >Approve extend veto period </SignButton>}
+
+            {user.role === "guardian" && <SignButton
+              proposalId={proposal.id}
+              contractData={{ actionName: "ApproveUpgradeGuardians", address: addresses.guardians, name: "Guardians" }}
+            >Approve proposal</SignButton>}
+
+            {user.role === "securityCouncil" && <SignButton
+              proposalId={proposal.id}
+              contractData={{ actionName: "Approve    UpgradeSecurityCouncil", address: addresses.council, name: "SecurityCouncil" }}
+            >Approve veto extension</SignButton>}
           </CardContent>
         </Card>
         <Card className="pb-10">

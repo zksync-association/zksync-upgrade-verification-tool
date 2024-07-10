@@ -1,7 +1,7 @@
 import { db } from "@/.server/db";
 import { signaturesTable } from "@/.server/db/schema";
 import {
-  councilAddress,
+  councilAddress, councilMembers,
   guardianMembers,
   guardiansAddress,
 } from "@/.server/service/authorized-users";
@@ -11,6 +11,8 @@ import { badRequest } from "@/utils/http";
 import { zodHex } from "validate-cli/src";
 import { type Hex, hashTypedData } from "viem";
 import { z } from "zod";
+import { createOrIgnoreSignature } from "@/.server/db/dto/signatures";
+import { env } from "@config/env.server";
 
 const actionSchema = z.enum([
   "ExtendLegalVetoPeriod",
@@ -21,16 +23,17 @@ const actionSchema = z.enum([
 type ProposalAction = z.infer<typeof actionSchema>;
 
 async function verifySignature(
-  verifierAddr: Hex,
+  signer: Hex,
   signature: Hex,
+  verifierAddr: Hex,
   action: ProposalAction,
   proposalId: Hex
-) {
+  , contractName: string) {
   const digest = hashTypedData({
     domain: {
-      name: "Guardians",
+      name: contractName,
       version: "1",
-      chainId: 31337,
+      chainId: env.NODE_ENV === "development" ? 31337 : 1,
       verifyingContract: verifierAddr,
     },
     primaryType: action,
@@ -50,12 +53,13 @@ async function verifySignature(
   try {
     await l1RpcProposals.contractRead(verifierAddr, "checkSignatures", guardiansAbi.raw, z.any(), [
       digest,
-      [verifierAddr],
+      [signer],
       [signature],
       1,
     ]);
     return true;
   } catch (e) {
+    console.log(e)
     return false;
   }
 }
@@ -71,6 +75,8 @@ export async function validateAndSaveSignature(
   const proposalIdHex = zodHex.parse(proposalId);
   const parsedAction = actionSchema.parse(action);
 
+  console.log(signatureHex, signerHex, proposalIdHex, parsedAction)
+
   let validSignature: boolean;
   if (parsedAction === "ExtendLegalVetoPeriod" || parsedAction === "ApproveUpgradeGuardians") {
     const guardians = await guardianMembers();
@@ -81,31 +87,29 @@ export async function validateAndSaveSignature(
     }
 
     const addr = await guardiansAddress();
-
-    validSignature = await verifySignature(addr, signatureHex, parsedAction, proposalIdHex);
+    validSignature = await verifySignature(signerHex, signatureHex, addr, parsedAction, proposalIdHex, "Guardians");
   } else {
-    const guardians = await guardianMembers();
-    if (!guardians.includes(signerHex)) {
+    const members = await councilMembers();
+    if (!members.includes(signerHex)) {
       throw badRequest(
-        `Signer is not a guardian. Only guardians can execute this action: ${parsedAction}`
+        `Signer is not a security council member. Only the security council can execute this action: ${parsedAction}`
       );
     }
 
     const addr = await councilAddress();
-    validSignature = await verifySignature(addr, signatureHex, parsedAction, proposalIdHex);
+    validSignature = await verifySignature(signerHex, signatureHex, addr, parsedAction, proposalIdHex, "SecurityCouncil");
   }
 
   if (!validSignature) {
     throw badRequest("Invalid signature");
   }
 
-  await db
-    .insert(signaturesTable)
-    .values({
-      action: parsedAction,
-      signature: signatureHex,
-      proposal: proposalIdHex,
-      signer: signerHex,
-    })
-    .onConflictDoNothing();
+  const dto = {
+    action: parsedAction,
+    signature: signatureHex,
+    proposal: proposalIdHex,
+    signer: signerHex,
+  }
+
+  await createOrIgnoreSignature(dto)
 }
