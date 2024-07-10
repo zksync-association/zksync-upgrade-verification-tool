@@ -9,9 +9,9 @@ export class RecordStorageSnapshot implements StorageSnapshot {
     this.data = new Map();
     const keys = Object.keys(raw);
 
-    for (const key of keys) {
+    for (const [key, value] of Object.entries(raw)) {
       const keyHex = Buffer.from(key.substring(2, 67), "hex");
-      const valueHex = Buffer.from(raw[key].substring(2, 67), "hex");
+      const valueHex = Buffer.from(value.substring(2, 67), "hex");
       this.data.set(bytesToBigInt(keyHex), valueHex);
     }
   }

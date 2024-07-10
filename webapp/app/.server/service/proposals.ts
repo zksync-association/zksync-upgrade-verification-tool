@@ -1,5 +1,4 @@
-import { db } from "@/.server/db";
-import { upgradesTable } from "@/.server/db/schema";
+import { createOrIgnoreProposal } from "@/.server/db/dto/proposals";
 import { upgradeHandlerAbi } from "@/.server/service/protocol-upgrade-handler-abi";
 import { env } from "@config/env.server";
 import { RpcClient } from "validate-cli";
@@ -43,6 +42,9 @@ export async function getPendingProposals(): Promise<Proposal[]> {
 
   for (const log of logs) {
     const [_, id] = log.topics;
+    if (!id) {
+      throw new Error("Invalid log");
+    }
     const stateNumber = await rpc.contractRead(
       upgradeHandlerAddress,
       "upgradeState",
@@ -53,13 +55,10 @@ export async function getPendingProposals(): Promise<Proposal[]> {
 
     if (stateNumber !== PROPOSAL_STATES.Expired && stateNumber !== PROPOSAL_STATES.Done) {
       nonResolvedUpgrades.push({ id });
-      await db
-        .insert(upgradesTable)
-        .values({
-          proposalId: id,
-          calldata: log.data,
-        })
-        .onConflictDoNothing({ target: upgradesTable.proposalId });
+      await createOrIgnoreProposal({
+        externalId: id,
+        calldata: log.data,
+      });
     }
   }
 

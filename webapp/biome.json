@@ -5,6 +5,7 @@
     "ignore": [
       "./.cache/*",
       "./build/*",
+      "./drizzle/*",
       "./node_modules/*",
       "./server-build/*",
       "remix-routes.d.ts",
