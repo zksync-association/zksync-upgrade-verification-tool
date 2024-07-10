@@ -1,4 +1,5 @@
 import { createOrIgnoreSignature } from "@/.server/db/dto/signatures";
+import { actionSchema } from "@/.server/db/schema";
 import {
   councilAddress,
   councilMembers,
@@ -11,9 +12,7 @@ import { badRequest } from "@/utils/http";
 import { env } from "@config/env.server";
 import { zodHex } from "validate-cli/src";
 import { type Hex, hashTypedData } from "viem";
-import { TypeOf, z, ZodAny, ZodType } from "zod";
-import { actionSchema } from "@/.server/db/schema";
-
+import { type TypeOf, type ZodType, z } from "zod";
 
 type ProposalAction = z.infer<typeof actionSchema>;
 
@@ -60,11 +59,11 @@ async function verifySignature(
 }
 
 function parseOrBadRequest<T extends ZodType>(value: any, parser: T): TypeOf<typeof parser> {
-  const parsed = parser.safeParse(value)
+  const parsed = parser.safeParse(value);
   if (!parsed.success) {
-    throw badRequest(parsed.error.message)
+    throw badRequest(parsed.error.message);
   }
-  return parsed.data
+  return parsed.data;
 }
 
 export async function validateAndSaveSignature(
@@ -74,8 +73,8 @@ export async function validateAndSaveSignature(
   proposalId: string
 ) {
   const signatureHex = parseOrBadRequest(signature, zodHex);
-  const signerHex = parseOrBadRequest(signer, zodHex) ;
-  const parsedAction = parseOrBadRequest(action ,actionSchema);
+  const signerHex = parseOrBadRequest(signer, zodHex);
+  const parsedAction = parseOrBadRequest(action, actionSchema);
   const proposalIdHex = parseOrBadRequest(proposalId, zodHex);
 
   let validSignature: boolean;
