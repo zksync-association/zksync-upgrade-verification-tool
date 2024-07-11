@@ -182,17 +182,13 @@ export default function Proposals() {
               user.role === "guardian";
 
             const executeSecurityCouncilApprovalEnabled =
-              proposal.status === PROPOSAL_STATES.Waiting &&
-              securityCouncilSignaturesReached &&
-              user.role === "securityCouncil";
+              proposal.status === PROPOSAL_STATES.Waiting && securityCouncilSignaturesReached;
             const executeGuardiansApprovalEnabled =
+              !proposal.guardiansApproval &&
               proposal.status === PROPOSAL_STATES.Waiting &&
-              guardiansSignaturesReached &&
-              user.role === "guardian";
+              guardiansSignaturesReached;
             const executeLegalVetoExtensionEnabled =
-              !proposal.extendedLegalVeto &&
-              proposal.status === PROPOSAL_STATES.LegalVetoPeriod &&
-              user.role === "guardian";
+              !proposal.extendedLegalVeto && proposal.status === PROPOSAL_STATES.LegalVetoPeriod;
             const executeProposalEnabled =
               proposal.status === PROPOSAL_STATES.Ready &&
               (isAddressEqual(proposal.executor as Hex, user.address as Hex) ||
