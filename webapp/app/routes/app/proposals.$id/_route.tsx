@@ -19,6 +19,7 @@ import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contra
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { cn } from "@/utils/cn";
+import { compareHexValues } from "@/utils/compare-hex-values";
 import { badRequest, notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
@@ -30,8 +31,6 @@ import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
-import { compareHexValues } from "@/utils/compare-hex-values";
-
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -69,15 +68,15 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         approvedByGuardians: proposalData.guardiansApproval,
         approvedByCouncil: proposalData.securityCouncilApprovalTimestamp !== 0,
         signatures: {
-          extendLegalVetoPeriod: signatures.filter(
-            (signature) => signature.action === "ExtendLegalVetoPeriod"
-          ).sort((a, b) => compareHexValues(a.signer, b.signer) ),
-          approveUpgradeGuardians: signatures.filter(
-            (signature) => signature.action === "ApproveUpgradeGuardians"
-          ).sort((a, b) => compareHexValues(a.signer, b.signer) ),
-          approveUpgradeSecurityCouncil: signatures.filter(
-            (signature) => signature.action === "ApproveUpgradeSecurityCouncil"
-          ).sort((a, b) => compareHexValues(a.signer, b.signer) ),
+          extendLegalVetoPeriod: signatures
+            .filter((signature) => signature.action === "ExtendLegalVetoPeriod")
+            .sort((a, b) => compareHexValues(a.signer, b.signer)),
+          approveUpgradeGuardians: signatures
+            .filter((signature) => signature.action === "ApproveUpgradeGuardians")
+            .sort((a, b) => compareHexValues(a.signer, b.signer)),
+          approveUpgradeSecurityCouncil: signatures
+            .filter((signature) => signature.action === "ApproveUpgradeSecurityCouncil")
+            .sort((a, b) => compareHexValues(a.signer, b.signer)),
         },
       },
       reports: {

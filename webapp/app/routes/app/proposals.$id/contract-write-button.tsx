@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ALL_ABIS, GUARDIANS_RAW_ABI } from "@/utils/raw-abis";
+import { ALL_ABIS } from "@/utils/raw-abis";
 import type React from "react";
 import { toast } from "react-hot-toast";
 import type { Hex } from "viem";
@@ -12,7 +12,7 @@ type BroadcastTxButtonProps = {
   threshold: number;
   proposalId: Hex;
   disabled: boolean;
-  abiName: "guardians" | "council"
+  abiName: "guardians" | "council";
   children?: React.ReactNode;
 };
 
@@ -24,7 +24,7 @@ export default function ContractWriteButton({
   threshold,
   proposalId,
   disabled,
-  abiName
+  abiName,
 }: BroadcastTxButtonProps) {
   const { address } = useAccount();
   const { writeContractAsync, isPending } = useWriteContract();
@@ -48,9 +48,9 @@ export default function ContractWriteButton({
     } catch (e) {
       console.error(e);
       if (e instanceof Error) {
-        toast.error(`Error broadcasting tx: ${e.message}`)
+        toast.error(`Error broadcasting tx: ${e.message}`);
       } else {
-        toast.error(`Error broadcasting tx: ${e}`)
+        toast.error(`Error broadcasting tx: ${e}`);
       }
     }
   };

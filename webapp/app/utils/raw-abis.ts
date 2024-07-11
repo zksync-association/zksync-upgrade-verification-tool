@@ -1709,9 +1709,8 @@ export const SEC_COUNCIL_RAW_ABI: Abi = [
   },
 ] as const;
 
-
 export const ALL_ABIS = {
   handler: PROTOCOL_UPGRADE_HANDLER_RAW_ABI,
   council: SEC_COUNCIL_RAW_ABI,
-  guardians: GUARDIANS_RAW_ABI
-}
+  guardians: GUARDIANS_RAW_ABI,
+};
