@@ -50,12 +50,17 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         <Transition show={loading ?? false} unmount={false}>
-          <div className="data-[leave]:data-[closed]:-translate-y-full absolute transition ease-in-out data-[enter]:data-[closed]:translate-y-full data-[closed]:opacity-0 ">
+          <div className="data-[leave]:data-[closed]:-translate-y-full absolute transition ease-in-out data-[enter]:data-[closed]:translate-y-full data-[closed]:opacity-0">
             <Loading className="h-6 w-6" />
           </div>
         </Transition>
         <Transition show={!loading}>
-          <div className="data-[leave]:data-[closed]:-translate-y-full flex transition ease-in-out data-[enter]:data-[closed]:translate-y-full data-[closed]:opacity-0 ">
+          <div
+            className={cn(
+              "data-[leave]:data-[closed]:-translate-y-full inline-flex items-center justify-center transition ease-in-out data-[enter]:data-[closed]:translate-y-full data-[closed]:opacity-0",
+              className
+            )}
+          >
             {children}
           </div>
         </Transition>
