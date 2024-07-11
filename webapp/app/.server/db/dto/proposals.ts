@@ -2,6 +2,7 @@ import { db } from "@/.server/db";
 import { createOrIgnoreRecord, getFirst, getFirstOrThrow } from "@/.server/db/dto/utils/common";
 import { proposalsTable } from "@/.server/db/schema";
 import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
+import type { Hex } from "viem";
 
 export async function createOrIgnoreProposal(
   data: InferInsertModel<typeof proposalsTable>,
@@ -10,7 +11,7 @@ export async function createOrIgnoreProposal(
   await createOrIgnoreRecord(proposalsTable, data, { tx });
 }
 
-export async function getProposalByExternalId(externalId: string) {
+export async function getProposalByExternalId(externalId: Hex) {
   return getFirst(
     await db.select().from(proposalsTable).where(eq(proposalsTable.externalId, externalId))
   );
