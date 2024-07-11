@@ -18,6 +18,7 @@ import {
   ZksyncEraState,
   memoryDiffParser,
 } from "validate-cli";
+import type { Hex } from "viem";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -81,7 +82,7 @@ async function calculateStorageChangeReport(_proposalId: string): Promise<FieldS
 }
 
 async function generateReportIfNotInDb<T>(
-  proposalId: string,
+  proposalId: Hex,
   propName: "checkReport" | "storageDiffReport",
   generator: (t: string) => Promise<T>
 ): Promise<T> {
@@ -98,10 +99,10 @@ async function generateReportIfNotInDb<T>(
   return proposal[propName] as T;
 }
 
-export async function getCheckReport(proposalId: string): Promise<CheckReportObj> {
+export async function getCheckReport(proposalId: Hex): Promise<CheckReportObj> {
   return generateReportIfNotInDb(proposalId, "checkReport", calculateCheckReport);
 }
 
-export async function getStorageChangeReport(proposalId: string): Promise<FieldStorageChange[]> {
+export async function getStorageChangeReport(proposalId: Hex): Promise<FieldStorageChange[]> {
   return generateReportIfNotInDb(proposalId, "storageDiffReport", calculateStorageChangeReport);
 }

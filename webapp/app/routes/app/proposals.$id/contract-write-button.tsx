@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { GUARDIANS_RAW_ABI } from "@/utils/raw-abis";
+import { ALL_ABIS } from "@/utils/raw-abis";
 import type React from "react";
 import { toast } from "react-hot-toast";
 import type { Hex } from "viem";
@@ -12,6 +12,7 @@ type BroadcastTxButtonProps = {
   threshold: number;
   proposalId: Hex;
   disabled: boolean;
+  abiName: "guardians" | "council";
   children?: React.ReactNode;
 };
 
@@ -23,6 +24,7 @@ export default function ContractWriteButton({
   threshold,
   proposalId,
   disabled,
+  abiName,
 }: BroadcastTxButtonProps) {
   const { address } = useAccount();
   const { writeContractAsync, isPending } = useWriteContract();
@@ -34,15 +36,23 @@ export default function ContractWriteButton({
       throw new Error();
     }
 
-    await writeContractAsync({
-      account: address,
-      address: target,
-      functionName: functionName,
-      abi: GUARDIANS_RAW_ABI,
-      args: [proposalId, signatures.map((s) => s.signer), signatures.map((s) => s.signature)],
-    });
-
-    toast.success("Transaction executed!", { id: "sign_button" });
+    try {
+      await writeContractAsync({
+        account: address,
+        address: target,
+        functionName: functionName,
+        abi: ALL_ABIS[abiName],
+        args: [proposalId, signatures.map((s) => s.signer), signatures.map((s) => s.signature)],
+      });
+      toast.success("Transaction executed!", { id: "sign_button" });
+    } catch (e) {
+      console.error(e);
+      if (e instanceof Error) {
+        toast.error(`Error broadcasting tx: ${e.message}`);
+      } else {
+        toast.error(`Error broadcasting tx: ${e}`);
+      }
+    }
   };
 
   return (
