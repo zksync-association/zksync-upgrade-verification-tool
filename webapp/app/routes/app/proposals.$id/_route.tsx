@@ -30,6 +30,8 @@ import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
+import { compareHexValues } from "@/utils/compare-hex-values";
+
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -64,16 +66,18 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         executor: proposal.executor,
         status: proposalStatus,
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
+        approvedByGuardians: proposalData.guardiansApproval,
+        approvedByCouncil: proposalData.securityCouncilApprovalTimestamp !== 0,
         signatures: {
           extendLegalVetoPeriod: signatures.filter(
             (signature) => signature.action === "ExtendLegalVetoPeriod"
-          ),
+          ).sort((a, b) => compareHexValues(a.signer, b.signer) ),
           approveUpgradeGuardians: signatures.filter(
             (signature) => signature.action === "ApproveUpgradeGuardians"
-          ),
+          ).sort((a, b) => compareHexValues(a.signer, b.signer) ),
           approveUpgradeSecurityCouncil: signatures.filter(
             (signature) => signature.action === "ApproveUpgradeSecurityCouncil"
-          ),
+          ).sort((a, b) => compareHexValues(a.signer, b.signer) ),
         },
       },
       reports: {
@@ -158,12 +162,6 @@ export default function Proposals() {
       >
         <Await resolve={asyncData}>
           {({ addresses, proposal, reports, userSignedLegalVeto, userSignedProposal }) => {
-            const securityCouncilSignaturesReached =
-              proposal.signatures.approveUpgradeSecurityCouncil.length >=
-              NECESSARY_SECURITY_COUNCIL_SIGNATURES;
-            const guardiansSignaturesReached =
-              proposal.signatures.approveUpgradeGuardians.length >= NECESSARY_GUARDIAN_SIGNATURES;
-
             return (
               <>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -289,27 +287,42 @@ export default function Proposals() {
                       <CardTitle>Proposal Actions</CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-col space-y-3">
-                      <Button disabled={!securityCouncilSignaturesReached}>
+                      <ContractWriteButton
+                        target={addresses.council}
+                        signatures={proposal.signatures.approveUpgradeSecurityCouncil}
+                        proposalId={proposalId}
+                        functionName={"approveUpgradeSecurityCouncil"}
+                        abiName="council"
+                        threshold={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
+                        disabled={proposal.approvedByCouncil}
+                      >
                         Execute security council approval
-                      </Button>
-                      <Button disabled={!guardiansSignaturesReached}>
+                      </ContractWriteButton>
+
+                      <ContractWriteButton
+                        target={addresses.guardians}
+                        signatures={proposal.signatures.approveUpgradeGuardians}
+                        proposalId={proposalId}
+                        functionName={"approveUpgradeGuardians"}
+                        abiName="guardians"
+                        threshold={NECESSARY_GUARDIAN_SIGNATURES}
+                        disabled={proposal.approvedByGuardians}
+                      >
                         Execute guardian approval
-                      </Button>
+                      </ContractWriteButton>
 
                       <ContractWriteButton
                         target={addresses.guardians}
                         signatures={proposal.signatures.extendLegalVetoPeriod}
                         proposalId={proposalId}
                         functionName={"extendLegalVeto"}
+                        abiName="guardians"
                         threshold={NECESSARY_LEGAL_VETO_SIGNATURES}
                         disabled={proposal.extendedLegalVeto}
                       >
                         Execute legal veto extension
                       </ContractWriteButton>
 
-                      {/*<Button disabled={!legalVetoSignaturesReached}>*/}
-                      {/*  */}
-                      {/*</Button>*/}
                       <Button
                         disabled={
                           !(proposal.status === PROPOSAL_STATES.Ready) &&

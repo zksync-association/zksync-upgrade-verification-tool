@@ -1,20 +1,23 @@
 import { customType } from "drizzle-orm/pg-core";
+import { Hex } from "viem";
 
 export const bytea = customType<{
-  data: string;
+  data: Hex;
   driverData: Buffer;
 }>({
   dataType() {
     return "bytea";
   },
   toDriver(val) {
-    let newVal = val;
+
     if (val.startsWith("0x")) {
-      newVal = val.slice(2);
+
+      return Buffer.from(val.slice(2), "hex")
+    } else {
+      return Buffer.from(val, "hex")
     }
-    return Buffer.from(newVal, "hex");
   },
-  fromDriver(val) {
+  fromDriver(val): Hex {
     return `0x${val.toString("hex")}`;
   },
 });
