@@ -152,10 +152,10 @@ export default function Proposals() {
 
       <Suspense
         fallback={
-          <Card className="flex flex-1 flex-col items-center justify-center space-y-6">
+          <div className="flex flex-1 flex-col items-center justify-center space-y-6">
             <Loading />
             <h2>Loading proposal...</h2>
-          </Card>
+          </div>
         }
       >
         <Await resolve={asyncData}>
