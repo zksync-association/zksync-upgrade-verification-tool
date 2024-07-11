@@ -54,6 +54,7 @@ export async function getPendingProposals(): Promise<Proposal[]> {
         calldata: log.data,
         proposedOn: new Date(hexToNumber(log.blockTimestamp) * 1000),
         executor: proposal.args._proposal.executor,
+        transactionHash: log.transactionHash,
       });
     }
   }
