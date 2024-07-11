@@ -68,6 +68,8 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         approvedByGuardians: proposalData.guardiansApproval,
         approvedByCouncil: proposalData.securityCouncilApprovalTimestamp !== 0,
+        guardiansApproval: proposalData.guardiansApproval,
+        guardiansExtendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         signatures: {
           extendLegalVetoPeriod: signatures
             .filter((signature) => signature.action === "ExtendLegalVetoPeriod")
@@ -163,6 +165,35 @@ export default function Proposals() {
       >
         <Await resolve={asyncData}>
           {({ addresses, proposal, reports, userSignedLegalVeto, userSignedProposal }) => {
+            const securityCouncilSignaturesReached =
+              proposal.signatures.approveUpgradeSecurityCouncil.length >=
+              NECESSARY_SECURITY_COUNCIL_SIGNATURES;
+            const guardiansSignaturesReached =
+              proposal.signatures.approveUpgradeGuardians.length >= NECESSARY_GUARDIAN_SIGNATURES;
+
+            const signProposalEnabled =
+              !userSignedProposal &&
+              proposal.status === PROPOSAL_STATES.Waiting &&
+              (user.role === "guardian" ? !proposal.guardiansApproval : true);
+            const signLegalVetoEnabled =
+              !userSignedLegalVeto &&
+              !proposal.guardiansExtendedLegalVeto &&
+              proposal.status === PROPOSAL_STATES.LegalVetoPeriod &&
+              user.role === "guardian";
+
+            const executeSecurityCouncilApprovalEnabled =
+              securityCouncilSignaturesReached && user.role === "securityCouncil";
+            const executeGuardiansApprovalEnabled =
+              guardiansSignaturesReached && user.role === "guardian";
+            const executeLegalVetoExtensionEnabled =
+              !proposal.extendedLegalVeto &&
+              proposal.status === PROPOSAL_STATES.LegalVetoPeriod &&
+              user.role === "guardian";
+            const executeProposalEnabled =
+              proposal.status === PROPOSAL_STATES.Ready &&
+              (isAddressEqual(proposal.executor as Hex, user.address as Hex) ||
+                isAddressEqual(proposal.executor as Hex, zeroAddress));
+
             return (
               <>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -260,12 +291,11 @@ export default function Proposals() {
                             address: addresses.guardians,
                             name: "Guardians",
                           }}
-                          disabled={userSignedLegalVeto}
+                          disabled={!signLegalVetoEnabled}
                         >
                           Approve extend veto period
                         </SignButton>
                       )}
-
                       {user.role === "guardian" && (
                         <SignButton
                           proposalId={proposalId}
@@ -274,12 +304,11 @@ export default function Proposals() {
                             address: addresses.guardians,
                             name: "Guardians",
                           }}
-                          disabled={userSignedProposal}
+                          disabled={!signProposalEnabled}
                         >
                           Approve proposal
                         </SignButton>
                       )}
-
                       {user.role === "securityCouncil" && (
                         <SignButton
                           proposalId={proposalId}
@@ -288,7 +317,7 @@ export default function Proposals() {
                             address: addresses.council,
                             name: "SecurityCouncil",
                           }}
-                          disabled={userSignedProposal}
+                          disabled={!signProposalEnabled}
                         >
                           Approve proposal
                         </SignButton>
@@ -307,7 +336,7 @@ export default function Proposals() {
                         functionName={"approveUpgradeSecurityCouncil"}
                         abiName="council"
                         threshold={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
-                        disabled={proposal.approvedByCouncil}
+                        disabled={!executeSecurityCouncilApprovalEnabled}
                       >
                         Execute security council approval
                       </ContractWriteButton>
@@ -319,7 +348,7 @@ export default function Proposals() {
                         functionName={"approveUpgradeGuardians"}
                         abiName="guardians"
                         threshold={NECESSARY_GUARDIAN_SIGNATURES}
-                        disabled={proposal.approvedByGuardians}
+                        disabled={!executeGuardiansApprovalEnabled}
                       >
                         Execute guardian approval
                       </ContractWriteButton>
@@ -331,22 +360,11 @@ export default function Proposals() {
                         functionName={"extendLegalVeto"}
                         abiName="guardians"
                         threshold={NECESSARY_LEGAL_VETO_SIGNATURES}
-                        disabled={proposal.extendedLegalVeto}
+                        disabled={!executeLegalVetoExtensionEnabled}
                       >
                         Execute legal veto extension
                       </ContractWriteButton>
-
-                      <Button
-                        disabled={
-                          !(proposal.status === PROPOSAL_STATES.Ready) &&
-                          !(
-                            isAddressEqual(proposal.executor as Hex, user.address as Hex) ||
-                            isAddressEqual(proposal.executor as Hex, zeroAddress)
-                          )
-                        }
-                      >
-                        Execute upgrade
-                      </Button>
+                      <Button disabled={!executeProposalEnabled}>Execute upgrade</Button>
                     </CardContent>
                   </Card>
                 </div>
