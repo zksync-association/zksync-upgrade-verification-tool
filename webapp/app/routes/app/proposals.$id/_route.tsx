@@ -71,6 +71,8 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         approvedByGuardians: proposalData.guardiansApproval,
         approvedByCouncil: proposalData.securityCouncilApprovalTimestamp !== 0,
+        guardiansApproval: proposalData.guardiansApproval,
+        guardiansExtendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         raw: proposal.calldata,
         signatures: {
           extendLegalVetoPeriod: signatures
@@ -152,7 +154,7 @@ export default function Proposals() {
           onClick={() => navigate(-1)}
           className="mr-2 hover:bg-transparent"
         >
-          <ArrowLeft />
+          <ArrowLeft/>
         </Button>
         <h2 className="font-semibold">Proposal {displayBytes32(proposalId)}</h2>
       </div>
@@ -160,13 +162,42 @@ export default function Proposals() {
       <Suspense
         fallback={
           <div className="flex flex-1 flex-col items-center justify-center space-y-6">
-            <Loading />
+            <Loading/>
             <h2>Loading proposal...</h2>
           </div>
         }
       >
         <Await resolve={asyncData}>
           {({ addresses, proposal, reports, userSignedLegalVeto, userSignedProposal }) => {
+            const securityCouncilSignaturesReached =
+              proposal.signatures.approveUpgradeSecurityCouncil.length >=
+              NECESSARY_SECURITY_COUNCIL_SIGNATURES;
+            const guardiansSignaturesReached =
+              proposal.signatures.approveUpgradeGuardians.length >= NECESSARY_GUARDIAN_SIGNATURES;
+
+            const signProposalEnabled =
+              !userSignedProposal &&
+              proposal.status === PROPOSAL_STATES.Waiting &&
+              (user.role === "guardian" ? !proposal.guardiansApproval : true);
+            const signLegalVetoEnabled =
+              !userSignedLegalVeto &&
+              !proposal.guardiansExtendedLegalVeto &&
+              proposal.status === PROPOSAL_STATES.LegalVetoPeriod &&
+              user.role === "guardian";
+
+            const executeSecurityCouncilApprovalEnabled =
+              proposal.status === PROPOSAL_STATES.Waiting && securityCouncilSignaturesReached;
+            const executeGuardiansApprovalEnabled =
+              !proposal.guardiansApproval &&
+              proposal.status === PROPOSAL_STATES.Waiting &&
+              guardiansSignaturesReached;
+            const executeLegalVetoExtensionEnabled =
+              !proposal.extendedLegalVeto && proposal.status === PROPOSAL_STATES.LegalVetoPeriod;
+            const executeProposalEnabled =
+              proposal.status === PROPOSAL_STATES.Ready &&
+              (isAddressEqual(proposal.executor as Hex, user.address as Hex) ||
+                isAddressEqual(proposal.executor as Hex, zeroAddress));
+
             return (
               <>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -214,15 +245,17 @@ export default function Proposals() {
                           <a
                             href={getTransactionUrl(proposal.transactionHash as Hex)}
                             className="flex w-1/2 items-center justify-end break-words underline"
+                            target="_blank"
+                            rel="noreferrer"
                           >
                             <span>{displayBytes32(proposal.transactionHash)}</span>
-                            <SquareArrowOutUpRight className="ml-1" width={12} height={12} />
+                            <SquareArrowOutUpRight className="ml-1" width={12} height={12}/>
                           </a>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className="pb-14">
+                  <Card className="pb-10">
                     <CardHeader className="pt-7">
                       {displayProposalState(proposal.status)}
                       <CardTitle>Proposal Status</CardTitle>
@@ -262,12 +295,11 @@ export default function Proposals() {
                             address: addresses.guardians,
                             name: "Guardians",
                           }}
-                          disabled={userSignedLegalVeto}
+                          disabled={!signLegalVetoEnabled}
                         >
                           Approve extend veto period
                         </SignButton>
                       )}
-
                       {user.role === "guardian" && (
                         <SignButton
                           proposalId={proposalId}
@@ -276,12 +308,11 @@ export default function Proposals() {
                             address: addresses.guardians,
                             name: "Guardians",
                           }}
-                          disabled={userSignedProposal}
+                          disabled={!signProposalEnabled}
                         >
                           Approve proposal
                         </SignButton>
                       )}
-
                       {user.role === "securityCouncil" && (
                         <SignButton
                           proposalId={proposalId}
@@ -290,7 +321,7 @@ export default function Proposals() {
                             address: addresses.council,
                             name: "SecurityCouncil",
                           }}
-                          disabled={userSignedProposal}
+                          disabled={!signProposalEnabled}
                         >
                           Approve proposal
                         </SignButton>
@@ -309,7 +340,7 @@ export default function Proposals() {
                         functionName={"approveUpgradeSecurityCouncil"}
                         abiName="council"
                         threshold={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
-                        disabled={proposal.approvedByCouncil}
+                        disabled={!executeSecurityCouncilApprovalEnabled}
                       >
                         Execute security council approval
                       </ContractWriteButton>
@@ -321,7 +352,7 @@ export default function Proposals() {
                         functionName={"approveUpgradeGuardians"}
                         abiName="guardians"
                         threshold={NECESSARY_GUARDIAN_SIGNATURES}
-                        disabled={proposal.approvedByGuardians}
+                        disabled={!executeGuardiansApprovalEnabled}
                       >
                         Execute guardian approval
                       </ContractWriteButton>
@@ -333,21 +364,14 @@ export default function Proposals() {
                         functionName={"extendLegalVeto"}
                         abiName="guardians"
                         threshold={NECESSARY_LEGAL_VETO_SIGNATURES}
-                        disabled={proposal.extendedLegalVeto}
+                        disabled={!executeLegalVetoExtensionEnabled}
                       >
                         Execute legal veto extension
                       </ContractWriteButton>
-
                       <ContractWriteButton2
                         target={addresses.upgradeHandler}
                         proposalCalldata={proposal.raw}
-                        // disabled={
-                        //   !(proposal.status === PROPOSAL_STATES.Ready) &&
-                        //   !(
-                        //     isAddressEqual(proposal.executor as Hex, user.address as Hex) ||
-                        //     isAddressEqual(proposal.executor as Hex, zeroAddress)
-                        //   )
-                        // }
+                        // disabled={!executeProposalEnabled}
                       >
                         Execute upgrade
                       </ContractWriteButton2>
@@ -371,7 +395,7 @@ export default function Proposals() {
                           <CardTitle>Facet Changes</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4">
-                          <FacetChangesTable data={reports.facetChanges} />
+                          <FacetChangesTable data={reports.facetChanges}/>
                         </CardContent>
                       </Card>
                     </TabsContent>
@@ -381,7 +405,7 @@ export default function Proposals() {
                           <CardTitle>System Contract Changes</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4">
-                          <SystemContractChangesTable data={reports.systemContractChanges} />
+                          <SystemContractChangesTable data={reports.systemContractChanges}/>
                         </CardContent>
                       </Card>
                     </TabsContent>
@@ -391,7 +415,7 @@ export default function Proposals() {
                           <CardTitle>Field Changes</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4">
-                          <FieldChangesTable data={reports.fieldChanges} />
+                          <FieldChangesTable data={reports.fieldChanges}/>
                         </CardContent>
                       </Card>
                     </TabsContent>
@@ -401,7 +425,7 @@ export default function Proposals() {
                           <CardTitle>Field Storage Changes</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4">
-                          <FieldStorageChangesTable data={reports.fieldStorageChanges} />{" "}
+                          <FieldStorageChangesTable data={reports.fieldStorageChanges}/>{" "}
                         </CardContent>
                       </Card>
                     </TabsContent>
@@ -417,10 +441,10 @@ export default function Proposals() {
 }
 
 function StatusIndicator({
-  signatures,
-  necessarySignatures,
-  label,
-}: { signatures: number; necessarySignatures: number; label: string }) {
+                           signatures,
+                           necessarySignatures,
+                           label,
+                         }: { signatures: number; necessarySignatures: number; label: string }) {
   const necessarySignaturesReached = signatures >= necessarySignatures;
 
   return (

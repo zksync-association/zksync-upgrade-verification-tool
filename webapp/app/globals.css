@@ -47,8 +47,9 @@
 }
 
 .cta-bg {
-  background: radial-gradient(60% 60% at center, transparent 0, #000 100%),
-    radial-gradient(80% 80% at 50% 50%, #000 0, transparent 100%),
+  background: radial-gradient(75% 75% at 50% 50%, black 0, transparent 100%),
+    linear-gradient(to left, transparent 90%, black 100%),
+    linear-gradient(to right, transparent 90%, black 100%),
     url(/graphics/cta.svg);
   background-position: center;
   background-repeat: no-repeat;
