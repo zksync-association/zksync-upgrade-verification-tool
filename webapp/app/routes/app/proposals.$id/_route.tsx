@@ -182,9 +182,13 @@ export default function Proposals() {
               user.role === "guardian";
 
             const executeSecurityCouncilApprovalEnabled =
-              securityCouncilSignaturesReached && user.role === "securityCouncil";
+              proposal.status === PROPOSAL_STATES.Waiting &&
+              securityCouncilSignaturesReached &&
+              user.role === "securityCouncil";
             const executeGuardiansApprovalEnabled =
-              guardiansSignaturesReached && user.role === "guardian";
+              proposal.status === PROPOSAL_STATES.Waiting &&
+              guardiansSignaturesReached &&
+              user.role === "guardian";
             const executeLegalVetoExtensionEnabled =
               !proposal.extendedLegalVeto &&
               proposal.status === PROPOSAL_STATES.LegalVetoPeriod &&
