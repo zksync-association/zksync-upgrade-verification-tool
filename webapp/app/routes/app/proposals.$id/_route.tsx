@@ -32,6 +32,8 @@ import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
+import { env } from "@config/env.server";
+import ContractWriteButton2 from "@/routes/app/proposals.$id/contract-write-button-2";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -57,6 +59,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       getSignaturesByExternalProposalId(params.data.id),
       getProposalData(params.data.id),
     ]);
+    const upgradeHandler = env.UPGRADE_HANDLER_ADDRESS
 
     return {
       proposal: {
@@ -68,6 +71,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         approvedByGuardians: proposalData.guardiansApproval,
         approvedByCouncil: proposalData.securityCouncilApprovalTimestamp !== 0,
+        raw: proposal.calldata,
         signatures: {
           extendLegalVetoPeriod: signatures
             .filter((signature) => signature.action === "ExtendLegalVetoPeriod")
@@ -87,7 +91,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         fieldChanges: checkReport.fieldChanges,
         fieldStorageChanges: storageChangeReport,
       },
-      addresses: { guardians, council },
+      addresses: { guardians, council, upgradeHandler },
       userSignedProposal: signatures
         .filter((s) =>
           user.role === "guardian"
@@ -334,17 +338,19 @@ export default function Proposals() {
                         Execute legal veto extension
                       </ContractWriteButton>
 
-                      <Button
-                        disabled={
-                          !(proposal.status === PROPOSAL_STATES.Ready) &&
-                          !(
-                            isAddressEqual(proposal.executor as Hex, user.address as Hex) ||
-                            isAddressEqual(proposal.executor as Hex, zeroAddress)
-                          )
-                        }
+                      <ContractWriteButton2
+                        target={addresses.upgradeHandler}
+                        proposalCalldata={proposal.raw}
+                        // disabled={
+                        //   !(proposal.status === PROPOSAL_STATES.Ready) &&
+                        //   !(
+                        //     isAddressEqual(proposal.executor as Hex, user.address as Hex) ||
+                        //     isAddressEqual(proposal.executor as Hex, zeroAddress)
+                        //   )
+                        // }
                       >
                         Execute upgrade
-                      </Button>
+                      </ContractWriteButton2>
                     </CardContent>
                   </Card>
                 </div>

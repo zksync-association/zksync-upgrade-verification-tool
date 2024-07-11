@@ -20,7 +20,7 @@ export const PROTOCOL_UPGRADE_HANDLER_RAW_ABI = [
         internalType: "address",
       },
       {
-        name: "_l2ProtocolGovernor",
+        name:  "_l2ProtocolGovernor",
         type: "address",
         internalType: "address",
       },

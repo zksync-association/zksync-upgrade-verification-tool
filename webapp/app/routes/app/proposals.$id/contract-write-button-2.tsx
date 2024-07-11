@@ -2,47 +2,43 @@ import { Button } from "@/components/ui/button";
 import { ALL_ABIS } from "@/utils/raw-abis";
 import type React from "react";
 import { toast } from "react-hot-toast";
-import type { Hex } from "viem";
+import { decodeAbiParameters, decodeFunctionData, getAbiItem, Hex } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
 
-type BroadcastTxButtonProps = {
+type BroadcastTxButtonProps2 = {
   target: Hex;
-  functionName: string;
-  signatures: any[];
-  threshold: number;
-  proposalId: Hex;
-  disabled: boolean;
-  abiName: "guardians" | "council";
+  proposalCalldata: Hex;
   children?: React.ReactNode;
 };
 
-export default function ContractWriteButton({
+export default function ContractWriteButton2({
   children,
   target,
-  functionName,
-  signatures,
-  threshold,
-  proposalId,
-  disabled,
-  abiName,
-}: BroadcastTxButtonProps) {
+  proposalCalldata
+}: BroadcastTxButtonProps2) {
   const { address } = useAccount();
   const { writeContractAsync, isPending } = useWriteContract();
 
   const execContractWrite = async (e: React.MouseEvent) => {
     e.preventDefault();
 
-    if (signatures.length < threshold === null) {
-      throw new Error();
-    }
+    const abiItem = getAbiItem({
+      abi: ALL_ABIS["handler"],
+      name: "execute"
+    })
+
+    const [ upgradeProposal] = decodeAbiParameters([abiItem.inputs[0]],
+      proposalCalldata
+    )
 
     try {
       await writeContractAsync({
         account: address,
         address: target,
-        functionName: functionName,
-        abi: ALL_ABIS[abiName],
-        args: [proposalId, signatures.map((s) => s.signer), signatures.map((s) => s.signature)],
+        functionName: "execute",
+        abi: ALL_ABIS["handler"],
+        args: [upgradeProposal],
+        dataSuffix: proposalCalldata
       });
       toast.success("Transaction executed!", { id: "sign_button" });
     } catch (e) {
@@ -53,10 +49,10 @@ export default function ContractWriteButton({
         toast.error(`Error broadcasting tx: ${e}`);
       }
     }
-  };
+  }
 
   return (
-    <Button disabled={disabled || isPending || signatures.length < threshold} onClick={execContractWrite}>
+    <Button onClick={execContractWrite}>
       {children}
     </Button>
   );
