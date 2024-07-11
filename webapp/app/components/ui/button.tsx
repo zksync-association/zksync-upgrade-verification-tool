@@ -1,7 +1,9 @@
+import { Transition } from "@headlessui/react";
 import { Slot } from "@radix-ui/react-slot";
 import { type VariantProps, cva } from "class-variance-authority";
 import * as React from "react";
 
+import Loading from "@/components/ui/loading";
 import { cn } from "@/utils/cn";
 
 const buttonVariants = cva(
@@ -34,13 +36,35 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  loading?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, loading, disabled, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
     return (
-      <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }), "relative overflow-hidden")}
+        ref={ref}
+        disabled={disabled || loading}
+        {...props}
+      >
+        <Transition show={loading ?? false} unmount={false}>
+          <div className="data-[leave]:data-[closed]:-translate-y-full absolute transition ease-in-out data-[enter]:data-[closed]:translate-y-full data-[closed]:opacity-0">
+            <Loading className="h-6 w-6" />
+          </div>
+        </Transition>
+        <Transition show={!loading}>
+          <div
+            className={cn(
+              "data-[leave]:data-[closed]:-translate-y-full inline-flex items-center justify-center transition ease-in-out data-[enter]:data-[closed]:translate-y-full data-[closed]:opacity-0",
+              className
+            )}
+          >
+            {children}
+          </div>
+        </Transition>
+      </Comp>
     );
   }
 );
