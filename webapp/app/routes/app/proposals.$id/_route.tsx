@@ -218,7 +218,7 @@ export default function Proposals() {
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className="pb-14">
+                  <Card className="pb-10">
                     <CardHeader className="pt-7">
                       {displayProposalState(proposal.status)}
                       <CardTitle>Proposal Status</CardTitle>
