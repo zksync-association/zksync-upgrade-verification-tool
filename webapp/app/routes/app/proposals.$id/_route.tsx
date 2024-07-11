@@ -210,6 +210,8 @@ export default function Proposals() {
                           <a
                             href={getTransactionUrl(proposal.transactionHash as Hex)}
                             className="flex w-1/2 items-center justify-end break-words underline"
+                            target="_blank"
+                            rel="noreferrer"
                           >
                             <span>{displayBytes32(proposal.transactionHash)}</span>
                             <SquareArrowOutUpRight className="ml-1" width={12} height={12} />
