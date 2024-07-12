@@ -1,9 +1,9 @@
 ![CoverImage](zkSyncEraUpgradeToolCover.png)
 
 
-# 🔍 zkSync Era Upgrade Verification Tool 
+# 🔍 zkSync Era Upgrade Verification Tool
 
-The zkSync Era Upgrade Verification Tool is a **CLI tool crafted to decode and present zkSync Era upgrade proposals in a human-readable format**.
+The zkSync Era Upgrade Verification Tool is composed of a **CLI and Web App tool crafted to decode and present zkSync Era upgrade proposals in a human-readable format**.
 
 <br>
 
@@ -11,9 +11,9 @@ The zkSync Era Upgrade Verification Tool is a **CLI tool crafted to decode and p
 
  > 🏗️ `Work In Progress` : This repo is being actively developed and does not represent final quality of the tool!
 
-  - **_[L1]_ Facets**: Identifies contract upgrades including additions or removals of functions. 
+  - **_[L1]_ Facets**: Identifies contract upgrades including additions or removals of functions.
   - **_[L1]_ Verifier** : Detects upgrades and parameter changes in contracts.
-  - **_[L2]_ System Contracts**: Lists changes and validates bytecode hashes. 
+  - **_[L2]_ System Contracts**: Lists changes and validates bytecode hashes.
  - **_[L2]_ Bootloader and DefaultAccount**: Validates bytecode hash.
  - **Solidity Diff Tool**: Compares current contracts with upgrade proposals for verification. *Currently available for Facets, Verifier & System Contracts.*
 
@@ -29,7 +29,7 @@ pnpm --version  # Checks the installed version of pnpm
 yarn --version  # Checks the installed version of yarn
 ```
 
-If you do not have Node.js installed, please install it from [nodejs.org](https://nodejs.org/en/download/package-manager). For example: 
+If you do not have Node.js installed, please install it from [nodejs.org](https://nodejs.org/en/download/package-manager). For example:
 
 ```bash
 brew install node
@@ -51,7 +51,7 @@ npm install -g yarn
 
 For the `<upgradeDir>` parameter, you need access to a upgrade directory. For example, [zksync-era upgrades directory](https://github.com/matter-labs/zksync-era/tree/main/etc/upgrades)
 
-You can clone [zkSync Era Repo](https://github.com/matter-labs/zksync-era) to access this directory: 
+You can clone [zkSync Era Repo](https://github.com/matter-labs/zksync-era) to access this directory:
 
 ```bash
 git clone https://github.com/matter-labs/zksync-era.git
@@ -63,38 +63,38 @@ Later you can define the target `<upgradeDir>` in tool commands using the path t
 path-to-directory/zksync-era/etc/upgrades/1699353977-boojum
 ```
 
-## 🏃 **Set up**
+## CLI
 
-### **1. Clone repository**
+### 🏃 **Set up**
+
+#### **1. Clone repository**
 
 ```bash
-git clone https://github.com/Moonsong-Labs/era-l1-upgrade-checker.git && cd era-l1-upgrade-checker
+git clone https://github.com/Moonsong-Labs/zksync-upgrade-verification-tool.git
 ```
 
-### **2. Install dependencies & build**
+#### **2. Install dependencies & build**
 
 ```bash
+cd zksync-upgrade-verification-tool
 pnpm install
-```
-
-```bash
 pnpm build
 ```
 
-### **3. Etherscan Key setup**
+#### **3. Etherscan Key setup**
 <br>
 
->You can create an Etherscan API key at [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).
+> You can create an Etherscan API key at [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).
 
 <br>
 
-#### ***Option 1: Environment Variables***
+##### ***Option 1: Environment Variables***
 
 ```bash
 export ETHERSCAN_API_KEY="<your_etherscan_api_key>"
 ```
 
-#### ***Option 2: Configuration Files***
+##### ***Option 2: Configuration Files***
 
 Alternatively, you can copy  env.example file and complete it with your keys:
 
@@ -107,7 +107,7 @@ This file should contain the following entries:
 ETHERSCAN_API_KEY=your_etherscan_api_key
 ```
 
-#### ***Option 3: CLI Argument***
+##### ***Option 3: CLI Argument***
 
  You can also specify your API keys directly as command line arguments when running commands that require them. For example:
 
@@ -115,12 +115,12 @@ ETHERSCAN_API_KEY=your_etherscan_api_key
 pnpm validate --ethscanApiKey=your_etherscan_api_key
 ```
 
-## 🛠️ **Usage**
+### 🛠️ **Usage**
 The zkSync Era Upgrade Verification Tool provides a range of commands for interacting with and verifying zkSync protocol upgrade data.
 
 >**Etherscan API Key required.*
 
-### **`check <upgradeDir>`**: 
+#### **`check <upgradeDir>`**:
 Checks the validity of the upgrade and prints a summary of the changes.
 
 ```bash
@@ -133,7 +133,7 @@ pnpm validate check ../zksync-era/etc/upgrades/1699353977-boojum #Example of che
 
 <br>
 
-### **`facet-diff <upgradeDir> <facetName>`**: 
+#### **`facet-diff <upgradeDir> <facetName>`**:
 Shows the proposed changes in a specified facet.
 
 
@@ -146,7 +146,7 @@ pnpm validate facet-diff ../zksync-era/etc/upgrades/1699353977-boojum GettersFac
 ```
 <br>
 
-### **`verifier-diff <upgradeDir>`**: 
+#### **`verifier-diff <upgradeDir>`**:
 Shows the proposed changes between current verifier source code and the proposed one.
 
 ```bash
@@ -154,11 +154,11 @@ pnpm validate verifier-diff <upgradeDir>
 ```
 ```bash
 pnpm validate verifier-diff ../zksync-era/etc/upgrades/1699353977-boojum #Example of verifier-diff command for Boojum upgrade.
-``` 
+```
 
 <br>
 
-### **`download-diff <upgradeDir> <targetSourceCodeDir>`** :
+#### **`download-diff <upgradeDir> <targetSourceCodeDir>`** :
 Downloads both the current and proposed versions of each contract being upgraded for comparison.
 
 1. **Run the Command:**
@@ -167,7 +167,7 @@ Downloads both the current and proposed versions of each contract being upgraded
     ```
     `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences.
 
-   *Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please refer to [--ref in options section.](#🎛️-options)*   
+   *Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please refer to [--ref in options section.](#🎛️-options)*
 
 
 2. **Navigate to Directory:** After running the command, navigate to the `<targetSourceCodeDir>` directory.
@@ -175,19 +175,19 @@ Downloads both the current and proposed versions of each contract being upgraded
 <br>
 
 3. **Use Your Preferred Diff Tool:** Once in the `<targetSourceCodeDir>`, you can use your preferred diff tool to compare the 'old' (*current*) versus 'new'  (*upgrade*) directory structure or specific files.
-    - *For example:* 
+    - *For example:*
         - ```diff -r old new```
         - ```meld old new```
         - ```vimdiff old new```
 
 <br>
 
-## 🎛️ **Options**
+### 🎛️ **Options**
 
 The following options are available to configure the zkSync Era Upgrade Verification Tool:
 
-### `-n`, `--network`
-Specifies the target network where the tool will perform the checks. 
+#### `-n`, `--network`
+Specifies the target network where the tool will perform the checks.
 - **Values**: `mainnet`, `sepolia`
 - **Default**: `mainnet`
 - **Example**: *Protodanksharding upgrade in sepolia*
@@ -196,13 +196,13 @@ Specifies the target network where the tool will perform the checks.
 pnpm validate check ../zksync-era/etc/upgrades/1709067445-protodanksharding --network=sepolia
 ```
 
-###  `--rpc` , `--rpcUrl`
+####  `--rpc` , `--rpcUrl`
 Specifies the Ethereum RPC URL to be used for connecting to the blockchain.
 - **Default**:
   - `mainnet`: `https://ethereum-rpc.publicnode.com`
   - `sepolia`: `https://ethereum-sepolia-rpc.publicnode.com`
 
-### `--ref`
+#### `--ref`
 Specifies the GitHub commit reference from which the L2 code will be downloaded.
 - **Default**: The last commit on the `main` branch.
 - **Example**: `--ref` to commit (related to `boojum` upgrade in `download_dif` command).
@@ -212,7 +212,7 @@ Specifies the GitHub commit reference from which the L2 code will be downloaded.
   ```
 
 
-## ❓ **Help**
+### ❓ **Help**
 
 **`help`**: Provides usage information and displays help for all commands.
 
@@ -220,7 +220,7 @@ Specifies the GitHub commit reference from which the L2 code will be downloaded.
 pnpm validate help
 ```
 
-## 🧪 **Testing**
+### 🧪 **Testing**
 
 Unit tests are located inside the cli package. To run:
 
@@ -249,15 +249,84 @@ Lastly, this command will execute all automated tests associated with the tool:
 pnpm test
 ```
 
-## 🔮 **Future Improvements**
+### 🔮 **Future Improvements**
 
 - **Extended Support for L2 Upgrades**: We plan to expand the capabilities of the Solidity Diff Tool to include Bootloader and DefaultAccount contracts.
 
 - **Improve Error Handling**: We plan to improve error messages and handling throughout the tool.
 
-- **Add HTML File Output Option**: Implementing HTML file output option to improve diff visualization and user experience. 
+- **Add HTML File Output Option**: Implementing HTML file output option to improve diff visualization and user experience.
 
 We welcome community feedback and suggestions which can be submitted via our GitHub repository.
+
+## Web App
+
+### 🏃 **Set up**
+
+#### **1. Clone repository**
+
+```bash
+git clone https://github.com/Moonsong-Labs/zksync-upgrade-verification-tool.git
+```
+
+#### **2. Install dependencies & build**
+
+We need to install all dependencies and build the CLI package, as the Web App uses the CLI package as a dependency.
+
+```bash
+cd zksync-upgrade-verification-tool
+pnpm install
+cd cli && pnpm build
+```
+
+#### **3. Run Postgres Database**
+
+The Web App uses a Postgres database to store the upgrade data. You can run a Postgres database through Docker running our provided script in the webapp folder:
+
+```bash
+./scripts/init-db.sh
+```
+
+#### **4. Environment keys setup**
+
+Before running the Web App, you need to set up the environment keys:
+
+```bash
+export ALLOW_INDEXING="false"
+export DATABASE_URL="postgresql://user:password@localhost:5432/webapp"
+export LOG_LEVEL="info"
+export NODE_ENV="production"
+export WALLET_CONNECT_PROJECT_ID=":placeholder:"
+export L1_RPC_URL=":placeholder:"
+export ETHERSCAN_API_KEY=":placeholder:"
+export ETH_NETWORK="mainnet"
+```
+
+- `ALLOW_INDEXING`: If set to `false`, the Web App will add headers to prevent indexing by search engines.
+- `DATABASE_URL`: The URL to the Postgres database.
+- `LOG_LEVEL`: The log level for the Web App, can be `info`, `debug`, `warn`, `error`.
+- `NODE_ENV`: The environment the Web App is running in, can be `production`, `development`, `test`.
+- `WALLET_CONNECT_PROJECT_ID`: The WalletConnect project ID. You can get one by registering at [WalletConnect](https://cloud.walletconnect.com/app).
+- `L1_RPC_URL`: The RPC URL for the L1 network. The selected RPC must be able to execute `debug_traceCall`. A good free option is [Tenderly](https://tenderly.co/).
+- `ETHERSCAN_API_KEY`: The Etherscan API key. You can get one at  [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).
+- `ETH_NETWORK`: The Ethereum network the Web App is running on, can be `mainnet`, `sepolia`.
+
+### 🛠️ **Usage**
+
+To start using the web app, simply build it and start it:
+
+```bash
+pnpm build
+pnpm start
+```
+
+### 🔎 Development
+
+In order to run the Web App in development mode, you can use the following commands:
+
+```bash
+pnpm dev
+```
 
 ## 📄 **License**
 
