@@ -14,7 +14,6 @@ export const env = createEnv({
     L1_RPC_URL_FOR_UPGRADES: z.string(),
     ETH_NETWORK: z.enum(["mainnet", "sepolia"]).default("mainnet"),
     ETHERSCAN_API_KEY: z.string(),
-    AUTH_SECRET: z.string(),
     UPGRADE_HANDLER_ADDRESS: zodHex,
   },
   // eslint-disable-next-line n/no-process-env
