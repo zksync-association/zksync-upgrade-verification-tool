@@ -173,6 +173,7 @@ export default function Proposals() {
 
             const signProposalEnabled =
               !userSignedProposal &&
+              [PROPOSAL_STATES.LegalVetoPeriod, PROPOSAL_STATES.Waiting].includes(proposal.status) &&
               (user.role === "guardian" ? !proposal.guardiansApproval : true);
             const signLegalVetoEnabled =
               !userSignedLegalVeto &&
