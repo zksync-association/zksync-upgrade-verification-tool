@@ -10,7 +10,7 @@ import {
   displayAddress,
   displayBytes32,
   displayEmpty,
-} from "@/routes/app/proposals.$id/common-tables";
+} from "@/routes/app/proposals/$id/common-tables";
 import { cn } from "@/utils/cn";
 import type { FieldStorageChange } from "validate-cli";
 import type { ExtractedValue } from "validate-cli/dist/lib/reports/obj-storage-visitor";
