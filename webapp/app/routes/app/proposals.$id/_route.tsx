@@ -371,7 +371,7 @@ export default function Proposals() {
                       <ContractWriteButton2
                         target={addresses.upgradeHandler}
                         proposalCalldata={proposal.raw}
-                        // disabled={!executeProposalEnabled}
+                        disabled={!executeProposalEnabled}
                       >
                         Execute upgrade
                       </ContractWriteButton2>

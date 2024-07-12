@@ -9,12 +9,14 @@ type BroadcastTxButtonProps2 = {
   target: Hex;
   proposalCalldata: Hex;
   children?: React.ReactNode;
+  disabled: boolean;
 };
 
 export default function ContractWriteButton2({
   children,
   target,
-  proposalCalldata
+  proposalCalldata,
+  disabled
 }: BroadcastTxButtonProps2) {
   const { address } = useAccount();
   const { writeContractAsync, isPending } = useWriteContract();
@@ -52,7 +54,7 @@ export default function ContractWriteButton2({
   }
 
   return (
-    <Button onClick={execContractWrite}>
+    <Button onClick={execContractWrite} disabled={disabled}>
       {children}
     </Button>
   );
