@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ALL_ABIS } from "@/utils/raw-abis";
 import type React from "react";
 import { toast } from "react-hot-toast";
-import { decodeAbiParameters, decodeFunctionData, getAbiItem, Hex } from "viem";
+import { type Hex, decodeAbiParameters, getAbiItem } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
 
 type BroadcastTxButtonProps2 = {
@@ -16,31 +16,29 @@ export default function ContractWriteButton2({
   children,
   target,
   proposalCalldata,
-  disabled
+  disabled,
 }: BroadcastTxButtonProps2) {
   const { address } = useAccount();
-  const { writeContractAsync, isPending } = useWriteContract();
+  const { writeContractAsync } = useWriteContract();
 
   const execContractWrite = async (e: React.MouseEvent) => {
     e.preventDefault();
 
     const abiItem = getAbiItem({
-      abi: ALL_ABIS["handler"],
-      name: "execute"
-    })
+      abi: ALL_ABIS.handler,
+      name: "execute",
+    });
 
-    const [ upgradeProposal] = decodeAbiParameters([abiItem.inputs[0]],
-      proposalCalldata
-    )
+    const [upgradeProposal] = decodeAbiParameters([abiItem.inputs[0]], proposalCalldata);
 
     try {
       await writeContractAsync({
         account: address,
         address: target,
         functionName: "execute",
-        abi: ALL_ABIS["handler"],
+        abi: ALL_ABIS.handler,
         args: [upgradeProposal],
-        dataSuffix: proposalCalldata
+        dataSuffix: proposalCalldata,
       });
       toast.success("Transaction executed!", { id: "sign_button" });
     } catch (e) {
@@ -51,7 +49,7 @@ export default function ContractWriteButton2({
         toast.error(`Error broadcasting tx: ${e}`);
       }
     }
-  }
+  };
 
   return (
     <Button onClick={execContractWrite} disabled={disabled}>

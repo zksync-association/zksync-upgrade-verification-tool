@@ -56,7 +56,10 @@ export default function ContractWriteButton({
   };
 
   return (
-    <Button disabled={disabled || isPending || signatures.length < threshold} onClick={execContractWrite}>
+    <Button
+      disabled={disabled || isPending || signatures.length < threshold}
+      onClick={execContractWrite}
+    >
       {children}
     </Button>
   );

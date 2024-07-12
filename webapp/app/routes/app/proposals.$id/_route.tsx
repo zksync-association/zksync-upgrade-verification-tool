@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { displayBytes32 } from "@/routes/app/proposals.$id/common-tables";
 import ContractWriteButton from "@/routes/app/proposals.$id/contract-write-button";
+import ContractWriteButton2 from "@/routes/app/proposals.$id/contract-write-button-2";
 import FacetChangesTable from "@/routes/app/proposals.$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals.$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals.$id/field-storage-changes-table";
@@ -23,6 +24,7 @@ import { compareHexValues } from "@/utils/compare-hex-values";
 import { getTransactionUrl } from "@/utils/etherscan";
 import { badRequest, notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
+import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { defer, json } from "@remix-run/node";
 import { Await, useLoaderData, useNavigate } from "@remix-run/react";
@@ -32,8 +34,6 @@ import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
-import { env } from "@config/env.server";
-import ContractWriteButton2 from "@/routes/app/proposals.$id/contract-write-button-2";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -59,7 +59,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       getSignaturesByExternalProposalId(params.data.id),
       getProposalData(params.data.id),
     ]);
-    const upgradeHandler = env.UPGRADE_HANDLER_ADDRESS
+    const upgradeHandler = env.UPGRADE_HANDLER_ADDRESS;
 
     return {
       proposal: {
@@ -154,7 +154,7 @@ export default function Proposals() {
           onClick={() => navigate(-1)}
           className="mr-2 hover:bg-transparent"
         >
-          <ArrowLeft/>
+          <ArrowLeft />
         </Button>
         <h2 className="font-semibold">Proposal {displayBytes32(proposalId)}</h2>
       </div>
@@ -162,7 +162,7 @@ export default function Proposals() {
       <Suspense
         fallback={
           <div className="flex flex-1 flex-col items-center justify-center space-y-6">
-            <Loading/>
+            <Loading />
             <h2>Loading proposal...</h2>
           </div>
         }
@@ -249,7 +249,7 @@ export default function Proposals() {
                             rel="noreferrer"
                           >
                             <span>{displayBytes32(proposal.transactionHash)}</span>
-                            <SquareArrowOutUpRight className="ml-1" width={12} height={12}/>
+                            <SquareArrowOutUpRight className="ml-1" width={12} height={12} />
                           </a>
                         </div>
                       </div>
@@ -395,7 +395,7 @@ export default function Proposals() {
                           <CardTitle>Facet Changes</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4">
-                          <FacetChangesTable data={reports.facetChanges}/>
+                          <FacetChangesTable data={reports.facetChanges} />
                         </CardContent>
                       </Card>
                     </TabsContent>
@@ -405,7 +405,7 @@ export default function Proposals() {
                           <CardTitle>System Contract Changes</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4">
-                          <SystemContractChangesTable data={reports.systemContractChanges}/>
+                          <SystemContractChangesTable data={reports.systemContractChanges} />
                         </CardContent>
                       </Card>
                     </TabsContent>
@@ -415,7 +415,7 @@ export default function Proposals() {
                           <CardTitle>Field Changes</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4">
-                          <FieldChangesTable data={reports.fieldChanges}/>
+                          <FieldChangesTable data={reports.fieldChanges} />
                         </CardContent>
                       </Card>
                     </TabsContent>
@@ -425,7 +425,7 @@ export default function Proposals() {
                           <CardTitle>Field Storage Changes</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4">
-                          <FieldStorageChangesTable data={reports.fieldStorageChanges}/>{" "}
+                          <FieldStorageChangesTable data={reports.fieldStorageChanges} />{" "}
                         </CardContent>
                       </Card>
                     </TabsContent>
@@ -441,10 +441,10 @@ export default function Proposals() {
 }
 
 function StatusIndicator({
-                           signatures,
-                           necessarySignatures,
-                           label,
-                         }: { signatures: number; necessarySignatures: number; label: string }) {
+  signatures,
+  necessarySignatures,
+  label,
+}: { signatures: number; necessarySignatures: number; label: string }) {
   const necessarySignaturesReached = signatures >= necessarySignatures;
 
   return (
