@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ALL_ABIS } from "@/utils/raw-abis";
 import type React from "react";
+import { useEffect } from "react";
 import { toast } from "react-hot-toast";
 import type { Hex } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
@@ -27,14 +28,16 @@ export default function ContractWriteButton({
   abiName,
 }: BroadcastTxButtonProps) {
   const { address } = useAccount();
-  const { writeContractAsync, isPending } = useWriteContract();
+  const { writeContractAsync, isPending, isSuccess } = useWriteContract();
+
+  useEffect(() => {
+    if (isSuccess) {
+      toast.success("Transaction executed!", { id: "execute_tx" });
+    }
+  }, [isSuccess]);
 
   const execContractWrite = async (e: React.MouseEvent) => {
     e.preventDefault();
-
-    if (signatures.length < threshold === null) {
-      throw new Error();
-    }
 
     try {
       await writeContractAsync({
@@ -44,11 +47,14 @@ export default function ContractWriteButton({
         abi: ALL_ABIS[abiName],
         args: [proposalId, signatures.map((s) => s.signer), signatures.map((s) => s.signature)],
       });
-      toast.success("Transaction executed!", { id: "sign_button" });
     } catch (e) {
       console.error(e);
       if (e instanceof Error) {
-        toast.error(`Error broadcasting tx: ${e.message}`);
+        if (e.message.includes("User rejected the request.")) {
+          toast("Transaction canceled", { icon: "✖️" });
+        } else {
+          toast.error(`Error broadcasting tx: ${e.message}`);
+        }
       } else {
         toast.error(`Error broadcasting tx: ${e}`);
       }

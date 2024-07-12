@@ -1,6 +1,8 @@
+import TxLink from "@/components/tx-link";
 import { Button } from "@/components/ui/button";
 import { ALL_ABIS } from "@/utils/raw-abis";
 import type React from "react";
+import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { type Hex, decodeAbiParameters, getAbiItem } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
@@ -12,14 +14,22 @@ type BroadcastTxButtonProps2 = {
   disabled: boolean;
 };
 
-export default function ContractWriteButton2({
+export default function ExecuteUpgradeButton({
   children,
   target,
   proposalCalldata,
   disabled,
 }: BroadcastTxButtonProps2) {
   const { address } = useAccount();
-  const { writeContractAsync } = useWriteContract();
+  const { writeContractAsync, isPending, data } = useWriteContract();
+  const [txid, setTxid] = useState<Hex | null>(null);
+
+  useEffect(() => {
+    if (data) {
+      toast.success("Transaction broadcasted!", { id: "sign_button", duration: 5000 });
+      setTxid(data);
+    }
+  }, [data]);
 
   const execContractWrite = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -40,11 +50,14 @@ export default function ContractWriteButton2({
         args: [upgradeProposal],
         dataSuffix: proposalCalldata,
       });
-      toast.success("Transaction executed!", { id: "sign_button" });
     } catch (e) {
       console.error(e);
       if (e instanceof Error) {
-        toast.error(`Error broadcasting tx: ${e.message}`);
+        if (e.message.includes("User rejected the request.")) {
+          toast("Transaction canceled", { icon: "✖️" });
+        } else {
+          toast.error(`Error broadcasting tx: ${e.message}`);
+        }
       } else {
         toast.error(`Error broadcasting tx: ${e}`);
       }
@@ -52,8 +65,11 @@ export default function ContractWriteButton2({
   };
 
   return (
-    <Button onClick={execContractWrite} disabled={disabled}>
-      {children}
-    </Button>
+    <>
+      <Button loading={isPending} onClick={execContractWrite} disabled={disabled || isPending}>
+        {children}
+      </Button>
+      {txid && <TxLink txid={txid} />}
+    </>
   );
 }

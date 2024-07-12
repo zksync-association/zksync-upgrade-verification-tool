@@ -5,6 +5,7 @@ import { councilAddress, guardiansAddress } from "@/.server/service/authorized-u
 import { getProposalData, getProposalStatus } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
+import TxLink from "@/components/tx-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
@@ -12,7 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { displayBytes32 } from "@/routes/app/proposals.$id/common-tables";
 import ContractWriteButton from "@/routes/app/proposals.$id/contract-write-button";
-import ContractWriteButton2 from "@/routes/app/proposals.$id/contract-write-button-2";
+import ExecuteUpgradeButton from "@/routes/app/proposals.$id/execute-upgrade-button";
 import FacetChangesTable from "@/routes/app/proposals.$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals.$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals.$id/field-storage-changes-table";
@@ -21,14 +22,13 @@ import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contra
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { cn } from "@/utils/cn";
 import { compareHexValues } from "@/utils/compare-hex-values";
-import { getTransactionUrl } from "@/utils/etherscan";
 import { badRequest, notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { defer, json } from "@remix-run/node";
 import { Await, useLoaderData, useNavigate } from "@remix-run/react";
-import { ArrowLeft, SquareArrowOutUpRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Suspense } from "react";
 import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
@@ -242,15 +242,7 @@ export default function Proposals() {
                         </div>
                         <div className="flex justify-between">
                           <span>Transaction hash:</span>
-                          <a
-                            href={getTransactionUrl(proposal.transactionHash as Hex)}
-                            className="flex w-1/2 items-center justify-end break-words underline"
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            <span>{displayBytes32(proposal.transactionHash)}</span>
-                            <SquareArrowOutUpRight className="ml-1" width={12} height={12} />
-                          </a>
+                          <TxLink txid={proposal.transactionHash} />
                         </div>
                       </div>
                     </CardContent>
@@ -368,13 +360,13 @@ export default function Proposals() {
                       >
                         Execute legal veto extension
                       </ContractWriteButton>
-                      <ContractWriteButton2
+                      <ExecuteUpgradeButton
                         target={addresses.upgradeHandler}
                         proposalCalldata={proposal.raw}
                         disabled={!executeProposalEnabled}
                       >
                         Execute upgrade
-                      </ContractWriteButton2>
+                      </ExecuteUpgradeButton>
                     </CardContent>
                   </Card>
                 </div>
