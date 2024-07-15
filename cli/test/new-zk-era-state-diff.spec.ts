@@ -546,13 +546,7 @@ describe("NewZkSyncStateDiff", () => {
       const explorerL2 = BlockExplorerClient.forL2("mainnet");
       const rpc = RpcClient.forL1("mainnet");
 
-      const [state] = await ZksyncEraState.fromCalldata(
-        buff,
-        "mainnet",
-        explorerL1,
-        rpc,
-        explorerL2
-      );
+      const [state] = await ZksyncEraState.fromCalldata("0x", "0x", buff, "mainnet", explorerL1, rpc, explorerL2);
       const facets = state.allFacets();
       const admin = facets.find((f) => f.name === "AdminFacet");
       if (!admin) {

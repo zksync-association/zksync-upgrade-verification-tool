@@ -120,7 +120,7 @@ export class RpcClient {
     return res.json();
   }
 
-  async debugTraceCall(from: string, to: string, callData: string): Promise<MemoryDiffRaw> {
+  async debugTraceCall(from: string, to: string, callData: Hex): Promise<MemoryDiffRaw> {
     const data = await this.rawCall("debug_traceCall", [
       {
         from,

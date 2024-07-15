@@ -30,6 +30,9 @@ import {
   upgradeCallDataSchema,
 } from "../schema/rpc";
 import { z } from "zod";
+import { RecordStorageSnapshot } from "./storage/record-storage-snapshot";
+import { ListOfAddressesVisitor } from "./reports/list-of-addresses-visitor";
+import { FacetsToSelectorsVisitor } from "./reports/facets-to-selectors-visitor";
 
 export type L2ContractData = {
   address: Hex;
@@ -239,19 +242,42 @@ export class ZksyncEraState {
   }
 
   static async fromCalldata(
-    buff: Buffer,
+    sender: Hex,
+    targetAddr: Hex,
+    callDataBuf: Buffer,
     network: Network,
     explorerL1: BlockExplorerClient,
     rpc: RpcClient,
-    explorerL2: BlockExplorer
-  ): Promise<[ZksyncEraState, Hex[]]> {
+    explorerL2: BlockExplorer): Promise<[ZksyncEraState, Hex[]]> {
     const addr = DIAMOND_ADDRS[network];
     const diamond = new Diamond(addr);
 
+    const memoryMap = await rpc.debugTraceCall(
+      sender,
+      targetAddr,
+      bytesToHex(callDataBuf)
+    )
+
+    const post = Option.fromNullable(memoryMap.result.post[addr])
+      .map(post => post.storage).flatten()
+
+    const base = new RpcStorageSnapshot(rpc, addr)
+    const storageWithUpgrade = base.apply(new RecordStorageSnapshot(post.unwrapOr({})))
+
+    const facetsAddressesValue = await MAIN_CONTRACT_FIELDS.facetAddresses.extract(storageWithUpgrade)
+    const facetsAddresses = facetsAddressesValue.map(value => value.accept(new ListOfAddressesVisitor())).expect(new Error("facets should be present"))
+    const facetSelectorsValue = await MAIN_CONTRACT_FIELDS.facetToSelectors(facetsAddresses).extract(storageWithUpgrade)
+    const facetToSelectors = facetsAddressesValue.map(value => {
+      const visitor = new FacetsToSelectorsVisitor();
+      value.accept(visitor)
+      return visitor.extracted()
+    }).expect(new Error("facets should be present"))
+
+
     await diamond.init(explorerL1, rpc);
 
-    const decoded = diamond.decodeFunctionData(buff, callDataSchema);
-    const facets = await reduceFacetCuts(decoded.args[0].facetCuts, explorerL1);
+    const decoded = diamond.decodeFunctionData(callDataBuf, callDataSchema);
+    const facets = await Promise.all(facetsAddresses.map(async addr => getFacetData(addr, explorerL1, facetToSelectors)))  //await reduceFacetCuts(decoded.args[0].facetCuts, explorerL1);
 
     const upgradeAddr = decoded.args[0].initAddress;
     const upgradeCalldata = decoded.args[0].initCalldata;
@@ -335,6 +361,19 @@ const SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
   "0x0000000000000000000000000000000000008011": "PubdataChunkPublisher",
   "0x0000000000000000000000000000000000010000": "Create2Factory",
 };
+
+async function getFacetData(address: Hex, explorer: BlockExplorer, selectorMap: Map<Hex, Hex[]>): Promise<FacetData> {
+  const contract = await explorer.getSourceCode(address);
+  const selectors = selectorMap.get(address)
+  if (!selectors) {
+    throw new Error("selectors should be present")
+  }
+  return {
+    name: contract.name,
+    address,
+    selectors,
+  };
+}
 
 async function reduceFacetCuts(cuts: FacetCut[], explorer: BlockExplorer): Promise<FacetData[]> {
   const selected = cuts.filter((cut) => cut.action === 0);

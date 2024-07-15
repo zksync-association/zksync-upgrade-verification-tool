@@ -30,13 +30,7 @@ export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
 
   const [proposed, systemContractsAddrs] = await withSpinner(
     () =>
-      ZksyncEraState.fromCalldata(
-        Buffer.from(hexToBytes(data)),
-        env.network,
-        env.l1Client(),
-        env.rpcL1(),
-        env.l2Client()
-      ),
+      ZksyncEraState.fromCalldata("0x", "0x", Buffer.from(hexToBytes(data)), env.network, env.l1Client(), env.rpcL1(), env.l2Client()),
     "Calculating upgrade changes",
     env
   );

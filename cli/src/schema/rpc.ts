@@ -6,7 +6,7 @@ const stateParser = z.record(
   z.string(),
   z.object({
     nonce: zodOptional(z.number()),
-    storage: zodOptional(z.record(z.string(), z.string())),
+    storage: zodOptional(z.record(z.string(), zodHex)),
   })
 );
 
