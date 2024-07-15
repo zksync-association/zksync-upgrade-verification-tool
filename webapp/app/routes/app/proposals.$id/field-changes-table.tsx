@@ -12,7 +12,7 @@ import {
   displayEmpty,
 } from "@/routes/app/proposals.$id/common-tables";
 import { cn } from "@/utils/cn";
-import type { ContractFieldChange } from "validate-cli/src/lib";
+import type { ContractFieldChange } from "validate-cli";
 
 export default function FieldChangesTable({
   className,

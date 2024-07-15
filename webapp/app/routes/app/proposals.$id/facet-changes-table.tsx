@@ -7,7 +7,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { removeFunctionParams } from "@/routes/app/proposals.$id/common-tables";
 import { cn } from "@/utils/cn";
-import type { FacetDataReportDiff } from "validate-cli/src/lib";
+import type { FacetDataReportDiff } from "validate-cli";
 
 export default function FacetChangesTable({
   className,

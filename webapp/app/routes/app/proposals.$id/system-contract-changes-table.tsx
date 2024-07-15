@@ -11,7 +11,7 @@ import {
   displayBytes32,
   displayEmpty,
 } from "@/routes/app/proposals.$id/common-tables";
-import type { SystemContractUpgrade } from "validate-cli/src/lib";
+import type { SystemContractUpgrade } from "validate-cli";
 
 export default function SystemContractChangesTable({
   className,
