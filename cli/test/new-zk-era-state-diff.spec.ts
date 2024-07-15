@@ -536,41 +536,45 @@ describe("NewZkSyncStateDiff", () => {
   });
 
   describe("#createFromCallData", () => {
-    it.skip("works", async () => {
+    it("works", async () => {
+      // This is a very specific calldata made by hand
       const hexBuff = await fs.readFile(
         path.join(import.meta.dirname, "data", "upgrade-calldata.hex")
       );
       const buff = Buffer.from(hexBuff.toString(), "hex");
 
-      const explorerL1 = BlockExplorerClient.forL1("IA817WPSNENBAK9EE3SNM1C5C31YUTZ4MV", "mainnet");
+      const explorerL1 = BlockExplorerClient.forL1("", "mainnet");
       const explorerL2 = BlockExplorerClient.forL2("mainnet");
-      const rpc = RpcClient.forL1("mainnet");
+      const rpc = new RpcClient("");
 
-      const [state] = await ZksyncEraState.fromCalldata("0x", "0x", buff, "mainnet", explorerL1, rpc, explorerL2);
+      const [state] = await ZksyncEraState.fromCalldata(
+        "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C",
+        "0x32400084c286cf3e17e7b677ea9583e60a000324",
+        buff,
+        "mainnet",
+        explorerL1,
+        rpc,
+        explorerL2
+      );
+
       const facets = state.allFacets();
       const admin = facets.find((f) => f.name === "AdminFacet");
       if (!admin) {
         return expect.fail("admin should be present");
       }
-      expect(admin.address).toEqual("0xF6F26b416CE7AE5e5FE224Be332C7aE4e1f3450a");
+      expect(admin.address).toEqual("0x230214f0224c7e0485f348a79512ad00514db1f7");
 
       const getters = facets.find((f) => f.name === "GettersFacet");
-      if (!getters) {
-        return expect.fail("getters should be present");
-      }
-      expect(getters.address).toEqual("0xE60E94fCCb18a81D501a38959E532C0A85A1be89");
+      expect(getters).toBe(undefined)
 
       const mailbox = facets.find((f) => f.name === "MailboxFacet");
       if (!mailbox) {
         return expect.fail("mailbox should be present");
       }
-      expect(mailbox.address).toEqual("0xCDB6228b616EEf8Df47D69A372C4f725C43e718C");
+      expect(mailbox.address).toEqual("0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7");
 
       const executor = facets.find((f) => f.name === "ExecutorFacet");
-      if (!executor) {
-        return expect.fail("executor should be present");
-      }
-      expect(executor.address).toEqual("0xaD193aDe635576d8e9f7ada71Af2137b16c64075");
+      expect(executor).toBe(undefined);
 
       expect(state.numberAttrValue("chainId").unwrap()).toEqual(324n);
       expect(state.hexAttrValue("bridgeHubAddress").unwrap().toLowerCase()).toEqual(

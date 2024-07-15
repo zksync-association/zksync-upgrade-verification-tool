@@ -24,16 +24,12 @@ import {
   type SystemContractProvider,
 } from "./system-contract-providers";
 import {
-  callDataSchema,
   type FacetCut,
-  l2UpgradeSchema,
-  upgradeCallDataSchema,
 } from "../schema/rpc";
 import { z } from "zod";
 import { RecordStorageSnapshot } from "./storage/record-storage-snapshot";
 import { ListOfAddressesVisitor } from "./reports/list-of-addresses-visitor";
 import { FacetsToSelectorsVisitor } from "./reports/facets-to-selectors-visitor";
-import type { MappingValue } from "./storage/values/mapping-value";
 import { AddressExtractor, BigNumberExtractor, BlobExtractor } from "./reports/extractors";
 import type { ContractField } from "./storage/contractField";
 import type { StorageSnapshot } from "./storage/storage-snapshot";
@@ -253,11 +249,16 @@ export class ZksyncEraState {
     network: Network,
     explorerL1: BlockExplorerClient,
     rpc: RpcClient,
-    explorerL2: BlockExplorer): Promise<[ZksyncEraState, Hex[]]> {
+    _explorerL2: BlockExplorer): Promise<[ZksyncEraState, Hex[]]> {
     const addr = DIAMOND_ADDRS[network];
-    // const diamond = new Diamond(addr);
 
-    const memoryMap = await rpc.debugTraceCall(
+    const memoryMap = await rpc.debugCallTraceStorage(
+      sender,
+      targetAddr,
+      bytesToHex(callDataBuf)
+    )
+
+    const callTracing = await rpc.debugCallTraceCalls(
       sender,
       targetAddr,
       bytesToHex(callDataBuf)
@@ -279,7 +280,8 @@ export class ZksyncEraState {
     await extractValue(MAIN_CONTRACT_FIELDS.verifierAddress, storageWithUpgrade, new AddressExtractor())
     const state = new ZksyncEraState(
       {
-        protocolVersion: await extractValue(MAIN_CONTRACT_FIELDS.protocolVersion, storageWithUpgrade, new BlobExtractor()),
+        protocolVersion: await extractValue(MAIN_CONTRACT_FIELDS.protocolVersion, storageWithUpgrade, new BigNumberExtractor())
+          .then(n => numberToHex(n)),
         verifierAddress: await extractValue(MAIN_CONTRACT_FIELDS.verifierAddress, storageWithUpgrade, new AddressExtractor()),
         l2DefaultAccountBytecodeHash: await extractValue(MAIN_CONTRACT_FIELDS.l2DefaultAccountBytecodeHash, storageWithUpgrade, new BlobExtractor()),
         l2BootloaderBytecodeHash: await extractValue(MAIN_CONTRACT_FIELDS.l2BootloaderBytecodeHash, storageWithUpgrade, new BlobExtractor()),
@@ -304,7 +306,7 @@ export class ZksyncEraState {
   }
 }
 
-const SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
+const _SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
   "0x0000000000000000000000000000000000000000": "EmptyContract",
   "0x0000000000000000000000000000000000000001": "Ecrecover",
   "0x0000000000000000000000000000000000000002": "SHA256",
@@ -351,7 +353,7 @@ async function getFacetData(address: Hex, explorer: BlockExplorer, selectorMap: 
   };
 }
 
-async function reduceFacetCuts(cuts: FacetCut[], explorer: BlockExplorer): Promise<FacetData[]> {
+async function _reduceFacetCuts(cuts: FacetCut[], explorer: BlockExplorer): Promise<FacetData[]> {
   const selected = cuts.filter((cut) => cut.action === 0);
 
   return await Promise.all(

@@ -120,7 +120,7 @@ export class RpcClient {
     return res.json();
   }
 
-  async debugTraceCall(from: string, to: string, callData: Hex): Promise<MemoryDiffRaw> {
+  async debugCallTraceStorage(from: string, to: string, callData: Hex): Promise<MemoryDiffRaw> {
     const data = await this.rawCall("debug_traceCall", [
       {
         from,
@@ -175,5 +175,22 @@ export class RpcClient {
     })) as any;
 
     return block.number;
+  }
+
+  async debugCallTraceCalls(from: Hex, to: Hex, callData: Hex) {
+    const data = await this.rawCall("debug_traceCall", [
+      {
+        from,
+        to,
+        data: callData,
+      },
+      "latest",
+      {
+        tracer: "callTracer",
+        tracerConfig: {
+          diffMode: true,
+        },
+      },
+    ]);
   }
 }

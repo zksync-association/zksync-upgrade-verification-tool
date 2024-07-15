@@ -60,6 +60,14 @@ export class Diamond {
     return address;
   }
 
+  selectorsForFacet(facet: Hex): Hex[] {
+    const selectors = this.facetToSelectors.get(this.sanitizeHex(facet));
+    if (selectors === undefined) {
+      throw new Error(`Unknown facet ${facet}`);
+    }
+    return selectors;
+  }
+
   private async findGetterFacetAbi(client: BlockExplorer, rpc: RpcClient): Promise<ContractAbi> {
     // Manually encode calldata becasue at this stage there
     // is no address to get the abi
@@ -133,6 +141,14 @@ export class Diamond {
     const abi = this.abiFor(facetAddr);
 
     return abi.decodeCallData(bytesToHex(buff), schema);
+  }
+
+  encodeFunctionData(name: string, args: any[]): Hex {
+    const abi = [...this.abis.values()].find(abi => abi.hasFunction(name))
+    if (!abi) {
+      throw new Error(`Expected function ${name} to be defined`)
+    }
+    return abi.encodeCallData(name,args)
   }
 
   private abiFor(facetAddr: Hex): ContractAbi {
