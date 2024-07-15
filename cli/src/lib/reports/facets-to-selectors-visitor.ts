@@ -5,12 +5,12 @@ import type { ValueField } from "../storage/values/struct-value";
 import { zodHex } from "../../schema/hex-parser";
 import { z } from "zod";
 
-type FacetsToSelectsValue =
+type FacetsToSelectorsValue =
   Hex |
   Hex[] |
   Map<Hex, Hex[]>
 
-export class FacetsToSelectorsVisitor implements StorageVisitor<FacetsToSelectsValue> {
+export class FacetsToSelectorsVisitor implements StorageVisitor<FacetsToSelectorsValue> {
   value: Map<Hex, Hex[]>
   nextList: Hex[]
 
@@ -19,19 +19,19 @@ export class FacetsToSelectorsVisitor implements StorageVisitor<FacetsToSelectsV
     this.nextList = []
   }
 
-  visitAddress(addr: Hex): FacetsToSelectsValue {
+  visitAddress(addr: Hex): FacetsToSelectorsValue {
     throw new Error("not implemented")
   }
 
-  visitBigNumber(n: bigint): FacetsToSelectsValue {
+  visitBigNumber(n: bigint): FacetsToSelectorsValue {
     throw new Error("not implemented")
   }
 
-  visitBuf(buf: Buffer): FacetsToSelectsValue {
+  visitBuf(buf: Buffer): FacetsToSelectorsValue {
     return bytesToHex(buf)
   }
 
-  visitBoolean(val: boolean): FacetsToSelectsValue {
+  visitBoolean(val: boolean): FacetsToSelectorsValue {
     throw new Error("not implemented")
   }
 
@@ -42,11 +42,11 @@ export class FacetsToSelectorsVisitor implements StorageVisitor<FacetsToSelectsV
     })
   }
 
-  visitEmpty(): FacetsToSelectsValue {
+  visitEmpty(): FacetsToSelectorsValue {
     throw new Error("not implemented")
   }
 
-  visitStruct(fields: ValueField[]): FacetsToSelectsValue {
+  visitStruct(fields: ValueField[]): FacetsToSelectorsValue {
     const field = fields.find(f => f.key === "selectors")
     if (!field) {
       throw new Error("selectors should be present")

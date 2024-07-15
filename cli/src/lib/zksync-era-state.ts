@@ -34,6 +34,10 @@ import { RecordStorageSnapshot } from "./storage/record-storage-snapshot";
 import { ListOfAddressesVisitor } from "./reports/list-of-addresses-visitor";
 import { FacetsToSelectorsVisitor } from "./reports/facets-to-selectors-visitor";
 import type { MappingValue } from "./storage/values/mapping-value";
+import { AddressExtractor, BigNumberExtractor, BlobExtractor } from "./reports/extractors";
+import type { ContractField } from "./storage/contractField";
+import type { StorageSnapshot } from "./storage/storage-snapshot";
+import type { StorageVisitor } from "./reports/storage-visitor";
 
 export type L2ContractData = {
   address: Hex;
@@ -251,7 +255,7 @@ export class ZksyncEraState {
     rpc: RpcClient,
     explorerL2: BlockExplorer): Promise<[ZksyncEraState, Hex[]]> {
     const addr = DIAMOND_ADDRS[network];
-    const diamond = new Diamond(addr);
+    // const diamond = new Diamond(addr);
 
     const memoryMap = await rpc.debugTraceCall(
       sender,
@@ -265,64 +269,29 @@ export class ZksyncEraState {
     const base = new RpcStorageSnapshot(rpc, addr)
     const storageWithUpgrade = base.apply(new RecordStorageSnapshot(post.unwrapOr({})))
 
-    const facetsAddressesValue = await MAIN_CONTRACT_FIELDS.facetAddresses.extract(storageWithUpgrade)
-    const facetsAddresses = facetsAddressesValue.map(value => value.accept(new ListOfAddressesVisitor())).expect(new Error("facets should be present"))
-    const facetSelectorsValue = await MAIN_CONTRACT_FIELDS.facetToSelectors(facetsAddresses).extract(storageWithUpgrade)
-    const facetToSelectors = facetSelectorsValue.map(value => {
-      const mapValue = value as MappingValue
-      const visitor = new FacetsToSelectorsVisitor();
-      return visitor.visitMapping(mapValue.fields)
-    }).expect(new Error("facets should be present"))
+    const facetsAddresses = await extractValue(MAIN_CONTRACT_FIELDS.facetAddresses, storageWithUpgrade, new ListOfAddressesVisitor())
+    const extractedFacetToSelectors = await extractValue(MAIN_CONTRACT_FIELDS.facetToSelectors(facetsAddresses), storageWithUpgrade, new FacetsToSelectorsVisitor())
+    const facetToSelectors = extractedFacetToSelectors as Map<Hex, Hex[]>
 
+    const facets = await Promise.all(facetsAddresses.map(async addr => getFacetData(addr, explorerL1, facetToSelectors)))
+    const systemContracts: L2ContractData[] = []
 
-    await diamond.init(explorerL1, rpc);
-
-    const decoded = diamond.decodeFunctionData(callDataBuf, callDataSchema);
-    const facets = await Promise.all(facetsAddresses.map(async addr => getFacetData(addr, explorerL1, facetToSelectors)))  //await reduceFacetCuts(decoded.args[0].facetCuts, explorerL1);
-
-    const upgradeAddr = decoded.args[0].initAddress;
-    const upgradeCalldata = decoded.args[0].initCalldata;
-    const upgradeAbi = await explorerL1.getAbi(upgradeAddr);
-    const decodedUpgrade = upgradeAbi.decodeCallData(upgradeCalldata, upgradeCallDataSchema);
-
-    const hex = decodedUpgrade.args[0].l2ProtocolUpgradeTx.to.toString(16);
-    const deployAddr = `0x${"0".repeat(40 - hex.length)}${hex}`;
-    const deploySysContractsAbi = await explorerL2.getAbi(deployAddr);
-    const decodedL2 = deploySysContractsAbi.decodeCallData(
-      decodedUpgrade.args[0].l2ProtocolUpgradeTx.data,
-      l2UpgradeSchema
-    );
-
-    const systemContracts: L2ContractData[] = decodedL2.args[0].map((contract) => {
-      const name = Option.fromNullable(
-        SYSTEM_CONTRACT_NAMES[contract.newAddress.toLowerCase() as Hex]
-      );
-      return {
-        name: name.unwrapOr("New contract."),
-        address: contract.newAddress,
-        bytecodeHash: contract.bytecodeHash,
-      };
-    });
-
-    const dataBlob = Buffer.from(hexToBytes(decodedUpgrade.args[0].postUpgradeCalldata));
-
-    // TODO: Just imposible to get baseTokenGasPriceMultiplierNominator and baseTokenGasPriceMultiplierDenominator
-    // from calldata. The only way is simulating the call.
+    await extractValue(MAIN_CONTRACT_FIELDS.verifierAddress, storageWithUpgrade, new AddressExtractor())
     const state = new ZksyncEraState(
       {
-        protocolVersion: numberToHex(decodedUpgrade.args[0].newProtocolVersion, { size: 32 }),
-        verifierAddress: decodedUpgrade.args[0].verifier,
-        l2DefaultAccountBytecodeHash: decodedUpgrade.args[0].defaultAccountHash,
-        l2BootloaderBytecodeHash: decodedUpgrade.args[0].bootloaderHash,
-        chainId: dataBlob.byteLength >= 32 ? bytesToBigInt(dataBlob.subarray(0, 32)) : undefined,
+        protocolVersion: await extractValue(MAIN_CONTRACT_FIELDS.protocolVersion, storageWithUpgrade, new BlobExtractor()),
+        verifierAddress: await extractValue(MAIN_CONTRACT_FIELDS.verifierAddress, storageWithUpgrade, new AddressExtractor()),
+        l2DefaultAccountBytecodeHash: await extractValue(MAIN_CONTRACT_FIELDS.l2DefaultAccountBytecodeHash, storageWithUpgrade, new BlobExtractor()),
+        l2BootloaderBytecodeHash: await extractValue(MAIN_CONTRACT_FIELDS.l2BootloaderBytecodeHash, storageWithUpgrade, new BlobExtractor()),
+        chainId: await extractValue(MAIN_CONTRACT_FIELDS.chainId, storageWithUpgrade, new BigNumberExtractor()),
         bridgeHubAddress:
-          dataBlob.byteLength >= 64 ? bytesToHex(dataBlob.subarray(32 + 12, 64)) : undefined,
+          await extractValue(MAIN_CONTRACT_FIELDS.bridgehubAddress, storageWithUpgrade, new AddressExtractor()),
         stateTransitionManagerAddress:
-          dataBlob.byteLength >= 96 ? bytesToHex(dataBlob.subarray(64 + 12, 96)) : undefined,
+          await extractValue(MAIN_CONTRACT_FIELDS.stateTransitionManager, storageWithUpgrade, new AddressExtractor()),
         baseTokenBridgeAddress:
-          dataBlob.byteLength >= 128 ? bytesToHex(dataBlob.subarray(96 + 12, 128)) : undefined,
+          await extractValue(MAIN_CONTRACT_FIELDS.baseTokenBridgeAddress, storageWithUpgrade, new AddressExtractor()),
         admin:
-          dataBlob.byteLength >= 128 ? bytesToHex(dataBlob.subarray(128 + 12, 160)) : undefined,
+          await extractValue(MAIN_CONTRACT_FIELDS.adminAddress, storageWithUpgrade, new AddressExtractor()),
       },
       facets,
       new SystemContractList(systemContracts)
@@ -362,6 +331,12 @@ const SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
   "0x0000000000000000000000000000000000008011": "PubdataChunkPublisher",
   "0x0000000000000000000000000000000000010000": "Create2Factory",
 };
+
+async function extractValue<T>(field: ContractField, snapshot: StorageSnapshot, visitor: StorageVisitor<T>) {
+  const value = await field.extract(snapshot)
+  const maybeRes = value.map(v => v.accept(visitor))
+  return maybeRes.expect(new Error(`"${field.name}" should be present`))
+}
 
 async function getFacetData(address: Hex, explorer: BlockExplorer, selectorMap: Map<Hex, Hex[]>): Promise<FacetData> {
   const contract = await explorer.getSourceCode(address);
