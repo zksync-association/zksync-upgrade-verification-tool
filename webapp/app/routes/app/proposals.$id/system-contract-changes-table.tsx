@@ -27,7 +27,7 @@ export default function SystemContractChangesTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((diff, i) => {
+        {data.map((diff) => {
           const address = displayAddress(diff.address);
           const current = diff.currentBytecodeHash
             ? displayBytes32(diff.currentBytecodeHash)

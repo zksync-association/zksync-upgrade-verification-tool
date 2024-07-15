@@ -31,7 +31,7 @@ export default function FieldChangesTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((diff, i) => {
+        {data.map((diff) => {
           const value = displayValue(diff);
           const current = value.current;
           const proposed = value.proposed;
