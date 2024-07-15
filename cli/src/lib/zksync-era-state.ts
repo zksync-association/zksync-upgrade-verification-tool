@@ -33,6 +33,7 @@ import { z } from "zod";
 import { RecordStorageSnapshot } from "./storage/record-storage-snapshot";
 import { ListOfAddressesVisitor } from "./reports/list-of-addresses-visitor";
 import { FacetsToSelectorsVisitor } from "./reports/facets-to-selectors-visitor";
+import type { MappingValue } from "./storage/values/mapping-value";
 
 export type L2ContractData = {
   address: Hex;
@@ -267,10 +268,10 @@ export class ZksyncEraState {
     const facetsAddressesValue = await MAIN_CONTRACT_FIELDS.facetAddresses.extract(storageWithUpgrade)
     const facetsAddresses = facetsAddressesValue.map(value => value.accept(new ListOfAddressesVisitor())).expect(new Error("facets should be present"))
     const facetSelectorsValue = await MAIN_CONTRACT_FIELDS.facetToSelectors(facetsAddresses).extract(storageWithUpgrade)
-    const facetToSelectors = facetsAddressesValue.map(value => {
+    const facetToSelectors = facetSelectorsValue.map(value => {
+      const mapValue = value as MappingValue
       const visitor = new FacetsToSelectorsVisitor();
-      value.accept(visitor)
-      return visitor.extracted()
+      return visitor.visitMapping(mapValue.fields)
     }).expect(new Error("facets should be present"))
 
 

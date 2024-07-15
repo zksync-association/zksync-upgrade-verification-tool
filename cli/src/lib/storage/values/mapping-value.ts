@@ -8,7 +8,7 @@ export class MappingValue implements StorageValue {
     this.fields = fields;
   }
 
-  accept<T>(report: StorageVisitor<T>): T {
-    return report.visitMapping(this.fields);
+  accept<T>(visitor: StorageVisitor<T>): T {
+    return visitor.visitMapping(this.fields);
   }
 }
