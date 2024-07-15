@@ -6,7 +6,7 @@ import { type ActionFunctionArgs, redirect } from "@remix-run/node";
 import { useFetcher, useNavigation } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
-import { zodHex } from "validate-cli/src";
+import { zodHex } from "validate-cli";
 import { useAccount } from "wagmi";
 
 export async function action({ request }: ActionFunctionArgs) {
