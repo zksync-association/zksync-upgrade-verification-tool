@@ -7,7 +7,7 @@ import { toast } from "react-hot-toast";
 import { type Hex, decodeAbiParameters, getAbiItem } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
 
-type BroadcastTxButtonProps2 = {
+type ExecuteUpgradeButtonProps = {
   target: Hex;
   proposalCalldata: Hex;
   children?: React.ReactNode;
@@ -19,7 +19,7 @@ export default function ExecuteUpgradeButton({
   target,
   proposalCalldata,
   disabled,
-}: BroadcastTxButtonProps2) {
+}: ExecuteUpgradeButtonProps) {
   const { address } = useAccount();
   const { writeContractAsync, isPending, data } = useWriteContract();
   const [txid, setTxid] = useState<Hex | null>(null);

@@ -6,14 +6,12 @@ import { getProposalData, getProposalStatus } from "@/.server/service/proposals"
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
 import TxLink from "@/components/tx-link";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { displayBytes32 } from "@/routes/app/proposals/$id/common-tables";
 import ContractWriteButton from "@/routes/app/proposals/$id/contract-write-button";
-import ExecuteUpgradeButton from "@/routes/app/proposals.$id/execute-upgrade-button";
+import ExecuteUpgradeButton from "@/routes/app/proposals/$id/execute-upgrade-button";
 import FacetChangesTable from "@/routes/app/proposals/$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals/$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-changes-table";
