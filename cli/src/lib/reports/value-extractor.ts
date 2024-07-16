@@ -3,7 +3,7 @@ import type { Hex } from "viem";
 import type { StorageValue } from "../storage/values/storage-value";
 import type { ValueField } from "../storage/values/struct-value";
 
-export class ValueExtractor<T> implements StorageVisitor<T>{
+export class ValueExtractor<T> implements StorageVisitor<T> {
   visitAddress(_addr: Hex): T {
     throw new Error("Not implemented");
   }

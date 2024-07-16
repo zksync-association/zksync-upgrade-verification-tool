@@ -53,7 +53,7 @@ export const MAIN_CONTRACT_FIELDS = {
     "The chainId of the chain",
     new BigNumberType()
   ),
-  bridgehubAddress:     new ContractField(
+  bridgehubAddress: new ContractField(
     "ZkSyncHyperchainBase.s.bridgehub",
     41n,
     "The address of the bridgehub",
@@ -90,25 +90,26 @@ export const MAIN_CONTRACT_FIELDS = {
     "The array of all unique facet addresses that belong to the diamond proxy",
     new ArrayType(new AddressType())
   ),
-  facetToSelectors: (facets: Hex[]) => new ContractField(
-    "DiamondStorage.facetToSelectors",
-    DIAMOND_STORAGE_SLOT + 1n,
-    "The array of all unique facet addresses that belong to the diamond proxy",
-    new MappingType(
-      facets.map((s) => hexToBytes(s)).map(Buffer.from),
-      new StructType([
-        {
-          name: "selectors",
-          type: new ArrayType(new BlobType(4)),
-        },
-        {
-          name: "facetPosition",
-          type: new BigNumberType(2),
-        },
-      ]),
-      true
-    )
-  )
+  facetToSelectors: (facets: Hex[]) =>
+    new ContractField(
+      "DiamondStorage.facetToSelectors",
+      DIAMOND_STORAGE_SLOT + 1n,
+      "The array of all unique facet addresses that belong to the diamond proxy",
+      new MappingType(
+        facets.map((s) => hexToBytes(s)).map(Buffer.from),
+        new StructType([
+          {
+            name: "selectors",
+            type: new ArrayType(new BlobType(4)),
+          },
+          {
+            name: "facetPosition",
+            type: new BigNumberType(2),
+          },
+        ]),
+        true
+      )
+    ),
 };
 
 export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractField[] {
@@ -234,15 +235,15 @@ export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractFiel
       "ZkSyncHyperchainBase.s.zkPorterIsAvailable",
       25n,
       "Indicates that the porter may be touched on L2 transactions. " +
-      "Used as an input to zkp-circuit.",
+        "Used as an input to zkp-circuit.",
       new BooleanType()
     ),
     new ContractField(
       "ZkSyncHyperchainBase.s.priorityTxMaxGasLimit",
       26n,
       "The maximum number of the L2 gas that a user can request for L1 -> L2 transactions " +
-      'This is the maximum number of L2 gas that is available for the "body" of the transaction, i.e. ' +
-      "without overhead for proving the batch.",
+        'This is the maximum number of L2 gas that is available for the "body" of the transaction, i.e. ' +
+        "without overhead for proving the batch.",
       new BigNumberType()
     ),
     new ContractField(
@@ -255,9 +256,9 @@ export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractFiel
       "ZkSyncHyperchainBase.s.isEthWithdrawalFinalized",
       29n,
       "A mapping L2 batch number => message number => flag. " +
-      "The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as " +
-      "a flag to indicate that the message was already processed. " +
-      "Used to indicate that eth withdrawal was already processed",
+        "The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as " +
+        "a flag to indicate that the message was already processed. " +
+        "Used to indicate that eth withdrawal was already processed",
       new MappingType([], new MappingType([], new BooleanType()))
     ),
     new ContractField(
@@ -289,7 +290,7 @@ export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractFiel
       "ZkSyncHyperchainBase.s.l2SystemContractsUpgradeBatchNumber",
       35n,
       "Batch number where the upgrade transaction has happened. If 0, then no upgrade " +
-      "yet transaction has happened",
+        "yet transaction has happened",
       new BlobType()
     ),
     MAIN_CONTRACT_FIELDS.adminAddress,
@@ -303,7 +304,7 @@ export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractFiel
       "ZkSyncHyperchainBase.s.feeParams",
       38n,
       "Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions, " +
-      "the bootloader gives enough freedom to the operator.",
+        "the bootloader gives enough freedom to the operator.",
       new StructType([
         {
           name: "pubdataPricingMode",

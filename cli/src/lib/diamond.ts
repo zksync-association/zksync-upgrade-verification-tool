@@ -144,11 +144,11 @@ export class Diamond {
   }
 
   encodeFunctionData(name: string, args: any[]): Hex {
-    const abi = [...this.abis.values()].find(abi => abi.hasFunction(name))
+    const abi = [...this.abis.values()].find((abi) => abi.hasFunction(name));
     if (!abi) {
-      throw new Error(`Expected function ${name} to be defined`)
+      throw new Error(`Expected function ${name} to be defined`);
     }
-    return abi.encodeCallData(name,args)
+    return abi.encodeCallData(name, args);
   }
 
   private abiFor(facetAddr: Hex): ContractAbi {

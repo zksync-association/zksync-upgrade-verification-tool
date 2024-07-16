@@ -1,5 +1,4 @@
 import { ValueExtractor } from "./value-extractor";
-import * as Buffer from "node:buffer";
 import { bytesToHex, type Hex } from "viem";
 
 export class BigNumberExtractor extends ValueExtractor<bigint> {

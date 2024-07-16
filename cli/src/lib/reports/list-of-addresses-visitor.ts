@@ -1,5 +1,5 @@
 import type { StorageVisitor } from "./storage-visitor";
-import { bytesToHex, type Hex } from "viem";
+import type { Hex } from "viem";
 import type { StorageValue } from "../storage/values/storage-value";
 import type { ValueField } from "../storage/values/struct-value";
 
@@ -9,19 +9,19 @@ export class ListOfAddressesVisitor implements StorageVisitor<Hex[]> {
   }
 
   visitBigNumber(_n: bigint): Hex[] {
-    throw new Error("Unexpected number")
+    throw new Error("Unexpected number");
   }
 
   visitBuf(_buf: Buffer): Hex[] {
-    throw new Error("Unexpected buffer")
+    throw new Error("Unexpected buffer");
   }
 
   visitBoolean(_val: boolean): Hex[] {
-    throw new Error("Unexpexted boolean")
+    throw new Error("Unexpexted boolean");
   }
 
   visitArray(inner: StorageValue[]): Hex[] {
-    return inner.map((v) => v.accept(this)).flat();
+    return inner.flatMap((v) => v.accept(this));
   }
 
   visitEmpty(): Hex[] {
@@ -29,10 +29,10 @@ export class ListOfAddressesVisitor implements StorageVisitor<Hex[]> {
   }
 
   visitStruct(_fields: ValueField[]): Hex[] {
-    throw new Error("Struct not expected.")
+    throw new Error("Struct not expected.");
   }
 
   visitMapping(_fields: ValueField[]): Hex[] {
-    throw new Error("Mapping not expected.")
+    throw new Error("Mapping not expected.");
   }
 }

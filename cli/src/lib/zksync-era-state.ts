@@ -3,9 +3,7 @@ import {
   bytesToHex,
   bytesToNumber,
   type Hex,
-  hexToBytes,
-  hexToNumber,
-  numberToHex,
+  numberToBytes,
 } from "viem";
 import type { FacetData } from "./upgrade-changes";
 import { Option } from "nochoices";
@@ -23,9 +21,6 @@ import {
   SystemContractList,
   type SystemContractProvider,
 } from "./system-contract-providers";
-import {
-  type FacetCut,
-} from "../schema/rpc";
 import { z } from "zod";
 import { RecordStorageSnapshot } from "./storage/record-storage-snapshot";
 import { ListOfAddressesVisitor } from "./reports/list-of-addresses-visitor";
@@ -68,7 +63,6 @@ export const ADDR_ZKSYNC_FIELDS = [
 export const BYTES32_ZKSYNC_FIELDS = [
   "l2DefaultAccountBytecodeHash",
   "l2BootloaderBytecodeHash",
-  "protocolVersion",
 ] as const;
 
 export const HEX_ZKSYNC_FIELDS = [...ADDR_ZKSYNC_FIELDS, ...BYTES32_ZKSYNC_FIELDS] as const;
@@ -79,6 +73,7 @@ export const NUMERIC_ZKSYNC_FIELDS = [
   "baseTokenGasPriceMultiplierNominator",
   "baseTokenGasPriceMultiplierDenominator",
   "chainId",
+  "protocolVersion",
 ] as const;
 
 export type NumberEraPropNames = (typeof NUMERIC_ZKSYNC_FIELDS)[number];
@@ -110,11 +105,11 @@ export class ZksyncEraState {
     if (!this.data.protocolVersion) {
       throw new MissingRequiredProp("protocolVersion");
     }
-    const bytes = Buffer.from(hexToBytes(this.data.protocolVersion));
+    const bytes = Buffer.from(numberToBytes(this.data.protocolVersion, { size: 32 }));
 
     const subarray = bytes.subarray(0, 28);
     if (bytesToBigInt(subarray) === 0n) {
-      return hexToNumber(this.data.protocolVersion).toString();
+      return this.data.protocolVersion.toString();
     }
 
     const patch = bytesToNumber(bytes.subarray(28, 32));
@@ -198,9 +193,7 @@ export class ZksyncEraState {
       pendingAdmin: await diamond.contractRead(rpc, "getPendingAdmin", zodHex),
       verifierAddress: await diamond.contractRead(rpc, "getVerifier", zodHex),
       bridgeHubAddress: await diamond.contractRead(rpc, "getBridgehub", zodHex),
-      protocolVersion: await diamond
-        .contractRead(rpc, "getProtocolVersion", z.bigint())
-        .then((n) => numberToHex(n, { size: 32 })),
+      protocolVersion: await diamond.contractRead(rpc, "getProtocolVersion", z.bigint()),
       baseTokenBridgeAddress: await diamond.contractRead(rpc, "getBaseTokenBridge", zodHex),
       stateTransitionManagerAddress: await diamond.contractRead(
         rpc,
@@ -249,51 +242,94 @@ export class ZksyncEraState {
     network: Network,
     explorerL1: BlockExplorerClient,
     rpc: RpcClient,
-    _explorerL2: BlockExplorer): Promise<[ZksyncEraState, Hex[]]> {
+    _explorerL2: BlockExplorer
+  ): Promise<[ZksyncEraState, Hex[]]> {
     const addr = DIAMOND_ADDRS[network];
 
-    const memoryMap = await rpc.debugCallTraceStorage(
-      sender,
-      targetAddr,
-      bytesToHex(callDataBuf)
-    )
+    const memoryMap = await rpc.debugCallTraceStorage(sender, targetAddr, bytesToHex(callDataBuf));
 
-    const callTracing = await rpc.debugCallTraceCalls(
-      sender,
-      targetAddr,
-      bytesToHex(callDataBuf)
-    )
+    // const callTracing = await rpc.debugCallTraceCalls(
+    //   sender,
+    //   targetAddr,
+    //   bytesToHex(callDataBuf)
+    // )
 
     const post = Option.fromNullable(memoryMap.result.post[addr])
-      .map(post => post.storage).flatten()
+      .map((post) => post.storage)
+      .flatten();
 
-    const base = new RpcStorageSnapshot(rpc, addr)
-    const storageWithUpgrade = base.apply(new RecordStorageSnapshot(post.unwrapOr({})))
+    const base = new RpcStorageSnapshot(rpc, addr);
+    const storageWithUpgrade = base.apply(new RecordStorageSnapshot(post.unwrapOr({})));
 
-    const facetsAddresses = await extractValue(MAIN_CONTRACT_FIELDS.facetAddresses, storageWithUpgrade, new ListOfAddressesVisitor())
-    const extractedFacetToSelectors = await extractValue(MAIN_CONTRACT_FIELDS.facetToSelectors(facetsAddresses), storageWithUpgrade, new FacetsToSelectorsVisitor())
-    const facetToSelectors = extractedFacetToSelectors as Map<Hex, Hex[]>
+    const facetsAddresses = await extractValue(
+      MAIN_CONTRACT_FIELDS.facetAddresses,
+      storageWithUpgrade,
+      new ListOfAddressesVisitor()
+    );
+    const extractedFacetToSelectors = await extractValue(
+      MAIN_CONTRACT_FIELDS.facetToSelectors(facetsAddresses),
+      storageWithUpgrade,
+      new FacetsToSelectorsVisitor()
+    );
+    const facetToSelectors = extractedFacetToSelectors as Map<Hex, Hex[]>;
 
-    const facets = await Promise.all(facetsAddresses.map(async addr => getFacetData(addr, explorerL1, facetToSelectors)))
-    const systemContracts: L2ContractData[] = []
+    const facets = await Promise.all(
+      facetsAddresses.map(async (addr) => getFacetData(addr, explorerL1, facetToSelectors))
+    );
+    const systemContracts: L2ContractData[] = [];
 
-    await extractValue(MAIN_CONTRACT_FIELDS.verifierAddress, storageWithUpgrade, new AddressExtractor())
+    await extractValue(
+      MAIN_CONTRACT_FIELDS.verifierAddress,
+      storageWithUpgrade,
+      new AddressExtractor()
+    );
     const state = new ZksyncEraState(
       {
-        protocolVersion: await extractValue(MAIN_CONTRACT_FIELDS.protocolVersion, storageWithUpgrade, new BigNumberExtractor())
-          .then(n => numberToHex(n)),
-        verifierAddress: await extractValue(MAIN_CONTRACT_FIELDS.verifierAddress, storageWithUpgrade, new AddressExtractor()),
-        l2DefaultAccountBytecodeHash: await extractValue(MAIN_CONTRACT_FIELDS.l2DefaultAccountBytecodeHash, storageWithUpgrade, new BlobExtractor()),
-        l2BootloaderBytecodeHash: await extractValue(MAIN_CONTRACT_FIELDS.l2BootloaderBytecodeHash, storageWithUpgrade, new BlobExtractor()),
-        chainId: await extractValue(MAIN_CONTRACT_FIELDS.chainId, storageWithUpgrade, new BigNumberExtractor()),
-        bridgeHubAddress:
-          await extractValue(MAIN_CONTRACT_FIELDS.bridgehubAddress, storageWithUpgrade, new AddressExtractor()),
-        stateTransitionManagerAddress:
-          await extractValue(MAIN_CONTRACT_FIELDS.stateTransitionManager, storageWithUpgrade, new AddressExtractor()),
-        baseTokenBridgeAddress:
-          await extractValue(MAIN_CONTRACT_FIELDS.baseTokenBridgeAddress, storageWithUpgrade, new AddressExtractor()),
-        admin:
-          await extractValue(MAIN_CONTRACT_FIELDS.adminAddress, storageWithUpgrade, new AddressExtractor()),
+        protocolVersion: await extractValue(
+          MAIN_CONTRACT_FIELDS.protocolVersion,
+          storageWithUpgrade,
+          new BigNumberExtractor()
+        ),
+        verifierAddress: await extractValue(
+          MAIN_CONTRACT_FIELDS.verifierAddress,
+          storageWithUpgrade,
+          new AddressExtractor()
+        ),
+        l2DefaultAccountBytecodeHash: await extractValue(
+          MAIN_CONTRACT_FIELDS.l2DefaultAccountBytecodeHash,
+          storageWithUpgrade,
+          new BlobExtractor()
+        ),
+        l2BootloaderBytecodeHash: await extractValue(
+          MAIN_CONTRACT_FIELDS.l2BootloaderBytecodeHash,
+          storageWithUpgrade,
+          new BlobExtractor()
+        ),
+        chainId: await extractValue(
+          MAIN_CONTRACT_FIELDS.chainId,
+          storageWithUpgrade,
+          new BigNumberExtractor()
+        ),
+        bridgeHubAddress: await extractValue(
+          MAIN_CONTRACT_FIELDS.bridgehubAddress,
+          storageWithUpgrade,
+          new AddressExtractor()
+        ),
+        stateTransitionManagerAddress: await extractValue(
+          MAIN_CONTRACT_FIELDS.stateTransitionManager,
+          storageWithUpgrade,
+          new AddressExtractor()
+        ),
+        baseTokenBridgeAddress: await extractValue(
+          MAIN_CONTRACT_FIELDS.baseTokenBridgeAddress,
+          storageWithUpgrade,
+          new AddressExtractor()
+        ),
+        admin: await extractValue(
+          MAIN_CONTRACT_FIELDS.adminAddress,
+          storageWithUpgrade,
+          new AddressExtractor()
+        ),
       },
       facets,
       new SystemContractList(systemContracts)
@@ -306,45 +342,53 @@ export class ZksyncEraState {
   }
 }
 
-const _SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
-  "0x0000000000000000000000000000000000000000": "EmptyContract",
-  "0x0000000000000000000000000000000000000001": "Ecrecover",
-  "0x0000000000000000000000000000000000000002": "SHA256",
-  "0x0000000000000000000000000000000000000006": "EcAdd",
-  "0x0000000000000000000000000000000000000007": "EcMul",
-  "0x0000000000000000000000000000000000000008": "EcPairing",
-  "0x0000000000000000000000000000000000008001": "EmptyContract",
-  "0x0000000000000000000000000000000000008002": "AccountCodeStorage",
-  "0x0000000000000000000000000000000000008003": "NonceHolder",
-  "0x0000000000000000000000000000000000008004": "KnownCodesStorage",
-  "0x0000000000000000000000000000000000008005": "ImmutableSimulator",
-  "0x0000000000000000000000000000000000008006": "ContractDeployer",
-  "0x0000000000000000000000000000000000008008": "L1Messenger",
-  "0x0000000000000000000000000000000000008009": "MsgValueSimulator",
-  "0x000000000000000000000000000000000000800a": "L2BaseToken",
-  "0x000000000000000000000000000000000000800b": "SystemContext",
-  "0x000000000000000000000000000000000000800c": "BootloaderUtilities",
-  "0x000000000000000000000000000000000000800d": "EventWriter",
-  "0x000000000000000000000000000000000000800e": "Compressor",
-  "0x000000000000000000000000000000000000800f": "ComplexUpgrader",
-  "0x0000000000000000000000000000000000008010": "Keccak256",
-  "0x0000000000000000000000000000000000008012": "CodeOracle",
-  "0x0000000000000000000000000000000000000100": "P256Verify",
-  "0x0000000000000000000000000000000000008011": "PubdataChunkPublisher",
-  "0x0000000000000000000000000000000000010000": "Create2Factory",
-};
+// const _SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
+//   "0x0000000000000000000000000000000000000000": "EmptyContract",
+//   "0x0000000000000000000000000000000000000001": "Ecrecover",
+//   "0x0000000000000000000000000000000000000002": "SHA256",
+//   "0x0000000000000000000000000000000000000006": "EcAdd",
+//   "0x0000000000000000000000000000000000000007": "EcMul",
+//   "0x0000000000000000000000000000000000000008": "EcPairing",
+//   "0x0000000000000000000000000000000000008001": "EmptyContract",
+//   "0x0000000000000000000000000000000000008002": "AccountCodeStorage",
+//   "0x0000000000000000000000000000000000008003": "NonceHolder",
+//   "0x0000000000000000000000000000000000008004": "KnownCodesStorage",
+//   "0x0000000000000000000000000000000000008005": "ImmutableSimulator",
+//   "0x0000000000000000000000000000000000008006": "ContractDeployer",
+//   "0x0000000000000000000000000000000000008008": "L1Messenger",
+//   "0x0000000000000000000000000000000000008009": "MsgValueSimulator",
+//   "0x000000000000000000000000000000000000800a": "L2BaseToken",
+//   "0x000000000000000000000000000000000000800b": "SystemContext",
+//   "0x000000000000000000000000000000000000800c": "BootloaderUtilities",
+//   "0x000000000000000000000000000000000000800d": "EventWriter",
+//   "0x000000000000000000000000000000000000800e": "Compressor",
+//   "0x000000000000000000000000000000000000800f": "ComplexUpgrader",
+//   "0x0000000000000000000000000000000000008010": "Keccak256",
+//   "0x0000000000000000000000000000000000008012": "CodeOracle",
+//   "0x0000000000000000000000000000000000000100": "P256Verify",
+//   "0x0000000000000000000000000000000000008011": "PubdataChunkPublisher",
+//   "0x0000000000000000000000000000000000010000": "Create2Factory",
+// };
 
-async function extractValue<T>(field: ContractField, snapshot: StorageSnapshot, visitor: StorageVisitor<T>) {
-  const value = await field.extract(snapshot)
-  const maybeRes = value.map(v => v.accept(visitor))
-  return maybeRes.expect(new Error(`"${field.name}" should be present`))
+async function extractValue<T>(
+  field: ContractField,
+  snapshot: StorageSnapshot,
+  visitor: StorageVisitor<T>
+) {
+  const value = await field.extract(snapshot);
+  const maybeRes = value.map((v) => v.accept(visitor));
+  return maybeRes.expect(new Error(`"${field.name}" should be present`));
 }
 
-async function getFacetData(address: Hex, explorer: BlockExplorer, selectorMap: Map<Hex, Hex[]>): Promise<FacetData> {
+async function getFacetData(
+  address: Hex,
+  explorer: BlockExplorer,
+  selectorMap: Map<Hex, Hex[]>
+): Promise<FacetData> {
   const contract = await explorer.getSourceCode(address);
-  const selectors = selectorMap.get(address)
+  const selectors = selectorMap.get(address);
   if (!selectors) {
-    throw new Error("selectors should be present")
+    throw new Error("selectors should be present");
   }
   return {
     name: contract.name,
@@ -353,17 +397,17 @@ async function getFacetData(address: Hex, explorer: BlockExplorer, selectorMap: 
   };
 }
 
-async function _reduceFacetCuts(cuts: FacetCut[], explorer: BlockExplorer): Promise<FacetData[]> {
-  const selected = cuts.filter((cut) => cut.action === 0);
-
-  return await Promise.all(
-    selected.map(async (cut) => {
-      const contract = await explorer.getSourceCode(cut.facet);
-      return {
-        name: contract.name,
-        address: cut.facet,
-        selectors: cut.selectors,
-      };
-    })
-  );
-}
+// async function _reduceFacetCuts(cuts: FacetCut[], explorer: BlockExplorer): Promise<FacetData[]> {
+//   const selected = cuts.filter((cut) => cut.action === 0);
+//
+//   return await Promise.all(
+//     selected.map(async (cut) => {
+//       const contract = await explorer.getSourceCode(cut.facet);
+//       return {
+//         name: contract.name,
+//         address: cut.facet,
+//         selectors: cut.selectors,
+//       };
+//     })
+//   );
+// }

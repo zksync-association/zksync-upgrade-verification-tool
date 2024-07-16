@@ -177,20 +177,20 @@ export class RpcClient {
     return block.number;
   }
 
-  async debugCallTraceCalls(from: Hex, to: Hex, callData: Hex) {
-    const data = await this.rawCall("debug_traceCall", [
-      {
-        from,
-        to,
-        data: callData,
-      },
-      "latest",
-      {
-        tracer: "callTracer",
-        tracerConfig: {
-          diffMode: true,
-        },
-      },
-    ]);
-  }
+  // async debugCallTraceCalls(from: Hex, to: Hex, callData: Hex) {
+  //   const data = await this.rawCall("debug_traceCall", [
+  //     {
+  //       from,
+  //       to,
+  //       data: callData,
+  //     },
+  //     "latest",
+  //     {
+  //       tracer: "callTracer",
+  //       tracerConfig: {
+  //         diffMode: true,
+  //       },
+  //     },
+  //   ]);
+  // }
 }

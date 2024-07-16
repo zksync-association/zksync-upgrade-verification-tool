@@ -2,7 +2,8 @@ import {
   type Abi,
   type AbiEvent,
   type AbiFunction,
-  decodeFunctionData, encodeFunctionData,
+  decodeFunctionData,
+  encodeFunctionData,
   type Hex,
   toEventSelector,
   toFunctionSelector,
@@ -62,6 +63,6 @@ export class ContractAbi {
   }
 
   hasFunction(name: string): boolean {
-    return this.raw.some(t => t.type === "function" && t.name === name);
+    return this.raw.some((t) => t.type === "function" && t.name === name);
   }
 }

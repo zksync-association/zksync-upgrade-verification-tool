@@ -58,7 +58,6 @@ const KNOWN_ERRORS = [
 
 export function printError(e: Error, term: Terminal): void {
   const isKnown = KNOWN_ERRORS.some((kind) => e instanceof kind);
-
   if (isKnown) {
     term.errLine("");
     term.errLine(`> ${e.message}`);
