@@ -5,7 +5,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
-import { removeFunctionParams } from "@/routes/app/proposals.$id/common-tables";
+import { removeFunctionParams } from "@/routes/app/proposals/$id/common-tables";
 import { cn } from "@/utils/cn";
 import type { FacetDataReportDiff } from "validate-cli";
 

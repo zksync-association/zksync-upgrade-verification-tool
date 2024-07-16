@@ -1,6 +1,6 @@
 import { createOrIgnoreProposal } from "@/.server/db/dto/proposals";
 import { upgradeHandlerAbi } from "@/.server/service/contract-abis";
-import { PROPOSAL_STATES } from "@/utils/proposal-states";
+import type { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { PROTOCOL_UPGRADE_HANDLER_RAW_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 import { RpcClient } from "validate-cli";
@@ -15,9 +15,10 @@ const rpc = new RpcClient(env.L1_RPC_URL_FOR_UPGRADES);
 
 export type Proposal = {
   id: Hex;
+  state: PROPOSAL_STATES;
 };
 
-export async function getPendingProposals(): Promise<Proposal[]> {
+export async function getProposals(): Promise<Proposal[]> {
   const currentBlock = await rpc.getLatestBlockNumber();
   const currentHeight = hexToBigInt(currentBlock);
   const maxUpgradeLiftimeInBlocks = BigInt(40 * 24 * 360); // conservative estimation of latest block with a valid upgrade
@@ -26,12 +27,14 @@ export async function getPendingProposals(): Promise<Proposal[]> {
   const abi = upgradeHandlerAbi;
 
   //FIXME: remove
-  await new Promise((resolve) => setTimeout(resolve, 5)); // Avoid anvil crushing for mysterious reasons
+  if (env.NODE_ENV === "development") {
+    await new Promise((resolve) => setTimeout(resolve, 5)); // Avoid anvil crushing for mysterious reasons
+  }
   const logs = await rpc.getLogs(upgradeHandlerAddress, numberToHex(from), "latest", [
     abi.eventIdFor("UpgradeStarted"),
   ]);
 
-  const nonResolvedUpgrades: Proposal[] = [];
+  const proposals: Proposal[] = [];
 
   for (const log of logs) {
     const [signature, id] = log.topics;
@@ -47,19 +50,17 @@ export async function getPendingProposals(): Promise<Proposal[]> {
       topics: [signature, id],
     });
 
-    if (stateNumber !== PROPOSAL_STATES.Expired && stateNumber !== PROPOSAL_STATES.Done) {
-      nonResolvedUpgrades.push({ id });
-      await createOrIgnoreProposal({
-        externalId: id,
-        calldata: log.data,
-        proposedOn: new Date(hexToNumber(log.blockTimestamp) * 1000),
-        executor: proposal.args._proposal.executor,
-        transactionHash: log.transactionHash,
-      });
-    }
+    proposals.push({ id, state: stateNumber });
+    await createOrIgnoreProposal({
+      externalId: id,
+      calldata: log.data,
+      proposedOn: new Date(hexToNumber(log.blockTimestamp) * 1000),
+      executor: proposal.args._proposal.executor,
+      transactionHash: log.transactionHash,
+    });
   }
 
-  return nonResolvedUpgrades;
+  return proposals;
 }
 
 export type ProposalData = {

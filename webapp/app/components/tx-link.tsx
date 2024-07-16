@@ -1,4 +1,4 @@
-import { displayBytes32 } from "@/routes/app/proposals.$id/common-tables";
+import { displayBytes32 } from "@/routes/app/proposals/$id/common-tables";
 import { getTransactionUrl } from "@/utils/etherscan";
 import { SquareArrowOutUpRight } from "lucide-react";
 import type { Hex } from "viem";

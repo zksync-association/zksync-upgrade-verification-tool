@@ -10,7 +10,7 @@ import {
   displayAddress,
   displayBytes32,
   displayEmpty,
-} from "@/routes/app/proposals.$id/common-tables";
+} from "@/routes/app/proposals/$id/common-tables";
 import type { SystemContractUpgrade } from "validate-cli";
 
 export default function SystemContractChangesTable({
