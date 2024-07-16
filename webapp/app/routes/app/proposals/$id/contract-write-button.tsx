@@ -31,7 +31,7 @@ export default function ContractWriteButton({
   abiName,
 }: BroadcastTxButtonProps) {
   const { address } = useAccount();
-  const { isPending, writeContract, status } = useWriteContract();
+  const { isPending, writeContract } = useWriteContract();
   const navigate = useNavigate();
 
   const thresholdReached = signatures.length >= threshold;

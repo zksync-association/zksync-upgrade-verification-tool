@@ -25,7 +25,7 @@ import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { defer, json } from "@remix-run/node";
-import { Await, useLoaderData, useNavigate } from "@remix-run/react";
+import { Await, useLoaderData } from "@remix-run/react";
 import { Suspense } from "react";
 import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
@@ -140,7 +140,6 @@ const NECESSARY_LEGAL_VETO_SIGNATURES = 2;
 
 export default function Proposals() {
   const { user, asyncData, proposalId } = useLoaderData<typeof loader>();
-  const navigate = useNavigate();
 
   return (
     <div className="flex flex-1 flex-col space-y-4">
@@ -348,6 +347,7 @@ export default function Proposals() {
                         Execute legal veto extension
                       </ContractWriteButton>
                       <ExecuteUpgradeButton
+                        proposalId={proposalId}
                         target={addresses.upgradeHandler}
                         proposalCalldata={proposal.raw}
                         disabled={!executeProposalEnabled}
