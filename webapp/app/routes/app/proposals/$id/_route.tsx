@@ -5,28 +5,27 @@ import { councilAddress, guardiansAddress } from "@/.server/service/authorized-u
 import { getProposalData, getProposalStatus } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
-import { Button } from "@/components/ui/button";
+import TxLink from "@/components/tx-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { displayBytes32 } from "@/routes/app/proposals.$id/common-tables";
-import ContractWriteButton from "@/routes/app/proposals.$id/contract-write-button";
-import FacetChangesTable from "@/routes/app/proposals.$id/facet-changes-table";
-import FieldChangesTable from "@/routes/app/proposals.$id/field-changes-table";
-import FieldStorageChangesTable from "@/routes/app/proposals.$id/field-storage-changes-table";
-import SignButton from "@/routes/app/proposals.$id/sign-button";
-import SystemContractChangesTable from "@/routes/app/proposals.$id/system-contract-changes-table";
+import ContractWriteButton from "@/routes/app/proposals/$id/contract-write-button";
+import ExecuteUpgradeButton from "@/routes/app/proposals/$id/execute-upgrade-button";
+import FacetChangesTable from "@/routes/app/proposals/$id/facet-changes-table";
+import FieldChangesTable from "@/routes/app/proposals/$id/field-changes-table";
+import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-changes-table";
+import SignButton from "@/routes/app/proposals/$id/sign-button";
+import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { cn } from "@/utils/cn";
 import { compareHexValues } from "@/utils/compare-hex-values";
-import { getTransactionUrl } from "@/utils/etherscan";
 import { badRequest, notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
+import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { defer, json } from "@remix-run/node";
-import { Await, useLoaderData, useNavigate } from "@remix-run/react";
-import { ArrowLeft, SquareArrowOutUpRight } from "lucide-react";
+import { Await, useLoaderData } from "@remix-run/react";
 import { Suspense } from "react";
 import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
@@ -57,6 +56,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       getSignaturesByExternalProposalId(params.data.id),
       getProposalData(params.data.id),
     ]);
+    const upgradeHandler = env.UPGRADE_HANDLER_ADDRESS;
 
     return {
       proposal: {
@@ -70,6 +70,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         approvedByCouncil: proposalData.securityCouncilApprovalTimestamp !== 0,
         guardiansApproval: proposalData.guardiansApproval,
         guardiansExtendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
+        raw: proposal.calldata,
         signatures: {
           extendLegalVetoPeriod: signatures
             .filter((signature) => signature.action === "ExtendLegalVetoPeriod")
@@ -89,7 +90,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         fieldChanges: checkReport.fieldChanges,
         fieldStorageChanges: storageChangeReport,
       },
-      addresses: { guardians, council },
+      addresses: { guardians, council, upgradeHandler },
       userSignedProposal: signatures
         .filter((s) =>
           user.role === "guardian"
@@ -139,22 +140,9 @@ const NECESSARY_LEGAL_VETO_SIGNATURES = 2;
 
 export default function Proposals() {
   const { user, asyncData, proposalId } = useLoaderData<typeof loader>();
-  const navigate = useNavigate();
 
   return (
-    <div className="mt-10 flex flex-1 flex-col space-y-4">
-      <div className="flex items-center pl-2">
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="mr-2 hover:bg-transparent"
-        >
-          <ArrowLeft />
-        </Button>
-        <h2 className="font-semibold">Proposal {displayBytes32(proposalId)}</h2>
-      </div>
-
+    <div className="flex flex-1 flex-col space-y-4">
       <Suspense
         fallback={
           <div className="flex flex-1 flex-col items-center justify-center space-y-6">
@@ -240,15 +228,7 @@ export default function Proposals() {
                         </div>
                         <div className="flex justify-between">
                           <span>Transaction hash:</span>
-                          <a
-                            href={getTransactionUrl(proposal.transactionHash as Hex)}
-                            className="flex w-1/2 items-center justify-end break-words underline"
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            <span>{displayBytes32(proposal.transactionHash)}</span>
-                            <SquareArrowOutUpRight className="ml-1" width={12} height={12} />
-                          </a>
+                          <TxLink txid={proposal.transactionHash} />
                         </div>
                       </div>
                     </CardContent>
@@ -366,7 +346,14 @@ export default function Proposals() {
                       >
                         Execute legal veto extension
                       </ContractWriteButton>
-                      <Button disabled={!executeProposalEnabled}>Execute upgrade</Button>
+                      <ExecuteUpgradeButton
+                        proposalId={proposalId}
+                        target={addresses.upgradeHandler}
+                        proposalCalldata={proposal.raw}
+                        disabled={!executeProposalEnabled}
+                      >
+                        Execute upgrade
+                      </ExecuteUpgradeButton>
                     </CardContent>
                   </Card>
                 </div>

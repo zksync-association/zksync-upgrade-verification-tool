@@ -10,8 +10,8 @@ import {
   displayAddress,
   displayBytes32,
   displayEmpty,
-} from "@/routes/app/proposals.$id/common-tables";
-import type { SystemContractUpgrade } from "validate-cli/src/lib";
+} from "@/routes/app/proposals/$id/common-tables";
+import type { SystemContractUpgrade } from "validate-cli";
 
 export default function SystemContractChangesTable({
   className,
@@ -27,7 +27,7 @@ export default function SystemContractChangesTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((diff, i) => {
+        {data.map((diff) => {
           const address = displayAddress(diff.address);
           const current = diff.currentBytecodeHash
             ? displayBytes32(diff.currentBytecodeHash)

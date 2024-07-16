@@ -5,14 +5,11 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
-import { removeFunctionParams } from "@/routes/app/proposals.$id/common-tables";
+import { removeFunctionParams } from "@/routes/app/proposals/$id/common-tables";
 import { cn } from "@/utils/cn";
-import type { FacetDataReportDiff } from "validate-cli/src/lib";
+import type { FacetDataReportDiff } from "validate-cli";
 
-export default function FacetChangesTable({
-  className,
-  data,
-}: { className?: string; data: FacetDataReportDiff[] }) {
+export default function FacetChangesTable({ data }: { data: FacetDataReportDiff[] }) {
   return (
     <div className="flex flex-col space-y-2">
       {data.map((diff, i) => (
@@ -41,7 +38,7 @@ export default function FacetChangesTable({
                   REMOVED FUNCTIONS
                 </AccordionTrigger>
                 <AccordionContent>
-                  {diff.removedFunctions.map((fn, i) => (
+                  {diff.removedFunctions.map((fn) => (
                     <div key={fn} className="mt-4 rounded-2xl border p-4">
                       {removeFunctionParams(fn)}
                     </div>
@@ -59,7 +56,7 @@ export default function FacetChangesTable({
                   ADDED FUNCTIONS
                 </AccordionTrigger>
                 <AccordionContent>
-                  {diff.addedFunctions.map((fn, i) => (
+                  {diff.addedFunctions.map((fn) => (
                     <div key={fn} className="mt-4 rounded-2xl border p-4">
                       {removeFunctionParams(fn)}
                     </div>

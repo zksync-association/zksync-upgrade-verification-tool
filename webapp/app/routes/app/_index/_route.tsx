@@ -1,28 +1,60 @@
-import { getPendingProposals } from "@/.server/service/proposals";
+import { type Proposal, getProposals } from "@/.server/service/proposals";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { Link, json, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { $path } from "remix-routes";
 
+const isProposalActive = (p: Proposal) =>
+  p.state !== PROPOSAL_STATES.Expired && p.state !== PROPOSAL_STATES.Done;
+const isProposalInactive = (p: Proposal) => !isProposalActive(p);
+
 export async function loader() {
+  const proposals = await getProposals();
   return json({
-    proposals: await getPendingProposals(),
+    activeProposals: proposals.filter(isProposalActive),
+    inactiveProposals: proposals.filter(isProposalInactive),
   });
 }
 
 export default function Index() {
-  const { proposals } = useLoaderData<typeof loader>();
+  const { activeProposals, inactiveProposals } = useLoaderData<typeof loader>();
 
   return (
-    <div className="mt-10">
+    <div className="mt-10 space-y-4">
       <Card className="pb-10">
         <CardHeader>
           <CardTitle>Active Proposals</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col space-y-4">
-            {proposals.map((proposal) => (
+            {activeProposals.map((proposal) => (
+              <Link
+                key={proposal.id}
+                className="flex"
+                to={$path("/app/proposals/:id", { id: proposal.id })}
+              >
+                <Button className="flex flex-1 justify-between pr-4" variant="outline">
+                  <span />
+                  <span>{proposal.id}</span>
+                  <ArrowRight />
+                </Button>
+              </Link>
+            ))}
+            {activeProposals.length === 0 && (
+              <div className="text-center text-gray-500">No active proposals found.</div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="pb-10">
+        <CardHeader>
+          <CardTitle>Inactive Proposals</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col space-y-4">
+            {inactiveProposals.map((proposal) => (
               <Link
                 key={proposal.id}
                 className="flex"
@@ -36,6 +68,9 @@ export default function Index() {
               </Link>
             ))}
           </div>
+          {inactiveProposals.length === 0 && (
+            <div className="text-center text-gray-500">No inactive proposals found.</div>
+          )}
         </CardContent>
       </Card>
     </div>

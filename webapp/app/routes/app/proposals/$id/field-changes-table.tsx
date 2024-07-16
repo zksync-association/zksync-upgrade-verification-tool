@@ -10,9 +10,9 @@ import {
   displayAddress,
   displayBytes32,
   displayEmpty,
-} from "@/routes/app/proposals.$id/common-tables";
+} from "@/routes/app/proposals/$id/common-tables";
 import { cn } from "@/utils/cn";
-import type { ContractFieldChange } from "validate-cli/src/lib";
+import type { ContractFieldChange } from "validate-cli";
 
 export default function FieldChangesTable({
   className,
@@ -31,7 +31,7 @@ export default function FieldChangesTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((diff, i) => {
+        {data.map((diff) => {
           const value = displayValue(diff);
           const current = value.current;
           const proposed = value.proposed;
