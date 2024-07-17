@@ -2,10 +2,10 @@ import { bytesToBigInt, bytesToHex, bytesToNumber, type Hex, numberToBytes } fro
 import type { FacetData } from "./upgrade-changes";
 import { Option } from "nochoices";
 import { MissingRequiredProp } from "./errors";
-import { DIAMOND_ADDRS, type Network } from "./constants";
+import { DIAMOND_ADDRS, type Network, UPGRADE_FN_SELECTOR } from "./constants";
 import { Diamond } from "./diamond";
 import { type BlockExplorer, BlockExplorerClient } from "./block-explorer-client";
-import { RpcClient } from "./rpc-client";
+import { type CallsTrace, RpcClient } from "./rpc-client";
 import { zodHex } from "../schema/zod-optionals";
 import { RpcStorageSnapshot } from "./storage/rpc-storage-snapshot";
 import { StringStorageVisitor } from "./reports/string-storage-visitor";
@@ -23,6 +23,7 @@ import { AddressExtractor, BigNumberExtractor, BlobExtractor } from "./reports/e
 import type { ContractField } from "./storage/contractField";
 import type { StorageSnapshot } from "./storage/storage-snapshot";
 import type { StorageVisitor } from "./reports/storage-visitor";
+import { l2UpgradeSchema, upgradeCallDataSchema } from "../schema/rpc";
 
 export type L2ContractData = {
   address: Hex;
@@ -234,9 +235,9 @@ export class ZksyncEraState {
     targetAddr: Hex,
     callDataBuf: Buffer,
     network: Network,
-    explorerL1: BlockExplorerClient,
+    l1Explorer: BlockExplorerClient,
     rpc: RpcClient,
-    _explorerL2: BlockExplorer
+    l2Explorer: BlockExplorer
   ): Promise<[ZksyncEraState, Hex[]]> {
     const addr = DIAMOND_ADDRS[network];
 
@@ -262,15 +263,23 @@ export class ZksyncEraState {
     const facetToSelectors = extractedFacetToSelectors as Map<Hex, Hex[]>;
 
     const facets = await Promise.all(
-      facetsAddresses.map(async (addr) => getFacetData(addr, explorerL1, facetToSelectors))
+      facetsAddresses.map(async (addr) => getFacetData(addr, l1Explorer, facetToSelectors))
     );
-    const systemContracts: L2ContractData[] = [];
 
+    const systemContracts: L2ContractData[] = await getSystemContracts(
+      rpc,
+      sender,
+      addr,
+      bytesToHex(callDataBuf),
+      l1Explorer,
+      l2Explorer
+    );
     await extractValue(
       MAIN_CONTRACT_FIELDS.verifierAddress,
       storageWithUpgrade,
       new AddressExtractor()
     );
+
     const state = new ZksyncEraState(
       {
         protocolVersion: await extractValue(
@@ -357,30 +366,82 @@ async function getFacetData(
   };
 }
 
-// const _SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
-//   "0x0000000000000000000000000000000000000000": "EmptyContract",
-//   "0x0000000000000000000000000000000000000001": "Ecrecover",
-//   "0x0000000000000000000000000000000000000002": "SHA256",
-//   "0x0000000000000000000000000000000000000006": "EcAdd",
-//   "0x0000000000000000000000000000000000000007": "EcMul",
-//   "0x0000000000000000000000000000000000000008": "EcPairing",
-//   "0x0000000000000000000000000000000000008001": "EmptyContract",
-//   "0x0000000000000000000000000000000000008002": "AccountCodeStorage",
-//   "0x0000000000000000000000000000000000008003": "NonceHolder",
-//   "0x0000000000000000000000000000000000008004": "KnownCodesStorage",
-//   "0x0000000000000000000000000000000000008005": "ImmutableSimulator",
-//   "0x0000000000000000000000000000000000008006": "ContractDeployer",
-//   "0x0000000000000000000000000000000000008008": "L1Messenger",
-//   "0x0000000000000000000000000000000000008009": "MsgValueSimulator",
-//   "0x000000000000000000000000000000000000800a": "L2BaseToken",
-//   "0x000000000000000000000000000000000000800b": "SystemContext",
-//   "0x000000000000000000000000000000000000800c": "BootloaderUtilities",
-//   "0x000000000000000000000000000000000000800d": "EventWriter",
-//   "0x000000000000000000000000000000000000800e": "Compressor",
-//   "0x000000000000000000000000000000000000800f": "ComplexUpgrader",
-//   "0x0000000000000000000000000000000000008010": "Keccak256",
-//   "0x0000000000000000000000000000000000008012": "CodeOracle",
-//   "0x0000000000000000000000000000000000000100": "P256Verify",
-//   "0x0000000000000000000000000000000000008011": "PubdataChunkPublisher",
-//   "0x0000000000000000000000000000000000010000": "Create2Factory",
-// };
+function findCall(calls: CallsTrace, selector: Hex): Option<CallsTrace> {
+  if (calls.input.startsWith(selector)) {
+    return Option.Some(calls);
+  }
+
+  if (!calls.calls) return Option.None();
+
+  return calls.calls.reduce(
+    (partial, nextCall) => partial.or(findCall(nextCall, selector)),
+    Option.None<CallsTrace>()
+  );
+}
+
+async function getSystemContracts(
+  rpc: RpcClient,
+  from: Hex,
+  to: Hex,
+  callData: Hex,
+  l1Explorer: BlockExplorer,
+  l2Explorer: BlockExplorer
+): Promise<L2ContractData[]> {
+  const calls = await rpc.debugCallTraceCalls(from, to, callData);
+
+  const desiredCall = findCall(calls, UPGRADE_FN_SELECTOR);
+  if (desiredCall.isNone()) {
+    return [];
+  }
+  const { input: upgradeCalldata, to: upgradeAddr } = desiredCall.unwrap();
+
+  const upgradeAbi = await l1Explorer.getAbi(upgradeAddr);
+  const decodedUpgrade = upgradeAbi.decodeCallData(upgradeCalldata, upgradeCallDataSchema);
+
+  const hex = decodedUpgrade.args[0].l2ProtocolUpgradeTx.to.toString(16);
+  const deployAddr = `0x${"0".repeat(40 - hex.length)}${hex}`;
+  const deploySysContractsAbi = await l2Explorer.getAbi(deployAddr);
+  const decodedL2 = deploySysContractsAbi.decodeCallData(
+    decodedUpgrade.args[0].l2ProtocolUpgradeTx.data,
+    l2UpgradeSchema
+  );
+
+  return decodedL2.args[0].map((contract) => {
+    const name = Option.fromNullable(
+      SYSTEM_CONTRACT_NAMES[contract.newAddress.toLowerCase() as Hex]
+    );
+    return {
+      name: name.unwrapOr("New contract."),
+      address: contract.newAddress,
+      bytecodeHash: contract.bytecodeHash,
+    };
+  });
+}
+
+const SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
+  "0x0000000000000000000000000000000000000000": "EmptyContract",
+  "0x0000000000000000000000000000000000000001": "Ecrecover",
+  "0x0000000000000000000000000000000000000002": "SHA256",
+  "0x0000000000000000000000000000000000000006": "EcAdd",
+  "0x0000000000000000000000000000000000000007": "EcMul",
+  "0x0000000000000000000000000000000000000008": "EcPairing",
+  "0x0000000000000000000000000000000000008001": "EmptyContract",
+  "0x0000000000000000000000000000000000008002": "AccountCodeStorage",
+  "0x0000000000000000000000000000000000008003": "NonceHolder",
+  "0x0000000000000000000000000000000000008004": "KnownCodesStorage",
+  "0x0000000000000000000000000000000000008005": "ImmutableSimulator",
+  "0x0000000000000000000000000000000000008006": "ContractDeployer",
+  "0x0000000000000000000000000000000000008008": "L1Messenger",
+  "0x0000000000000000000000000000000000008009": "MsgValueSimulator",
+  "0x000000000000000000000000000000000000800a": "L2BaseToken",
+  "0x000000000000000000000000000000000000800b": "SystemContext",
+  "0x000000000000000000000000000000000000800c": "BootloaderUtilities",
+  "0x000000000000000000000000000000000000800d": "EventWriter",
+  "0x000000000000000000000000000000000000800e": "Compressor",
+  "0x000000000000000000000000000000000000800f": "ComplexUpgrader",
+  "0x0000000000000000000000000000000000008010": "Keccak256",
+  "0x0000000000000000000000000000000000008012": "CodeOracle",
+  "0x0000000000000000000000000000000000000100": "P256Verify",
+  "0x0000000000000000000000000000000000008011": "PubdataChunkPublisher",
+  "0x0000000000000000000000000000000000010000": "Create2Factory",
+};

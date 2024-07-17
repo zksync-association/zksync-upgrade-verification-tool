@@ -81,6 +81,20 @@ export const contractEventSchema = z.object({
   blockTimestamp: zodHex,
 });
 
+const baseCallTracerSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  input: z.string(),
+});
+
+export type CallTrace = z.infer<typeof baseCallTracerSchema> & {
+  calls?: CallTrace[];
+};
+
+export const callTracerSchema: z.ZodType<CallTrace> = baseCallTracerSchema.extend({
+  calls: z.lazy(() => callTracerSchema.array().optional()),
+});
+
 export type MemoryDiffRaw = z.infer<typeof memoryDiffParser>;
 export type FacetCut = z.infer<typeof facetCutSchema>;
 export type ContractEvent = z.infer<typeof contractEventSchema>;

@@ -539,16 +539,23 @@ describe("NewZkSyncStateDiff", () => {
   });
 
   describe("#createFromCallData", () => {
-    it.skip("works", async () => {
+    it("works", async (t) => {
+      const etherscanKey = process.env.ETHERSCAN_API_KEY;
+      const rpcUrl = process.env.RPC_URL;
+
+      if (!etherscanKey || !rpcUrl) {
+        return t.skip();
+      }
+
       // This is a very specific calldata made by hand
       const hexBuff = await fs.readFile(
         path.join(import.meta.dirname, "data", "upgrade-calldata.hex")
       );
       const buff = Buffer.from(hexBuff.toString(), "hex");
 
-      const explorerL1 = BlockExplorerClient.forL1("", "mainnet");
+      const explorerL1 = BlockExplorerClient.forL1(etherscanKey, "mainnet");
       const explorerL2 = BlockExplorerClient.forL2("mainnet");
-      const rpc = new RpcClient("");
+      const rpc = new RpcClient(rpcUrl);
 
       const [state] = await ZksyncEraState.fromCalldata(
         "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C",
@@ -870,8 +877,8 @@ describe("NewZkSyncStateDiff", () => {
       ];
 
       for (const { addr, name } of l2Contracts) {
-        const empty1 = await state.dataForL2Address(addr as Hex);
-        expect(empty1.unwrap().name).toMatch(new RegExp(name));
+        const contract = await state.dataForL2Address(addr as Hex);
+        expect(contract.unwrap().name).toMatch(new RegExp(name));
       }
     });
   });
