@@ -1,9 +1,10 @@
-name: WebApp
+name: Build / Test CLI & WebApp
 on:
   push:
     branches:
       - "**"
 env:
+  FORCE_COLOR: 1
   ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
   NODE_OPTIONS: "--no-deprecation"
   ALLOW_INDEXING: false
@@ -17,11 +18,32 @@ env:
   UPGRADE_HANDLER_ADDRESS: 0xd88ce7170eac2aad76acc74bda448c512818a2d4
 
 jobs:
-  build:
+  cli-build-and-test:
     runs-on: ubuntu-latest
     env:
       FORCE_COLOR: 1
 
+    defaults:
+      run:
+        working-directory: ./cli 
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: pnpm install
+      - run: pnpm test:ci
+      - name: Coverage
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          lcov-file: ./cli/coverage/lcov.info
+          github-token: ${{ github.token }}
+  build:
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./webapp
@@ -42,4 +64,7 @@ jobs:
 
       - name: Build WebApp
         run: pnpm build
+
+        
+
 
