@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getProposalByExternalId, updateProposal } from "@/.server/db/dto/proposals";
 import { l1Explorer, l1Rpc, l2Explorer } from "@/.server/service/clients";
+import { ALL_ABIS } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 import {
   type BlockExplorerClient,
@@ -18,8 +19,7 @@ import {
   ZksyncEraState,
   memoryDiffParser,
 } from "validate-cli";
-import { decodeAbiParameters, getAbiItem, Hex, hexToBytes } from "viem";
-import { ALL_ABIS } from "@/utils/raw-abis";
+import { type Hex, decodeAbiParameters, getAbiItem, hexToBytes } from "viem";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -44,7 +44,7 @@ async function calculateBeforeAndAfter(
   const call = upgradeProposal.calls[0];
 
   if (!call) {
-    throw new Error("No calls specified in this address")
+    throw new Error("No calls specified in this address");
   }
 
   const [proposed, sysAddresses] = await ZksyncEraState.fromCalldata(
@@ -64,12 +64,12 @@ async function calculateCheckReport(_reportId: Hex, calldata: Hex): Promise<Chec
     return {
       metadata: {
         currentVersion: "0.24.1",
-        proposedVersion: "0.25.0"
+        proposedVersion: "0.25.0",
       },
       facetChanges: [],
       fieldChanges: [],
-      systemContractChanges: []
-    }
+      systemContractChanges: [],
+    };
   }
 
   const { current, proposed, sysAddresses } = await calculateBeforeAndAfter(
@@ -83,15 +83,23 @@ async function calculateCheckReport(_reportId: Hex, calldata: Hex): Promise<Chec
   return report.format();
 }
 
-async function calculateStorageChangeReport(_proposalId: Hex, calldata: Hex): Promise<FieldStorageChange[]> {
+async function calculateStorageChangeReport(
+  _proposalId: Hex,
+  calldata: Hex
+): Promise<FieldStorageChange[]> {
   if (env.SKIP_REPORTS) {
-    return []
+    return [];
   }
 
   const network = "mainnet";
   const diamondAddress = DIAMOND_ADDRS[network];
 
-  const { current, proposed } = await calculateBeforeAndAfter(network, l1Explorer, l2Explorer, calldata);
+  const { current, proposed } = await calculateBeforeAndAfter(
+    network,
+    l1Explorer,
+    l2Explorer,
+    calldata
+  );
 
   const memoryMapBuf = await fs.readFile(path.join(__dirname, "mock-memory-map.json"));
   const rawMap = memoryDiffParser.parse(JSON.parse(memoryMapBuf.toString()));
@@ -116,7 +124,6 @@ async function generateReportIfNotInDb<T>(
   propName: "checkReport" | "storageDiffReport",
   generator: (id: Hex, calldata: Hex) => Promise<T>
 ): Promise<T> {
-
   const proposal = await getProposalByExternalId(proposalId);
   if (!proposal) {
     throw new Error("Unknown proposal");

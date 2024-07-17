@@ -140,15 +140,17 @@ export class StringCheckReport {
     const table = new CliTable({ style: { border: [] } });
     table.push(["Field name", "Field Values"]);
 
-    const hexes = HEX_ZKSYNC_FIELDS
-      .map(f => [f, this.diff.hexAttrDiff(f)] as const)
-      .map(([f, [current, maybeAfter]]) => [f, this.formatHex(current), maybeAfter.map(after => this.formatHex(after)) ] as const)
+    const hexes = HEX_ZKSYNC_FIELDS.map((f) => [f, this.diff.hexAttrDiff(f)] as const).map(
+      ([f, [current, maybeAfter]]) =>
+        [f, this.formatHex(current), maybeAfter.map((after) => this.formatHex(after))] as const
+    );
 
-    const numbers = NUMERIC_ZKSYNC_FIELDS
-      .map(f => [f, this.diff.numberAttrDiff(f)] as const )
-      .map(([f, [current, maybeAfter]]) => [f, current.toString(), maybeAfter.map(after => after.toString()) ] as const)
+    const numbers = NUMERIC_ZKSYNC_FIELDS.map((f) => [f, this.diff.numberAttrDiff(f)] as const).map(
+      ([f, [current, maybeAfter]]) =>
+        [f, current.toString(), maybeAfter.map((after) => after.toString())] as const
+    );
 
-    for (const [ field, current, maybeProposed ] of [...hexes, ...numbers]) {
+    for (const [field, current, maybeProposed] of [...hexes, ...numbers]) {
       maybeProposed.ifSome((proposed) => {
         table.push(
           [{ content: field, rowSpan: 2, vAlign: "center" }, `Current: ${current}`],

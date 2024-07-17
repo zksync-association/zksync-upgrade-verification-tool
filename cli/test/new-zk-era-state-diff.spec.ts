@@ -502,8 +502,8 @@ describe("NewZkSyncStateDiff", () => {
 
       const changes = await diff.systemContractChanges();
       expect(changes.length).to.eql(1);
-      const change = changes[0]
-      if (change === undefined) throw new Error("Should exist")
+      const change = changes[0];
+      if (change === undefined) throw new Error("Should exist");
       expect(change.address).to.eql("0x01");
       expect(change.name).to.eql("SystemContract01");
       expect(change.currentBytecodeHash.unwrap()).to.eql("0x000a");

@@ -14,7 +14,7 @@ export const env = createEnv({
     ETH_NETWORK: z.enum(["mainnet", "sepolia"]).default("mainnet"),
     ETHERSCAN_API_KEY: z.string(),
     UPGRADE_HANDLER_ADDRESS: zodHex,
-    SKIP_REPORTS: z.coerce.boolean().default(false)
+    SKIP_REPORTS: z.coerce.boolean().default(false),
   },
   // eslint-disable-next-line n/no-process-env
   runtimeEnv: process.env,

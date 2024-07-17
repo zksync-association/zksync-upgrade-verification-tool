@@ -4,9 +4,9 @@ import type { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { PROTOCOL_UPGRADE_HANDLER_RAW_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 
+import { l1Rpc } from "@/.server/service/clients";
 import { type Hex, decodeEventLog, hexToBigInt, hexToNumber, numberToHex } from "viem";
 import { z } from "zod";
-import { l1Rpc } from "@/.server/service/clients";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 

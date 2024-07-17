@@ -3,11 +3,7 @@ import { StorageChanges } from "../src";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { memoryDiffParser } from "../src";
-import {
-  bytesToHex,
-  type Hex,
-  hexToBigInt,
-} from "viem";
+import { bytesToHex, type Hex, hexToBigInt } from "viem";
 import { AddressType } from "../src/lib/storage/types/address-type";
 import { StructType } from "../src/lib/storage/types/struct-type";
 import { BigNumberType } from "../src/lib/storage/types/big-number-type";

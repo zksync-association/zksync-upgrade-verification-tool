@@ -1,10 +1,4 @@
-import {
-  bytesToBigInt,
-  bytesToHex,
-  bytesToNumber,
-  type Hex,
-  numberToBytes,
-} from "viem";
+import { bytesToBigInt, bytesToHex, bytesToNumber, type Hex, numberToBytes } from "viem";
 import type { FacetData } from "./upgrade-changes";
 import { Option } from "nochoices";
 import { MissingRequiredProp } from "./errors";
