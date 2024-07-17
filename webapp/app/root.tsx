@@ -16,7 +16,10 @@ import "@rainbow-me/rainbowkit/styles.css";
 import ConnectRedirectProvider from "@/components/providers/connect-redirect-provider";
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: "https://rsms.me/inter/inter.css" },
+  {
+    rel: "stylesheet",
+    href: "https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap",
+  },
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {

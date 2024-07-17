@@ -1,30 +1,30 @@
-name: Build & Test
+name: CLI
 on:
   push:
     branches:
       - "**"
 env:
   ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+  NODE_OPTIONS: "--no-deprecation"
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     env:
       FORCE_COLOR: 1
+
+    defaults:
+      run:
+        working-directory: ./cli 
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 8
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.15.0
+          node-version: 22
           cache: "pnpm"
       - run: pnpm install
-      - run: pnpm run build
-      - name: Link Binary & Test
-        # Temporary running only unit tests in ci.
-        run: pnpm i && pnpm run --filter=./cli test:ci
+      - run: pnpm test:ci
       - name: Coverage
         uses: romeovs/lcov-reporter-action@v0.3.1
         with:
