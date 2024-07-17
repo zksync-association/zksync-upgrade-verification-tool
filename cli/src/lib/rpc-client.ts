@@ -8,7 +8,7 @@ import {
   http,
   numberToHex,
 } from "viem";
-import { type TypeOf, type ZodType } from "zod";
+import type { TypeOf, ZodType } from "zod";
 import type { PublicClient, HttpTransport } from "viem";
 import {
   type CallTrace,

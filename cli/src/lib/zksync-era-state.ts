@@ -22,7 +22,7 @@ import {
   BigNumberExtractor,
   BlobExtractor,
   FacetsToSelectorsVisitor,
-  ListOfAddressesExtractor
+  ListOfAddressesExtractor,
 } from "./reports/extractors";
 import type { ContractField } from "./storage/contractField";
 import type { StorageSnapshot } from "./storage/storage-snapshot";
@@ -399,7 +399,10 @@ async function getSystemContracts(
   const { input: upgradeCalldata, to: upgradeAddr } = desiredCall.unwrap();
 
   const upgradeAbi = await l1Explorer.getAbi(upgradeAddr);
-  const decodedUpgrade = upgradeAbi.decodeCallData(zodHex.parse(upgradeCalldata), upgradeCallDataSchema);
+  const decodedUpgrade = upgradeAbi.decodeCallData(
+    zodHex.parse(upgradeCalldata),
+    upgradeCallDataSchema
+  );
 
   const hex = decodedUpgrade.args[0].l2ProtocolUpgradeTx.to.toString(16);
   const deployAddr = `0x${"0".repeat(40 - hex.length)}${hex}`;
