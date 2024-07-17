@@ -42,11 +42,8 @@ jobs:
           lcov-file: ./cli/coverage/lcov.info
           github-token: ${{ secrets.GITHUB_TOKEN }}
           
-  webapp-build:
+  webapp-start:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./webapp
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -56,10 +53,25 @@ jobs:
         with:
           node-version: 22
           cache: "pnpm"
-      - run: pnpm install
+      - run: |
+          pnpm install
+          pnpm build
       - name: Start DB
         run: |
+          cd webapp
           ./scripts/init_db.sh
           docker ps -a
-      - name: Build WebApp
-        run: pnpm build
+      - name: Start WebApp
+        run: |
+          cd webapp
+          timeout 60s pnpm start &
+          PID=$!
+          sleep 20
+          if ps -p $PID > /dev/null; then
+            echo "WebApp started successfully"
+            kill $PID
+          else
+            echo "WebApp failed to start"
+            exit 1
+          fi
+    
