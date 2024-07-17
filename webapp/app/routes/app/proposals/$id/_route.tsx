@@ -47,6 +47,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   }
 
   const getAsyncData = async () => {
+    console.log("HoluuuuuuuuuuuuuuuHoluuuuuuuuuuuuuuuHoluuuuuuuuuuuuuuuHoluuuuuuuuuuuuuuuHoluuuuuuuuuuuuuuu");
     const checkReport = await getCheckReport(params.data.id);
     const storageChangeReport = await getStorageChangeReport(params.data.id);
     const [guardians, council, proposalStatus, signatures, proposalData] = await Promise.all([

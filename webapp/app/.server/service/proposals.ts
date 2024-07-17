@@ -3,15 +3,14 @@ import { upgradeHandlerAbi } from "@/.server/service/contract-abis";
 import type { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { PROTOCOL_UPGRADE_HANDLER_RAW_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
-import { RpcClient } from "validate-cli";
+
 import { type Hex, decodeEventLog, hexToBigInt, hexToNumber, numberToHex } from "viem";
 import { z } from "zod";
+import { l1Rpc } from "@/.server/service/clients";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 
 const bigIntMax = (...args: bigint[]) => args.reduce((m, e) => (e > m ? e : m));
-
-const rpc = new RpcClient(env.L1_RPC_URL_FOR_UPGRADES);
 
 export type Proposal = {
   id: Hex;
@@ -19,7 +18,7 @@ export type Proposal = {
 };
 
 export async function getProposals(): Promise<Proposal[]> {
-  const currentBlock = await rpc.getLatestBlockNumber();
+  const currentBlock = await l1Rpc.getLatestBlockNumber();
   const currentHeight = hexToBigInt(currentBlock);
   const maxUpgradeLiftimeInBlocks = BigInt(40 * 24 * 360); // conservative estimation of latest block with a valid upgrade
 
@@ -30,7 +29,7 @@ export async function getProposals(): Promise<Proposal[]> {
   if (env.NODE_ENV === "development") {
     await new Promise((resolve) => setTimeout(resolve, 5)); // Avoid anvil crushing for mysterious reasons
   }
-  const logs = await rpc.getLogs(upgradeHandlerAddress, numberToHex(from), "latest", [
+  const logs = await l1Rpc.getLogs(upgradeHandlerAddress, numberToHex(from), "latest", [
     abi.eventIdFor("UpgradeStarted"),
   ]);
 
@@ -78,7 +77,7 @@ export async function getProposalData(id: Hex): Promise<ProposalData> {
     guardiansApproval,
     guardiansExtendedLegalVeto,
     executed,
-  ] = await rpc.contractRead(
+  ] = await l1Rpc.contractRead(
     upgradeHandlerAddress,
     "upgradeStatus",
     upgradeHandlerAbi.raw,
@@ -96,7 +95,7 @@ export async function getProposalData(id: Hex): Promise<ProposalData> {
 }
 
 export async function getProposalStatus(id: Hex) {
-  return await rpc.contractRead(
+  return await l1Rpc.contractRead(
     upgradeHandlerAddress,
     "upgradeState",
     upgradeHandlerAbi.raw,

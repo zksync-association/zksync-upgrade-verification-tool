@@ -18,7 +18,8 @@ import {
   ZksyncEraState,
   memoryDiffParser,
 } from "validate-cli";
-import type { Hex } from "viem";
+import { decodeAbiParameters, getAbiItem, Hex, hexToBigInt, hexToBytes } from "viem";
+import { ALL_ABIS } from "@/utils/raw-abis";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,40 +29,59 @@ const network = env.ETH_NETWORK;
 async function calculateBeforeAndAfter(
   network: Network,
   l1Explorer: BlockExplorerClient,
-  l2Explorer: BlockExplorerClient
+  l2Explorer: BlockExplorerClient,
+  calldata: Hex
 ) {
-  const current = await ZksyncEraState.fromBlockchain(network, l1Explorer, l1Rpc);
+  try {
+    const current = await ZksyncEraState.fromBlockchain(network, l1Explorer, l1Rpc);
 
-  const rawBuf = await fs.readFile(path.join(__dirname, "mock-upgrade.hex"));
-  const decodedBuf = Buffer.from(rawBuf.toString(), "hex");
+    const abiItem = getAbiItem({
+      abi: ALL_ABIS.handler,
+      name: "execute",
+    });
 
-  const [proposed, sysAddresses] = await ZksyncEraState.fromCalldata(
-    decodedBuf,
-    network,
-    l1Explorer,
-    l1Rpc,
-    l2Explorer
-  );
-  return { current, proposed, sysAddresses, callData: decodedBuf };
+    const [upgradeProposal] = decodeAbiParameters([abiItem.inputs[0]], calldata);
+
+    const call = upgradeProposal.calls[0];
+
+    if (!call) {
+      throw new Error("No calls specified in this address")
+    }
+
+    const [proposed, sysAddresses] = await ZksyncEraState.fromCalldata(
+      upgradeProposal.executor,
+      call.target,
+      Buffer.from(hexToBytes(call.data)),
+      network,
+      l1Explorer,
+      l1Rpc,
+      l2Explorer
+    );
+    return { current, proposed, sysAddresses };
+  } catch (e) {
+    console.error(e)
+    throw e
+  }
+
 }
 
-async function calculateCheckReport(_reportId: string): Promise<CheckReportObj> {
+async function calculateCheckReport(_reportId: Hex, calldata: Hex): Promise<CheckReportObj> {
   const { current, proposed, sysAddresses } = await calculateBeforeAndAfter(
     network,
     l1Explorer,
-    l2Explorer
+    l2Explorer,
+    calldata
   );
-
   const diff = new ZkSyncEraDiff(current, proposed, sysAddresses);
   const report = new ObjectCheckReport(diff, l1Explorer);
   return report.format();
 }
 
-async function calculateStorageChangeReport(_proposalId: string): Promise<FieldStorageChange[]> {
+async function calculateStorageChangeReport(_proposalId: Hex, calldata: Hex): Promise<FieldStorageChange[]> {
   const network = "mainnet";
   const diamondAddress = DIAMOND_ADDRS[network];
 
-  const { current, proposed } = await calculateBeforeAndAfter(network, l1Explorer, l2Explorer);
+  const { current, proposed } = await calculateBeforeAndAfter(network, l1Explorer, l2Explorer, calldata);
 
   const memoryMapBuf = await fs.readFile(path.join(__dirname, "mock-memory-map.json"));
   const rawMap = memoryDiffParser.parse(JSON.parse(memoryMapBuf.toString()));
@@ -84,15 +104,15 @@ async function calculateStorageChangeReport(_proposalId: string): Promise<FieldS
 async function generateReportIfNotInDb<T>(
   proposalId: Hex,
   propName: "checkReport" | "storageDiffReport",
-  generator: (t: string) => Promise<T>
+  generator: (id: Hex, calldata: Hex) => Promise<T>
 ): Promise<T> {
+
   const proposal = await getProposalByExternalId(proposalId);
   if (!proposal) {
     throw new Error("Unknown proposal");
   }
-
   if (!proposal[propName]) {
-    proposal[propName] = await generator(proposalId);
+    proposal[propName] = await generator(proposalId, proposal.calldata);
     await updateProposal(proposal);
   }
 
