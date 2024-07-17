@@ -284,7 +284,7 @@ cd cli && pnpm build
 The Web App uses a Postgres database to store the upgrade data. You can run a Postgres database through Docker running our provided script in the webapp folder:
 
 ```bash
-./scripts/init-db.sh
+./scripts/init_db.sh
 ```
 
 #### **4. Environment keys setup**

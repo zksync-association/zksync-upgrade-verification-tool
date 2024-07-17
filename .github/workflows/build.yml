@@ -59,7 +59,7 @@ jobs:
       - run: pnpm install
       - name: Start DB
         run: |
-          ./scripts/init-db.sh
+          ./scripts/init_db.sh
           docker ps -a
       - name: Build WebApp
         run: pnpm build
