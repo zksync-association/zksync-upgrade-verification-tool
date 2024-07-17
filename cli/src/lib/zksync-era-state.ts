@@ -5,7 +5,7 @@ import { MissingRequiredProp } from "./errors";
 import { DIAMOND_ADDRS, type Network, UPGRADE_FN_SELECTOR } from "./constants";
 import { Diamond } from "./diamond";
 import { type BlockExplorer, BlockExplorerClient } from "./block-explorer-client";
-import { type CallsTrace, RpcClient } from "./rpc-client";
+import { RpcClient } from "./rpc-client";
 import { zodHex } from "../schema/zod-optionals";
 import { RpcStorageSnapshot } from "./storage/rpc-storage-snapshot";
 import { StringStorageVisitor } from "./reports/string-storage-visitor";
@@ -27,7 +27,7 @@ import {
 import type { ContractField } from "./storage/contractField";
 import type { StorageSnapshot } from "./storage/storage-snapshot";
 import type { StorageVisitor } from "./reports/storage-visitor";
-import { l2UpgradeSchema, upgradeCallDataSchema } from "../schema/rpc";
+import { type CallTrace, l2UpgradeSchema, upgradeCallDataSchema } from "../schema/rpc";
 
 export type L2ContractData = {
   address: Hex;
@@ -35,19 +35,19 @@ export type L2ContractData = {
   name: string;
 };
 
-export enum PubdataPricingMode {
-  Rollup = 0,
-  Validium = 1,
-}
+// export enum PubdataPricingMode {
+//   Rollup = 0,
+//   Validium = 1,
+// }
 
-export type FeeParams = {
-  pubdataPricingMode: PubdataPricingMode;
-  batchOverheadL1Gas: bigint;
-  maxPubdataPerBatch: bigint;
-  maxL2GasPerBatch: bigint;
-  priorityTxMaxPubdata: bigint;
-  minimalL2GasPrice: bigint;
-};
+// export type FeeParams = {
+//   pubdataPricingMode: PubdataPricingMode;
+//   batchOverheadL1Gas: bigint;
+//   maxPubdataPerBatch: bigint;
+//   maxL2GasPerBatch: bigint;
+//   priorityTxMaxPubdata: bigint;
+//   minimalL2GasPrice: bigint;
+// };
 
 export const ADDR_ZKSYNC_FIELDS = [
   "admin",
@@ -370,16 +370,15 @@ async function getFacetData(
   };
 }
 
-function findCall(calls: CallsTrace, selector: Hex): Option<CallsTrace> {
+function findCall(calls: CallTrace, selector: Hex): Option<CallTrace> {
   if (calls.input.startsWith(selector)) {
     return Option.Some(calls);
   }
-
   if (!calls.calls) return Option.None();
 
   return calls.calls.reduce(
     (partial, nextCall) => partial.or(findCall(nextCall, selector)),
-    Option.None<CallsTrace>()
+    Option.None<CallTrace>()
   );
 }
 
@@ -400,7 +399,7 @@ async function getSystemContracts(
   const { input: upgradeCalldata, to: upgradeAddr } = desiredCall.unwrap();
 
   const upgradeAbi = await l1Explorer.getAbi(upgradeAddr);
-  const decodedUpgrade = upgradeAbi.decodeCallData(upgradeCalldata, upgradeCallDataSchema);
+  const decodedUpgrade = upgradeAbi.decodeCallData(zodHex.parse(upgradeCalldata), upgradeCallDataSchema);
 
   const hex = decodedUpgrade.args[0].l2ProtocolUpgradeTx.to.toString(16);
   const deployAddr = `0x${"0".repeat(40 - hex.length)}${hex}`;
