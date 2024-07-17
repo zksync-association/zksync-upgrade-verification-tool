@@ -6,6 +6,7 @@ import { getProposalByExternalId, updateProposal } from "@/.server/db/dto/propos
 import { l1Explorer, l1Rpc, l2Explorer } from "@/.server/service/clients";
 import { ALL_ABIS } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
+import { defaultLogger } from "@config/log.server";
 import {
   type BlockExplorerClient,
   type CheckReportObj,
@@ -20,7 +21,6 @@ import {
   memoryDiffParser,
 } from "validate-cli";
 import { type Hex, decodeAbiParameters, getAbiItem, hexToBytes } from "viem";
-import { defaultLogger } from "@config/log.server";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -125,7 +125,7 @@ async function generateReportIfNotInDb<T>(
   emptyReport: T
 ): Promise<T> {
   if (env.SKIP_REPORTS) {
-    return emptyReport
+    return emptyReport;
   }
 
   const proposal = await getProposalByExternalId(proposalId);
@@ -137,7 +137,7 @@ async function generateReportIfNotInDb<T>(
       proposal[propName] = await generator(proposalId, proposal.calldata);
     } catch (e) {
       defaultLogger.warn(e);
-      return emptyReport
+      return emptyReport;
     }
 
     await updateProposal(proposal);
