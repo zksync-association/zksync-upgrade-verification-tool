@@ -22,9 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_COLOR: 1
-    defaults:
-      run:
-        working-directory: ./cli 
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -34,8 +31,12 @@ jobs:
         with:
           node-version: 22
           cache: "pnpm"
-      - run: pnpm install
-      - run: pnpm test:ci
+      - run: |
+          cd cli
+          pnpm install
+      - run: |
+          cd cli
+          pnpm test:ci
       - name: Coverage
         uses: romeovs/lcov-reporter-action@v0.3.1
         with:
@@ -44,9 +45,6 @@ jobs:
           
   webapp-build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./webapp
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -56,10 +54,15 @@ jobs:
         with:
           node-version: 22
           cache: "pnpm"
-      - run: pnpm install
+      - run: |
+          cd webapp
+          pnpm install
       - name: Start DB
         run: |
+          cd webapp
           ./scripts/init-db.sh
           docker ps -a
       - name: Build WebApp
-        run: pnpm build
+        run: |
+          cd webapp
+          pnpm build
