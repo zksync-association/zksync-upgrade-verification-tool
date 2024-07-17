@@ -8,12 +8,11 @@ import {
   http,
   numberToHex,
 } from "viem";
-import { type TypeOf, z, type ZodType } from "zod";
+import { type TypeOf, type ZodType } from "zod";
 import type { PublicClient, HttpTransport } from "viem";
 import {
   type CallTrace,
   callTracerSchema,
-  contractEventSchema,
   memoryDiffParser,
   type MemoryDiffRaw,
 } from "../schema/rpc";
@@ -66,20 +65,20 @@ export class RpcClient {
   }
 
   async getByteCode(addr: Hex): Promise<Hex | undefined> {
-    return this.viemClient.getBytecode({ address: addr });
+    return this.viemClient.getCode({ address: addr });
   }
 
   async storageRead(addr: Hex, position: bigint): Promise<Hex> {
-    const readedValue = await getStorageAt(this.viemClient, {
+    const readValue = await getStorageAt(this.viemClient, {
       address: addr,
       slot: numberToHex(position, { size: 32 }),
     });
 
-    if (!readedValue) {
+    if (!readValue) {
       throw new Error("Error reading storage");
     }
 
-    return readedValue;
+    return readValue;
   }
 
   async contractRead<T extends ZodType>(
@@ -166,53 +165,4 @@ export class RpcClient {
       method: "net_version",
     });
   }
-
-  async getLogs(address: Hex, fromBlock: string, toBLock: string, topics: Hex[] = []) {
-    const arg = {
-      fromBlock,
-      toBlock: toBLock,
-      address,
-      topics,
-    };
-
-    const data = await this.rawCall("eth_getLogs", [arg]);
-
-    if (data.error) {
-      throw new Error(`Error getting logs: ${data.error?.message}`);
-    }
-
-    const parsed = z
-      .object({
-        result: z.array(contractEventSchema),
-      })
-      .parse(data);
-
-    return parsed.result;
-  }
-
-  async getLatestBlockNumber(): Promise<Hex> {
-    const block = (await this.viemClient.request({
-      method: "eth_getBlockByNumber",
-      params: ["latest", false],
-    })) as any;
-
-    return block.number;
-  }
-
-  // async debugCallTraceCalls(from: Hex, to: Hex, callData: Hex) {
-  //   const data = await this.rawCall("debug_traceCall", [
-  //     {
-  //       from,
-  //       to,
-  //       data: callData,
-  //     },
-  //     "latest",
-  //     {
-  //       tracer: "callTracer",
-  //       tracerConfig: {
-  //         diffMode: true,
-  //       },
-  //     },
-  //   ]);
-  // }
 }
