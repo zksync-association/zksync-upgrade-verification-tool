@@ -18,7 +18,7 @@ import {
   ZksyncEraState,
   memoryDiffParser,
 } from "validate-cli";
-import { decodeAbiParameters, getAbiItem, Hex, hexToBigInt, hexToBytes } from "viem";
+import { decodeAbiParameters, getAbiItem, Hex, hexToBytes } from "viem";
 import { ALL_ABIS } from "@/utils/raw-abis";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,40 +32,46 @@ async function calculateBeforeAndAfter(
   l2Explorer: BlockExplorerClient,
   calldata: Hex
 ) {
-  try {
-    const current = await ZksyncEraState.fromBlockchain(network, l1Explorer, l1Rpc);
+  const current = await ZksyncEraState.fromBlockchain(network, l1Explorer, l1Rpc);
 
-    const abiItem = getAbiItem({
-      abi: ALL_ABIS.handler,
-      name: "execute",
-    });
+  const abiItem = getAbiItem({
+    abi: ALL_ABIS.handler,
+    name: "execute",
+  });
 
-    const [upgradeProposal] = decodeAbiParameters([abiItem.inputs[0]], calldata);
+  const [upgradeProposal] = decodeAbiParameters([abiItem.inputs[0]], calldata);
 
-    const call = upgradeProposal.calls[0];
+  const call = upgradeProposal.calls[0];
 
-    if (!call) {
-      throw new Error("No calls specified in this address")
-    }
-
-    const [proposed, sysAddresses] = await ZksyncEraState.fromCalldata(
-      upgradeProposal.executor,
-      call.target,
-      Buffer.from(hexToBytes(call.data)),
-      network,
-      l1Explorer,
-      l1Rpc,
-      l2Explorer
-    );
-    return { current, proposed, sysAddresses };
-  } catch (e) {
-    console.error(e)
-    throw e
+  if (!call) {
+    throw new Error("No calls specified in this address")
   }
 
+  const [proposed, sysAddresses] = await ZksyncEraState.fromCalldata(
+    upgradeProposal.executor,
+    call.target,
+    Buffer.from(hexToBytes(call.data)),
+    network,
+    l1Explorer,
+    l1Rpc,
+    l2Explorer
+  );
+  return { current, proposed, sysAddresses };
 }
 
 async function calculateCheckReport(_reportId: Hex, calldata: Hex): Promise<CheckReportObj> {
+  if (env.SKIP_REPORTS) {
+    return {
+      metadata: {
+        currentVersion: "0.24.1",
+        proposedVersion: "0.25.0"
+      },
+      facetChanges: [],
+      fieldChanges: [],
+      systemContractChanges: []
+    }
+  }
+
   const { current, proposed, sysAddresses } = await calculateBeforeAndAfter(
     network,
     l1Explorer,
@@ -78,6 +84,10 @@ async function calculateCheckReport(_reportId: Hex, calldata: Hex): Promise<Chec
 }
 
 async function calculateStorageChangeReport(_proposalId: Hex, calldata: Hex): Promise<FieldStorageChange[]> {
+  if (env.SKIP_REPORTS) {
+    return []
+  }
+
   const network = "mainnet";
   const diamondAddress = DIAMOND_ADDRS[network];
 

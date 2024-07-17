@@ -7,7 +7,7 @@ import {
   guardianMembers,
   guardiansAddress,
 } from "@/.server/service/authorized-users";
-import { l1RpcProposals } from "@/.server/service/clients";
+import { l1Rpc } from "@/.server/service/clients";
 import { guardiansAbi } from "@/.server/service/contract-abis";
 import { badRequest } from "@/utils/http";
 import { env } from "@config/env.server";
@@ -48,7 +48,7 @@ async function verifySignature(
   });
 
   try {
-    await l1RpcProposals.contractRead(verifierAddr, "checkSignatures", guardiansAbi.raw, z.any(), [
+    await l1Rpc.contractRead(verifierAddr, "checkSignatures", guardiansAbi.raw, z.any(), [
       digest,
       [signer],
       [signature],
