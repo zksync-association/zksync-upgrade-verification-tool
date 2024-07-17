@@ -17,9 +17,13 @@ import {
 } from "./system-contract-providers";
 import { z } from "zod";
 import { RecordStorageSnapshot } from "./storage/record-storage-snapshot";
-import { ListOfAddressesVisitor } from "./reports/list-of-addresses-visitor";
-import { FacetsToSelectorsVisitor } from "./reports/facets-to-selectors-visitor";
-import { AddressExtractor, BigNumberExtractor, BlobExtractor } from "./reports/extractors";
+import {
+  AddressExtractor,
+  BigNumberExtractor,
+  BlobExtractor,
+  FacetsToSelectorsVisitor,
+  ListOfAddressesExtractor
+} from "./reports/extractors";
 import type { ContractField } from "./storage/contractField";
 import type { StorageSnapshot } from "./storage/storage-snapshot";
 import type { StorageVisitor } from "./reports/storage-visitor";
@@ -253,7 +257,7 @@ export class ZksyncEraState {
     const facetsAddresses = await extractValue(
       MAIN_CONTRACT_FIELDS.facetAddresses,
       storageWithUpgrade,
-      new ListOfAddressesVisitor()
+      new ListOfAddressesExtractor()
     );
     const extractedFacetToSelectors = await extractValue(
       MAIN_CONTRACT_FIELDS.facetToSelectors(facetsAddresses),
