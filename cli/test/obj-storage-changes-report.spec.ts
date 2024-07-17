@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { StorageChanges } from "../src/lib/storage/storage-changes";
+import { StorageChanges } from "../src/index";
 import { memoryDiffParser, type MemoryDiffRaw } from "../src/schema/rpc";
 import { type Hex, hexToBigInt, keccak256, numberToBytes, numberToHex } from "viem";
 import { AddressType } from "../src/lib/storage/types/address-type";
