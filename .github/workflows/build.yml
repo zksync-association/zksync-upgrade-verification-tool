@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_COLOR: 1
-
     defaults:
       run:
         working-directory: ./cli 
@@ -41,8 +40,9 @@ jobs:
         uses: romeovs/lcov-reporter-action@v0.3.1
         with:
           lcov-file: ./cli/coverage/lcov.info
-          github-token: ${{ github.token }}
-  build:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          
+  webapp-build:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -61,10 +61,5 @@ jobs:
         run: |
           ./scripts/init-db.sh
           docker ps -a
-
       - name: Build WebApp
         run: pnpm build
-
-        
-
-
