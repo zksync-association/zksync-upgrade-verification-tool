@@ -248,12 +248,6 @@ export class ZksyncEraState {
 
     const memoryMap = await rpc.debugCallTraceStorage(sender, targetAddr, bytesToHex(callDataBuf));
 
-    // const callTracing = await rpc.debugCallTraceCalls(
-    //   sender,
-    //   targetAddr,
-    //   bytesToHex(callDataBuf)
-    // )
-
     const post = Option.fromNullable(memoryMap.result.post[addr])
       .map((post) => post.storage)
       .flatten();
@@ -342,34 +336,6 @@ export class ZksyncEraState {
   }
 }
 
-// const _SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
-//   "0x0000000000000000000000000000000000000000": "EmptyContract",
-//   "0x0000000000000000000000000000000000000001": "Ecrecover",
-//   "0x0000000000000000000000000000000000000002": "SHA256",
-//   "0x0000000000000000000000000000000000000006": "EcAdd",
-//   "0x0000000000000000000000000000000000000007": "EcMul",
-//   "0x0000000000000000000000000000000000000008": "EcPairing",
-//   "0x0000000000000000000000000000000000008001": "EmptyContract",
-//   "0x0000000000000000000000000000000000008002": "AccountCodeStorage",
-//   "0x0000000000000000000000000000000000008003": "NonceHolder",
-//   "0x0000000000000000000000000000000000008004": "KnownCodesStorage",
-//   "0x0000000000000000000000000000000000008005": "ImmutableSimulator",
-//   "0x0000000000000000000000000000000000008006": "ContractDeployer",
-//   "0x0000000000000000000000000000000000008008": "L1Messenger",
-//   "0x0000000000000000000000000000000000008009": "MsgValueSimulator",
-//   "0x000000000000000000000000000000000000800a": "L2BaseToken",
-//   "0x000000000000000000000000000000000000800b": "SystemContext",
-//   "0x000000000000000000000000000000000000800c": "BootloaderUtilities",
-//   "0x000000000000000000000000000000000000800d": "EventWriter",
-//   "0x000000000000000000000000000000000000800e": "Compressor",
-//   "0x000000000000000000000000000000000000800f": "ComplexUpgrader",
-//   "0x0000000000000000000000000000000000008010": "Keccak256",
-//   "0x0000000000000000000000000000000000008012": "CodeOracle",
-//   "0x0000000000000000000000000000000000000100": "P256Verify",
-//   "0x0000000000000000000000000000000000008011": "PubdataChunkPublisher",
-//   "0x0000000000000000000000000000000000010000": "Create2Factory",
-// };
-
 async function extractValue<T>(
   field: ContractField,
   snapshot: StorageSnapshot,
@@ -397,17 +363,30 @@ async function getFacetData(
   };
 }
 
-// async function _reduceFacetCuts(cuts: FacetCut[], explorer: BlockExplorer): Promise<FacetData[]> {
-//   const selected = cuts.filter((cut) => cut.action === 0);
-//
-//   return await Promise.all(
-//     selected.map(async (cut) => {
-//       const contract = await explorer.getSourceCode(cut.facet);
-//       return {
-//         name: contract.name,
-//         address: cut.facet,
-//         selectors: cut.selectors,
-//       };
-//     })
-//   );
-// }
+// const _SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {
+//   "0x0000000000000000000000000000000000000000": "EmptyContract",
+//   "0x0000000000000000000000000000000000000001": "Ecrecover",
+//   "0x0000000000000000000000000000000000000002": "SHA256",
+//   "0x0000000000000000000000000000000000000006": "EcAdd",
+//   "0x0000000000000000000000000000000000000007": "EcMul",
+//   "0x0000000000000000000000000000000000000008": "EcPairing",
+//   "0x0000000000000000000000000000000000008001": "EmptyContract",
+//   "0x0000000000000000000000000000000000008002": "AccountCodeStorage",
+//   "0x0000000000000000000000000000000000008003": "NonceHolder",
+//   "0x0000000000000000000000000000000000008004": "KnownCodesStorage",
+//   "0x0000000000000000000000000000000000008005": "ImmutableSimulator",
+//   "0x0000000000000000000000000000000000008006": "ContractDeployer",
+//   "0x0000000000000000000000000000000000008008": "L1Messenger",
+//   "0x0000000000000000000000000000000000008009": "MsgValueSimulator",
+//   "0x000000000000000000000000000000000000800a": "L2BaseToken",
+//   "0x000000000000000000000000000000000000800b": "SystemContext",
+//   "0x000000000000000000000000000000000000800c": "BootloaderUtilities",
+//   "0x000000000000000000000000000000000000800d": "EventWriter",
+//   "0x000000000000000000000000000000000000800e": "Compressor",
+//   "0x000000000000000000000000000000000000800f": "ComplexUpgrader",
+//   "0x0000000000000000000000000000000000008010": "Keccak256",
+//   "0x0000000000000000000000000000000000008012": "CodeOracle",
+//   "0x0000000000000000000000000000000000000100": "P256Verify",
+//   "0x0000000000000000000000000000000000008011": "PubdataChunkPublisher",
+//   "0x0000000000000000000000000000000000010000": "Create2Factory",
+// };
