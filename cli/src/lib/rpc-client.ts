@@ -12,7 +12,8 @@ import { type TypeOf, z, type ZodType } from "zod";
 import type { PublicClient, HttpTransport } from "viem";
 import {
   type CallTrace,
-  callTracerSchema, contractEventSchema,
+  callTracerSchema,
+  contractEventSchema,
   memoryDiffParser,
   type MemoryDiffRaw,
 } from "../schema/rpc";
