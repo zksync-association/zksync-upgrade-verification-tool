@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type ContractsRepo, StringCheckReport, SystemContractList, ZkSyncEraDiff } from "../src";
 import {
   HEX_ZKSYNC_FIELDS,
-  type L2ContractData, NUMERIC_ZKSYNC_FIELDS,
+  type L2ContractData,
+  NUMERIC_ZKSYNC_FIELDS,
   type ZkEraStateData,
   ZksyncEraState,
 } from "../src/lib/zksync-era-state";
@@ -110,7 +111,9 @@ describe("CheckReport", () => {
     ];
 
     ctx.currentFields = {
-      protocolVersion: hexToBigInt("0x000000000000000000000000000000000000000000000000000000000000000f"),
+      protocolVersion: hexToBigInt(
+        "0x000000000000000000000000000000000000000000000000000000000000000f"
+      ),
       admin: "0x010a",
       pendingAdmin: "0x020a",
       verifierAddress: "0x030a",
@@ -164,7 +167,9 @@ describe("CheckReport", () => {
     }
 
     ctx.proposedFields = {
-      protocolVersion: hexToBigInt("0x0000000000000000000000000000000000000000000000000000001800000001"),
+      protocolVersion: hexToBigInt(
+        "0x0000000000000000000000000000000000000000000000000000001800000001"
+      ),
       admin: "0x010b",
       pendingAdmin: "0x020b",
       verifierAddress: "0x030b",
@@ -296,14 +301,14 @@ describe("CheckReport", () => {
       const lines = await createReportLines(ctx);
 
       for (const field of HEX_ZKSYNC_FIELDS) {
-        if (field === "baseTokenBridgeAddress") continue // This property is kept the same in this test
+        if (field === "baseTokenBridgeAddress") continue; // This property is kept the same in this test
         const line = lines.findIndex((l) => l.includes(field));
         expect(line).not.toEqual(-1);
         expect(lines[line - 1]).toContain(ctx.currentFields[field]);
       }
 
       for (const field of NUMERIC_ZKSYNC_FIELDS) {
-        if (field === "baseTokenGasPriceMultiplierDenominator") continue // This property is kept the same in this test
+        if (field === "baseTokenGasPriceMultiplierDenominator") continue; // This property is kept the same in this test
         const line = lines.findIndex((l) => l.includes(field));
         expect(line).not.toEqual(-1);
         expect(lines[line - 1]).toContain(`Current: ${ctx.currentFields[field]}`);
