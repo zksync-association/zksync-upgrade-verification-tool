@@ -15,13 +15,16 @@ env:
   L1_RPC_URL: ${{ secrets.TENDERLY_RPC_URL }}
   L1_RPC_URL_FOR_UPGRADES: http://127.0.0.1:8545
   AUTH_SECRET: sososecret
-  UPGRADE_HANDLER_ADDRESS: 0xd88ce7170eac2aad76acc74bda448c512818a2d4
+  UPGRADE_HANDLER_ADDRESS: "0xd88ce7170eac2aad76acc74bda448c512818a2d4"
 
 jobs:
   cli-build-and-test:
     runs-on: ubuntu-latest
     env:
       FORCE_COLOR: 1
+    defaults:
+      run:
+        working-directory: ./cli 
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -31,12 +34,8 @@ jobs:
         with:
           node-version: 22
           cache: "pnpm"
-      - run: |
-          cd cli
-          pnpm install
-      - run: |
-          cd cli
-          pnpm test:ci
+      - run: pnpm install
+      - run: pnpm test:ci
       - name: Coverage
         uses: romeovs/lcov-reporter-action@v0.3.1
         with:
@@ -45,6 +44,9 @@ jobs:
           
   webapp-build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./webapp
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -54,15 +56,10 @@ jobs:
         with:
           node-version: 22
           cache: "pnpm"
-      - run: |
-          cd webapp
-          pnpm install
+      - run: pnpm install
       - name: Start DB
         run: |
-          cd webapp
           ./scripts/init-db.sh
           docker ps -a
       - name: Build WebApp
-        run: |
-          cd webapp
-          pnpm build
+        run: pnpm build
