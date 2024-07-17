@@ -1,4 +1,4 @@
-name: CLI
+name: WebApp
 on:
   push:
     branches:
