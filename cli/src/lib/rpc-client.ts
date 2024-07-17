@@ -8,11 +8,11 @@ import {
   http,
   numberToHex,
 } from "viem";
-import type { TypeOf, ZodType } from "zod";
+import { type TypeOf, z, type ZodType } from "zod";
 import type { PublicClient, HttpTransport } from "viem";
 import {
   type CallTrace,
-  callTracerSchema,
+  callTracerSchema, contractEventSchema,
   memoryDiffParser,
   type MemoryDiffRaw,
 } from "../schema/rpc";
@@ -164,5 +164,37 @@ export class RpcClient {
     return this.viemClient.request({
       method: "net_version",
     });
+  }
+
+  async getLogs(address: Hex, fromBlock: string, toBLock: string, topics: Hex[] = []) {
+    const arg = {
+      fromBlock,
+      toBlock: toBLock,
+      address,
+      topics,
+    };
+
+    const data = await this.rawCall("eth_getLogs", [arg]);
+
+    if (data.error) {
+      throw new Error(`Error getting logs: ${data.error?.message}`);
+    }
+
+    const parsed = z
+      .object({
+        result: z.array(contractEventSchema),
+      })
+      .parse(data);
+
+    return parsed.result;
+  }
+
+  async getLatestBlockNumber(): Promise<Hex> {
+    const block = (await this.viemClient.request({
+      method: "eth_getBlockByNumber",
+      params: ["latest", false],
+    })) as any;
+
+    return block.number;
   }
 }
