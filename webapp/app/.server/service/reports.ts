@@ -20,6 +20,7 @@ import {
   memoryDiffParser,
 } from "validate-cli";
 import { type Hex, decodeAbiParameters, getAbiItem, hexToBytes } from "viem";
+import { defaultLogger } from "@config/log.server";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -59,19 +60,17 @@ async function calculateBeforeAndAfter(
   return { current, proposed, sysAddresses };
 }
 
-async function calculateCheckReport(_reportId: Hex, calldata: Hex): Promise<CheckReportObj> {
-  if (env.SKIP_REPORTS) {
-    return {
-      metadata: {
-        currentVersion: "0.24.1",
-        proposedVersion: "0.25.0",
-      },
-      facetChanges: [],
-      fieldChanges: [],
-      systemContractChanges: [],
-    };
-  }
+const emptyCheckReport = {
+  metadata: {
+    currentVersion: "0.24.1",
+    proposedVersion: "0.25.0",
+  },
+  facetChanges: [],
+  fieldChanges: [],
+  systemContractChanges: [],
+};
 
+async function calculateCheckReport(_reportId: Hex, calldata: Hex): Promise<CheckReportObj> {
   const { current, proposed, sysAddresses } = await calculateBeforeAndAfter(
     network,
     l1Explorer,
@@ -122,14 +121,25 @@ async function calculateStorageChangeReport(
 async function generateReportIfNotInDb<T>(
   proposalId: Hex,
   propName: "checkReport" | "storageDiffReport",
-  generator: (id: Hex, calldata: Hex) => Promise<T>
+  generator: (id: Hex, calldata: Hex) => Promise<T>,
+  emptyReport: T
 ): Promise<T> {
+  if (env.SKIP_REPORTS) {
+    return emptyReport
+  }
+
   const proposal = await getProposalByExternalId(proposalId);
   if (!proposal) {
     throw new Error("Unknown proposal");
   }
   if (!proposal[propName]) {
-    proposal[propName] = await generator(proposalId, proposal.calldata);
+    try {
+      proposal[propName] = await generator(proposalId, proposal.calldata);
+    } catch (e) {
+      defaultLogger.warn(e);
+      return emptyReport
+    }
+
     await updateProposal(proposal);
   }
 
@@ -137,9 +147,9 @@ async function generateReportIfNotInDb<T>(
 }
 
 export async function getCheckReport(proposalId: Hex): Promise<CheckReportObj> {
-  return generateReportIfNotInDb(proposalId, "checkReport", calculateCheckReport);
+  return generateReportIfNotInDb(proposalId, "checkReport", calculateCheckReport, emptyCheckReport);
 }
 
 export async function getStorageChangeReport(proposalId: Hex): Promise<FieldStorageChange[]> {
-  return generateReportIfNotInDb(proposalId, "storageDiffReport", calculateStorageChangeReport);
+  return generateReportIfNotInDb(proposalId, "storageDiffReport", calculateStorageChangeReport, []);
 }
