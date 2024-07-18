@@ -35,20 +35,6 @@ export type L2ContractData = {
   name: string;
 };
 
-// export enum PubdataPricingMode {
-//   Rollup = 0,
-//   Validium = 1,
-// }
-
-// export type FeeParams = {
-//   pubdataPricingMode: PubdataPricingMode;
-//   batchOverheadL1Gas: bigint;
-//   maxPubdataPerBatch: bigint;
-//   maxL2GasPerBatch: bigint;
-//   priorityTxMaxPubdata: bigint;
-//   minimalL2GasPrice: bigint;
-// };
-
 export const ADDR_ZKSYNC_FIELDS = [
   "admin",
   "pendingAdmin",
