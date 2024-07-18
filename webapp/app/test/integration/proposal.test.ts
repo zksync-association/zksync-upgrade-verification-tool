@@ -1,9 +1,9 @@
 import { db } from "@/.server/db";
-import { createOrIgnoreProposal } from "@/.server/db/dto/proposals";
+import { createOrIgnoreProposal, getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { proposalsTable } from "@/.server/db/schema";
 import { eq } from "drizzle-orm";
 import { expect } from "vitest";
-import { createRandomProposal } from "../factory";
+import { createRandomProposal, createRandomProposalParams } from "../factory";
 
 describe("Proposal DB", () => {
   it("should create a proposal", async () => {
@@ -47,5 +47,18 @@ describe("Proposal DB", () => {
     const proposals = await db.select().from(proposalsTable);
     expect(proposals).toBeDefined();
     expect(proposals).toBeInstanceOf(Array);
+  });
+
+  it("should throw an error when creating a proposal with invalid data", async () => {
+    const invalidData = { ...createRandomProposalParams(), externalId: -2 };
+    await expect(createOrIgnoreProposal(invalidData as any)).rejects.toThrowError(
+      "Expected string, received number"
+    );
+  });
+
+  it("should return null when retrieving a non-existent proposal", async () => {
+    const nonExistentId = "0x1234567890123456789012345678901234567890";
+    const proposal = await getProposalByExternalId(nonExistentId);
+    expect(proposal).toBeUndefined();
   });
 });
