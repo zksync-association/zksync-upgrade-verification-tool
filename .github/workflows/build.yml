@@ -11,7 +11,7 @@ env:
   LOG_LEVEL: debug
   ETH_NETWORK: "mainnet"
   DATABASE_URL: postgresql://user:password@localhost:5432/webapp
-  NODE_ENV: development
+  NODE_ENV: test
   L1_RPC_URL: ${{ secrets.TENDERLY_RPC_URL }}
   L1_RPC_URL_FOR_UPGRADES: http://127.0.0.1:8545
   WALLET_CONNECT_PROJECT_ID: 00000000000000000000000000000000
@@ -25,7 +25,7 @@ jobs:
       FORCE_COLOR: 1
     defaults:
       run:
-        working-directory: ./cli 
+        working-directory: ./cli
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -42,7 +42,7 @@ jobs:
         with:
           lcov-file: ./cli/coverage/lcov.info
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          
+
   webapp-start:
     runs-on: ubuntu-latest
     steps:
@@ -75,4 +75,21 @@ jobs:
             echo "WebApp failed to start"
             exit 1
           fi
-    
+
+  webapp-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: pnpm install
+      - run: pnpm build
+      - name: Run integration tests
+        run: |
+          cd webapp
+          pnpm test:i

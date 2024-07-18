@@ -14,15 +14,15 @@
     "typecheck": "tsc",
     "ci:prepare": "run-s typecheck lint:fix",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node ./scripts/migrate.mjs",
+    "db:migrate": "pnpm tsx ./scripts/migrate.ts",
     "db:wait": "sleep 2",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down db",
-    "pretest:i": "NODE_ENV=test pnpm run db:up && pnpm run db:wait && pnpm db:migrate",
-    "test:i": "NODE_ENV=test vitest run --config ./vitest.integration.config.ts",
-    "posttest:i": "pnpm run db:down"
+    "pretest:i": "pnpm run db:up &&  pnpm run db:wait && pnpm db:migrate test",
+    "test:i": " vitest run --config ./vitest.integration.config.ts",
+    "posttest:i": " pnpm run db:down"
   },
   "dependencies": {
     "@headlessui/react": "^2.1.2",
