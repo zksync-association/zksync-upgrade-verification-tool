@@ -1,7 +1,7 @@
 import { GeneralErrorBoundary } from "@/components/error-boundary";
 import { WalletProvider } from "@/components/providers/wallet-provider";
 import { useNonce } from "@/utils/nonce-provider";
-import { clientEnv } from "@config/env.server";
+import { type CLIENT_ENV, clientEnv } from "@config/env.server";
 import { type LinksFunction, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "@remix-run/react";
 import { Toaster } from "react-hot-toast";
@@ -16,7 +16,10 @@ import "@rainbow-me/rainbowkit/styles.css";
 import ConnectRedirectProvider from "@/components/providers/connect-redirect-provider";
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: "https://rsms.me/inter/inter.css" },
+  {
+    rel: "stylesheet",
+    href: "https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap",
+  },
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -59,7 +62,7 @@ function Document({
 }: {
   children: React.ReactNode;
   nonce: string;
-  env?: typeof clientEnv;
+  env?: CLIENT_ENV;
   allowIndexing?: boolean;
 }) {
   return (

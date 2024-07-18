@@ -1,0 +1,11 @@
+services:
+  db:
+    image: postgres:13
+    ports:
+      - "5432:5432"
+    restart: always
+    container_name: integration-tests
+    environment:
+      POSTGRES_USER: "user"
+      POSTGRES_PASSWORD: "password"
+      POSTGRES_DB: "webapp"

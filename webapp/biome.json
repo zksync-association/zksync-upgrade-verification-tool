@@ -17,6 +17,9 @@
   },
   "linter": {
     "rules": {
+      "a11y": {
+        "useValidAriaRole": "off"
+      },
       "nursery": {
         "useSortedClasses": {
           "fix": "safe",
