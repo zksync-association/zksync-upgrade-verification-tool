@@ -1,11 +1,14 @@
 import { customType } from "drizzle-orm/pg-core";
+import type { Hex } from "viem";
 import { z } from "zod";
 
 const hexSchema = z.string().regex(/^0x[0-9a-fA-F]*$/);
-export type HexSchema = z.infer<typeof hexSchema>;
+export type HexString = z.infer<typeof hexSchema>;
+export const AddressSchema = hexSchema.length(42);
+export type AddressHex = z.infer<typeof AddressSchema>;
 
 export const bytea = customType<{
-  data: HexSchema;
+  data: Hex;
   driverData: Buffer;
 }>({
   dataType() {
@@ -18,8 +21,8 @@ export const bytea = customType<{
     }
     return Buffer.from(parsed, "hex");
   },
-  fromDriver(val): HexSchema {
+  fromDriver(val) {
     const hex = `0x${val.toString("hex")}`;
-    return hexSchema.parse(hex) as `0x${string}`;
+    return hexSchema.parse(hex) as Hex;
   },
 });

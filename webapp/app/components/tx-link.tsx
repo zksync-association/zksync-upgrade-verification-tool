@@ -12,7 +12,12 @@ export default function TxLink({ txid }: { txid: Hex }) {
       rel="noreferrer"
     >
       <span>{displayBytes32(txid)}</span>
-      <SquareArrowOutUpRight className="ml-1" width={12} height={12} />
+      <SquareArrowOutUpRight
+        className="ml-1"
+        width={12}
+        height={12}
+        data-testid="square-arrow-out-up-right-icon"
+      />
     </a>
   );
 }

@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     globals: true,
-    environment: "happy-dom",
+    environment: "jsdom",
     setupFiles: ["app/test/setup.unit.ts"],
     include: ["app/test/unit/*.{test,spec}.{ts,tsx}"],
   },

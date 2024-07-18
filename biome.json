@@ -46,6 +46,9 @@
       "suspicious": {
         "noExplicitAny": "off",
         "noAsyncPromiseExecutor": "off"
+      },
+      "a11y":{
+        "useValidAriaRole": "off"
       }
     }
   }
