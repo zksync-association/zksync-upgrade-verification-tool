@@ -130,3 +130,5 @@ dist
 
 .idea
 .vscode
+
+.cursorignore

@@ -1,23 +1,18 @@
 ![CoverImage](zkSyncEraUpgradeToolCover.png)
 
-
 # 🔍 zkSync Era Upgrade Verification Tool
 
-The zkSync Era Upgrade Verification Tool is composed of a **CLI and Web App tool crafted to decode and present zkSync Era upgrade proposals in a human-readable format**.
-
-<br>
+The zkSync Era Upgrade Verification Tool is composed of a **CLI and Web App tool crafted to decode and present zkSync Era upgrade proposals in a human-readable format**.  
 
 ## 🌟 **Features**
 
  > 🏗️ `Work In Progress` : This repo is being actively developed and does not represent final quality of the tool!
 
-  - **_[L1]_ Facets**: Identifies contract upgrades including additions or removals of functions.
-  - **_[L1]_ Verifier** : Detects upgrades and parameter changes in contracts.
-  - **_[L2]_ System Contracts**: Lists changes and validates bytecode hashes.
- - **_[L2]_ Bootloader and DefaultAccount**: Validates bytecode hash.
- - **Solidity Diff Tool**: Compares current contracts with upgrade proposals for verification. *Currently available for Facets, Verifier & System Contracts.*
-
-<br>
+- **_[L1]_ Facets**: Identifies contract upgrades including additions or removals of functions.
+- **_[L1]_ Verifier** : Detects upgrades and parameter changes in contracts.
+- **_[L2]_ System Contracts**: Lists changes and validates bytecode hashes.
+- **_[L2]_ Bootloader and DefaultAccount**: Validates bytecode hash.
+- **Solidity Diff Tool**: Compares current contracts with upgrade proposals for verification. _Currently available for Facets, Verifier & System Contracts.  
 
 ## 🔍 **Prerequisites**
 
@@ -81,33 +76,32 @@ pnpm install
 pnpm build
 ```
 
-#### **3. Etherscan Key setup**
-<br>
+#### **3. Etherscan Key setup**  
 
-> You can create an Etherscan API key at [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).
+> You can create an Etherscan API key at [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).  
 
-<br>
-
-##### ***Option 1: Environment Variables***
+##### _**Option 1: Environment Variables**_
 
 ```bash
 export ETHERSCAN_API_KEY="<your_etherscan_api_key>"
 ```
 
-##### ***Option 2: Configuration Files***
+##### _**Option 2: Configuration Files**_
 
 Alternatively, you can copy  env.example file and complete it with your keys:
 
 ```bash
 cp env.example .env
 ```
+
 This file should contain the following entries:
+
 ```bash
 # .env
 ETHERSCAN_API_KEY=your_etherscan_api_key
 ```
 
-##### ***Option 3: CLI Argument***
+##### _**Option 3: CLI Argument**_
 
  You can also specify your API keys directly as command line arguments when running commands that require them. For example:
 
@@ -116,11 +110,13 @@ pnpm validate --ethscanApiKey=your_etherscan_api_key
 ```
 
 ### 🛠️ **Usage**
+
 The zkSync Era Upgrade Verification Tool provides a range of commands for interacting with and verifying zkSync protocol upgrade data.
 
->**Etherscan API Key required.*
+>*_Etherscan API Key required._
 
-#### **`check <upgradeDir>`**:
+#### **`check <upgradeDir>`**
+
 Checks the validity of the upgrade and prints a summary of the changes.
 
 ```bash
@@ -130,12 +126,11 @@ pnpm validate check <upgradeDir>
 ```bash
 pnpm validate check ../zksync-era/etc/upgrades/1699353977-boojum #Example of check command with Boojum upgrade.
 ```
+  
 
-<br>
+#### **`facet-diff <upgradeDir> <facetName>`**
 
-#### **`facet-diff <upgradeDir> <facetName>`**:
 Shows the proposed changes in a specified facet.
-
 
 ```bash
 pnpm validate show-diff <upgradeDir> <facetName>
@@ -144,73 +139,75 @@ pnpm validate show-diff <upgradeDir> <facetName>
 ```bash
 pnpm validate facet-diff ../zksync-era/etc/upgrades/1699353977-boojum GettersFacet --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0 #Example with GettersFacet in Boojum upgrade with specific commit reference.
 ```
-<br>
+  
+#### **`verifier-diff <upgradeDir>`**
 
-#### **`verifier-diff <upgradeDir>`**:
 Shows the proposed changes between current verifier source code and the proposed one.
 
 ```bash
 pnpm validate verifier-diff <upgradeDir>
 ```
+
 ```bash
 pnpm validate verifier-diff ../zksync-era/etc/upgrades/1699353977-boojum #Example of verifier-diff command for Boojum upgrade.
 ```
+  
+#### **`download-diff <upgradeDir> <targetSourceCodeDir>`**
 
-<br>
-
-#### **`download-diff <upgradeDir> <targetSourceCodeDir>`** :
 Downloads both the current and proposed versions of each contract being upgraded for comparison.
 
 1. **Run the Command:**
+
     ```bash
       pnpm validate download-diff <upgradeDir> <targetSourceCodeDir>
     ```
+
     `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences.
 
-   *Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please refer to [--ref in options section.](#🎛️-options)*
-
+   _Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please refer to [--ref in options section.](#🎛️-options)_
 
 2. **Navigate to Directory:** After running the command, navigate to the `<targetSourceCodeDir>` directory.
-
-<br>
-
-3. **Use Your Preferred Diff Tool:** Once in the `<targetSourceCodeDir>`, you can use your preferred diff tool to compare the 'old' (*current*) versus 'new'  (*upgrade*) directory structure or specific files.
-    - *For example:*
+  
+3. **Use Your Preferred Diff Tool:** Once in the `<targetSourceCodeDir>`, you can use your preferred diff tool to compare the 'old' (_current_) versus 'new'  (_upgrade_) directory structure or specific files.
+    - _For example:_
         - ```diff -r old new```
         - ```meld old new```
         - ```vimdiff old new```
-
-<br>
-
+  
 ### 🎛️ **Options**
 
 The following options are available to configure the zkSync Era Upgrade Verification Tool:
 
 #### `-n`, `--network`
+
 Specifies the target network where the tool will perform the checks.
+
 - **Values**: `mainnet`, `sepolia`
 - **Default**: `mainnet`
-- **Example**: *Protodanksharding upgrade in sepolia*
+- **Example**: _Protodanksharding upgrade in sepolia_
 
 ```bash
 pnpm validate check ../zksync-era/etc/upgrades/1709067445-protodanksharding --network=sepolia
 ```
 
-####  `--rpc` , `--rpcUrl`
+#### `--rpc` , `--rpcUrl`
+
 Specifies the Ethereum RPC URL to be used for connecting to the blockchain.
+
 - **Default**:
   - `mainnet`: `https://ethereum-rpc.publicnode.com`
   - `sepolia`: `https://ethereum-sepolia-rpc.publicnode.com`
 
 #### `--ref`
+
 Specifies the GitHub commit reference from which the L2 code will be downloaded.
+
 - **Default**: The last commit on the `main` branch.
 - **Example**: `--ref` to commit (related to `boojum` upgrade in `download_dif` command).
 
   ```bash
   pnpm validate download-diff ../zksync-era/etc/upgrades/1699353977-boojum boojumDiff --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0
   ```
-
 
 ### ❓ **Help**
 
@@ -261,33 +258,20 @@ We welcome community feedback and suggestions which can be submitted via our Git
 
 ## Web App
 
-### 🏃 **Set up**
+## 🏃 **Web App: Set up**
 
-#### **1. Clone repository**
+> [!NOTE]  
+> Running `pnpm i` and `pnpm build` at the root level in previous steps will have built the webapp for you already.
 
-```bash
-git clone https://github.com/Moonsong-Labs/zksync-upgrade-verification-tool.git
-```
-
-#### **2. Install dependencies & build**
-
-We need to install all dependencies and build the CLI package, as the Web App uses the CLI package as a dependency.
-
-```bash
-cd zksync-upgrade-verification-tool
-pnpm install
-cd cli && pnpm build
-```
-
-#### **3. Run Postgres Database**
+### **1. Run Postgres Database**
 
 The Web App uses a Postgres database to store the upgrade data. You can run a Postgres database through Docker running our provided script in the webapp folder:
 
 ```bash
-./scripts/init-db.sh
+./scripts/init_db.sh
 ```
 
-#### **4. Environment keys setup**
+### **2. Environment keys setup**
 
 Before running the Web App, you need to set up the environment keys:
 
@@ -311,12 +295,11 @@ export ETH_NETWORK="mainnet"
 - `ETHERSCAN_API_KEY`: The Etherscan API key. You can get one at  [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).
 - `ETH_NETWORK`: The Ethereum network the Web App is running on, can be `mainnet`, `sepolia`.
 
-### 🛠️ **Usage**
+## 🛠️ **WebApp: Usage**
 
 To start using the web app, simply build it and start it:
 
-```bash
-pnpm build
+```shell
 pnpm start
 ```
 
@@ -327,6 +310,18 @@ In order to run the Web App in development mode, you can use the following comma
 ```bash
 pnpm dev
 ```
+
+## 🧪 **WebApp: Testing**
+
+### Unit Testing
+
+- Component level - verifies logic of react components
+- Uses `vitest` `testing-library`
+
+### E2E Testing
+
+- End-to-End - hosts the site locally and verifies via browser interactions
+- Uses `vitest` `playwright` `remix`
 
 ## 📄 **License**
 

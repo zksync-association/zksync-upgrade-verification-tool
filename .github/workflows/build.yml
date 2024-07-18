@@ -1,34 +1,113 @@
-name: Build & Test
+name: Build / Test CLI & WebApp
 on:
   push:
     branches:
       - "**"
 env:
+  FORCE_COLOR: 1
   ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+  NODE_OPTIONS: "--no-deprecation"
+  ALLOW_INDEXING: false
+  LOG_LEVEL: debug
+  ETH_NETWORK: "mainnet"
+  DATABASE_URL: postgresql://user:password@localhost:5432/webapp
+  NODE_ENV: test
+  L1_RPC_URL: ${{ secrets.TENDERLY_RPC_URL }}
+  L1_RPC_URL_FOR_UPGRADES: http://127.0.0.1:8545
+  WALLET_CONNECT_PROJECT_ID: 00000000000000000000000000000000
+  AUTH_SECRET: sososecret
+  UPGRADE_HANDLER_ADDRESS: "0xd88ce7170eac2aad76acc74bda448c512818a2d4"
 
 jobs:
-  build:
+  cli-build-and-test:
     runs-on: ubuntu-latest
     env:
       FORCE_COLOR: 1
+    defaults:
+      run:
+        working-directory: ./cli
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: 8
+          version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.15.0
+          node-version: 22
           cache: "pnpm"
       - run: pnpm install
-      - run: pnpm run build
-      - name: Link Binary & Test
-        # Temporary running only unit tests in ci.
-        run: pnpm i && pnpm run --filter=./cli test:ci
+      - run: pnpm test:ci
       - name: Coverage
         uses: romeovs/lcov-reporter-action@v0.3.1
         with:
           lcov-file: ./cli/coverage/lcov.info
-          github-token: ${{ github.token }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
+  webapp-start:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: |
+          pnpm install
+          pnpm build
+      - name: Start DB
+        run: |
+          cd webapp
+          ./scripts/init_db.sh
+          docker ps -a
+      - name: Start WebApp
+        run: |
+          cd webapp
+          timeout 60s pnpm start &
+          PID=$!
+          sleep 20
+          if ps -p $PID > /dev/null; then
+            echo "WebApp started successfully"
+            kill $PID
+          else
+            echo "WebApp failed to start"
+            exit 1
+          fi
 
+  webapp-integration-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: pnpm install
+      - run: pnpm build
+      - name: Run integration tests
+        run: |
+          cd webapp
+          pnpm test:i
+
+  webapp-unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: pnpm install
+      - run: pnpm build
+      - name: Run unit tests
+        run: |
+          cd webapp
+          pnpm test:u
