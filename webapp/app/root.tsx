@@ -1,7 +1,7 @@
 import { GeneralErrorBoundary } from "@/components/error-boundary";
 import { WalletProvider } from "@/components/providers/wallet-provider";
 import { useNonce } from "@/utils/nonce-provider";
-import { clientEnv } from "@config/env.server";
+import { type CLIENT_ENV, clientEnv } from "@config/env.server";
 import { type LinksFunction, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "@remix-run/react";
 import { Toaster } from "react-hot-toast";
@@ -62,7 +62,7 @@ function Document({
 }: {
   children: React.ReactNode;
   nonce: string;
-  env?: typeof clientEnv;
+  env?: CLIENT_ENV;
   allowIndexing?: boolean;
 }) {
   return (

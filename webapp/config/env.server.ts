@@ -30,8 +30,10 @@ export const clientEnv = {
   WALLET_CONNECT_PROJECT_ID: env.WALLET_CONNECT_PROJECT_ID,
 };
 
+export type CLIENT_ENV = typeof clientEnv;
+
 declare global {
   interface Window {
-    ENV: typeof clientEnv;
+    ENV: CLIENT_ENV;
   }
 }
