@@ -30,83 +30,117 @@ export const ADDRESS_ZERO = `0x${"0".repeat(40)}`;
 export const OPEN_ZEP_PROXY_IMPL_SLOT =
   "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
-
 const UPGRADE_FUNCTION_ABI_ITEM = {
-  inputs: [{
-    components: [{
-      components: [{ internalType: "uint256", name: "txType", type: "uint256" }, {
-        internalType: "uint256",
-        name: "from",
-        type: "uint256"
-      }, { internalType: "uint256", name: "to", type: "uint256" }, {
-        internalType: "uint256",
-        name: "gasLimit",
-        type: "uint256"
-      }, {
-        internalType: "uint256",
-        name: "gasPerPubdataByteLimit",
-        type: "uint256"
-      }, { internalType: "uint256", name: "maxFeePerGas", type: "uint256" }, {
-        internalType: "uint256",
-        name: "maxPriorityFeePerGas",
-        type: "uint256"
-      }, { internalType: "uint256", name: "paymaster", type: "uint256" }, {
-        internalType: "uint256",
-        name: "nonce",
-        type: "uint256"
-      }, { internalType: "uint256", name: "value", type: "uint256" }, {
-        internalType: "uint256[4]",
-        name: "reserved",
-        type: "uint256[4]"
-      }, { internalType: "bytes", name: "data", type: "bytes" }, {
-        internalType: "bytes",
-        name: "signature",
-        type: "bytes"
-      }, { internalType: "uint256[]", name: "factoryDeps", type: "uint256[]" }, {
-        internalType: "bytes",
-        name: "paymasterInput",
-        type: "bytes"
-      }, { internalType: "bytes", name: "reservedDynamic", type: "bytes" }],
-      internalType: "struct L2CanonicalTransaction",
-      name: "l2ProtocolUpgradeTx",
-      type: "tuple"
-    }, { internalType: "bytes[]", name: "factoryDeps", type: "bytes[]" }, {
-      internalType: "bytes32",
-      name: "bootloaderHash",
-      type: "bytes32"
-    }, { internalType: "bytes32", name: "defaultAccountHash", type: "bytes32" }, {
-      internalType: "address",
-      name: "verifier",
-      type: "address"
-    }, {
-      components: [{
-        internalType: "bytes32",
-        name: "recursionNodeLevelVkHash",
-        type: "bytes32"
-      }, {
-        internalType: "bytes32",
-        name: "recursionLeafLevelVkHash",
-        type: "bytes32"
-      }, { internalType: "bytes32", name: "recursionCircuitsSetVksHash", type: "bytes32" }],
-      internalType: "struct VerifierParams",
-      name: "verifierParams",
-      type: "tuple"
-    }, { internalType: "bytes", name: "l1ContractsUpgradeCalldata", type: "bytes" }, {
-      internalType: "bytes",
-      name: "postUpgradeCalldata",
-      type: "bytes"
-    }, { internalType: "uint256", name: "upgradeTimestamp", type: "uint256" }, {
-      internalType: "uint256",
-      name: "newProtocolVersion",
-      type: "uint256"
-    }], internalType: "struct ProposedUpgrade", name: "_proposedUpgrade", type: "tuple"
-  }],
+  inputs: [
+    {
+      components: [
+        {
+          components: [
+            { internalType: "uint256", name: "txType", type: "uint256" },
+            {
+              internalType: "uint256",
+              name: "from",
+              type: "uint256",
+            },
+            { internalType: "uint256", name: "to", type: "uint256" },
+            {
+              internalType: "uint256",
+              name: "gasLimit",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "gasPerPubdataByteLimit",
+              type: "uint256",
+            },
+            { internalType: "uint256", name: "maxFeePerGas", type: "uint256" },
+            {
+              internalType: "uint256",
+              name: "maxPriorityFeePerGas",
+              type: "uint256",
+            },
+            { internalType: "uint256", name: "paymaster", type: "uint256" },
+            {
+              internalType: "uint256",
+              name: "nonce",
+              type: "uint256",
+            },
+            { internalType: "uint256", name: "value", type: "uint256" },
+            {
+              internalType: "uint256[4]",
+              name: "reserved",
+              type: "uint256[4]",
+            },
+            { internalType: "bytes", name: "data", type: "bytes" },
+            {
+              internalType: "bytes",
+              name: "signature",
+              type: "bytes",
+            },
+            { internalType: "uint256[]", name: "factoryDeps", type: "uint256[]" },
+            {
+              internalType: "bytes",
+              name: "paymasterInput",
+              type: "bytes",
+            },
+            { internalType: "bytes", name: "reservedDynamic", type: "bytes" },
+          ],
+          internalType: "struct L2CanonicalTransaction",
+          name: "l2ProtocolUpgradeTx",
+          type: "tuple",
+        },
+        { internalType: "bytes[]", name: "factoryDeps", type: "bytes[]" },
+        {
+          internalType: "bytes32",
+          name: "bootloaderHash",
+          type: "bytes32",
+        },
+        { internalType: "bytes32", name: "defaultAccountHash", type: "bytes32" },
+        {
+          internalType: "address",
+          name: "verifier",
+          type: "address",
+        },
+        {
+          components: [
+            {
+              internalType: "bytes32",
+              name: "recursionNodeLevelVkHash",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes32",
+              name: "recursionLeafLevelVkHash",
+              type: "bytes32",
+            },
+            { internalType: "bytes32", name: "recursionCircuitsSetVksHash", type: "bytes32" },
+          ],
+          internalType: "struct VerifierParams",
+          name: "verifierParams",
+          type: "tuple",
+        },
+        { internalType: "bytes", name: "l1ContractsUpgradeCalldata", type: "bytes" },
+        {
+          internalType: "bytes",
+          name: "postUpgradeCalldata",
+          type: "bytes",
+        },
+        { internalType: "uint256", name: "upgradeTimestamp", type: "uint256" },
+        {
+          internalType: "uint256",
+          name: "newProtocolVersion",
+          type: "uint256",
+        },
+      ],
+      internalType: "struct ProposedUpgrade",
+      name: "_proposedUpgrade",
+      type: "tuple",
+    },
+  ],
   name: "upgrade",
   outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }],
   stateMutability: "nonpayable",
-  type: "function"
-} as const
-
+  type: "function",
+} as const;
 
 export const UPGRADE_FN_SELECTOR: Hex = toFunctionSelector(UPGRADE_FUNCTION_ABI_ITEM);
-
