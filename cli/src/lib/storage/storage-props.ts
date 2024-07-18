@@ -11,6 +11,36 @@ import { ArrayType } from "./types/array-type";
 import { DIAMOND_STORAGE_SLOT } from "./storage-changes";
 
 export const MAIN_CONTRACT_FIELDS = {
+  protocolVersion: new ContractField(
+    "ZkSyncHyperchainBase.s.protocolVersion",
+    33n,
+    "Stores the protocol version. Note, that the protocol version may not only encompass changes to the smart contracts, but also to the node behavior.",
+    new BigNumberType()
+  ),
+  verifierAddress: new ContractField(
+    "ZkSyncHyperchainBase.s.verifier",
+    10n,
+    "Verifier contract. Used to verify aggregated proof for batches",
+    new AddressType()
+  ),
+  l2BootloaderBytecodeHash: new ContractField(
+    "ZkSyncHyperchainBase.s.l2BootloaderBytecodeHash",
+    23n,
+    "Bytecode hash of bootloader program. Used as an input to zkp-circuit.",
+    new BlobType()
+  ),
+  l2DefaultAccountBytecodeHash: new ContractField(
+    "ZkSyncHyperchainBase.s.l2DefaultAccountBytecodeHash",
+    24n,
+    "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
+    new BlobType()
+  ),
+  adminAddress: new ContractField(
+    "ZkSyncHyperchainBase.s.admin",
+    36n,
+    "Address which will exercise non-critical changes to the Diamond Proxy (changing validator set & unfreezing)",
+    new AddressType()
+  ),
   blobVersionedHashRetriever: new ContractField(
     "ZkSyncHyperchainBase.s.blobVersionedHashRetriever",
     39n,
@@ -22,6 +52,24 @@ export const MAIN_CONTRACT_FIELDS = {
     40n,
     "The chainId of the chain",
     new BigNumberType()
+  ),
+  bridgehubAddress: new ContractField(
+    "ZkSyncHyperchainBase.s.bridgehub",
+    41n,
+    "The address of the bridgehub",
+    new AddressType()
+  ),
+  stateTransitionManager: new ContractField(
+    "ZkSyncHyperchainBase.s.stateTransitionManager",
+    42n,
+    "The address of the StateTransitionManager",
+    new AddressType()
+  ),
+  baseTokenBridgeAddress: new ContractField(
+    "ZkSyncHyperchainBase.s.baseTokenBridge",
+    44n,
+    "The address of the baseTokenbridge. Eth also uses the shared bridge",
+    new AddressType()
   ),
   baseTokenGasPriceMultiplierNominator: new ContractField(
     "ZkSyncHyperchainBase.s.baseTokenGasPriceMultiplierNominator",
@@ -36,6 +84,32 @@ export const MAIN_CONTRACT_FIELDS = {
     new BigNumberType(16),
     16
   ),
+  facetAddresses: new ContractField(
+    "DiamondStorage.facets",
+    DIAMOND_STORAGE_SLOT + 2n,
+    "The array of all unique facet addresses that belong to the diamond proxy",
+    new ArrayType(new AddressType())
+  ),
+  facetToSelectors: (facets: Hex[]) =>
+    new ContractField(
+      "DiamondStorage.facetToSelectors",
+      DIAMOND_STORAGE_SLOT + 1n,
+      "The array of all unique facet addresses that belong to the diamond proxy",
+      new MappingType(
+        facets.map((s) => hexToBytes(s)).map(Buffer.from),
+        new StructType([
+          {
+            name: "selectors",
+            type: new ArrayType(new BlobType(4)),
+          },
+          {
+            name: "facetPosition",
+            type: new BigNumberType(2),
+          },
+        ]),
+        true
+      )
+    ),
 };
 
 export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractField[] {
@@ -64,12 +138,7 @@ export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractFiel
       "List of permitted validators",
       new MappingType([], new BooleanType())
     ),
-    new ContractField(
-      "ZkSyncHyperchainBase.s.verifier",
-      10n,
-      "Verifier contract. Used to verify aggregated proof for batches",
-      new AddressType()
-    ),
+    MAIN_CONTRACT_FIELDS.verifierAddress,
     new ContractField(
       "ZkSyncHyperchainBase.s.totalBatchesExecuted",
       11n,
@@ -160,18 +229,8 @@ export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractFiel
         },
       ])
     ),
-    new ContractField(
-      "ZkSyncHyperchainBase.s.l2BootloaderBytecodeHash",
-      23n,
-      "Bytecode hash of bootloader program. Used as an input to zkp-circuit.",
-      new BlobType()
-    ),
-    new ContractField(
-      "ZkSyncHyperchainBase.s.l2DefaultAccountBytecodeHash",
-      24n,
-      "Bytecode hash of default account (bytecode for EOA). Used as an input to zkp-circuit.",
-      new BlobType()
-    ),
+    MAIN_CONTRACT_FIELDS.l2BootloaderBytecodeHash,
+    MAIN_CONTRACT_FIELDS.l2DefaultAccountBytecodeHash,
     new ContractField(
       "ZkSyncHyperchainBase.s.zkPorterIsAvailable",
       25n,
@@ -220,12 +279,7 @@ export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractFiel
       "[DEPRECATED] A mapping user address => the total deposited amount by the user",
       new MappingType([], new BigNumberType())
     ),
-    new ContractField(
-      "ZkSyncHyperchainBase.s.protocolVersion",
-      33n,
-      "Stores the protocol version. Note, that the protocol version may not only encompass changes to the smart contracts, but also to the node behavior.",
-      new BigNumberType()
-    ),
+    MAIN_CONTRACT_FIELDS.protocolVersion,
     new ContractField(
       "ZkSyncHyperchainBase.s.l2SystemContractsUpgradeTxHash",
       34n,
@@ -239,12 +293,7 @@ export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractFiel
         "yet transaction has happened",
       new BlobType()
     ),
-    new ContractField(
-      "ZkSyncHyperchainBase.s.admin",
-      36n,
-      "Address which will exercise non-critical changes to the Diamond Proxy (changing validator set & unfreezing)",
-      new AddressType()
-    ),
+    MAIN_CONTRACT_FIELDS.adminAddress,
     new ContractField(
       "ZkSyncHyperchainBase.s.pendingAdmin",
       37n,
@@ -285,12 +334,7 @@ export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractFiel
     ),
     MAIN_CONTRACT_FIELDS.blobVersionedHashRetriever,
     MAIN_CONTRACT_FIELDS.chainId,
-    new ContractField(
-      "ZkSyncHyperchainBase.s.bridgehub",
-      41n,
-      "The address of the bridgehub",
-      new AddressType()
-    ),
+    MAIN_CONTRACT_FIELDS.bridgehubAddress,
     new ContractField(
       "ZkSyncHyperchainBase.s.stateTransitionManager",
       42n,
@@ -303,12 +347,7 @@ export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractFiel
       "The address of the baseToken contract. Eth is address(1)",
       new AddressType()
     ),
-    new ContractField(
-      "ZkSyncHyperchainBase.s.baseTokenBridge",
-      44n,
-      "The address of the baseTokenbridge. Eth also uses the shared bridge",
-      new AddressType()
-    ),
+    MAIN_CONTRACT_FIELDS.baseTokenBridgeAddress,
     MAIN_CONTRACT_FIELDS.baseTokenGasPriceMultiplierNominator,
     MAIN_CONTRACT_FIELDS.baseTokenGasPriceMultiplierDenominator,
     new ContractField(
@@ -343,30 +382,7 @@ export function mainDiamondFields(selectors: Hex[], facets: Hex[]): ContractFiel
         false
       )
     ),
-    new ContractField(
-      "DiamondStorage.facetToSelectors",
-      DIAMOND_STORAGE_SLOT + 1n,
-      "The array of all unique facet addresses that belong to the diamond proxy",
-      new MappingType(
-        facets.map((s) => hexToBytes(s)).map(Buffer.from),
-        new StructType([
-          {
-            name: "selectors",
-            type: new ArrayType(new BlobType(4)),
-          },
-          {
-            name: "facetPosition",
-            type: new BigNumberType(2),
-          },
-        ]),
-        true
-      )
-    ),
-    new ContractField(
-      "DiamondStorage.facets",
-      DIAMOND_STORAGE_SLOT + 2n,
-      "The array of all unique facet addresses that belong to the diamond proxy",
-      new ArrayType(new AddressType())
-    ),
+    MAIN_CONTRACT_FIELDS.facetToSelectors(facets),
+    MAIN_CONTRACT_FIELDS.facetAddresses,
   ];
 }

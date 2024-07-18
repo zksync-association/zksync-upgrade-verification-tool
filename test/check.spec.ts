@@ -73,7 +73,7 @@ describe("validate check", () => {
         ["ExecutorFacet", "0x9e3Fa34a10619fEDd7aE40A3fb86FA515fcfd269", "None", "None"],
         ["MailboxFacet", "0x63b5EC36B09384fFA7106A80Ec7cfdFCa521fD08", "None", "None"],
         ["GettersFacet", "0xF3ACF6a03ea4a914B78Ec788624B25ceC37c14A4", "getAllowList()", "None"],
-      ];
+      ] as const;
 
       for (const [name, addr] of facetData) {
         validateFacet(name, addr);
@@ -196,7 +196,7 @@ describe("validate check", () => {
           "0x0000000000000000000000000000000000008010",
           "0x0100001fb52ca33668d01c230a1c3b13ede90fe2e37d77222410e9f183cb7a89",
         ],
-      ];
+      ] as const;
 
       for (const [name, addr, bytecodeHash] of systemContractData) {
         const systemContractLine = lines.findIndex(
@@ -210,7 +210,7 @@ describe("validate check", () => {
       const specialContractData = [
         ["Default Account", "0x01000651c5ae96f2aab07d720439e42491bb44c6384015e3a08e32620a4d582d"],
         [" Bootloader ", "0x01000983d4ac4f797cf5c077e022f72284969b13248c2a8e9846f574bdeb5b88"],
-      ];
+      ] as const;
 
       for (const [name, byteCodeHash] of specialContractData) {
         const line = lines.find((line) => line.includes(name));

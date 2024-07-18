@@ -125,6 +125,8 @@ export const downloadCodeCommand = async (
   const [proposed, systemContractsAddrs] = await withSpinner(
     () =>
       ZksyncEraState.fromCalldata(
+        "0x",
+        "0x",
         Buffer.from(hexToBytes(data)),
         env.network,
         env.l1Client(),

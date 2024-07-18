@@ -6,7 +6,7 @@ const stateParser = z.record(
   z.string(),
   z.object({
     nonce: zodOptional(z.number()),
-    storage: zodOptional(z.record(z.string(), z.string())),
+    storage: zodOptional(z.record(z.string(), zodHex)),
   })
 );
 
@@ -79,6 +79,20 @@ export const contractEventSchema = z.object({
   transactionHash: zodHex,
   blockNumber: zodHex,
   blockTimestamp: zodHex,
+});
+
+const baseCallTracerSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  input: z.string(),
+});
+
+export type CallTrace = z.infer<typeof baseCallTracerSchema> & {
+  calls?: CallTrace[];
+};
+
+export const callTracerSchema: z.ZodType<CallTrace> = baseCallTracerSchema.extend({
+  calls: z.lazy(() => callTracerSchema.array().optional()),
 });
 
 export type MemoryDiffRaw = z.infer<typeof memoryDiffParser>;

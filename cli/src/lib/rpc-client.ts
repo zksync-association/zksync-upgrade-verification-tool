@@ -10,7 +10,13 @@ import {
 } from "viem";
 import { type TypeOf, z, type ZodType } from "zod";
 import type { PublicClient, HttpTransport } from "viem";
-import { contractEventSchema, memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
+import {
+  type CallTrace,
+  callTracerSchema,
+  contractEventSchema,
+  memoryDiffParser,
+  type MemoryDiffRaw,
+} from "../schema/rpc";
 import { getStorageAt } from "viem/actions";
 
 const L1_DEFAULT_URLS = {
@@ -60,20 +66,20 @@ export class RpcClient {
   }
 
   async getByteCode(addr: Hex): Promise<Hex | undefined> {
-    return this.viemClient.getBytecode({ address: addr });
+    return this.viemClient.getCode({ address: addr });
   }
 
   async storageRead(addr: Hex, position: bigint): Promise<Hex> {
-    const readedValue = await getStorageAt(this.viemClient, {
+    const readValue = await getStorageAt(this.viemClient, {
       address: addr,
       slot: numberToHex(position, { size: 32 }),
     });
 
-    if (!readedValue) {
+    if (!readValue) {
       throw new Error("Error reading storage");
     }
 
-    return readedValue;
+    return readValue;
   }
 
   async contractRead<T extends ZodType>(
@@ -120,7 +126,7 @@ export class RpcClient {
     return res.json();
   }
 
-  async debugTraceCall(from: string, to: string, callData: string): Promise<MemoryDiffRaw> {
+  async debugCallTraceStorage(from: string, to: string, callData: Hex): Promise<MemoryDiffRaw> {
     const data = await this.rawCall("debug_traceCall", [
       {
         from,
@@ -137,6 +143,22 @@ export class RpcClient {
     ]);
 
     return memoryDiffParser.parse(data);
+  }
+
+  async debugCallTraceCalls(from: string, to: string, callData: Hex): Promise<CallTrace> {
+    const data = await this.rawCall("debug_traceCall", [
+      {
+        from,
+        to,
+        data: callData,
+      },
+      "latest",
+      {
+        tracer: "callTracer",
+      },
+    ]);
+
+    return callTracerSchema.parse(data.result);
   }
 
   async netVersion(): Promise<string> {

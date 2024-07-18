@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ZkSyncEraDiff } from "../src/lib/zk-sync-era-diff";
+import { ZkSyncEraDiff } from "../src/index";
 import {
   type ZkEraStateData,
   ZksyncEraState,
@@ -8,13 +8,14 @@ import {
   type L2ContractData,
 } from "../src/lib/zksync-era-state";
 import { MissingRequiredProp } from "../src/lib/errors";
-import { bytesToHex, type Hex } from "viem";
+import { type Hex, hexToBigInt } from "viem";
 import { BlockExplorerClient, type FacetData } from "../src/lib";
 import { Option } from "nochoices";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { SystemContractList } from "../src/lib/system-contract-providers";
-import { RpcClient } from "../src/lib/rpc-client";
+import { SystemContractList } from "../src/index";
+import { RpcClient } from "../src/index";
+import { bytesToBigint } from "viem/utils";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): ZkSyncEraDiff {
@@ -111,8 +112,8 @@ describe("NewZkSyncStateDiff", () => {
       const newVersion = `0x${"0".repeat(62)}12` as Hex;
 
       const diff = diffWithDataChanges(
-        { protocolVersion: oldVersion },
-        { protocolVersion: newVersion }
+        { protocolVersion: hexToBigInt(oldVersion) },
+        { protocolVersion: hexToBigInt(newVersion) }
       );
       const [old, proposed] = diff.protocolVersion();
       expect(old).toEqual("10");
@@ -125,8 +126,8 @@ describe("NewZkSyncStateDiff", () => {
       const newVersion = `0x${"0".repeat(62)}12` as Hex;
 
       const diff = diffWithDataChanges(
-        { protocolVersion: bytesToHex(oldVersion) },
-        { protocolVersion: newVersion }
+        { protocolVersion: bytesToBigint(oldVersion) },
+        { protocolVersion: hexToBigInt(newVersion) }
       );
       const [old, proposed] = diff.protocolVersion();
       expect(old).toEqual("0.1.0");
@@ -142,8 +143,8 @@ describe("NewZkSyncStateDiff", () => {
       newVersion[31] = 1;
 
       const diff = diffWithDataChanges(
-        { protocolVersion: bytesToHex(oldVersion) },
-        { protocolVersion: bytesToHex(newVersion) }
+        { protocolVersion: bytesToBigint(oldVersion) },
+        { protocolVersion: bytesToBigint(newVersion) }
       );
       const [old, proposed] = diff.protocolVersion();
       expect(old).toEqual("0.1.0");
@@ -155,7 +156,7 @@ describe("NewZkSyncStateDiff", () => {
       newVersion[27] = 1;
       newVersion[31] = 1;
 
-      const diff = diffWithDataChanges({}, { protocolVersion: bytesToHex(newVersion) });
+      const diff = diffWithDataChanges({}, { protocolVersion: bytesToBigint(newVersion) });
       expect(() => diff.protocolVersion()).toThrow(MissingRequiredProp);
     });
 
@@ -164,7 +165,7 @@ describe("NewZkSyncStateDiff", () => {
       oldVersion[27] = 1;
       oldVersion[31] = 1;
 
-      const diff = diffWithDataChanges({ protocolVersion: bytesToHex(oldVersion) }, {});
+      const diff = diffWithDataChanges({ protocolVersion: bytesToBigint(oldVersion) }, {});
       expect(() => diff.protocolVersion()).toThrow(MissingRequiredProp);
     });
   });
@@ -501,10 +502,12 @@ describe("NewZkSyncStateDiff", () => {
 
       const changes = await diff.systemContractChanges();
       expect(changes.length).to.eql(1);
-      expect(changes[0].address).to.eql("0x01");
-      expect(changes[0].name).to.eql("SystemContract01");
-      expect(changes[0].currentBytecodeHash.unwrap()).to.eql("0x000a");
-      expect(changes[0].proposedBytecodeHash).to.eql("0x000b");
+      const change = changes[0];
+      if (change === undefined) throw new Error("Should exist");
+      expect(change.address).to.eql("0x01");
+      expect(change.name).to.eql("SystemContract01");
+      expect(change.currentBytecodeHash.unwrap()).to.eql("0x000a");
+      expect(change.proposedBytecodeHash).to.eql("0x000b");
     });
 
     it("when hashes for old and new are the same is not returned", async () => {
@@ -536,47 +539,52 @@ describe("NewZkSyncStateDiff", () => {
   });
 
   describe("#createFromCallData", () => {
-    it.skip("works", async () => {
+    it("works", async (t) => {
+      const etherscanKey = process.env.ETHERSCAN_API_KEY;
+      const rpcUrl = process.env.RPC_URL;
+
+      if (!etherscanKey || !rpcUrl) {
+        return t.skip();
+      }
+
+      // This is a very specific calldata made by hand
       const hexBuff = await fs.readFile(
         path.join(import.meta.dirname, "data", "upgrade-calldata.hex")
       );
       const buff = Buffer.from(hexBuff.toString(), "hex");
 
-      const explorerL1 = BlockExplorerClient.forL1("IA817WPSNENBAK9EE3SNM1C5C31YUTZ4MV", "mainnet");
+      const explorerL1 = BlockExplorerClient.forL1(etherscanKey, "mainnet");
       const explorerL2 = BlockExplorerClient.forL2("mainnet");
-      const rpc = RpcClient.forL1("mainnet");
+      const rpc = new RpcClient(rpcUrl);
 
       const [state] = await ZksyncEraState.fromCalldata(
+        "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C",
+        "0x32400084c286cf3e17e7b677ea9583e60a000324",
         buff,
         "mainnet",
         explorerL1,
         rpc,
         explorerL2
       );
+
       const facets = state.allFacets();
       const admin = facets.find((f) => f.name === "AdminFacet");
       if (!admin) {
         return expect.fail("admin should be present");
       }
-      expect(admin.address).toEqual("0xF6F26b416CE7AE5e5FE224Be332C7aE4e1f3450a");
+      expect(admin.address).toEqual("0x230214f0224c7e0485f348a79512ad00514db1f7");
 
       const getters = facets.find((f) => f.name === "GettersFacet");
-      if (!getters) {
-        return expect.fail("getters should be present");
-      }
-      expect(getters.address).toEqual("0xE60E94fCCb18a81D501a38959E532C0A85A1be89");
+      expect(getters).toBe(undefined);
 
       const mailbox = facets.find((f) => f.name === "MailboxFacet");
       if (!mailbox) {
         return expect.fail("mailbox should be present");
       }
-      expect(mailbox.address).toEqual("0xCDB6228b616EEf8Df47D69A372C4f725C43e718C");
+      expect(mailbox.address).toEqual("0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7");
 
       const executor = facets.find((f) => f.name === "ExecutorFacet");
-      if (!executor) {
-        return expect.fail("executor should be present");
-      }
-      expect(executor.address).toEqual("0xaD193aDe635576d8e9f7ada71Af2137b16c64075");
+      expect(executor).toBe(undefined);
 
       expect(state.numberAttrValue("chainId").unwrap()).toEqual(324n);
       expect(state.hexAttrValue("bridgeHubAddress").unwrap().toLowerCase()).toEqual(
@@ -869,8 +877,8 @@ describe("NewZkSyncStateDiff", () => {
       ];
 
       for (const { addr, name } of l2Contracts) {
-        const empty1 = await state.dataForL2Address(addr as Hex);
-        expect(empty1.unwrap().name).toMatch(new RegExp(name));
+        const contract = await state.dataForL2Address(addr as Hex);
+        expect(contract.unwrap().name).toMatch(new RegExp(name));
       }
     });
   });

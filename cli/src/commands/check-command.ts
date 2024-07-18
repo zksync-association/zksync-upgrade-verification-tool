@@ -1,5 +1,5 @@
 import type { EnvBuilder } from "../lib/env-builder";
-import { StringCheckReport, ZkSyncEraDiff, ZksyncEraState } from "../lib/index";
+import { DIAMOND_ADDRS, StringCheckReport, ZkSyncEraDiff, ZksyncEraState } from "../lib/index";
 import { hexToBytes } from "viem";
 import { withSpinner } from "../lib/with-spinner";
 import { MalformedUpgrade } from "../lib/errors";
@@ -28,9 +28,15 @@ export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
     env
   );
 
+  const stateManagerAddress = current
+    .hexAttrValue("stateTransitionManagerAddress")
+    .expect(new Error("Should be present"));
+
   const [proposed, systemContractsAddrs] = await withSpinner(
     () =>
       ZksyncEraState.fromCalldata(
+        stateManagerAddress,
+        DIAMOND_ADDRS[env.network],
         Buffer.from(hexToBytes(data)),
         env.network,
         env.l1Client(),

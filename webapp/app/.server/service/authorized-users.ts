@@ -1,4 +1,4 @@
-import { l1RpcProposals } from "@/.server/service/clients";
+import { l1Rpc } from "@/.server/service/clients";
 import { guardiansAbi, scAbi, upgradeHandlerAbi } from "@/.server/service/contract-abis";
 import { env } from "@config/env.server";
 import { zodHex } from "validate-cli";
@@ -11,16 +11,11 @@ const range = (l: number): number[] => new Array(l).fill(0).map((_, i) => i);
 
 export const UserRole = z.enum(["guardian", "securityCouncil"]);
 export async function guardiansAddress(): Promise<Hex> {
-  return l1RpcProposals.contractRead(
-    upgradeHandlerAddress,
-    "guardians",
-    upgradeHandlerAbi.raw,
-    zodHex
-  );
+  return l1Rpc.contractRead(upgradeHandlerAddress, "guardians", upgradeHandlerAbi.raw, zodHex);
 }
 
 export async function councilAddress(): Promise<Hex> {
-  return l1RpcProposals.contractRead(
+  return l1Rpc.contractRead(
     upgradeHandlerAddress,
     "securityCouncil",
     upgradeHandlerAbi.raw,
@@ -31,9 +26,7 @@ export async function councilAddress(): Promise<Hex> {
 export async function guardianMembers(): Promise<Hex[]> {
   return Promise.all(
     range(8).map(async (i) =>
-      l1RpcProposals.contractRead(await guardiansAddress(), "members", guardiansAbi.raw, z.any(), [
-        i,
-      ])
+      l1Rpc.contractRead(await guardiansAddress(), "members", guardiansAbi.raw, z.any(), [i])
     )
   );
 }
@@ -41,7 +34,7 @@ export async function guardianMembers(): Promise<Hex[]> {
 export async function councilMembers(): Promise<Hex[]> {
   return Promise.all(
     range(12).map(async (i) =>
-      l1RpcProposals.contractRead(await councilAddress(), "members", scAbi.raw, z.any(), [i])
+      l1Rpc.contractRead(await councilAddress(), "members", scAbi.raw, z.any(), [i])
     )
   );
 }

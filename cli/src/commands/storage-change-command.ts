@@ -25,7 +25,7 @@ async function getMemoryPath(
     .unwrapOrElse(() => {
       return env
         .rpcL1()
-        .debugTraceCall(
+        .debugCallTraceStorage(
           "0x0b622a2061eaccae1c664ebc3e868b8438e03f61",
           address,
           changes.upgradeCalldataHex.expect(new Error("Missing upgrade calldata"))

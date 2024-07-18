@@ -139,24 +139,24 @@ export class StringCheckReport {
 
     const table = new CliTable({ style: { border: [] } });
     table.push(["Field name", "Field Values"]);
-    for (const field of HEX_ZKSYNC_FIELDS) {
-      const [before, maybeAfter] = this.diff.hexAttrDiff(field);
 
-      const after = maybeAfter.map((v) => this.formatHex(v)).unwrapOr("No changes.");
-      table.push(
-        [{ content: field, rowSpan: 2, vAlign: "center" }, `Current: ${this.formatHex(before)}`],
-        [`Proposed: ${after}`]
-      );
-    }
+    const hexes = HEX_ZKSYNC_FIELDS.map((f) => [f, this.diff.hexAttrDiff(f)] as const).map(
+      ([f, [current, maybeAfter]]) =>
+        [f, this.formatHex(current), maybeAfter.map((after) => this.formatHex(after))] as const
+    );
 
-    for (const field of NUMERIC_ZKSYNC_FIELDS) {
-      const [before, maybeAfter] = this.diff.numberAttrDiff(field);
+    const numbers = NUMERIC_ZKSYNC_FIELDS.map((f) => [f, this.diff.numberAttrDiff(f)] as const).map(
+      ([f, [current, maybeAfter]]) =>
+        [f, current.toString(), maybeAfter.map((after) => after.toString())] as const
+    );
 
-      const after = maybeAfter.map((v) => v.toString()).unwrapOr("No changes.");
-      table.push(
-        [{ content: field, rowSpan: 2, vAlign: "center" }, `Current: ${before}`],
-        [`Proposed: ${after}`]
-      );
+    for (const [field, current, maybeProposed] of [...hexes, ...numbers]) {
+      maybeProposed.ifSome((proposed) => {
+        table.push(
+          [{ content: field, rowSpan: 2, vAlign: "center" }, `Current: ${current}`],
+          [`Proposed: ${proposed}`]
+        );
+      });
     }
 
     lines.push(table.toString(), "");

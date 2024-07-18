@@ -3,13 +3,14 @@ import { type ContractsRepo, StringCheckReport, SystemContractList, ZkSyncEraDif
 import {
   HEX_ZKSYNC_FIELDS,
   type L2ContractData,
+  NUMERIC_ZKSYNC_FIELDS,
   type ZkEraStateData,
   ZksyncEraState,
 } from "../src/lib/zksync-era-state";
 import { TestBlockExplorer } from "./utilities/test-block-explorer";
 import { ContractAbi } from "../src/lib/contract-abi";
 import type { BlockExplorer } from "../src";
-import type { Hex } from "viem";
+import { type Hex, hexToBigInt } from "viem";
 import { TestContractRepo } from "./utilities/test-contract-repo";
 import { Option } from "nochoices";
 import { type CheckReportObj, ObjectCheckReport } from "../src";
@@ -110,7 +111,9 @@ describe("CheckReport", () => {
     ];
 
     ctx.currentFields = {
-      protocolVersion: "0x000000000000000000000000000000000000000000000000000000000000000f",
+      protocolVersion: hexToBigInt(
+        "0x000000000000000000000000000000000000000000000000000000000000000f"
+      ),
       admin: "0x010a",
       pendingAdmin: "0x020a",
       verifierAddress: "0x030a",
@@ -164,7 +167,9 @@ describe("CheckReport", () => {
     }
 
     ctx.proposedFields = {
-      protocolVersion: "0x0000000000000000000000000000000000000000000000000000001800000001",
+      protocolVersion: hexToBigInt(
+        "0x0000000000000000000000000000000000000000000000000000001800000001"
+      ),
       admin: "0x010b",
       pendingAdmin: "0x020b",
       verifierAddress: "0x030b",
@@ -173,6 +178,7 @@ describe("CheckReport", () => {
       stateTransitionManagerAddress: "0x060b",
       l2DefaultAccountBytecodeHash: "0x070b",
       l2BootloaderBytecodeHash: "0x080b",
+      // baseTokenBridgeAddress: "0x090b" # skip this prop to test the case when a prop keeps the same.
       chainId: 101n,
       baseTokenGasPriceMultiplierNominator: 201n,
     };
@@ -295,21 +301,19 @@ describe("CheckReport", () => {
       const lines = await createReportLines(ctx);
 
       for (const field of HEX_ZKSYNC_FIELDS) {
+        if (field === "baseTokenBridgeAddress") continue; // This property is kept the same in this test
         const line = lines.findIndex((l) => l.includes(field));
         expect(line).not.toEqual(-1);
         expect(lines[line - 1]).toContain(ctx.currentFields[field]);
       }
 
-      for (const field of HEX_ZKSYNC_FIELDS) {
+      for (const field of NUMERIC_ZKSYNC_FIELDS) {
+        if (field === "baseTokenGasPriceMultiplierDenominator") continue; // This property is kept the same in this test
         const line = lines.findIndex((l) => l.includes(field));
         expect(line).not.toEqual(-1);
         expect(lines[line - 1]).toContain(`Current: ${ctx.currentFields[field]}`);
         const proposed = ctx.proposedFields[field];
-        if (proposed) {
-          expect(lines[line + 1]).toContain(`Proposed: ${ctx.proposedFields[field]}`);
-        } else {
-          expect(lines[line + 1]).toContain("No changes");
-        }
+        expect(lines[line + 1]).toContain(`Proposed: ${proposed}`);
       }
     });
 
@@ -405,9 +409,9 @@ describe("CheckReport", () => {
             },
             {
               name: "protocolVersion",
-              current: "0x000000000000000000000000000000000000000000000000000000000000000f",
-              proposed: "0x0000000000000000000000000000000000000000000000000000001800000001",
-              type: "bytes32",
+              current: "15",
+              proposed: "103079215105",
+              type: "number",
             },
             {
               name: "baseTokenGasPriceMultiplierNominator",
@@ -501,7 +505,7 @@ describe("CheckReport", () => {
       for (const a of ctx.sysContractsAfter.slice(0, 2)) {
         repo.addHash(a.name, a.bytecodeHash);
       }
-      repo.addHash(ctx.sysContractsAfter[2].name, "WrongHash");
+      repo.addHash(ctx.sysContractsAfter[2]!.name, "WrongHash");
 
       ctx.contractsRepo = repo;
 

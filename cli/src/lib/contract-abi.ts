@@ -3,6 +3,7 @@ import {
   type AbiEvent,
   type AbiFunction,
   decodeFunctionData,
+  encodeFunctionData,
   type Hex,
   toEventSelector,
   toFunctionSelector,
@@ -45,11 +46,23 @@ export class ContractAbi {
     return schema.parse(raw);
   }
 
+  encodeCallData(name: string, args: any[]): Hex {
+    return encodeFunctionData({
+      functionName: name,
+      args: args,
+      abi: this.raw,
+    });
+  }
+
   eventIdFor(eventName: string): Hex {
     const abiElem = this.raw.find((e) => e.type === "event" && e.name === eventName);
     if (!abiElem) {
       throw new Error(`Event "${eventName}" not present in abi.`);
     }
     return toEventSelector(abiElem as AbiEvent);
+  }
+
+  hasFunction(name: string): boolean {
+    return this.raw.some((t) => t.type === "function" && t.name === name);
   }
 }
