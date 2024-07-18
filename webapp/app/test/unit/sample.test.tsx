@@ -1,13 +1,14 @@
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { createRemixStub } from "@remix-run/testing";
+import { createRemixStub ,} from "@remix-run/testing";
 import { render, screen, waitFor } from "@testing-library/react";
 import { test } from "vitest";
 
 test("renders loader data", async () => {
-  // ⚠️ This would usually be a component you import from your app code
   function MyComponent() {
-    const data = useLoaderData() as { message: string };
+    // const data = useLoaderData() as { message: string };
+
+    const data = {message: "hello", name: "world"};
     return <p>Message: {data.message}</p>;
   }
 

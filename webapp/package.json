@@ -20,9 +20,13 @@
     "db:studio": "drizzle-kit studio",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down db",
+    "test:u": "vitest run --config ./vitest.unit.config.ts",
     "pretest:i": "pnpm run db:up &&  pnpm run db:wait && pnpm db:migrate test",
-    "test:i": " vitest run --config ./vitest.integration.config.ts",
-    "posttest:i": " pnpm run db:down"
+    "test:i": "vitest run --config ./vitest.integration.config.ts",
+    "posttest:i": "pnpm run db:down",
+    "pretest:i:ui": "pnpm run db:up &&  pnpm run db:wait && pnpm db:migrate test",
+    "test:i:ui": "vitest run --config ./vitest.integration.config.ts --ui --api 9588",
+    "posttest:i:ui": "pnpm run db:down"
   },
   "dependencies": {
     "@headlessui/react": "^2.1.2",
@@ -81,6 +85,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "@vitest/browser": "^2.0.3",
+    "@vitest/ui": "^2.0.3",
     "autoprefixer": "^10.4.19",
     "dotenv": "^16.4.5",
     "drizzle-kit": "^0.22.8",
