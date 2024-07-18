@@ -5,12 +5,7 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 async function main() {
-  const env = process.argv[2];
-
-  console.log(`Running on Environment: ${env}`);
-
-  const envFile = `.env.${env}`;
-  dotenv.config({ path: envFile });
+  dotenv.config({ path: ".env" });
 
   if (!process.env.DATABASE_URL) {
     throw new Error("Database url env var not defined");
