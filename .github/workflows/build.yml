@@ -76,7 +76,7 @@ jobs:
             exit 1
           fi
 
-  webapp-test:
+  webapp-integration-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -93,3 +93,21 @@ jobs:
         run: |
           cd webapp
           pnpm test:i
+
+  webapp-unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: pnpm install
+      - run: pnpm build
+      - name: Run unit tests
+        run: |
+          cd webapp
+          pnpm test:u
