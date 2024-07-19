@@ -99,7 +99,7 @@ describe("MemoryMapReport", () => {
         "some description",
         new AddressType()
       );
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges([], null, null, [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -120,7 +120,7 @@ describe("MemoryMapReport", () => {
         "it is a number",
         new BigNumberType()
       );
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges([], null, null, [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -131,7 +131,7 @@ describe("MemoryMapReport", () => {
 
     it("can display blob elements", async () => {
       const prop = new ContractField("blobProp", BigInt(0xa), "it is a blob", new BlobType());
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges([], null, null, [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -147,7 +147,7 @@ describe("MemoryMapReport", () => {
 
     it("can display boolean elements", async () => {
       const prop = new ContractField("blobProp", boolSlot, "it is a blob", new BooleanType());
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges([], null, null, [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -163,7 +163,7 @@ describe("MemoryMapReport", () => {
         "it is a list",
         new ArrayType(new BigNumberType())
       );
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges([], null, null, [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -182,7 +182,7 @@ describe("MemoryMapReport", () => {
         "it is a list",
         new FixedArrayType(3, new BigNumberType())
       );
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges([], null, null, [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -201,7 +201,7 @@ describe("MemoryMapReport", () => {
         "it is a list",
         new FixedArrayType(3, new BigNumberType())
       );
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges([], null, null, [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -237,7 +237,7 @@ describe("MemoryMapReport", () => {
           },
         ])
       );
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges([], null, null, [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 

@@ -2,11 +2,13 @@ import type { EnvBuilder } from "../lib/env-builder";
 import { DIAMOND_ADDRS, type UpgradeChanges, UpgradeImporter } from "../lib";
 import { StorageChanges } from "../lib/storage/storage-changes";
 import type { Hex } from "viem";
-import type { Option } from "nochoices";
+import { Option } from "nochoices";
 import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
 import { withSpinner } from "../lib/with-spinner";
 import { StringStorageChangeReport } from "../lib/reports/string-storage-change-report";
 import { ZksyncEraState } from "../lib/zksync-era-state";
+import { RpcStorageSnapshot } from "../lib/storage/rpc-storage-snapshot";
+import { RecordStorageSnapshot } from "../lib/storage/record-storage-snapshot";
 
 async function getMemoryPath(
   preCalculatedPath: Option<string>,
@@ -38,7 +40,7 @@ export async function storageChangeCommand(
   dir: string,
   preCalculatedPath: Option<string>
 ): Promise<void> {
-  const state = await withSpinner(
+  const currentState = await withSpinner(
     () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
     "Gathering contract data",
     env
@@ -46,10 +48,16 @@ export async function storageChangeCommand(
   const importer = new UpgradeImporter(env.fs());
   const changes = await importer.readFromFiles(dir, env.network);
 
-  const rawMap = await getMemoryPath(preCalculatedPath, env, DIAMOND_ADDRS[env.network], changes);
+  const diamondaddr = DIAMOND_ADDRS[env.network];
+  const rawMap = await getMemoryPath(preCalculatedPath, env, diamondaddr, changes);
+  const cc = Option.fromNullable(rawMap.result.post[diamondaddr])
+    .map(data => data.storage).flatten()
+    .orElse(() => Option.Some({}))
+    .map(s => new RecordStorageSnapshot(s))
+    .unwrap()
 
   const selectors = new Set<Hex>();
-  for (const selector of state.allSelectors()) {
+  for (const selector of currentState.allSelectors()) {
     selectors.add(selector);
   }
   for (const selector of changes.allSelectors()) {
@@ -57,21 +65,19 @@ export async function storageChangeCommand(
   }
 
   const facets = new Set<Hex>();
-  for (const addr of state.allFacetsAddrs()) {
+  for (const addr of currentState.allFacetsAddrs()) {
     facets.add(addr);
   }
   for (const addr of changes.allFacetsAddresses()) {
     facets.add(addr);
   }
 
-  const memoryMap = new StorageChanges(
-    rawMap,
-    DIAMOND_ADDRS[env.network],
-    [...selectors],
-    ["0x10113bb3a8e64f8ed67003126adc8ce74c34610c"]
-  );
+  const pre = new RpcStorageSnapshot(env.rpcL1(), diamondaddr);
+  const post = pre.apply(cc)
 
-  const report = new StringStorageChangeReport(memoryMap, env.colored);
+  const storageChanges = new StorageChanges([...selectors], pre, post);
+
+  const report = new StringStorageChangeReport(storageChanges, env.colored);
 
   env.term().line(await report.format());
 }

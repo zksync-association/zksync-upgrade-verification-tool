@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { StorageChanges } from "../src";
+import { memoryDiffParser, StorageChanges } from "../src";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { memoryDiffParser } from "../src";
 import { bytesToHex, type Hex, hexToBigInt } from "viem";
 import { AddressType } from "../src/lib/storage/types/address-type";
 import { StructType } from "../src/lib/storage/types/struct-type";
@@ -14,6 +13,8 @@ import { type PropertyChange } from "../src/lib/storage/property-change";
 import type { StorageValue } from "../src/lib/storage/values/storage-value";
 import type { ValueField } from "../src/lib/storage/values/struct-value";
 import { Option } from "nochoices";
+import { RecordStorageSnapshot } from "../src/lib/storage/record-storage-snapshot";
+import type { StorageSnapshot } from "../src/lib/storage/storage-snapshot";
 
 class TestReport implements StorageVisitor<string> {
   beforeData: Option<string>;
@@ -87,16 +88,37 @@ class TestReport implements StorageVisitor<string> {
   }
 }
 
+const ADDRESS = "0x32400084c286cf3e17e7b677ea9583e60a000324";
+
 describe("MemoryMap", () => {
+  const extractPreAndPost = async (rawDiff: Buffer): Promise<[ StorageSnapshot, StorageSnapshot ]> => {
+    const json = memoryDiffParser.parse(JSON.parse(rawDiff.toString()));
+
+    if (!json.result.pre[ADDRESS]) {
+      throw new Error()
+    }
+
+    if (!json.result.post[ADDRESS]) {
+      throw new Error()
+    }
+
+    const pre = json.result.pre[ADDRESS].storage
+      .map(s => new RecordStorageSnapshot(s) )
+      .unwrap()
+
+    const post = json.result.post[ADDRESS]!.storage
+      .map(s => new RecordStorageSnapshot(s))
+      .unwrap()
+
+    return [ pre, post ]
+  }
+
+
   const subject = async (file: string, selectors: Hex[] = [], facets: Hex[] = []) => {
     const diff = await fs.readFile(path.join(import.meta.dirname, "data", file));
-    const json = memoryDiffParser.parse(JSON.parse(diff.toString()));
-    return new StorageChanges(
-      json,
-      "0x32400084c286cf3e17e7b677ea9583e60a000324",
-      selectors,
-      facets
-    );
+    const [pre, post ] = await extractPreAndPost(diff)
+
+    return new StorageChanges(selectors, pre, post, facets, []);
   };
 
   const scenario = async (
@@ -311,7 +333,9 @@ describe("MemoryMap", () => {
     const diff = await fs.readFile(
       path.join(import.meta.dirname, "data", "realistic-memory-diff.json")
     );
-    const json = memoryDiffParser.parse(JSON.parse(diff.toString()));
+
+    const [pre, post] = await extractPreAndPost(diff)
+
     const prop = new ContractField(
       "myStruct",
       hexToBigInt("0xf78707ba12ab026e6a86b731b9d6b0fc0e151ddd06be4f9f8e940a8fa89bb893"),
@@ -332,13 +356,7 @@ describe("MemoryMap", () => {
       ])
     );
 
-    const map = new StorageChanges(
-      json,
-      "0x32400084c286cf3e17e7b677ea9583e60a000324",
-      [],
-      [],
-      [prop]
-    );
+    const map = new StorageChanges([], pre, post, [], [prop]);
 
     const change = (await map.changeFor("myStruct")).unwrap();
 

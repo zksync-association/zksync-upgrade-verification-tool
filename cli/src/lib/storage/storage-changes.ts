@@ -19,28 +19,13 @@ export class StorageChanges {
   private facets: Hex[];
 
   constructor(
-    diff: MemoryDiffRaw,
-    addr: string,
     selectors: Hex[],
+    pre: StorageSnapshot,
+    post: StorageSnapshot,
     facets: Hex[] = [],
-    contractProps: ContractField[] = []
-  ) {
-    const pre = diff.result.pre[addr];
-    const post = diff.result.post[addr];
-
-    if (!pre) {
-      throw new Error("missing pre");
-    }
-
-    if (!post) {
-      throw new Error("missing post");
-    }
-
-    const preStorage = pre.storage.unwrapOr({});
-    const postStorage = post.storage.unwrapOr({});
-
-    this.pre = new RecordStorageSnapshot(preStorage);
-    this.post = new RecordStorageSnapshot(postStorage);
+    contractProps: ContractField[] = []) {
+    this.pre = pre;
+    this.post = post;
     this.selectors = selectors;
     this.facets = facets;
     this.contractProps = contractProps.length === 0 ? this.allContractProps() : contractProps;
