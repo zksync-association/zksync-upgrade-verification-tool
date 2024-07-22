@@ -1,0 +1,12 @@
+overwrite: true
+schema:
+  - "https://api.tally.xyz/query":
+      headers:
+        Api-Key: ${TALLY_API_KEY}
+documents: "webapp/app/.server/service/**/*.ts"
+generates:
+  webapp/app/.server/service/generated/graphql.ts:
+    plugins:
+      - "typescript"
+      - "typescript-operations"
+      - "typescript-urql"

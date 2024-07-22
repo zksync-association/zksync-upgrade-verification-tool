@@ -27,7 +27,7 @@ import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { defer, json } from "@remix-run/node";
-import { Await, useLoaderData, useAsyncValue } from "@remix-run/react";
+import { Await, useLoaderData } from "@remix-run/react";
 import { Suspense } from "react";
 import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
@@ -430,13 +430,16 @@ export default function Proposals() {
                         <CardHeader>
                           <CardTitle>Loading Info From Tally</CardTitle>
                         </CardHeader>
-                        <CardContent className="flex justify-center items-center h-40">
+                        <CardContent className="flex h-40 items-center justify-center">
                           <Loading />
                         </CardContent>
                       </Card>
                     }
                   >
-                    <Await resolve={tallyData}>
+                    <Await
+                      resolve={tallyData}
+                      errorElement={<div>Problem with fetching from Tally 😰</div>}
+                    >
                       <TallyInfo />
                     </Await>
                   </Suspense>

@@ -1,0 +1,31 @@
+query Proposal($proposalId: String!, $governorId: AccountID!) {
+  proposal(
+    input: {
+      onchainId: $proposalId
+      governorId: $governorId
+    }
+  ) {
+    onchainId
+    chainId
+    createdAt
+    l1ChainId
+    originalId
+    quorum
+    status
+    governor {
+      isPrimary
+      name
+      quorum
+      type
+    }
+    metadata {
+      title
+      description
+      eta
+      ipfsHash
+      txHash
+      discourseURL
+      snapshotURL
+    }
+  }
+}

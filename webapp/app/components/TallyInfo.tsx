@@ -1,34 +1,43 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAsyncValue } from "@remix-run/react";
+import { useAsyncError, useAsyncValue } from "@remix-run/react";
 import ReactMarkdown from "react-markdown";
 
 export default function TallyInfo() {
-    const {data:{proposal:{metadata}} } = useAsyncValue();
+  const {
+    data: {
+      proposal: { metadata },
+    },
+  } = useAsyncValue();
 
-    const { title, description } = metadata;
-    return (
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ReactMarkdown
-            className="prose max-w-none"
-            components={{
-              h1: HeadingRenderer,
-              h2: HeadingRenderer,
-              h3: HeadingRenderer,
-              h4: HeadingRenderer,
-              h5: HeadingRenderer,
-              h6: HeadingRenderer,
-            }}
-          >
-            {description}
-          </ReactMarkdown>
-        </CardContent>
-      </Card>
-    );
+  const error = useAsyncError();
+  if (error) {
+    return <div>{error.message}</div>;
   }
+
+  const { title, description } = metadata;
+  return (
+    <Card className="mt-4">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ReactMarkdown
+          className="prose max-w-none"
+          components={{
+            h1: HeadingRenderer,
+            h2: HeadingRenderer,
+            h3: HeadingRenderer,
+            h4: HeadingRenderer,
+            h5: HeadingRenderer,
+            h6: HeadingRenderer,
+          }}
+        >
+          {description}
+        </ReactMarkdown>
+      </CardContent>
+    </Card>
+  );
+}
 
 const HeadingRenderer = ({
   children,
@@ -38,9 +47,9 @@ const HeadingRenderer = ({
 
   switch (props.node?.tagName) {
     case "h1":
-      return <h1 className={`${baseClasses} text-3xl my-4`}>{children}</h1>;
+      return <h1 className={`${baseClasses} my-4 text-3xl`}>{children}</h1>;
     case "h2":
-      return <h2 className={`${baseClasses} text-2xl my-3`}>{children}</h2>;
+      return <h2 className={`${baseClasses} my-3 text-2xl`}>{children}</h2>;
     case "h3":
       return <h3 className={`${baseClasses} text-xl`}>{children}</h3>;
     case "h4":
@@ -50,6 +59,6 @@ const HeadingRenderer = ({
     case "h6":
       return <h6 className={`${baseClasses} text-sm`}>{children}</h6>;
     default:
-      return <p className="text-base my-2">{children}</p>;
+      return <p className="my-2 text-base">{children}</p>;
   }
 };
