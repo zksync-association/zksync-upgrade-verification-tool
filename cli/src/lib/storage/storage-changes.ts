@@ -1,4 +1,3 @@
-
 import { Option } from "nochoices";
 import { type Hex, hexToBigInt } from "viem";
 import type { ContractField } from "./contractField";

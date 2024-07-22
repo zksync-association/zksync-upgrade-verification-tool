@@ -43,13 +43,16 @@ export async function storageChangeCommand(
 ): Promise<void> {
   const diamondAddress = DIAMOND_ADDRS[env.network];
 
-  const rawMap = await withSpinner(async () => {
+  const rawMap = await withSpinner(
+    async () => {
+      const importer = new UpgradeImporter(env.fs());
+      const changes = await importer.readFromFiles(dir, env.network);
 
-    const importer = new UpgradeImporter(env.fs());
-    const changes = await importer.readFromFiles(dir, env.network);
-
-    return getMemoryPath(preCalculatedPath, env, diamondAddress, changes);
-  }, "Calculating storage changes", env)
+      return getMemoryPath(preCalculatedPath, env, diamondAddress, changes);
+    },
+    "Calculating storage changes",
+    env
+  );
 
   const changesSnapshot = Option.fromNullable(rawMap.result.post[diamondAddress])
     .map((data) => data.storage)
@@ -61,43 +64,51 @@ export async function storageChangeCommand(
   const pre = new RpcStorageSnapshot(env.rpcL1(), diamondAddress);
   const post = pre.apply(changesSnapshot);
 
-  const [facetsPre, facetsPost] = await withSpinner(async () => {
-    const facetsPre = await MAIN_CONTRACT_FIELDS.facetAddresses
-      .extract(pre)
-      .then((opt) =>
-        opt.map((value) => value.accept(new ListOfAddressesExtractor())).or(Option.Some([]))
-      );
-    const facetsPost = await MAIN_CONTRACT_FIELDS.facetAddresses
-      .extract(post)
-      .then((opt) =>
-        opt.map((value) => value.accept(new ListOfAddressesExtractor())).or(Option.Some([]))
-      );
-    return [facetsPre, facetsPost]
-  }, "Searching all facet addresses", env)
+  const [facetsPre, facetsPost] = await withSpinner(
+    async () => {
+      const facetsPre = await MAIN_CONTRACT_FIELDS.facetAddresses
+        .extract(pre)
+        .then((opt) =>
+          opt.map((value) => value.accept(new ListOfAddressesExtractor())).or(Option.Some([]))
+        );
+      const facetsPost = await MAIN_CONTRACT_FIELDS.facetAddresses
+        .extract(post)
+        .then((opt) =>
+          opt.map((value) => value.accept(new ListOfAddressesExtractor())).or(Option.Some([]))
+        );
+      return [facetsPre, facetsPost];
+    },
+    "Searching all facet addresses",
+    env
+  );
 
   const allFacets = facetsPre
     .zip(facetsPost)
     .map(([pre, post]) => [...pre, ...post])
     .unwrapOr([]);
 
-  const [selectorsPre, selectorsPost] = await withSpinner(async () => {
-    const selectorsPre = await MAIN_CONTRACT_FIELDS.facetToSelectors(allFacets)
-      .extract(pre)
-      .then((opt) =>
-        opt
-          .map((value) => value.accept(new FacetsToSelectorsVisitor()) as Map<Hex, Hex[]>)
-          .or(Option.Some(new Map()))
-      );
+  const [selectorsPre, selectorsPost] = await withSpinner(
+    async () => {
+      const selectorsPre = await MAIN_CONTRACT_FIELDS.facetToSelectors(allFacets)
+        .extract(pre)
+        .then((opt) =>
+          opt
+            .map((value) => value.accept(new FacetsToSelectorsVisitor()) as Map<Hex, Hex[]>)
+            .or(Option.Some(new Map()))
+        );
 
-    const selectorsPost = await MAIN_CONTRACT_FIELDS.facetToSelectors(allFacets)
-      .extract(post)
-      .then((opt) =>
-        opt
-          .map((value) => value.accept(new FacetsToSelectorsVisitor()) as Map<Hex, Hex[]>)
-          .or(Option.Some(new Map()))
-      );
-    return [selectorsPre, selectorsPost]
-  }, "Searching all selectors", env)
+      const selectorsPost = await MAIN_CONTRACT_FIELDS.facetToSelectors(allFacets)
+        .extract(post)
+        .then((opt) =>
+          opt
+            .map((value) => value.accept(new FacetsToSelectorsVisitor()) as Map<Hex, Hex[]>)
+            .or(Option.Some(new Map()))
+        );
+      return [selectorsPre, selectorsPost];
+    },
+    "Searching all selectors",
+    env
+  );
 
   const allSelectors = selectorsPre
     .zip(selectorsPost)
@@ -106,12 +117,15 @@ export async function storageChangeCommand(
     })
     .unwrapOr([]);
 
-  const report = await withSpinner(async () => {
-    const storageChanges = new StorageChanges(pre, post, allFacets, [...allSelectors]);
-    const report = new StringStorageChangeReport(storageChanges, env.colored);
-    return await report.format();
-  }, "calculating report", env)
-
+  const report = await withSpinner(
+    async () => {
+      const storageChanges = new StorageChanges(pre, post, allFacets, [...allSelectors]);
+      const report = new StringStorageChangeReport(storageChanges, env.colored);
+      return await report.format();
+    },
+    "calculating report",
+    env
+  );
 
   env.term().line(report);
 }

@@ -13,7 +13,7 @@ import { type PropertyChange } from "../src/lib/storage/property-change";
 import type { StorageValue } from "../src/lib/storage/values/storage-value";
 import type { ValueField } from "../src/lib/storage/values/struct-value";
 import { Option } from "nochoices";
-import { RecordStorageSnapshot } from '../src';
+import { RecordStorageSnapshot } from "../src";
 import type { StorageSnapshot } from "../src";
 
 class TestReport implements StorageVisitor<string> {
@@ -97,11 +97,11 @@ describe("MemoryMap", () => {
     const json = memoryDiffParser.parse(JSON.parse(rawDiff.toString()));
 
     if (!json.result.pre[ADDRESS]) {
-      return expect.fail("Should be present")
+      return expect.fail("Should be present");
     }
 
     if (!json.result.post[ADDRESS]) {
-      return expect.fail("Should be present")
+      return expect.fail("Should be present");
     }
 
     const pre = json.result.pre[ADDRESS].storage.map((s) => new RecordStorageSnapshot(s)).unwrap();
