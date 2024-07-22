@@ -2,7 +2,7 @@ import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { actionSchema } from "@/.server/db/schema";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
-import { getProposalData, getProposalStatus } from "@/.server/service/proposals";
+import { calculateStatusPendingDays, getProposalData, getProposalStatus } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
 import TxLink from "@/components/tx-link";
@@ -65,6 +65,11 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         proposedOn: proposal.proposedOn,
         executor: proposal.executor,
         status: proposalStatus,
+        statusTimes: await calculateStatusPendingDays(
+          proposalStatus,
+          proposalData.creationTimestamp,
+          proposalData.guardiansExtendedLegalVeto
+        ),
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         approvedByGuardians: proposalData.guardiansApproval,
         approvedByCouncil: proposalData.securityCouncilApprovalTimestamp !== 0,
@@ -235,7 +240,7 @@ export default function Proposals() {
                   </Card>
                   <Card className="pb-10">
                     <CardHeader className="pt-7">
-                      {displayProposalState(proposal.status)}
+                      {displayProposalState(proposal.status, proposal.statusTimes)}
                       <CardTitle>Proposal Status</CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -444,9 +449,13 @@ function StatusIndicator({
   );
 }
 
-function displayProposalState(state: PROPOSAL_STATES) {
+function displayProposalState(state: PROPOSAL_STATES, times: {totalDays: number, currentDay: number} | null) {
   let color: string;
   let label: string;
+
+  const timeData = times
+    ? `(day ${times.currentDay} out of ${times.totalDays})`
+    : ""
 
   switch (state) {
     case PROPOSAL_STATES.None:
@@ -479,5 +488,5 @@ function displayProposalState(state: PROPOSAL_STATES) {
       break;
   }
 
-  return <p className={color}>{label}</p>;
+  return <p className={color}>{label} {timeData}</p>;
 }

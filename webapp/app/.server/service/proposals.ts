@@ -1,6 +1,6 @@
 import { createOrIgnoreProposal } from "@/.server/db/dto/proposals";
 import { upgradeHandlerAbi } from "@/.server/service/contract-abis";
-import type { PROPOSAL_STATES } from "@/utils/proposal-states";
+import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { PROTOCOL_UPGRADE_HANDLER_RAW_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 
@@ -18,7 +18,8 @@ export type Proposal = {
 };
 
 export async function getProposals(): Promise<Proposal[]> {
-  const currentBlock = await l1Rpc.getLatestBlockNumber();
+  const latestBlock = await l1Rpc.getLatestBlock();
+  const currentBlock = latestBlock.number;
   const currentHeight = hexToBigInt(currentBlock);
   const maxUpgradeLiftimeInBlocks = BigInt(40 * 24 * 360); // conservative estimation of latest block with a valid upgrade
 
@@ -62,6 +63,11 @@ export async function getProposals(): Promise<Proposal[]> {
   return proposals;
 }
 
+export type StatusTime = {
+  totalDays: number,
+  currentDay: number
+}
+
 export type ProposalData = {
   creationTimestamp: number;
   securityCouncilApprovalTimestamp: number;
@@ -69,6 +75,56 @@ export type ProposalData = {
   guardiansExtendedLegalVeto: boolean;
   executed: boolean;
 };
+
+function daysInSeconds(days: number): number {
+  return days * 24 * 3600
+}
+
+
+
+async function nowInSeconds() {
+  const block = await l1Rpc.getLatestBlock();
+  return block.timestamp
+}
+
+export async function calculateStatusPendingDays(
+  status: PROPOSAL_STATES,
+  creationTimestamp: number,
+  guardiansExtendedLegalVeto: boolean,
+): Promise<StatusTime | null> {
+  const now = await nowInSeconds();
+
+  if (status === PROPOSAL_STATES.LegalVetoPeriod) {
+    const delta = now - creationTimestamp
+    const currentDay = Math.ceil(delta / daysInSeconds(1))
+    const totalDays = guardiansExtendedLegalVeto ? 7 : 3
+
+    return {
+      totalDays: totalDays,
+      currentDay: currentDay
+    }
+  }
+
+  if (status === PROPOSAL_STATES.Waiting) {
+    const delta = now -
+      creationTimestamp +
+      ( guardiansExtendedLegalVeto
+          ? daysInSeconds(3)
+          : daysInSeconds(7)
+      )
+    const currentDay = Math.ceil(delta / daysInSeconds(1))
+    return {
+      totalDays: 30,
+      currentDay: currentDay
+    }
+  }
+
+  if (status === PROPOSAL_STATES.ExecutionPending) {
+    return { totalDays: 1, currentDay: 1 }
+  }
+
+  return null
+}
 
 export async function getProposalData(id: Hex): Promise<ProposalData> {
   const [
@@ -90,7 +146,7 @@ export async function getProposalData(id: Hex): Promise<ProposalData> {
     executed,
     guardiansApproval,
     guardiansExtendedLegalVeto,
-    securityCouncilApprovalTimestamp,
+    securityCouncilApprovalTimestamp
   };
 }
 
