@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { hashString, bytes32Hash } from "./common";
+import { account20String, bytes32Hash } from "./common";
 import { facetCutsSchema } from "./facetCuts";
 import { zodHex } from "./hex-parser";
 
@@ -13,7 +13,7 @@ export const transactionsSchema = z.object({
   proposeUpgradeTx: z.object({
     bootloaderHash: bytes32Hash,
     defaultAccountHash: bytes32Hash,
-    verifier: hashString,
+    verifier: account20String,
     verifierParams: verifierParamsSchema,
   }),
   transparentUpgrade: z.object({
