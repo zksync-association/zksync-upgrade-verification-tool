@@ -1,8 +1,8 @@
 import {
-  account20String,
   type ContractEvent,
   contractEventSchema,
   getAbiSchema,
+  hashString,
   sourceCodeResponseSchema,
   sourceCodeSchema,
 } from "../schema";
@@ -70,7 +70,7 @@ export class BlockExplorerClient implements BlockExplorer {
       return existing;
     }
 
-    const contractAddr = account20String.parse(rawAddress);
+    const contractAddr = hashString.parse(rawAddress);
 
     const { message, result } = await this.fetch(
       {
@@ -100,7 +100,7 @@ export class BlockExplorerClient implements BlockExplorer {
       throw new ContractNotVerified(rawAddress);
     }
 
-    const contractAddr = account20String.parse(rawAddress);
+    const contractAddr = hashString.parse(rawAddress);
 
     const { message, result } = await this.fetch(
       {

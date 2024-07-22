@@ -5,6 +5,8 @@ import { councilAddress, guardiansAddress } from "@/.server/service/authorized-u
 import { getProposalData, getProposalStatus } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
+import { getTallyInfo } from "@/.server/service/tally";
+import TallyInfo from "@/components/TallyInfo";
 import TxLink from "@/components/tx-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
@@ -25,12 +27,14 @@ import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { defer, json } from "@remix-run/node";
-import { Await, useLoaderData } from "@remix-run/react";
+import { Await, useLoaderData, useAsyncValue } from "@remix-run/react";
 import { Suspense } from "react";
 import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
+
+// import Markdown from "react-markdown";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -45,6 +49,13 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   if (!proposal) {
     throw notFound();
   }
+
+  const getTallyData = async (extProposalId: string) => {
+    console.log(`Fetching Tally Info for proposalId: ${extProposalId}`);
+    const proposalId =
+      "16862129143470948068395175122563617380780349421262247459634070073165514405758";
+    return getTallyInfo(proposalId);
+  };
 
   const getAsyncData = async () => {
     const checkReport = await getCheckReport(params.data.id);
@@ -108,6 +119,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     user,
     proposalId: proposal.externalId as Hex,
     asyncData: getAsyncData(),
+    tallyData: getTallyData(proposal.externalId),
   });
 }
 
@@ -139,7 +151,7 @@ const NECESSARY_GUARDIAN_SIGNATURES = 5;
 const NECESSARY_LEGAL_VETO_SIGNATURES = 2;
 
 export default function Proposals() {
-  const { user, asyncData, proposalId } = useLoaderData<typeof loader>();
+  const { user, asyncData, proposalId, tallyData } = useLoaderData<typeof loader>();
 
   return (
     <div className="flex flex-1 flex-col space-y-4">
@@ -409,6 +421,25 @@ export default function Proposals() {
                       </Card>
                     </TabsContent>
                   </Tabs>
+                </div>
+                <div>
+                  <h2 className="font-bold text-3xl">Tally Info</h2>
+                  <Suspense
+                    fallback={
+                      <Card className="mt-4">
+                        <CardHeader>
+                          <CardTitle>Loading Info From Tally</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex justify-center items-center h-40">
+                          <Loading />
+                        </CardContent>
+                      </Card>
+                    }
+                  >
+                    <Await resolve={tallyData}>
+                      <TallyInfo />
+                    </Await>
+                  </Suspense>
                 </div>
               </>
             );

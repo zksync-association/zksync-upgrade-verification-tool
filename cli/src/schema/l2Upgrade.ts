@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { account20String, bytes32Hash } from "../schema";
+import { hashString, bytes32Hash } from "../schema";
 
 const systemContracts = z.array(
   z.object({
     name: z.string(),
     bytecodeHashes: z.array(bytes32Hash),
-    address: account20String,
+    address: hashString
   })
 );
 
