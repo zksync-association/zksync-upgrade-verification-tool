@@ -4,19 +4,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
 import { type State, WagmiProvider, cookieStorage, createStorage } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
-import { defineChain } from "viem";
-
-const localnet = defineChain({
-  id: 11_155_111,
-  name: 'Sepolia',
-  nativeCurrency: { name: 'LocalEther', symbol: 'ETH', decimals: 18 },
-  rpcUrls: {
-    default: {
-      http: ['http://localhost:8545'],
-    },
-  },
-  testnet: true,
-})
 
 const queryClient = new QueryClient();
 
@@ -34,7 +21,7 @@ export function WalletProvider({
   const config = useMemo(() => {
     return getDefaultConfig({
       appName: "zkSync Upgrade Verification Tool",
-      chains: devNetwork ? [localnet] : [mainnet],
+      chains: devNetwork ? [sepolia] : [mainnet],
       projectId,
       ssr: true,
       storage: createStorage({
