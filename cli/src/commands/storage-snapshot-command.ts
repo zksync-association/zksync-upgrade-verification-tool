@@ -1,5 +1,5 @@
 import type { EnvBuilder } from "../lib/env-builder";
-import { RpcStorageSnapshot } from "../lib/storage/rpc-storage-snapshot";
+import { RpcStorageSnapshot } from "../lib/storage/snapshot/rpc-storage-snapshot";
 import { SnapshotReport } from "../lib/reports/storage-snapshot-report";
 import { mainDiamondFields } from "../lib/storage/storage-props";
 import { DIAMOND_ADDRS } from "../lib";

@@ -1,10 +1,9 @@
-import type { MemoryDiffRaw } from "../../schema/rpc";
+
 import { Option } from "nochoices";
 import { type Hex, hexToBigInt } from "viem";
 import type { ContractField } from "./contractField";
-import type { StorageSnapshot } from "./storage-snapshot";
+import type { StorageSnapshot } from "./snapshot/storage-snapshot";
 import { PropertyChange } from "./property-change";
-import { RecordStorageSnapshot } from "./record-storage-snapshot";
 import { mainDiamondFields } from "./storage-props";
 
 export const DIAMOND_STORAGE_SLOT = hexToBigInt(
@@ -19,11 +18,12 @@ export class StorageChanges {
   private facets: Hex[];
 
   constructor(
-    selectors: Hex[],
     pre: StorageSnapshot,
     post: StorageSnapshot,
+    selectors: Hex[],
     facets: Hex[] = [],
-    contractProps: ContractField[] = []) {
+    contractProps: ContractField[] = []
+  ) {
     this.pre = pre;
     this.post = post;
     this.selectors = selectors;

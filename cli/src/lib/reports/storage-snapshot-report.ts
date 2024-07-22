@@ -1,4 +1,4 @@
-import type { StorageSnapshot } from "../storage/storage-snapshot";
+import type { StorageSnapshot } from "../storage/snapshot/storage-snapshot";
 import type { ContractField } from "../storage/contractField";
 import { StringStorageVisitor } from "./string-storage-visitor";
 

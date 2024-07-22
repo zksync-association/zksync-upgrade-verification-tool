@@ -19,3 +19,4 @@ export * from "./reports/object-storage-change-report";
 export * from "./reports/object-check-report";
 export * from "./contract-abi";
 export * from "./storage/storage-changes";
+export * from "./storage/snapshot";

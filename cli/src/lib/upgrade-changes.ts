@@ -16,7 +16,6 @@ export type SystemContractData = {
 };
 
 export class UpgradeChanges {
-  newProtocolVersion: string;
   facets: FacetData[];
   orphanedSelectors: Hex[];
   verifier: VerifierContract;
@@ -26,13 +25,11 @@ export class UpgradeChanges {
   upgradeCalldataHex: Option<Hex>;
 
   constructor(
-    newProtocolVersion: string,
     verifier: VerifierContract,
     aaBytecodeHash: string,
     bootloaderBytecodeHash: string,
     upgradeTxHex?: Hex
   ) {
-    this.newProtocolVersion = newProtocolVersion;
     this.facets = [];
     this.orphanedSelectors = [];
     this.systemContractChanges = [];
@@ -81,7 +78,6 @@ export class UpgradeChanges {
     );
 
     const instance = new UpgradeChanges(
-      common.protocolVersion.toString(),
       verifier,
       txFile.proposeUpgradeTx.defaultAccountHash,
       txFile.proposeUpgradeTx.bootloaderHash,

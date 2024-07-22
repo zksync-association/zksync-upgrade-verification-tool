@@ -1,14 +1,14 @@
 import type { EnvBuilder } from "../lib/env-builder";
 import { DIAMOND_ADDRS, type UpgradeChanges, UpgradeImporter } from "../lib";
-import { StorageChanges } from "../lib/storage/storage-changes";
+import { StorageChanges } from "../lib";
 import type { Hex } from "viem";
 import { Option } from "nochoices";
 import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
-import { withSpinner } from "../lib/with-spinner";
 import { StringStorageChangeReport } from "../lib/reports/string-storage-change-report";
-import { ZksyncEraState } from "../lib/zksync-era-state";
-import { RpcStorageSnapshot } from "../lib/storage/rpc-storage-snapshot";
-import { RecordStorageSnapshot } from "../lib/storage/record-storage-snapshot";
+import { RpcStorageSnapshot } from "../lib/storage/snapshot/rpc-storage-snapshot";
+import { RecordStorageSnapshot } from "../lib/storage/snapshot/record-storage-snapshot";
+import { MAIN_CONTRACT_FIELDS } from "../lib/storage/storage-props";
+import { FacetsToSelectorsVisitor, ListOfAddressesExtractor } from "../lib/reports/extractors";
 
 async function getMemoryPath(
   preCalculatedPath: Option<string>,
@@ -40,42 +40,61 @@ export async function storageChangeCommand(
   dir: string,
   preCalculatedPath: Option<string>
 ): Promise<void> {
-  const currentState = await withSpinner(
-    () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
-    "Gathering contract data",
-    env
-  );
   const importer = new UpgradeImporter(env.fs());
   const changes = await importer.readFromFiles(dir, env.network);
 
-  const diamondaddr = DIAMOND_ADDRS[env.network];
-  const rawMap = await getMemoryPath(preCalculatedPath, env, diamondaddr, changes);
-  const cc = Option.fromNullable(rawMap.result.post[diamondaddr])
-    .map(data => data.storage).flatten()
+  const diamondAddress = DIAMOND_ADDRS[env.network];
+  const rawMap = await getMemoryPath(preCalculatedPath, env, diamondAddress, changes);
+  const cc = Option.fromNullable(rawMap.result.post[diamondAddress])
+    .map((data) => data.storage)
+    .flatten()
     .orElse(() => Option.Some({}))
-    .map(s => new RecordStorageSnapshot(s))
-    .unwrap()
+    .map((s) => new RecordStorageSnapshot(s))
+    .unwrap();
 
-  const selectors = new Set<Hex>();
-  for (const selector of currentState.allSelectors()) {
-    selectors.add(selector);
-  }
-  for (const selector of changes.allSelectors()) {
-    selectors.add(selector);
-  }
+  const pre = new RpcStorageSnapshot(env.rpcL1(), diamondAddress);
+  const post = pre.apply(cc);
 
-  const facets = new Set<Hex>();
-  for (const addr of currentState.allFacetsAddrs()) {
-    facets.add(addr);
-  }
-  for (const addr of changes.allFacetsAddresses()) {
-    facets.add(addr);
-  }
+  const facetsPre = await MAIN_CONTRACT_FIELDS.facetAddresses
+    .extract(pre)
+    .then((opt) =>
+      opt.map((value) => value.accept(new ListOfAddressesExtractor())).or(Option.Some([]))
+    );
+  const facetsPost = await MAIN_CONTRACT_FIELDS.facetAddresses
+    .extract(post)
+    .then((opt) =>
+      opt.map((value) => value.accept(new ListOfAddressesExtractor())).or(Option.Some([]))
+    );
 
-  const pre = new RpcStorageSnapshot(env.rpcL1(), diamondaddr);
-  const post = pre.apply(cc)
+  const allFacets = facetsPre
+    .zip(facetsPost)
+    .map(([pre, post]) => [...pre, ...post])
+    .unwrapOr([]);
 
-  const storageChanges = new StorageChanges([...selectors], pre, post);
+  const selectorsPre = await MAIN_CONTRACT_FIELDS.facetToSelectors(allFacets)
+    .extract(pre)
+    .then((opt) =>
+      opt
+        .map((value) => value.accept(new FacetsToSelectorsVisitor()) as Map<Hex, Hex[]>)
+        .or(Option.Some(new Map()))
+    );
+
+  const selectorsPost = await MAIN_CONTRACT_FIELDS.facetToSelectors(allFacets)
+    .extract(post)
+    .then((opt) =>
+      opt
+        .map((value) => value.accept(new FacetsToSelectorsVisitor()) as Map<Hex, Hex[]>)
+        .or(Option.Some(new Map()))
+    );
+
+  const allSelectors = selectorsPre
+    .zip(selectorsPost)
+    .map(([pre, post]) => {
+      return [...pre.values(), ...post.values()].flat();
+    })
+    .unwrapOr([]);
+
+  const storageChanges = new StorageChanges(pre, post, allFacets, [...allSelectors]);
 
   const report = new StringStorageChangeReport(storageChanges, env.colored);
 

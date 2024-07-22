@@ -1,7 +1,3 @@
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { getProposalByExternalId, updateProposal } from "@/.server/db/dto/proposals";
 import { l1Explorer, l1Rpc, l2Explorer } from "@/.server/service/clients";
 import { ALL_ABIS } from "@/utils/raw-abis";
@@ -15,15 +11,13 @@ import {
   type Network,
   ObjectCheckReport,
   ObjectStorageChangeReport,
+  RecordStorageSnapshot,
+  RpcStorageSnapshot,
   StorageChanges,
   ZkSyncEraDiff,
   ZksyncEraState,
-  memoryDiffParser,
 } from "validate-cli";
 import { type Hex, decodeAbiParameters, getAbiItem, hexToBytes } from "viem";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 const network = env.ETH_NETWORK;
 
@@ -90,29 +84,35 @@ async function calculateStorageChangeReport(
     return [];
   }
 
-  const network = "mainnet";
-  const diamondAddress = DIAMOND_ADDRS[network];
+  const diamondAddress = DIAMOND_ADDRS[env.ETH_NETWORK];
 
-  const { current, proposed } = await calculateBeforeAndAfter(
-    network,
-    l1Explorer,
-    l2Explorer,
-    calldata
+  const abiItem = getAbiItem({
+    abi: ALL_ABIS.handler,
+    name: "execute",
+  });
+  const [upgradeProposal] = decodeAbiParameters([abiItem.inputs[0]], calldata);
+  const [call] = upgradeProposal.calls;
+  if (call === undefined) {
+    return [];
+  }
+  const rawMap = await l1Rpc.debugCallTraceStorage(
+    upgradeProposal.executor,
+    call.target,
+    call.data
   );
+  const contractChanges = rawMap.result.post[diamondAddress];
+  if (!contractChanges) {
+    return [];
+  }
 
-  const memoryMapBuf = await fs.readFile(path.join(__dirname, "mock-memory-map.json"));
-  const rawMap = memoryDiffParser.parse(JSON.parse(memoryMapBuf.toString()));
+  const selectors: Hex[] = [];
+  const facetAddrs: Hex[] = [];
 
-  const selectors = [...new Set([...current.allSelectors(), ...proposed.allSelectors()])];
+  const pre = new RpcStorageSnapshot(l1Rpc, diamondAddress);
+  const storageDelta = new RecordStorageSnapshot(contractChanges.storage.unwrapOr({}));
+  const post = pre.apply(storageDelta);
 
-  const facetAddrs = [...new Set([...current.allFacetsAddrs(), ...proposed.allFacetsAddrs()])];
-
-  const memoryMap: StorageChanges = new StorageChanges(
-    rawMap,
-    diamondAddress,
-    selectors,
-    facetAddrs
-  );
+  const memoryMap: StorageChanges = new StorageChanges(pre, post, selectors, facetAddrs);
   const report = new ObjectStorageChangeReport(memoryMap);
 
   return report.format();

@@ -1,26 +1,8 @@
 import type { StorageSnapshot } from "./storage-snapshot";
 import { Option } from "nochoices";
-import type { RpcClient } from "../rpc-client";
+import type { RpcClient } from "../../rpc-client";
 import { type Hex, hexToBytes } from "viem";
-
-export class CompoundStorageSnapshot implements StorageSnapshot {
-  base: StorageSnapshot;
-  outerLayer: StorageSnapshot;
-
-  constructor(base: StorageSnapshot, outerLayer: StorageSnapshot) {
-    this.base = base;
-    this.outerLayer = outerLayer;
-  }
-
-  async at(pos: bigint): Promise<Option<Buffer>> {
-    const outerValue = await this.outerLayer.at(pos);
-    if (outerValue.isSome()) {
-      return outerValue;
-    }
-
-    return this.base.at(pos);
-  }
-}
+import { CompoundStorageSnapshot } from "./compound-storage-snapshot";
 
 export class RpcStorageSnapshot implements StorageSnapshot {
   private rpc: RpcClient;

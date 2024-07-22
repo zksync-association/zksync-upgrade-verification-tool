@@ -1,5 +1,5 @@
 import type { MemoryDataType } from "./data-type";
-import type { StorageSnapshot } from "../storage-snapshot";
+import type { StorageSnapshot } from "../snapshot/storage-snapshot";
 import { Option } from "nochoices";
 import type { StorageValue } from "../values/storage-value";
 import { ArrayValue } from "../values/array-value";
