@@ -64,9 +64,9 @@ export async function getProposals(): Promise<Proposal[]> {
 }
 
 export type StatusTime = {
-  totalDays: number,
-  currentDay: number
-}
+  totalDays: number;
+  currentDay: number;
+};
 
 export type ProposalData = {
   creationTimestamp: number;
@@ -77,53 +77,47 @@ export type ProposalData = {
 };
 
 function daysInSeconds(days: number): number {
-  return days * 24 * 3600
+  return days * 24 * 3600;
 }
-
-
 
 async function nowInSeconds() {
   const block = await l1Rpc.getLatestBlock();
-  return block.timestamp
+  return block.timestamp;
 }
 
 export async function calculateStatusPendingDays(
   status: PROPOSAL_STATES,
   creationTimestamp: number,
-  guardiansExtendedLegalVeto: boolean,
+  guardiansExtendedLegalVeto: boolean
 ): Promise<StatusTime | null> {
   const now = await nowInSeconds();
 
   if (status === PROPOSAL_STATES.LegalVetoPeriod) {
-    const delta = now - creationTimestamp
-    const currentDay = Math.ceil(delta / daysInSeconds(1))
-    const totalDays = guardiansExtendedLegalVeto ? 7 : 3
+    const delta = now - creationTimestamp;
+    const currentDay = Math.ceil(delta / daysInSeconds(1));
+    const totalDays = guardiansExtendedLegalVeto ? 7 : 3;
 
     return {
       totalDays: totalDays,
-      currentDay: currentDay
-    }
+      currentDay: currentDay,
+    };
   }
 
   if (status === PROPOSAL_STATES.Waiting) {
-    const delta = now -
-      creationTimestamp +
-      ( guardiansExtendedLegalVeto
-          ? daysInSeconds(3)
-          : daysInSeconds(7)
-      )
-    const currentDay = Math.ceil(delta / daysInSeconds(1))
+    const delta =
+      now - creationTimestamp + (guardiansExtendedLegalVeto ? daysInSeconds(3) : daysInSeconds(7));
+    const currentDay = Math.ceil(delta / daysInSeconds(1));
     return {
       totalDays: 30,
-      currentDay: currentDay
-    }
+      currentDay: currentDay,
+    };
   }
 
   if (status === PROPOSAL_STATES.ExecutionPending) {
-    return { totalDays: 1, currentDay: 1 }
+    return { totalDays: 1, currentDay: 1 };
   }
 
-  return null
+  return null;
 }
 
 export async function getProposalData(id: Hex): Promise<ProposalData> {
@@ -146,7 +140,7 @@ export async function getProposalData(id: Hex): Promise<ProposalData> {
     executed,
     guardiansApproval,
     guardiansExtendedLegalVeto,
-    securityCouncilApprovalTimestamp
+    securityCouncilApprovalTimestamp,
   };
 }
 

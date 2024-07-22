@@ -4,7 +4,8 @@ import {
   createPublicClient,
   decodeFunctionResult,
   encodeFunctionData,
-  type Hex, hexToNumber,
+  type Hex,
+  hexToNumber,
   http,
   numberToHex,
 } from "viem";
@@ -106,7 +107,7 @@ export class RpcClient {
   }
 
   private async rawCall(method: string, params: any[]): Promise<any> {
-    console.log("params", params)
+    console.log("params", params);
     const res = await fetch(this.rpcUrl(), {
       method: "POST",
       body: JSON.stringify({
@@ -191,7 +192,7 @@ export class RpcClient {
     return parsed.result;
   }
 
-  async getLatestBlock(): Promise<{ number: Hex, timestamp: number }> {
+  async getLatestBlock(): Promise<{ number: Hex; timestamp: number }> {
     const block = (await this.viemClient.request({
       method: "eth_getBlockByNumber",
       params: ["latest", false],
@@ -199,7 +200,7 @@ export class RpcClient {
 
     return {
       number: block.number,
-      timestamp: hexToNumber(block.timestamp)
+      timestamp: hexToNumber(block.timestamp),
     };
   }
 }

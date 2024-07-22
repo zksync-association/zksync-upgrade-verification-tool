@@ -2,7 +2,11 @@ import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { actionSchema } from "@/.server/db/schema";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
-import { calculateStatusPendingDays, getProposalData, getProposalStatus } from "@/.server/service/proposals";
+import {
+  calculateStatusPendingDays,
+  getProposalData,
+  getProposalStatus,
+} from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
 import TxLink from "@/components/tx-link";
@@ -449,13 +453,14 @@ function StatusIndicator({
   );
 }
 
-function displayProposalState(state: PROPOSAL_STATES, times: {totalDays: number, currentDay: number} | null) {
+function displayProposalState(
+  state: PROPOSAL_STATES,
+  times: { totalDays: number; currentDay: number } | null
+) {
   let color: string;
   let label: string;
 
-  const timeData = times
-    ? `(day ${times.currentDay} out of ${times.totalDays})`
-    : ""
+  const timeData = times ? `(day ${times.currentDay} out of ${times.totalDays})` : "";
 
   switch (state) {
     case PROPOSAL_STATES.None:
@@ -488,5 +493,9 @@ function displayProposalState(state: PROPOSAL_STATES, times: {totalDays: number,
       break;
   }
 
-  return <p className={color}>{label} {timeData}</p>;
+  return (
+    <p className={color}>
+      {label} {timeData}
+    </p>
+  );
 }
