@@ -5,8 +5,8 @@ import type { Hex } from "viem";
 import { Option } from "nochoices";
 import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
 import { StringStorageChangeReport } from "../lib/reports/string-storage-change-report";
-import { RpcStorageSnapshot } from "../lib/storage/snapshot/rpc-storage-snapshot";
-import { RecordStorageSnapshot } from "../lib/storage/snapshot/record-storage-snapshot";
+import { RpcStorageSnapshot } from "../lib";
+import { RecordStorageSnapshot } from "../lib";
 import { MAIN_CONTRACT_FIELDS } from "../lib/storage/storage-props";
 import { FacetsToSelectorsVisitor, ListOfAddressesExtractor } from "../lib/reports/extractors";
 

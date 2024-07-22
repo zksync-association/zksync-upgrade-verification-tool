@@ -13,8 +13,8 @@ import { type PropertyChange } from "../src/lib/storage/property-change";
 import type { StorageValue } from "../src/lib/storage/values/storage-value";
 import type { ValueField } from "../src/lib/storage/values/struct-value";
 import { Option } from "nochoices";
-import { RecordStorageSnapshot } from "../src/lib/storage/snapshot/record-storage-snapshot";
-import type { StorageSnapshot } from "../src/lib/storage/snapshot/storage-snapshot";
+import { RecordStorageSnapshot } from '../src';
+import type { StorageSnapshot } from "../src";
 
 class TestReport implements StorageVisitor<string> {
   beforeData: Option<string>;

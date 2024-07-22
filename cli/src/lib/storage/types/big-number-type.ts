@@ -2,7 +2,7 @@ import type { MemoryDataType } from "./data-type";
 import type { Option } from "nochoices";
 import { bytesToBigInt } from "viem";
 
-import type { StorageSnapshot } from "../snapshot/storage-snapshot";
+import type { StorageSnapshot } from "../snapshot";
 import { BigNumberValue } from "../values/big-number-value";
 import type { StorageValue } from "../values/storage-value";
 

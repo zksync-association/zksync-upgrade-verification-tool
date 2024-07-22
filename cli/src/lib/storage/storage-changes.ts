@@ -2,7 +2,7 @@
 import { Option } from "nochoices";
 import { type Hex, hexToBigInt } from "viem";
 import type { ContractField } from "./contractField";
-import type { StorageSnapshot } from "./snapshot/storage-snapshot";
+import type { StorageSnapshot } from "./snapshot";
 import { PropertyChange } from "./property-change";
 import { mainDiamondFields } from "./storage-props";
 
