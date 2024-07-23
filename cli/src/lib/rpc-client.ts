@@ -71,7 +71,7 @@ export class RpcClient {
 
   async checkContractCode(addr: Hex): Promise<boolean> {
     const code = await this.viemClient.getCode({ address: addr });
-    return (code !== undefined && code.length > 2)
+    return code !== undefined && code.length > 2;
   }
 
   async storageRead(addr: Hex, position: bigint): Promise<Hex> {
