@@ -5,7 +5,7 @@ import { PROTOCOL_UPGRADE_HANDLER_RAW_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 
 import { l1Rpc } from "@/.server/service/clients";
-import { type Hex, decodeEventLog, hexToBigInt, hexToNumber, numberToHex } from "viem";
+import { type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
@@ -49,11 +49,13 @@ export async function getProposals(): Promise<Proposal[]> {
       topics: [signature, id],
     });
 
+    const data = await getProposalData(id);
+
     proposals.push({ id, state: stateNumber });
     await createOrIgnoreProposal({
       externalId: id,
       calldata: log.data,
-      proposedOn: new Date(hexToNumber(log.blockTimestamp) * 1000),
+      proposedOn: new Date(data.creationTimestamp * 1000),
       executor: proposal.args._proposal.executor,
       transactionHash: log.transactionHash,
     });
