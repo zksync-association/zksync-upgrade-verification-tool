@@ -1,4 +1,5 @@
 import { isUserAuthorized } from "@/.server/service/authorized-users";
+import { checkConnection } from "@/.server/service/clients";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
 import { getUserFromHeader } from "@/utils/auth-headers";
@@ -18,6 +19,10 @@ export async function action({ request }: ActionFunctionArgs) {
   const parsedAddress = zodHex.safeParse(address);
   if (!parsedAddress.success) {
     throw redirect($path("/"));
+  }
+  const isUp = await checkConnection();
+  if (!isUp) {
+    throw redirect($path("/app/down"));
   }
   const auth = await isUserAuthorized(parsedAddress.data);
   if (!auth.authorized) {
