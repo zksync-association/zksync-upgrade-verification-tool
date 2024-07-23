@@ -41,7 +41,15 @@ export async function councilMembers(): Promise<Hex[]> {
 
 export type UserRole = z.infer<typeof UserRole>;
 
+export const validateHandlerAddress = async () => {
+  const exists = await l1Rpc.checkContractCode(upgradeHandlerAddress);
+  if (!exists) {
+    throw new Error(`Upgrade handler contract not found at ${upgradeHandlerAddress}`);
+  }
+};
+
 export async function isUserAuthorized(address: Hex) {
+  await validateHandlerAddress();
   const [guardianAddresses, scAddresses] = await Promise.all([guardianMembers(), councilMembers()]);
   const isGuardian = guardianAddresses.includes(address);
   const isSecurityCouncil = scAddresses.includes(address);

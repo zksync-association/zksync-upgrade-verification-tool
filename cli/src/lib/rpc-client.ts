@@ -69,6 +69,11 @@ export class RpcClient {
     return this.viemClient.getCode({ address: addr });
   }
 
+  async checkContractCode(addr: Hex): Promise<boolean> {
+    const code = await this.viemClient.getCode({ address: addr });
+    return (code !== undefined && code.length > 2)
+  }
+
   async storageRead(addr: Hex, position: bigint): Promise<Hex> {
     const readValue = await getStorageAt(this.viemClient, {
       address: addr,
@@ -89,20 +94,31 @@ export class RpcClient {
     parser: T,
     args: any[] = []
   ): Promise<TypeOf<typeof parser>> {
-    const callData = encodeFunctionData({
-      abi,
-      functionName: fnName,
-      args: args,
-    });
+    try {
+      const callData = encodeFunctionData({
+        abi,
+        functionName: fnName,
+        args: args,
+      });
 
-    const hexValue = await this.contractReadRaw(target, callData);
-    const rawValue = decodeFunctionResult({
-      abi,
-      functionName: fnName,
-      data: hexValue,
-    });
+      const hexValue = await this.contractReadRaw(target, callData);
+      const rawValue = decodeFunctionResult({
+        abi,
+        functionName: fnName,
+        data: hexValue,
+      });
 
-    return parser.parse(rawValue);
+      return parser.parse(rawValue);
+    } catch (e) {
+      console.error(`Error calling '${fnName}' on ${target}`);
+      if (e instanceof Error) {
+        console.error(e.name);
+        console.error(e.message);
+        console.error(e.cause);
+      }
+
+      throw new Error("Error executing contract read");
+    }
   }
 
   private async rawCall(method: string, params: any[]): Promise<any> {
