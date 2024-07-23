@@ -32,4 +32,4 @@ async function testDbConnection() {
   }
 }
 
- testDbConnection();
+testDbConnection();
