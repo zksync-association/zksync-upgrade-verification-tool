@@ -26,7 +26,11 @@ export const checkConnection = async () => {
     const data: any = await response.json();
     return "result" in data;
   } catch (error) {
-    console.error("Error checking connection:", error);
+    console.error("Error checking connection to :", env.L1_RPC_URL);
+    if (error instanceof Error) {
+      console.error(error.message);
+      console.error(error.cause);
+    }
     return false;
   }
 };
