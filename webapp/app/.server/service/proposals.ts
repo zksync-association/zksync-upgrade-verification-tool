@@ -49,11 +49,13 @@ export async function getProposals(): Promise<Proposal[]> {
       topics: [signature, id],
     });
 
+    const data = await getProposalData(id)
+
     proposals.push({ id, state: stateNumber });
     await createOrIgnoreProposal({
       externalId: id,
       calldata: log.data,
-      proposedOn: new Date(hexToNumber(log.blockTimestamp) * 1000),
+      proposedOn: new Date(data.creationTimestamp * 1000),
       executor: proposal.args._proposal.executor,
       transactionHash: log.transactionHash,
     });
