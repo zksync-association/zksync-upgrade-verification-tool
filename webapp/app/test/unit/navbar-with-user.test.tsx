@@ -81,7 +81,7 @@ describe("NavbarWithUser", () => {
       wrapper,
     });
 
-    let envBadge: HTMLElement | null = screen.getByText("development");
+    let envBadge: HTMLElement | null = screen.getByText("Dev");
     expect(envBadge).toBeInTheDocument();
 
     rerender(<NavbarWithUser role={null} environment="production" />);

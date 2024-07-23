@@ -29,7 +29,7 @@ describe("Navbar", () => {
   it("renders EnvBadge for development environment but not for production", () => {
     const { rerender } = render(<Navbar environment="development" />);
 
-    let envBadge: HTMLElement | null = screen.getByText("development");
+    let envBadge: HTMLElement | null = screen.getByText("Dev");
     expect(envBadge).toBeInTheDocument();
 
     rerender(<Navbar environment="production" />);

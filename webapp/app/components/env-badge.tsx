@@ -7,7 +7,7 @@ export default function EnvBadge({ environment }: { environment: NodeEnv }) {
   }
   return (
     <Badge variant={"outline"} className="h-auto px-3 py-1 text-s">
-      {environment}
+      {environment.charAt(0).toUpperCase() + environment.slice(1, 3)}
     </Badge>
   );
 }

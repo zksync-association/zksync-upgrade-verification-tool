@@ -6,11 +6,11 @@ import { $path } from "remix-routes";
 export default function Navbar({ environment }: { environment: NodeEnv }) {
   return (
     <header className="w-full">
-      <nav className="flex justify-between">
-        <a href={$path("/")}>
-          <Logo />
-        </a>
+      <nav>
         <div className="flex items-center space-x-2">
+          <a href={$path("/")}>
+            <Logo />
+          </a>
           <EnvBadge environment={environment} />
         </div>
       </nav>

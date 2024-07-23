@@ -13,11 +13,13 @@ export default function NavbarWithUser({
   return (
     <header className="w-full">
       <nav className="flex justify-between">
-        <a href={$path("/")}>
-          <Logo />
-        </a>
         <div className="flex items-center space-x-2">
+          <a href={$path("/")}>
+            <Logo />
+          </a>
           <EnvBadge environment={environment} />
+        </div>
+        <div className="flex items-center space-x-2">
           {role && (
             <Button className="disabled:opacity-100" disabled>
               {role === "guardian" ? "Guardian" : "Security Council"}
