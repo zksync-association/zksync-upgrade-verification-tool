@@ -5,7 +5,7 @@ import { councilAddress, guardiansAddress } from "@/.server/service/authorized-u
 import {
   calculateStatusPendingDays,
   getProposalData,
-  getProposalStatus,
+  getProposalStatus, nowInSeconds,
 } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
@@ -69,10 +69,11 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         proposedOn: proposal.proposedOn,
         executor: proposal.executor,
         status: proposalStatus,
-        statusTimes: await calculateStatusPendingDays(
+        statusTimes: calculateStatusPendingDays(
           proposalStatus,
           proposalData.creationTimestamp,
-          proposalData.guardiansExtendedLegalVeto
+          proposalData.guardiansExtendedLegalVeto,
+          await nowInSeconds()
         ),
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         approvedByGuardians: proposalData.guardiansApproval,

@@ -5,7 +5,7 @@ import { PROTOCOL_UPGRADE_HANDLER_RAW_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 
 import { l1Rpc } from "@/.server/service/clients";
-import { type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
+import { decodeEventLog, type Hex, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
@@ -21,7 +21,7 @@ export async function getProposals(): Promise<Proposal[]> {
   const latestBlock = await l1Rpc.getLatestBlock();
   const currentBlock = latestBlock.number;
   const currentHeight = hexToBigInt(currentBlock);
-  const maxUpgradeLiftimeInBlocks = BigInt(40 * 24 * 360); // conservative estimation of latest block with a valid upgrade
+  const maxUpgradeLiftimeInBlocks = BigInt(40 * 24 * 360); // conservative estimation of oldest block with a valid upgrade
 
   const from = bigIntMax(currentHeight - maxUpgradeLiftimeInBlocks, 1n);
   const abi = upgradeHandlerAbi;
@@ -78,24 +78,23 @@ export type ProposalData = {
   executed: boolean;
 };
 
-function daysInSeconds(days: number): number {
+export function daysInSeconds(days: number): number {
   return days * 24 * 3600;
 }
 
-async function nowInSeconds() {
+export async function nowInSeconds() {
   const block = await l1Rpc.getLatestBlock();
   return block.timestamp;
 }
 
-export async function calculateStatusPendingDays(
+export function calculateStatusPendingDays(
   status: PROPOSAL_STATES,
   creationTimestamp: number,
-  guardiansExtendedLegalVeto: boolean
-): Promise<StatusTime | null> {
-  const now = await nowInSeconds();
-
+  guardiansExtendedLegalVeto: boolean,
+  nowInSeconds: number,
+): StatusTime | null {
   if (status === PROPOSAL_STATES.LegalVetoPeriod) {
-    const delta = now - creationTimestamp;
+    const delta = nowInSeconds - creationTimestamp;
     const currentDay = Math.ceil(delta / daysInSeconds(1));
     const totalDays = guardiansExtendedLegalVeto ? 7 : 3;
 
@@ -106,8 +105,11 @@ export async function calculateStatusPendingDays(
   }
 
   if (status === PROPOSAL_STATES.Waiting) {
-    const delta =
-      now - creationTimestamp + (guardiansExtendedLegalVeto ? daysInSeconds(3) : daysInSeconds(7));
+
+    const days3 = daysInSeconds(3);
+    const days7 = daysInSeconds(7);
+    const vetoPeriodDuration = guardiansExtendedLegalVeto ? days7 : days3
+    const delta = nowInSeconds - (creationTimestamp + vetoPeriodDuration)
     const currentDay = Math.ceil(delta / daysInSeconds(1));
     return {
       totalDays: 30,
