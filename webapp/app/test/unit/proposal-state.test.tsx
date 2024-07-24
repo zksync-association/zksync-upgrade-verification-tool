@@ -1,4 +1,3 @@
-import Navbar from "@/components/navbar";
 import { render, screen } from "@testing-library/react";
 import { expect, vi } from "vitest";
 import "@testing-library/jest-dom";
@@ -15,17 +14,22 @@ describe("ProposalState", () => {
 
     const element = await screen.findByText(/LEGAL VETO PERIOD/);
     expect(element).toBeInTheDocument();
-    expect(element).toHaveClass("text-yellow-400")
-    expect(element).toHaveTextContent(/^LEGAL VETO PERIOD$/)
+    expect(element).toHaveClass("text-yellow-400");
+    expect(element).toHaveTextContent(/^LEGAL VETO PERIOD$/);
   });
 
   it("adds the time when they are present", async () => {
-    render(<ProposalState status={PROPOSAL_STATES.LegalVetoPeriod} times={{ currentDay: 6, totalDays: 13 }} />);
+    render(
+      <ProposalState
+        status={PROPOSAL_STATES.LegalVetoPeriod}
+        times={{ currentDay: 6, totalDays: 13 }}
+      />
+    );
 
     const element = await screen.findByText(/LEGAL VETO PERIOD/);
     expect(element).toBeInTheDocument();
-    expect(element).toHaveClass("text-yellow-400")
-    expect(element).toHaveTextContent(/^LEGAL VETO PERIOD \(day 6 out of 13\)$/)
+    expect(element).toHaveClass("text-yellow-400");
+    expect(element).toHaveTextContent(/^LEGAL VETO PERIOD \(day 6 out of 13\)$/);
   });
 
   // it("renders Navbar with Logo and correct link", async () => {

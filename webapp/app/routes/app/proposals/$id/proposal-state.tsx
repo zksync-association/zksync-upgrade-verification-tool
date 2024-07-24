@@ -1,9 +1,9 @@
-import { PROPOSAL_STATES, StatusTime } from "@/utils/proposal-states";
+import { PROPOSAL_STATES, type StatusTime } from "@/utils/proposal-states";
 
 export type ProposalStateProps = {
-  status: PROPOSAL_STATES,
-  times: StatusTime | null
-}
+  status: PROPOSAL_STATES;
+  times: StatusTime | null;
+};
 
 export default function ProposalState({ status, times }: ProposalStateProps) {
   let color: string;

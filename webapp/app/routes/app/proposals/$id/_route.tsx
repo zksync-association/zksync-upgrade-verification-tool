@@ -2,10 +2,8 @@ import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { actionSchema } from "@/.server/db/schema";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
-import {
-  getProposalData,
-  getProposalStatus, nowInSeconds,
-} from "@/.server/service/proposals";
+import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
+import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
 import TxLink from "@/components/tx-link";
@@ -18,6 +16,7 @@ import ExecuteUpgradeButton from "@/routes/app/proposals/$id/execute-upgrade-but
 import FacetChangesTable from "@/routes/app/proposals/$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals/$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-changes-table";
+import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
@@ -34,8 +33,6 @@ import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
-import ProposalState from "@/routes/app/proposals/$id/proposal-state";
-import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);

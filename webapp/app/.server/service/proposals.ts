@@ -1,11 +1,11 @@
 import { createOrIgnoreProposal } from "@/.server/db/dto/proposals";
 import { upgradeHandlerAbi } from "@/.server/service/contract-abis";
-import { PROPOSAL_STATES } from "@/utils/proposal-states";
+import type { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { PROTOCOL_UPGRADE_HANDLER_RAW_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 
 import { l1Rpc } from "@/.server/service/clients";
-import { decodeEventLog, type Hex, hexToBigInt, numberToHex } from "viem";
+import { type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
