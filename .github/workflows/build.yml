@@ -13,9 +13,8 @@ env:
   DATABASE_URL: postgresql://user:password@localhost:5432/webapp
   NODE_ENV: test
   L1_RPC_URL: ${{ secrets.TENDERLY_RPC_URL }}
-  L1_RPC_URL_FOR_UPGRADES: http://127.0.0.1:8545
   WALLET_CONNECT_PROJECT_ID: 00000000000000000000000000000000
-  UPGRADE_HANDLER_ADDRESS: "0xd88ce7170eac2aad76acc74bda448c512818a2d4"
+  UPGRADE_HANDLER_ADDRESS: 0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9 # set to sepolia zkSync diamond just because it exists
 
 jobs:
   cli-build-and-test:
