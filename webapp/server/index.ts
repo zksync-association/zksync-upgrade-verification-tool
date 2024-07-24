@@ -7,6 +7,7 @@ import compression from "compression";
 import express, { type RequestHandler, type Request, type Response } from "express";
 import getPort, { portNumbers } from "get-port";
 
+import { validateHandlerAddress } from "@/.server/service/clients";
 import { auth } from "@server/middlewares/auth";
 import { cspNonce } from "@server/middlewares/csp-nonce";
 import { env } from "../config/env.server";
@@ -100,6 +101,17 @@ if (!portAvailable && env.NODE_ENV !== "development") {
   console.log(`⚠️ Port ${desiredPort} is not available.`);
   process.exit(1);
 }
+
+validateHandlerAddress().catch((error: unknown) => {
+  if (error instanceof Error) {
+    console.error(error.name);
+    console.error(error.message);
+    console.error(error.cause);
+  }
+
+  console.error("Failed to validate upgrade handler address:", error);
+  process.exit(1);
+});
 
 const server = app.listen(portToUse, () => {
   if (!portAvailable) {
