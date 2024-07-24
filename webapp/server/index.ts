@@ -7,6 +7,8 @@ import compression from "compression";
 import express, { type RequestHandler, type Request, type Response } from "express";
 import getPort, { portNumbers } from "get-port";
 
+import { testDbConnection } from "@/.server/db";
+import { validateHandlerAddress } from "@/.server/service/clients";
 import { auth } from "@server/middlewares/auth";
 import { cspNonce } from "@server/middlewares/csp-nonce";
 import { env } from "../config/env.server";
@@ -101,34 +103,43 @@ if (!portAvailable && env.NODE_ENV !== "development") {
   process.exit(1);
 }
 
-const server = app.listen(portToUse, () => {
-  if (!portAvailable) {
-    console.warn(
-      chalk.yellow(`⚠️  Port ${desiredPort} is not available, using ${portToUse} instead.`)
-    );
-  }
-  console.log("🚀  We have liftoff!");
-  const localUrl = `http://localhost:${portToUse}`;
-  let lanUrl: string | null = null;
-  const localIp = ipAddress() ?? "Unknown";
-  // Check if the address is a private ip
-  // https://en.wikipedia.org/wiki/Private_network#Private_IPv4_address_spaces
-  // https://github.com/facebook/create-react-app/blob/d960b9e38c062584ff6cfb1a70e1512509a966e7/packages/react-dev-utils/WebpackDevServerUtils.js#LL48C9-L54C10
-  if (/^10[.]|^172[.](1[6-9]|2[0-9]|3[0-1])[.]|^192[.]168[.]/.test(localIp)) {
-    lanUrl = `http://${localIp}:${portToUse}`;
-  }
+async function startServer() {
+  try {
+    await testDbConnection();
+    await validateHandlerAddress();
 
-  console.log(
-    `
+    const server = app.listen(portToUse, () => {
+      if (!portAvailable) {
+        console.warn(
+          chalk.yellow(`⚠️  Port ${desiredPort} is not available, using ${portToUse} instead.`)
+        );
+      }
+      console.log("🚀  We have liftoff!");
+      const localUrl = `http://localhost:${portToUse}`;
+      let lanUrl: string | null = null;
+      const localIp = ipAddress() ?? "Unknown";
+      if (/^10[.]|^172[.](1[6-9]|2[0-9]|3[0-1])[.]|^192[.]168[.]/.test(localIp)) {
+        lanUrl = `http://${localIp}:${portToUse}`;
+      }
+
+      console.log(
+        `
 ${chalk.bold("Local:")}            ${chalk.cyan(localUrl)}
 ${lanUrl ? `${chalk.bold("On Your Network:")}  ${chalk.cyan(lanUrl)}` : ""}
 ${chalk.bold("Press Ctrl+C to stop")}
-		`.trim()
-  );
-});
+        `.trim()
+      );
+    });
 
-closeWithGrace(async () => {
-  await new Promise((resolve, reject) => {
-    server.close((e) => (e ? reject(e) : resolve("ok")));
-  });
-});
+    closeWithGrace(async () => {
+      await new Promise((resolve, reject) => {
+        server.close((e) => (e ? reject(e) : resolve("ok")));
+      });
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+}
+
+startServer();

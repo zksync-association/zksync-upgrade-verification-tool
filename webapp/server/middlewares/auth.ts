@@ -8,7 +8,7 @@ export const USER_ADDRESS_HEADER = "x-user-address";
 export const USER_ROLE_HEADER = "x-user-role";
 
 const protectedRoutes = ["/app"] satisfies (keyof Routes)[];
-const unprotectedRoutes = ["/", "/app/denied"] satisfies (keyof Routes)[];
+const unprotectedRoutes = ["/", "/app/denied", "/app/down"] satisfies (keyof Routes)[];
 
 function isProtectedRoute(req: Request) {
   return (

@@ -20,7 +20,7 @@ export function helmet() {
           "https://explorer-api.walletconnect.com",
           "https://enhanced-provider.rainbow.me",
         ].filter(Boolean) as string[],
-        "font-src": ["'self'", "https://rsms.me"],
+        "font-src": ["'self'", "https://fonts.gstatic.com"],
         "frame-src": ["'self'", "https://verify.walletconnect.com"],
         "img-src": [
           "'self'",
