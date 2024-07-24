@@ -1,13 +1,20 @@
 import { isUserAuthorized } from "@/.server/service/authorized-users";
+import { checkConnection } from "@/.server/service/clients";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
 import { getUserFromHeader } from "@/utils/auth-headers";
-import { type ActionFunctionArgs, redirect } from "@remix-run/node";
-import { useFetcher, useNavigation } from "@remix-run/react";
+import { clientEnv } from "@config/env.server";
+import { type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { useAccount } from "wagmi";
+
+export function loader({ request }: LoaderFunctionArgs) {
+  const environment = clientEnv.NODE_ENV;
+  return { environment };
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   // On error redirect to the home page, address should be set by the backend
@@ -18,6 +25,10 @@ export async function action({ request }: ActionFunctionArgs) {
   const parsedAddress = zodHex.safeParse(address);
   if (!parsedAddress.success) {
     throw redirect($path("/"));
+  }
+  const isUp = await checkConnection();
+  if (!isUp) {
+    throw redirect($path("/app/down"));
   }
   const auth = await isUserAuthorized(parsedAddress.data);
   if (!auth.authorized) {
@@ -30,6 +41,7 @@ export default function Index() {
   const account = useAccount();
   const fetcher = useFetcher<typeof action>();
   const navigation = useNavigation();
+  const { environment } = useLoaderData<typeof loader>();
 
   useEffect(() => {
     if (account.isConnected) {
@@ -39,7 +51,7 @@ export default function Index() {
 
   return (
     <>
-      <Navbar />
+      <Navbar environment={environment} />
       <div className="relative mt-6 flex max-h-[700px] flex-1">
         <div className="cta-bg -z-10 pointer-events-none w-full" />
         <main className="flex flex-1 flex-col items-center justify-center">
