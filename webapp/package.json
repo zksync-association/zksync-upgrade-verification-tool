@@ -20,6 +20,7 @@
     "db:studio": "drizzle-kit studio",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down db",
+    "test:server": "vitest run --config ./vitest.server.config.ts",
     "test:u": "vitest run --config ./vitest.unit.config.ts",
     "pretest:i": "pnpm run db:up &&  pnpm run db:wait && pnpm db:migrate test",
     "test:i": "vitest run --config ./vitest.integration.config.ts",

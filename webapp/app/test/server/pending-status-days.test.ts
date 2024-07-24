@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { calculateStatusPendingDays, daysInSeconds } from "@/.server/service/proposals";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
+import { calculateStatusPendingDays, daysInSeconds } from "@/.server/service/proposal-times";
 
 describe("calculateStatusPendingDays", () => {
   const nowInSeconds = Math.ceil(new Date().valueOf() / 1000);

@@ -111,3 +111,4 @@ jobs:
         run: |
           cd webapp
           pnpm test:u
+          pnpm test:server

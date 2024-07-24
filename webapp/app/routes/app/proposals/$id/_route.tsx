@@ -3,7 +3,6 @@ import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { actionSchema } from "@/.server/db/schema";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
 import {
-  calculateStatusPendingDays,
   getProposalData,
   getProposalStatus, nowInSeconds,
 } from "@/.server/service/proposals";
@@ -36,6 +35,7 @@ import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
 import ProposalState from "@/routes/app/proposals/$id/proposal-state";
+import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
