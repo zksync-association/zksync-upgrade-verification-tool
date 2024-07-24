@@ -17,7 +17,7 @@ export const db = drizzle(queryClient, {
   },
 });
 
-async function testDbConnection() {
+export const testDbConnection = async () => {
   try {
     await db.select().from(proposalsTable).limit(1);
 
@@ -30,6 +30,4 @@ async function testDbConnection() {
     }
     throw new Error("Failed to connect to the database");
   }
-}
-
-testDbConnection();
+};
