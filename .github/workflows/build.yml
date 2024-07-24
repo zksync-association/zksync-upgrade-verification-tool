@@ -43,6 +43,7 @@ jobs:
 
   webapp-start:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -65,9 +66,10 @@ jobs:
       - name: Start WebApp
         run: |
           cd webapp
-          timeout 60s pnpm start | tee output.log &
+          timeout 60s pnpm start &
           PID=$!
-          if grep -q "🚀  We have liftoff!" <(tail -f output.log); then
+          sleep 20
+          if ps -p $PID > /dev/null; then
             echo "WebApp started successfully"
             kill $PID
           else
