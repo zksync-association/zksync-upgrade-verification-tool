@@ -64,17 +64,15 @@ jobs:
       - name: Start WebApp
         run: |
           cd webapp
-          timeout 60s pnpm start &
+          timeout 60s pnpm start | tee output.log &
           PID=$!
-          sleep 20
-          if ps -p $PID > /dev/null; then
+          if grep -q "🚀  We have liftoff!" <(tail -f output.log); then
             echo "WebApp started successfully"
             kill $PID
           else
             echo "WebApp failed to start"
             exit 1
           fi
-
   webapp-integration-test:
     runs-on: ubuntu-latest
     steps:
