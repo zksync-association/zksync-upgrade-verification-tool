@@ -35,6 +35,7 @@ import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
+import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -245,7 +246,7 @@ export default function Proposals() {
                   </Card>
                   <Card className="pb-10">
                     <CardHeader className="pt-7">
-                      {displayProposalState(proposal.status, proposal.statusTimes)}
+                      <ProposalState status={proposal.status} times={proposal.statusTimes} />
                       <CardTitle>Proposal Status</CardTitle>
                     </CardHeader>
                     <CardContent>

@@ -1,6 +1,6 @@
 import { createOrIgnoreProposal } from "@/.server/db/dto/proposals";
 import { upgradeHandlerAbi } from "@/.server/service/contract-abis";
-import { PROPOSAL_STATES } from "@/utils/proposal-states";
+import { PROPOSAL_STATES, StatusTime } from "@/utils/proposal-states";
 import { PROTOCOL_UPGRADE_HANDLER_RAW_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 
@@ -64,11 +64,6 @@ export async function getProposals(): Promise<Proposal[]> {
 
   return proposals;
 }
-
-export type StatusTime = {
-  totalDays: number;
-  currentDay: number;
-};
 
 export type ProposalData = {
   creationTimestamp: number;

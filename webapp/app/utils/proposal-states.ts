@@ -7,3 +7,8 @@ export enum PROPOSAL_STATES {
   Expired = 5,
   Done = 6,
 }
+
+export type StatusTime = {
+  totalDays: number;
+  currentDay: number;
+};
