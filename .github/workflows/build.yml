@@ -60,6 +60,8 @@ jobs:
           cd webapp
           ./scripts/init_db.sh
           docker ps -a
+          sleep 10
+          pnpm db:migrate
       - name: Start WebApp
         run: |
           cd webapp
