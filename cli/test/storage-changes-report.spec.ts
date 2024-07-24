@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { StorageChanges } from "../src/index";
-import { memoryDiffParser, type MemoryDiffRaw } from "../src/schema/rpc";
+import { RecordStorageSnapshot, StorageChanges } from "../src";
 import { type Hex, hexToBigInt, keccak256, numberToBytes, numberToHex } from "viem";
 import chalk from "chalk";
 import { AddressType } from "../src/lib/storage/types/address-type";
@@ -24,40 +23,27 @@ describe("MemoryMapReport", () => {
       return numberToHex(n + add, { size: 32 });
     }
 
-    const diff: MemoryDiffRaw = memoryDiffParser.parse({
-      result: {
-        pre: {
-          addr: {
-            storage: {
-              "0x000000000000000000000000000000000000000000000000000000000000000a": numberToHex(
-                10,
-                { size: 32 }
-              ),
-              [numberToHex(boolSlot, { size: 32 })]: numberToHex(1, { size: 32 }),
-              [numberToHex(listSlot, { size: 32 })]: numberToHex(3, { size: 32 }),
-              [addToHashed(hashedListSlot, 0n)]: numberToHex(100, { size: 32 }),
-              [addToHashed(hashedListSlot, 1n)]: numberToHex(101, { size: 32 }),
-              [addToHashed(hashedListSlot, 2n)]: numberToHex(102, { size: 32 }),
-            },
-          },
-        },
-        post: {
-          addr: {
-            storage: {
-              "0x000000000000000000000000000000000000000000000000000000000000000a": numberToHex(
-                20,
-                { size: 32 }
-              ),
-              [numberToHex(boolSlot, { size: 32 })]: numberToHex(0, { size: 32 }),
-              [numberToHex(listSlot, { size: 32 })]: numberToHex(4, { size: 32 }),
-              [addToHashed(hashedListSlot, 0n)]: numberToHex(100, { size: 32 }),
-              [addToHashed(hashedListSlot, 1n)]: numberToHex(201, { size: 32 }),
-              [addToHashed(hashedListSlot, 2n)]: numberToHex(102, { size: 32 }),
-              [addToHashed(hashedListSlot, 3n)]: numberToHex(103, { size: 32 }),
-            },
-          },
-        },
-      },
+    const pre = new RecordStorageSnapshot({
+      "0x000000000000000000000000000000000000000000000000000000000000000a": numberToHex(10, {
+        size: 32,
+      }),
+      [numberToHex(boolSlot, { size: 32 })]: numberToHex(1, { size: 32 }),
+      [numberToHex(listSlot, { size: 32 })]: numberToHex(3, { size: 32 }),
+      [addToHashed(hashedListSlot, 0n)]: numberToHex(100, { size: 32 }),
+      [addToHashed(hashedListSlot, 1n)]: numberToHex(101, { size: 32 }),
+      [addToHashed(hashedListSlot, 2n)]: numberToHex(102, { size: 32 }),
+    });
+
+    const post = new RecordStorageSnapshot({
+      "0x000000000000000000000000000000000000000000000000000000000000000a": numberToHex(20, {
+        size: 32,
+      }),
+      [numberToHex(boolSlot, { size: 32 })]: numberToHex(0, { size: 32 }),
+      [numberToHex(listSlot, { size: 32 })]: numberToHex(4, { size: 32 }),
+      [addToHashed(hashedListSlot, 0n)]: numberToHex(100, { size: 32 }),
+      [addToHashed(hashedListSlot, 1n)]: numberToHex(201, { size: 32 }),
+      [addToHashed(hashedListSlot, 2n)]: numberToHex(102, { size: 32 }),
+      [addToHashed(hashedListSlot, 3n)]: numberToHex(103, { size: 32 }),
     });
 
     function expectedReportSingleLine(
@@ -99,7 +85,8 @@ describe("MemoryMapReport", () => {
         "some description",
         new AddressType()
       );
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+
+      const memoryMap = new StorageChanges(pre, post, [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -120,7 +107,7 @@ describe("MemoryMapReport", () => {
         "it is a number",
         new BigNumberType()
       );
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges(pre, post, [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -131,7 +118,7 @@ describe("MemoryMapReport", () => {
 
     it("can display blob elements", async () => {
       const prop = new ContractField("blobProp", BigInt(0xa), "it is a blob", new BlobType());
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges(pre, post, [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -147,7 +134,7 @@ describe("MemoryMapReport", () => {
 
     it("can display boolean elements", async () => {
       const prop = new ContractField("blobProp", boolSlot, "it is a blob", new BooleanType());
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges(pre, post, [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -163,7 +150,7 @@ describe("MemoryMapReport", () => {
         "it is a list",
         new ArrayType(new BigNumberType())
       );
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges(pre, post, [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -182,7 +169,7 @@ describe("MemoryMapReport", () => {
         "it is a list",
         new FixedArrayType(3, new BigNumberType())
       );
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges(pre, post, [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -201,7 +188,7 @@ describe("MemoryMapReport", () => {
         "it is a list",
         new FixedArrayType(3, new BigNumberType())
       );
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges(pre, post, [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 
@@ -237,7 +224,7 @@ describe("MemoryMapReport", () => {
           },
         ])
       );
-      const memoryMap = new StorageChanges(diff, "addr", [], [], [prop]);
+      const memoryMap = new StorageChanges(pre, post, [], [], [prop]);
 
       const report = new StringStorageChangeReport(memoryMap, true);
 

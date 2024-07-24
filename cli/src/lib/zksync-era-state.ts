@@ -7,7 +7,7 @@ import { Diamond } from "./diamond";
 import { type BlockExplorer, BlockExplorerClient } from "./block-explorer-client";
 import { RpcClient } from "./rpc-client";
 import { zodHex } from "../schema/zod-optionals";
-import { RpcStorageSnapshot } from "./storage/rpc-storage-snapshot";
+import { RpcStorageSnapshot } from "./storage/snapshot";
 import { StringStorageVisitor } from "./reports/string-storage-visitor";
 import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props";
 import {
@@ -16,7 +16,7 @@ import {
   type SystemContractProvider,
 } from "./system-contract-providers";
 import { z } from "zod";
-import { RecordStorageSnapshot } from "./storage/record-storage-snapshot";
+import { RecordStorageSnapshot } from "./storage/snapshot";
 import {
   AddressExtractor,
   BigNumberExtractor,
@@ -25,7 +25,7 @@ import {
   ListOfAddressesExtractor,
 } from "./reports/extractors";
 import type { ContractField } from "./storage/contractField";
-import type { StorageSnapshot } from "./storage/storage-snapshot";
+import type { StorageSnapshot } from "./storage/snapshot";
 import type { StorageVisitor } from "./reports/storage-visitor";
 import { type CallTrace, l2UpgradeSchema, upgradeCallDataSchema } from "../schema/rpc";
 

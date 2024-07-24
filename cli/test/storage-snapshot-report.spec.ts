@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SnapshotReport } from "../src/lib/reports/storage-snapshot-report";
-import { RecordStorageSnapshot } from "../src/lib/storage/record-storage-snapshot";
+import { RecordStorageSnapshot } from "../src";
 import { BigNumberType } from "../src/lib/storage/types/big-number-type";
 import { ContractField } from "../src/lib/storage/contractField";
 import { BlobType } from "../src/lib/storage/types/blob-type";

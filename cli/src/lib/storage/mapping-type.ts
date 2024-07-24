@@ -2,7 +2,7 @@ import type { MemoryDataType } from "./types/data-type";
 import { Option } from "nochoices";
 import { bytesToHex, hexToBigInt, keccak256, numberToBytes } from "viem";
 
-import type { StorageSnapshot } from "./storage-snapshot";
+import type { StorageSnapshot } from "./snapshot";
 import type { StorageValue } from "./values/storage-value";
 import { EmptyValue } from "./values/empty-value";
 import { MappingValue } from "./values/mapping-value";

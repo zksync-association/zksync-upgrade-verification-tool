@@ -1,12 +1,15 @@
 import type { EnvBuilder } from "../lib/env-builder";
 import { DIAMOND_ADDRS, type UpgradeChanges, UpgradeImporter } from "../lib";
-import { StorageChanges } from "../lib/storage/storage-changes";
+import { StorageChanges } from "../lib";
 import type { Hex } from "viem";
-import type { Option } from "nochoices";
+import { Option } from "nochoices";
 import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
-import { withSpinner } from "../lib/with-spinner";
 import { StringStorageChangeReport } from "../lib/reports/string-storage-change-report";
-import { ZksyncEraState } from "../lib/zksync-era-state";
+import { RpcStorageSnapshot } from "../lib";
+import { RecordStorageSnapshot } from "../lib";
+import { MAIN_CONTRACT_FIELDS } from "../lib/storage/storage-props";
+import { FacetsToSelectorsVisitor, ListOfAddressesExtractor } from "../lib/reports/extractors";
+import { withSpinner } from "../lib/with-spinner";
 
 async function getMemoryPath(
   preCalculatedPath: Option<string>,
@@ -38,40 +41,91 @@ export async function storageChangeCommand(
   dir: string,
   preCalculatedPath: Option<string>
 ): Promise<void> {
-  const state = await withSpinner(
-    () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
-    "Gathering contract data",
+  const diamondAddress = DIAMOND_ADDRS[env.network];
+
+  const rawMap = await withSpinner(
+    async () => {
+      const importer = new UpgradeImporter(env.fs());
+      const changes = await importer.readFromFiles(dir, env.network);
+
+      return getMemoryPath(preCalculatedPath, env, diamondAddress, changes);
+    },
+    "Calculating storage changes",
     env
   );
-  const importer = new UpgradeImporter(env.fs());
-  const changes = await importer.readFromFiles(dir, env.network);
 
-  const rawMap = await getMemoryPath(preCalculatedPath, env, DIAMOND_ADDRS[env.network], changes);
+  const changesSnapshot = Option.fromNullable(rawMap.result.post[diamondAddress])
+    .map((data) => data.storage)
+    .flatten()
+    .orElse(() => Option.Some({}))
+    .map((s) => new RecordStorageSnapshot(s))
+    .unwrap();
 
-  const selectors = new Set<Hex>();
-  for (const selector of state.allSelectors()) {
-    selectors.add(selector);
-  }
-  for (const selector of changes.allSelectors()) {
-    selectors.add(selector);
-  }
+  const pre = new RpcStorageSnapshot(env.rpcL1(), diamondAddress);
+  const post = pre.apply(changesSnapshot);
 
-  const facets = new Set<Hex>();
-  for (const addr of state.allFacetsAddrs()) {
-    facets.add(addr);
-  }
-  for (const addr of changes.allFacetsAddresses()) {
-    facets.add(addr);
-  }
-
-  const memoryMap = new StorageChanges(
-    rawMap,
-    DIAMOND_ADDRS[env.network],
-    [...selectors],
-    ["0x10113bb3a8e64f8ed67003126adc8ce74c34610c"]
+  const [facetsPre, facetsPost] = await withSpinner(
+    async () => {
+      const facetsPre = await MAIN_CONTRACT_FIELDS.facetAddresses
+        .extract(pre)
+        .then((opt) =>
+          opt.map((value) => value.accept(new ListOfAddressesExtractor())).or(Option.Some([]))
+        );
+      const facetsPost = await MAIN_CONTRACT_FIELDS.facetAddresses
+        .extract(post)
+        .then((opt) =>
+          opt.map((value) => value.accept(new ListOfAddressesExtractor())).or(Option.Some([]))
+        );
+      return [facetsPre, facetsPost];
+    },
+    "Searching all facet addresses",
+    env
   );
 
-  const report = new StringStorageChangeReport(memoryMap, env.colored);
+  const allFacets = facetsPre
+    .zip(facetsPost)
+    .map(([pre, post]) => [...pre, ...post])
+    .unwrapOr([]);
 
-  env.term().line(await report.format());
+  const [selectorsPre, selectorsPost] = await withSpinner(
+    async () => {
+      const selectorsPre = await MAIN_CONTRACT_FIELDS.facetToSelectors(allFacets)
+        .extract(pre)
+        .then((opt) =>
+          opt
+            .map((value) => value.accept(new FacetsToSelectorsVisitor()) as Map<Hex, Hex[]>)
+            .or(Option.Some(new Map()))
+        );
+
+      const selectorsPost = await MAIN_CONTRACT_FIELDS.facetToSelectors(allFacets)
+        .extract(post)
+        .then((opt) =>
+          opt
+            .map((value) => value.accept(new FacetsToSelectorsVisitor()) as Map<Hex, Hex[]>)
+            .or(Option.Some(new Map()))
+        );
+      return [selectorsPre, selectorsPost];
+    },
+    "Searching all selectors",
+    env
+  );
+
+  const allSelectors = selectorsPre
+    .zip(selectorsPost)
+    .map(([pre, post]) => {
+      return [...pre.values(), ...post.values()].flat();
+    })
+    .unwrapOr([]);
+
+  const report = await withSpinner(
+    async () => {
+      const storageChanges = new StorageChanges(pre, post, allFacets, [...allSelectors]);
+      const report = new StringStorageChangeReport(storageChanges, env.colored);
+      return await report.format();
+    },
+    "calculating report",
+    env
+  );
+
+  env.term().line(report);
 }

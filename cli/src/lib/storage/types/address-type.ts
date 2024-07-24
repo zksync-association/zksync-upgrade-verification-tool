@@ -2,7 +2,7 @@ import type { MemoryDataType } from "./data-type";
 import type { Option } from "nochoices";
 import { bytesToHex, type Hex } from "viem";
 
-import type { StorageSnapshot } from "../storage-snapshot";
+import type { StorageSnapshot } from "../snapshot";
 import { AddressValue } from "../values/address-value";
 import type { StorageValue } from "../values/storage-value";
 

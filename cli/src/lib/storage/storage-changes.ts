@@ -1,10 +1,8 @@
-import type { MemoryDiffRaw } from "../../schema/rpc";
 import { Option } from "nochoices";
 import { type Hex, hexToBigInt } from "viem";
 import type { ContractField } from "./contractField";
-import type { StorageSnapshot } from "./storage-snapshot";
+import type { StorageSnapshot } from "./snapshot";
 import { PropertyChange } from "./property-change";
-import { RecordStorageSnapshot } from "./record-storage-snapshot";
 import { mainDiamondFields } from "./storage-props";
 
 export const DIAMOND_STORAGE_SLOT = hexToBigInt(
@@ -19,28 +17,14 @@ export class StorageChanges {
   private facets: Hex[];
 
   constructor(
-    diff: MemoryDiffRaw,
-    addr: string,
+    pre: StorageSnapshot,
+    post: StorageSnapshot,
     selectors: Hex[],
     facets: Hex[] = [],
     contractProps: ContractField[] = []
   ) {
-    const pre = diff.result.pre[addr];
-    const post = diff.result.post[addr];
-
-    if (!pre) {
-      throw new Error("missing pre");
-    }
-
-    if (!post) {
-      throw new Error("missing post");
-    }
-
-    const preStorage = pre.storage.unwrapOr({});
-    const postStorage = post.storage.unwrapOr({});
-
-    this.pre = new RecordStorageSnapshot(preStorage);
-    this.post = new RecordStorageSnapshot(postStorage);
+    this.pre = pre;
+    this.post = post;
     this.selectors = selectors;
     this.facets = facets;
     this.contractProps = contractProps.length === 0 ? this.allContractProps() : contractProps;
