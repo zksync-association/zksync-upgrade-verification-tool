@@ -459,7 +459,7 @@ function displayProposalState(
   let color: string;
   let label: string;
 
-  const timeData = times ? `(day ${times.currentDay} out of ${times.totalDays})` : "";
+  const timeData = times ? `(Day ${times.currentDay} of ${times.totalDays})` : "";
 
   switch (state) {
     case PROPOSAL_STATES.None:
