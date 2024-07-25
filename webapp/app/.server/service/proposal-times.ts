@@ -11,7 +11,8 @@ const SEVEN_DAYS_SECONDS = daysInSeconds(7);
 const WAITING_PERIOD_DURATION_DAYS = 30;
 
 
-// This function recreates logic from the flow enforced by ProtocolUpgradeHandler.
+// This function recreates the schedulled described here: https://docs.zknation.io/zksync-governance/schedule-1-standard-governance-procedures.
+// This is also enforce on chain by ProtocolUpgradeHandler.
 // The 3 states that have expiration times are:
 // -- LegalVetoPeriod: 3 days. Can be extended to 7. Starts on upgrade creation.
 // -- Waiting: 30 days. Starts when veto period finishes.
