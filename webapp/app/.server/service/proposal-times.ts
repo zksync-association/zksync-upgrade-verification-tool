@@ -10,7 +10,6 @@ const SEVEN_DAYS_SECONDS = daysInSeconds(7);
 // ProtocolUpgradeHandler.UPGRADE_WAIT_OR_EXPIRE_PERIOD
 const WAITING_PERIOD_DURATION_DAYS = 30;
 
-
 // This function recreates the schedulled described here: https://docs.zknation.io/zksync-governance/schedule-1-standard-governance-procedures.
 // This is also enforce on chain by ProtocolUpgradeHandler.
 // The 3 states that have expiration times are:
@@ -35,9 +34,7 @@ export function calculateStatusPendingDays(
   }
 
   if (status === PROPOSAL_STATES.Waiting) {
-    const vetoPeriodDuration = guardiansExtendedLegalVeto
-      ? SEVEN_DAYS_SECONDS
-      : THREE_DAYS_SECONDS;
+    const vetoPeriodDuration = guardiansExtendedLegalVeto ? SEVEN_DAYS_SECONDS : THREE_DAYS_SECONDS;
     const delta = nowInSeconds - (creationTimestamp + vetoPeriodDuration);
     const currentDay = Math.ceil(delta / daysInSeconds(1));
 
