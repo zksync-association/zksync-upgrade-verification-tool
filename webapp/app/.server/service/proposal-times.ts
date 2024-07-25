@@ -4,6 +4,18 @@ export function daysInSeconds(days: number): number {
   return days * 24 * 3600;
 }
 
+const THREE_DAYS_SECONDS = daysInSeconds(3);
+const SEVEN_DAYS_SECONDS = daysInSeconds(7);
+
+// ProtocolUpgradeHandler.UPGRADE_WAIT_OR_EXPIRE_PERIOD
+const WAITING_PERIOD_DURATION_DAYS = 30;
+
+
+// This function recreates logic from the flow enforced by ProtocolUpgradeHandler.
+// The 3 states that have expiration times are:
+// -- LegalVetoPeriod: 3 days. Can be extended to 7. Starts on upgrade creation.
+// -- Waiting: 30 days. Starts when veto period finishes.
+// -- ExecutionPending. 1 day.
 export function calculateStatusPendingDays(
   status: PROPOSAL_STATES,
   creationTimestamp: number,
@@ -22,13 +34,14 @@ export function calculateStatusPendingDays(
   }
 
   if (status === PROPOSAL_STATES.Waiting) {
-    const days3 = daysInSeconds(3);
-    const days7 = daysInSeconds(7);
-    const vetoPeriodDuration = guardiansExtendedLegalVeto ? days7 : days3;
+    const vetoPeriodDuration = guardiansExtendedLegalVeto
+      ? SEVEN_DAYS_SECONDS
+      : THREE_DAYS_SECONDS;
     const delta = nowInSeconds - (creationTimestamp + vetoPeriodDuration);
     const currentDay = Math.ceil(delta / daysInSeconds(1));
+
     return {
-      totalDays: 30,
+      totalDays: WAITING_PERIOD_DURATION_DAYS,
       currentDay: currentDay,
     };
   }
