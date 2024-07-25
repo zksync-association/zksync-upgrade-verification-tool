@@ -41,8 +41,6 @@ describe("calculateStatusPendingDays", () => {
   });
 
   describe("LegalVetoPeriod", () => {
-    const state = PROPOSAL_STATES.LegalVetoPeriod;
-
     it("returns 3 as totalDays when was not extended", () => {
       const creationTime = nowInSeconds;
       const now = creationTime + 1;
