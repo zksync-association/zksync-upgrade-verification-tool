@@ -18,9 +18,10 @@ export type Proposal = {
 };
 
 export async function getProposals(): Promise<Proposal[]> {
-  const currentBlock = await l1Rpc.getLatestBlockNumber();
+  const latestBlock = await l1Rpc.getLatestBlock();
+  const currentBlock = latestBlock.number;
   const currentHeight = hexToBigInt(currentBlock);
-  const maxUpgradeLiftimeInBlocks = BigInt(40 * 24 * 360); // conservative estimation of latest block with a valid upgrade
+  const maxUpgradeLiftimeInBlocks = BigInt(40 * 24 * 360); // conservative estimation of oldest block with a valid upgrade
 
   const from = bigIntMax(currentHeight - maxUpgradeLiftimeInBlocks, 1n);
   const abi = upgradeHandlerAbi;
@@ -71,6 +72,11 @@ export type ProposalData = {
   guardiansExtendedLegalVeto: boolean;
   executed: boolean;
 };
+
+export async function nowInSeconds() {
+  const block = await l1Rpc.getLatestBlock();
+  return block.timestamp;
+}
 
 export async function getProposalData(id: Hex): Promise<ProposalData> {
   const [

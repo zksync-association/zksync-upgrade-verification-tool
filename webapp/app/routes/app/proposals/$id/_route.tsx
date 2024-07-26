@@ -2,7 +2,8 @@ import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { actionSchema } from "@/.server/db/schema";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
-import { getProposalData, getProposalStatus } from "@/.server/service/proposals";
+import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
+import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
 import TxLink from "@/components/tx-link";
@@ -15,6 +16,7 @@ import ExecuteUpgradeButton from "@/routes/app/proposals/$id/execute-upgrade-but
 import FacetChangesTable from "@/routes/app/proposals/$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals/$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-changes-table";
+import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
@@ -65,6 +67,12 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         proposedOn: proposal.proposedOn,
         executor: proposal.executor,
         status: proposalStatus,
+        statusTimes: calculateStatusPendingDays(
+          proposalStatus,
+          proposalData.creationTimestamp,
+          proposalData.guardiansExtendedLegalVeto,
+          await nowInSeconds()
+        ),
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         approvedByGuardians: proposalData.guardiansApproval,
         approvedByCouncil: proposalData.securityCouncilApprovalTimestamp !== 0,
@@ -235,7 +243,7 @@ export default function Proposals() {
                   </Card>
                   <Card className="pb-10">
                     <CardHeader className="pt-7">
-                      {displayProposalState(proposal.status)}
+                      <ProposalState status={proposal.status} times={proposal.statusTimes} />
                       <CardTitle>Proposal Status</CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -442,42 +450,4 @@ function StatusIndicator({
       />
     </div>
   );
-}
-
-function displayProposalState(state: PROPOSAL_STATES) {
-  let color: string;
-  let label: string;
-
-  switch (state) {
-    case PROPOSAL_STATES.None:
-      color = "text-red-400";
-      label = "NONE";
-      break;
-    case PROPOSAL_STATES.LegalVetoPeriod:
-      color = "text-yellow-400";
-      label = "LEGAL VETO PERIOD";
-      break;
-    case PROPOSAL_STATES.Waiting:
-      color = "text-yellow-400";
-      label = "WAITING";
-      break;
-    case PROPOSAL_STATES.ExecutionPending:
-      color = "text-yellow-400";
-      label = "EXECUTION PENDING";
-      break;
-    case PROPOSAL_STATES.Ready:
-      color = "text-green-400";
-      label = "READY";
-      break;
-    case PROPOSAL_STATES.Expired:
-      color = "text-red-400";
-      label = "EXPIRED";
-      break;
-    case PROPOSAL_STATES.Done:
-      color = "text-green-400";
-      label = "DONE";
-      break;
-  }
-
-  return <p className={color}>{label}</p>;
 }
