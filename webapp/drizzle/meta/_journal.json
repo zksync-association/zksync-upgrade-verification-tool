@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1720565735864,
-      "tag": "0000_medical_microbe",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1720581776954,
-      "tag": "0001_youthful_gargoyle",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1720628726537,
-      "tag": "0002_mixed_makkari",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1720655835415,
-      "tag": "0003_curly_snowbird",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1722243445861,
-      "tag": "0004_nice_wolfpack",
+      "when": 1722244871323,
+      "tag": "0000_daffy_wrecker",
       "breakpoints": true
     }
   ]

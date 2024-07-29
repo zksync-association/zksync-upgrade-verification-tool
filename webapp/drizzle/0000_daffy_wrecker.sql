@@ -1,3 +1,16 @@
+CREATE TABLE IF NOT EXISTS "proposals" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"external_id" "bytea" NOT NULL,
+	"calldata" "bytea" NOT NULL,
+	"check_report" json,
+	"storage_diff_report" json,
+	"proposed_on" timestamp with time zone NOT NULL,
+	"executor" "bytea" NOT NULL,
+	"transaction_hash" "bytea" NOT NULL,
+	"proposal_type" text DEFAULT 'routine' NOT NULL,
+	CONSTRAINT "proposals_external_id_unique" UNIQUE("external_id")
+);
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "signatures" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"proposal_id" "bytea" NOT NULL,
@@ -12,3 +25,5 @@ DO $$ BEGIN
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "external_id_idx" ON "proposals" USING btree ("external_id");

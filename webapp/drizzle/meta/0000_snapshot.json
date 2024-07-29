@@ -1,5 +1,5 @@
 {
-  "id": "221c2550-6947-4389-9a63-373e5ed7935c",
+  "id": "09edb4be-5db0-44a6-aa99-2f5d1d74a8cb",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -37,6 +37,31 @@
           "type": "json",
           "primaryKey": false,
           "notNull": false
+        },
+        "proposed_on": {
+          "name": "proposed_on",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "executor": {
+          "name": "executor",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_hash": {
+          "name": "transaction_hash",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proposal_type": {
+          "name": "proposal_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'routine'"
         }
       },
       "indexes": {
@@ -67,18 +92,73 @@
           ]
         }
       }
+    },
+    "public.signatures": {
+      "name": "signatures",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "proposal_id": {
+          "name": "proposal_id",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "signer": {
+          "name": "signer",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "signature": {
+          "name": "signature",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "signatures_proposal_id_proposals_external_id_fk": {
+          "name": "signatures_proposal_id_proposals_external_id_fk",
+          "tableFrom": "signatures",
+          "tableTo": "proposals",
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "external_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "signatures_proposal_id_signer_action_unique": {
+          "name": "signatures_proposal_id_signer_action_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "proposal_id",
+            "signer",
+            "action"
+          ]
+        }
+      }
     }
   },
-  "enums": {
-    "public.status": {
-      "name": "status",
-      "schema": "public",
-      "values": [
-        "pending",
-        "completed"
-      ]
-    }
-  },
+  "enums": {},
   "schemas": {},
   "_meta": {
     "columns": {},
