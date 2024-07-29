@@ -71,6 +71,9 @@ describe("Proposal DB", () => {
     const proposal = await getProposalByExternalId(params.externalId, "routine");
     expect(proposal).toBeDefined();
     expect(proposal?.proposalType).toEqual("routine");
+
+    const noProposal = await getProposalByExternalId(params.externalId, "emergency");
+    expect(noProposal).toBeUndefined();
   });
 
   it("should create and retrieve an emergency proposal", async () => {
