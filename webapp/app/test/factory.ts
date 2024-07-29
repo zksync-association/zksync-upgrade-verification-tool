@@ -9,6 +9,7 @@ export const createRandomProposal = async () => {
     proposedOn: params.proposedOn,
     executor: params.executor,
     transactionHash: params.transactionHash,
+    proposalType: "routine",
   });
 
   return params;
@@ -23,5 +24,6 @@ export const createRandomProposalParams = () => {
     proposedOn: faker.date.anytime(),
     executor: faker.string.hexadecimal({ length: 20 }) as `0x${string}`,
     transactionHash: faker.string.hexadecimal({ length: 32 }) as `0x${string}`,
+    proposalType: "routine" as const,
   };
 };

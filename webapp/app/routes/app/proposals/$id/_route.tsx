@@ -43,7 +43,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   }
 
   // Id is external_id coming from the smart contract
-  const proposal = await getProposalByExternalId(params.data.id);
+  const proposal = await getProposalByExternalId(params.data.id, "routine");
   if (!proposal) {
     throw notFound();
   }

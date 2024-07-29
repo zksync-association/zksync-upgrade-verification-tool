@@ -58,7 +58,30 @@ describe("Proposal DB", () => {
 
   it("should return null when retrieving a non-existent proposal", async () => {
     const nonExistentId = "0x1234567890123456789012345678901234567890";
-    const proposal = await getProposalByExternalId(nonExistentId);
+    const proposal = await getProposalByExternalId(nonExistentId, "routine");
     expect(proposal).toBeUndefined();
+  });
+
+  it("should create a proposal with default routine type", async () => {
+    const params = createRandomProposalParams();
+    await createOrIgnoreProposal({
+      ...params,
+    });
+
+    const proposal = await getProposalByExternalId(params.externalId, "routine");
+    expect(proposal).toBeDefined();
+    expect(proposal?.proposalType).toEqual("routine");
+  });
+
+  it("should create and retrieve an emergency proposal", async () => {
+    const params = createRandomProposalParams();
+    await createOrIgnoreProposal({
+      ...params,
+      proposalType: "emergency",
+    });
+
+    const proposal = await getProposalByExternalId(params.externalId, "emergency");
+    expect(proposal).toBeDefined();
+    expect(proposal?.proposalType).toEqual("emergency");
   });
 });

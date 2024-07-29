@@ -59,6 +59,7 @@ export async function getProposals(): Promise<Proposal[]> {
       proposedOn: new Date(data.creationTimestamp * 1000),
       executor: proposal.args._proposal.executor,
       transactionHash: log.transactionHash,
+      proposalType: "routine",
     });
   }
 

@@ -128,7 +128,7 @@ async function generateReportIfNotInDb<T>(
     return emptyReport;
   }
 
-  const proposal = await getProposalByExternalId(proposalId);
+  const proposal = await getProposalByExternalId(proposalId, "routine");
   if (!proposal) {
     throw new Error("Unknown proposal");
   }

@@ -29,6 +29,13 @@
       "when": 1720655835415,
       "tag": "0003_curly_snowbird",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1722243445861,
+      "tag": "0004_nice_wolfpack",
+      "breakpoints": true
     }
   ]
 }

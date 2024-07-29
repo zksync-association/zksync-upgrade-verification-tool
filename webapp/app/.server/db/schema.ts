@@ -2,6 +2,10 @@ import { bytea } from "@/.server/db/custom-types";
 import { index, json, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
+export const proposalType = z.enum(["routine", "emergency"]);
+
+export type ProposalType = z.infer<typeof proposalType>;
+
 export const proposalsTable = pgTable(
   "proposals",
   {
@@ -13,6 +17,11 @@ export const proposalsTable = pgTable(
     proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
     executor: bytea("executor").notNull(),
     transactionHash: bytea("transaction_hash").notNull(),
+    proposalType: text("proposal_type", {
+      enum: proposalType.options,
+    })
+      .default("routine")
+      .notNull(),
   },
   (table) => ({
     externalIdIdx: index("external_id_idx").on(table.externalId),

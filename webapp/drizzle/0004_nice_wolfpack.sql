@@ -1,0 +1,1 @@
+ALTER TABLE "proposals" ADD COLUMN "proposal_type" text DEFAULT 'routine' NOT NULL;
