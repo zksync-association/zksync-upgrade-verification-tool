@@ -17,6 +17,9 @@ COPY . .
 RUN pnpm install --prod=false --frozen-lockfile
 RUN pnpm run build
 
+ENV SERVER_PORT=3000
+EXPOSE 3000
+
 # launch the webapp
 WORKDIR /app/webapp
 CMD ["pnpm", "start"]
