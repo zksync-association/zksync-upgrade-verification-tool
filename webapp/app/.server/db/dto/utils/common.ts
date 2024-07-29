@@ -21,15 +21,3 @@ export async function createOrIgnoreRecord<T extends PgTable>(
 ): Promise<void> {
   await (tx ?? db).insert(table).values(data).onConflictDoNothing().returning();
 }
-
-export function createMutualExclusivityCheck(
-  column1: string,
-  column2: string,
-  constraintName: string
-) {
-  return check(
-    constraintName,
-    sql`((${column1} IS NOT NULL AND ${column2} IS NULL) OR 
-         (${column1} IS NULL AND ${column2} IS NOT NULL))`
-  );
-}
