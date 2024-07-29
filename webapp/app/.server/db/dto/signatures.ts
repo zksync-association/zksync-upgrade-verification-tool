@@ -10,13 +10,6 @@ export async function createOrIgnoreSignature(
   await createOrIgnoreRecord(signaturesTable, data, { tx });
 }
 
-export async function createOrIgnoreEmergencySignature(
-  data: InferInsertModel<typeof signaturesTable>,
-  { tx }: { tx?: typeof db } = {}
-): Promise<void> {
-  await createOrIgnoreRecord(signaturesTable, data, { tx });
-}
-
 export async function getSignaturesByExternalProposalId(
   id: InferSelectModel<typeof proposalsTable>["externalId"]
 ) {
