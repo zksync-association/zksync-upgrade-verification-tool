@@ -1,6 +1,6 @@
 import { db } from "@/.server/db";
-import { type InferInsertModel, sql } from "drizzle-orm";
-import { type PgTable, check } from "drizzle-orm/pg-core";
+import type { InferInsertModel } from "drizzle-orm";
+import type { PgTable } from "drizzle-orm/pg-core";
 
 export function getFirstOrThrow<T>(value: T[]): T {
   const firstValue = getFirst(value);
