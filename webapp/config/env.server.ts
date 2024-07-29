@@ -27,6 +27,7 @@ export const env = createEnv({
 export const clientEnv = {
   ALLOW_INDEXING: env.ALLOW_INDEXING,
   NODE_ENV: env.NODE_ENV,
+  ETH_NETWORK: env.ETH_NETWORK,
   WALLET_CONNECT_PROJECT_ID: env.WALLET_CONNECT_PROJECT_ID,
 };
 
