@@ -9,7 +9,6 @@ export const createRandomProposal = async () => {
     proposedOn: params.proposedOn,
     executor: params.executor,
     transactionHash: params.transactionHash,
-    proposalType: "routine",
   });
 
   return params;
@@ -24,6 +23,17 @@ export const createRandomProposalParams = () => {
     proposedOn: faker.date.anytime(),
     executor: faker.string.hexadecimal({ length: 20 }) as `0x${string}`,
     transactionHash: faker.string.hexadecimal({ length: 32 }) as `0x${string}`,
-    proposalType: "routine" as const,
+  };
+};
+
+export const createRandomEmergencyProposalParams = () => {
+  const randomLength = Math.floor(Math.random() * (50 - 16 + 1)) * 2 + 32;
+
+  return {
+    externalId: faker.string.hexadecimal({ length: 20 }) as `0x${string}`,
+    calls: faker.string.hexadecimal({ length: randomLength }) as `0x${string}`,
+    proposedOn: faker.date.anytime(),
+    proposer: faker.string.hexadecimal({ length: 20 }) as `0x${string}`,
+    transactionHash: faker.string.hexadecimal({ length: 32 }) as `0x${string}`,
   };
 };

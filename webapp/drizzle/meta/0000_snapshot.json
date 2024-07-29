@@ -1,9 +1,91 @@
 {
-  "id": "09edb4be-5db0-44a6-aa99-2f5d1d74a8cb",
+  "id": "6cedfea5-f947-4176-83e1-f23ebe9104a9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.emergency_proposals": {
+      "name": "emergency_proposals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "external_id": {
+          "name": "external_id",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calls": {
+          "name": "calls",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "check_report": {
+          "name": "check_report",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "storage_diff_report": {
+          "name": "storage_diff_report",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proposed_on": {
+          "name": "proposed_on",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proposer": {
+          "name": "proposer",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_hash": {
+          "name": "transaction_hash",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "emergency_external_id_idx": {
+          "name": "emergency_external_id_idx",
+          "columns": [
+            {
+              "expression": "external_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "emergency_proposals_external_id_unique": {
+          "name": "emergency_proposals_external_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "external_id"
+          ]
+        }
+      }
+    },
     "public.proposals": {
       "name": "proposals",
       "schema": "",
@@ -55,13 +137,6 @@
           "type": "bytea",
           "primaryKey": false,
           "notNull": true
-        },
-        "proposal_type": {
-          "name": "proposal_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'routine'"
         }
       },
       "indexes": {
@@ -107,7 +182,13 @@
           "name": "proposal_id",
           "type": "bytea",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "emergency_proposal_id": {
+          "name": "emergency_proposal_id",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
         },
         "signer": {
           "name": "signer",
@@ -136,6 +217,19 @@
           "tableTo": "proposals",
           "columnsFrom": [
             "proposal_id"
+          ],
+          "columnsTo": [
+            "external_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "signatures_emergency_proposal_id_emergency_proposals_external_id_fk": {
+          "name": "signatures_emergency_proposal_id_emergency_proposals_external_id_fk",
+          "tableFrom": "signatures",
+          "tableTo": "emergency_proposals",
+          "columnsFrom": [
+            "emergency_proposal_id"
           ],
           "columnsTo": [
             "external_id"

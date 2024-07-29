@@ -1,6 +1,6 @@
 import { db } from "@/.server/db";
-import type { InferInsertModel } from "drizzle-orm";
-import type { PgTable } from "drizzle-orm/pg-core";
+import { type InferInsertModel, sql } from "drizzle-orm";
+import { type PgTable, check } from "drizzle-orm/pg-core";
 
 export function getFirstOrThrow<T>(value: T[]): T {
   const firstValue = getFirst(value);
@@ -20,4 +20,16 @@ export async function createOrIgnoreRecord<T extends PgTable>(
   { tx }: { tx?: typeof db } = {}
 ): Promise<void> {
   await (tx ?? db).insert(table).values(data).onConflictDoNothing().returning();
+}
+
+export function createMutualExclusivityCheck(
+  column1: string,
+  column2: string,
+  constraintName: string
+) {
+  return check(
+    constraintName,
+    sql`((${column1} IS NOT NULL AND ${column2} IS NULL) OR 
+         (${column1} IS NULL AND ${column2} IS NOT NULL))`
+  );
 }
