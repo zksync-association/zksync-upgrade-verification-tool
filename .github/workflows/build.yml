@@ -110,5 +110,5 @@ jobs:
       - name: Run unit tests
         run: |
           cd webapp
-          pnpm test:u
-          pnpm test:s
+          pnpm test:u  # unit tests
+          pnpm test:s  # server tests
