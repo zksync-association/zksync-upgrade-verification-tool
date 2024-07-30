@@ -2,17 +2,17 @@
 
 # 🔍 zkSync Era Upgrade Verification Tool
 
-The zkSync Era Upgrade Verification Tool is composed of a **CLI and Web App tool crafted to decode and present zkSync Era upgrade proposals in a human-readable format**.  
+The zkSync Era Upgrade Verification Tool is composed of a **CLI and Web App tool crafted to decode and present zkSync Era upgrade proposals in a human-readable format**.
 
 ## 🌟 **Features**
 
- > 🏗️ `Work In Progress` : This repo is being actively developed and does not represent final quality of the tool!
+> 🏗️ `Work In Progress` : This repo is being actively developed and does not represent final quality of the tool!
 
 - **_[L1]_ Facets**: Identifies contract upgrades including additions or removals of functions.
 - **_[L1]_ Verifier** : Detects upgrades and parameter changes in contracts.
 - **_[L2]_ System Contracts**: Lists changes and validates bytecode hashes.
 - **_[L2]_ Bootloader and DefaultAccount**: Validates bytecode hash.
-- **Solidity Diff Tool**: Compares current contracts with upgrade proposals for verification. _Currently available for Facets, Verifier & System Contracts.  
+- **Solidity Diff Tool**: Compares current contracts with upgrade proposals for verification. \_Currently available for Facets, Verifier & System Contracts.
 
 ## 🔍 **Prerequisites**
 
@@ -76,9 +76,9 @@ pnpm install
 pnpm build
 ```
 
-#### **3. Etherscan Key setup**  
+#### **3. Etherscan Key setup**
 
-> You can create an Etherscan API key at [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).  
+> You can create an Etherscan API key at [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).
 
 ##### _**Option 1: Environment Variables**_
 
@@ -88,7 +88,7 @@ export ETHERSCAN_API_KEY="<your_etherscan_api_key>"
 
 ##### _**Option 2: Configuration Files**_
 
-Alternatively, you can copy  env.example file and complete it with your keys:
+Alternatively, you can copy env.example file and complete it with your keys:
 
 ```bash
 cp env.example .env
@@ -103,7 +103,7 @@ ETHERSCAN_API_KEY=your_etherscan_api_key
 
 ##### _**Option 3: CLI Argument**_
 
- You can also specify your API keys directly as command line arguments when running commands that require them. For example:
+You can also specify your API keys directly as command line arguments when running commands that require them. For example:
 
 ```bash
 pnpm validate --ethscanApiKey=your_etherscan_api_key
@@ -113,7 +113,7 @@ pnpm validate --ethscanApiKey=your_etherscan_api_key
 
 The zkSync Era Upgrade Verification Tool provides a range of commands for interacting with and verifying zkSync protocol upgrade data.
 
->*_Etherscan API Key required._
+> \*_Etherscan API Key required._
 
 #### **`check <upgradeDir>`**
 
@@ -126,7 +126,6 @@ pnpm validate check <upgradeDir>
 ```bash
 pnpm validate check ../zksync-era/etc/upgrades/1699353977-boojum #Example of check command with Boojum upgrade.
 ```
-  
 
 #### **`facet-diff <upgradeDir> <facetName>`**
 
@@ -139,7 +138,7 @@ pnpm validate show-diff <upgradeDir> <facetName>
 ```bash
 pnpm validate facet-diff ../zksync-era/etc/upgrades/1699353977-boojum GettersFacet --ref=e77971dba8f589b625e72e69dd7e33ccbe697cc0 #Example with GettersFacet in Boojum upgrade with specific commit reference.
 ```
-  
+
 #### **`verifier-diff <upgradeDir>`**
 
 Shows the proposed changes between current verifier source code and the proposed one.
@@ -151,29 +150,29 @@ pnpm validate verifier-diff <upgradeDir>
 ```bash
 pnpm validate verifier-diff ../zksync-era/etc/upgrades/1699353977-boojum #Example of verifier-diff command for Boojum upgrade.
 ```
-  
+
 #### **`download-diff <upgradeDir> <targetSourceCodeDir>`**
 
 Downloads both the current and proposed versions of each contract being upgraded for comparison.
 
 1. **Run the Command:**
 
-    ```bash
-      pnpm validate download-diff <upgradeDir> <targetSourceCodeDir>
-    ```
+   ```bash
+     pnpm validate download-diff <upgradeDir> <targetSourceCodeDir>
+   ```
 
-    `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences.
+   `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences.
 
    _Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please refer to [--ref in options section.](#🎛️-options)_
 
 2. **Navigate to Directory:** After running the command, navigate to the `<targetSourceCodeDir>` directory.
-  
-3. **Use Your Preferred Diff Tool:** Once in the `<targetSourceCodeDir>`, you can use your preferred diff tool to compare the 'old' (_current_) versus 'new'  (_upgrade_) directory structure or specific files.
-    - _For example:_
-        - ```diff -r old new```
-        - ```meld old new```
-        - ```vimdiff old new```
-  
+
+3. **Use Your Preferred Diff Tool:** Once in the `<targetSourceCodeDir>`, you can use your preferred diff tool to compare the 'old' (_current_) versus 'new' (_upgrade_) directory structure or specific files.
+   - _For example:_
+     - `diff -r old new`
+     - `meld old new`
+     - `vimdiff old new`
+
 ### 🎛️ **Options**
 
 The following options are available to configure the zkSync Era Upgrade Verification Tool:
@@ -229,14 +228,14 @@ Integration tests are inside "test" package. In order to run them
 it's important to config api keys for testing. That can be done with
 a dotenv file inside the test directory:
 
-``` bash
+```bash
 cp env.example test/.env
 vim .env # complete with real api keys
 ```
 
 Once it's completed you can run the integration tests with:
 
-``` test
+```test
 pnpm run --filter=./test test
 ```
 
@@ -292,7 +291,7 @@ export ETH_NETWORK="mainnet"
 - `NODE_ENV`: The environment the Web App is running in, can be `production`, `development`, `test`.
 - `WALLET_CONNECT_PROJECT_ID`: The WalletConnect project ID. You can get one by registering at [WalletConnect](https://cloud.walletconnect.com/app).
 - `L1_RPC_URL`: The RPC URL for the L1 network. The selected RPC must be able to execute `debug_traceCall`. A good free option is [Tenderly](https://tenderly.co/).
-- `ETHERSCAN_API_KEY`: The Etherscan API key. You can get one at  [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).
+- `ETHERSCAN_API_KEY`: The Etherscan API key. You can get one at [Etherscan API Key](https://docs.etherscan.io/getting-started/viewing-api-usage-statistics).
 - `ETH_NETWORK`: The Ethereum network the Web App is running on, can be `mainnet`, `sepolia`.
 
 ## 🛠️ **WebApp: Usage**
@@ -322,6 +321,31 @@ pnpm dev
 
 - End-to-End - hosts the site locally and verifies via browser interactions
 - Uses `vitest` `playwright` `remix`
+
+## Docker
+
+Included is a Dockerfile for making images. A sample stack has been provided, but should be customized for production usecases.
+
+### **1. Build the Docker Image**
+
+First, build the Docker image using the following command:
+
+```sh
+pnpm docker:build
+```
+
+### **2. Run the Compose stack**
+
+Then run the app with:
+
+```sh
+pnpm docker:run
+```
+
+> [!TIP]  
+> Make sure your `webapp/.env` file exists and has the values you expect!
+
+---
 
 ## 📄 **License**
 

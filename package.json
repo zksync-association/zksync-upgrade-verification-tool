@@ -14,6 +14,8 @@
     "*.mjs"
   ],
   "scripts": {
+    "docker:build": "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t upgrade-checker:local .",
+    "docker:run": "docker compose up",
     "dev": "pnpm -r --filter='./cli' run start",
     "build": "pnpm -r --filter='*' run build",
     "test": "pnpm -r --filter='./test' run test",
