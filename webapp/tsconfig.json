@@ -17,6 +17,7 @@
       "@remix-run/node",
       "vite/client",
       "vitest/globals",
+      "react",
       "@vitest/browser/providers/playwright"
     ],
     "isolatedModules": true,
