@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM --platform=linux/amd64 node:20-bullseye-slim
 
 # Configure pnpm
 ENV PNPM_HOME="/pnpm"
@@ -6,7 +6,8 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN npm i -g pnpm
 
 # install git (needed to compile system contracts)
-RUN apk add git
+RUN apt-get update && apt-get install -y git
+RUN apt-get install -y build-essential python3
 
 # Setup working dir
 RUN mkdir /app
@@ -22,4 +23,4 @@ EXPOSE 3000
 
 # launch the webapp
 WORKDIR /app/webapp
-CMD ["pnpm", "start"]
+CMD ["node", "./server-build/index.js"]
