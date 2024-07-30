@@ -1,9 +1,17 @@
 import { db } from "@/.server/db";
+import {
+  createOrIgnoreEmergencyProposal,
+  getEmergencyProposalByExternalId,
+} from "@/.server/db/dto/emergencyProposals";
 import { createOrIgnoreProposal, getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { proposalsTable } from "@/.server/db/schema";
 import { eq } from "drizzle-orm";
 import { expect } from "vitest";
-import { createRandomProposal, createRandomProposalParams } from "../factory";
+import {
+  createRandomEmergencyProposalParams,
+  createRandomProposal,
+  createRandomProposalParams,
+} from "../factory";
 
 describe("Proposal DB", () => {
   it("should create a proposal", async () => {
@@ -60,5 +68,18 @@ describe("Proposal DB", () => {
     const nonExistentId = "0x1234567890123456789012345678901234567890";
     const proposal = await getProposalByExternalId(nonExistentId);
     expect(proposal).toBeUndefined();
+  });
+
+  it("should create and retrieve an emergency proposal", async () => {
+    const params = createRandomEmergencyProposalParams();
+    await createOrIgnoreEmergencyProposal({
+      ...params,
+    });
+
+    const proposal = await getProposalByExternalId(params.externalId);
+    expect(proposal).toBeUndefined();
+
+    const emergencyProposal = await getEmergencyProposalByExternalId(params.externalId);
+    expect(emergencyProposal).toBeDefined();
   });
 });
