@@ -269,7 +269,9 @@ export default function Proposals() {
                   <Card className="pb-10">
                     <CardHeader>
                       <CardTitle>
-                        {user.role === "guardian" ? "Guardian" : "Security Council"} Actions
+                        {user.role === "anonymous" && "No role actions"}
+                        {user.role === "guardian" && "Guardian Actions"}
+                        {user.role === "securityCouncil" &&  "Security Council Actions"}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-col space-y-3">

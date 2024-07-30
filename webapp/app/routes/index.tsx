@@ -30,10 +30,6 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!isUp) {
     throw redirect($path("/app/down"));
   }
-  const auth = await isUserAuthorized(parsedAddress.data);
-  if (!auth.authorized) {
-    throw redirect($path("/app/denied"));
-  }
   throw redirect($path("/app"));
 }
 

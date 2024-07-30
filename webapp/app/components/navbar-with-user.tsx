@@ -22,7 +22,9 @@ export default function NavbarWithUser({
         <div className="flex items-center space-x-2">
           {role && (
             <Button className="disabled:opacity-100" disabled>
-              {role === "guardian" ? "Guardian" : "Security Council"}
+              {role === "guardian" && "Guardian"}
+              {role === "securityCouncil" && "Security Council"}
+              {role === "anonymous" && "Anonymous"}
             </Button>
           )}
           <ConnectButton />

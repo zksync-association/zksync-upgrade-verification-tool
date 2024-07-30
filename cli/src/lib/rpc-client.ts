@@ -123,7 +123,6 @@ export class RpcClient {
   }
 
   private async rawCall(method: string, params: any[]): Promise<any> {
-    console.log("params", params);
     const res = await fetch(this.rpcUrl(), {
       method: "POST",
       body: JSON.stringify({

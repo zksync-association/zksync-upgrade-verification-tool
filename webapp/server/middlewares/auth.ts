@@ -7,7 +7,7 @@ import { zodHex } from "validate-cli";
 export const USER_ADDRESS_HEADER = "x-user-address";
 export const USER_ROLE_HEADER = "x-user-role";
 
-const protectedRoutes = ["/app"] satisfies (keyof Routes)[];
+const protectedRoutes = [] satisfies (keyof Routes)[];
 const unprotectedRoutes = ["/", "/app/denied", "/app/down"] satisfies (keyof Routes)[];
 
 function isProtectedRoute(req: Request) {
@@ -43,10 +43,11 @@ export async function auth(req: Request, res: Response, next: NextFunction) {
 
   // If route is not protected, Remix might still need user information
   if (session?.address) {
-    setUserHeaders(req, { address: session.address, role: null });
+    setUserHeaders(req, { address: session.address, role: "anonymous" });
   } else {
     clearUserHeaders(req);
   }
+
 
   next();
 }

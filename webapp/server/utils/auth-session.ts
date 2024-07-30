@@ -8,7 +8,7 @@ import {
 export const AUTH_COOKIE_NAME = "wagmi.store";
 
 export function readAuthSession(req: Request) {
-  const wagmiCookie = parseWagmiCookie(req.headers.cookie || "", "wagmi.store");
+  const wagmiCookie = parseWagmiCookie(req.headers.cookie || "", AUTH_COOKIE_NAME);
   const cookie = wagmiCookie
     ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
     : undefined;
