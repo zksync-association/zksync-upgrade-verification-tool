@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 node:20-bullseye-slim
+FROM node:20-alpine
 
 # Configure pnpm
 ENV PNPM_HOME="/pnpm"
@@ -6,8 +6,7 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN npm i -g pnpm
 
 # install git (needed to compile system contracts)
-RUN apt-get update && apt-get install -y git
-RUN apt-get install -y build-essential python3
+RUN apk add git
 
 # Setup working dir
 RUN mkdir /app
