@@ -41,7 +41,7 @@ export async function councilMembers(): Promise<Hex[]> {
 
 export type UserRole = z.infer<typeof UserRole>;
 
-export async function isUserAuthorized(address: Hex) {
+export async function isUserAuthorized(address: Hex): Promise<{ authorized: boolean, role: UserRole }> {
   const [guardianAddresses, scAddresses] = await Promise.all([guardianMembers(), councilMembers()]);
   const isGuardian = guardianAddresses.includes(address);
   const isSecurityCouncil = scAddresses.includes(address);
