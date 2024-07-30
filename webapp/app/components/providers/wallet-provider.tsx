@@ -11,24 +11,24 @@ export function WalletProvider({
   children,
   initialState,
   projectId,
-  devNetwork,
+  network,
 }: {
   children: ReactNode;
   initialState?: State;
   projectId: string;
-  devNetwork: boolean;
+  network: string;
 }) {
   const config = useMemo(() => {
     return getDefaultConfig({
       appName: "zkSync Upgrade Verification Tool",
-      chains: devNetwork ? [sepolia] : [mainnet],
+      chains: network === "sepolia" ? [sepolia] : [mainnet],
       projectId,
       ssr: true,
       storage: createStorage({
         storage: cookieStorage,
       }),
     });
-  }, [projectId, devNetwork]);
+  }, [projectId, network]);
 
   return (
     <WagmiProvider config={config} initialState={initialState}>
