@@ -1,4 +1,4 @@
-import { isUserAuthorized } from "@/.server/service/authorized-users";
+import { getUserAuthRole } from "@/.server/service/authorized-users";
 import { readAuthSession } from "@server/utils/auth-session";
 import type { NextFunction, Request, Response } from "express";
 import { $path, type Routes } from "remix-routes";
@@ -26,7 +26,7 @@ export async function auth(req: Request, res: Response, next: NextFunction) {
     return next()
   }
 
-  const auth = await isUserAuthorized(zodHex.parse(parsed.data));
+  const auth = await getUserAuthRole(zodHex.parse(parsed.data));
   setUserHeaders(req, { address: parsed.data, role: auth.role });
 
   if (isProtectedRoute(req) && !auth.authorized) {
