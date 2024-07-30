@@ -41,20 +41,16 @@ export async function councilMembers(): Promise<Hex[]> {
 
 export type UserRole = z.infer<typeof UserRole>;
 
-export async function isUserAuthorized(address: Hex): Promise<{ authorized: boolean, role: UserRole }> {
+export async function getUserAuthRole(address: Hex): Promise<UserRole> {
   const [guardianAddresses, scAddresses] = await Promise.all([guardianMembers(), councilMembers()]);
-  const isGuardian = guardianAddresses.includes(address);
-  const isSecurityCouncil = scAddresses.includes(address);
 
-  if (isGuardian || isSecurityCouncil) {
-    return {
-      authorized: true,
-      role: isGuardian ? UserRole.enum.guardian : UserRole.enum.securityCouncil,
-    } as const;
+  if (guardianAddresses.includes(address)) {
+    return UserRole.enum.guardian;
   }
 
-  return {
-    authorized: false,
-    role: UserRole.enum.anonymous,
-  } as const;
+  if (scAddresses.includes(address)) {
+    return UserRole.enum.securityCouncil
+  }
+
+  return UserRole.enum.anonymous
 }
