@@ -271,7 +271,7 @@ export default function Proposals() {
                       <CardTitle>
                         {user.role === "anonymous" && "No role actions"}
                         {user.role === "guardian" && "Guardian Actions"}
-                        {user.role === "securityCouncil" &&  "Security Council Actions"}
+                        {user.role === "securityCouncil" && "Security Council Actions"}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-col space-y-3">

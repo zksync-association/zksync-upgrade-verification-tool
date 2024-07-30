@@ -20,10 +20,10 @@ function isProtectedRoute(req: Request) {
 export async function auth(req: Request, res: Response, next: NextFunction) {
   const session = readAuthSession(req);
 
-  const parsed = zodHex.safeParse(session.address)
+  const parsed = zodHex.safeParse(session.address);
   if (parsed.error) {
     clearUserHeaders(req);
-    return next()
+    return next();
   }
 
   const role = await getUserAuthRole(zodHex.parse(parsed.data));

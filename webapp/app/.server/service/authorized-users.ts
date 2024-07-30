@@ -49,8 +49,8 @@ export async function getUserAuthRole(address: Hex): Promise<UserRole> {
   }
 
   if (scAddresses.includes(address)) {
-    return UserRole.enum.securityCouncil
+    return UserRole.enum.securityCouncil;
   }
 
-  return UserRole.enum.anonymous
+  return UserRole.enum.anonymous;
 }

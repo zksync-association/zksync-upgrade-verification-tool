@@ -2,29 +2,29 @@ import Avatar from "@/components/connect-button/avatar";
 import { RainbowKitProvider, darkTheme, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
+import { defineChain } from "viem";
 import { type State, WagmiProvider, cookieStorage, createStorage } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
-import { defineChain } from "viem";
 
 const regtest = defineChain({
   id: 11155111,
-  name: 'Sepolia',
+  name: "Sepolia",
   rpcUrls: {
     default: {
-      http: ['http://localhost:8545'],
+      http: ["http://localhost:8545"],
     },
   },
-  nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
-  testnet: true
-})
+  nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 },
+  testnet: true,
+});
 
 const queryClient = new QueryClient();
 
 const NETWORKS = {
   mainnet: mainnet,
   sepolia: sepolia,
-  regtest: regtest
-}
+  regtest: regtest,
+};
 
 export function WalletProvider({
   children,
