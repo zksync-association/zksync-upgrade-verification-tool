@@ -1,10 +1,10 @@
 import Avatar from "@/components/connect-button/avatar";
+import { regtest } from "@/utils/regtest";
 import { RainbowKitProvider, darkTheme, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
 import { type State, WagmiProvider, cookieStorage, createStorage } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
-import { regtest } from "@/utils/regtest";
 
 const queryClient = new QueryClient();
 
