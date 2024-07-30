@@ -20,18 +20,18 @@ function isProtectedRoute(req: Request) {
 export async function auth(req: Request, res: Response, next: NextFunction) {
   const session = readAuthSession(req);
 
-  // const parsed = zodHex.safeParse(session.address)
-  // if (parsed.error) {
-  //   clearUserHeaders(req);
-  //   return res.redirect($path("/"));
-  // }
-  //
-  // const auth = await isUserAuthorized(zodHex.parse(parsed.data));
-  // setUserHeaders(req, { address: parsed.data, role: auth.role });
-  //
-  // if (isProtectedRoute(req) && !auth.authorized) {
-  //   return res.redirect($path("/app/denied"));
-  // }
+  const parsed = zodHex.safeParse(session.address)
+  if (parsed.error) {
+    clearUserHeaders(req);
+    return next()
+  }
+
+  const auth = await isUserAuthorized(zodHex.parse(parsed.data));
+  setUserHeaders(req, { address: parsed.data, role: auth.role });
+
+  if (isProtectedRoute(req) && !auth.authorized) {
+    return res.redirect($path("/app/denied"));
+  }
 
   next();
 }
