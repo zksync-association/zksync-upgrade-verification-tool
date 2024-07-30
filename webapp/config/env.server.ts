@@ -14,7 +14,7 @@ export const env = createEnv({
     SERVER_PORT: z.coerce.number().default(3000),
     WALLET_CONNECT_PROJECT_ID: z.string(),
     L1_RPC_URL: z.string(),
-    ETH_NETWORK: z.enum(["mainnet", "sepolia"]).default("mainnet"),
+    ETH_NETWORK: z.enum(["mainnet", "sepolia", "regtest"]).default("mainnet"),
     ETHERSCAN_API_KEY: z.string(),
     UPGRADE_HANDLER_ADDRESS: zodHex,
     SKIP_REPORTS: z.coerce.boolean().default(false),
