@@ -2,21 +2,9 @@ import Avatar from "@/components/connect-button/avatar";
 import { RainbowKitProvider, darkTheme, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
-import { defineChain } from "viem";
 import { type State, WagmiProvider, cookieStorage, createStorage } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
-
-const regtest = defineChain({
-  id: 11155111,
-  name: "Sepolia",
-  rpcUrls: {
-    default: {
-      http: ["http://localhost:8545"],
-    },
-  },
-  nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 },
-  testnet: true,
-});
+import { regtest } from "@/utils/regtest";
 
 const queryClient = new QueryClient();
 
