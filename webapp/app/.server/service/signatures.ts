@@ -3,7 +3,7 @@ import { db } from "@/.server/db/index";
 import { type Action, type actionSchema, signaturesTable } from "@/.server/db/schema";
 import {
   councilAddress,
-  councilMembers,
+  councilMembers, emergencyBoardAddress,
   guardianMembers,
   guardiansAddress,
 } from "@/.server/service/authorized-users";
@@ -24,7 +24,8 @@ async function verifySignature(
   verifierAddr: Hex,
   action: ProposalAction,
   proposalId: Hex,
-  contractName: string
+  contractName: string,
+  targetContract: Hex
 ) {
   const digest = hashTypedData({
     domain: {
@@ -48,7 +49,7 @@ async function verifySignature(
   });
 
   try {
-    await l1Rpc.contractRead(verifierAddr, "checkSignatures", guardiansAbi.raw, z.any(), [
+    await l1Rpc.contractRead(targetContract, "checkSignatures", guardiansAbi.raw, z.any(), [
       digest,
       [signer],
       [signature],
@@ -58,6 +59,56 @@ async function verifySignature(
   } catch (e) {
     return false;
   }
+}
+
+export async function saveEmergencySignature(
+  signature: Hex,
+  signer: Hex,
+  action: Action,
+  emergencyProposalId: Hex
+) {
+  if (action === "ExecuteEmergencyUpgradeGuardians") {
+    const isValid = await verifySignature(
+      signer,
+      signature,
+      await emergencyBoardAddress(),
+      action,
+      emergencyProposalId,
+      "EmergencyUpgradeBoard",
+      await guardiansAddress()
+    )
+    if (!isValid) {
+      throw badRequest("Invalid signature provided")
+    }
+  }
+
+  if (action === "ExecuteEmergencyUpgradeSecurityCouncil") {
+    const isValid = await verifySignature(
+      signer,
+      signature,
+      await emergencyBoardAddress(),
+      action,
+      emergencyProposalId,
+      "EmergencyUpgradeBoard",
+      await councilAddress()
+    )
+    if (!isValid) {
+      throw badRequest("Invalid signature provided")
+    }
+  }
+
+  if (action === "ExecuteEmergencyUpgradeZKFoundation") {
+    // TODO: How do we verify this signatures?
+  }
+
+  const dto = {
+    action,
+    signature,
+    emergencyProposal: emergencyProposalId,
+    signer
+  };
+
+  await createOrIgnoreSignature(dto);
 }
 
 export async function validateAndSaveSignature(
@@ -82,7 +133,8 @@ export async function validateAndSaveSignature(
       addr,
       action,
       proposalId,
-      "Guardians"
+      "Guardians",
+      addr
     );
   } else {
     const members = await councilMembers();
@@ -99,7 +151,8 @@ export async function validateAndSaveSignature(
       addr,
       action,
       proposalId,
-      "SecurityCouncil"
+      "SecurityCouncil",
+      addr
     );
   }
 
@@ -111,7 +164,7 @@ export async function validateAndSaveSignature(
     action,
     signature,
     proposal: proposalId,
-    signer,
+    signer
   };
 
   await createOrIgnoreSignature(dto);

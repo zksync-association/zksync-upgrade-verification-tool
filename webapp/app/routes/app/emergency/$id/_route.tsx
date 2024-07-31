@@ -4,17 +4,22 @@ import { Button } from "@/components/ui/button";
 import { displayBytes32 } from "@/routes/app/proposals/$id/common-tables";
 import { ArrowLeft } from "lucide-react";
 import { useLoaderData, useNavigate } from "@remix-run/react";
-import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { getParams } from "remix-params-helper";
+import { type ActionFunctionArgs, json, type LoaderFunctionArgs } from "@remix-run/node";
+import { getFormData, getParams } from "remix-params-helper";
 import { z } from "zod";
 import { zodHex } from "validate-cli";
-import { notFound } from "@/utils/http";
+import { badRequest, notFound } from "@/utils/http";
 import { createOrIgnoreEmergencyProposal, getEmergencyProposalByExternalId } from "@/.server/db/dto/emergencyProposals";
-import { zeroAddress } from "viem";
+import { type Hex, zeroAddress } from "viem";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
+import { $path } from "remix-routes";
+import { requireUserFromHeader } from "@/utils/auth-headers";
+import { actionSchema } from "@/.server/db/schema";
+import { saveEmergencySignature, validateAndSaveSignature } from "@/.server/service/signatures";
 
 export async function loader(args: LoaderFunctionArgs) {
+  const user = requireUserFromHeader(args.request)
   const params = getParams(args.params, z.object({ id: zodHex }));
   if (!params.success) {
     throw notFound();
@@ -41,16 +46,56 @@ export async function loader(args: LoaderFunctionArgs) {
     proposal: proposal,
     addresses: {
       emergencyBoard: boardAddress
-    }
+    },
+    user
   })
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  const user = requireUserFromHeader(request);
+  const formData = await getFormData(
+    request,
+    z.object({
+      signature: zodHex,
+      proposalId: zodHex,
+      actionName: actionSchema,
+    })
+  );
+  if (!formData.success) {
+    throw badRequest("Failed to parse signature data");
+  }
+  const data = formData.data;
+
+
+  await saveEmergencySignature(
+    data.signature,
+    user.address as Hex,
+    data.actionName,
+    data.proposalId
+  );
+
+  return json({ ok: true })
+}
+
+const ACTION_NAMES = {
+  "guardian": "ExecuteEmergencyUpgradeGuardians",
+  "securityCouncil": "ExecuteEmergencyUpgradeSecurityCouncil",
+  "zkSyncAssociation": "ExecuteEmergencyUpgradeZKFoundation",
 }
 
 export default function EmergencyUpgradeDetails() {
   const navigate = useNavigate();
 
   const loaderData = useLoaderData<typeof loader>();
+  const user = loaderData.user
   const proposal = loaderData.proposal
   const addresses = loaderData.addresses
+
+  if (user.role === "visitor") {
+    throw new Error("Only valid approvers can see this page.")
+  }
+
+  const actionName = ACTION_NAMES[user.role];
   return (
     <>
       <div className="mt-10 flex flex-1 flex-col">
@@ -126,11 +171,12 @@ export default function EmergencyUpgradeDetails() {
             <SignButton
               proposalId={proposal.externalId}
               contractData={{
-                actionName: "ExecuteEmergencyUpgradeGuardians",
+                actionName: actionName,
                 address: addresses.emergencyBoard,
                 name: "EmergencyUpgradeBoard",
               }}
-              disabled={true}
+              disabled={false}
+              postAction={$path("/app/emergency/:id", {id: proposal.externalId})}
             >
               Approve
             </SignButton>

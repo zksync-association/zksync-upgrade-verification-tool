@@ -32,6 +32,7 @@ import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
 import { StatusIndicator } from "@/components/status-indicator";
+import { $path } from "remix-routes";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -283,6 +284,7 @@ export default function Proposals() {
                             name: "Guardians",
                           }}
                           disabled={!signLegalVetoEnabled}
+                          postAction={$path("/app/proposals/:id", {id: proposalId})}
                         >
                           Approve extend veto period
                         </SignButton>
@@ -296,6 +298,7 @@ export default function Proposals() {
                             name: "Guardians",
                           }}
                           disabled={!signProposalEnabled}
+                          postAction={$path("/app/proposals/:id", {id: proposalId})}
                         >
                           Approve proposal
                         </SignButton>
@@ -309,6 +312,7 @@ export default function Proposals() {
                             name: "SecurityCouncil",
                           }}
                           disabled={!signProposalEnabled}
+                          postAction={$path("/app/proposals/:id", {id: proposalId})}
                         >
                           Approve proposal
                         </SignButton>
