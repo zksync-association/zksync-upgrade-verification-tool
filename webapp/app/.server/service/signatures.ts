@@ -1,5 +1,5 @@
-import { createOrIgnoreSignature } from "@/.server/db/dto/signatures";
 import { db } from "@/.server/db";
+import { createOrIgnoreSignature } from "@/.server/db/dto/signatures";
 import { type Action, type actionSchema, signaturesTable } from "@/.server/db/schema";
 import {
   councilAddress,

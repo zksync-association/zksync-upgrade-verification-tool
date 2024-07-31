@@ -3,7 +3,7 @@ import {
   getEmergencyProposalByExternalId,
 } from "@/.server/db/dto/emergencyProposals";
 import { getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures";
-import { actionSchema, emergencyProposalsTable } from "@/.server/db/schema";
+import { actionSchema, type emergencyProposalsTable } from "@/.server/db/schema";
 import {
   councilMembers,
   emergencyBoardAddress,

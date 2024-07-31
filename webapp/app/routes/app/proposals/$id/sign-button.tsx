@@ -27,13 +27,7 @@ export default function SignButton({
   disabled,
   postAction,
 }: SignButtonProps) {
-  const {
-    signTypedData,
-    isPending,
-    isSuccess,
-    isError,
-    data: signature,
-  } = useSignTypedData();
+  const { signTypedData, isPending, isSuccess, isError, data: signature } = useSignTypedData();
   const [chain] = useChains();
   const fetcher = useFetcher<typeof action>();
 
