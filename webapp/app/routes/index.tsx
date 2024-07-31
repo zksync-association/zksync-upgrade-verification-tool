@@ -1,4 +1,3 @@
-import { isUserAuthorized } from "@/.server/service/authorized-users";
 import { checkConnection } from "@/.server/service/clients";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
@@ -29,10 +28,6 @@ export async function action({ request }: ActionFunctionArgs) {
   const isUp = await checkConnection();
   if (!isUp) {
     throw redirect($path("/app/down"));
-  }
-  const auth = await isUserAuthorized(parsedAddress.data);
-  if (!auth.authorized) {
-    throw redirect($path("/app/denied"));
   }
   throw redirect($path("/app"));
 }

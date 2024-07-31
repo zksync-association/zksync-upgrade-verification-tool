@@ -19,7 +19,7 @@ import {
 } from "validate-cli";
 import { type Hex, decodeAbiParameters, getAbiItem, hexToBytes } from "viem";
 
-const network = env.ETH_NETWORK;
+const network = env.ETH_NETWORK === "local" ? "sepolia" : env.ETH_NETWORK;
 
 async function calculateBeforeAndAfter(
   network: Network,
@@ -84,7 +84,7 @@ async function calculateStorageChangeReport(
     return [];
   }
 
-  const diamondAddress = DIAMOND_ADDRS[env.ETH_NETWORK];
+  const diamondAddress = DIAMOND_ADDRS[network];
 
   const abiItem = getAbiItem({
     abi: ALL_ABIS.handler,
