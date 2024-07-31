@@ -33,9 +33,7 @@ export async function action({ request }: ActionFunctionArgs) {
     throw redirect($path("/app/down"));
   }
   const role = await getUserAuthRole(parsedAddress.data);
-  if (role === "visitor") {
-    throw redirect($path("/app/denied"));
-  }
+
   return json({ status: "success", role });
 }
 

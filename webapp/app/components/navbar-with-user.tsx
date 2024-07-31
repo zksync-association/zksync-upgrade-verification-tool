@@ -25,6 +25,7 @@ export default function NavbarWithUser({
               {role === "guardian" && "Guardian"}
               {role === "securityCouncil" && "Security Council"}
               {role === "visitor" && "Visitor"}
+              {role === "zkFoundation" && "ZkSync Foundation"}
             </Button>
           )}
           <ConnectButton />
