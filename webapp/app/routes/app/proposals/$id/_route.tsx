@@ -9,7 +9,6 @@ import { validateAndSaveSignature } from "@/.server/service/signatures";
 import TxLink from "@/components/tx-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ContractWriteButton from "@/routes/app/proposals/$id/contract-write-button";
 import ExecuteUpgradeButton from "@/routes/app/proposals/$id/execute-upgrade-button";
@@ -20,7 +19,6 @@ import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
-import { cn } from "@/utils/cn";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { badRequest, notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
@@ -33,6 +31,7 @@ import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
+import { StatusIndicator } from "@/components/status-indicator";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -429,27 +428,3 @@ export default function Proposals() {
   );
 }
 
-function StatusIndicator({
-  signatures,
-  necessarySignatures,
-  label,
-}: { signatures: number; necessarySignatures: number; label: string }) {
-  const necessarySignaturesReached = signatures >= necessarySignatures;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-between">
-        <span>{label}</span>
-        <span
-          className={cn("text-muted-foreground", necessarySignaturesReached && "text-green-400")}
-        >
-          {signatures}/{necessarySignatures}
-        </span>
-      </div>
-      <Progress
-        indicatorClassName={cn(necessarySignaturesReached && "bg-green-500")}
-        value={(signatures / necessarySignatures) * 100}
-      />
-    </div>
-  );
-}
