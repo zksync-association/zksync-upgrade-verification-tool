@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import TxLink from "@/components/tx-link";
 import { StatusIndicator } from "@/components/status-indicator";
 import { Button } from "@/components/ui/button";
 import { displayBytes32 } from "@/routes/app/proposals/$id/common-tables";
@@ -12,6 +11,8 @@ import { zodHex } from "validate-cli";
 import { notFound } from "@/utils/http";
 import { createOrIgnoreEmergencyProposal, getEmergencyProposalByExternalId } from "@/.server/db/dto/emergencyProposals";
 import { zeroAddress } from "viem";
+import SignButton from "@/routes/app/proposals/$id/sign-button";
+import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 
 export async function loader(args: LoaderFunctionArgs) {
   const params = getParams(args.params, z.object({ id: zodHex }));
@@ -21,9 +22,11 @@ export async function loader(args: LoaderFunctionArgs) {
 
   const { id: proposalId } = params.data
 
-  const proposal = await getEmergencyProposalByExternalId(proposalId)
-  if (proposal === undefined) {
-    const newProposal = await createOrIgnoreEmergencyProposal({
+  const boardAddress = await emergencyBoardAddress()
+
+  const maybeProposal = await getEmergencyProposalByExternalId(proposalId)
+  const proposal = maybeProposal === undefined
+    ? await createOrIgnoreEmergencyProposal({
       externalId: proposalId,
       calls: "0x0001",
       checkReport: null,
@@ -32,18 +35,22 @@ export async function loader(args: LoaderFunctionArgs) {
       proposer: zeroAddress,
       transactionHash: "0x01"
     })
-    return json({ proposal: newProposal })
-  }
-
+    : maybeProposal
 
   return json({
-    proposal
+    proposal: proposal,
+    addresses: {
+      emergencyBoard: boardAddress
+    }
   })
 }
 
 export default function EmergencyUpgradeDetails() {
-  const loaderData = useLoaderData<typeof loader>();
   const navigate = useNavigate();
+
+  const loaderData = useLoaderData<typeof loader>();
+  const proposal = loaderData.proposal
+  const addresses = loaderData.addresses
   return (
     <>
       <div className="mt-10 flex flex-1 flex-col">
@@ -84,8 +91,8 @@ export default function EmergencyUpgradeDetails() {
               <div className="flex justify-between">
                 <span>Proposed On:</span>
                 <div className="flex w-3/4 flex-col break-words text-right">
-                  <span>{new Date(loaderData.proposal.proposedOn).toLocaleDateString()}</span>
-                  <span>{new Date(loaderData.proposal.proposedOn).toLocaleTimeString()}</span>
+                  <span>{new Date(proposal.proposedOn).toLocaleDateString()}</span>
+                  <span>{new Date(proposal.proposedOn).toLocaleTimeString()}</span>
                 </div>
               </div>
             </div>
@@ -116,7 +123,17 @@ export default function EmergencyUpgradeDetails() {
             <CardTitle>Signatures</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            <Button>Sign</Button>
+            <SignButton
+              proposalId={proposal.externalId}
+              contractData={{
+                actionName: "ExecuteEmergencyUpgradeGuardians",
+                address: addresses.emergencyBoard,
+                name: "EmergencyUpgradeBoard",
+              }}
+              disabled={true}
+            >
+              Approve
+            </SignButton>
           </CardContent>
         </Card>
         <Card className="pb-10">

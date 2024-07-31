@@ -14,6 +14,10 @@ export async function guardiansAddress(): Promise<Hex> {
   return l1Rpc.contractRead(upgradeHandlerAddress, "guardians", upgradeHandlerAbi.raw, zodHex);
 }
 
+export async function emergencyBoardAddress(): Promise<Hex> {
+  return l1Rpc.contractRead(upgradeHandlerAddress, "emergencyUpgradeBoard", upgradeHandlerAbi.raw, zodHex);
+}
+
 export async function councilAddress(): Promise<Hex> {
   return l1Rpc.contractRead(
     upgradeHandlerAddress,
