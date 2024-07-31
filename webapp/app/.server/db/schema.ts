@@ -34,15 +34,15 @@ export const emergencyProposalsTable = pgTable(
   "emergency_proposals",
   {
     id: serial("id").primaryKey(),
+    proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
     externalId: bytea("external_id").notNull().unique(),
     title: text("title").notNull(),
     targetAddress: bytea("target_address").notNull(),
     calls: bytea("calls").notNull(),
-    checkReport: json("check_report"),
     value: bigint("value", { mode: "bigint" }).notNull(),
-    storageDiffReport: json("storage_diff_report"),
-    proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
     proposer: bytea("proposer").notNull(),
+    storageDiffReport: json("storage_diff_report"),
+    checkReport: json("check_report"),
   },
   (table) => ({
     externalIdIdx: index("emergency_external_id_idx").on(table.externalId),

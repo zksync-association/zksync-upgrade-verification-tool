@@ -171,6 +171,27 @@ export function CreateEmergencyProposalModal({
                     name="value"
                     render={({ field }) => (
                       <FormItem>
+                        <FormLabel>Value</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input placeholder="0" {...field} className="pr-12" />
+                            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
+                              ETH
+                            </span>
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          The amount of Ether to be sent along with the call.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {/* <FormField
+                    control={form.control}
+                    name="value"
+                    render={({ field }) => (
+                      <FormItem>
                         <FormLabel>Value (eth)</FormLabel>
                         <FormControl>
                           <Input placeholder="0" {...field} />
@@ -181,7 +202,7 @@ export function CreateEmergencyProposalModal({
                         <FormMessage />
                       </FormItem>
                     )}
-                  />
+                  /> */}
                 </div>
                 <AlertDialogFooter>
                   <Button type="button" onClick={handleVerify}>

@@ -1,1 +1,0 @@
-ALTER TABLE "emergency_proposals" DROP COLUMN IF EXISTS "transaction_hash";

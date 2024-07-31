@@ -1,5 +1,5 @@
 {
-  "id": "6cedfea5-f947-4176-83e1-f23ebe9104a9",
+  "id": "d086d139-e3a5-4ffd-b020-fb7da373f5ff",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -14,8 +14,26 @@
           "primaryKey": true,
           "notNull": true
         },
+        "proposed_on": {
+          "name": "proposed_on",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
         "external_id": {
           "name": "external_id",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_address": {
+          "name": "target_address",
           "type": "bytea",
           "primaryKey": false,
           "notNull": true
@@ -26,21 +44,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "check_report": {
-          "name": "check_report",
-          "type": "json",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "storage_diff_report": {
-          "name": "storage_diff_report",
-          "type": "json",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "proposed_on": {
-          "name": "proposed_on",
-          "type": "timestamp with time zone",
+        "value": {
+          "name": "value",
+          "type": "bigint",
           "primaryKey": false,
           "notNull": true
         },
@@ -50,11 +56,17 @@
           "primaryKey": false,
           "notNull": true
         },
-        "transaction_hash": {
-          "name": "transaction_hash",
-          "type": "bytea",
+        "storage_diff_report": {
+          "name": "storage_diff_report",
+          "type": "json",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "check_report": {
+          "name": "check_report",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {

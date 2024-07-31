@@ -1,11 +1,11 @@
 import { saveEmergencyProposal } from "@/.server/service/emergency-proposals";
 import { type Proposal, getProposals } from "@/.server/service/proposals";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   CreateEmergencyProposalModal,
   emergencyPropSchema,
-} from "@/components/create-emergency-proposal-modal";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+} from "@/routes/app/emergency/create-emergency-proposal-modal";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { PlusIcon } from "@radix-ui/react-icons";
 import type { ActionFunctionArgs } from "@remix-run/node";
