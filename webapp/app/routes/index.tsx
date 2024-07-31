@@ -13,7 +13,7 @@ import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { useAccount } from "wagmi";
 
-export function loader({ request }: LoaderFunctionArgs) {
+export function loader(_args: LoaderFunctionArgs) {
   const environment = clientEnv.NODE_ENV;
   return { environment };
 }

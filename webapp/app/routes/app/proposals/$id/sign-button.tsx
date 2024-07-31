@@ -32,7 +32,6 @@ export default function SignButton({
     isPending,
     isSuccess,
     isError,
-    error,
     data: signature,
   } = useSignTypedData();
   const [chain] = useChains();
