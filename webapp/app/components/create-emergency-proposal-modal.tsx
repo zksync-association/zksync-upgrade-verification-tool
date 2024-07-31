@@ -26,7 +26,7 @@ import { useForm } from "react-hook-form";
 import { isAddress } from "viem";
 import { z } from "zod";
 
-const formSchema = z.object({
+export const emergencyPropSchema = z.object({
   title: z.string().min(1, "Title is required"),
   targetAddress: z.string().refine((value) => isAddress(value), {
     message: "Invalid Ethereum address",
@@ -43,7 +43,15 @@ const formSchema = z.object({
     .refine((value) => Number.parseFloat(value) >= 0, {
       message: "Value must be a positive number",
     }),
+  proposer: z
+    .string()
+    .refine((value) => isAddress(value), {
+      message: "Invalid proposer address",
+    })
+    .optional(),
 });
+
+export type EmergencyProp = z.infer<typeof emergencyPropSchema>;
 
 export function CreateEmergencyProposalModal({
   isOpen,
@@ -61,8 +69,8 @@ export function CreateEmergencyProposalModal({
   const [step, setStep] = useState(1);
   const fetcher = useFetcher<typeof action>();
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<EmergencyProp>({
+    resolver: zodResolver(emergencyPropSchema),
     defaultValues: {
       title: "",
       targetAddress: "0x",
@@ -71,7 +79,7 @@ export function CreateEmergencyProposalModal({
     },
   });
 
-  const handleCreate = (data: z.infer<typeof formSchema>) => {
+  const handleCreate = (data: EmergencyProp) => {
     if (form.formState.isValid) {
       console.log("Creating emergency proposal:", data);
       fetcher.submit({ ...data, proposer: proposerAddress ?? "" }, { method: "post" });

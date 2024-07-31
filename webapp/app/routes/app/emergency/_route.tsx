@@ -1,6 +1,9 @@
 import { saveEmergencyProposal } from "@/.server/service/emergency-proposals";
 import { type Proposal, getProposals } from "@/.server/service/proposals";
-import { CreateEmergencyProposalModal } from "@/components/create-emergency-proposal-modal";
+import {
+  CreateEmergencyProposalModal,
+  emergencyPropSchema,
+} from "@/components/create-emergency-proposal-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
@@ -27,10 +30,9 @@ export async function loader() {
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const data = Object.fromEntries(formData);
-  // todo validate data with zod
-  console.log("Received data in action:", data);
-  await saveEmergencyProposal({ ...data });
-  return json({ status: "success", errors: {}, data });
+  const parsedData = emergencyPropSchema.parse(data);
+  await saveEmergencyProposal(parsedData);
+  return json({ status: "success", errors: {}, data: parsedData });
 }
 
 export default function Index() {
