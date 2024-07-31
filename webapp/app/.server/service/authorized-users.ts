@@ -9,7 +9,7 @@ const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 
 const range = (l: number): number[] => new Array(l).fill(0).map((_, i) => i);
 
-export const UserRole = z.enum(["guardian", "securityCouncil", "anonymous"]);
+export const UserRole = z.enum(["guardian", "securityCouncil", "visitor"]);
 export async function guardiansAddress(): Promise<Hex> {
   return l1Rpc.contractRead(upgradeHandlerAddress, "guardians", upgradeHandlerAbi.raw, zodHex);
 }
@@ -52,5 +52,5 @@ export async function getUserAuthRole(address: Hex): Promise<UserRole> {
     return UserRole.enum.securityCouncil;
   }
 
-  return UserRole.enum.anonymous;
+  return UserRole.enum.visitor;
 }

@@ -29,7 +29,7 @@ export async function auth(req: Request, res: Response, next: NextFunction) {
   const role = await getUserAuthRole(zodHex.parse(parsed.data));
   setUserHeaders(req, { address: parsed.data, role });
 
-  if (isProtectedRoute(req) && role === "anonymous") {
+  if (isProtectedRoute(req) && role === "visitor") {
     return res.redirect($path("/app/denied"));
   }
 

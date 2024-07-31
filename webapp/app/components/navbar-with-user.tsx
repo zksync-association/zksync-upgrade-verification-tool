@@ -24,7 +24,7 @@ export default function NavbarWithUser({
             <Button className="disabled:opacity-100" disabled>
               {role === "guardian" && "Guardian"}
               {role === "securityCouncil" && "Security Council"}
-              {role === "anonymous" && "Anonymous"}
+              {role === "visitor" && "Visitor"}
             </Button>
           )}
           <ConnectButton />
