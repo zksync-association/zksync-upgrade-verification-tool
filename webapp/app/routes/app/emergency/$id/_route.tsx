@@ -7,7 +7,8 @@ import { actionSchema, type emergencyProposalsTable } from "@/.server/db/schema"
 import {
   councilMembers,
   emergencyBoardAddress,
-  guardianMembers, zkFoundationAddress,
+  guardianMembers,
+  zkFoundationAddress,
 } from "@/.server/service/authorized-users";
 import { saveEmergencySignature } from "@/.server/service/signatures";
 import { StatusIndicator } from "@/components/status-indicator";
@@ -61,7 +62,7 @@ export async function loader(args: LoaderFunctionArgs) {
     proposal: proposal,
     addresses: {
       emergencyBoard: boardAddress,
-      zkFoundation: await zkFoundationAddress()
+      zkFoundation: await zkFoundationAddress(),
     },
     user,
     signatures,
@@ -114,13 +115,13 @@ export default function EmergencyUpgradeDetails() {
 
   if (user.role === "visitor") {
     // throw new Error("Only valid approvers can see this page.");
-    return "Unauthorized: Only valid signers can see this page."
+    return "Unauthorized: Only valid signers can see this page.";
   }
 
   const actionName = ACTION_NAMES[user.role];
   const GUARDIAN_THRESHOLD = 5;
   const SC_THRESHOLD = 6;
-  const haveAlreadySigned = signatures.some(s => isAddressEqual(s.signer, user.address as Hex));
+  const haveAlreadySigned = signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
   const gatheredScSignatures = signatures.filter((sig) => {
     return allSecurityCouncil.some((addr) => isAddressEqual(addr, sig.signer));
   }).length;
@@ -128,9 +129,9 @@ export default function EmergencyUpgradeDetails() {
     return allGuardians.some((addr) => isAddressEqual(addr, sig.signer));
   }).length;
   const ZK_FOUNDATION_THRESHOLD = 1;
-  const gatheredZkFoundationSignatures = signatures
-    .filter(s => isAddressEqual(s.signer, addresses.zkFoundation ))
-    .length;
+  const gatheredZkFoundationSignatures = signatures.filter((s) =>
+    isAddressEqual(s.signer, addresses.zkFoundation)
+  ).length;
   return (
     <>
       <div className="mt-10 flex flex-1 flex-col">

@@ -1711,198 +1711,198 @@ export const SEC_COUNCIL_RAW_ABI: Abi = [
 
 export const EMERGENCTY_BOARD_ABI = [
   {
-    "inputs": [
+    inputs: [
       {
-        "internalType": "contract IProtocolUpgradeHandler",
-        "name": "_protocolUpgradeHandler",
-        "type": "address"
+        internalType: "contract IProtocolUpgradeHandler",
+        name: "_protocolUpgradeHandler",
+        type: "address",
       },
       {
-        "internalType": "address",
-        "name": "_securityCouncil",
-        "type": "address"
+        internalType: "address",
+        name: "_securityCouncil",
+        type: "address",
       },
       {
-        "internalType": "address",
-        "name": "_guardians",
-        "type": "address"
+        internalType: "address",
+        name: "_guardians",
+        type: "address",
       },
       {
-        "internalType": "address",
-        "name": "_zkFoundation",
-        "type": "address"
-      }
+        internalType: "address",
+        name: "_zkFoundation",
+        type: "address",
+      },
     ],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
+    stateMutability: "nonpayable",
+    type: "constructor",
   },
   {
-    "inputs": [],
-    "name": "InvalidShortString",
-    "type": "error"
+    inputs: [],
+    name: "InvalidShortString",
+    type: "error",
   },
   {
-    "inputs": [
+    inputs: [
       {
-        "internalType": "string",
-        "name": "str",
-        "type": "string"
-      }
+        internalType: "string",
+        name: "str",
+        type: "string",
+      },
     ],
-    "name": "StringTooLong",
-    "type": "error"
+    name: "StringTooLong",
+    type: "error",
   },
   {
-    "anonymous": false,
-    "inputs": [],
-    "name": "EIP712DomainChanged",
-    "type": "event"
+    anonymous: false,
+    inputs: [],
+    name: "EIP712DomainChanged",
+    type: "event",
   },
   {
-    "inputs": [],
-    "name": "GUARDIANS",
-    "outputs": [
+    inputs: [],
+    name: "GUARDIANS",
+    outputs: [
       {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
     ],
-    "stateMutability": "view",
-    "type": "function"
+    stateMutability: "view",
+    type: "function",
   },
   {
-    "inputs": [],
-    "name": "PROTOCOL_UPGRADE_HANDLER",
-    "outputs": [
+    inputs: [],
+    name: "PROTOCOL_UPGRADE_HANDLER",
+    outputs: [
       {
-        "internalType": "contract IProtocolUpgradeHandler",
-        "name": "",
-        "type": "address"
-      }
+        internalType: "contract IProtocolUpgradeHandler",
+        name: "",
+        type: "address",
+      },
     ],
-    "stateMutability": "view",
-    "type": "function"
+    stateMutability: "view",
+    type: "function",
   },
   {
-    "inputs": [],
-    "name": "SECURITY_COUNCIL",
-    "outputs": [
+    inputs: [],
+    name: "SECURITY_COUNCIL",
+    outputs: [
       {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
     ],
-    "stateMutability": "view",
-    "type": "function"
+    stateMutability: "view",
+    type: "function",
   },
   {
-    "inputs": [],
-    "name": "ZK_FOUNDATION_SAFE",
-    "outputs": [
+    inputs: [],
+    name: "ZK_FOUNDATION_SAFE",
+    outputs: [
       {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
     ],
-    "stateMutability": "view",
-    "type": "function"
+    stateMutability: "view",
+    type: "function",
   },
   {
-    "inputs": [],
-    "name": "eip712Domain",
-    "outputs": [
+    inputs: [],
+    name: "eip712Domain",
+    outputs: [
       {
-        "internalType": "bytes1",
-        "name": "fields",
-        "type": "bytes1"
+        internalType: "bytes1",
+        name: "fields",
+        type: "bytes1",
       },
       {
-        "internalType": "string",
-        "name": "name",
-        "type": "string"
+        internalType: "string",
+        name: "name",
+        type: "string",
       },
       {
-        "internalType": "string",
-        "name": "version",
-        "type": "string"
+        internalType: "string",
+        name: "version",
+        type: "string",
       },
       {
-        "internalType": "uint256",
-        "name": "chainId",
-        "type": "uint256"
+        internalType: "uint256",
+        name: "chainId",
+        type: "uint256",
       },
       {
-        "internalType": "address",
-        "name": "verifyingContract",
-        "type": "address"
+        internalType: "address",
+        name: "verifyingContract",
+        type: "address",
       },
       {
-        "internalType": "bytes32",
-        "name": "salt",
-        "type": "bytes32"
+        internalType: "bytes32",
+        name: "salt",
+        type: "bytes32",
       },
       {
-        "internalType": "uint256[]",
-        "name": "extensions",
-        "type": "uint256[]"
-      }
+        internalType: "uint256[]",
+        name: "extensions",
+        type: "uint256[]",
+      },
     ],
-    "stateMutability": "view",
-    "type": "function"
+    stateMutability: "view",
+    type: "function",
   },
   {
-    "inputs": [
+    inputs: [
       {
-        "components": [
+        components: [
           {
-            "internalType": "address",
-            "name": "target",
-            "type": "address"
+            internalType: "address",
+            name: "target",
+            type: "address",
           },
           {
-            "internalType": "uint256",
-            "name": "value",
-            "type": "uint256"
+            internalType: "uint256",
+            name: "value",
+            type: "uint256",
           },
           {
-            "internalType": "bytes",
-            "name": "data",
-            "type": "bytes"
-          }
+            internalType: "bytes",
+            name: "data",
+            type: "bytes",
+          },
         ],
-        "internalType": "struct IProtocolUpgradeHandler.Call[]",
-        "name": "_calls",
-        "type": "tuple[]"
+        internalType: "struct IProtocolUpgradeHandler.Call[]",
+        name: "_calls",
+        type: "tuple[]",
       },
       {
-        "internalType": "bytes32",
-        "name": "_salt",
-        "type": "bytes32"
+        internalType: "bytes32",
+        name: "_salt",
+        type: "bytes32",
       },
       {
-        "internalType": "bytes",
-        "name": "_guardiansSignatures",
-        "type": "bytes"
+        internalType: "bytes",
+        name: "_guardiansSignatures",
+        type: "bytes",
       },
       {
-        "internalType": "bytes",
-        "name": "_securityCouncilSignatures",
-        "type": "bytes"
+        internalType: "bytes",
+        name: "_securityCouncilSignatures",
+        type: "bytes",
       },
       {
-        "internalType": "bytes",
-        "name": "_zkFoundationSignatures",
-        "type": "bytes"
-      }
+        internalType: "bytes",
+        name: "_zkFoundationSignatures",
+        type: "bytes",
+      },
     ],
-    "name": "executeEmergencyUpgrade",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
+    name: "executeEmergencyUpgrade",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
 ] as const;
 
 export const ALL_ABIS = {
