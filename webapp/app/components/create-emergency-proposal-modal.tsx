@@ -6,12 +6,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Cross2Icon } from "@radix-ui/react-icons";
-import { Form as RemixForm } from "@remix-run/react";
-import { useState } from "react";
 import {
   Form,
   FormControl,
@@ -21,21 +15,27 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import type { action } from "@/routes/app/emergency/_route";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Cross2Icon } from "@radix-ui/react-icons";
+import { useFetcher } from "@remix-run/react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { isAddress } from "viem";
+import { z } from "zod";
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   targetAddress: z.string().refine((value) => isAddress(value), {
     message: "Invalid Ethereum address",
   }),
-  calldata: z
+  calls: z
     .string()
-    .regex(/^0x[a-fA-F0-9]*$/, "Calldata must be a hex string starting with 0x")
+    .regex(/^0x[a-fA-F0-9]*$/, "Calls must be a hex string starting with 0x")
     .refine((value) => value.length % 2 === 0, {
-      message: "Calldata must be valid hex-encoded bytes",
+      message: "Calls must be valid hex-encoded bytes",
     }),
   value: z
     .string()
@@ -48,35 +48,42 @@ const formSchema = z.object({
 export function CreateEmergencyProposalModal({
   isOpen,
   errors,
+  status,
   onClose,
+  proposerAddress,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  errors: { targetAddress?: string; status: "success" | "error" };
+  errors: object;
+  status?: string;
+  proposerAddress?: `0x${string}`;
 }) {
   const [step, setStep] = useState(1);
+  const fetcher = useFetcher<typeof action>();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: "",
       targetAddress: "0x",
-      calldata: "0x",
+      calls: "0x",
       value: "0",
     },
   });
+
+  const handleCreate = (data: z.infer<typeof formSchema>) => {
+    if (form.formState.isValid) {
+      console.log("Creating emergency proposal:", data);
+      fetcher.submit({ ...data, proposer: proposerAddress ?? "" }, { method: "post" });
+      onClose();
+    }
+  };
 
   const handleVerify = () => {
     if (form.formState.isValid) {
       setStep(2);
     } else {
       form.trigger();
-    }
-  };
-
-  const handleCreate = () => {
-    if (form.formState.isValid) {
-      console.log("Creating emergency proposal:", form.getValues());
     }
   };
 
@@ -97,117 +104,113 @@ export function CreateEmergencyProposalModal({
             </Button>
           )}
         </AlertDialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleCreate)}>
-              {step === 1 ? (
-                <>
-                  <div className="grid gap-4 py-4">
-                    <FormField
-                      control={form.control}
-                      name="title"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Title</FormLabel>
-                          <FormControl>
-                            <Input placeholder="..." {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            This is to help voters identify which proposal this is.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="targetAddress"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Target address</FormLabel>
-                          <FormControl>
-                            <Input placeholder="0x..." {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            {" "}
-                            The address to which the call will be made.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="calldata"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Calldata</FormLabel>
-                          <FormControl>
-                            <Textarea placeholder="0x..." {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            The calldata to be executed on the `target` address.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="value"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Value (eth)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="0" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            The amount of Ether (in ether) to be sent along with the call.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleCreate)}>
+            {step === 1 ? (
+              <>
+                <div className="grid gap-4 py-4">
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Title</FormLabel>
+                        <FormControl>
+                          <Input placeholder="..." {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          This is to help voters identify which proposal this is.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="targetAddress"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Target address</FormLabel>
+                        <FormControl>
+                          <Input placeholder="0x..." {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          {" "}
+                          The address to which the call will be made.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="calls"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Calls</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="0x..." {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          The encoded calls to be executed on the `target` address.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="value"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Value (eth)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="0" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          The amount of Ether (in ether) to be sent along with the call.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <AlertDialogFooter>
+                  <Button type="button" onClick={handleVerify}>
+                    Verify
+                  </Button>
+                </AlertDialogFooter>
+              </>
+            ) : (
+              <>
+                <div className="py-4">
+                  <h3 className="mb-4 font-semibold">Proposal Details</h3>
+                  <div className="space-y-2">
+                    <p>
+                      <span className="font-medium">Title:</span> {form.getValues("title")}
+                    </p>
+                    <p>
+                      <span className="font-medium">Target Address:</span>{" "}
+                      {form.getValues("targetAddress")}
+                    </p>
+                    <p>
+                      <span className="font-medium">Calls:</span> {form.getValues("calls")}
+                    </p>
+                    <p>
+                      <span className="font-medium">Value:</span> {form.getValues("value")} eth
+                    </p>
                   </div>
-                  <AlertDialogFooter>
-                    <Button type="button" onClick={handleVerify}>
-                      Verify
-                    </Button>
-                  </AlertDialogFooter>
-                </>
-              ) : (
-                <>
-        <RemixForm method="post">
-                  <div className="py-4">
-                    <h3 className="mb-4 font-semibold">Proposal Details</h3>
-                    <div className="space-y-2">
-                      <p>
-                        <span className="font-medium">Title:</span> {form.getValues("title")}
-                      </p>
-                      <p>
-                        <span className="font-medium">Target Address:</span>{" "}
-                        {form.getValues("targetAddress")}
-                        {errors?.targetAddress ? <em>{errors?.targetAddress}</em> : null}
-                      </p>
-                      <p>
-                        <span className="font-medium">Calldata:</span> {form.getValues("calldata")}
-                      </p>
-                      <p>
-                        <span className="font-medium">Value:</span> {form.getValues("value")} eth
-                      </p>
-                    </div>
-                  </div>
-                  <AlertDialogFooter>
-                    <Button type="button" variant="outline" onClick={handleBack}>
-                      Back
-                    </Button>
-                    <Button type="submit">Create</Button>
-                  </AlertDialogFooter>
-                  </RemixForm>
-                </>
-              )}
-            </form>
-          </Form>
-      
+                </div>
+                <AlertDialogFooter>
+                  <Button type="button" variant="outline" onClick={handleBack}>
+                    Back
+                  </Button>
+                  <Button type="submit">Create</Button>
+                </AlertDialogFooter>
+              </>
+            )}
+          </form>
+        </Form>
       </AlertDialogContent>
     </AlertDialog>
   );

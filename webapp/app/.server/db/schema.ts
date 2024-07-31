@@ -1,6 +1,16 @@
 import { bytea } from "@/.server/db/custom-types";
 import { sql } from "drizzle-orm";
-import { check, index, json, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  check,
+  index,
+  json,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 export const proposalsTable = pgTable(
@@ -25,12 +35,14 @@ export const emergencyProposalsTable = pgTable(
   {
     id: serial("id").primaryKey(),
     externalId: bytea("external_id").notNull().unique(),
+    title: text("title").notNull(),
+    targetAddress: bytea("target_address").notNull(),
     calls: bytea("calls").notNull(),
     checkReport: json("check_report"),
+    value: bigint("value", { mode: "bigint" }).notNull(),
     storageDiffReport: json("storage_diff_report"),
     proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
     proposer: bytea("proposer").notNull(),
-    transactionHash: bytea("transaction_hash").notNull(),
   },
   (table) => ({
     externalIdIdx: index("emergency_external_id_idx").on(table.externalId),

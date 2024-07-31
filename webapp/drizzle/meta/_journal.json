@@ -8,6 +8,27 @@
       "when": 1722264953276,
       "tag": "0000_jittery_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1722436889445,
+      "tag": "0001_left_imperial_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1722440930915,
+      "tag": "0002_busy_mentor",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1722441596031,
+      "tag": "0003_white_whistler",
+      "breakpoints": true
     }
   ]
 }

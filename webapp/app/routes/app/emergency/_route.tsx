@@ -1,3 +1,4 @@
+import { saveEmergencyProposal } from "@/.server/service/emergency-proposals";
 import { type Proposal, getProposals } from "@/.server/service/proposals";
 import { CreateEmergencyProposalModal } from "@/components/create-emergency-proposal-modal";
 import { Button } from "@/components/ui/button";
@@ -5,11 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { PlusIcon } from "@radix-ui/react-icons";
 import type { ActionFunctionArgs } from "@remix-run/node";
-import { Link, json, useActionData, useLoaderData } from "@remix-run/react";
+import { Form, Link, json, useActionData, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { $path } from "remix-routes";
-import { isAddress } from "viem";
+import { useAccount } from "wagmi";
 
 const isProposalActive = (p: Proposal) =>
   p.state !== PROPOSAL_STATES.Expired && p.state !== PROPOSAL_STATES.Done;
@@ -25,32 +26,18 @@ export async function loader() {
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
-  console.log("Form data:", formData);
-  const title = String(formData.get("title"));
-  const targetAddress = String(formData.get("targetAddress"));
-  const calldata = String(formData.get("calldata"));
-  const value = String(formData.get("value"));
-  const errors: any = {};
-
-  if (!isAddress(targetAddress)) {
-    errors.targetAddress = "Invalid target address";
-  }
-
-  if (Object.keys(errors).length > 0) {
-    return json({ errors, status: "error" });
-  }
-  return json({ status: "success", errors });
+  const data = Object.fromEntries(formData);
+  // todo validate data with zod
+  console.log("Received data in action:", data);
+  await saveEmergencyProposal({ ...data });
+  return json({ status: "success", errors: {}, data });
 }
 
 export default function Index() {
   const { activeProposals, inactiveProposals } = useLoaderData<typeof loader>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const actionData = useActionData<typeof action>();
-  console.log("actionData", actionData);
-
-  if (actionData?.status === "success") {
-    setIsModalOpen(false);
-  }
+  const { address } = useAccount();
 
   return (
     <div className="mt-10 space-y-4">
@@ -109,7 +96,15 @@ export default function Index() {
           )}
         </CardContent>
       </Card>
-      <CreateEmergencyProposalModal isOpen={isModalOpen} onClose={()=>setIsModalOpen(false)} errors={actionData?.errors} />
+      <Form method="post">
+        <CreateEmergencyProposalModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          errors={actionData?.errors as object}
+          status={actionData?.status}
+          proposerAddress={address}
+        />
+      </Form>
     </div>
   );
 }

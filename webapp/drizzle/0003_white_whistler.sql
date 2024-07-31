@@ -1,0 +1,1 @@
+ALTER TABLE "emergency_proposals" ADD COLUMN "value" bigint NOT NULL;
