@@ -1,6 +1,6 @@
 import { defineChain } from "viem";
 
-export const regtest = defineChain({
+export const localchain = defineChain({
   id: 11155111,
   name: "Sepolia",
   rpcUrls: {

@@ -1,5 +1,5 @@
 import Avatar from "@/components/connect-button/avatar";
-import { regtest } from "@/utils/regtest";
+import { localchain } from "@/utils/localchain";
 import { RainbowKitProvider, darkTheme, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
@@ -11,7 +11,7 @@ const queryClient = new QueryClient();
 const NETWORKS = {
   mainnet: mainnet,
   sepolia: sepolia,
-  regtest: regtest,
+  local: localchain,
 };
 
 export function WalletProvider({
@@ -23,7 +23,7 @@ export function WalletProvider({
   children: ReactNode;
   initialState?: State;
   projectId: string;
-  network: "mainnet" | "sepolia" | "regtest";
+  network: "mainnet" | "sepolia" | "local";
 }) {
   const config = useMemo(() => {
     return getDefaultConfig({
