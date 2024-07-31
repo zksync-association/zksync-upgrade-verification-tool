@@ -1,4 +1,3 @@
-import { isUserAuthorized } from "@/.server/service/authorized-users";
 import { checkConnection } from "@/.server/service/clients";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
@@ -12,6 +11,7 @@ import { useEffect } from "react";
 import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { useAccount } from "wagmi";
+import { getUserAuthRole } from "@/.server/service/authorized-users";
 
 export function loader({ request }: LoaderFunctionArgs) {
   const environment = clientEnv.NODE_ENV;
@@ -32,11 +32,11 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!isUp) {
     throw redirect($path("/app/down"));
   }
-  const auth = await isUserAuthorized(parsedAddress.data);
-  if (!auth.authorized) {
+  const role = await getUserAuthRole(parsedAddress.data);
+  if (role === "visitor") {
     throw redirect($path("/app/denied"));
   }
-  return json({ status: "success", role: auth.role });
+  return json({ status: "success", role });
 }
 
 export default function Index() {
