@@ -6,6 +6,7 @@ import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
+import { StatusIndicator } from "@/components/status-indicator";
 import TxLink from "@/components/tx-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
@@ -28,11 +29,10 @@ import { defer, json } from "@remix-run/node";
 import { Await, useLoaderData } from "@remix-run/react";
 import { Suspense } from "react";
 import { getFormData, getParams } from "remix-params-helper";
+import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
-import { StatusIndicator } from "@/components/status-indicator";
-import { $path } from "remix-routes";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -284,7 +284,7 @@ export default function Proposals() {
                             name: "Guardians",
                           }}
                           disabled={!signLegalVetoEnabled}
-                          postAction={$path("/app/proposals/:id", {id: proposalId})}
+                          postAction={$path("/app/proposals/:id", { id: proposalId })}
                         >
                           Approve extend veto period
                         </SignButton>
@@ -298,7 +298,7 @@ export default function Proposals() {
                             name: "Guardians",
                           }}
                           disabled={!signProposalEnabled}
-                          postAction={$path("/app/proposals/:id", {id: proposalId})}
+                          postAction={$path("/app/proposals/:id", { id: proposalId })}
                         >
                           Approve proposal
                         </SignButton>
@@ -312,7 +312,7 @@ export default function Proposals() {
                             name: "SecurityCouncil",
                           }}
                           disabled={!signProposalEnabled}
-                          postAction={$path("/app/proposals/:id", {id: proposalId})}
+                          postAction={$path("/app/proposals/:id", { id: proposalId })}
                         >
                           Approve proposal
                         </SignButton>
@@ -431,4 +431,3 @@ export default function Proposals() {
     </div>
   );
 }
-

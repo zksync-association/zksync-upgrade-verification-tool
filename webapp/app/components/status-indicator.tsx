@@ -1,5 +1,5 @@
-import { cn } from "@/utils/cn";
 import { Progress } from "@/components/ui/progress";
+import { cn } from "@/utils/cn";
 
 export function StatusIndicator({
   signatures,

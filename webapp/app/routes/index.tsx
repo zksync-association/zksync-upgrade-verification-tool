@@ -1,3 +1,4 @@
+import { getUserAuthRole } from "@/.server/service/authorized-users";
 import { checkConnection } from "@/.server/service/clients";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
@@ -11,7 +12,6 @@ import { useEffect } from "react";
 import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { useAccount } from "wagmi";
-import { getUserAuthRole } from "@/.server/service/authorized-users";
 
 export function loader({ request }: LoaderFunctionArgs) {
   const environment = clientEnv.NODE_ENV;

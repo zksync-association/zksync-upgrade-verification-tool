@@ -1,54 +1,72 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  createOrIgnoreEmergencyProposal,
+  getEmergencyProposalByExternalId,
+} from "@/.server/db/dto/emergencyProposals";
+import { getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures";
+import { actionSchema, emergencyProposalsTable } from "@/.server/db/schema";
+import {
+  councilMembers,
+  emergencyBoardAddress,
+  guardianMembers,
+} from "@/.server/service/authorized-users";
+import { saveEmergencySignature } from "@/.server/service/signatures";
 import { StatusIndicator } from "@/components/status-indicator";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { displayBytes32 } from "@/routes/app/proposals/$id/common-tables";
-import { ArrowLeft } from "lucide-react";
-import { useLoaderData, useNavigate } from "@remix-run/react";
-import { type ActionFunctionArgs, json, type LoaderFunctionArgs } from "@remix-run/node";
-import { getFormData, getParams } from "remix-params-helper";
-import { z } from "zod";
-import { zodHex } from "validate-cli";
-import { badRequest, notFound } from "@/utils/http";
-import { createOrIgnoreEmergencyProposal, getEmergencyProposalByExternalId } from "@/.server/db/dto/emergencyProposals";
-import { type Hex, zeroAddress } from "viem";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
-import { emergencyBoardAddress } from "@/.server/service/authorized-users";
-import { $path } from "remix-routes";
 import { requireUserFromHeader } from "@/utils/auth-headers";
-import { actionSchema } from "@/.server/db/schema";
-import { saveEmergencySignature, validateAndSaveSignature } from "@/.server/service/signatures";
+import { badRequest, notFound } from "@/utils/http";
+import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
+import { useLoaderData, useNavigate } from "@remix-run/react";
+import { ArrowLeft } from "lucide-react";
+import { getFormData, getParams } from "remix-params-helper";
+import { $path } from "remix-routes";
+import { zodHex } from "validate-cli";
+import { type Hex, isAddressEqual, zeroAddress } from "viem";
+import { z } from "zod";
 
 export async function loader(args: LoaderFunctionArgs) {
-  const user = requireUserFromHeader(args.request)
+  const user = requireUserFromHeader(args.request);
   const params = getParams(args.params, z.object({ id: zodHex }));
   if (!params.success) {
     throw notFound();
   }
 
-  const { id: proposalId } = params.data
+  const { id: proposalId } = params.data;
 
-  const boardAddress = await emergencyBoardAddress()
+  const boardAddress = await emergencyBoardAddress();
 
-  const maybeProposal = await getEmergencyProposalByExternalId(proposalId)
-  const proposal = maybeProposal === undefined
-    ? await createOrIgnoreEmergencyProposal({
+  const maybeProposal = await getEmergencyProposalByExternalId(proposalId);
+  let proposal: typeof emergencyProposalsTable.$inferInsert;
+  if (maybeProposal === undefined) {
+    const proposalData = {
       externalId: proposalId,
       calls: "0x0001",
       checkReport: null,
       storageDiffReport: null,
       proposedOn: new Date(),
       proposer: zeroAddress,
-      transactionHash: "0x01"
-    })
-    : maybeProposal
+      transactionHash: "0x01",
+    } as const;
+    await createOrIgnoreEmergencyProposal(proposalData);
+    proposal = proposalData;
+  } else {
+    proposal = maybeProposal;
+  }
+
+  const signatures = await getSignaturesByEmergencyProposalId(proposal.externalId);
 
   return json({
     proposal: proposal,
     addresses: {
-      emergencyBoard: boardAddress
+      emergencyBoard: boardAddress,
     },
-    user
-  })
+    user,
+    signatures,
+    allGuardians: await guardianMembers(),
+    allSecurityCouncil: await councilMembers(),
+  });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -66,7 +84,6 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   const data = formData.data;
 
-
   await saveEmergencySignature(
     data.signature,
     user.address as Hex,
@@ -74,28 +91,39 @@ export async function action({ request }: ActionFunctionArgs) {
     data.proposalId
   );
 
-  return json({ ok: true })
+  return json({ ok: true });
 }
 
 const ACTION_NAMES = {
-  "guardian": "ExecuteEmergencyUpgradeGuardians",
-  "securityCouncil": "ExecuteEmergencyUpgradeSecurityCouncil",
-  "zkSyncAssociation": "ExecuteEmergencyUpgradeZKFoundation",
-}
+  guardian: "ExecuteEmergencyUpgradeGuardians",
+  securityCouncil: "ExecuteEmergencyUpgradeSecurityCouncil",
+  zkSyncAssociation: "ExecuteEmergencyUpgradeZKFoundation",
+};
 
 export default function EmergencyUpgradeDetails() {
   const navigate = useNavigate();
 
   const loaderData = useLoaderData<typeof loader>();
-  const user = loaderData.user
-  const proposal = loaderData.proposal
-  const addresses = loaderData.addresses
+  const user = loaderData.user;
+  const proposal = loaderData.proposal;
+  const addresses = loaderData.addresses;
+  const signatures = loaderData.signatures;
+  const allSecurityCouncil = loaderData.allSecurityCouncil;
+  const allGuardians = loaderData.allGuardians;
 
   if (user.role === "visitor") {
-    throw new Error("Only valid approvers can see this page.")
+    throw new Error("Only valid approvers can see this page.");
   }
 
   const actionName = ACTION_NAMES[user.role];
+  const GUARDIAN_THRESHOLD = 5;
+  const SC_THRESHOLD = 6;
+  const gatheredScSignatures = signatures.filter((sig) => {
+    return allSecurityCouncil.some((addr) => isAddressEqual(addr, sig.signer));
+  }).length;
+  const gatheredGuardianSignatures = signatures.filter((sig) => {
+    return allGuardians.some((addr) => isAddressEqual(addr, sig.signer));
+  }).length;
   return (
     <>
       <div className="mt-10 flex flex-1 flex-col">
@@ -131,7 +159,9 @@ export default function EmergencyUpgradeDetails() {
               {/*</div>*/}
               <div className="flex justify-between">
                 <span>Proposal ID:</span>
-                <span className="w-4/5 justify-end break-words text-right">{loaderData.proposal.externalId}</span>
+                <span className="w-4/5 justify-end break-words text-right">
+                  {loaderData.proposal.externalId}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Proposed On:</span>
@@ -151,10 +181,14 @@ export default function EmergencyUpgradeDetails() {
             <div className="space-y-5">
               <StatusIndicator
                 label="Security Council Approvals"
-                signatures={1}
-                necessarySignatures={6}
+                signatures={gatheredScSignatures}
+                necessarySignatures={SC_THRESHOLD}
               />
-              <StatusIndicator label="Guardian Approvals" signatures={1} necessarySignatures={5} />
+              <StatusIndicator
+                label="Guardian Approvals"
+                signatures={gatheredGuardianSignatures}
+                necessarySignatures={GUARDIAN_THRESHOLD}
+              />
               <StatusIndicator
                 label="ZkFoundation approvals"
                 signatures={0}
@@ -176,7 +210,7 @@ export default function EmergencyUpgradeDetails() {
                 name: "EmergencyUpgradeBoard",
               }}
               disabled={false}
-              postAction={$path("/app/emergency/:id", {id: proposal.externalId})}
+              postAction={$path("/app/emergency/:id", { id: proposal.externalId })}
             >
               Approve
             </SignButton>

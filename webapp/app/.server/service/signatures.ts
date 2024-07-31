@@ -3,7 +3,8 @@ import { db } from "@/.server/db/index";
 import { type Action, type actionSchema, signaturesTable } from "@/.server/db/schema";
 import {
   councilAddress,
-  councilMembers, emergencyBoardAddress,
+  councilMembers,
+  emergencyBoardAddress,
   guardianMembers,
   guardiansAddress,
 } from "@/.server/service/authorized-users";
@@ -76,9 +77,9 @@ export async function saveEmergencySignature(
       emergencyProposalId,
       "EmergencyUpgradeBoard",
       await guardiansAddress()
-    )
+    );
     if (!isValid) {
-      throw badRequest("Invalid signature provided")
+      throw badRequest("Invalid signature provided");
     }
   }
 
@@ -91,9 +92,9 @@ export async function saveEmergencySignature(
       emergencyProposalId,
       "EmergencyUpgradeBoard",
       await councilAddress()
-    )
+    );
     if (!isValid) {
-      throw badRequest("Invalid signature provided")
+      throw badRequest("Invalid signature provided");
     }
   }
 
@@ -105,7 +106,7 @@ export async function saveEmergencySignature(
     action,
     signature,
     emergencyProposal: emergencyProposalId,
-    signer
+    signer,
   };
 
   await createOrIgnoreSignature(dto);
@@ -164,7 +165,7 @@ export async function validateAndSaveSignature(
     action,
     signature,
     proposal: proposalId,
-    signer
+    signer,
   };
 
   await createOrIgnoreSignature(dto);

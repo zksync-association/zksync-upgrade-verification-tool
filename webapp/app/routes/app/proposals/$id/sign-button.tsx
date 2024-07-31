@@ -25,7 +25,7 @@ export default function SignButton({
   proposalId,
   contractData,
   disabled,
-  postAction
+  postAction,
 }: SignButtonProps) {
   const {
     signTypedData,
@@ -33,7 +33,7 @@ export default function SignButton({
     isSuccess,
     isError,
     error,
-    data: signature
+    data: signature,
   } = useSignTypedData();
   const [chain] = useChains();
   const fetcher = useFetcher<typeof action>();
@@ -45,7 +45,7 @@ export default function SignButton({
         { method: "POST", action: postAction }
       );
     }
-  }, [isSuccess, contractData.actionName, fetcher.submit, proposalId, signature]);
+  }, [isSuccess, contractData.actionName, fetcher.submit, proposalId, signature, postAction]);
 
   const loading = isPending || fetcher.state === "submitting" || fetcher.state === "loading";
   const success = isSuccess && fetcher.state === "idle" && fetcher.data?.ok;
