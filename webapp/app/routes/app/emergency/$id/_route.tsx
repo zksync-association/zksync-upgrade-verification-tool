@@ -1,9 +1,8 @@
 import {
-  createOrIgnoreEmergencyProposal,
   getEmergencyProposalByExternalId,
 } from "@/.server/db/dto/emergencyProposals";
 import { getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures";
-import { actionSchema, type emergencyProposalsTable } from "@/.server/db/schema";
+import { actionSchema } from "@/.server/db/schema";
 import {
   councilMembers,
   emergencyBoardAddress,
@@ -24,7 +23,7 @@ import { ArrowLeft } from "lucide-react";
 import { getFormData, getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
-import { type Hex, isAddressEqual, zeroAddress } from "viem";
+import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
 
 export async function loader(args: LoaderFunctionArgs) {
@@ -38,22 +37,10 @@ export async function loader(args: LoaderFunctionArgs) {
 
   const boardAddress = await emergencyBoardAddress();
 
-  const maybeProposal = await getEmergencyProposalByExternalId(proposalId);
-  let proposal: typeof emergencyProposalsTable.$inferInsert;
-  if (maybeProposal === undefined) {
-    const proposalData = {
-      externalId: proposalId,
-      calls: "0x0001",
-      checkReport: null,
-      storageDiffReport: null,
-      proposedOn: new Date(),
-      proposer: zeroAddress,
-      transactionHash: "0x01",
-    } as const;
-    await createOrIgnoreEmergencyProposal(proposalData);
-    proposal = proposalData;
-  } else {
-    proposal = maybeProposal;
+  const proposal = await getEmergencyProposalByExternalId(proposalId);
+
+  if (proposal === undefined) {
+    throw notFound();
   }
 
   const signatures = await getSignaturesByEmergencyProposalId(proposal.externalId);
@@ -114,7 +101,6 @@ export default function EmergencyUpgradeDetails() {
   const allGuardians = loaderData.allGuardians;
 
   if (user.role === "visitor") {
-    // throw new Error("Only valid approvers can see this page.");
     return "Unauthorized: Only valid signers can see this page.";
   }
 
@@ -229,18 +215,7 @@ export default function EmergencyUpgradeDetails() {
             <CardTitle>Broadcast actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            <Button>Execute upgrade</Button>
-            {/*<ContractWriteButton*/}
-            {/*  target={addresses.guardians}*/}
-            {/*  signatures={proposal.signatures.extendLegalVetoPeriod}*/}
-            {/*  proposalId={proposalId}*/}
-            {/*  functionName={"extendLegalVeto"}*/}
-            {/*  abiName="guardians"*/}
-            {/*  threshold={NECESSARY_LEGAL_VETO_SIGNATURES}*/}
-            {/*  disabled={!executeLegalVetoExtensionEnabled}*/}
-            {/*>*/}
-            {/*  Execute legal veto extension*/}
-            {/*</ContractWriteButton>*/}
+            <Button>Execute upgrade (wip)</Button>
           </CardContent>
         </Card>
       </div>
