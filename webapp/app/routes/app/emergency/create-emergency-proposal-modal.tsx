@@ -208,32 +208,39 @@ export function CreateEmergencyProposalModal({
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="value"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Value</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              placeholder="0"
-                              {...field}
-                              className="pr-12"
-                              data-testid="value-input"
-                            />
-                            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
-                              ETH
-                            </span>
-                          </div>
-                        </FormControl>
-                        <FormDescription>
-                          The amount of Ether to be sent along with the call.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <Collapsible>
+                    <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border p-2 text-sm hover:bg-muted">
+                      <span>Value (optional)</span>
+                      <ChevronDownIcon className="h-4 w-4" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2">
+                      <FormField
+                        control={form.control}
+                        name="value"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <div className="relative">
+                                <Input
+                                  placeholder="0"
+                                  {...field}
+                                  className="pr-12"
+                                  data-testid="value-input"
+                                />
+                                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
+                                  ETH
+                                </span>
+                              </div>
+                            </FormControl>
+                            <FormDescription>
+                              The amount of Ether to be sent along with the call.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
                   <Collapsible>
                     <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border p-2 text-sm hover:bg-muted">
                       <span>Salt (optional)</span>
