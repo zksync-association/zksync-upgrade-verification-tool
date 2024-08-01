@@ -278,7 +278,6 @@ Before running the Web App, you need to set up the environment keys:
 export ALLOW_INDEXING="false"
 export DATABASE_URL="postgresql://user:password@localhost:5432/webapp"
 export LOG_LEVEL="info"
-export NODE_ENV="production"
 export WALLET_CONNECT_PROJECT_ID=":placeholder:"
 export L1_RPC_URL=":placeholder:"
 export ETHERSCAN_API_KEY=":placeholder:"

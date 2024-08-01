@@ -40,6 +40,11 @@ declare module "remix-routes" {
       query: ExportedQuery<import('app/routes/app/down/_route').SearchParams>,
     };
   
+    "/app/emergency": {
+      params: never,
+      query: ExportedQuery<import('app/routes/app/emergency/_route').SearchParams>,
+    };
+  
     "/app/proposals": {
       params: never,
       query: ExportedQuery<import('app/routes/app/proposals/_layout').SearchParams>,
@@ -75,6 +80,7 @@ declare module "remix-routes" {
     | 'routes/app/_layout'
     | 'routes/app/denied/_route'
     | 'routes/app/down/_route'
+    | 'routes/app/emergency/_route'
     | 'routes/app/proposals/_layout'
     | 'routes/app/proposals/$id_.transactions.$hash/_route'
     | 'routes/app/proposals/$id/_route'

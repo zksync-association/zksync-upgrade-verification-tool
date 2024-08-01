@@ -1,10 +1,12 @@
 import { checkConnection } from "@/.server/service/clients";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
+import { Button } from "@/components/ui/button";
 import { getUserFromHeader } from "@/utils/auth-headers";
 import { clientEnv } from "@config/env.server";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
+import { useNavigate } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
@@ -37,6 +39,7 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
   const navigation = useNavigation();
   const { environment } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (account.isConnected) {
@@ -44,6 +47,13 @@ export default function Index() {
     }
   }, [account.isConnected, fetcher.submit]);
 
+  const handleStandardUpgrades = () => {
+    navigate($path("/app"));
+  };
+
+  const handleEmergencyUpgrades = () => {
+    navigate($path("/app/emergency"));
+  };
   return (
     <>
       <Navbar environment={environment} />
@@ -57,12 +67,22 @@ export default function Index() {
               vote.
             </p>
             <div className="mt-10">
-              <ConnectButton
-                loading={
-                  fetcher.state === "submitting" ||
-                  (navigation.state === "loading" && navigation.location.pathname === $path("/app"))
-                }
-              />
+              {!account.isConnected ? (
+                <ConnectButton
+                  loading={
+                    fetcher.state === "submitting" ||
+                    (navigation.state === "loading" &&
+                      navigation.location.pathname === $path("/app"))
+                  }
+                />
+              ) : (
+                <div className="flex space-x-4">
+                  <Button onClick={handleStandardUpgrades}>Standard Upgrades</Button>
+                  <Button onClick={handleEmergencyUpgrades} variant={"ghost"}>
+                    Emergency Upgrades
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </main>
