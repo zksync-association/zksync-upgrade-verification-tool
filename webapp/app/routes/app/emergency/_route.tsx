@@ -1,12 +1,12 @@
+import { getAllEmergencyProposals } from "@/.server/db/dto/emergencyProposals";
 import { saveEmergencyProposal } from "@/.server/service/emergency-proposals";
-import { type Proposal, getProposals } from "@/.server/service/proposals";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   CreateEmergencyProposalModal,
   emergencyPropSchema,
 } from "@/routes/app/emergency/create-emergency-proposal-modal";
-import { PROPOSAL_STATES } from "@/utils/proposal-states";
+import { EMERGENCY_PROPOSAL_STATUS, PROPOSAL_STATES } from "@/utils/proposal-states";
 import { PlusIcon } from "@radix-ui/react-icons";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { Form, Link, json, useActionData, useLoaderData } from "@remix-run/react";
@@ -15,15 +15,16 @@ import { useState } from "react";
 import { $path } from "remix-routes";
 import { useAccount } from "wagmi";
 
-const isProposalActive = (p: Proposal) =>
-  p.state !== PROPOSAL_STATES.Expired && p.state !== PROPOSAL_STATES.Done;
-const isProposalInactive = (p: Proposal) => !isProposalActive(p);
-
 export async function loader() {
-  const proposals = await getProposals();
+  console.log("calling loader");
+  const emergencyProposals = await getAllEmergencyProposals();
+
+ console.dir(emergencyProposals);
   return json({
-    activeProposals: proposals.filter(isProposalActive),
-    inactiveProposals: proposals.filter(isProposalInactive),
+    activeEmergencyProposals: emergencyProposals.filter(({ status }) => status === "ACTIVE"),
+    inactiveEmergencyProposals: emergencyProposals.filter(
+      ({ status }) => status === "CLOSED" || status === "BROADCAST"
+    ),
   });
 }
 
@@ -36,7 +37,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Index() {
-  const { activeProposals, inactiveProposals } = useLoaderData<typeof loader>();
+  const { activeEmergencyProposals, inactiveEmergencyProposals } = useLoaderData<typeof loader>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const actionData = useActionData<typeof action>();
   const { address } = useAccount();
@@ -54,20 +55,16 @@ export default function Index() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col space-y-4">
-            {activeProposals.map((proposal) => (
-              <Link
-                key={proposal.id}
-                className="flex"
-                to={$path("/app/proposals/:id", { id: proposal.id })}
-              >
+            {activeEmergencyProposals.map((ep) => (
+              <Link key={ep.id} className="flex" to={$path("/app/proposals/:id", { id: ep.id })}>
                 <Button className="flex flex-1 justify-between pr-4" variant="outline">
                   <span />
-                  <span>{proposal.id}</span>
+                  <span>{ep.id}</span>
                   <ArrowRight />
                 </Button>
               </Link>
             ))}
-            {activeProposals.length === 0 && (
+            {activeEmergencyProposals.length === 0 && (
               <div className="text-center text-gray-500">No active emergency proposals found.</div>
             )}
           </div>
@@ -79,21 +76,17 @@ export default function Index() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col space-y-4">
-            {inactiveProposals.map((proposal) => (
-              <Link
-                key={proposal.id}
-                className="flex"
-                to={$path("/app/proposals/:id", { id: proposal.id })}
-              >
+            {inactiveEmergencyProposals.map((ep) => (
+              <Link key={ep.id} className="flex" to={$path("/app/proposals/:id", { id: ep.id })}>
                 <Button className="flex flex-1 justify-between pr-4" variant="outline">
                   <span />
-                  <span>{proposal.id}</span>
+                  <span>{ep.id}</span>
                   <ArrowRight />
                 </Button>
               </Link>
             ))}
           </div>
-          {inactiveProposals.length === 0 && (
+          {inactiveEmergencyProposals.length === 0 && (
             <div className="text-center text-gray-500">No inactive emergency proposals found.</div>
           )}
         </CardContent>

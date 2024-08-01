@@ -1,4 +1,7 @@
-import { createOrIgnoreEmergencyProposal } from "@/.server/db/dto/emergencyProposals";
+import {
+  createOrIgnoreEmergencyProposal,
+  getAllEmergencyProposals,
+} from "@/.server/db/dto/emergencyProposals";
 import type { EmergencyProp } from "@/routes/app/emergency/create-emergency-proposal-modal";
 import { EMERGENCY_BOARD, calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { type Hash, parseEther } from "viem";
@@ -17,6 +20,7 @@ export const saveEmergencyProposal = async (data: EmergencyProp) => {
   const value = parseEther(data.value);
 
   await createOrIgnoreEmergencyProposal({
+    status: "ACTIVE",
     calldata: data.calldata as Hash,
     proposer: data.proposer,
     proposedOn: new Date(),
@@ -26,4 +30,8 @@ export const saveEmergencyProposal = async (data: EmergencyProp) => {
     targetAddress: data.targetAddress,
     value,
   });
+};
+
+export const getEmergencyProposals = async () => {
+  const emergencyProposals = await getAllEmergencyProposals();
 };

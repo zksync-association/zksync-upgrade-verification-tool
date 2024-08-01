@@ -1,0 +1,1 @@
+ALTER TABLE "emergency_proposals" RENAME COLUMN "action" TO "status";

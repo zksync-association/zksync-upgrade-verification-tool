@@ -29,6 +29,9 @@ export const proposalsTable = pgTable(
     externalIdIdx: index("external_id_idx").on(table.externalId),
   })
 );
+export const emergencyProposalStatusSchema = z.enum(["ACTIVE", "READY", "BROADCAST", "CLOSED"]);
+
+export type EmergencyProposalStatus = z.infer<typeof emergencyProposalStatusSchema>;
 
 export const emergencyProposalsTable = pgTable(
   "emergency_proposals",
@@ -40,7 +43,10 @@ export const emergencyProposalsTable = pgTable(
     targetAddress: bytea("target_address").notNull(),
     calldata: bytea("calldata").notNull(),
     salt: bytea("salt").notNull(),
-    value: bigint("value", { mode: "bigint" }).notNull(),
+    status: text("status", {
+      enum: emergencyProposalStatusSchema.options,
+    }).notNull(),
+    value: bigint("value", { mode: "number" }).notNull(),
     proposer: bytea("proposer").notNull(),
     storageDiffReport: json("storage_diff_report"),
     checkReport: json("check_report"),

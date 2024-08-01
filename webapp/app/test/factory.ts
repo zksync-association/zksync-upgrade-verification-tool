@@ -32,6 +32,7 @@ export const createRandomEmergencyProposalParams = () => {
   return {
     title: faker.lorem.sentence(),
     value: faker.number.bigInt(),
+    status: "ACTIVE" as const,
     targetAddress: faker.string.hexadecimal({ length: 20 }) as `0x${string}`,
     externalId: faker.string.hexadecimal({ length: 20 }) as `0x${string}`,
     calldata: faker.string.hexadecimal({ length: randomLength }) as `0x${string}`,
