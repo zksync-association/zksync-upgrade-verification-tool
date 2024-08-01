@@ -1,4 +1,4 @@
-import { isUserAuthorized } from "@/.server/service/authorized-users";
+import { getUserAuthRole } from "@/.server/service/authorized-users";
 import { readAuthSession } from "@server/utils/auth-session";
 import type { NextFunction, Request, Response } from "express";
 import { $path, type Routes } from "remix-routes";
@@ -7,7 +7,7 @@ import { zodHex } from "validate-cli";
 export const USER_ADDRESS_HEADER = "x-user-address";
 export const USER_ROLE_HEADER = "x-user-role";
 
-const protectedRoutes = ["/app"] satisfies (keyof Routes)[];
+const protectedRoutes = [] satisfies (keyof Routes)[];
 const unprotectedRoutes = ["/", "/app/denied", "/app/down"] satisfies (keyof Routes)[];
 
 function isProtectedRoute(req: Request) {
@@ -20,32 +20,17 @@ function isProtectedRoute(req: Request) {
 export async function auth(req: Request, res: Response, next: NextFunction) {
   const session = readAuthSession(req);
 
-  if (isProtectedRoute(req)) {
-    // If user is not logged in, redirect to home page
-    if (!session?.address) {
-      clearUserHeaders(req);
-      return res.redirect($path("/"));
-    }
-
-    const auth = await isUserAuthorized(zodHex.parse(session.address));
-
-    // Session headers are set for all requests, authorized or not,
-    // to be used by Remix loaders
-    setUserHeaders(req, { address: session.address, role: auth.role });
-
-    // If user is logged in but not authorized, redirect to denied page
-    if (!auth.authorized) {
-      return res.redirect($path("/app/denied"));
-    }
-
+  const parsed = zodHex.safeParse(session.address);
+  if (parsed.error) {
+    clearUserHeaders(req);
     return next();
   }
 
-  // If route is not protected, Remix might still need user information
-  if (session?.address) {
-    setUserHeaders(req, { address: session.address, role: null });
-  } else {
-    clearUserHeaders(req);
+  const role = await getUserAuthRole(zodHex.parse(parsed.data));
+  setUserHeaders(req, { address: parsed.data, role });
+
+  if (isProtectedRoute(req) && role === "visitor") {
+    return res.redirect($path("/app/denied"));
   }
 
   next();

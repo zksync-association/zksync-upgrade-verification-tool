@@ -11,9 +11,6 @@ export function getUserFromHeader(request: Request) {
 
 export function requireUserFromHeader(request: Request) {
   const { address, role } = getUserFromHeader(request);
-  if (!address) {
-    throw unauthorized();
-  }
 
   const parsedRole = UserRole.safeParse(role);
   if (!parsedRole.success) {
