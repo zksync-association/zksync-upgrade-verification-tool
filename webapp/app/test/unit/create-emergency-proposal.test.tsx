@@ -31,12 +31,12 @@ describe("CreateEmergencyProposalModal", () => {
 
   it("renders the modal when isOpen is true", () => {
     render(<CreateEmergencyProposalModal {...defaultProps} />);
-    expect(screen.getByText("Create Emergency Upgrade Proposal")).toBeInTheDocument();
+    expect(screen.getByText("Define Emergency Proposal")).toBeInTheDocument();
   });
 
   it("doesn't render the modal when isOpen is false", () => {
     render(<CreateEmergencyProposalModal {...defaultProps} isOpen={false} />);
-    expect(screen.queryByText("Create Emergency Upgrade Proposal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Define Emergency Proposal")).not.toBeInTheDocument();
   });
 
   it("calls onClose when the close button is clicked", () => {

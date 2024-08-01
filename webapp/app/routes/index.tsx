@@ -1,11 +1,10 @@
-import { isUserAuthorized } from "@/.server/service/authorized-users";
 import { checkConnection } from "@/.server/service/clients";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { getUserFromHeader } from "@/utils/auth-headers";
 import { clientEnv } from "@config/env.server";
-import { type ActionFunctionArgs, type LoaderFunctionArgs, json, redirect } from "@remix-run/node";
+import { type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import { useNavigate } from "@remix-run/react";
 import { useEffect } from "react";
@@ -32,11 +31,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!isUp) {
     throw redirect($path("/app/down"));
   }
-  const auth = await isUserAuthorized(parsedAddress.data);
-  if (!auth.authorized) {
-    throw redirect($path("/app/denied"));
-  }
-  return json({ status: "success", role: auth.role });
+  throw redirect($path("/app"));
 }
 
 export default function Index() {
