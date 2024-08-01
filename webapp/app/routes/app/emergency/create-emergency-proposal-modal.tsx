@@ -5,6 +5,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -24,8 +25,9 @@ import { Cross2Icon, MagnifyingGlassIcon, ResetIcon, Share2Icon } from "@radix-u
 import { useFetcher } from "@remix-run/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { isAddress } from "viem";
+import { type Hash, encodeAbiParameters, isAddress, keccak256 } from "viem";
 import { z } from "zod";
+import { StepIndicator } from "./step-indicator";
 
 export const emergencyPropSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -68,16 +70,21 @@ export function CreateEmergencyProposalModal({
   proposerAddress?: `0x${string}`;
 }) {
   const [step, setStep] = useState(1);
+  const [extId, setExtId] = useState("");
   const fetcher = useFetcher<typeof action>();
 
+  const deriveExternalId = (calls: Hash) =>
+    keccak256(encodeAbiParameters([{ type: "bytes", name: "upgradeProposal" }], [calls]));
+
+  const defaultFormValues = {
+    title: "",
+    targetAddress: "0x" as Hash,
+    calls: "0x",
+    value: "0",
+  };
   const form = useForm<EmergencyProp>({
     resolver: zodResolver(emergencyPropSchema),
-    defaultValues: {
-      title: "",
-      targetAddress: "0x",
-      calls: "0x",
-      value: "0",
-    },
+    defaultValues: defaultFormValues,
   });
 
   const handleCreate = (data: EmergencyProp) => {
@@ -85,15 +92,24 @@ export function CreateEmergencyProposalModal({
       console.log("Creating emergency proposal:", data);
       fetcher.submit({ ...data, proposer: proposerAddress ?? "" }, { method: "post" });
       onClose();
+      setStep(1);
+      form.reset(defaultFormValues);
     }
   };
 
   const handleVerify = () => {
     if (form.formState.isValid) {
       setStep(2);
+      setExtId(deriveExternalId(form.getValues("calls") as Hash));
     } else {
       form.trigger();
     }
+  };
+
+  const handleClose = () => {
+    onClose();
+    setStep(1);
+    form.reset(defaultFormValues);
   };
 
   const handleBack = () => {
@@ -106,17 +122,20 @@ export function CreateEmergencyProposalModal({
     <AlertDialog open={isOpen}>
       <AlertDialogContent className={step === 2 ? "sm:max-w-[66vw]" : "sm:max-w-[425px]"}>
         <AlertDialogHeader className="flex flex-row items-center justify-between">
-          <AlertDialogTitle>Create Emergency Upgrade Proposal</AlertDialogTitle>
-          {step === 1 && (
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-4 w-4 p-0">
-              <Cross2Icon className="h-4 w-4" />
-            </Button>
-          )}
+          <AlertDialogTitle className="mb-4 flex w-full items-center justify-between">
+            <StepIndicator currentStep={step} totalSteps={2} />
+            {step === 1 && (
+              <Button variant="ghost" size="icon" onClick={handleClose} className="h-8 w-8 p-0">
+                <Cross2Icon className="h-4 w-4" />
+              </Button>
+            )}
+          </AlertDialogTitle>
         </AlertDialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleCreate)}>
             {step === 1 ? (
               <>
+                <h3 className="mb-4 font-semibold text-lg">Define Emergency Proposal</h3>
                 <div className="grid gap-4 py-4">
                   <FormField
                     control={form.control}
@@ -199,7 +218,7 @@ export function CreateEmergencyProposalModal({
             ) : (
               <>
                 <div className="py-4">
-                  <h3 className="mb-4 font-semibold text-lg">Proposal Details</h3>
+                  <h3 className="mb-4 font-semibold text-lg">Emergency Proposal Details</h3>
                   <div className="space-y-4">
                     <div className="rounded-md bg-muted p-4">
                       <p className="mb-1 font-medium text-muted-foreground text-sm">Title</p>
@@ -218,8 +237,19 @@ export function CreateEmergencyProposalModal({
                       </ScrollArea>
                     </div>
                     <div className="rounded-md bg-muted p-4">
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">
+                        External ID (derived)
+                      </p>
+                      <p className="break-all text-sm">{extId}</p>
+                    </div>
+                    <div className="rounded-md bg-muted p-4">
                       <p className="mb-1 font-medium text-muted-foreground text-sm">Value</p>
-                      <p className="text-sm">{form.getValues("value")} eth</p>
+                      <span className="text-sm">
+                        {form.getValues("value")}{" "}
+                        <Badge variant="outline" className="font-semibold text-xs">
+                          ETH
+                        </Badge>
+                      </span>
                     </div>
                   </div>
                 </div>
