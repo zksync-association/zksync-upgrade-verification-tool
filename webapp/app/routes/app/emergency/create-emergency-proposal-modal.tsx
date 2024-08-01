@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { action } from "@/routes/app/emergency/_route";
+import type { action } from "@/routes/app/emergency/_index/_route";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { useFetcher } from "@remix-run/react";
