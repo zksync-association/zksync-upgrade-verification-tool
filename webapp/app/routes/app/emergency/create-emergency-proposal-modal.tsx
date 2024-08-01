@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Form,
   FormControl,
@@ -20,12 +21,19 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import type { action } from "@/routes/app/emergency/_index/_route";
+import { EMERGENCY_BOARD, calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Cross2Icon, MagnifyingGlassIcon, ResetIcon, Share2Icon } from "@radix-ui/react-icons";
+import {
+  ChevronDownIcon,
+  Cross2Icon,
+  MagnifyingGlassIcon,
+  ResetIcon,
+  Share2Icon,
+} from "@radix-ui/react-icons";
 import { useFetcher } from "@remix-run/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { type Hash, encodeAbiParameters, isAddress, keccak256 } from "viem";
+import { type Hash, isAddress, padHex, parseEther } from "viem";
 import { z } from "zod";
 import { StepIndicator } from "./step-indicator";
 
@@ -34,12 +42,19 @@ export const emergencyPropSchema = z.object({
   targetAddress: z.string().refine((value) => isAddress(value), {
     message: "Invalid Ethereum address",
   }),
-  calls: z
+  calldata: z
     .string()
-    .regex(/^0x[a-fA-F0-9]*$/, "Calls must be a hex string starting with 0x")
+    .regex(/^0x[a-fA-F0-9]*$/, "Calldata must be a hex string starting with 0x")
     .refine((value) => value.length % 2 === 0, {
-      message: "Calls must be valid hex-encoded bytes",
+      message: "Calldata must be valid hex-encoded bytes",
     }),
+  salt: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]*$/, "Salt must be a hex string starting with 0x")
+    .refine((value) => value.length === 66, {
+      message: "Salt must be a 32-byte hex string (64 characters)",
+    })
+    .default(padHex("0x0")),
   value: z
     .string()
     .regex(/^\d*\.?\d*$/, "Value must be a positive number")
@@ -73,14 +88,12 @@ export function CreateEmergencyProposalModal({
   const [extId, setExtId] = useState("");
   const fetcher = useFetcher<typeof action>();
 
-  const deriveExternalId = (calls: Hash) =>
-    keccak256(encodeAbiParameters([{ type: "bytes", name: "upgradeProposal" }], [calls]));
-
   const defaultFormValues = {
     title: "",
     targetAddress: "0x" as Hash,
-    calls: "0x",
+    calldata: "0x",
     value: "0",
+    salt: "0x0000000000000000000000000000000000000000000000000000000000000000",
   };
   const form = useForm<EmergencyProp>({
     resolver: zodResolver(emergencyPropSchema),
@@ -89,7 +102,6 @@ export function CreateEmergencyProposalModal({
 
   const handleCreate = (data: EmergencyProp) => {
     if (form.formState.isValid) {
-      console.log("Creating emergency proposal:", data);
       fetcher.submit({ ...data, proposer: proposerAddress ?? "" }, { method: "post" });
       onClose();
       setStep(1);
@@ -100,7 +112,18 @@ export function CreateEmergencyProposalModal({
   const handleVerify = async () => {
     if (form.formState.isValid) {
       setStep(2);
-      setExtId(deriveExternalId(form.getValues("calls") as Hash));
+      const derivedExternalId = calculateUpgradeProposalHash(
+        [
+          {
+            value: parseEther(form.getValues("value")),
+            data: form.getValues("calldata") as Hash,
+            target: form.getValues("targetAddress"),
+          },
+        ],
+        form.getValues("salt") as Hash,
+        EMERGENCY_BOARD
+      );
+      setExtId(derivedExternalId);
     } else {
       await form.trigger();
     }
@@ -171,46 +194,76 @@ export function CreateEmergencyProposalModal({
                   />
                   <FormField
                     control={form.control}
-                    name="calls"
+                    name="calldata"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Calls</FormLabel>
+                        <FormLabel>Calldata</FormLabel>
                         <FormControl>
                           <Textarea placeholder="0x..." {...field} />
                         </FormControl>
                         <FormDescription>
-                          The encoded calls to be executed on the `target` address.
+                          The calldata to be executed on the `target` address.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="value"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Value</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              placeholder="0"
-                              {...field}
-                              className="pr-12"
-                              data-testid="value-input"
-                            />
-                            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
-                              ETH
-                            </span>
-                          </div>
-                        </FormControl>
-                        <FormDescription>
-                          The amount of Ether to be sent along with the call.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <Collapsible>
+                    <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border p-2 text-sm hover:bg-muted">
+                      <span>Value (optional)</span>
+                      <ChevronDownIcon className="h-4 w-4" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2">
+                      <FormField
+                        control={form.control}
+                        name="value"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <div className="relative">
+                                <Input
+                                  placeholder="0"
+                                  {...field}
+                                  className="pr-12"
+                                  data-testid="value-input"
+                                />
+                                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
+                                  ETH
+                                </span>
+                              </div>
+                            </FormControl>
+                            <FormDescription>
+                              The amount of Ether to be sent along with the call.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
+                  <Collapsible>
+                    <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border p-2 text-sm hover:bg-muted">
+                      <span>Salt (optional)</span>
+                      <ChevronDownIcon className="h-4 w-4" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <FormField
+                        control={form.control}
+                        name="salt"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Input placeholder="0x..." {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              A bytes32 value used for creating unique upgrade proposal hashes.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
                 </div>
                 <AlertDialogFooter>
                   <Button type="button" onClick={handleVerify} data-testid="verify-button">
@@ -235,9 +288,9 @@ export function CreateEmergencyProposalModal({
                       <p className="break-all text-sm">{form.getValues("targetAddress")}</p>
                     </div>
                     <div className="rounded-md bg-muted p-4">
-                      <p className="mb-1 font-medium text-muted-foreground text-sm">Calls</p>
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">Calldata</p>
                       <ScrollArea className="h-24">
-                        <p className="break-all text-sm">{form.getValues("calls")}</p>
+                        <p className="break-all text-sm">{form.getValues("calldata")}</p>
                       </ScrollArea>
                     </div>
                     <div className="rounded-md bg-muted p-4">
@@ -245,6 +298,10 @@ export function CreateEmergencyProposalModal({
                         External ID (derived)
                       </p>
                       <p className="break-all text-sm">{extId}</p>
+                    </div>
+                    <div className="rounded-md bg-muted p-4">
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">Salt</p>
+                      <p className="break-all text-sm">{form.getValues("salt")}</p>
                     </div>
                     <div className="rounded-md bg-muted p-4">
                       <p className="mb-1 font-medium text-muted-foreground text-sm">Value</p>

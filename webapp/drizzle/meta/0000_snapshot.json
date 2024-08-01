@@ -1,5 +1,5 @@
 {
-  "id": "d086d139-e3a5-4ffd-b020-fb7da373f5ff",
+  "id": "1a0a5a36-6617-4dda-900e-f81e1b4bb9cf",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -38,8 +38,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "calls": {
-          "name": "calls",
+        "calldata": {
+          "name": "calldata",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "salt": {
+          "name": "salt",
           "type": "bytea",
           "primaryKey": false,
           "notNull": true
