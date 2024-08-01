@@ -9,10 +9,10 @@ export enum PROPOSAL_STATES {
 }
 
 export enum EMERGENCY_PROPOSAL_STATUS {
-    ACTIVE = 0,
-    READY = 1,
-    BROADCAST = 2,
-    CLOSED = 3,
+  ACTIVE = 0,
+  READY = 1,
+  BROADCAST = 2,
+  CLOSED = 3,
 }
 
 export type StatusTime = {
