@@ -16,10 +16,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import type { action } from "@/routes/app/emergency/_route";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Cross2Icon } from "@radix-ui/react-icons";
+import { Cross2Icon, MagnifyingGlassIcon, ResetIcon, Share2Icon } from "@radix-ui/react-icons";
 import { useFetcher } from "@remix-run/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -103,7 +104,7 @@ export function CreateEmergencyProposalModal({
 
   return (
     <AlertDialog open={isOpen}>
-      <AlertDialogContent className="sm:max-w-[425px]">
+      <AlertDialogContent className={step === 2 ? "sm:max-w-[66vw]" : "sm:max-w-[425px]"}>
         <AlertDialogHeader className="flex flex-row items-center justify-between">
           <AlertDialogTitle>Create Emergency Upgrade Proposal</AlertDialogTitle>
           {step === 1 && (
@@ -190,6 +191,7 @@ export function CreateEmergencyProposalModal({
                 </div>
                 <AlertDialogFooter>
                   <Button type="button" onClick={handleVerify}>
+                    <MagnifyingGlassIcon className="mr-2 h-4 w-4" />
                     Verify
                   </Button>
                 </AlertDialogFooter>
@@ -197,28 +199,39 @@ export function CreateEmergencyProposalModal({
             ) : (
               <>
                 <div className="py-4">
-                  <h3 className="mb-4 font-semibold">Proposal Details</h3>
-                  <div className="space-y-2">
-                    <p>
-                      <span className="font-medium">Title:</span> {form.getValues("title")}
-                    </p>
-                    <p>
-                      <span className="font-medium">Target Address:</span>{" "}
-                      {form.getValues("targetAddress")}
-                    </p>
-                    <p>
-                      <span className="font-medium">Calls:</span> {form.getValues("calls")}
-                    </p>
-                    <p>
-                      <span className="font-medium">Value:</span> {form.getValues("value")} eth
-                    </p>
+                  <h3 className="mb-4 font-semibold text-lg">Proposal Details</h3>
+                  <div className="space-y-4">
+                    <div className="rounded-md bg-muted p-4">
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">Title</p>
+                      <p className="text-sm">{form.getValues("title")}</p>
+                    </div>
+                    <div className="rounded-md bg-muted p-4">
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">
+                        Target Address
+                      </p>
+                      <p className="break-all text-sm">{form.getValues("targetAddress")}</p>
+                    </div>
+                    <div className="rounded-md bg-muted p-4">
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">Calls</p>
+                      <ScrollArea className="h-24">
+                        <p className="break-all text-sm">{form.getValues("calls")}</p>
+                      </ScrollArea>
+                    </div>
+                    <div className="rounded-md bg-muted p-4">
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">Value</p>
+                      <p className="text-sm">{form.getValues("value")} eth</p>
+                    </div>
                   </div>
                 </div>
                 <AlertDialogFooter>
                   <Button type="button" variant="outline" onClick={handleBack}>
+                    <ResetIcon className="mr-2 h-4 w-4" />
                     Back
                   </Button>
-                  <Button type="submit">Create</Button>
+
+                  <Button type="submit">
+                    <Share2Icon className="mr-2 h-4 w-4" /> Create
+                  </Button>
                 </AlertDialogFooter>
               </>
             )}

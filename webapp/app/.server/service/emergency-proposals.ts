@@ -2,10 +2,11 @@ import { createOrIgnoreEmergencyProposal } from "@/.server/db/dto/emergencyPropo
 import type { EmergencyProp } from "@/routes/app/emergency/create-emergency-proposal-modal";
 import { type Hash, encodeAbiParameters, keccak256, parseEther } from "viem";
 
+export const deriveExternalId = (calls: Hash) =>
+  keccak256(encodeAbiParameters([{ type: "bytes", name: "upgradeProposal" }], [calls]));
+
 export const saveEmergencyProposal = async (data: EmergencyProp) => {
-  const externalId = keccak256(
-    encodeAbiParameters([{ type: "bytes", name: "upgradeProposal" }], [data.calls as Hash])
-  );
+  const externalId = deriveExternalId(data.calls as Hash);
 
   if (!data.proposer) {
     throw new Error("Proposer is required");

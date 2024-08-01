@@ -74,7 +74,7 @@ describe("Proposal DB", () => {
     const params = createRandomEmergencyProposalParams();
     await createOrIgnoreEmergencyProposal({
       ...params,
-    })
+    });
 
     const proposal = await getProposalByExternalId(params.externalId);
     expect(proposal).toBeUndefined();
