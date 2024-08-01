@@ -33,7 +33,7 @@ import {
 import { useFetcher } from "@remix-run/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { type Hash, isAddress, padHex, parseEther } from "viem";
+import { type Hex, isAddress, padHex, parseEther } from "viem";
 import { z } from "zod";
 import { StepIndicator } from "./step-indicator";
 
@@ -90,7 +90,7 @@ export function CreateEmergencyProposalModal({
 
   const defaultFormValues = {
     title: "",
-    targetAddress: "0x" as Hash,
+    targetAddress: "0x" as Hex,
     calldata: "0x",
     value: "0",
     salt: "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -116,11 +116,11 @@ export function CreateEmergencyProposalModal({
         [
           {
             value: parseEther(form.getValues("value")),
-            data: form.getValues("calldata") as Hash,
-            target: form.getValues("targetAddress"),
+            data: form.getValues("calldata") as Hex,
+            target: form.getValues("targetAddress") as Hex,
           },
         ],
-        form.getValues("salt") as Hash,
+        form.getValues("salt") as Hex,
         EMERGENCY_BOARD
       );
       setExtId(derivedExternalId);
