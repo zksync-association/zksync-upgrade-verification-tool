@@ -97,12 +97,12 @@ export function CreateEmergencyProposalModal({
     }
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (form.formState.isValid) {
       setStep(2);
       setExtId(deriveExternalId(form.getValues("calls") as Hash));
     } else {
-      form.trigger();
+      await form.trigger();
     }
   };
 
@@ -149,7 +149,7 @@ export function CreateEmergencyProposalModal({
                         <FormDescription>
                           This is to help voters identify which proposal this is.
                         </FormDescription>
-                        <FormMessage />
+                        <FormMessage data-testid="title-error" />
                       </FormItem>
                     )}
                   />
@@ -163,7 +163,6 @@ export function CreateEmergencyProposalModal({
                           <Input placeholder="0x..." {...field} />
                         </FormControl>
                         <FormDescription>
-                          {" "}
                           The address to which the call will be made.
                         </FormDescription>
                         <FormMessage />
@@ -194,7 +193,12 @@ export function CreateEmergencyProposalModal({
                         <FormLabel>Value</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <Input placeholder="0" {...field} className="pr-12" />
+                            <Input
+                              placeholder="0"
+                              {...field}
+                              className="pr-12"
+                              data-testid="value-input"
+                            />
                             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
                               ETH
                             </span>
@@ -209,7 +213,7 @@ export function CreateEmergencyProposalModal({
                   />
                 </div>
                 <AlertDialogFooter>
-                  <Button type="button" onClick={handleVerify}>
+                  <Button type="button" onClick={handleVerify} data-testid="verify-button">
                     <MagnifyingGlassIcon className="mr-2 h-4 w-4" />
                     Verify
                   </Button>
