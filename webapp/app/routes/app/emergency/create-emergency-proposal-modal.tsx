@@ -5,6 +5,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -16,15 +17,17 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import type { action } from "@/routes/app/emergency/_index/_route";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Cross2Icon } from "@radix-ui/react-icons";
+import { Cross2Icon, MagnifyingGlassIcon, ResetIcon, Share2Icon } from "@radix-ui/react-icons";
 import { useFetcher } from "@remix-run/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { isAddress } from "viem";
+import { type Hash, encodeAbiParameters, isAddress, keccak256 } from "viem";
 import { z } from "zod";
+import { StepIndicator } from "./step-indicator";
 
 export const emergencyPropSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -67,16 +70,21 @@ export function CreateEmergencyProposalModal({
   proposerAddress?: `0x${string}`;
 }) {
   const [step, setStep] = useState(1);
+  const [extId, setExtId] = useState("");
   const fetcher = useFetcher<typeof action>();
 
+  const deriveExternalId = (calls: Hash) =>
+    keccak256(encodeAbiParameters([{ type: "bytes", name: "upgradeProposal" }], [calls]));
+
+  const defaultFormValues = {
+    title: "",
+    targetAddress: "0x" as Hash,
+    calls: "0x",
+    value: "0",
+  };
   const form = useForm<EmergencyProp>({
     resolver: zodResolver(emergencyPropSchema),
-    defaultValues: {
-      title: "",
-      targetAddress: "0x",
-      calls: "0x",
-      value: "0",
-    },
+    defaultValues: defaultFormValues,
   });
 
   const handleCreate = (data: EmergencyProp) => {
@@ -84,15 +92,24 @@ export function CreateEmergencyProposalModal({
       console.log("Creating emergency proposal:", data);
       fetcher.submit({ ...data, proposer: proposerAddress ?? "" }, { method: "post" });
       onClose();
+      setStep(1);
+      form.reset(defaultFormValues);
     }
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (form.formState.isValid) {
       setStep(2);
+      setExtId(deriveExternalId(form.getValues("calls") as Hash));
     } else {
-      form.trigger();
+      await form.trigger();
     }
+  };
+
+  const handleClose = () => {
+    onClose();
+    setStep(1);
+    form.reset(defaultFormValues);
   };
 
   const handleBack = () => {
@@ -103,19 +120,22 @@ export function CreateEmergencyProposalModal({
 
   return (
     <AlertDialog open={isOpen}>
-      <AlertDialogContent className="sm:max-w-[425px]">
+      <AlertDialogContent className={step === 2 ? "sm:max-w-[66vw]" : "sm:max-w-[425px]"}>
         <AlertDialogHeader className="flex flex-row items-center justify-between">
-          <AlertDialogTitle>Create Emergency Upgrade Proposal</AlertDialogTitle>
-          {step === 1 && (
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-4 w-4 p-0">
-              <Cross2Icon className="h-4 w-4" />
-            </Button>
-          )}
+          <AlertDialogTitle className="mb-4 flex w-full items-center justify-between">
+            <StepIndicator currentStep={step} totalSteps={2} />
+            {step === 1 && (
+              <Button variant="ghost" size="icon" onClick={handleClose} className="h-8 w-8 p-0">
+                <Cross2Icon className="h-4 w-4" />
+              </Button>
+            )}
+          </AlertDialogTitle>
         </AlertDialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleCreate)}>
             {step === 1 ? (
               <>
+                <h3 className="mb-4 font-semibold text-lg">Define Emergency Proposal</h3>
                 <div className="grid gap-4 py-4">
                   <FormField
                     control={form.control}
@@ -129,7 +149,7 @@ export function CreateEmergencyProposalModal({
                         <FormDescription>
                           This is to help voters identify which proposal this is.
                         </FormDescription>
-                        <FormMessage />
+                        <FormMessage data-testid="title-error" />
                       </FormItem>
                     )}
                   />
@@ -143,7 +163,6 @@ export function CreateEmergencyProposalModal({
                           <Input placeholder="0x..." {...field} />
                         </FormControl>
                         <FormDescription>
-                          {" "}
                           The address to which the call will be made.
                         </FormDescription>
                         <FormMessage />
@@ -174,7 +193,12 @@ export function CreateEmergencyProposalModal({
                         <FormLabel>Value</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <Input placeholder="0" {...field} className="pr-12" />
+                            <Input
+                              placeholder="0"
+                              {...field}
+                              className="pr-12"
+                              data-testid="value-input"
+                            />
                             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
                               ETH
                             </span>
@@ -189,7 +213,8 @@ export function CreateEmergencyProposalModal({
                   />
                 </div>
                 <AlertDialogFooter>
-                  <Button type="button" onClick={handleVerify}>
+                  <Button type="button" onClick={handleVerify} data-testid="verify-button">
+                    <MagnifyingGlassIcon className="mr-2 h-4 w-4" />
                     Verify
                   </Button>
                 </AlertDialogFooter>
@@ -197,28 +222,50 @@ export function CreateEmergencyProposalModal({
             ) : (
               <>
                 <div className="py-4">
-                  <h3 className="mb-4 font-semibold">Proposal Details</h3>
-                  <div className="space-y-2">
-                    <p>
-                      <span className="font-medium">Title:</span> {form.getValues("title")}
-                    </p>
-                    <p>
-                      <span className="font-medium">Target Address:</span>{" "}
-                      {form.getValues("targetAddress")}
-                    </p>
-                    <p>
-                      <span className="font-medium">Calls:</span> {form.getValues("calls")}
-                    </p>
-                    <p>
-                      <span className="font-medium">Value:</span> {form.getValues("value")} eth
-                    </p>
+                  <h3 className="mb-4 font-semibold text-lg">Emergency Proposal Details</h3>
+                  <div className="space-y-4">
+                    <div className="rounded-md bg-muted p-4">
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">Title</p>
+                      <p className="text-sm">{form.getValues("title")}</p>
+                    </div>
+                    <div className="rounded-md bg-muted p-4">
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">
+                        Target Address
+                      </p>
+                      <p className="break-all text-sm">{form.getValues("targetAddress")}</p>
+                    </div>
+                    <div className="rounded-md bg-muted p-4">
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">Calls</p>
+                      <ScrollArea className="h-24">
+                        <p className="break-all text-sm">{form.getValues("calls")}</p>
+                      </ScrollArea>
+                    </div>
+                    <div className="rounded-md bg-muted p-4">
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">
+                        External ID (derived)
+                      </p>
+                      <p className="break-all text-sm">{extId}</p>
+                    </div>
+                    <div className="rounded-md bg-muted p-4">
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">Value</p>
+                      <span className="text-sm">
+                        {form.getValues("value")}{" "}
+                        <Badge variant="outline" className="font-semibold text-xs">
+                          ETH
+                        </Badge>
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <AlertDialogFooter>
                   <Button type="button" variant="outline" onClick={handleBack}>
+                    <ResetIcon className="mr-2 h-4 w-4" />
                     Back
                   </Button>
-                  <Button type="submit">Create</Button>
+
+                  <Button type="submit">
+                    <Share2Icon className="mr-2 h-4 w-4" /> Create
+                  </Button>
                 </AlertDialogFooter>
               </>
             )}
