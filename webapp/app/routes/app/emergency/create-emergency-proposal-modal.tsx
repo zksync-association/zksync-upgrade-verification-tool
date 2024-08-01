@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Form,
   FormControl,
@@ -22,7 +23,13 @@ import { Textarea } from "@/components/ui/textarea";
 import type { action } from "@/routes/app/emergency/_route";
 import { EMERGENCY_BOARD, calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Cross2Icon, MagnifyingGlassIcon, ResetIcon, Share2Icon } from "@radix-ui/react-icons";
+import {
+  ChevronDownIcon,
+  Cross2Icon,
+  MagnifyingGlassIcon,
+  ResetIcon,
+  Share2Icon,
+} from "@radix-ui/react-icons";
 import { useFetcher } from "@remix-run/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -227,22 +234,29 @@ export function CreateEmergencyProposalModal({
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="salt"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Salt</FormLabel>
-                        <FormControl>
-                          <Input placeholder="0x..." {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          A bytes32 value used for creating unique upgrade proposal hashes.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <Collapsible>
+                    <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border p-2 text-sm hover:bg-muted">
+                      <span>Salt (optional)</span>
+                      <ChevronDownIcon className="h-4 w-4" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <FormField
+                        control={form.control}
+                        name="salt"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Input placeholder="0x..." {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              A bytes32 value used for creating unique upgrade proposal hashes.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
                 </div>
                 <AlertDialogFooter>
                   <Button type="button" onClick={handleVerify} data-testid="verify-button">
