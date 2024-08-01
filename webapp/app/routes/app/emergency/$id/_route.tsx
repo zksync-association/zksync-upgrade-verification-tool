@@ -103,7 +103,7 @@ export default function EmergencyUpgradeDetails() {
 
   const actionName = ACTION_NAMES[user.role];
   const GUARDIAN_THRESHOLD = 5;
-  const SC_THRESHOLD = 6;
+  const SC_THRESHOLD = 9;
   const haveAlreadySigned = signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
   const gatheredScSignatures = signatures.filter((sig) => {
     return allSecurityCouncil.some((addr) => isAddressEqual(addr, sig.signer));
