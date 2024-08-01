@@ -3,6 +3,14 @@ import { saveEmergencyProposal } from "@/.server/service/emergency-proposals";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   CreateEmergencyProposalModal,
   emergencyPropSchema,
 } from "@/routes/app/emergency/create-emergency-proposal-modal";
@@ -19,7 +27,7 @@ export async function loader() {
   console.log("calling loader");
   const emergencyProposals = await getAllEmergencyProposals();
 
- console.dir(emergencyProposals);
+  console.dir(emergencyProposals);
   return json({
     activeEmergencyProposals: emergencyProposals.filter(({ status }) => status === "ACTIVE"),
     inactiveEmergencyProposals: emergencyProposals.filter(
@@ -54,20 +62,55 @@ export default function Index() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col space-y-4">
-            {activeEmergencyProposals.map((ep) => (
-              <Link key={ep.id} className="flex" to={$path("/app/proposals/:id", { id: ep.id })}>
-                <Button className="flex flex-1 justify-between pr-4" variant="outline">
-                  <span />
-                  <span>{ep.id}</span>
-                  <ArrowRight />
-                </Button>
-              </Link>
-            ))}
-            {activeEmergencyProposals.length === 0 && (
-              <div className="text-center text-gray-500">No active emergency proposals found.</div>
-            )}
-          </div>
+          {activeEmergencyProposals.length === 0 ? (
+            <div className="text-center text-gray-500">No active emergency proposals found.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">ID</TableHead>
+                    <TableHead className="w-[40%]">Title</TableHead>
+                    <TableHead className="w-32">Proposer</TableHead>
+                    <TableHead className="w-32">Proposed On</TableHead>
+                    <TableHead className="w-20" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activeEmergencyProposals.map((ep) => (
+                    <TableRow key={ep.id}>
+                      <TableCell>{ep.id}</TableCell>
+                      <TableCell className="max-w-0">
+                        <div className="truncate">{ep.title}</div>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <div className="truncate">{ep.proposer}</div>
+                      </TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">
+                        {new Date(ep.proposedOn).toLocaleString("en-US", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                          timeZoneName: "short",
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <Link to={$path("/app/proposals/:id", { id: ep.id })}>
+                          <Button variant="outline" size="sm">
+                            View
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
       <Card className="pb-10">
@@ -75,19 +118,54 @@ export default function Index() {
           <CardTitle>Inactive Emergency Proposals</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col space-y-4">
-            {inactiveEmergencyProposals.map((ep) => (
-              <Link key={ep.id} className="flex" to={$path("/app/proposals/:id", { id: ep.id })}>
-                <Button className="flex flex-1 justify-between pr-4" variant="outline">
-                  <span />
-                  <span>{ep.id}</span>
-                  <ArrowRight />
-                </Button>
-              </Link>
-            ))}
-          </div>
-          {inactiveEmergencyProposals.length === 0 && (
+          {inactiveEmergencyProposals.length === 0 ? (
             <div className="text-center text-gray-500">No inactive emergency proposals found.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">ID</TableHead>
+                    <TableHead className="w-[40%]">Title</TableHead>
+                    <TableHead className="w-32">Proposer</TableHead>
+                    <TableHead className="w-32">Proposed On</TableHead>
+                    <TableHead className="w-20" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inactiveEmergencyProposals.map((ep) => (
+                    <TableRow key={ep.id}>
+                      <TableCell>{ep.id}</TableCell>
+                      <TableCell className="max-w-0">
+                        <div className="truncate">{ep.title}</div>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <div className="truncate">{ep.proposer}</div>
+                      </TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">
+                        {new Date(ep.proposedOn).toLocaleString("en-US", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                          timeZoneName: "short",
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <Link to={$path("/app/proposals/:id", { id: ep.id })}>
+                          <Button variant="outline" size="sm">
+                            View
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
