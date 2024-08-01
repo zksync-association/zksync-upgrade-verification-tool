@@ -1,12 +1,14 @@
 CREATE TABLE IF NOT EXISTS "emergency_proposals" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"external_id" "bytea" NOT NULL,
-	"calls" "bytea" NOT NULL,
-	"check_report" json,
-	"storage_diff_report" json,
 	"proposed_on" timestamp with time zone NOT NULL,
+	"external_id" "bytea" NOT NULL,
+	"title" text NOT NULL,
+	"target_address" "bytea" NOT NULL,
+	"calls" "bytea" NOT NULL,
+	"value" bigint NOT NULL,
 	"proposer" "bytea" NOT NULL,
-	"transaction_hash" "bytea" NOT NULL,
+	"storage_diff_report" json,
+	"check_report" json,
 	CONSTRAINT "emergency_proposals_external_id_unique" UNIQUE("external_id")
 );
 --> statement-breakpoint

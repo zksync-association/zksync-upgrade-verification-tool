@@ -1,13 +1,19 @@
+import { saveEmergencyProposal } from "@/.server/service/emergency-proposals";
 import { type Proposal, getProposals } from "@/.server/service/proposals";
-import { CreateEmergencyProposalModal } from "@/components/create-emergency-proposal-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  CreateEmergencyProposalModal,
+  emergencyPropSchema,
+} from "@/routes/app/emergency/create-emergency-proposal-modal";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { PlusIcon } from "@radix-ui/react-icons";
-import { Link, json, useLoaderData } from "@remix-run/react";
+import type { ActionFunctionArgs } from "@remix-run/node";
+import { Form, Link, json, useActionData, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { $path } from "remix-routes";
+import { useAccount } from "wagmi";
 
 const isProposalActive = (p: Proposal) =>
   p.state !== PROPOSAL_STATES.Expired && p.state !== PROPOSAL_STATES.Done;
@@ -21,9 +27,19 @@ export async function loader() {
   });
 }
 
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const data = Object.fromEntries(formData);
+  const parsedData = emergencyPropSchema.parse(data);
+  await saveEmergencyProposal(parsedData);
+  return json({ status: "success", errors: {}, data: parsedData });
+}
+
 export default function Index() {
   const { activeProposals, inactiveProposals } = useLoaderData<typeof loader>();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const actionData = useActionData<typeof action>();
+  const { address } = useAccount();
 
   return (
     <div className="mt-10 space-y-4">
@@ -82,7 +98,15 @@ export default function Index() {
           )}
         </CardContent>
       </Card>
-      <CreateEmergencyProposalModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <Form method="post">
+        <CreateEmergencyProposalModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          errors={actionData?.errors as object}
+          status={actionData?.status}
+          proposerAddress={address}
+        />
+      </Form>
     </div>
   );
 }
