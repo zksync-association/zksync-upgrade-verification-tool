@@ -35,11 +35,11 @@ jobs:
           cache: "pnpm"
       - run: pnpm install
       - run: pnpm test:ci
-      - name: Coverage
-        uses: romeovs/lcov-reporter-action@v0.3.1
-        with:
-          lcov-file: ./cli/coverage/lcov.info
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+#      - name: Coverage
+#        uses: romeovs/lcov-reporter-action@v0.3.1
+#        with:
+#          lcov-file: ./cli/coverage/lcov.info
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   webapp-start:
     runs-on: ubuntu-latest
