@@ -46,7 +46,11 @@ export async function loader(args: LoaderFunctionArgs) {
   const signatures = await getSignaturesByEmergencyProposalId(proposal.externalId);
 
   return json({
-    proposal: proposal,
+    proposal: {
+      title: proposal?.title,
+      externalId: proposal.externalId,
+      proposedOn: proposal.proposedOn
+    },
     addresses: {
       emergencyBoard: boardAddress,
       zkFoundation: await zkFoundationAddress(),
@@ -92,13 +96,14 @@ const ACTION_NAMES = {
 export default function EmergencyUpgradeDetails() {
   const navigate = useNavigate();
 
-  const loaderData = useLoaderData<typeof loader>();
-  const user = loaderData.user;
-  const proposal = loaderData.proposal;
-  const addresses = loaderData.addresses;
-  const signatures = loaderData.signatures;
-  const allSecurityCouncil = loaderData.allSecurityCouncil;
-  const allGuardians = loaderData.allGuardians;
+  const {
+    user,
+    proposal,
+    addresses,
+    signatures,
+    allSecurityCouncil,
+    allGuardians
+  } = useLoaderData<typeof loader>();
 
   if (user.role === "visitor") {
     return "Unauthorized: Only valid signers can see this page.";
@@ -152,9 +157,15 @@ export default function EmergencyUpgradeDetails() {
               {/*  <span className="w-1/2 break-words text-right">new version</span>*/}
               {/*</div>*/}
               <div className="flex justify-between">
+                <span>Title:</span>
+                <span className="w-4/5 justify-end break-words text-right">
+                  {proposal.title}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span>Proposal ID:</span>
                 <span className="w-4/5 justify-end break-words text-right">
-                  {loaderData.proposal.externalId}
+                  {proposal.externalId}
                 </span>
               </div>
               <div className="flex justify-between">
