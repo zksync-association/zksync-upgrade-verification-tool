@@ -50,7 +50,7 @@ describe("CreateEmergencyProposalModal", () => {
     render(<CreateEmergencyProposalModal {...defaultProps} />);
     expect(screen.getByLabelText("Title")).toBeInTheDocument();
     expect(screen.getByLabelText("Target address")).toBeInTheDocument();
-    expect(screen.getByLabelText("Calls")).toBeInTheDocument();
+    expect(screen.getByLabelText("Calldata")).toBeInTheDocument();
     expect(screen.getByTestId("value-input")).toBeInTheDocument();
   });
 

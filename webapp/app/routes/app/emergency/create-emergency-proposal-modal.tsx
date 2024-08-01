@@ -20,12 +20,13 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import type { action } from "@/routes/app/emergency/_route";
+import { EMERGENCY_BOARD, calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Cross2Icon, MagnifyingGlassIcon, ResetIcon, Share2Icon } from "@radix-ui/react-icons";
 import { useFetcher } from "@remix-run/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { type Hash, encodeAbiParameters, isAddress, keccak256 } from "viem";
+import { type Hash, isAddress, padHex, parseEther } from "viem";
 import { z } from "zod";
 import { StepIndicator } from "./step-indicator";
 
@@ -34,12 +35,19 @@ export const emergencyPropSchema = z.object({
   targetAddress: z.string().refine((value) => isAddress(value), {
     message: "Invalid Ethereum address",
   }),
-  calls: z
+  calldata: z
     .string()
-    .regex(/^0x[a-fA-F0-9]*$/, "Calls must be a hex string starting with 0x")
+    .regex(/^0x[a-fA-F0-9]*$/, "Calldata must be a hex string starting with 0x")
     .refine((value) => value.length % 2 === 0, {
-      message: "Calls must be valid hex-encoded bytes",
+      message: "Calldata must be valid hex-encoded bytes",
     }),
+  salt: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]*$/, "Salt must be a hex string starting with 0x")
+    .refine((value) => value.length === 66, {
+      message: "Salt must be a 32-byte hex string (64 characters)",
+    })
+    .default(padHex("0x0")),
   value: z
     .string()
     .regex(/^\d*\.?\d*$/, "Value must be a positive number")
@@ -73,14 +81,12 @@ export function CreateEmergencyProposalModal({
   const [extId, setExtId] = useState("");
   const fetcher = useFetcher<typeof action>();
 
-  const deriveExternalId = (calls: Hash) =>
-    keccak256(encodeAbiParameters([{ type: "bytes", name: "upgradeProposal" }], [calls]));
-
   const defaultFormValues = {
     title: "",
     targetAddress: "0x" as Hash,
-    calls: "0x",
+    calldata: "0x",
     value: "0",
+    salt: "0x0000000000000000000000000000000000000000000000000000000000000000",
   };
   const form = useForm<EmergencyProp>({
     resolver: zodResolver(emergencyPropSchema),
@@ -89,7 +95,6 @@ export function CreateEmergencyProposalModal({
 
   const handleCreate = (data: EmergencyProp) => {
     if (form.formState.isValid) {
-      console.log("Creating emergency proposal:", data);
       fetcher.submit({ ...data, proposer: proposerAddress ?? "" }, { method: "post" });
       onClose();
       setStep(1);
@@ -100,7 +105,18 @@ export function CreateEmergencyProposalModal({
   const handleVerify = async () => {
     if (form.formState.isValid) {
       setStep(2);
-      setExtId(deriveExternalId(form.getValues("calls") as Hash));
+      const derivedExternalId = calculateUpgradeProposalHash(
+        [
+          {
+            value: parseEther(form.getValues("value")),
+            data: form.getValues("calldata") as Hash,
+            target: form.getValues("targetAddress"),
+          },
+        ],
+        form.getValues("salt") as Hash,
+        EMERGENCY_BOARD
+      );
+      setExtId(derivedExternalId);
     } else {
       await form.trigger();
     }
@@ -171,15 +187,15 @@ export function CreateEmergencyProposalModal({
                   />
                   <FormField
                     control={form.control}
-                    name="calls"
+                    name="calldata"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Calls</FormLabel>
+                        <FormLabel>Calldata</FormLabel>
                         <FormControl>
                           <Textarea placeholder="0x..." {...field} />
                         </FormControl>
                         <FormDescription>
-                          The encoded calls to be executed on the `target` address.
+                          The calldata to be executed on the `target` address.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -211,6 +227,22 @@ export function CreateEmergencyProposalModal({
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name="salt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Salt</FormLabel>
+                        <FormControl>
+                          <Input placeholder="0x..." {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          A bytes32 value used for creating unique upgrade proposal hashes.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
                 <AlertDialogFooter>
                   <Button type="button" onClick={handleVerify} data-testid="verify-button">
@@ -235,9 +267,9 @@ export function CreateEmergencyProposalModal({
                       <p className="break-all text-sm">{form.getValues("targetAddress")}</p>
                     </div>
                     <div className="rounded-md bg-muted p-4">
-                      <p className="mb-1 font-medium text-muted-foreground text-sm">Calls</p>
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">Calldata</p>
                       <ScrollArea className="h-24">
-                        <p className="break-all text-sm">{form.getValues("calls")}</p>
+                        <p className="break-all text-sm">{form.getValues("calldata")}</p>
                       </ScrollArea>
                     </div>
                     <div className="rounded-md bg-muted p-4">
@@ -245,6 +277,10 @@ export function CreateEmergencyProposalModal({
                         External ID (derived)
                       </p>
                       <p className="break-all text-sm">{extId}</p>
+                    </div>
+                    <div className="rounded-md bg-muted p-4">
+                      <p className="mb-1 font-medium text-muted-foreground text-sm">Salt</p>
+                      <p className="break-all text-sm">{form.getValues("salt")}</p>
                     </div>
                     <div className="rounded-md bg-muted p-4">
                       <p className="mb-1 font-medium text-muted-foreground text-sm">Value</p>
