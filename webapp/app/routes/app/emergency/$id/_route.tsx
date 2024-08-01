@@ -1,6 +1,4 @@
-import {
-  getEmergencyProposalByExternalId,
-} from "@/.server/db/dto/emergencyProposals";
+import { getEmergencyProposalByExternalId } from "@/.server/db/dto/emergencyProposals";
 import { getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures";
 import { actionSchema } from "@/.server/db/schema";
 import {
@@ -49,7 +47,7 @@ export async function loader(args: LoaderFunctionArgs) {
     proposal: {
       title: proposal?.title,
       externalId: proposal.externalId,
-      proposedOn: proposal.proposedOn
+      proposedOn: proposal.proposedOn,
     },
     addresses: {
       emergencyBoard: boardAddress,
@@ -96,14 +94,8 @@ const ACTION_NAMES = {
 export default function EmergencyUpgradeDetails() {
   const navigate = useNavigate();
 
-  const {
-    user,
-    proposal,
-    addresses,
-    signatures,
-    allSecurityCouncil,
-    allGuardians
-  } = useLoaderData<typeof loader>();
+  const { user, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
+    useLoaderData<typeof loader>();
 
   if (user.role === "visitor") {
     return "Unauthorized: Only valid signers can see this page.";
@@ -158,9 +150,7 @@ export default function EmergencyUpgradeDetails() {
               {/*</div>*/}
               <div className="flex justify-between">
                 <span>Title:</span>
-                <span className="w-4/5 justify-end break-words text-right">
-                  {proposal.title}
-                </span>
+                <span className="w-4/5 justify-end break-words text-right">{proposal.title}</span>
               </div>
               <div className="flex justify-between">
                 <span>Proposal ID:</span>
