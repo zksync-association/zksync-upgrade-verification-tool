@@ -49,7 +49,6 @@ export default function Index() {
   const { activeEmergencyProposals, inactiveEmergencyProposals, emergencyBoardAddress } =
     useLoaderData<typeof loader>();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const actionData = useActionData<typeof action>();
   const { address } = useAccount();
 
   return (
