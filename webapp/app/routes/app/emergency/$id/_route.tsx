@@ -13,9 +13,13 @@ import { StatusIndicator } from "@/components/status-indicator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExecuteEmergencyUpgradeButton } from "@/routes/app/emergency/$id/execute-emergency-upgrade-button";
-import { displayBytes32 } from "@/routes/app/proposals/$id/common-tables";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import { requireUserFromHeader } from "@/utils/auth-headers";
+import {
+  GUARDIANS_COUNCIL_THRESHOLD,
+  SEC_COUNCIL_THRESHOLD,
+  ZK_FOUNDATION_THRESHOLD,
+} from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
@@ -54,7 +58,7 @@ export async function loader(args: LoaderFunctionArgs) {
       targetAddress: proposal.targetAddress,
       salt: proposal.salt,
       value: proposal.value.toString(),
-      status: proposal.status
+      status: proposal.status,
     },
     addresses: {
       emergencyBoard: boardAddress,
@@ -124,8 +128,6 @@ export default function EmergencyUpgradeDetails() {
   }
 
   const actionName = actionForRole(user.role);
-  const GUARDIAN_THRESHOLD = 5;
-  const SC_THRESHOLD = 9;
   const haveAlreadySigned = signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
   const gatheredScSignatures = signatures.filter((sig) => {
     return allSecurityCouncil.some((addr) => isAddressEqual(addr, sig.signer));
@@ -133,7 +135,6 @@ export default function EmergencyUpgradeDetails() {
   const gatheredGuardianSignatures = signatures.filter((sig) => {
     return allGuardians.some((addr) => isAddressEqual(addr, sig.signer));
   }).length;
-  const ZK_FOUNDATION_THRESHOLD = 1;
   const gatheredZkFoundationSignatures = signatures.filter((s) =>
     isAddressEqual(s.signer, addresses.zkFoundation)
   ).length;
@@ -149,10 +150,7 @@ export default function EmergencyUpgradeDetails() {
           >
             <ArrowLeft />
           </Button>
-          <h2 className="font-semibold">
-            Proposal{" "}
-            {displayBytes32("0x967063a9ce441cdbf1ac4262f9d8152b96c6080144a1d5cb7b058dea70d01d02")}
-          </h2>
+          <h2 className="font-semibold">Proposal {proposal.externalId}</h2>
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -199,12 +197,12 @@ export default function EmergencyUpgradeDetails() {
               <StatusIndicator
                 label="Security Council Approvals"
                 signatures={gatheredScSignatures}
-                necessarySignatures={SC_THRESHOLD}
+                necessarySignatures={SEC_COUNCIL_THRESHOLD}
               />
               <StatusIndicator
                 label="Guardian Approvals"
                 signatures={gatheredGuardianSignatures}
-                necessarySignatures={GUARDIAN_THRESHOLD}
+                necessarySignatures={GUARDIANS_COUNCIL_THRESHOLD}
               />
               <StatusIndicator
                 label="ZkFoundation approvals"
@@ -240,7 +238,7 @@ export default function EmergencyUpgradeDetails() {
           <CardContent className="flex flex-col space-y-3">
             <ExecuteEmergencyUpgradeButton
               boardAddress={addresses.emergencyBoard}
-              signatures={signatures}
+              gatheredSignatures={signatures}
               allGuardians={allGuardians}
               allCouncil={allSecurityCouncil}
               zkFoundationAddress={addresses.zkFoundation}

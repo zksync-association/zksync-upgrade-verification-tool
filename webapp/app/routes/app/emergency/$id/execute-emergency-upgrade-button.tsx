@@ -1,29 +1,23 @@
+import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { Button } from "@/components/ui/button";
 import { ALL_ABIS } from "@/utils/raw-abis";
+import { type BasicProposal, type BasicSignature, classifySignatures } from "@/utils/signatures";
 import type React from "react";
 import { toast } from "react-hot-toast";
-import { type Hex, encodeAbiParameters, hexToBigInt, isAddressEqual } from "viem";
+import { type Hex, encodeAbiParameters } from "viem";
 import { useWriteContract } from "wagmi";
-
-type Signature = { signer: Hex; signature: Hex };
-type Proposal = {
-  calldata: Hex;
-  targetAddress: Hex;
-  salt: Hex;
-  value: string;
-};
 
 export type ExecuteEmergencyUpgradeButtonProps = {
   children?: React.ReactNode;
   boardAddress: Hex;
-  signatures: Signature[];
+  gatheredSignatures: BasicSignature[];
   allGuardians: Hex[];
   allCouncil: Hex[];
   zkFoundationAddress: Hex;
-  proposal: Proposal;
+  proposal: BasicProposal;
 };
 
-function encodeSignatures(signatures: Signature[]): Hex {
+function encodeSignatures(signatures: BasicSignature[]): Hex {
   return encodeAbiParameters(
     [
       { name: "addresses", type: "address[]" },
@@ -36,7 +30,7 @@ function encodeSignatures(signatures: Signature[]): Hex {
 export function ExecuteEmergencyUpgradeButton({
   children,
   boardAddress,
-  signatures,
+  gatheredSignatures,
   allGuardians,
   allCouncil,
   zkFoundationAddress,
@@ -44,24 +38,13 @@ export function ExecuteEmergencyUpgradeButton({
 }: ExecuteEmergencyUpgradeButtonProps) {
   const { writeContract, isPending } = useWriteContract();
 
-  const guardianSignatures = signatures
-    .filter((s) => allGuardians.some((member) => isAddressEqual(s.signer, member)))
-    .sort((a, b) => Number(hexToBigInt(a.signer) - hexToBigInt(b.signer)));
+  const {
+    guardians: guardianSignatures,
+    council: councilSignatures,
+    foundation: zkFoundationSignature,
+  } = classifySignatures(allGuardians, allCouncil, zkFoundationAddress, gatheredSignatures);
 
-  const councilSignatures = signatures
-    .filter((s) => allCouncil.some((member) => isAddressEqual(s.signer, member)))
-    .sort((a, b) => Number(hexToBigInt(a.signer) - hexToBigInt(b.signer)));
-
-  const zkFoundationSignature = signatures.find((s) =>
-    isAddressEqual(s.signer, zkFoundationAddress)
-  );
-
-  const enabled =
-    guardianSignatures.length >= 5 &&
-    councilSignatures.length >= 9 &&
-    zkFoundationSignature !== undefined;
-
-  const abi = ALL_ABIS.emergencyBoard;
+  const enabled = proposal.status === emergencyProposalStatusSchema.enum.READY;
 
   const onClick = () => {
     if (!zkFoundationSignature) {
@@ -69,10 +52,9 @@ export function ExecuteEmergencyUpgradeButton({
     }
 
     toast.loading("Broadcasting transaction...", { id: "exec-emergency-upgrade" });
-
     writeContract(
       {
-        abi,
+        abi: ALL_ABIS.emergencyBoard,
         functionName: "executeEmergencyUpgrade",
         args: [
           [

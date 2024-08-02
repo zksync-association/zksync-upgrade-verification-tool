@@ -1,8 +1,18 @@
 import { bytea } from "@/.server/db/custom-types";
-import { sql } from "drizzle-orm";
-import { bigint, check, index, json, pgTable, serial, text, timestamp, unique, } from "drizzle-orm/pg-core";
-import { z } from "zod";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
+import { sql } from "drizzle-orm";
+import {
+  bigint,
+  check,
+  index,
+  json,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core";
+import { z } from "zod";
 
 export const proposalsTable = pgTable(
   "proposals",

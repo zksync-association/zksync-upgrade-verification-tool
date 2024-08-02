@@ -1,4 +1,3 @@
-import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -77,7 +76,7 @@ export function CreateEmergencyProposalModal({
   isOpen,
   onClose,
   proposerAddress,
-  emergencyBoardAddress
+  emergencyBoardAddress,
 }: {
   isOpen: boolean;
   onClose: () => void;

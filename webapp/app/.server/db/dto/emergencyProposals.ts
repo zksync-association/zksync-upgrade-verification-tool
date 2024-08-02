@@ -15,7 +15,10 @@ export async function getAllEmergencyProposals() {
   return db.select().from(emergencyProposalsTable);
 }
 
-export async function getEmergencyProposalByExternalId(externalId: Hex, { tx }: { tx?: typeof db } = {}) {
+export async function getEmergencyProposalByExternalId(
+  externalId: Hex,
+  { tx }: { tx?: typeof db } = {}
+) {
   return getFirst(
     await (tx ?? db)
       .select()

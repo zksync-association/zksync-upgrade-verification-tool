@@ -1,27 +1,31 @@
 import { db } from "@/.server/db";
-import { createOrIgnoreSignature, getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures";
 import {
-  type Action,
-  type actionSchema,
-  emergencyProposalStatusSchema,
-  signaturesTable
-} from "@/.server/db/schema";
+  getEmergencyProposalByExternalId,
+  updateEmergencyProposal,
+} from "@/.server/db/dto/emergencyProposals";
+import {
+  createOrIgnoreSignature,
+  getSignaturesByEmergencyProposalId,
+} from "@/.server/db/dto/signatures";
+import { type Action, type actionSchema, signaturesTable } from "@/.server/db/schema";
 import {
   councilAddress,
   councilMembers,
   emergencyBoardAddress,
   guardianMembers,
   guardiansAddress,
+  zkFoundationAddress,
 } from "@/.server/service/authorized-users";
 import { l1Rpc } from "@/.server/service/clients";
 import { guardiansAbi } from "@/.server/service/contract-abis";
+import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { badRequest, notFound } from "@/utils/http";
+import { classifySignatures } from "@/utils/signatures";
 import { env } from "@config/env.server";
 import { and, asc, eq } from "drizzle-orm";
 import { type Hex, hashTypedData } from "viem";
 import { mainnet, sepolia } from "wagmi/chains";
 import { z } from "zod";
-import { getEmergencyProposalByExternalId } from "@/.server/db/dto/emergencyProposals";
 
 type ProposalAction = z.infer<typeof actionSchema>;
 
@@ -108,15 +112,15 @@ export async function saveEmergencySignature(
     // TODO: How do we verify this signatures?
   }
 
-  await db.transaction(async sqltx => {
-    const proposal = await getEmergencyProposalByExternalId(emergencyProposalId, { tx: sqltx })
+  await db.transaction(async (sqltx) => {
+    const proposal = await getEmergencyProposalByExternalId(emergencyProposalId, { tx: sqltx });
 
     if (!proposal) {
-      throw notFound()
+      throw notFound();
     }
 
     if (proposal.status !== emergencyProposalStatusSchema.enum.ACTIVE) {
-      throw badRequest("Proposal is not accepting more signatures")
+      throw badRequest("Proposal is not accepting more signatures");
     }
 
     const dto = {
@@ -126,17 +130,32 @@ export async function saveEmergencySignature(
       signer,
     };
 
+    const guardians = await guardianMembers();
+    const council = await councilMembers();
+    const foundation = await zkFoundationAddress();
+
+    const oldSignatures = await getSignaturesByEmergencyProposalId(emergencyProposalId, {
+      tx: sqltx,
+    });
+    const allSignatures = [...oldSignatures, dto];
+
+    const {
+      guardians: guardianSignatures,
+      council: councilSignatures,
+      foundation: foundationSignature,
+    } = classifySignatures(guardians, council, foundation, allSignatures);
+
+    if (
+      guardianSignatures.length >= 5 &&
+      councilSignatures.length >= 9 &&
+      foundationSignature !== undefined
+    ) {
+      proposal.status = emergencyProposalStatusSchema.enum.READY;
+      await updateEmergencyProposal(proposal);
+    }
+
     await createOrIgnoreSignature(dto);
-  })
-
-  const dto = {
-    action,
-    signature,
-    emergencyProposal: emergencyProposalId,
-    signer,
-  };
-
-  await createOrIgnoreSignature(dto);
+  });
 }
 
 export async function validateAndSaveSignature(

@@ -1,5 +1,7 @@
 import { getAllEmergencyProposals } from "@/.server/db/dto/emergencyProposals";
+import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import { saveEmergencyProposal } from "@/.server/service/emergency-proposals";
+import type { EmergencyProposalStatus } from "@/common/proposal-status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -21,8 +23,6 @@ import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { $path } from "remix-routes";
 import { useAccount } from "wagmi";
-import { emergencyBoardAddress } from "@/.server/service/authorized-users";
-import { EmergencyProposalStatus } from "@/common/proposal-status";
 
 export async function loader() {
   const emergencyProposals = await getAllEmergencyProposals();
@@ -33,7 +33,7 @@ export async function loader() {
     inactiveEmergencyProposals: emergencyProposals.filter(
       ({ status }) => status === "CLOSED" || status === "BROADCAST"
     ),
-    emergencyBoardAddress: await emergencyBoardAddress()
+    emergencyBoardAddress: await emergencyBoardAddress(),
   });
 }
 
@@ -46,7 +46,8 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Index() {
-  const { activeEmergencyProposals, inactiveEmergencyProposals, emergencyBoardAddress } = useLoaderData<typeof loader>();
+  const { activeEmergencyProposals, inactiveEmergencyProposals, emergencyBoardAddress } =
+    useLoaderData<typeof loader>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const actionData = useActionData<typeof action>();
   const { address } = useAccount();
