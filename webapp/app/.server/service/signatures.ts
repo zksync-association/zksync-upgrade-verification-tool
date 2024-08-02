@@ -19,14 +19,14 @@ import {
 import { l1Rpc } from "@/.server/service/clients";
 import { guardiansAbi } from "@/.server/service/contract-abis";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
+import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
-import { BasicSignature, classifySignatures } from "@/utils/signatures";
+import { type BasicSignature, classifySignatures } from "@/utils/signatures";
 import { env } from "@config/env.server";
 import { and, asc, eq } from "drizzle-orm";
 import { type Hex, hashTypedData } from "viem";
 import { mainnet, sepolia } from "wagmi/chains";
 import { z } from "zod";
-import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 
 type ProposalAction = z.infer<typeof actionSchema>;
 
@@ -113,7 +113,7 @@ export async function saveEmergencySignature(
     // TODO: How do we verify ths signatures?
   }
 
-  async function shouldMarkProposalAsReady (allSignatures: BasicSignature[]): Promise<boolean> {
+  async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
     const guardians = await guardianMembers();
     const council = await councilMembers();
     const foundation = await zkFoundationAddress();
@@ -124,11 +124,12 @@ export async function saveEmergencySignature(
       foundation: foundationSignature,
     } = classifySignatures(guardians, council, foundation, allSignatures);
 
-    return guardianSignatures.length >= GUARDIANS_COUNCIL_THRESHOLD &&
+    return (
+      guardianSignatures.length >= GUARDIANS_COUNCIL_THRESHOLD &&
       councilSignatures.length >= SEC_COUNCIL_THRESHOLD &&
       foundationSignature !== null
+    );
   }
-
 
   await db.transaction(async (sqltx) => {
     const proposal = await getEmergencyProposalByExternalId(emergencyProposalId, { tx: sqltx });
@@ -153,9 +154,7 @@ export async function saveEmergencySignature(
     });
     const allSignatures = [...oldSignatures, dto];
 
-    if (
-      await shouldMarkProposalAsReady(allSignatures)
-    ) {
+    if (await shouldMarkProposalAsReady(allSignatures)) {
       proposal.status = emergencyProposalStatusSchema.enum.READY;
       await updateEmergencyProposal(proposal);
     }
