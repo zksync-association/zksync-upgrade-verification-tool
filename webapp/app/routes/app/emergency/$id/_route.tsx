@@ -4,7 +4,7 @@ import { actionSchema } from "@/.server/db/schema";
 import {
   councilMembers,
   emergencyBoardAddress,
-  guardianMembers,
+  guardianMembers, UserRole,
   zkFoundationAddress,
 } from "@/.server/service/authorized-users";
 import { saveEmergencySignature } from "@/.server/service/signatures";
@@ -90,11 +90,28 @@ export async function action({ request }: ActionFunctionArgs) {
   return json({ ok: true });
 }
 
+const ActionSchema = z.enum([
+  "ExecuteEmergencyUpgradeGuardians",
+  "ExecuteEmergencyUpgradeSecurityCouncil",
+  "ExecuteEmergencyUpgradeZKFoundation"
+])
+type Action = z.infer<typeof ActionSchema>
+
 const ACTION_NAMES = {
-  guardian: "ExecuteEmergencyUpgradeGuardians",
-  securityCouncil: "ExecuteEmergencyUpgradeSecurityCouncil",
-  zkFoundation: "ExecuteEmergencyUpgradeZKFoundation",
+  guardian: ActionSchema.enum.ExecuteEmergencyUpgradeGuardians,
+  securityCouncil: ActionSchema.enum.ExecuteEmergencyUpgradeSecurityCouncil,
+  zkFoundation: ActionSchema.enum.ExecuteEmergencyUpgradeZKFoundation,
 };
+
+function actionForRole(role: UserRole): Action {
+  if (role === UserRole.enum.visitor) {
+    throw new Error("Visitors are not allowed to sign emergency upgrades")
+  }
+
+  return ACTION_NAMES[role]
+}
+
+
 
 export default function EmergencyUpgradeDetails() {
   const navigate = useNavigate();
@@ -106,7 +123,7 @@ export default function EmergencyUpgradeDetails() {
     return "Unauthorized: Only valid signers can see this page.";
   }
 
-  const actionName = ACTION_NAMES[user.role];
+  const actionName = actionForRole(user.role);
   const GUARDIAN_THRESHOLD = 5;
   const SC_THRESHOLD = 9;
   const haveAlreadySigned = signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
