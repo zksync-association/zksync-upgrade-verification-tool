@@ -1,0 +1,1 @@
+ALTER TABLE "emergency_proposals" ADD COLUMN "action" text NOT NULL;

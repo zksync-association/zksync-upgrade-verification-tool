@@ -20,12 +20,15 @@ export const saveEmergencyProposal = async (data: EmergencyProp) => {
     throw new Error("Proposer is required");
   }
 
-  const value = parseEther(data.value);
+  const value = Number(parseEther(data.value));
+  const currentDate = new Date();
 
   await createOrIgnoreEmergencyProposal({
+    status: "ACTIVE",
     calldata: data.calldata as Hex,
     proposer: data.proposer as Hex,
-    proposedOn: new Date(),
+    proposedOn: currentDate,
+    changedOn: currentDate,
     externalId,
     salt: data.salt as Hex,
     title: data.title,

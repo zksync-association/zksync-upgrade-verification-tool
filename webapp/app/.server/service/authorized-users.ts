@@ -1,10 +1,10 @@
 import { l1Rpc } from "@/.server/service/clients";
 import { emergencyBoardAbi, guardiansAbi, scAbi, upgradeHandlerAbi, } from "@/.server/service/contract-abis";
+import { UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { env } from "@config/env.server";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
-import { UserRole } from "@/common/user-role";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 
@@ -57,21 +57,19 @@ export async function councilMembers(): Promise<Hex[]> {
   );
 }
 
-export type UserRole = z.infer<typeof UserRole>;
-
 export async function getUserAuthRole(address: Hex): Promise<UserRole> {
   const [guardianAddresses, scAddresses] = await Promise.all([guardianMembers(), councilMembers()]);
 
   if (guardianAddresses.includes(address)) {
-    return UserRole.enum.guardian;
+    return UserRoleSchema.enum.guardian;
   }
 
   if (scAddresses.includes(address)) {
-    return UserRole.enum.securityCouncil;
+    return UserRoleSchema.enum.securityCouncil;
   }
   if (isAddressEqual(address, await zkFoundationAddress())) {
-    return UserRole.enum.zkFoundation;
+    return UserRoleSchema.enum.zkFoundation;
   }
 
-  return UserRole.enum.visitor;
+  return UserRoleSchema.enum.visitor;
 }

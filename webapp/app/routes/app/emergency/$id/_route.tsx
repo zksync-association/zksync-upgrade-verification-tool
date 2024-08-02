@@ -4,9 +4,11 @@ import { actionSchema } from "@/.server/db/schema";
 import {
   councilMembers,
   emergencyBoardAddress,
-  guardianMembers, zkFoundationAddress,
+  guardianMembers,
+  zkFoundationAddress,
 } from "@/.server/service/authorized-users";
 import { saveEmergencySignature } from "@/.server/service/signatures";
+import { UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { StatusIndicator } from "@/components/status-indicator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +25,6 @@ import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
-import { UserRole } from "@/common/user-role";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
@@ -93,9 +94,9 @@ export async function action({ request }: ActionFunctionArgs) {
 const ActionSchema = z.enum([
   "ExecuteEmergencyUpgradeGuardians",
   "ExecuteEmergencyUpgradeSecurityCouncil",
-  "ExecuteEmergencyUpgradeZKFoundation"
-])
-type Action = z.infer<typeof ActionSchema>
+  "ExecuteEmergencyUpgradeZKFoundation",
+]);
+type Action = z.infer<typeof ActionSchema>;
 
 const ACTION_NAMES = {
   guardian: ActionSchema.enum.ExecuteEmergencyUpgradeGuardians,
@@ -104,14 +105,12 @@ const ACTION_NAMES = {
 };
 
 function actionForRole(role: UserRole): Action {
-  if (role === UserRole.enum.visitor) {
-    throw new Error("Visitors are not allowed to sign emergency upgrades")
+  if (role === UserRoleSchema.enum.visitor) {
+    throw new Error("Visitors are not allowed to sign emergency upgrades");
   }
 
-  return ACTION_NAMES[role]
+  return ACTION_NAMES[role];
 }
-
-
 
 export default function EmergencyUpgradeDetails() {
   const navigate = useNavigate();

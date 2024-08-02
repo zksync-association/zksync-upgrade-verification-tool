@@ -11,6 +11,10 @@ export async function createOrIgnoreEmergencyProposal(
   await createOrIgnoreRecord(emergencyProposalsTable, data, { tx });
 }
 
+export async function getAllEmergencyProposals() {
+  return db.select().from(emergencyProposalsTable);
+}
+
 export async function getEmergencyProposalByExternalId(externalId: Hex) {
   return getFirst(
     await db

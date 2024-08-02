@@ -25,6 +25,7 @@ import { EMERGENCY_BOARD, calculateUpgradeProposalHash } from "@/utils/emergency
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ChevronDownIcon,
+  ChevronUpIcon,
   Cross2Icon,
   MagnifyingGlassIcon,
   ResetIcon,
@@ -86,6 +87,8 @@ export function CreateEmergencyProposalModal({
 }) {
   const [step, setStep] = useState(1);
   const [extId, setExtId] = useState("");
+  const [valueOpen, setValueOpen] = useState(false);
+  const [saltOpen, setSaltOpen] = useState(false);
   const fetcher = useFetcher<typeof action>();
 
   const defaultFormValues = {
@@ -209,11 +212,18 @@ export function CreateEmergencyProposalModal({
                     )}
                   />
                   <Collapsible>
-                    <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border p-2 text-sm hover:bg-muted">
+                    <CollapsibleTrigger
+                      className="flex w-full items-center justify-between rounded-md border p-2 text-sm hover:bg-muted"
+                      onClick={() => setValueOpen(!valueOpen)}
+                    >
                       <span>Value (optional)</span>
-                      <ChevronDownIcon className="h-4 w-4" />
+                      {valueOpen ? (
+                        <ChevronDownIcon className="h-4 w-4" />
+                      ) : (
+                        <ChevronUpIcon className="h-4 w-4" />
+                      )}
                     </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-2">
+                    <CollapsibleContent className="mt-2 ml-2">
                       <FormField
                         control={form.control}
                         name="value"
@@ -242,11 +252,18 @@ export function CreateEmergencyProposalModal({
                     </CollapsibleContent>
                   </Collapsible>
                   <Collapsible>
-                    <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border p-2 text-sm hover:bg-muted">
+                    <CollapsibleTrigger
+                      className="flex w-full items-center justify-between rounded-md border p-2 text-sm hover:bg-muted"
+                      onClick={() => setSaltOpen(!saltOpen)}
+                    >
                       <span>Salt (optional)</span>
-                      <ChevronDownIcon className="h-4 w-4" />
+                      {saltOpen ? (
+                        <ChevronUpIcon className="h-4 w-4" />
+                      ) : (
+                        <ChevronDownIcon className="h-4 w-4" />
+                      )}
                     </CollapsibleTrigger>
-                    <CollapsibleContent>
+                    <CollapsibleContent className="mt-2 ml-2">
                       <FormField
                         control={form.control}
                         name="salt"

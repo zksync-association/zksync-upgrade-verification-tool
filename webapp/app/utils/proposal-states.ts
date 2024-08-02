@@ -8,6 +8,13 @@ export enum PROPOSAL_STATES {
   Done = 6,
 }
 
+export enum EMERGENCY_PROPOSAL_STATUS {
+  ACTIVE = 0,
+  READY = 1,
+  BROADCAST = 2,
+  CLOSED = 3,
+}
+
 export type StatusTime = {
   totalDays: number;
   currentDay: number;
