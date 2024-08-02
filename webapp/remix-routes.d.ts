@@ -71,6 +71,13 @@ declare module "remix-routes" {
       query: ExportedQuery<import('app/routes/app/proposals/$id_.transactions.$hash/_route').SearchParams>,
     };
   
+    "/app/transactions/:hash": {
+      params: {
+        hash: string | number;
+      } ,
+      query: ExportedQuery<import('app/routes/app/transactions.$hash/_route').SearchParams>,
+    };
+  
   }
 
   type RoutesWithParams = Pick<
@@ -92,6 +99,7 @@ declare module "remix-routes" {
     | 'routes/app/proposals/_layout'
     | 'routes/app/proposals/$id_.transactions.$hash/_route'
     | 'routes/app/proposals/$id/_route'
+    | 'routes/app/transactions.$hash/_route'
     | 'routes/index';
 
   export function $path<

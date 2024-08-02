@@ -48,7 +48,7 @@ function registerFullUpgrade(baseDir: string, fs: TestFS) {
 
   const facetAddr = repeated(7, 20);
   fs.register(
-    [baseDir, "mainnet", "transactions.json"],
+    [baseDir, "mainnet", "transactions.$hash.json"],
     JSON.stringify({
       proposeUpgradeTx: {
         bootloaderHash: repeated(1, 32),
@@ -118,7 +118,7 @@ describe("UpgradeImporter", () => {
         JSON.stringify({ name: "test", creationTimestamp: 1, protocolVersion: "25" })
       );
       fs.register(
-        [baseDir, "mainnet", "transactions.json"],
+        [baseDir, "mainnet", "transactions.$hash.json"],
         JSON.stringify({
           proposeUpgradeTx: {
             bootloaderHash: repeated(1, 32),
@@ -199,14 +199,14 @@ describe("UpgradeImporter", () => {
     });
   });
 
-  describe("when the transactions.js file is malformed", () => {
+  describe("when the transactions.$hash.js file is malformed", () => {
     const baseDir = "base";
 
     beforeEach<Ctx>(({ fs }) => {
       registerFullUpgrade(baseDir, fs);
       // missing "proposeUpgradeTx"
       fs.register(
-        [baseDir, "mainnet", "transactions.json"],
+        [baseDir, "mainnet", "transactions.$hash.json"],
         JSON.stringify({
           transparentUpgrade: {
             facetCuts: [
