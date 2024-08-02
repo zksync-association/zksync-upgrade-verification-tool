@@ -77,10 +77,12 @@ export function CreateEmergencyProposalModal({
   isOpen,
   onClose,
   proposerAddress,
+  emergencyBoardAddress
 }: {
   isOpen: boolean;
   onClose: () => void;
-  proposerAddress?: `0x${string}`;
+  proposerAddress?: Hex;
+  emergencyBoardAddress: Hex;
 }) {
   const [step, setStep] = useState(1);
   const [extId, setExtId] = useState("");
@@ -121,7 +123,7 @@ export function CreateEmergencyProposalModal({
           },
         ],
         form.getValues("salt") as Hex,
-        await emergencyBoardAddress()
+        emergencyBoardAddress
       );
       setExtId(derivedExternalId);
     } else {

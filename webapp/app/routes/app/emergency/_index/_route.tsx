@@ -22,6 +22,7 @@ import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { $path } from "remix-routes";
 import { useAccount } from "wagmi";
+import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 
 export async function loader() {
   const emergencyProposals = await getAllEmergencyProposals();
@@ -32,6 +33,7 @@ export async function loader() {
     inactiveEmergencyProposals: emergencyProposals.filter(
       ({ status }) => status === "CLOSED" || status === "BROADCAST"
     ),
+    emergencyBoardAddress: await emergencyBoardAddress()
   });
 }
 
@@ -44,7 +46,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Index() {
-  const { activeEmergencyProposals, inactiveEmergencyProposals } = useLoaderData<typeof loader>();
+  const { activeEmergencyProposals, inactiveEmergencyProposals, emergencyBoardAddress } = useLoaderData<typeof loader>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const actionData = useActionData<typeof action>();
   const { address } = useAccount();
@@ -188,9 +190,8 @@ export default function Index() {
         <CreateEmergencyProposalModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          errors={actionData?.errors as object}
-          status={actionData?.status}
           proposerAddress={address}
+          emergencyBoardAddress={emergencyBoardAddress}
         />
       </Form>
     </div>
