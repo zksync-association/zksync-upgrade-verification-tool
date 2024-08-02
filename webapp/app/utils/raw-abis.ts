@@ -2276,7 +2276,7 @@ export const IPROTOCOL_UPGRADE_HANDLER_RAW_ABI: Abi = [
   },
 ] as const;
 
-export const EMERGENCTY_BOARD_ABI = [
+export const EMERGENCY_BOARD_ABI = [
   {
     inputs: [
       {
@@ -2476,6 +2476,6 @@ export const ALL_ABIS = {
   handler: PROTOCOL_UPGRADE_HANDLER_RAW_ABI,
   council: SEC_COUNCIL_RAW_ABI,
   guardians: GUARDIANS_RAW_ABI,
-  emergencyBoard: EMERGENCTY_BOARD_ABI,
+  emergencyBoard: EMERGENCY_BOARD_ABI,
   handlerInterface: IPROTOCOL_UPGRADE_HANDLER_RAW_ABI,
 };
