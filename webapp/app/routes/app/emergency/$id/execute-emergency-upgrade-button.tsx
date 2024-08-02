@@ -5,9 +5,9 @@ import { type BasicProposal, type BasicSignature, classifySignatures } from "@/u
 import { useFetcher, useNavigate } from "@remix-run/react";
 import type React from "react";
 import { toast } from "react-hot-toast";
+import { $path } from "remix-routes";
 import { type Hex, encodeAbiParameters } from "viem";
 import { useWriteContract } from "wagmi";
-import { $path } from "remix-routes";
 
 export type ExecuteEmergencyUpgradeButtonProps = {
   children?: React.ReactNode;
@@ -40,7 +40,7 @@ export function ExecuteEmergencyUpgradeButton({
 }: ExecuteEmergencyUpgradeButtonProps) {
   const { writeContract, isPending } = useWriteContract();
   const { submit } = useFetcher();
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   const {
     guardians: guardianSignatures,
@@ -82,7 +82,7 @@ export function ExecuteEmergencyUpgradeButton({
             { method: "POST" }
           );
           toast.success("Transaction broadcast success", { id: "exec-emergency-upgrade" });
-          navigate($path("/app/transactions/:hash", { hash }))
+          navigate($path("/app/transactions/:hash", { hash }));
         },
         onError: (e) => {
           console.error(e);
