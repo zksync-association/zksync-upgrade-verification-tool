@@ -38,6 +38,7 @@ export const emergencyProposalsTable = pgTable(
   {
     id: serial("id").primaryKey(),
     proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
+    changedOn: timestamp("changed_on", { withTimezone: true }).notNull(),
     externalId: bytea("external_id").notNull().unique(),
     title: text("title").notNull(),
     targetAddress: bytea("target_address").notNull(),

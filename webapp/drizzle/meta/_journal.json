@@ -22,6 +22,13 @@
       "when": 1722524220423,
       "tag": "0002_pale_calypso",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1722598710366,
+      "tag": "0003_naive_the_enforcers",
+      "breakpoints": true
     }
   ]
 }

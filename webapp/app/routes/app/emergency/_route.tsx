@@ -48,63 +48,6 @@ export default function Index() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const actionData = useActionData<typeof action>();
   const { address } = useAccount();
-  const drawTable = (
-    proposals: typeof activeEmergencyProposals | typeof inactiveEmergencyProposals
-  ) => {
-    return (
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-16">ID</TableHead>
-              <TableHead className="w-[40%]">Title</TableHead>
-              <TableHead className="w-32">Proposer</TableHead>
-              <TableHead className="w-32">Proposed On</TableHead>
-              <TableHead className="w-24">Status</TableHead>
-              <TableHead className="w-20" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {proposals.map((ep) => (
-              <TableRow key={ep.id}>
-                <TableCell>{ep.id}</TableCell>
-                <TableCell className="max-w-0">
-                  <div className="truncate">{ep.title}</div>
-                </TableCell>
-                <TableCell className="text-xs">
-                  <div className="truncate">{ep.proposer}</div>
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-xs">
-                  {new Date(ep.proposedOn).toLocaleString("en-US", {
-                    weekday: "short",
-                    day: "numeric",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: false,
-                    timeZoneName: "short",
-                  })}
-                </TableCell>
-                <TableCell>
-                  <span className={`rounded-full px-2 py-1 text-xs ${getStatusColor(ep.status)}`}>
-                    {ep.status}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <Link to={$path("/app/proposals/:id", { id: ep.id })}>
-                    <Button variant="outline" size="sm">
-                      View
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    );
-  };
 
   return (
     <div className="mt-10 space-y-4">
@@ -121,7 +64,59 @@ export default function Index() {
           {activeEmergencyProposals.length === 0 ? (
             <div className="text-center text-gray-500">No active emergency proposals found.</div>
           ) : (
-            drawTable(activeEmergencyProposals)
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">ID</TableHead>
+                    <TableHead className="w-[40%]">Title</TableHead>
+                    <TableHead className="w-32">ProposalId</TableHead>
+                    <TableHead className="w-32">Proposed On</TableHead>
+                    <TableHead className="w-24">Status</TableHead>
+                    <TableHead className="w-20" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activeEmergencyProposals.map((ep) => (
+                    <TableRow key={ep.id}>
+                      <TableCell>{ep.id}</TableCell>
+                      <TableCell className="max-w-0">
+                        <div className="truncate">{ep.title}</div>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <div className="truncate">{`${ep.externalId.slice(0, 10)} ... ${ep.externalId.slice(-8)}`}</div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">
+                        {new Date(ep.proposedOn).toLocaleString("en-US", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                          timeZoneName: "short",
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`rounded-full px-2 py-1 text-xs ${getStatusColor(ep.status)}`}
+                        >
+                          {ep.status}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Link to={$path("/app/proposals/:id", { id: ep.id })}>
+                          <Button variant="outline" size="sm">
+                            View
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -133,7 +128,59 @@ export default function Index() {
           {inactiveEmergencyProposals.length === 0 ? (
             <div className="text-center text-gray-500">No inactive emergency proposals found.</div>
           ) : (
-            drawTable(inactiveEmergencyProposals)
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">ID</TableHead>
+                    <TableHead className="w-[40%]">Title</TableHead>
+                    <TableHead className="w-32">ProposalId</TableHead>
+                    <TableHead className="w-32">Closed At</TableHead>
+                    <TableHead className="w-24">Status</TableHead>
+                    <TableHead className="w-20" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inactiveEmergencyProposals.map((ep) => (
+                    <TableRow key={ep.id}>
+                      <TableCell>{ep.id}</TableCell>
+                      <TableCell className="max-w-0">
+                        <div className="truncate">{ep.title}</div>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <div className="truncate">{`${ep.externalId.slice(0, 10)} ... ${ep.externalId.slice(-8)}`}</div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">
+                        {new Date(ep.changedOn).toLocaleString("en-US", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                          timeZoneName: "short",
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`rounded-full px-2 py-1 text-xs ${getStatusColor(ep.status)}`}
+                        >
+                          {ep.status}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Link to={$path("/app/proposals/:id", { id: ep.id })}>
+                          <Button variant="outline" size="sm">
+                            View
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
