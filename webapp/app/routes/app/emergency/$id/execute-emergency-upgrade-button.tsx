@@ -6,6 +6,7 @@ import type React from "react";
 import { toast } from "react-hot-toast";
 import { type Hex, encodeAbiParameters } from "viem";
 import { useWriteContract } from "wagmi";
+import { useFetcher } from "@remix-run/react";
 
 export type ExecuteEmergencyUpgradeButtonProps = {
   children?: React.ReactNode;
@@ -37,6 +38,7 @@ export function ExecuteEmergencyUpgradeButton({
   proposal,
 }: ExecuteEmergencyUpgradeButtonProps) {
   const { writeContract, isPending } = useWriteContract();
+  const { submit } = useFetcher();
 
   const {
     guardians: guardianSignatures,
@@ -72,10 +74,12 @@ export function ExecuteEmergencyUpgradeButton({
         address: boardAddress,
       },
       {
-        onSuccess: () => {
-          toast.success("Transaction broadcasted successfully", { id: "exec-emergency-upgrade" });
+        onSuccess: async () => {
+          submit({ intent: "broadcastSuccess", proposalId: proposal.externalId }, { method: "POST" })
+          toast.success("Transaction broadcast success", { id: "exec-emergency-upgrade" });
         },
-        onError: () => {
+        onError: (e) => {
+          console.error(e)
           toast.error("Error. Transaction was not broadcasted", { id: "exec-emergency-upgrade" });
         },
       }

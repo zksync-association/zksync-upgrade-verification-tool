@@ -24,11 +24,12 @@ import { badRequest, notFound } from "@/utils/http";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
-import { getFormData, getParams } from "remix-params-helper";
+import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
-import { z } from "zod";
+import { z, ZodTypeAny } from "zod";
+import { broadcastSuccess } from "@/.server/service/emergency-proposals";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
@@ -71,29 +72,43 @@ export async function loader(args: LoaderFunctionArgs) {
   });
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  const user = requireUserFromHeader(request);
-  const formData = await getFormData(
-    request,
-    z.object({
-      signature: zodHex,
-      proposalId: zodHex,
-      actionName: actionSchema,
-    })
-  );
-  if (!formData.success) {
-    throw badRequest("Failed to parse signature data");
+function extract<T extends ZodTypeAny>(formData: FormData, key: string, parser: T): z.infer<typeof parser> {
+  const value = formData.get(key);
+  const parsed = parser.safeParse(value);
+  if (parsed.error) {
+    throw badRequest(`Wrong value for ${key}`)
   }
-  const data = formData.data;
+  return parsed.data
+}
+const intentParser = z.enum(["newSignature", "broadcastSuccess"]);
 
-  await saveEmergencySignature(
-    data.signature,
-    user.address as Hex,
-    data.actionName,
-    data.proposalId
-  );
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData()
+    .catch(() => {
+      throw badRequest("Failed to parse body")
+    });
 
-  return json({ ok: true });
+  const intent = extract(formData, "intent", intentParser)
+  const proposalId = extract(formData, "proposalId", zodHex)
+
+  if (intent === intentParser.enum.newSignature) {
+    const user = requireUserFromHeader(request);
+    const signature = extract(formData, "signature", zodHex)
+    const actionName = extract(formData, "actionName", actionSchema)
+
+    await saveEmergencySignature(
+      signature,
+      user.address,
+      actionName,
+      proposalId
+    );
+  }
+
+  if (intent === intentParser.enum.broadcastSuccess) {
+    await broadcastSuccess(proposalId)
+  }
+
+  return json({ ok: true })
 }
 
 const ActionSchema = z.enum([

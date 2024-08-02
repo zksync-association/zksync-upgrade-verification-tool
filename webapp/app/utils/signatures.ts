@@ -8,6 +8,7 @@ export type BasicProposal = {
   salt: Hex;
   value: string;
   status: EmergencyProposalStatus;
+  externalId: Hex;
 };
 
 export function filterSignatures<T extends BasicSignature>(members: Hex[], signatures: T[]): T[] {

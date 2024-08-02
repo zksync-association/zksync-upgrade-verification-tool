@@ -34,7 +34,7 @@ export default function SignButton({
   useEffect(() => {
     if (isSuccess) {
       fetcher.submit(
-        { signature, actionName: contractData.actionName, proposalId },
+        { intent: "newSignature" , signature, actionName: contractData.actionName, proposalId },
         { method: "POST", action: postAction }
       );
     }
