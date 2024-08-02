@@ -4,7 +4,7 @@ import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { getUserFromHeader } from "@/utils/auth-headers";
 import { clientEnv } from "@config/env.server";
-import { type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { type ActionFunctionArgs, type LoaderFunctionArgs, json, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import { useNavigate } from "@remix-run/react";
 import { useEffect } from "react";
@@ -31,7 +31,8 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!isUp) {
     throw redirect($path("/app/down"));
   }
-  throw redirect($path("/app"));
+
+  return json({ status: "success" });
 }
 
 export default function Index() {
