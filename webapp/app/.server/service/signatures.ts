@@ -1,6 +1,11 @@
 import { db } from "@/.server/db";
-import { createOrIgnoreSignature } from "@/.server/db/dto/signatures";
-import { type Action, type actionSchema, signaturesTable } from "@/.server/db/schema";
+import { createOrIgnoreSignature, getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures";
+import {
+  type Action,
+  type actionSchema,
+  emergencyProposalStatusSchema,
+  signaturesTable
+} from "@/.server/db/schema";
 import {
   councilAddress,
   councilMembers,
@@ -10,12 +15,13 @@ import {
 } from "@/.server/service/authorized-users";
 import { l1Rpc } from "@/.server/service/clients";
 import { guardiansAbi } from "@/.server/service/contract-abis";
-import { badRequest } from "@/utils/http";
+import { badRequest, notFound } from "@/utils/http";
 import { env } from "@config/env.server";
 import { and, asc, eq } from "drizzle-orm";
 import { type Hex, hashTypedData } from "viem";
 import { mainnet, sepolia } from "wagmi/chains";
 import { z } from "zod";
+import { getEmergencyProposalByExternalId } from "@/.server/db/dto/emergencyProposals";
 
 type ProposalAction = z.infer<typeof actionSchema>;
 
@@ -101,6 +107,27 @@ export async function saveEmergencySignature(
   if (action === "ExecuteEmergencyUpgradeZKFoundation") {
     // TODO: How do we verify this signatures?
   }
+
+  await db.transaction(async sqltx => {
+    const proposal = await getEmergencyProposalByExternalId(emergencyProposalId, { tx: sqltx })
+
+    if (!proposal) {
+      throw notFound()
+    }
+
+    if (proposal.status !== emergencyProposalStatusSchema.enum.ACTIVE) {
+      throw badRequest("Proposal is not accepting more signatures")
+    }
+
+    const dto = {
+      action,
+      signature,
+      emergencyProposal: emergencyProposalId,
+      signer,
+    };
+
+    await createOrIgnoreSignature(dto);
+  })
 
   const dto = {
     action,

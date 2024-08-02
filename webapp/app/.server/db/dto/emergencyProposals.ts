@@ -15,9 +15,9 @@ export async function getAllEmergencyProposals() {
   return db.select().from(emergencyProposalsTable);
 }
 
-export async function getEmergencyProposalByExternalId(externalId: Hex) {
+export async function getEmergencyProposalByExternalId(externalId: Hex, { tx }: { tx?: typeof db } = {}) {
   return getFirst(
-    await db
+    await (tx ?? db)
       .select()
       .from(emergencyProposalsTable)
       .where(eq(emergencyProposalsTable.externalId, externalId))

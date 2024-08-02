@@ -17,7 +17,8 @@ export async function getSignaturesByExternalProposalId(
 }
 
 export async function getSignaturesByEmergencyProposalId(
-  id: InferSelectModel<typeof proposalsTable>["externalId"]
+  id: InferSelectModel<typeof proposalsTable>["externalId"],
+  { tx }: { tx?: typeof db } = {}
 ) {
-  return db.select().from(signaturesTable).where(eq(signaturesTable.emergencyProposal, id));
+  return (tx ?? db).select().from(signaturesTable).where(eq(signaturesTable.emergencyProposal, id));
 }
