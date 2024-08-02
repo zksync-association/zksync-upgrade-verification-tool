@@ -42,7 +42,7 @@ export function ExecuteEmergencyUpgradeButton({
   zkFoundationAddress,
   proposal,
 }: ExecuteEmergencyUpgradeButtonProps) {
-  const { writeContract } = useWriteContract();
+  const { writeContract, isPending } = useWriteContract();
 
   const guardianSignatures = signatures
     .filter((s) => allGuardians.some((member) => isAddressEqual(s.signer, member)))
@@ -101,7 +101,7 @@ export function ExecuteEmergencyUpgradeButton({
   };
 
   return (
-    <Button disabled={!enabled} onClick={onClick}>
+    <Button disabled={!enabled} onClick={onClick} loading={isPending}>
       {children}
     </Button>
   );
