@@ -23,7 +23,7 @@ describe("CreateEmergencyProposalModal", () => {
     errors: {},
     status: undefined,
     proposerAddress: "0x1234567890123456789012345678901234567890" as Hex,
-    emergencyBoardAddress: "0x0011223344556677889900112233445566778899" as Hex
+    emergencyBoardAddress: "0x0011223344556677889900112233445566778899" as Hex,
   };
 
   beforeEach(() => {
