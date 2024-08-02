@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { CreateEmergencyProposalModal } from "@/routes/app/emergency/create-emergency-proposal-modal";
-import type { Hash } from "viem";
+import type { Hex } from "viem";
 
 const mockSubmit = vi.fn();
 
@@ -22,7 +22,7 @@ describe("CreateEmergencyProposalModal", () => {
     onClose: mockOnClose,
     errors: {},
     status: undefined,
-    proposerAddress: "0x1234567890123456789012345678901234567890" as Hash,
+    proposerAddress: "0x1234567890123456789012345678901234567890" as Hex,
   };
 
   beforeEach(() => {

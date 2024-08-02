@@ -1,18 +1,18 @@
-import { type AbiParameter, type Hash, encodeAbiParameters, keccak256 } from "viem";
+import { type AbiParameter, type Hex, encodeAbiParameters, keccak256 } from "viem";
 
 type Call = {
-  target: Hash;
+  target: Hex;
   value: bigint;
-  data: Hash;
+  data: Hex;
 };
 
 type UpgradeProposal = {
   calls: Call[];
-  executor: Hash;
-  salt: Hash;
+  executor: Hex;
+  salt: Hex;
 };
 
-export const calculateUpgradeProposalHash = (calls: Call[], salt: Hash, executorAddress: Hash) => {
+export const calculateUpgradeProposalHash = (calls: Call[], salt: Hex, executorAddress: Hex) => {
   const upgradeProposal: UpgradeProposal = {
     calls,
     executor: executorAddress,
