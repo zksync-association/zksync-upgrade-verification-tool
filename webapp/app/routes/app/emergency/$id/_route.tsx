@@ -11,6 +11,7 @@ import { saveEmergencySignature } from "@/.server/service/signatures";
 import { StatusIndicator } from "@/components/status-indicator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExecuteEmergencyUpgradeButton } from "@/routes/app/emergency/$id/execute-emergency-upgrade-button";
 import { displayBytes32 } from "@/routes/app/proposals/$id/common-tables";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import { requireUserFromHeader } from "@/utils/auth-headers";
@@ -48,6 +49,10 @@ export async function loader(args: LoaderFunctionArgs) {
       title: proposal?.title,
       externalId: proposal.externalId,
       proposedOn: proposal.proposedOn,
+      calldata: proposal.calldata,
+      targetAddress: proposal.targetAddress,
+      salt: proposal.salt,
+      value: proposal.value.toString(),
     },
     addresses: {
       emergencyBoard: boardAddress,
@@ -216,7 +221,16 @@ export default function EmergencyUpgradeDetails() {
             <CardTitle>Broadcast actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            <Button>Execute upgrade (wip)</Button>
+            <ExecuteEmergencyUpgradeButton
+              boardAddress={addresses.emergencyBoard}
+              signatures={signatures}
+              allGuardians={allGuardians}
+              allCouncil={allSecurityCouncil}
+              zkFoundationAddress={addresses.zkFoundation}
+              proposal={proposal}
+            >
+              Execute upgrade (wip)
+            </ExecuteEmergencyUpgradeButton>
           </CardContent>
         </Card>
       </div>
