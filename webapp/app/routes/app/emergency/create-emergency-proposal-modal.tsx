@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import type { action } from "@/routes/app/emergency/_index/_route";
-import { EMERGENCY_BOARD, calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
+import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ChevronDownIcon,
@@ -37,6 +37,7 @@ import { useForm } from "react-hook-form";
 import { type Hex, isAddress, padHex, parseEther } from "viem";
 import { z } from "zod";
 import { StepIndicator } from "./step-indicator";
+import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 
 export const emergencyPropSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -124,7 +125,7 @@ export function CreateEmergencyProposalModal({
           },
         ],
         form.getValues("salt") as Hex,
-        EMERGENCY_BOARD
+        await emergencyBoardAddress()
       );
       setExtId(derivedExternalId);
     } else {

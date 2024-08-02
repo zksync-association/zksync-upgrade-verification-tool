@@ -1,7 +1,8 @@
 import { createOrIgnoreEmergencyProposal } from "@/.server/db/dto/emergencyProposals";
 import type { EmergencyProp } from "@/routes/app/emergency/create-emergency-proposal-modal";
-import { EMERGENCY_BOARD, calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
+import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { type Hex, parseEther } from "viem";
+import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 
 export const saveEmergencyProposal = async (data: EmergencyProp) => {
   const externalId = calculateUpgradeProposalHash(
@@ -13,7 +14,7 @@ export const saveEmergencyProposal = async (data: EmergencyProp) => {
       },
     ],
     data.salt as Hex,
-    EMERGENCY_BOARD
+    await emergencyBoardAddress()
   );
 
   if (!data.proposer) {

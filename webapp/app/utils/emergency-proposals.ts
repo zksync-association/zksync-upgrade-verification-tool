@@ -42,5 +42,3 @@ export const calculateUpgradeProposalHash = (calls: Call[], salt: Hash, executor
   return keccak256(encodedProposal);
 };
 
-// TODO: Replace with derive fn
-export const EMERGENCY_BOARD = "0xee4a55397e9d6f4f222df2b9aa0c2ae8a69e8fa4";
