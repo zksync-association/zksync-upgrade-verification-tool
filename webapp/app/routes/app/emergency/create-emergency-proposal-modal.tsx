@@ -75,15 +75,11 @@ export type EmergencyProp = z.infer<typeof emergencyPropSchema>;
 
 export function CreateEmergencyProposalModal({
   isOpen,
-  errors,
-  status,
   onClose,
   proposerAddress,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  errors: object;
-  status?: string;
   proposerAddress?: `0x${string}`;
 }) {
   const [step, setStep] = useState(1);
