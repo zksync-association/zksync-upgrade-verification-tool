@@ -160,14 +160,6 @@ export default function EmergencyUpgradeDetails() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {/*<div className="flex justify-between">*/}
-              {/*  <span>Current Version:</span>*/}
-              {/*  <span className="w-1/2 break-words text-right">current version</span>*/}
-              {/*</div>*/}
-              {/*<div className="flex justify-between">*/}
-              {/*  <span>Proposed Version:</span>*/}
-              {/*  <span className="w-1/2 break-words text-right">new version</span>*/}
-              {/*</div>*/}
               <div className="flex justify-between">
                 <span>Title:</span>
                 <span className="w-4/5 justify-end break-words text-right">{proposal.title}</span>
