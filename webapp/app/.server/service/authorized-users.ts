@@ -1,6 +1,11 @@
 import { l1Rpc } from "@/.server/service/clients";
-import { emergencyBoardAbi, guardiansAbi, scAbi, upgradeHandlerAbi, } from "@/.server/service/contract-abis";
-import { UserRole, UserRoleSchema } from "@/common/user-role-schema";
+import {
+  emergencyBoardAbi,
+  guardiansAbi,
+  scAbi,
+  upgradeHandlerAbi,
+} from "@/.server/service/contract-abis";
+import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { env } from "@config/env.server";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";

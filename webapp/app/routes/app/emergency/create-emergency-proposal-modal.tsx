@@ -1,3 +1,4 @@
+import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -37,7 +38,6 @@ import { useForm } from "react-hook-form";
 import { type Hex, isAddress, padHex, parseEther } from "viem";
 import { z } from "zod";
 import { StepIndicator } from "./step-indicator";
-import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 
 export const emergencyPropSchema = z.object({
   title: z.string().min(1, "Title is required"),

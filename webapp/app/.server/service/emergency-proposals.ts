@@ -1,8 +1,8 @@
 import { createOrIgnoreEmergencyProposal } from "@/.server/db/dto/emergencyProposals";
+import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import type { EmergencyProp } from "@/routes/app/emergency/create-emergency-proposal-modal";
 import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { type Hex, parseEther } from "viem";
-import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 
 export const saveEmergencyProposal = async (data: EmergencyProp) => {
   const externalId = calculateUpgradeProposalHash(

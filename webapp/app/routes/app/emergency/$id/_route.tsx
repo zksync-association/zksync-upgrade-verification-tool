@@ -8,7 +8,7 @@ import {
   zkFoundationAddress,
 } from "@/.server/service/authorized-users";
 import { saveEmergencySignature } from "@/.server/service/signatures";
-import { UserRole, UserRoleSchema } from "@/common/user-role-schema";
+import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { StatusIndicator } from "@/components/status-indicator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
