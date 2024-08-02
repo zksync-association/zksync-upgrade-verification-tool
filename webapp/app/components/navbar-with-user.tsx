@@ -1,4 +1,4 @@
-import type { UserRoleSchema } from "@/common/user-role-schema";
+import type { UserRole } from "@/common/user-role-schema";
 import ConnectButton from "@/components/connect-button";
 import EnvBadge from "@/components/env-badge";
 import Logo from "@/components/logo";
@@ -9,7 +9,7 @@ import { $path } from "remix-routes";
 export default function NavbarWithUser({
   role,
   environment,
-}: { role: UserRoleSchema | null; environment: NodeEnv }) {
+}: { role: UserRole | null; environment: NodeEnv }) {
   return (
     <header className="w-full">
       <nav className="flex justify-between">
