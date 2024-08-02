@@ -229,7 +229,7 @@ export default function EmergencyUpgradeDetails() {
               zkFoundationAddress={addresses.zkFoundation}
               proposal={proposal}
             >
-              Execute upgrade (wip)
+              Execute upgrade
             </ExecuteEmergencyUpgradeButton>
           </CardContent>
         </Card>
