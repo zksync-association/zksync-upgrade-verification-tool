@@ -2,11 +2,11 @@ import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { Button } from "@/components/ui/button";
 import { ALL_ABIS } from "@/utils/raw-abis";
 import { type BasicProposal, type BasicSignature, classifySignatures } from "@/utils/signatures";
+import { useFetcher } from "@remix-run/react";
 import type React from "react";
 import { toast } from "react-hot-toast";
 import { type Hex, encodeAbiParameters } from "viem";
 import { useWriteContract } from "wagmi";
-import { useFetcher } from "@remix-run/react";
 
 export type ExecuteEmergencyUpgradeButtonProps = {
   children?: React.ReactNode;
@@ -75,11 +75,14 @@ export function ExecuteEmergencyUpgradeButton({
       },
       {
         onSuccess: async () => {
-          submit({ intent: "broadcastSuccess", proposalId: proposal.externalId }, { method: "POST" })
+          submit(
+            { intent: "broadcastSuccess", proposalId: proposal.externalId },
+            { method: "POST" }
+          );
           toast.success("Transaction broadcast success", { id: "exec-emergency-upgrade" });
         },
         onError: (e) => {
-          console.error(e)
+          console.error(e);
           toast.error("Error. Transaction was not broadcasted", { id: "exec-emergency-upgrade" });
         },
       }

@@ -18,7 +18,7 @@ import {
 } from "@/routes/app/emergency/create-emergency-proposal-modal";
 import { PlusIcon } from "@radix-ui/react-icons";
 import type { ActionFunctionArgs } from "@remix-run/node";
-import { Form, Link, json, useActionData, useLoaderData } from "@remix-run/react";
+import { Form, Link, json, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { $path } from "remix-routes";

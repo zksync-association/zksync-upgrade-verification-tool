@@ -1,24 +1,23 @@
 import {
   createOrIgnoreEmergencyProposal,
   getEmergencyProposalByExternalId,
-  updateEmergencyProposal
+  updateEmergencyProposal,
 } from "@/.server/db/dto/emergencyProposals";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
+import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import type { EmergencyProp } from "@/routes/app/emergency/create-emergency-proposal-modal";
 import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
-import { type Hex, parseEther } from "viem";
-import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { notFound } from "@/utils/http";
-
+import { type Hex, parseEther } from "viem";
 
 export async function broadcastSuccess(propsalId: Hex) {
-  const proposal = await getEmergencyProposalByExternalId(propsalId)
+  const proposal = await getEmergencyProposalByExternalId(propsalId);
   if (!proposal) {
-    throw notFound()
+    throw notFound();
   }
 
-  proposal.status = emergencyProposalStatusSchema.enum.BROADCAST
-  await updateEmergencyProposal(proposal)
+  proposal.status = emergencyProposalStatusSchema.enum.BROADCAST;
+  await updateEmergencyProposal(proposal);
 }
 
 export const saveEmergencyProposal = async (data: EmergencyProp) => {

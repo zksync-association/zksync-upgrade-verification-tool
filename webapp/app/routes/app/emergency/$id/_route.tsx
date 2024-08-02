@@ -7,6 +7,7 @@ import {
   guardianMembers,
   zkFoundationAddress,
 } from "@/.server/service/authorized-users";
+import { broadcastSuccess } from "@/.server/service/emergency-proposals";
 import { saveEmergencySignature } from "@/.server/service/signatures";
 import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { StatusIndicator } from "@/components/status-indicator";
@@ -28,8 +29,7 @@ import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
-import { z, ZodTypeAny } from "zod";
-import { broadcastSuccess } from "@/.server/service/emergency-proposals";
+import { type ZodTypeAny, z } from "zod";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
@@ -72,43 +72,41 @@ export async function loader(args: LoaderFunctionArgs) {
   });
 }
 
-function extract<T extends ZodTypeAny>(formData: FormData, key: string, parser: T): z.infer<typeof parser> {
+function extract<T extends ZodTypeAny>(
+  formData: FormData,
+  key: string,
+  parser: T
+): z.infer<typeof parser> {
   const value = formData.get(key);
   const parsed = parser.safeParse(value);
   if (parsed.error) {
-    throw badRequest(`Wrong value for ${key}`)
+    throw badRequest(`Wrong value for ${key}`);
   }
-  return parsed.data
+  return parsed.data;
 }
 const intentParser = z.enum(["newSignature", "broadcastSuccess"]);
 
 export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData()
-    .catch(() => {
-      throw badRequest("Failed to parse body")
-    });
+  const formData = await request.formData().catch(() => {
+    throw badRequest("Failed to parse body");
+  });
 
-  const intent = extract(formData, "intent", intentParser)
-  const proposalId = extract(formData, "proposalId", zodHex)
+  const intent = extract(formData, "intent", intentParser);
+  const proposalId = extract(formData, "proposalId", zodHex);
 
   if (intent === intentParser.enum.newSignature) {
     const user = requireUserFromHeader(request);
-    const signature = extract(formData, "signature", zodHex)
-    const actionName = extract(formData, "actionName", actionSchema)
+    const signature = extract(formData, "signature", zodHex);
+    const actionName = extract(formData, "actionName", actionSchema);
 
-    await saveEmergencySignature(
-      signature,
-      user.address,
-      actionName,
-      proposalId
-    );
+    await saveEmergencySignature(signature, user.address, actionName, proposalId);
   }
 
   if (intent === intentParser.enum.broadcastSuccess) {
-    await broadcastSuccess(proposalId)
+    await broadcastSuccess(proposalId);
   }
 
-  return json({ ok: true })
+  return json({ ok: true });
 }
 
 const ActionSchema = z.enum([
