@@ -2,68 +2,68 @@ declare module "remix-routes" {
   type URLSearchParamsInit = string | string[][] | Record<string, string> | URLSearchParams;
   // symbol won't be a key of SearchParams
   type IsSearchParams<T> = symbol extends keyof T ? false : true;
-  
+
   type ExportedQuery<T> = IsSearchParams<T> extends true ? T : URLSearchParamsInit;
-  
+
 
   export interface Routes {
-  
+
     "": {
       params: never,
       query: ExportedQuery<import('app/routes/index').SearchParams>,
     };
-  
+
     "/": {
       params: never,
       query: ExportedQuery<import('app/root').SearchParams>,
     };
-  
+
     "/*": {
       params: {
         "*": string | number;
       } ,
       query: ExportedQuery<import('app/routes/$').SearchParams>,
     };
-  
+
     "/app": {
       params: never,
       query: ExportedQuery<import('app/routes/app/_index/_route').SearchParams>,
     };
-  
+
     "/app/denied": {
       params: never,
       query: ExportedQuery<import('app/routes/app/denied/_route').SearchParams>,
     };
-  
+
     "/app/down": {
       params: never,
       query: ExportedQuery<import('app/routes/app/down/_route').SearchParams>,
     };
-  
+
     "/app/emergency": {
       params: never,
       query: ExportedQuery<import('app/routes/app/emergency/_route').SearchParams>,
     };
-  
+
     "/app/proposals": {
       params: never,
-      query: ExportedQuery<import('app/routes/app/proposals/_layout').SearchParams>,
+      query: ExportedQuery<import('app/routes/app/proposals/_index/_route').SearchParams>,
     };
-  
+
     "/app/proposals/:id": {
       params: {
         id: string | number;
       } ,
       query: ExportedQuery<import('app/routes/app/proposals/$id/_route').SearchParams>,
     };
-  
+
     "/app/proposals/:id/transactions/:hash": {
       params: {
         id: string | number;hash: string | number;
       } ,
       query: ExportedQuery<import('app/routes/app/proposals/$id_.transactions.$hash/_route').SearchParams>,
     };
-  
+
   }
 
   type RoutesWithParams = Pick<
@@ -81,6 +81,7 @@ declare module "remix-routes" {
     | 'routes/app/denied/_route'
     | 'routes/app/down/_route'
     | 'routes/app/emergency/_route'
+    | 'routes/app/proposals/_index/_route'
     | 'routes/app/proposals/_layout'
     | 'routes/app/proposals/$id_.transactions.$hash/_route'
     | 'routes/app/proposals/$id/_route'
