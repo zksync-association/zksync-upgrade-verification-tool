@@ -4,8 +4,7 @@ import { actionSchema } from "@/.server/db/schema";
 import {
   councilMembers,
   emergencyBoardAddress,
-  guardianMembers, UserRole,
-  zkFoundationAddress,
+  guardianMembers, zkFoundationAddress,
 } from "@/.server/service/authorized-users";
 import { saveEmergencySignature } from "@/.server/service/signatures";
 import { StatusIndicator } from "@/components/status-indicator";
@@ -24,6 +23,7 @@ import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
+import { UserRole } from "@/common/user-role";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);

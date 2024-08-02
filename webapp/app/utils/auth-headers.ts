@@ -1,6 +1,6 @@
-import { UserRole } from "@/.server/service/authorized-users";
 import { unauthorized } from "@/utils/http";
 import { USER_ADDRESS_HEADER, USER_ROLE_HEADER } from "@server/middlewares/auth";
+import { UserRole } from "@/common/user-role";
 
 export function getUserFromHeader(request: Request) {
   const address = request.headers.get(USER_ADDRESS_HEADER);

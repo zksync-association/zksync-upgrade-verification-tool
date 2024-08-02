@@ -1,10 +1,10 @@
-import type { UserRole } from "@/.server/service/authorized-users";
 import ConnectButton from "@/components/connect-button";
 import EnvBadge from "@/components/env-badge";
 import Logo from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import type { NodeEnv } from "@config/env.server";
 import { $path } from "remix-routes";
+import { UserRole } from "@/common/user-role";
 
 export default function NavbarWithUser({
   role,

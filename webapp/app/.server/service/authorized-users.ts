@@ -1,20 +1,15 @@
 import { l1Rpc } from "@/.server/service/clients";
-import {
-  emergencyBoardAbi,
-  guardiansAbi,
-  scAbi,
-  upgradeHandlerAbi,
-} from "@/.server/service/contract-abis";
+import { emergencyBoardAbi, guardiansAbi, scAbi, upgradeHandlerAbi, } from "@/.server/service/contract-abis";
 import { env } from "@config/env.server";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
+import { UserRole } from "@/common/user-role";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 
 const range = (l: number): number[] => new Array(l).fill(0).map((_, i) => i);
 
-export const UserRole = z.enum(["guardian", "securityCouncil", "zkFoundation", "visitor"]);
 export async function guardiansAddress(): Promise<Hex> {
   return l1Rpc.contractRead(upgradeHandlerAddress, "guardians", upgradeHandlerAbi.raw, zodHex);
 }
