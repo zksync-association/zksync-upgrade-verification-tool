@@ -54,6 +54,7 @@ export async function loader(args: LoaderFunctionArgs) {
       targetAddress: proposal.targetAddress,
       salt: proposal.salt,
       value: proposal.value.toString(),
+      status: proposal.status
     },
     addresses: {
       emergencyBoard: boardAddress,

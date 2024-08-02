@@ -1,5 +1,4 @@
 import { getAllEmergencyProposals } from "@/.server/db/dto/emergencyProposals";
-import type { EmergencyProposalStatus } from "@/.server/db/schema";
 import { saveEmergencyProposal } from "@/.server/service/emergency-proposals";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +22,7 @@ import { useState } from "react";
 import { $path } from "remix-routes";
 import { useAccount } from "wagmi";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
+import { EmergencyProposalStatus } from "@/common/proposal-status";
 
 export async function loader() {
   const emergencyProposals = await getAllEmergencyProposals();

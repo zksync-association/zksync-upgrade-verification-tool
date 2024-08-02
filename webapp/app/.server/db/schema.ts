@@ -1,17 +1,8 @@
 import { bytea } from "@/.server/db/custom-types";
 import { sql } from "drizzle-orm";
-import {
-  bigint,
-  check,
-  index,
-  json,
-  pgTable,
-  serial,
-  text,
-  timestamp,
-  unique,
-} from "drizzle-orm/pg-core";
+import { bigint, check, index, json, pgTable, serial, text, timestamp, unique, } from "drizzle-orm/pg-core";
 import { z } from "zod";
+import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 
 export const proposalsTable = pgTable(
   "proposals",
@@ -29,9 +20,6 @@ export const proposalsTable = pgTable(
     externalIdIdx: index("external_id_idx").on(table.externalId),
   })
 );
-export const emergencyProposalStatusSchema = z.enum(["ACTIVE", "READY", "BROADCAST", "CLOSED"]);
-
-export type EmergencyProposalStatus = z.infer<typeof emergencyProposalStatusSchema>;
 
 export const emergencyProposalsTable = pgTable(
   "emergency_proposals",
