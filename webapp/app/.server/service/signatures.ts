@@ -7,7 +7,7 @@ import {
   createOrIgnoreSignature,
   getSignaturesByEmergencyProposalId,
 } from "@/.server/db/dto/signatures";
-import { type Action, type actionSchema, signaturesTable } from "@/.server/db/schema";
+import { signaturesTable } from "@/.server/db/schema";
 import {
   councilAddress,
   councilMembers,
@@ -19,6 +19,7 @@ import {
 import { l1Rpc } from "@/.server/service/clients";
 import { guardiansAbi } from "@/.server/service/contract-abis";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
+import type { SignAction, signActionSchema } from "@/common/sign-action";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
@@ -28,7 +29,7 @@ import { type Hex, hashTypedData } from "viem";
 import { mainnet, sepolia } from "wagmi/chains";
 import { z } from "zod";
 
-type ProposalAction = z.infer<typeof actionSchema>;
+type ProposalAction = z.infer<typeof signActionSchema>;
 
 async function verifySignature(
   signer: Hex,
@@ -73,62 +74,66 @@ async function verifySignature(
   }
 }
 
+async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
+  const guardians = await guardianMembers();
+  const council = await councilMembers();
+  const foundation = await zkFoundationAddress();
+
+  const {
+    guardians: guardianSignatures,
+    council: councilSignatures,
+    foundation: foundationSignature,
+  } = classifySignatures(guardians, council, foundation, allSignatures);
+
+  return (
+    guardianSignatures.length >= GUARDIANS_COUNCIL_THRESHOLD &&
+    councilSignatures.length >= SEC_COUNCIL_THRESHOLD &&
+    foundationSignature !== null
+  );
+}
+
 export async function saveEmergencySignature(
   signature: Hex,
   signer: Hex,
-  action: Action,
+  action: SignAction,
   emergencyProposalId: Hex
 ) {
-  if (action === "ExecuteEmergencyUpgradeGuardians") {
-    const isValid = await verifySignature(
-      signer,
-      signature,
-      await emergencyBoardAddress(),
-      action,
-      emergencyProposalId,
-      "EmergencyUpgradeBoard",
-      await guardiansAddress()
-    );
-    if (!isValid) {
-      throw badRequest("Invalid signature provided");
+  switch (action) {
+    case "ExecuteEmergencyUpgradeGuardians": {
+      const isValid = await verifySignature(
+        signer,
+        signature,
+        await emergencyBoardAddress(),
+        action,
+        emergencyProposalId,
+        "EmergencyUpgradeBoard",
+        await guardiansAddress()
+      );
+      if (!isValid) {
+        throw badRequest("Invalid signature provided");
+      }
+      break;
     }
-  }
-
-  if (action === "ExecuteEmergencyUpgradeSecurityCouncil") {
-    const isValid = await verifySignature(
-      signer,
-      signature,
-      await emergencyBoardAddress(),
-      action,
-      emergencyProposalId,
-      "EmergencyUpgradeBoard",
-      await councilAddress()
-    );
-    if (!isValid) {
-      throw badRequest("Invalid signature provided");
+    case "ExecuteEmergencyUpgradeSecurityCouncil": {
+      const isValid = await verifySignature(
+        signer,
+        signature,
+        await emergencyBoardAddress(),
+        action,
+        emergencyProposalId,
+        "EmergencyUpgradeBoard",
+        await councilAddress()
+      );
+      if (!isValid) {
+        throw badRequest("Invalid signature provided");
+      }
+      break;
     }
-  }
-
-  if (action === "ExecuteEmergencyUpgradeZKFoundation") {
-    // TODO: How do we verify ths signatures?
-  }
-
-  async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
-    const guardians = await guardianMembers();
-    const council = await councilMembers();
-    const foundation = await zkFoundationAddress();
-
-    const {
-      guardians: guardianSignatures,
-      council: councilSignatures,
-      foundation: foundationSignature,
-    } = classifySignatures(guardians, council, foundation, allSignatures);
-
-    return (
-      guardianSignatures.length >= GUARDIANS_COUNCIL_THRESHOLD &&
-      councilSignatures.length >= SEC_COUNCIL_THRESHOLD &&
-      foundationSignature !== null
-    );
+    case "ExecuteEmergencyUpgradeZKFoundation":
+      // TODO: Check how to validate this signature.
+      break;
+    default:
+      throw badRequest(`Unknown signature action: ${action}`);
   }
 
   await db.transaction(async (sqltx) => {
@@ -159,14 +164,14 @@ export async function saveEmergencySignature(
       await updateEmergencyProposal(proposal);
     }
 
-    await createOrIgnoreSignature(dto);
+    await createOrIgnoreSignature(dto, { tx: sqltx });
   });
 }
 
 export async function validateAndSaveSignature(
   signature: Hex,
   signer: Hex,
-  action: Action,
+  action: SignAction,
   proposalId: Hex
 ) {
   let validSignature: boolean;

@@ -1,6 +1,5 @@
 import { getEmergencyProposalByExternalId } from "@/.server/db/dto/emergencyProposals";
 import { getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures";
-import { actionSchema } from "@/.server/db/schema";
 import {
   councilMembers,
   emergencyBoardAddress,
@@ -9,6 +8,7 @@ import {
 } from "@/.server/service/authorized-users";
 import { broadcastSuccess } from "@/.server/service/emergency-proposals";
 import { saveEmergencySignature } from "@/.server/service/signatures";
+import { type SignAction, signActionSchema } from "@/common/sign-action";
 import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { StatusIndicator } from "@/components/status-indicator";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,7 @@ function extract<T extends ZodTypeAny>(
   }
   return parsed.data;
 }
+
 const intentParser = z.enum(["newSignature", "broadcastSuccess"]);
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -97,7 +98,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === intentParser.enum.newSignature) {
     const user = requireUserFromHeader(request);
     const signature = extract(formData, "signature", zodHex);
-    const actionName = extract(formData, "actionName", actionSchema);
+    const actionName = extract(formData, "actionName", signActionSchema);
 
     await saveEmergencySignature(signature, user.address, actionName, proposalId);
   }
@@ -109,20 +110,13 @@ export async function action({ request }: ActionFunctionArgs) {
   return json({ ok: true });
 }
 
-const ActionSchema = z.enum([
-  "ExecuteEmergencyUpgradeGuardians",
-  "ExecuteEmergencyUpgradeSecurityCouncil",
-  "ExecuteEmergencyUpgradeZKFoundation",
-]);
-type Action = z.infer<typeof ActionSchema>;
-
 const ACTION_NAMES = {
-  guardian: ActionSchema.enum.ExecuteEmergencyUpgradeGuardians,
-  securityCouncil: ActionSchema.enum.ExecuteEmergencyUpgradeSecurityCouncil,
-  zkFoundation: ActionSchema.enum.ExecuteEmergencyUpgradeZKFoundation,
+  guardian: signActionSchema.enum.ExecuteEmergencyUpgradeGuardians,
+  securityCouncil: signActionSchema.enum.ExecuteEmergencyUpgradeSecurityCouncil,
+  zkFoundation: signActionSchema.enum.ExecuteEmergencyUpgradeZKFoundation,
 };
 
-function actionForRole(role: UserRole): Action {
+function actionForRole(role: UserRole): SignAction {
   if (role === UserRoleSchema.enum.visitor) {
     throw new Error("Visitors are not allowed to sign emergency upgrades");
   }
@@ -152,20 +146,19 @@ export default function EmergencyUpgradeDetails() {
     isAddressEqual(s.signer, addresses.zkFoundation)
   ).length;
   return (
-    <>
-      <div className="mt-10 flex flex-1 flex-col">
-        <div className="mb-4 flex items-center pl-2">
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => navigate(-1)}
-            className="mr-2 hover:bg-transparent"
-          >
-            <ArrowLeft />
-          </Button>
-          <h2 className="font-semibold">Proposal {proposal.externalId}</h2>
-        </div>
+    <div className="flex min-h-screen flex-col pt-10">
+      <div className="mb-4 flex items-center pl-2">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => navigate(-1)}
+          className="mr-2 hover:bg-transparent"
+        >
+          <ArrowLeft />
+        </Button>
+        <h2 className="font-semibold">Proposal {proposal.externalId}</h2>
       </div>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card className="pb-10">
           <CardHeader>
@@ -254,6 +247,6 @@ export default function EmergencyUpgradeDetails() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   );
 }

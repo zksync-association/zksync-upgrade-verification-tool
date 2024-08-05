@@ -1,11 +1,11 @@
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
-import { actionSchema } from "@/.server/db/schema";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
+import { signActionSchema } from "@/common/sign-action";
 import { StatusIndicator } from "@/components/status-indicator";
 import TxLink from "@/components/tx-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -126,7 +126,7 @@ export async function action({ request }: ActionFunctionArgs) {
     z.object({
       signature: zodHex,
       proposalId: zodHex,
-      actionName: actionSchema,
+      actionName: signActionSchema,
     })
   );
   if (!data.success) {
