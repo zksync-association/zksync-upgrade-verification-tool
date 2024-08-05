@@ -1,6 +1,5 @@
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
-import { actionSchema } from "@/.server/db/schema";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
@@ -33,6 +32,7 @@ import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
+import { signActionSchema } from "@/common/sign-action";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -126,7 +126,7 @@ export async function action({ request }: ActionFunctionArgs) {
     z.object({
       signature: zodHex,
       proposalId: zodHex,
-      actionName: actionSchema,
+      actionName: signActionSchema,
     })
   );
   if (!data.success) {

@@ -7,7 +7,7 @@ import {
   createOrIgnoreSignature,
   getSignaturesByEmergencyProposalId,
 } from "@/.server/db/dto/signatures";
-import { type Action, type actionSchema, signaturesTable } from "@/.server/db/schema";
+import { signaturesTable } from "@/.server/db/schema";
 import {
   councilAddress,
   councilMembers,
@@ -27,8 +27,9 @@ import { and, asc, eq } from "drizzle-orm";
 import { type Hex, hashTypedData } from "viem";
 import { mainnet, sepolia } from "wagmi/chains";
 import { z } from "zod";
+import { SignAction, signActionSchema } from "@/common/sign-action";
 
-type ProposalAction = z.infer<typeof actionSchema>;
+type ProposalAction = z.infer<typeof signActionSchema>;
 
 async function verifySignature(
   signer: Hex,
@@ -94,7 +95,7 @@ async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promi
 export async function saveEmergencySignature(
   signature: Hex,
   signer: Hex,
-  action: Action,
+  action: SignAction,
   emergencyProposalId: Hex
 ) {
   switch (action) {
@@ -168,7 +169,7 @@ export async function saveEmergencySignature(
 export async function validateAndSaveSignature(
   signature: Hex,
   signer: Hex,
-  action: Action,
+  action: SignAction,
   proposalId: Hex
 ) {
   let validSignature: boolean;
