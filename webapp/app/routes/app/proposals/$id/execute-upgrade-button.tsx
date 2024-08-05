@@ -51,8 +51,7 @@ export default function ExecuteUpgradeButton({
         onSuccess: (hash) => {
           toast.success("Transaction broadcasted successfully", { id: "broadcasting-tx" });
           navigate(
-            $path("/app/proposals/:id/transactions/:hash", {
-              id: proposalId,
+            $path("/app/transactions/:hash", {
               hash,
             })
           );
