@@ -73,62 +73,64 @@ async function verifySignature(
   }
 }
 
+async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
+  const guardians = await guardianMembers();
+  const council = await councilMembers();
+  const foundation = await zkFoundationAddress();
+
+  const {
+    guardians: guardianSignatures,
+    council: councilSignatures,
+    foundation: foundationSignature,
+  } = classifySignatures(guardians, council, foundation, allSignatures);
+
+  return (
+    guardianSignatures.length >= GUARDIANS_COUNCIL_THRESHOLD &&
+    councilSignatures.length >= SEC_COUNCIL_THRESHOLD &&
+    foundationSignature !== null
+  );
+}
+
 export async function saveEmergencySignature(
   signature: Hex,
   signer: Hex,
   action: Action,
   emergencyProposalId: Hex
 ) {
-  if (action === "ExecuteEmergencyUpgradeGuardians") {
-    const isValid = await verifySignature(
-      signer,
-      signature,
-      await emergencyBoardAddress(),
-      action,
-      emergencyProposalId,
-      "EmergencyUpgradeBoard",
-      await guardiansAddress()
-    );
-    if (!isValid) {
-      throw badRequest("Invalid signature provided");
-    }
-  }
-
-  if (action === "ExecuteEmergencyUpgradeSecurityCouncil") {
-    const isValid = await verifySignature(
-      signer,
-      signature,
-      await emergencyBoardAddress(),
-      action,
-      emergencyProposalId,
-      "EmergencyUpgradeBoard",
-      await councilAddress()
-    );
-    if (!isValid) {
-      throw badRequest("Invalid signature provided");
-    }
-  }
-
-  if (action === "ExecuteEmergencyUpgradeZKFoundation") {
-    // TODO: How do we verify ths signatures?
-  }
-
-  async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
-    const guardians = await guardianMembers();
-    const council = await councilMembers();
-    const foundation = await zkFoundationAddress();
-
-    const {
-      guardians: guardianSignatures,
-      council: councilSignatures,
-      foundation: foundationSignature,
-    } = classifySignatures(guardians, council, foundation, allSignatures);
-
-    return (
-      guardianSignatures.length >= GUARDIANS_COUNCIL_THRESHOLD &&
-      councilSignatures.length >= SEC_COUNCIL_THRESHOLD &&
-      foundationSignature !== null
-    );
+  switch (action) {
+    case "ExecuteEmergencyUpgradeGuardians":
+      const isValid1 = await verifySignature(
+        signer,
+        signature,
+        await emergencyBoardAddress(),
+        action,
+        emergencyProposalId,
+        "EmergencyUpgradeBoard",
+        await guardiansAddress()
+      );
+      if (!isValid1) {
+        throw badRequest("Invalid signature provided");
+      }
+      break
+    case "ExecuteEmergencyUpgradeSecurityCouncil":
+      const isValid2 = await verifySignature(
+        signer,
+        signature,
+        await emergencyBoardAddress(),
+        action,
+        emergencyProposalId,
+        "EmergencyUpgradeBoard",
+        await councilAddress()
+      );
+      if (!isValid2) {
+        throw badRequest("Invalid signature provided");
+      }
+      break
+    case "ExecuteEmergencyUpgradeZKFoundation":
+      // TODO: Check how to validate this signature.
+      break
+    default:
+      throw badRequest(`Unknown signature action: ${action}`)
   }
 
   await db.transaction(async (sqltx) => {
