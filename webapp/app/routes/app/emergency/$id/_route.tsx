@@ -146,7 +146,7 @@ export default function EmergencyUpgradeDetails() {
     isAddressEqual(s.signer, addresses.zkFoundation)
   ).length;
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col pt-10">
       <div className="mb-4 flex items-center pl-2">
         <Button
           size="icon"
