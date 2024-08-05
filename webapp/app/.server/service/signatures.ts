@@ -164,7 +164,7 @@ export async function saveEmergencySignature(
       await updateEmergencyProposal(proposal);
     }
 
-    await createOrIgnoreSignature(dto);
+    await createOrIgnoreSignature(dto, { tx: sqltx });
   });
 }
 
