@@ -33,12 +33,12 @@ import { type ZodTypeAny, z } from "zod";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
-  const params = getParams(args.params, z.object({ id: zodHex }));
+  const params = getParams(args.params, z.object({id: zodHex}));
   if (!params.success) {
     throw notFound();
   }
 
-  const { id: proposalId } = params.data;
+  const {id: proposalId} = params.data;
 
   const boardAddress = await emergencyBoardAddress();
 
@@ -84,9 +84,10 @@ function extract<T extends ZodTypeAny>(
   }
   return parsed.data;
 }
+
 const intentParser = z.enum(["newSignature", "broadcastSuccess"]);
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({request}: ActionFunctionArgs) {
   const formData = await request.formData().catch(() => {
     throw badRequest("Failed to parse body");
   });
@@ -106,7 +107,7 @@ export async function action({ request }: ActionFunctionArgs) {
     await broadcastSuccess(proposalId);
   }
 
-  return json({ ok: true });
+  return json({ok: true});
 }
 
 const ACTION_NAMES = {
@@ -126,7 +127,7 @@ function actionForRole(role: UserRole): SignAction {
 export default function EmergencyUpgradeDetails() {
   const navigate = useNavigate();
 
-  const { user, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
+  const {user, proposal, addresses, signatures, allSecurityCouncil, allGuardians} =
     useLoaderData<typeof loader>();
 
   if (user.role === "visitor") {
@@ -145,20 +146,19 @@ export default function EmergencyUpgradeDetails() {
     isAddressEqual(s.signer, addresses.zkFoundation)
   ).length;
   return (
-    <>
-      <div className="mt-10 flex flex-1 flex-col">
-        <div className="mb-4 flex items-center pl-2">
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => navigate(-1)}
-            className="mr-2 hover:bg-transparent"
-          >
-            <ArrowLeft />
-          </Button>
-          <h2 className="font-semibold">Proposal {proposal.externalId}</h2>
-        </div>
+    <div className="flex flex-col min-h-screen">
+      <div className="mb-4 flex items-center pl-2">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => navigate(-1)}
+          className="mr-2 hover:bg-transparent"
+        >
+          <ArrowLeft/>
+        </Button>
+        <h2 className="font-semibold">Proposal {proposal.externalId}</h2>
       </div>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card className="pb-10">
           <CardHeader>
@@ -223,7 +223,7 @@ export default function EmergencyUpgradeDetails() {
                 name: "EmergencyUpgradeBoard",
               }}
               disabled={haveAlreadySigned}
-              postAction={$path("/app/emergency/:id", { id: proposal.externalId })}
+              postAction={$path("/app/emergency/:id", {id: proposal.externalId})}
             >
               Approve
             </SignButton>
@@ -247,6 +247,6 @@ export default function EmergencyUpgradeDetails() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   );
 }
