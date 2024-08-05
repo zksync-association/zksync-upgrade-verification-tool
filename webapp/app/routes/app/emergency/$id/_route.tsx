@@ -8,6 +8,7 @@ import {
 } from "@/.server/service/authorized-users";
 import { broadcastSuccess } from "@/.server/service/emergency-proposals";
 import { saveEmergencySignature } from "@/.server/service/signatures";
+import { type SignAction, signActionSchema } from "@/common/sign-action";
 import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { StatusIndicator } from "@/components/status-indicator";
 import { Button } from "@/components/ui/button";
@@ -21,15 +22,14 @@ import {
   ZK_FOUNDATION_THRESHOLD,
 } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
-import { type ActionFunctionArgs, json, type LoaderFunctionArgs } from "@remix-run/node";
+import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
-import { z, type ZodTypeAny } from "zod";
-import { SignAction, signActionSchema } from "@/common/sign-action";
+import { type ZodTypeAny, z } from "zod";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);

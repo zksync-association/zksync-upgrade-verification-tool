@@ -19,6 +19,7 @@ import {
 import { l1Rpc } from "@/.server/service/clients";
 import { guardiansAbi } from "@/.server/service/contract-abis";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
+import type { SignAction, signActionSchema } from "@/common/sign-action";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
@@ -27,7 +28,6 @@ import { and, asc, eq } from "drizzle-orm";
 import { type Hex, hashTypedData } from "viem";
 import { mainnet, sepolia } from "wagmi/chains";
 import { z } from "zod";
-import { SignAction, signActionSchema } from "@/common/sign-action";
 
 type ProposalAction = z.infer<typeof signActionSchema>;
 
@@ -99,8 +99,8 @@ export async function saveEmergencySignature(
   emergencyProposalId: Hex
 ) {
   switch (action) {
-    case "ExecuteEmergencyUpgradeGuardians":
-      const isValid1 = await verifySignature(
+    case "ExecuteEmergencyUpgradeGuardians": {
+      const isValid = await verifySignature(
         signer,
         signature,
         await emergencyBoardAddress(),
@@ -109,12 +109,13 @@ export async function saveEmergencySignature(
         "EmergencyUpgradeBoard",
         await guardiansAddress()
       );
-      if (!isValid1) {
+      if (!isValid) {
         throw badRequest("Invalid signature provided");
       }
-      break
-    case "ExecuteEmergencyUpgradeSecurityCouncil":
-      const isValid2 = await verifySignature(
+      break;
+    }
+    case "ExecuteEmergencyUpgradeSecurityCouncil": {
+      const isValid = await verifySignature(
         signer,
         signature,
         await emergencyBoardAddress(),
@@ -123,15 +124,16 @@ export async function saveEmergencySignature(
         "EmergencyUpgradeBoard",
         await councilAddress()
       );
-      if (!isValid2) {
+      if (!isValid) {
         throw badRequest("Invalid signature provided");
       }
-      break
+      break;
+    }
     case "ExecuteEmergencyUpgradeZKFoundation":
       // TODO: Check how to validate this signature.
-      break
+      break;
     default:
-      throw badRequest(`Unknown signature action: ${action}`)
+      throw badRequest(`Unknown signature action: ${action}`);
   }
 
   await db.transaction(async (sqltx) => {
