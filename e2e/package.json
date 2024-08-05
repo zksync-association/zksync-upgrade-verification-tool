@@ -17,22 +17,37 @@
   ],
   "scripts": {
     "update": "vitest -u",
-    "check": "pnpm biome check .",
-    "check:fix": "pnpm biome check . --write",
+    "compile": "hardhat compile",
+    "check": "biome check .",
+    "check:fix": "biome check . --write",
+    "deploy:setup": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' pnpm hardhat run scripts/deploySetup.ts --network local",
+    "deploy:upgrade": "hardhat run scripts/startUpgrade.ts $HANDLER --network local",
+    "env:up": "hardhat node > .hardhat.log 2>&1 & echo $! > .hardhat-pid",
+    "env:down": "kill $(cat .hardhat-pid) && rm .hardhat-pid .hardhat.log",
+    "test:local": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' pnpm hardhat test --network local",
     "test:cli": "vitest run --config ./vitest.cli.config.ts"
   },
   "keywords": [],
   "author": "moonsong-labs",
   "license": "GPL-3.0-only",
-  "devDependencies": {
-    "@biomejs/biome": "1.8.3",
-    "@types/node": "^20.12.6",
-    "typescript": "^5.4.4"
-  },
   "dependencies": {
+    "@biomejs/biome": "1.8.3",
+    "@nomicfoundation/hardhat-ignition-viem": "^0.15.5",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.11",
+    "@nomicfoundation/hardhat-viem": "^2.0.3",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@types/chai": "4",
+    "@types/mocha": "^10.0.7",
+    "@types/node": "^20.12.6",
+    "chai": "4",
     "dotenv": "^16.4.5",
+    "glob": "^11.0.0",
+    "hardhat": "^2.22.6",
     "tempy": "^3.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.4",
     "validate-cli": "workspace:*",
+    "viem": "^2.17.5",
     "vitest": "^2.0.5"
   }
 }
