@@ -64,13 +64,6 @@ declare module "remix-routes" {
       query: ExportedQuery<import('app/routes/app/proposals/$id/_route').SearchParams>,
     };
   
-    "/app/proposals/:id/transactions/:hash": {
-      params: {
-        id: string | number;hash: string | number;
-      } ,
-      query: ExportedQuery<import('app/routes/app/proposals/$id_.transactions.$hash/_route').SearchParams>,
-    };
-  
     "/app/transactions/:hash": {
       params: {
         hash: string | number;
@@ -97,7 +90,6 @@ declare module "remix-routes" {
     | 'routes/app/emergency/_index/_route'
     | 'routes/app/emergency/$id/_route'
     | 'routes/app/proposals/_layout'
-    | 'routes/app/proposals/$id_.transactions.$hash/_route'
     | 'routes/app/proposals/$id/_route'
     | 'routes/app/transactions.$hash/_route'
     | 'routes/index';
