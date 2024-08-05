@@ -1,5 +1,5 @@
 {
-  "name": "validate-test",
+  "name": "validate-e2e",
   "version": "1.0.0",
   "description": "",
   "type": "module",
@@ -17,11 +17,9 @@
   ],
   "scripts": {
     "update": "vitest -u",
-    "fmt": "biome format .",
-    "fmt:fix": "biome format . --write",
-    "lint": "pnpm biome lint .",
-    "lint:fix": "pnpm biome lint . --write",
-    "test": "vitest run --maxWorkers=1"
+    "check": "pnpm biome check .",
+    "check:fix": "pnpm biome check . --write",
+    "test:cli": "vitest run --config ./vitest.cli.config.ts"
   },
   "keywords": [],
   "author": "moonsong-labs",
@@ -35,6 +33,6 @@
     "dotenv": "^16.4.5",
     "tempy": "^3.1.0",
     "validate-cli": "workspace:*",
-    "vitest": "^1.4.0"
+    "vitest": "^2.0.5"
   }
 }
