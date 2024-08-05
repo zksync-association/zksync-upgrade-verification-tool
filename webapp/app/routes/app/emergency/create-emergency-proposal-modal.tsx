@@ -20,8 +20,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import type { action } from "@/routes/app/emergency/_route";
-import { EMERGENCY_BOARD, calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
+import type { action } from "@/routes/app/emergency/_index/_route";
+import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ChevronDownIcon,
@@ -34,7 +34,7 @@ import {
 import { useFetcher } from "@remix-run/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { type Hash, isAddress, padHex, parseEther } from "viem";
+import { type Hex, isAddress, padHex, parseEther } from "viem";
 import { z } from "zod";
 import { StepIndicator } from "./step-indicator";
 
@@ -74,16 +74,14 @@ export type EmergencyProp = z.infer<typeof emergencyPropSchema>;
 
 export function CreateEmergencyProposalModal({
   isOpen,
-  errors,
-  status,
   onClose,
   proposerAddress,
+  emergencyBoardAddress,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  errors: object;
-  status?: string;
-  proposerAddress?: `0x${string}`;
+  proposerAddress?: Hex;
+  emergencyBoardAddress: Hex;
 }) {
   const [step, setStep] = useState(1);
   const [extId, setExtId] = useState("");
@@ -93,7 +91,7 @@ export function CreateEmergencyProposalModal({
 
   const defaultFormValues = {
     title: "",
-    targetAddress: "0x" as Hash,
+    targetAddress: "0x" as Hex,
     calldata: "0x",
     value: "0",
     salt: "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -119,12 +117,12 @@ export function CreateEmergencyProposalModal({
         [
           {
             value: parseEther(form.getValues("value")),
-            data: form.getValues("calldata") as Hash,
-            target: form.getValues("targetAddress"),
+            data: form.getValues("calldata") as Hex,
+            target: form.getValues("targetAddress") as Hex,
           },
         ],
-        form.getValues("salt") as Hash,
-        EMERGENCY_BOARD
+        form.getValues("salt") as Hex,
+        emergencyBoardAddress
       );
       setExtId(derivedExternalId);
     } else {

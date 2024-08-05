@@ -2276,9 +2276,206 @@ export const IPROTOCOL_UPGRADE_HANDLER_RAW_ABI: Abi = [
   },
 ] as const;
 
+export const EMERGENCY_BOARD_ABI = [
+  {
+    inputs: [
+      {
+        internalType: "contract IProtocolUpgradeHandler",
+        name: "_protocolUpgradeHandler",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "_securityCouncil",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "_guardians",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "_zkFoundation",
+        type: "address",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "constructor",
+  },
+  {
+    inputs: [],
+    name: "InvalidShortString",
+    type: "error",
+  },
+  {
+    inputs: [
+      {
+        internalType: "string",
+        name: "str",
+        type: "string",
+      },
+    ],
+    name: "StringTooLong",
+    type: "error",
+  },
+  {
+    anonymous: false,
+    inputs: [],
+    name: "EIP712DomainChanged",
+    type: "event",
+  },
+  {
+    inputs: [],
+    name: "GUARDIANS",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "PROTOCOL_UPGRADE_HANDLER",
+    outputs: [
+      {
+        internalType: "contract IProtocolUpgradeHandler",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "SECURITY_COUNCIL",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "ZK_FOUNDATION_SAFE",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "eip712Domain",
+    outputs: [
+      {
+        internalType: "bytes1",
+        name: "fields",
+        type: "bytes1",
+      },
+      {
+        internalType: "string",
+        name: "name",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "version",
+        type: "string",
+      },
+      {
+        internalType: "uint256",
+        name: "chainId",
+        type: "uint256",
+      },
+      {
+        internalType: "address",
+        name: "verifyingContract",
+        type: "address",
+      },
+      {
+        internalType: "bytes32",
+        name: "salt",
+        type: "bytes32",
+      },
+      {
+        internalType: "uint256[]",
+        name: "extensions",
+        type: "uint256[]",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        components: [
+          {
+            internalType: "address",
+            name: "target",
+            type: "address",
+          },
+          {
+            internalType: "uint256",
+            name: "value",
+            type: "uint256",
+          },
+          {
+            internalType: "bytes",
+            name: "data",
+            type: "bytes",
+          },
+        ],
+        internalType: "struct IProtocolUpgradeHandler.Call[]",
+        name: "_calls",
+        type: "tuple[]",
+      },
+      {
+        internalType: "bytes32",
+        name: "_salt",
+        type: "bytes32",
+      },
+      {
+        internalType: "bytes",
+        name: "_guardiansSignatures",
+        type: "bytes",
+      },
+      {
+        internalType: "bytes",
+        name: "_securityCouncilSignatures",
+        type: "bytes",
+      },
+      {
+        internalType: "bytes",
+        name: "_zkFoundationSignatures",
+        type: "bytes",
+      },
+    ],
+    name: "executeEmergencyUpgrade",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
 export const ALL_ABIS = {
   handler: PROTOCOL_UPGRADE_HANDLER_RAW_ABI,
   council: SEC_COUNCIL_RAW_ABI,
   guardians: GUARDIANS_RAW_ABI,
+  emergencyBoard: EMERGENCY_BOARD_ABI,
   handlerInterface: IPROTOCOL_UPGRADE_HANDLER_RAW_ABI,
 };

@@ -1,15 +1,15 @@
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
-import { actionSchema } from "@/.server/db/schema";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
+import { signActionSchema } from "@/common/sign-action";
+import { StatusIndicator } from "@/components/status-indicator";
 import TxLink from "@/components/tx-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ContractWriteButton from "@/routes/app/proposals/$id/contract-write-button";
 import ExecuteUpgradeButton from "@/routes/app/proposals/$id/execute-upgrade-button";
@@ -20,7 +20,6 @@ import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
-import { cn } from "@/utils/cn";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { badRequest, notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
@@ -30,6 +29,7 @@ import { defer, json } from "@remix-run/node";
 import { Await, useLoaderData } from "@remix-run/react";
 import { Suspense } from "react";
 import { getFormData, getParams } from "remix-params-helper";
+import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
@@ -126,7 +126,7 @@ export async function action({ request }: ActionFunctionArgs) {
     z.object({
       signature: zodHex,
       proposalId: zodHex,
-      actionName: actionSchema,
+      actionName: signActionSchema,
     })
   );
   if (!data.success) {
@@ -284,6 +284,7 @@ export default function Proposals() {
                             name: "Guardians",
                           }}
                           disabled={!signLegalVetoEnabled}
+                          postAction={$path("/app/proposals/:id", { id: proposalId })}
                         >
                           Approve extend veto period
                         </SignButton>
@@ -297,6 +298,7 @@ export default function Proposals() {
                             name: "Guardians",
                           }}
                           disabled={!signProposalEnabled}
+                          postAction={$path("/app/proposals/:id", { id: proposalId })}
                         >
                           Approve proposal
                         </SignButton>
@@ -310,6 +312,7 @@ export default function Proposals() {
                             name: "SecurityCouncil",
                           }}
                           disabled={!signProposalEnabled}
+                          postAction={$path("/app/proposals/:id", { id: proposalId })}
                         >
                           Approve proposal
                         </SignButton>
@@ -425,31 +428,6 @@ export default function Proposals() {
           }}
         </Await>
       </Suspense>
-    </div>
-  );
-}
-
-function StatusIndicator({
-  signatures,
-  necessarySignatures,
-  label,
-}: { signatures: number; necessarySignatures: number; label: string }) {
-  const necessarySignaturesReached = signatures >= necessarySignatures;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-between">
-        <span>{label}</span>
-        <span
-          className={cn("text-muted-foreground", necessarySignaturesReached && "text-green-400")}
-        >
-          {signatures}/{necessarySignatures}
-        </span>
-      </div>
-      <Progress
-        indicatorClassName={cn(necessarySignaturesReached && "bg-green-500")}
-        value={(signatures / necessarySignatures) * 100}
-      />
     </div>
   );
 }

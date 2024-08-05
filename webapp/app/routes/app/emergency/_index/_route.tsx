@@ -1,6 +1,7 @@
 import { getAllEmergencyProposals } from "@/.server/db/dto/emergencyProposals";
-import type { EmergencyProposalStatus } from "@/.server/db/schema";
+import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import { saveEmergencyProposal } from "@/.server/service/emergency-proposals";
+import type { EmergencyProposalStatus } from "@/common/proposal-status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -17,7 +18,7 @@ import {
 } from "@/routes/app/emergency/create-emergency-proposal-modal";
 import { PlusIcon } from "@radix-ui/react-icons";
 import type { ActionFunctionArgs } from "@remix-run/node";
-import { Form, Link, json, useActionData, useLoaderData } from "@remix-run/react";
+import { Form, Link, json, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { $path } from "remix-routes";
@@ -32,6 +33,7 @@ export async function loader() {
     inactiveEmergencyProposals: emergencyProposals.filter(
       ({ status }) => status === "CLOSED" || status === "BROADCAST"
     ),
+    emergencyBoardAddress: await emergencyBoardAddress(),
   });
 }
 
@@ -44,9 +46,9 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Index() {
-  const { activeEmergencyProposals, inactiveEmergencyProposals } = useLoaderData<typeof loader>();
+  const { activeEmergencyProposals, inactiveEmergencyProposals, emergencyBoardAddress } =
+    useLoaderData<typeof loader>();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const actionData = useActionData<typeof action>();
   const { address } = useAccount();
 
   return (
@@ -105,7 +107,7 @@ export default function Index() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Link to={$path("/app/proposals/:id", { id: ep.id })}>
+                        <Link to={$path("/app/emergency/:id", { id: ep.externalId })}>
                           <Button variant="outline" size="sm">
                             View
                             <ArrowRight className="ml-2 h-4 w-4" />
@@ -188,9 +190,8 @@ export default function Index() {
         <CreateEmergencyProposalModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          errors={actionData?.errors as object}
-          status={actionData?.status}
           proposerAddress={address}
+          emergencyBoardAddress={emergencyBoardAddress}
         />
       </Form>
     </div>

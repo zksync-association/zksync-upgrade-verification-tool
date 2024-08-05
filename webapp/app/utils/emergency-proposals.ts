@@ -1,18 +1,18 @@
-import { type AbiParameter, type Hash, encodeAbiParameters, keccak256 } from "viem";
+import { type AbiParameter, type Hex, encodeAbiParameters, keccak256 } from "viem";
 
 type Call = {
-  target: Hash;
+  target: Hex;
   value: bigint;
-  data: Hash;
+  data: Hex;
 };
 
 type UpgradeProposal = {
   calls: Call[];
-  executor: Hash;
-  salt: Hash;
+  executor: Hex;
+  salt: Hex;
 };
 
-export const calculateUpgradeProposalHash = (calls: Call[], salt: Hash, executorAddress: Hash) => {
+export const calculateUpgradeProposalHash = (calls: Call[], salt: Hex, executorAddress: Hex) => {
   const upgradeProposal: UpgradeProposal = {
     calls,
     executor: executorAddress,
@@ -42,5 +42,6 @@ export const calculateUpgradeProposalHash = (calls: Call[], salt: Hash, executor
   return keccak256(encodedProposal);
 };
 
-// TODO: Replace with derive fn
-export const EMERGENCY_BOARD = "0xee4a55397e9d6f4f222df2b9aa0c2ae8a69e8fa4";
+export const SEC_COUNCIL_THRESHOLD = 9;
+export const GUARDIANS_COUNCIL_THRESHOLD = 5;
+export const ZK_FOUNDATION_THRESHOLD = 1;

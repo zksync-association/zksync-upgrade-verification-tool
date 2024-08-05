@@ -1,3 +1,4 @@
+import { getUserAuthRole } from "@/.server/service/authorized-users";
 import { checkConnection } from "@/.server/service/clients";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
@@ -12,7 +13,7 @@ import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { useAccount } from "wagmi";
 
-export function loader({ request }: LoaderFunctionArgs) {
+export function loader(_args: LoaderFunctionArgs) {
   const environment = clientEnv.NODE_ENV;
   return { environment };
 }
@@ -31,8 +32,9 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!isUp) {
     throw redirect($path("/app/down"));
   }
+  const role = await getUserAuthRole(parsedAddress.data);
 
-  return json({ status: "success" });
+  return json({ status: "success", role });
 }
 
 export default function Index() {
