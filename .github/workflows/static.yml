@@ -19,7 +19,7 @@ jobs:
       - run: pnpm install
       - run: pnpm run build
 
-  lint:
+  biome-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,22 +32,8 @@ jobs:
           cache: "pnpm"
       - run: pnpm install
       - run: pnpm build
-      - run: pnpm run lint
-
-  format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: "pnpm"
-      - run: pnpm install
-      - run: pnpm run fmt
-
+      - run: pnpm run check
+      
   typecheck:
     runs-on: ubuntu-latest
     steps:

@@ -13,7 +13,7 @@ export default defineConfig({
         singleThread: true,
       },
     },
-    setupFiles: ["app/test/setup.integration.ts"],
-    include: ["app/test/integration/*.{test,spec}.{ts,tsx}"],
+    setupFiles: ["test/setup.integration.ts"],
+    include: ["test/integration/*.{test,spec}.{ts,tsx}"],
   },
 });

@@ -11,7 +11,6 @@ env:
   LOG_LEVEL: debug
   ETH_NETWORK: "mainnet"
   DATABASE_URL: postgresql://user:password@localhost:5432/webapp
-  NODE_ENV: test
   L1_RPC_URL: ${{ secrets.TENDERLY_RPC_URL }}
   WALLET_CONNECT_PROJECT_ID: 00000000000000000000000000000000
   UPGRADE_HANDLER_ADDRESS: "0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9" # set to sepolia zkSync diamond just because it exists

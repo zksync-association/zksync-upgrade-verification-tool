@@ -20,10 +20,8 @@
     "*.mjs"
   ],
   "scripts": {
-    "fmt": "biome format .",
-    "fmt:fix": "biome format . --write",
-    "lint": "pnpm biome lint ./src",
-    "lint:fix": "pnpm biome lint ./src --write",
+    "check": "pnpm biome check ./src",
+    "check:fix": "pnpm biome check ./src --write",
     "start": "tsx src/entrypoint.ts",
     "build": "tsup src --format esm --dts --no-splitting --sourcemap",
     "watch": "tsup src --format esm --sourcemap --no-splitting --watch",
