@@ -1,7 +1,8 @@
-import { UserRoleSchema } from "@/common/user-role-schema";
+import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { unauthorized } from "@/utils/http";
 import { USER_ADDRESS_HEADER, USER_ROLE_HEADER } from "@server/middlewares/auth";
 import { zodHex } from "validate-cli/src";
+import type { Hex } from "viem";
 
 export function getUserFromHeader(request: Request) {
   const address = request.headers.get(USER_ADDRESS_HEADER);
@@ -11,7 +12,7 @@ export function getUserFromHeader(request: Request) {
   return { address: parsedAddress, role: parsedRole.data ?? null };
 }
 
-export function requireUserFromHeader(request: Request) {
+export function requireUserFromHeader(request: Request): { address: Hex; role: UserRole } {
   const { address, role } = getUserFromHeader(request);
 
   const parsedRole = UserRoleSchema.safeParse(role);

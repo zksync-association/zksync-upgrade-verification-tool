@@ -66,8 +66,7 @@ export const emergencyPropSchema = z.object({
     .string()
     .refine((value) => isAddress(value), {
       message: "Invalid proposer address",
-    })
-    .optional(),
+    }),
 });
 
 export type EmergencyProp = z.infer<typeof emergencyPropSchema>;
@@ -80,7 +79,7 @@ export function CreateEmergencyProposalModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  proposerAddress?: Hex;
+  proposerAddress: Hex;
   emergencyBoardAddress: Hex;
 }) {
   const [step, setStep] = useState(1);
@@ -103,7 +102,7 @@ export function CreateEmergencyProposalModal({
 
   const handleCreate = (data: EmergencyProp) => {
     if (form.formState.isValid) {
-      fetcher.submit({ ...data, proposer: proposerAddress ?? "" }, { method: "post" });
+      fetcher.submit({ ...data, proposer: proposerAddress }, { method: "post" });
       onClose();
       setStep(1);
       form.reset(defaultFormValues);

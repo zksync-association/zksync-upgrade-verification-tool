@@ -16,16 +16,18 @@ import {
   CreateEmergencyProposalModal,
   emergencyPropSchema,
 } from "@/routes/app/emergency/create-emergency-proposal-modal";
+import { requireUserFromHeader } from "@/utils/auth-headers";
 import { PlusIcon } from "@radix-ui/react-icons";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { Form, Link, json, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { $path } from "remix-routes";
 import { useAccount } from "wagmi";
 
-export async function loader() {
+export async function loader(args: LoaderFunctionArgs) {
   const emergencyProposals = await getAllEmergencyProposals();
+  const user = requireUserFromHeader(args.request);
   return json({
     activeEmergencyProposals: emergencyProposals.filter(
       ({ status }) => status === "ACTIVE" || status === "READY"
@@ -34,6 +36,7 @@ export async function loader() {
       ({ status }) => status === "CLOSED" || status === "BROADCAST"
     ),
     emergencyBoardAddress: await emergencyBoardAddress(),
+    currentUser: user.address,
   });
 }
 
@@ -46,8 +49,12 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Index() {
-  const { activeEmergencyProposals, inactiveEmergencyProposals, emergencyBoardAddress } =
-    useLoaderData<typeof loader>();
+  const {
+    activeEmergencyProposals,
+    inactiveEmergencyProposals,
+    emergencyBoardAddress,
+    currentUser,
+  } = useLoaderData<typeof loader>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { address } = useAccount();
 
@@ -190,7 +197,7 @@ export default function Index() {
         <CreateEmergencyProposalModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          proposerAddress={address}
+          proposerAddress={currentUser}
           emergencyBoardAddress={emergencyBoardAddress}
         />
       </Form>
