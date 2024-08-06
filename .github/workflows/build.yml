@@ -111,3 +111,43 @@ jobs:
           cd webapp
           pnpm test:u  # unit tests
           pnpm test:s  # server tests
+
+  compile-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: pnpm install
+      - name: Run compile
+        run: |
+          cd e2e
+          pnpm run compile
+
+  test-local:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: cp .env.example .env
+      - run: pnpm install
+      - run: pnpm env:up
+      - run: pnpm deploy:setup
+      - run: pnpm test:local
+      - name: Stop local environment
+        if: always()
+        run: pnpm env:down
