@@ -106,6 +106,12 @@ importers:
       '@openzeppelin/contracts':
         specifier: ^5.0.2
         version: 5.0.2
+      '@playwright/test':
+        specifier: ^1.46.0
+        version: 1.46.0
+      '@tenkeylabs/dappwright':
+        specifier: ^2.8.5
+        version: 2.8.5(playwright-core@1.46.0)
       '@types/chai':
         specifier: '4'
         version: 4.3.17
@@ -2711,6 +2717,11 @@ packages:
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
 
+  '@playwright/test@1.46.0':
+    resolution: {integrity: sha512-/QYft5VArOrGRP5pgkrfKksqsKA6CEFyGQ/gjNe6q0y4tZ1aaPfq4gIjudr1s3D+pXyrPRdsy4opKDrjBabE5w==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   '@polka/url@1.0.0-next.25':
     resolution: {integrity: sha512-j7P6Rgr3mmtdkeDGTe0E/aYyWEWVtc5yFXtHCRHs28/jptDEWfaVOc5T7cblqy1XKPPfCxJc/8DwQ5YgLOZOVQ==}
 
@@ -3672,6 +3683,12 @@ packages:
 
   '@tanstack/virtual-core@3.8.4':
     resolution: {integrity: sha512-iO5Ujgw3O1yIxWDe9FgUPNkGjyT657b1WNX52u+Wv1DyBFEpdCdGkuVaky0M3hHFqNWjAmHWTn4wgj9rTr7ZQg==}
+
+  '@tenkeylabs/dappwright@2.8.5':
+    resolution: {integrity: sha512-Pr1M183hc7hbewWs2ALpqxCf6ZKw+B0gVUXKWaAtP4/zIyHclHWTkTwQVEpnhWadMMC+WsZbFrJiZyIGKpsXlg==}
+    engines: {node: '>=16'}
+    peerDependencies:
+      playwright-core: '>1.0'
 
   '@testing-library/dom@10.4.0':
     resolution: {integrity: sha512-pemlzrSESWbdAloYml3bAJMEfNh1Z7EduzqPKprCH5S341frlpYnUEW0H72dLxa6IsYr+mPno20GiSm+h9dEdQ==}
@@ -7308,8 +7325,18 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
+  playwright-core@1.46.0:
+    resolution: {integrity: sha512-9Y/d5UIwuJk8t3+lhmMSAJyNP1BUC/DqP3cQJDQQL/oWqAiuPTLgy7Q5dzglmTLwcBRdetzgNM/gni7ckfTr6A==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   playwright@1.45.3:
     resolution: {integrity: sha512-QhVaS+lpluxCaioejDZ95l4Y4jSFCsBvl2UZkpeXlzxmqS+aABr5c82YmfMHrL6x27nvrvykJAFpkzT2eWdJww==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  playwright@1.46.0:
+    resolution: {integrity: sha512-XYJ5WvfefWONh1uPAUAi0H2xXV5S3vrtcnXe6uAOgdGi3aSpqOSXX08IAjXW34xitfuOJsvXU5anXZxPSEQiJw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -11576,6 +11603,10 @@ snapshots:
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
+  '@playwright/test@1.46.0':
+    dependencies:
+      playwright: 1.46.0
+
   '@polka/url@1.0.0-next.25': {}
 
   '@radix-ui/number@1.1.0': {}
@@ -12782,6 +12813,11 @@ snapshots:
 
   '@tanstack/virtual-core@3.8.4': {}
 
+  '@tenkeylabs/dappwright@2.8.5(playwright-core@1.46.0)':
+    dependencies:
+      node-stream-zip: 1.15.0
+      playwright-core: 1.46.0
+
   '@testing-library/dom@10.4.0':
     dependencies:
       '@babel/code-frame': 7.24.7
@@ -13201,7 +13237,7 @@ snapshots:
       pathe: 1.1.2
       sirv: 2.0.4
       tinyrainbow: 1.2.0
-      vitest: 2.0.5(@types/node@20.14.14)(@vitest/browser@2.0.5)(@vitest/ui@2.0.5)(happy-dom@14.12.3)(jsdom@24.1.1(bufferutil@4.0.8)(utf-8-validate@5.0.10))(terser@5.31.3)
+      vitest: 2.0.5(@types/node@22.1.0)(@vitest/browser@2.0.5)(@vitest/ui@2.0.5)(happy-dom@14.12.3)(jsdom@24.1.1(bufferutil@4.0.8)(utf-8-validate@6.0.4))(terser@5.31.3)
 
   '@vitest/utils@2.0.5':
     dependencies:
@@ -17478,9 +17514,17 @@ snapshots:
 
   playwright-core@1.45.3: {}
 
+  playwright-core@1.46.0: {}
+
   playwright@1.45.3:
     dependencies:
       playwright-core: 1.45.3
+    optionalDependencies:
+      fsevents: 2.3.2
+
+  playwright@1.46.0:
+    dependencies:
+      playwright-core: 1.46.0
     optionalDependencies:
       fsevents: 2.3.2
 

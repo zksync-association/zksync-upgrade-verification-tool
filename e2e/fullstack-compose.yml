@@ -1,5 +1,6 @@
 services:
   hh-node:
+    platform: linux/amd64
     image: upgrade-checker:local
     command:  sh -c "cd .. && cd e2e && pnpm hardhat node"
     ports:
@@ -14,6 +15,7 @@ services:
       start_period: 2s
   
   hh-deploy:
+    platform: linux/amd64
     image: upgrade-checker:local
     command: sh -c "cd .. && cd e2e && pnpm deploy:setup:remote"
     env_file:
@@ -26,6 +28,7 @@ services:
 
   db:
     image: postgres:14
+    platform: linux/amd64
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
@@ -42,6 +45,7 @@ services:
 
   migrate:
     image: upgrade-checker:local
+    platform: linux/amd64
     command: sh -c "pnpm db:migrate"
     environment:
       DATABASE_URL: postgresql://user:password@db:5432/webapp
@@ -51,6 +55,7 @@ services:
 
   webapp:
     image: upgrade-checker:local
+    platform: linux/amd64
     env_file:
       - ../webapp/.env
     environment:
