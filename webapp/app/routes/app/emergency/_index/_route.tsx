@@ -14,16 +14,19 @@ import {
 } from "@/components/ui/table";
 import {
   CreateEmergencyProposalModal,
-  emergencyPropSchema,
-} from "@/routes/app/emergency/create-emergency-proposal-modal";
+
+} from "@/routes/app/emergency/_index/create-emergency-proposal-modal";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { PlusIcon } from "@radix-ui/react-icons";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, Link, json, useLoaderData } from "@remix-run/react";
+import { Form, Link, json, useLoaderData, useActionData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { $path } from "remix-routes";
 import { useAccount } from "wagmi";
+import { badRequest } from "@/utils/http";
+import { z } from "zod";
+import { fullEmergencyPropSchema } from "@/common/emergency-proposal-schema";
 
 export async function loader(args: LoaderFunctionArgs) {
   const emergencyProposals = await getAllEmergencyProposals();
@@ -43,9 +46,21 @@ export async function loader(args: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const data = Object.fromEntries(formData);
-  const parsedData = emergencyPropSchema.parse(data);
-  await saveEmergencyProposal(parsedData);
-  return json({ status: "success", errors: {}, data: parsedData });
+  if(data.intent === "validate") {
+    const parsed = z.object({
+      targetAddress: z.string(),
+      value: z.any(),
+      calldata: z.any()
+    }).parse(data)
+    console.log(parsed)
+    return json({status: "success", intent: "validate"})
+  } else if (data.intent === "submit") {
+    const parsedData = fullEmergencyPropSchema.parse(data);
+    await saveEmergencyProposal(parsedData);
+    return json({ status: "success", intent: "submit" });
+  } else {
+    throw badRequest(`Unknown intent: ${data.intent}`)
+  }
 }
 
 export default function Index() {
@@ -56,7 +71,6 @@ export default function Index() {
     currentUser,
   } = useLoaderData<typeof loader>();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { address } = useAccount();
 
   return (
     <div className="mt-10 space-y-4">
