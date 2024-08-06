@@ -62,11 +62,6 @@ export const emergencyPropSchema = z.object({
     .refine((value) => Number.parseFloat(value) >= 0, {
       message: "Value must be a positive number",
     }),
-  proposer: z
-    .string()
-    .refine((value) => isAddress(value), {
-      message: "Invalid proposer address",
-    }),
 });
 
 export type EmergencyProp = z.infer<typeof emergencyPropSchema>;
@@ -110,6 +105,7 @@ export function CreateEmergencyProposalModal({
   };
 
   const handleVerify = async () => {
+    await form.trigger();
     if (form.formState.isValid) {
       setStep(2);
       const derivedExternalId = calculateUpgradeProposalHash(
@@ -124,8 +120,6 @@ export function CreateEmergencyProposalModal({
         emergencyBoardAddress
       );
       setExtId(derivedExternalId);
-    } else {
-      await form.trigger();
     }
   };
 
