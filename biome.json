@@ -20,7 +20,8 @@
       "**/__snapshots__/*",
       "**/coverage/*",
       "**/artifacts",
-      "**/zk-gov"
+      "**/zk-gov",
+      "**/contracts"
     ]
   },
   "organizeImports": {
