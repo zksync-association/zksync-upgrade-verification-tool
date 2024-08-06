@@ -14,7 +14,7 @@ subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, hre, runSupe
 
   const l1contracts = path.join(hre.config.paths.sources, "zk-gov","l1-contracts","src", "**", "*.sol");
   // const l2contracts = path.join(hre.config.paths.sources, "zk-gov","l2-contracts","src", "**", "*.sol");
-  const devcontracts = path.join(hre.config.paths.sources, "dev", "**", "*.sol");
+  const devcontracts = path.join(hre.config.paths.sources, "local-contracts", "**", "*.sol");
   const otherPaths = glob.sync([l1contracts, devcontracts]);
   return [...otherPaths];
 });
