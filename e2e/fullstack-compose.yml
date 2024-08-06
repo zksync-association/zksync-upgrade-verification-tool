@@ -1,4 +1,29 @@
 services:
+  hh-node:
+    image: upgrade-checker:local
+    command:  sh -c "cd .. && cd e2e && pnpm hardhat node"
+    ports:
+      - "8545:8545"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["../e2e/scripts/healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 2s
+  
+  hh-deploy:
+    image: upgrade-checker:local
+    command: sh -c "cd .. && cd e2e && pnpm deploy:setup:remote"
+    env_file:
+      - .env
+    environment:
+      L1_RPC_URL: http://hh-node:8545
+    depends_on:
+      hh-node:
+        condition: service_healthy
+
   db:
     image: postgres:14
     environment:
@@ -27,12 +52,15 @@ services:
   webapp:
     image: upgrade-checker:local
     env_file:
-      - webapp/.env
+      - ../webapp/.env
     environment:
       DATABASE_URL: postgresql://user:password@db:5432/webapp
+      L1_RPC_URL: http://hh-node:8545
     ports:
       - "3000:3000"
     depends_on:
+      hh-deploy:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       migrate:

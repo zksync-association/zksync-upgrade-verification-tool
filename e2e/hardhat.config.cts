@@ -49,6 +49,9 @@ const config: HardhatUserConfig = {
     tests:"suites/contracts"
   },
   networks: {
+    remote:{
+      url: process.env.L1_RPC_URL || "ENV_VAR_L1_RPC_URL_MISSING"
+    },
     local: {
       url: "http://localhost:8545",
     },
