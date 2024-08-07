@@ -35,7 +35,11 @@ export default function Index() {
                 className="flex"
                 to={$path("/app/proposals/:id", { id: proposal.id })}
               >
-                <Button className="flex flex-1 justify-between pr-4" variant="outline">
+                <Button
+                  className="flex flex-1 justify-between pr-4"
+                  variant="outline"
+                  data-testid={`proposal-${proposal.id}`}
+                >
                   <span />
                   <span>{proposal.id}</span>
                   <ArrowRight />

@@ -29,7 +29,8 @@
     "fullenv:up": "docker compose -f fullstack-compose.yml up -d",
     "fullenv:down": "docker compose -f fullstack-compose.yml down",
     "test:local": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' pnpm hardhat test --network local",
-    "test:cli": "vitest run --config ./vitest.cli.config.ts"
+    "test:cli": "vitest run --config ./vitest.cli.config.ts",
+    "test:e2e": "playwright test"
   },
   "keywords": [],
   "author": "moonsong-labs",

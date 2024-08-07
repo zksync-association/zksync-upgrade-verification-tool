@@ -137,6 +137,9 @@ dist
 .cursorignore
 
 
+
+
 # hardhat temp
 **/.hardhat*
 **/addresses.txt
+**/test-results/

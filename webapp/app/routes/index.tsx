@@ -2,6 +2,7 @@ import { getUserAuthRole } from "@/.server/service/authorized-users";
 import { checkConnection } from "@/.server/service/clients";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
+import NavbarWithUser from "@/components/navbar-with-user";
 import { Button } from "@/components/ui/button";
 import { getUserFromHeader } from "@/utils/auth-headers";
 import { clientEnv } from "@config/env.server";
@@ -13,9 +14,10 @@ import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { useAccount } from "wagmi";
 
-export function loader(_args: LoaderFunctionArgs) {
+export function loader({ request }: LoaderFunctionArgs) {
+  const user = getUserFromHeader(request);
   const environment = clientEnv.NODE_ENV;
-  return { environment };
+  return { environment, user };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -41,7 +43,7 @@ export default function Index() {
   const account = useAccount();
   const fetcher = useFetcher<typeof action>();
   const navigation = useNavigation();
-  const { environment } = useLoaderData<typeof loader>();
+  const { environment, user } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -59,7 +61,11 @@ export default function Index() {
   };
   return (
     <>
-      <Navbar environment={environment} />
+      {account.isConnected ? (
+        <NavbarWithUser role={user.role} environment={environment} />
+      ) : (
+        <Navbar environment={environment} />
+      )}
       <div className="relative mt-6 flex max-h-[700px] flex-1">
         <div className="cta-bg -z-10 pointer-events-none w-full" />
         <main className="flex flex-1 flex-col items-center justify-center">

@@ -56,6 +56,7 @@ const config: HardhatUserConfig = {
       url: "http://localhost:8545",
     },
     hardhat: {
+      chainId: 11155111,
       mining: {
         auto: false,
         interval: 1000,
@@ -65,7 +66,7 @@ const config: HardhatUserConfig = {
       },
       accounts: {
         mnemonic:
-          "suspect naive grow benefit turkey pizza fine luxury young bullet noise barely flee cement venture",
+          "test test test test test test test test test test test junk",
       },
     },
   },
