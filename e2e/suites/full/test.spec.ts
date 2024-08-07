@@ -26,8 +26,56 @@ test("should be able to see an active standard proposal", async ({ wallet, page 
 });
 
 // add test for login as visitor
+test("should be able to login as visitor", async ({ wallet, page }, testInfo) => {
+  await page.getByTestId("connected-button").click();
+  await page.getByText("Disconnect").click();
+  await wallet.importPK("0xa93661466cdbbbad85f7cf419a45a00e55012de9") // account #19
 
-// add test for login as guardian
+  const connectButton = page.getByText("Connect Wallet")
+  await expect(connectButton).toBeVisible();
+  await connectButton.click();
+
+  await page.getByText("Metamask").click();
+  await wallet.approve();
+  const userRole = page.getByTestId("user-role");
+  await expect(userRole).toBeVisible();
+  await expect(userRole).toHaveText("Visitor");
+}
+);
+
+test("should be able to login as sec council", async ({ wallet, page }, testInfo) => {
+  await page.getByTestId("connected-button").click();
+  await page.getByText("Disconnect").click();
+  await wallet.switchAccount(0)
+
+  const connectButton = page.getByText("Connect Wallet")
+  await expect(connectButton).toBeVisible();
+  await connectButton.click();
+
+  await page.getByText("Metamask").click();
+  await wallet.approve();
+  const userRole = page.getByTestId("user-role");
+  await expect(userRole).toBeVisible();
+  await expect(userRole).toHaveText("Security Council");
+}
+);
+
+test("should be able to login as guardian", async ({ wallet, page }, testInfo) => {
+  await page.getByTestId("connected-button").click();
+  await page.getByText("Disconnect").click();
+  await wallet.switchAccount(7)
+
+  const connectButton = page.getByText("Connect Wallet")
+  await expect(connectButton).toBeVisible();
+  await connectButton.click();
+
+  await page.getByText("Metamask").click();
+  await wallet.approve();
+  const userRole = page.getByTestId("user-role");
+  await expect(userRole).toBeVisible();
+  await expect(userRole).toHaveText("Guardian");
+}
+);
 
 // add test for standard proposal navigation
 

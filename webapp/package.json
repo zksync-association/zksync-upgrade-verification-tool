@@ -22,10 +22,10 @@
     "db:down": "docker compose down db",
     "test:s": "vitest run --config ./vitest.server.config.ts",
     "test:u": "vitest run --config ./vitest.unit.config.ts",
-    "pretest:i": "pnpm run db:up &&  pnpm run db:wait && pnpm db:migrate test",
+    "pretest:i": "pnpm run db:up &&  pnpm run db:wait && pnpm db:migrate",
     "test:i": "vitest run --config ./vitest.integration.config.ts",
     "posttest:i": "pnpm run db:down",
-    "pretest:i:ui": "pnpm run db:up &&  pnpm run db:wait && pnpm db:migrate test",
+    "pretest:i:ui": "pnpm run db:up &&  pnpm run db:wait && pnpm db:migrate",
     "test:i:ui": "vitest run --config ./vitest.integration.config.ts --ui --api 9588",
     "posttest:i:ui": "pnpm run db:down"
   },

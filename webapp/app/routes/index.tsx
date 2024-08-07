@@ -15,9 +15,15 @@ import { zodHex } from "validate-cli";
 import { useAccount } from "wagmi";
 
 export function loader({ request }: LoaderFunctionArgs) {
-  const user = getUserFromHeader(request);
-  const environment = clientEnv.NODE_ENV;
-  return { environment, user };
+  try{
+    const user = getUserFromHeader(request)
+    const environment = clientEnv.NODE_ENV;
+    return { environment, user };
+  }
+  catch{
+    console.log("No Connected User")
+    return { environment: clientEnv.NODE_ENV, user: { address: null, role: null } };
+  }
 }
 
 export async function action({ request }: ActionFunctionArgs) {
