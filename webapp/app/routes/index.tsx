@@ -66,10 +66,10 @@ export default function Index() {
                     <Button>Standard Upgrades</Button>
                   </Link>
                   <Link to={$path("/app/emergency")}>
-                    <Button variant="secondary">Emergency Upgrades</Button>
+                    <Button variant="destructive">Emergency Upgrades</Button>
                   </Link>
                   <Link to={$path("/app/freeze")}>
-                    <Button variant="secondary">Freeze Proposals</Button>
+                    <Button variant="secondary">Freeze Requests</Button>
                   </Link>
                 </div>
               )}
