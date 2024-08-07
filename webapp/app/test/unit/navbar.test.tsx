@@ -2,14 +2,22 @@ import Navbar from "@/components/navbar";
 import { render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import "@testing-library/jest-dom";
+import { useRouteLoaderData } from "@remix-run/react";
 
 vi.mock("remix-routes", () => ({
   $path: () => "/",
 }));
 
+vi.mock("@remix-run/react", () => ({
+  useRouteLoaderData: vi.fn(),
+}));
+
+const mockedUseRouteLoaderData = vi.mocked(useRouteLoaderData);
+
 describe("Navbar", () => {
   it("renders Navbar with Logo and correct link", async () => {
-    render(<Navbar environment={"production"} />);
+    mockedUseRouteLoaderData.mockReturnValue({ env: { NODE_ENV: "production" } });
+    render(<Navbar />);
 
     const logo = await screen.findByAltText("Zksync Logo");
     expect(logo).toBeInTheDocument();
@@ -27,12 +35,14 @@ describe("Navbar", () => {
   });
 
   it("renders EnvBadge for development environment but not for production", () => {
-    const { rerender } = render(<Navbar environment="development" />);
+    mockedUseRouteLoaderData.mockReturnValue({ env: { NODE_ENV: "development" } });
+    const { rerender } = render(<Navbar />);
 
     let envBadge: HTMLElement | null = screen.getByText("Dev");
     expect(envBadge).toBeInTheDocument();
 
-    rerender(<Navbar environment="production" />);
+    mockedUseRouteLoaderData.mockReturnValue({ env: { NODE_ENV: "production" } });
+    rerender(<Navbar />);
     envBadge = screen.queryByText("production");
     expect(envBadge).not.toBeInTheDocument();
   });
