@@ -2,9 +2,10 @@ import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { Button } from "@/components/ui/button";
 import { ALL_ABIS } from "@/utils/raw-abis";
 import { type BasicProposal, type BasicSignature, classifySignatures } from "@/utils/signatures";
-import { useFetcher } from "@remix-run/react";
+import { useFetcher, useNavigate } from "@remix-run/react";
 import type React from "react";
 import { toast } from "react-hot-toast";
+import { $path } from "remix-routes";
 import { type Hex, encodeAbiParameters } from "viem";
 import { useWriteContract } from "wagmi";
 
@@ -39,6 +40,7 @@ export function ExecuteEmergencyUpgradeButton({
 }: ExecuteEmergencyUpgradeButtonProps) {
   const { writeContract, isPending } = useWriteContract();
   const { submit } = useFetcher();
+  const navigate = useNavigate();
 
   const {
     guardians: guardianSignatures,
@@ -74,12 +76,13 @@ export function ExecuteEmergencyUpgradeButton({
         address: boardAddress,
       },
       {
-        onSuccess: async () => {
+        onSuccess: async (hash) => {
           submit(
             { intent: "broadcastSuccess", proposalId: proposal.externalId },
             { method: "POST" }
           );
           toast.success("Transaction broadcast success", { id: "exec-emergency-upgrade" });
+          navigate($path("/app/transactions/:hash", { hash }));
         },
         onError: (e) => {
           console.error(e);

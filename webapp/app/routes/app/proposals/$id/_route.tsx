@@ -360,7 +360,6 @@ export default function Proposals() {
                         Execute legal veto extension
                       </ContractWriteButton>
                       <ExecuteUpgradeButton
-                        proposalId={proposalId}
                         target={addresses.upgradeHandler}
                         proposalCalldata={proposal.raw}
                         disabled={!executeProposalEnabled}
