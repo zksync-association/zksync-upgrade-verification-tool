@@ -4,11 +4,13 @@ import {
   updateEmergencyProposal,
 } from "@/.server/db/dto/emergencyProposals";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
+import { l1Rpc } from "@/.server/service/clients";
+import type { BasicEmergencyProp, FullEmergencyProp } from "@/common/emergency-proposal-schema";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { notFound } from "@/utils/http";
+import { env } from "@config/env.server";
 import { type Hex, parseEther } from "viem";
-import { FullEmergencyProp } from "@/common/emergency-proposal-schema";
 
 export async function broadcastSuccess(propsalId: Hex) {
   const proposal = await getEmergencyProposalByExternalId(propsalId);
@@ -18,6 +20,15 @@ export async function broadcastSuccess(propsalId: Hex) {
 
   proposal.status = emergencyProposalStatusSchema.enum.BROADCAST;
   await updateEmergencyProposal(proposal);
+}
+
+export async function validateEmergencyProposal(data: BasicEmergencyProp): Promise<string | null> {
+  try {
+    await l1Rpc.contractReadRaw(data.targetAddress, data.calldata, env.UPGRADE_HANDLER_ADDRESS);
+    return null;
+  } catch (e) {
+    return "eth_call execution failed";
+  }
 }
 
 export const saveEmergencyProposal = async (data: FullEmergencyProp) => {

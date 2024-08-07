@@ -1,3 +1,4 @@
+import { type EmergencyProp, emergencyPropSchema } from "@/common/emergency-proposal-schema";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -8,7 +9,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage, } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,7 +37,6 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { type Hex, parseEther } from "viem";
 import { StepIndicator } from "./step-indicator";
-import { EmergencyProp, emergencyPropSchema } from "@/common/emergency-proposal-schema";
 
 export function CreateEmergencyProposalModal({
   isOpen,
@@ -49,14 +57,16 @@ export function CreateEmergencyProposalModal({
 
   useEffect(() => {
     if (fetcher.data?.intent === "validate" && fetcher.data?.status === "success") {
-      setStep(2)
+      setStep(2);
     }
   }, [fetcher.data]);
 
+  const validationError = fetcher.data?.error
+
   const defaultFormValues = {
     title: "",
-    targetAddress: "0x" as Hex,
-    calldata: "0x",
+    targetAddress: "" as Hex,
+    calldata: "",
     value: "0",
     salt: "0x0000000000000000000000000000000000000000000000000000000000000000",
   };
@@ -77,13 +87,20 @@ export function CreateEmergencyProposalModal({
   const handleVerify = async () => {
     await form.trigger();
     if (form.formState.isValid) {
-      const [targetAddress, calldata, value] = form.getValues(["targetAddress", "calldata", "value"])
-      fetcher.submit({
-        targetAddress,
-        calldata,
-        value,
-        intent: "validate"
-      }, { method: "post" })
+      const [targetAddress, calldata, value] = form.getValues([
+        "targetAddress",
+        "calldata",
+        "value",
+      ]);
+      fetcher.submit(
+        {
+          targetAddress,
+          calldata,
+          value,
+          intent: "validate",
+        },
+        { method: "post" }
+      );
       const derivedExternalId = calculateUpgradeProposalHash(
         [
           {
@@ -249,8 +266,19 @@ export function CreateEmergencyProposalModal({
                     </CollapsibleContent>
                   </Collapsible>
                 </div>
+                { validationError &&
+                  <p className="text-red-500 italic">
+                    Error: {validationError}
+                  </p>
+                }
+
                 <AlertDialogFooter>
-                  <Button type="button" onClick={handleVerify} data-testid="verify-button" loading={fetcher.state === "loading"}>
+                  <Button
+                    type="button"
+                    onClick={handleVerify}
+                    data-testid="verify-button"
+                    loading={fetcher.state === "submitting"}
+                  >
                     <MagnifyingGlassIcon className="mr-2 h-4 w-4" />
                     Verify
                   </Button>

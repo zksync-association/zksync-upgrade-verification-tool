@@ -1,9 +1,7 @@
+import { isAddress, padHex, getAddress } from "viem";
 import { z } from "zod";
-import { isAddress, padHex } from "viem";
-import { zodHex } from "validate-cli/src";
 
-export const emergencyPropSchema = z.object({
-  title: z.string().min(1, "Title is required"),
+export const basicPropSchema = z.object({
   targetAddress: z.string().refine((value) => isAddress(value), {
     message: "Invalid Ethereum address",
   }),
@@ -13,13 +11,6 @@ export const emergencyPropSchema = z.object({
     .refine((value) => value.length % 2 === 0, {
       message: "Calldata must be valid hex-encoded bytes",
     }),
-  salt: z
-    .string()
-    .regex(/^0x[a-fA-F0-9]*$/, "Salt must be a hex string starting with 0x")
-    .refine((value) => value.length === 66, {
-      message: "Salt must be a 32-byte hex string (64 characters)",
-    })
-    .default(padHex("0x0")),
   value: z
     .string()
     .regex(/^\d*\.?\d*$/, "Value must be a positive number")
@@ -28,10 +19,26 @@ export const emergencyPropSchema = z.object({
     }),
 });
 
+export const emergencyPropSchema = basicPropSchema.extend({
+  title: z.string().min(1, "Title is required"),
+  salt: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]*$/, "Salt must be a hex string starting with 0x")
+    .refine((value) => value.length === 66, {
+      message: "Salt must be a 32-byte hex string (64 characters)",
+    })
+    .default(padHex("0x0")),
+});
+
 export const fullEmergencyPropSchema = emergencyPropSchema.extend({
-  proposer: zodHex
-})
+  proposer: z.string()
+    .regex(/^0x[a-fA-F0-9]*$/)
+    .length(42)
+    .transform((str) => getAddress(str))
+});
+
+export type BasicEmergencyProp = z.infer<typeof basicPropSchema>;
 
 export type EmergencyProp = z.infer<typeof emergencyPropSchema>;
 
-export type FullEmergencyProp = z.infer<typeof fullEmergencyPropSchema>
+export type FullEmergencyProp = z.infer<typeof fullEmergencyPropSchema>;
