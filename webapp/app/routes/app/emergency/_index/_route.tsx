@@ -47,7 +47,11 @@ export async function action({ request }: ActionFunctionArgs) {
   if (data.intent === "validate") {
     const parsed = basicPropSchema.parse(data);
     const validation = await validateEmergencyProposal(parsed);
-    return json({ status: validation === null ? "success" : "failure", intent: "validate", error: validation });
+    return json({
+      status: validation === null ? "success" : "failure",
+      intent: "validate",
+      error: validation,
+    });
   }
 
   if (data.intent === "submit") {

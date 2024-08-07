@@ -1,4 +1,4 @@
-import { isAddress, padHex, getAddress } from "viem";
+import { getAddress, isAddress, padHex } from "viem";
 import { z } from "zod";
 
 export const basicPropSchema = z.object({
@@ -31,10 +31,11 @@ export const emergencyPropSchema = basicPropSchema.extend({
 });
 
 export const fullEmergencyPropSchema = emergencyPropSchema.extend({
-  proposer: z.string()
+  proposer: z
+    .string()
     .regex(/^0x[a-fA-F0-9]*$/)
     .length(42)
-    .transform((str) => getAddress(str))
+    .transform((str) => getAddress(str)),
 });
 
 export type BasicEmergencyProp = z.infer<typeof basicPropSchema>;

@@ -61,7 +61,7 @@ export function CreateEmergencyProposalModal({
     }
   }, [fetcher.data]);
 
-  const validationError = fetcher.data?.error
+  const validationError = fetcher.data?.error;
 
   const defaultFormValues = {
     title: "",
@@ -266,11 +266,7 @@ export function CreateEmergencyProposalModal({
                     </CollapsibleContent>
                   </Collapsible>
                 </div>
-                { validationError &&
-                  <p className="text-red-500 italic">
-                    Error: {validationError}
-                  </p>
-                }
+                {validationError && <p className="text-red-500 italic">Error: {validationError}</p>}
 
                 <AlertDialogFooter>
                   <Button
