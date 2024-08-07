@@ -4,6 +4,7 @@ import {
   bigint,
   check,
   index,
+  integer,
   json,
   pgTable,
   serial,
@@ -64,6 +65,10 @@ export const actionSchema = z.enum([
   "ExecuteEmergencyUpgradeGuardians",
   "ExecuteEmergencyUpgradeSecurityCouncil",
   "ExecuteEmergencyUpgradeZKFoundation",
+  "ApproveSoftFreeze",
+  "ApproveHardFreeze",
+  "ApproveUnfreeze",
+  "ApproveSetSoftFreezeThreshold",
 ]);
 
 export type Action = z.infer<typeof actionSchema>;
@@ -76,18 +81,56 @@ export const signaturesTable = pgTable(
     emergencyProposal: bytea("emergency_proposal_id").references(
       () => emergencyProposalsTable.externalId
     ),
+    freezeProposal: integer("freeze_proposal_id").references(() => freezeProposalsTable.id),
     signer: bytea("signer").notNull(),
     signature: bytea("signature").notNull(),
     action: text("action", {
       enum: actionSchema.options,
     }).notNull(),
   },
-  ({ proposal, signer, action }) => ({
-    uniqueSigner: unique().on(proposal, signer, action),
+  ({ proposal, signer, action, emergencyProposal, freezeProposal }) => ({
+    uniqueProposalSigner: unique().on(proposal, signer, action),
+    uniqueEmergencyProposalSigner: unique().on(emergencyProposal, signer, action),
+    uniqueFreezeProposalSigner: unique().on(freezeProposal, signer, action),
     proposalCheck: check(
       "mutual_exclusivity",
-      sql`((proposal_id IS NOT NULL AND emergency_proposal_id IS NULL) OR 
-           (proposal_id IS NULL AND emergency_proposal_id IS NOT NULL))`
+      sql`(
+            (proposal_id IS NOT NULL AND emergency_proposal_id IS NULL     AND freeze_proposal_id IS NULL) OR
+            (proposal_id IS NULL     AND emergency_proposal_id IS NOT NULL AND freeze_proposal_id IS NULL) OR
+            (proposal_id IS NULL     AND emergency_proposal_id IS NULL     AND freeze_proposal_id IS NOT NULL)
+          )`
+    ),
+  })
+);
+
+export const freezeProposalsTypeSchema = z.enum([
+  "SOFT_FREEZE",
+  "HARD_FREEZE",
+  "UNFREEZE",
+  "SET_SOFT_FREEZE_THRESHOLD",
+]);
+
+export type FreezeProposalsType = z.infer<typeof freezeProposalsTypeSchema>;
+
+export const freezeProposalsTable = pgTable(
+  "freeze_proposals",
+  {
+    id: serial("id").primaryKey(),
+    type: text("type", { enum: freezeProposalsTypeSchema.options }).notNull(),
+    externalId: bigint("external_id", { mode: "bigint" }).notNull(),
+    validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
+    proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
+    softFreezeThreshold: bigint("soft_freeze_threshold", { mode: "number" }),
+  },
+  ({ externalId, type }) => ({
+    externalIdIdx: index("freeze_proposals_external_id_idx").on(externalId),
+    uniqueProposal: unique().on(externalId, type),
+    proposalCheck: check(
+      "soft_freeze_threshold",
+      sql`(
+        (type = ${freezeProposalsTypeSchema.Values.SET_SOFT_FREEZE_THRESHOLD} AND soft_freeze_threshold IS NOT NULL) OR
+        (type != ${freezeProposalsTypeSchema.Values.SET_SOFT_FREEZE_THRESHOLD} AND soft_freeze_threshold IS NULL)
+      )`
     ),
   })
 );

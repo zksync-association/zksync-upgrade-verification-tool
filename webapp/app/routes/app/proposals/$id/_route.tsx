@@ -1,16 +1,16 @@
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { actionSchema } from "@/.server/db/schema";
-import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
+import { councilAddress, guardiansAddress } from "@/.server/service/contracts";
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
-import { validateAndSaveSignature } from "@/.server/service/signatures";
+import { validateAndSaveProposalSignature } from "@/.server/service/signatures";
 import TxLink from "@/components/tx-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import VotingStatusIndicator from "@/components/voting-status-indicator";
 import ContractWriteButton from "@/routes/app/proposals/$id/contract-write-button";
 import ExecuteUpgradeButton from "@/routes/app/proposals/$id/execute-upgrade-button";
 import FacetChangesTable from "@/routes/app/proposals/$id/facet-changes-table";
@@ -20,7 +20,6 @@ import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
-import { cn } from "@/utils/cn";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { badRequest, notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
@@ -133,7 +132,7 @@ export async function action({ request }: ActionFunctionArgs) {
     throw badRequest("Failed to parse signature data");
   }
 
-  await validateAndSaveSignature(
+  await validateAndSaveProposalSignature(
     data.data.signature,
     user.address as Hex,
     data.data.actionName,
@@ -248,17 +247,17 @@ export default function Proposals() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-5">
-                        <StatusIndicator
+                        <VotingStatusIndicator
                           label="Security Council Approvals"
                           signatures={proposal.signatures.approveUpgradeSecurityCouncil.length}
                           necessarySignatures={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
                         />
-                        <StatusIndicator
+                        <VotingStatusIndicator
                           label="Guardian Approvals"
                           signatures={proposal.signatures.approveUpgradeGuardians.length}
                           necessarySignatures={NECESSARY_GUARDIAN_SIGNATURES}
                         />
-                        <StatusIndicator
+                        <VotingStatusIndicator
                           label="Extend Legal Veto Approvals"
                           signatures={proposal.signatures.extendLegalVetoPeriod.length}
                           necessarySignatures={NECESSARY_LEGAL_VETO_SIGNATURES}
@@ -425,31 +424,6 @@ export default function Proposals() {
           }}
         </Await>
       </Suspense>
-    </div>
-  );
-}
-
-function StatusIndicator({
-  signatures,
-  necessarySignatures,
-  label,
-}: { signatures: number; necessarySignatures: number; label: string }) {
-  const necessarySignaturesReached = signatures >= necessarySignatures;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-between">
-        <span>{label}</span>
-        <span
-          className={cn("text-muted-foreground", necessarySignaturesReached && "text-green-400")}
-        >
-          {signatures}/{necessarySignatures}
-        </span>
-      </div>
-      <Progress
-        indicatorClassName={cn(necessarySignaturesReached && "bg-green-500")}
-        value={(signatures / necessarySignatures) * 100}
-      />
     </div>
   );
 }

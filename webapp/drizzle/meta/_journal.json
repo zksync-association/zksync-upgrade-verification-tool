@@ -29,6 +29,13 @@
       "when": 1722598710366,
       "tag": "0003_naive_the_enforcers",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1723031892023,
+      "tag": "0004_chilly_ben_urich",
+      "breakpoints": true
     }
   ]
 }

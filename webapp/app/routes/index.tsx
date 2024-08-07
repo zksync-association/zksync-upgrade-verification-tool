@@ -48,14 +48,16 @@ export default function Index() {
           <div className="flex flex-1 flex-col items-center justify-center text-center md:max-w-3xl">
             <h1 className="font-bold text-3xl md:text-5xl">Upgrade Analysis & Voting Tool</h1>
             <p className="mt-10 text-lg md:max-w-xl">
-              Analyze upgrade proposal transaction call data in human-readable format and cast your vote.
+              Analyze upgrade proposal transaction call data in human-readable format and cast your
+              vote.
             </p>
             <div className="mt-10">
               {!account.isConnected ? (
                 <ConnectButton
                   loading={
                     fetcher.state === "submitting" ||
-                    (navigation.state === "loading" && navigation.location.pathname === $path("/app"))
+                    (navigation.state === "loading" &&
+                      navigation.location.pathname === $path("/app"))
                   }
                 />
               ) : (
@@ -65,6 +67,9 @@ export default function Index() {
                   </Link>
                   <Link to={$path("/app/emergency")}>
                     <Button variant="secondary">Emergency Upgrades</Button>
+                  </Link>
+                  <Link to={$path("/app/freeze")}>
+                    <Button variant="secondary">Freeze Proposals</Button>
                   </Link>
                 </div>
               )}
