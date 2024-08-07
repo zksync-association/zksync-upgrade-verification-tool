@@ -58,7 +58,7 @@ export class RpcClient {
       to: target as Hex,
       account: from,
       data: callData as Hex,
-      value: value
+      value: value,
     });
 
     if (!data) {
