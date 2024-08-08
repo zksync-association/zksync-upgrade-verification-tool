@@ -36,7 +36,7 @@ import { useFetcher } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { type Hex, parseEther } from "viem";
-import { StepIndicator } from "./step-indicator";
+import { StepIndicator } from "@/components/step-indicator";
 
 export function CreateEmergencyProposalModal({
   isOpen,
