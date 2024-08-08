@@ -48,7 +48,7 @@ export const emergencyProposalsTable = pgTable(
     changedOn: timestamp("changed_on", { withTimezone: true }).notNull(),
     externalId: bytea("external_id").notNull().unique(),
     title: text("title").notNull(),
-    calls: json("calldata").$type<Call[]>().notNull(),
+    calls: json("calls").$type<Call[]>().notNull(),
     salt: bytea("salt").notNull(),
     status: text("status", {
       enum: emergencyProposalStatusSchema.options,
