@@ -44,7 +44,7 @@ async function verifySignature(
     domain: {
       name: contractName,
       version: "1",
-      chainId: env.NODE_ENV === "development" ? sepolia.id : mainnet.id,
+      chainId: env.ETH_NETWORK === "mainnet" ? mainnet.id : sepolia.id,
       verifyingContract: verifierAddr,
     },
     primaryType: action,
