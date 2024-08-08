@@ -10,7 +10,7 @@ import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { notFound } from "@/utils/http";
 import { env } from "@config/env.server";
-import { type Hex, parseEther } from "viem";
+import { type Hex, numberToHex, parseEther } from "viem";
 
 export async function broadcastSuccess(propsalId: Hex) {
   const proposal = await getEmergencyProposalByExternalId(propsalId);
@@ -44,19 +44,20 @@ export const saveEmergencyProposal = async (data: FullEmergencyProp) => {
     await emergencyBoardAddress()
   );
 
-  const value = Number(parseEther(data.value));
   const currentDate = new Date();
 
   await createOrIgnoreEmergencyProposal({
     status: "ACTIVE",
-    calldata: data.calldata as Hex,
+    calls: [{
+      target: data.targetAddress as Hex,
+      data: data.calldata as Hex,
+      value: numberToHex(parseEther(data.value)),
+    }],
     proposer: data.proposer as Hex,
     proposedOn: currentDate,
     changedOn: currentDate,
     externalId,
     salt: data.salt as Hex,
     title: data.title,
-    targetAddress: data.targetAddress as Hex,
-    value,
   });
 };

@@ -13,6 +13,8 @@ import {
   timestamp,
   unique,
 } from "drizzle-orm/pg-core";
+import { z } from "zod";
+import { zodHex } from "validate-cli";
 
 export const proposalsTable = pgTable(
   "proposals",
@@ -31,6 +33,13 @@ export const proposalsTable = pgTable(
   })
 );
 
+const callSchema = z.object({
+  target: zodHex,
+  value: zodHex,
+  data: zodHex
+})
+type Call = z.infer<typeof callSchema>
+
 export const emergencyProposalsTable = pgTable(
   "emergency_proposals",
   {
@@ -39,13 +48,11 @@ export const emergencyProposalsTable = pgTable(
     changedOn: timestamp("changed_on", { withTimezone: true }).notNull(),
     externalId: bytea("external_id").notNull().unique(),
     title: text("title").notNull(),
-    targetAddress: bytea("target_address").notNull(),
-    calldata: bytea("calldata").notNull(),
+    calls: json("calldata").$type<Call[]>().notNull(),
     salt: bytea("salt").notNull(),
     status: text("status", {
       enum: emergencyProposalStatusSchema.options,
     }).notNull(),
-    value: bigint("value", { mode: "number" }).notNull(),
     proposer: bytea("proposer").notNull(),
     storageDiffReport: json("storage_diff_report"),
     checkReport: json("check_report"),
