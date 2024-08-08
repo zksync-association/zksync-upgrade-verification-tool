@@ -55,10 +55,8 @@ export async function loader(args: LoaderFunctionArgs) {
       title: proposal?.title,
       externalId: proposal.externalId,
       proposedOn: proposal.proposedOn,
-      calldata: proposal.calldata,
-      targetAddress: proposal.targetAddress,
+      calls: proposal.calls,
       salt: proposal.salt,
-      value: proposal.value.toString(),
       status: proposal.status,
     },
     addresses: {

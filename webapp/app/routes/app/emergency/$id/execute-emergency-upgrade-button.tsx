@@ -6,7 +6,7 @@ import { useFetcher, useNavigate } from "@remix-run/react";
 import type React from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
-import { type Hex, encodeAbiParameters } from "viem";
+import { type Hex, encodeAbiParameters, hexToBigInt } from "viem";
 import { useWriteContract } from "wagmi";
 
 export type ExecuteEmergencyUpgradeButtonProps = {
@@ -61,13 +61,7 @@ export function ExecuteEmergencyUpgradeButton({
         abi: ALL_ABIS.emergencyBoard,
         functionName: "executeEmergencyUpgrade",
         args: [
-          [
-            {
-              target: proposal.targetAddress,
-              value: BigInt(proposal.value),
-              data: proposal.calldata,
-            },
-          ],
+          proposal.calls.map(c => ({ ...c, value: hexToBigInt(c.value) })),
           proposal.salt,
           encodeSignatures(guardianSignatures),
           encodeSignatures(councilSignatures),
