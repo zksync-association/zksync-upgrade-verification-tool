@@ -28,7 +28,7 @@ export default function NavbarWithUser({
               {role === "zkFoundation" && "ZkSync Foundation"}
             </Button>
           )}
-          <ConnectButton data-testid="connected-button"/>
+          <ConnectButton />
         </div>
       </nav>
     </header>
