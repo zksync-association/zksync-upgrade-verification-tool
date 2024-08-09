@@ -22,14 +22,14 @@ import {
   ZK_FOUNDATION_THRESHOLD,
 } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
-import { type ActionFunctionArgs, json, type LoaderFunctionArgs } from "@remix-run/node";
+import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
-import { z, type ZodTypeAny } from "zod";
+import { type ZodTypeAny, z } from "zod";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
@@ -210,7 +210,7 @@ export default function EmergencyUpgradeDetails() {
             <CardTitle>Signatures</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            { user.role !== "visitor" &&
+            {user.role !== "visitor" && (
               <SignButton
                 proposalId={proposal.externalId}
                 contractData={{
@@ -223,11 +223,8 @@ export default function EmergencyUpgradeDetails() {
               >
                 Approve
               </SignButton>
-            }
-            { user.role === "visitor" &&
-              <p>No signing actions</p>
-            }
-
+            )}
+            {user.role === "visitor" && <p>No signing actions</p>}
           </CardContent>
         </Card>
         <Card className="pb-10">
