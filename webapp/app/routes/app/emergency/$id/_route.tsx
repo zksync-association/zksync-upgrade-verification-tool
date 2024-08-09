@@ -22,14 +22,14 @@ import {
   ZK_FOUNDATION_THRESHOLD,
 } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
-import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
+import { type ActionFunctionArgs, json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
-import { type ZodTypeAny, z } from "zod";
+import { z, type ZodTypeAny } from "zod";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
@@ -130,11 +130,6 @@ export default function EmergencyUpgradeDetails() {
   const { user, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
     useLoaderData<typeof loader>();
 
-  if (user.role === "visitor") {
-    return "Unauthorized: Only valid signers can see this page.";
-  }
-
-  const actionName = actionForRole(user.role);
   const haveAlreadySigned = signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
   const gatheredScSignatures = signatures.filter((sig) => {
     return allSecurityCouncil.some((addr) => isAddressEqual(addr, sig.signer));
@@ -215,18 +210,24 @@ export default function EmergencyUpgradeDetails() {
             <CardTitle>Signatures</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            <SignButton
-              proposalId={proposal.externalId}
-              contractData={{
-                actionName: actionName,
-                address: addresses.emergencyBoard,
-                name: "EmergencyUpgradeBoard",
-              }}
-              disabled={haveAlreadySigned}
-              postAction={$path("/app/emergency/:id", { id: proposal.externalId })}
-            >
-              Approve
-            </SignButton>
+            { user.role !== "visitor" &&
+              <SignButton
+                proposalId={proposal.externalId}
+                contractData={{
+                  actionName: actionForRole(user.role),
+                  address: addresses.emergencyBoard,
+                  name: "EmergencyUpgradeBoard",
+                }}
+                disabled={haveAlreadySigned}
+                postAction={$path("/app/emergency/:id", { id: proposal.externalId })}
+              >
+                Approve
+              </SignButton>
+            }
+            { user.role === "visitor" &&
+              <p>No signing actions</p>
+            }
+
           </CardContent>
         </Card>
         <Card className="pb-10">
