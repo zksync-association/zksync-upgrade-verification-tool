@@ -1,42 +1,47 @@
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import React, { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { emergencyPropSchema } from "@/common/emergency-proposal-schema";
-
+import { Hex, padHex } from "viem";
 
 export const step1Schema = z.object({
-  title: z.string(),
-  salt: z.string(),
+  title: z.string().min(1, "Cannot be empty"),
+  salt: z.string()
+    .regex(/^0x[a-fA-F0-9]*$/, "Salt must be a hex string starting with 0x")
+    .refine(a => a.length <= 66, "Should be 32 byte number")
+    .transform(str => str as Hex)
+    .transform(str => padHex(str, { size: 32 }))
 })
 
 export type Step1 = z.infer<typeof step1Schema>
 
 const step1Default: Step1 = {
   title: "",
-  salt: ""
+  salt: `0x${'0'.repeat(64)}`
 }
 
-export function NewEmergencyProposalStep1 () {
+export type NewEmergencyProposalStep1Props = {
+  callback: (data: Step1) => void
+}
+
+export function NewEmergencyProposalStep1 (props: NewEmergencyProposalStep1Props) {
   const form = useForm<Step1>({
-    resolver: zodResolver(emergencyPropSchema),
+    resolver: zodResolver(step1Schema),
     defaultValues: step1Default
   })
-  const [step, setStep] = useState<number>(1)
 
-  const step1Submit = (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log(step)
+  const step1Submit = (data: Step1) => {
+    props.callback(data)
   }
 
   return (
     <div>
+      <h3 className="mb-4 font-semibold text-lg">Define upgrade basic data</h3>
       <Form {...form}>
-        <form onSubmit={step1Submit}>
-          <h3 className="mb-4 font-semibold text-lg">Define Emergency Proposal</h3>
+        <form onSubmit={form.handleSubmit(step1Submit)}>
           <div className="grid gap-4 py-4">
             <FormField
               control={form.control}
@@ -60,6 +65,7 @@ export function NewEmergencyProposalStep1 () {
               name="salt"
               render={({field}) => (
                 <FormItem>
+                  <FormLabel>Salt</FormLabel>
                   <FormControl>
                     <Input placeholder="0x..." {...field} />
                   </FormControl>
