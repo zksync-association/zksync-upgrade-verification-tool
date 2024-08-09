@@ -15,13 +15,12 @@ import { zodHex } from "validate-cli";
 import { useAccount } from "wagmi";
 
 export function loader({ request }: LoaderFunctionArgs) {
-  try{
-    const user = getUserFromHeader(request)
+  try {
+    const user = getUserFromHeader(request);
     const environment = clientEnv.NODE_ENV;
     return { environment, user };
-  }
-  catch{
-    console.log("No Connected User")
+  } catch {
+    console.log("No Connected User");
     return { environment: clientEnv.NODE_ENV, user: { address: null, role: null } };
   }
 }

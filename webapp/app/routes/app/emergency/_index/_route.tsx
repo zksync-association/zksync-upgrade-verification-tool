@@ -57,7 +57,12 @@ export default function Index() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Active Emergency Proposals</CardTitle>
-            <Button variant="secondary" size="icon" onClick={() => setIsModalOpen(true)}>
+            <Button
+              data-testid="new-emergency-proposal"
+              variant="secondary"
+              size="icon"
+              onClick={() => setIsModalOpen(true)}
+            >
               <PlusIcon className="h-4 w-4" />
             </Button>
           </div>

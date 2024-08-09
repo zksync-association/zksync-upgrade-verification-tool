@@ -66,7 +66,7 @@ const config: HardhatUserConfig = {
       },
       accounts: {
         mnemonic:
-          "test test test test test test test test test test test junk",
+          "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
       },
     },
   },

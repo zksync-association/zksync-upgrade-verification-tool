@@ -26,3 +26,9 @@ You should now be able to open the webapp at: [http://localhost:3000](http://loc
 ```sh
 pnpm test:local
 ```
+
+### End-to-End Tests
+
+```sh
+pnpm test:e2e
+```

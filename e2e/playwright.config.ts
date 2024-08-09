@@ -5,8 +5,10 @@ export default defineConfig({
   testMatch: /.*\.(spec|test)\.ts$/,
   use: {
     baseURL: "http://localhost:3000",
+    viewport: { width: 1366, height: 768 },
   },
   timeout: 3000000,
+
   //   webServer: [
   //     {
   //       command: "yarn preview --port 8080",

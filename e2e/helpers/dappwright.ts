@@ -15,7 +15,7 @@ export const test = baseTest.extend<{
       const [wallet, page, browserContext] = await dappwright.bootstrap("", {
         wallet: "metamask",
         version: MetaMaskWallet.recommendedVersion,
-        seed: "test test test test test test test test test test test junk",
+        seed: "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
         headless: false,
       });
 
