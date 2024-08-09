@@ -130,11 +130,6 @@ export default function EmergencyUpgradeDetails() {
   const { user, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
     useLoaderData<typeof loader>();
 
-  if (user.role === "visitor") {
-    return "Unauthorized: Only valid signers can see this page.";
-  }
-
-  const actionName = actionForRole(user.role);
   const haveAlreadySigned = signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
   const gatheredScSignatures = signatures.filter((sig) => {
     return allSecurityCouncil.some((addr) => isAddressEqual(addr, sig.signer));
@@ -215,18 +210,21 @@ export default function EmergencyUpgradeDetails() {
             <CardTitle>Signatures</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            <SignButton
-              proposalId={proposal.externalId}
-              contractData={{
-                actionName: actionName,
-                address: addresses.emergencyBoard,
-                name: "EmergencyUpgradeBoard",
-              }}
-              disabled={haveAlreadySigned}
-              postAction={$path("/app/emergency/:id", { id: proposal.externalId })}
-            >
-              Approve
-            </SignButton>
+            {user.role !== "visitor" && (
+              <SignButton
+                proposalId={proposal.externalId}
+                contractData={{
+                  actionName: actionForRole(user.role),
+                  address: addresses.emergencyBoard,
+                  name: "EmergencyUpgradeBoard",
+                }}
+                disabled={haveAlreadySigned}
+                postAction={$path("/app/emergency/:id", { id: proposal.externalId })}
+              >
+                Approve
+              </SignButton>
+            )}
+            {user.role === "visitor" && <p>No signing actions</p>}
           </CardContent>
         </Card>
         <Card className="pb-10">
