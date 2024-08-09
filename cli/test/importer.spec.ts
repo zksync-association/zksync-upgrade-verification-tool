@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { UpgradeImporter } from "../src/lib";
-import { FileSystem } from "../src/lib/file-system";
+import { UpgradeImporter } from "../src";
+import { FileSystem } from "../src";
 import path from "node:path";
 import { MalformedUpgrade } from "../src/lib/errors";
 
@@ -222,7 +222,7 @@ describe("UpgradeImporter", () => {
       );
     });
 
-    it<Ctx>("fails with proppr error", async ({ importer }) => {
+    it<Ctx>("fails with proper error", async ({ importer }) => {
       await expect(importer.readFromFiles(baseDir, "mainnet")).rejects.toThrow(MalformedUpgrade);
     });
   });

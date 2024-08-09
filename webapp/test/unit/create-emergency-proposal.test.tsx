@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { CreateEmergencyProposalModal } from "@/routes/app/emergency/create-emergency-proposal-modal";
+import { CreateEmergencyProposalModal } from "@/routes/app/emergency/_index/create-emergency-proposal-modal";
 import type { Hex } from "viem";
 
 const mockSubmit = vi.fn();

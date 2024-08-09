@@ -1,6 +1,10 @@
 import { getAllEmergencyProposals } from "@/.server/db/dto/emergencyProposals";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
-import { saveEmergencyProposal } from "@/.server/service/emergency-proposals";
+import {
+  saveEmergencyProposal,
+  validateEmergencyProposal,
+} from "@/.server/service/emergency-proposals";
+import { basicPropSchema, fullEmergencyPropSchema } from "@/common/emergency-proposal-schema";
 import type { EmergencyProposalStatus } from "@/common/proposal-status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,20 +16,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  CreateEmergencyProposalModal,
-  emergencyPropSchema,
-} from "@/routes/app/emergency/create-emergency-proposal-modal";
+import { CreateEmergencyProposalModal } from "@/routes/app/emergency/_index/create-emergency-proposal-modal";
+import { requireUserFromHeader } from "@/utils/auth-headers";
+import { badRequest } from "@/utils/http";
 import { PlusIcon } from "@radix-ui/react-icons";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { Form, Link, json, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { $path } from "remix-routes";
-import { useAccount } from "wagmi";
 
-export async function loader() {
+export async function loader(args: LoaderFunctionArgs) {
   const emergencyProposals = await getAllEmergencyProposals();
+  const user = requireUserFromHeader(args.request);
   return json({
     activeEmergencyProposals: emergencyProposals.filter(
       ({ status }) => status === "ACTIVE" || status === "READY"
@@ -34,23 +37,40 @@ export async function loader() {
       ({ status }) => status === "CLOSED" || status === "BROADCAST"
     ),
     emergencyBoardAddress: await emergencyBoardAddress(),
+    currentUser: user.address,
   });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const data = Object.fromEntries(formData);
-  const parsedData = emergencyPropSchema.parse(data);
-  await saveEmergencyProposal(parsedData);
-  return json({ status: "success", errors: {}, data: parsedData });
+  if (data.intent === "validate") {
+    const parsed = basicPropSchema.parse(data);
+    const validation = await validateEmergencyProposal(parsed);
+    return json({
+      status: validation === null ? "success" : "failure",
+      intent: "validate",
+      error: validation,
+    });
+  }
+
+  if (data.intent === "submit") {
+    const parsedData = fullEmergencyPropSchema.parse(data);
+    await saveEmergencyProposal(parsedData);
+    return json({ status: "success", intent: "submit", error: null });
+  }
+
+  throw badRequest(`Unknown intent: ${data.intent}`);
 }
 
 export default function Index() {
-  const { activeEmergencyProposals, inactiveEmergencyProposals, emergencyBoardAddress } =
-    useLoaderData<typeof loader>();
+  const {
+    activeEmergencyProposals,
+    inactiveEmergencyProposals,
+    emergencyBoardAddress,
+    currentUser,
+  } = useLoaderData<typeof loader>();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { address } = useAccount();
-
   return (
     <div className="mt-10 space-y-4">
       <Card className="pb-10">
@@ -195,7 +215,7 @@ export default function Index() {
         <CreateEmergencyProposalModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          proposerAddress={address}
+          proposerAddress={currentUser}
           emergencyBoardAddress={emergencyBoardAddress}
         />
       </Form>

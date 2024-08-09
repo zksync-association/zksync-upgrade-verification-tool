@@ -4,10 +4,12 @@ import {
   updateEmergencyProposal,
 } from "@/.server/db/dto/emergencyProposals";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
+import { l1Rpc } from "@/.server/service/clients";
+import type { BasicEmergencyProp, FullEmergencyProp } from "@/common/emergency-proposal-schema";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
-import type { EmergencyProp } from "@/routes/app/emergency/create-emergency-proposal-modal";
 import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { notFound } from "@/utils/http";
+import { env } from "@config/env.server";
 import { type Hex, parseEther } from "viem";
 
 export async function broadcastSuccess(propsalId: Hex) {
@@ -20,7 +22,16 @@ export async function broadcastSuccess(propsalId: Hex) {
   await updateEmergencyProposal(proposal);
 }
 
-export const saveEmergencyProposal = async (data: EmergencyProp) => {
+export async function validateEmergencyProposal(data: BasicEmergencyProp): Promise<string | null> {
+  try {
+    await l1Rpc.contractReadRaw(data.targetAddress, data.calldata, env.UPGRADE_HANDLER_ADDRESS);
+    return null;
+  } catch (e) {
+    return "eth_call execution failed";
+  }
+}
+
+export const saveEmergencyProposal = async (data: FullEmergencyProp) => {
   const externalId = calculateUpgradeProposalHash(
     [
       {
@@ -32,10 +43,6 @@ export const saveEmergencyProposal = async (data: EmergencyProp) => {
     data.salt as Hex,
     await emergencyBoardAddress()
   );
-
-  if (!data.proposer) {
-    throw new Error("Proposer is required");
-  }
 
   const value = Number(parseEther(data.value));
   const currentDate = new Date();
