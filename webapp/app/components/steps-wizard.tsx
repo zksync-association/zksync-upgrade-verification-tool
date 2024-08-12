@@ -21,7 +21,7 @@ export function StepsWizard(props: StepsWizzardProps): React.ReactElement {
   return (
     <>
       <StepIndicator currentStep={props.currentStep} totalSteps={props.totalSteps} />
-      <div>{currentChildren}</div>
+      <div className="pt-12">{currentChildren}</div>
     </>
   );
 }

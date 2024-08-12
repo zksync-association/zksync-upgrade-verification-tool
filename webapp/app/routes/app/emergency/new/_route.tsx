@@ -96,6 +96,8 @@ export default function NewEmergencyUpgrade() {
 
   return (
     <div>
+      <h2 className="text-2xl font-bold pt-20 pb-5">Create new emergency proposal</h2>
+
       <StepsWizard currentStep={currentStep} totalSteps={5}>
         <WizardStep step={1}>
           <NewEmergencyProposalStep1 callback={step1Submit} />
