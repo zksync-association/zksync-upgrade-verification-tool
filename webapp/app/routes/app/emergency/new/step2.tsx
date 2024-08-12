@@ -8,9 +8,9 @@ import { useCallback, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { FormCall, formCallSchema } from "@/common/calls";
 
-const defaultValue: FormCall = {
-  target: "0x",
-  data: "0x",
+const defaultValue = {
+  target: "",
+  data: "",
   value: "0"
 }
 
@@ -25,7 +25,7 @@ export function NewEmergencyProposalStep2 (props: NewEmergencyProposalStep2Props
   const [calls, setCalls] = useState<FormCall[]>(props.calls)
   const form = useForm<FormCall>({
     resolver: zodResolver(formCallSchema),
-    defaultValues: defaultValue
+    defaultValues: defaultValue as FormCall
   })
 
   const submit = (newCall: FormCall) => {
