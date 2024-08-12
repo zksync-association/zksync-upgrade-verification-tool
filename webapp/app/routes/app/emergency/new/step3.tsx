@@ -14,18 +14,17 @@ export type Step3Props = {
 }
 
 export function Step3(props: Step3Props) {
-  const { submit, data, state } = useFetcher<typeof action>();
+  const {submit, data, state} = useFetcher<typeof action>();
 
   useEffect(() => {
     submit(
-      { intent: "validate", calls: JSON.stringify(props.calls), salt: props.step1.salt, title: props.step1.title },
-      { method: "POST", action: $path("/app/emergency/new") }
+      {intent: "validate", calls: JSON.stringify(props.calls), salt: props.step1.salt, title: props.step1.title},
+      {method: "POST", action: $path("/app/emergency/new")}
     )
   }, []);
 
-  const valid = data && data.ok
+  const valid = data && data.ok && data.errors.length === 0
 
-  const coso = data === undefined ? "waiting.." : data
   return (
     <div>
       <div>
@@ -47,15 +46,21 @@ export function Step3(props: Step3Props) {
         ))}
       </div>
 
-      { JSON.stringify(coso) }
+      {!data && <div>Validating...</div>}
 
+      {data?.errors && <div>
+        Error validation transactions: {data.errors.join(", ")}
+      </div>}
 
+      <div>
+        {valid ? "Data validation ok" : "Error validating transactions"}
+      </div>
 
       <Button variant="outline" onClick={props.onBack}>
         Back
       </Button>
 
-      <Button onClick={props.submit}>
+      <Button disabled={!valid} onClick={props.submit} loading={state === "submitting" || state === "loading"}>
         Submit
       </Button>
     </div>
