@@ -1,4 +1,5 @@
-import type { Action, FreezeProposalsType } from "@/.server/db/schema";
+import type { FreezeProposalsType } from "@/.server/db/schema";
+import type { SignAction } from "@/common/sign-action";
 import { Button } from "@/components/ui/button";
 import type { action } from "@/routes/app/proposals/$id/_route";
 import { useFetcher } from "@remix-run/react";
@@ -10,7 +11,7 @@ import { useChains, useSignTypedData } from "wagmi";
 type ContractData = {
   name: string;
   address: Hex;
-  actionName: Action;
+  actionName: SignAction;
 };
 
 type SignButtonProps = {

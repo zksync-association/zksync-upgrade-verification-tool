@@ -1,6 +1,5 @@
 import { getFreezeProposalById } from "@/.server/db/dto/freeze-proposals";
 import { getSignaturesByFreezeProposalId } from "@/.server/db/dto/signatures";
-import { type Action, actionSchema } from "@/.server/db/schema";
 import {
   councilAddress,
   councilHardFreezeThreshold,
@@ -9,6 +8,7 @@ import {
   councilUnfreezeThreshold,
 } from "@/.server/service/contracts";
 import { validateAndSaveFreezeSignature } from "@/.server/service/signatures";
+import { type SignAction, signActionSchema } from "@/common/sign-action";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
@@ -76,7 +76,7 @@ export async function action({ request }: ActionFunctionArgs) {
     z.object({
       signature: zodHex,
       proposalId: z.number(),
-      action: actionSchema,
+      action: signActionSchema,
     })
   );
   if (!data.success) {
@@ -109,7 +109,7 @@ export default function Freeze() {
   } = useLoaderData<typeof loader>();
 
   let proposalType: string;
-  let action: Action;
+  let action: SignAction;
   switch (proposal.type) {
     case "SOFT_FREEZE":
       proposalType = "Soft Freeze";
