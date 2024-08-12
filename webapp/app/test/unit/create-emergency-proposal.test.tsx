@@ -1,5 +1,4 @@
 import "@testing-library/jest-dom";
-import type { Hex } from "viem";
 
 const mockSubmit = vi.fn();
 

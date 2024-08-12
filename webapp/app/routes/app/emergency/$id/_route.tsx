@@ -13,6 +13,7 @@ import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { StatusIndicator } from "@/components/status-indicator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExecuteEmergencyUpgradeButton } from "@/routes/app/emergency/$id/execute-emergency-upgrade-button";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import { requireUserFromHeader } from "@/utils/auth-headers";
@@ -28,18 +29,17 @@ import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
-import { formatEther, type Hex, hexToBigInt, isAddressEqual } from "viem";
+import { type Hex, formatEther, hexToBigInt, isAddressEqual } from "viem";
 import { type ZodTypeAny, z } from "zod";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
-  const params = getParams(args.params, z.object({id: zodHex}));
+  const params = getParams(args.params, z.object({ id: zodHex }));
   if (!params.success) {
     throw notFound();
   }
 
-  const {id: proposalId} = params.data;
+  const { id: proposalId } = params.data;
 
   const boardAddress = await emergencyBoardAddress();
 
@@ -86,7 +86,7 @@ function extract<T extends ZodTypeAny>(
 
 const intentParser = z.enum(["newSignature", "broadcastSuccess"]);
 
-export async function action({request}: ActionFunctionArgs) {
+export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData().catch(() => {
     throw badRequest("Failed to parse body");
   });
@@ -106,7 +106,7 @@ export async function action({request}: ActionFunctionArgs) {
     await broadcastSuccess(proposalId);
   }
 
-  return json({ok: true});
+  return json({ ok: true });
 }
 
 const ACTION_NAMES = {
@@ -126,7 +126,7 @@ function actionForRole(role: UserRole): SignAction {
 export default function EmergencyUpgradeDetails() {
   const navigate = useNavigate();
 
-  const {user, proposal, addresses, signatures, allSecurityCouncil, allGuardians} =
+  const { user, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
     useLoaderData<typeof loader>();
 
   if (user.role === "visitor") {
@@ -153,7 +153,7 @@ export default function EmergencyUpgradeDetails() {
           onClick={() => navigate(-1)}
           className="mr-2 hover:bg-transparent"
         >
-          <ArrowLeft/>
+          <ArrowLeft />
         </Button>
         <h2 className="font-semibold">Proposal {proposal.externalId}</h2>
       </div>
@@ -222,7 +222,7 @@ export default function EmergencyUpgradeDetails() {
                 name: "EmergencyUpgradeBoard",
               }}
               disabled={haveAlreadySigned}
-              postAction={$path("/app/emergency/:id", {id: proposal.externalId})}
+              postAction={$path("/app/emergency/:id", { id: proposal.externalId })}
             >
               Approve
             </SignButton>
@@ -261,27 +261,24 @@ export default function EmergencyUpgradeDetails() {
                 <b>salt:</b> <span>{proposal.salt}</span>
               </p>
 
-              <h3 className="text-xl font-bold">Calls</h3>
+              <h3 className="font-bold text-xl">Calls</h3>
 
-              {proposal.calls.map((call, i) => (
-                <div key={i} className="grid grid-cols-4 border-t-2 pt-5 mt-10 gap-y-3">
-                  <div className="grid-col-span-1">
-                    Target
-                  </div>
+              {proposal.calls.map((call) => (
+                <div
+                  key={call.target + call.target + call.value}
+                  className="mt-10 grid grid-cols-4 gap-y-3 border-t-2 pt-5"
+                >
+                  <div className="grid-col-span-1">Target</div>
                   <div className="col-span-3 font-mono">
                     <span className="break-words">{call.target}</span>
                   </div>
 
-                  <div className="grid-col-span-1">
-                    Data
-                  </div>
+                  <div className="grid-col-span-1">Data</div>
                   <div className="col-span-3 font-mono">
                     <span className="break-words">{call.data}</span>
                   </div>
 
-                  <div className="grid-col-span-1">
-                    Value
-                  </div>
+                  <div className="grid-col-span-1">Value</div>
                   <div className="col-span-3 font-mono">
                     <span className="break-words">{formatEther(hexToBigInt(call.value))}</span>
                   </div>

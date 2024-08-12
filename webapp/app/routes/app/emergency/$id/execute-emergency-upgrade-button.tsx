@@ -61,7 +61,7 @@ export function ExecuteEmergencyUpgradeButton({
         abi: ALL_ABIS.emergencyBoard,
         functionName: "executeEmergencyUpgrade",
         args: [
-          proposal.calls.map(c => ({ ...c, value: hexToBigInt(c.value) })),
+          proposal.calls.map((c) => ({ ...c, value: hexToBigInt(c.value) })),
           proposal.salt,
           encodeSignatures(guardianSignatures),
           encodeSignatures(councilSignatures),

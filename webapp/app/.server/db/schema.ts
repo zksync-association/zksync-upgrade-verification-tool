@@ -2,19 +2,9 @@ import { bytea } from "@/.server/db/custom-types";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { signActionSchema } from "@/common/sign-action";
 import { sql } from "drizzle-orm";
-import {
-  bigint,
-  check,
-  index,
-  json,
-  pgTable,
-  serial,
-  text,
-  timestamp,
-  unique,
-} from "drizzle-orm/pg-core";
-import { z } from "zod";
+import { check, index, json, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
 import { zodHex } from "validate-cli";
+import { z } from "zod";
 
 export const proposalsTable = pgTable(
   "proposals",
@@ -36,9 +26,9 @@ export const proposalsTable = pgTable(
 const callSchema = z.object({
   target: zodHex,
   value: zodHex,
-  data: zodHex
-})
-type Call = z.infer<typeof callSchema>
+  data: zodHex,
+});
+type Call = z.infer<typeof callSchema>;
 
 export const emergencyProposalsTable = pgTable(
   "emergency_proposals",

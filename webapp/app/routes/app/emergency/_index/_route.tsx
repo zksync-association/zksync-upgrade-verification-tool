@@ -35,14 +35,11 @@ export async function loader(args: LoaderFunctionArgs) {
 }
 
 export default function Index() {
-  const {
-    activeEmergencyProposals,
-    inactiveEmergencyProposals,
-  } = useLoaderData<typeof loader>();
-  const navigate = useNavigate()
+  const { activeEmergencyProposals, inactiveEmergencyProposals } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
   const goToNewProposal = useCallback(() => {
-    navigate($path("/app/emergency/new"))
-  }, [])
+    navigate($path("/app/emergency/new"));
+  }, [navigate]);
 
   return (
     <div className="mt-10 space-y-4">

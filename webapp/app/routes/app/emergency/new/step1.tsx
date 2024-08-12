@@ -1,40 +1,49 @@
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Hex, padHex } from "viem";
+import { useForm } from "react-hook-form";
+import { type Hex, padHex } from "viem";
+import { z } from "zod";
 
 export const step1Schema = z.object({
   title: z.string().min(1, "Cannot be empty"),
-  salt: z.string()
+  salt: z
+    .string()
     .regex(/^0x[a-fA-F0-9]*$/, "Salt must be a hex string starting with 0x")
-    .refine(a => a.length <= 66, "Should be 32 byte number")
-    .transform(str => str as Hex)
-    .transform(str => padHex(str, { size: 32 }))
-})
+    .refine((a) => a.length <= 66, "Should be 32 byte number")
+    .transform((str) => str as Hex)
+    .transform((str) => padHex(str, { size: 32 })),
+});
 
-export type Step1 = z.infer<typeof step1Schema>
+export type Step1 = z.infer<typeof step1Schema>;
 
 const step1Default: Step1 = {
   title: "",
-  salt: `0x${'0'.repeat(64)}`
-}
+  salt: `0x${"0".repeat(64)}`,
+};
 
 export type NewEmergencyProposalStep1Props = {
-  callback: (data: Step1) => void
-}
+  callback: (data: Step1) => void;
+};
 
-export function NewEmergencyProposalStep1 (props: NewEmergencyProposalStep1Props) {
+export function NewEmergencyProposalStep1(props: NewEmergencyProposalStep1Props) {
   const form = useForm<Step1>({
     resolver: zodResolver(step1Schema),
-    defaultValues: step1Default
-  })
+    defaultValues: step1Default,
+  });
 
   const step1Submit = (data: Step1) => {
-    props.callback(data)
-  }
+    props.callback(data);
+  };
 
   return (
     <div>
@@ -45,7 +54,7 @@ export function NewEmergencyProposalStep1 (props: NewEmergencyProposalStep1Props
             <FormField
               control={form.control}
               name="title"
-              render={({field}) => (
+              render={({ field }) => (
                 <FormItem>
                   <FormLabel>Title</FormLabel>
                   <FormControl>
@@ -54,7 +63,7 @@ export function NewEmergencyProposalStep1 (props: NewEmergencyProposalStep1Props
                   <FormDescription>
                     This is to help voters identify which proposal this is.
                   </FormDescription>
-                  <FormMessage data-testid="title-error"/>
+                  <FormMessage data-testid="title-error" />
                 </FormItem>
               )}
             />
@@ -62,7 +71,7 @@ export function NewEmergencyProposalStep1 (props: NewEmergencyProposalStep1Props
             <FormField
               control={form.control}
               name="salt"
-              render={({field}) => (
+              render={({ field }) => (
                 <FormItem>
                   <FormLabel>Salt</FormLabel>
                   <FormControl>
@@ -71,16 +80,14 @@ export function NewEmergencyProposalStep1 (props: NewEmergencyProposalStep1Props
                   <FormDescription>
                     A bytes32 value used for creating unique upgrade proposal hashes.
                   </FormDescription>
-                  <FormMessage/>
+                  <FormMessage />
                 </FormItem>
               )}
             />
           </div>
-          <Button type="submit">
-            Next
-          </Button>
+          <Button type="submit">Next</Button>
         </form>
       </Form>
     </div>
-  )
+  );
 }

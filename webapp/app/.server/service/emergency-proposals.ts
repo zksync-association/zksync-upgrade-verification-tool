@@ -5,13 +5,13 @@ import {
 } from "@/.server/db/dto/emergencyProposals";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import { l1Rpc } from "@/.server/service/clients";
+import type { Call } from "@/common/calls";
 import type { FullEmergencyProp } from "@/common/emergency-proposal-schema";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { notFound } from "@/utils/http";
 import { env } from "@config/env.server";
 import { type Hex, numberToHex } from "viem";
-import { Call } from "@/common/calls";
 
 export async function broadcastSuccess(propsalId: Hex) {
   const proposal = await getEmergencyProposalByExternalId(propsalId);
@@ -24,9 +24,11 @@ export async function broadcastSuccess(propsalId: Hex) {
 }
 
 export async function validateEmergencyProposalCalls(calls: Call[]): Promise<string[]> {
-  return await Promise.all(calls.map(async (call) => {
-    return await validateCall(call)
-  })).then(list => list.filter(msg => msg !== null) as string[])
+  return await Promise.all(
+    calls.map(async (call) => {
+      return await validateCall(call);
+    })
+  ).then((list) => list.filter((msg) => msg !== null) as string[]);
 }
 
 export async function validateCall(call: Call): Promise<null | string> {
@@ -47,10 +49,10 @@ export const saveEmergencyProposal = async (data: FullEmergencyProp) => {
 
   const currentDate = new Date();
 
-  const callsToStore = data.calls.map(call => ({
+  const callsToStore = data.calls.map((call) => ({
     ...call,
-    value: numberToHex(call.value)
-  }))
+    value: numberToHex(call.value),
+  }));
 
   await createOrIgnoreEmergencyProposal({
     status: "ACTIVE",
