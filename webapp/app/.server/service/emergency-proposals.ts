@@ -10,7 +10,7 @@ import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { notFound } from "@/utils/http";
 import { env } from "@config/env.server";
-import { type Hex, numberToHex, parseEther } from "viem";
+import { type Hex, numberToHex } from "viem";
 import { Call } from "@/common/calls";
 
 export async function broadcastSuccess(propsalId: Hex) {
@@ -24,7 +24,7 @@ export async function broadcastSuccess(propsalId: Hex) {
 }
 
 export async function validateEmergencyProposalCalls(calls: Call[]): Promise<string[]> {
-  return await Promise.all(calls.map(async (call, i) => {
+  return await Promise.all(calls.map(async (call) => {
     return await validateCall(call)
   })).then(list => list.filter(msg => msg !== null) as string[])
 }
