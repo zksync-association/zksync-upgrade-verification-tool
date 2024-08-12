@@ -1,31 +1,16 @@
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { getAddress, Hex, padHex, parseEther } from "viem";
 import { Step1 } from "@/routes/app/emergency/new/step1";
 import { useCallback, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
-
-export const formCallSchema = z.object({
-  target: z.string()
-    .regex(/^0x[a-fA-F0-9]*$/, "Must be a hex string starting with 0x")
-    .length(42, "Address have to be 20 bytes long")
-    .transform(str => getAddress(str)),
-  data: z.string()
-    .regex(/^0x[a-fA-F0-9]*$/, "Must be a hex string starting with 0x")
-    .refine(str => str.length % 2 === 0, "Length of hex string should be even"),
-  value: z.string()
-    .refine(str => !isNaN(parseFloat(str)), "Should be a valid number")
-})
-
-export type FormCall = z.infer<typeof formCallSchema>
+import { FormCall, formCallSchema } from "@/common/calls";
 
 const defaultValue: FormCall = {
   target: "0x",
-  data: "",
+  data: "0x",
   value: "0"
 }
 
@@ -33,10 +18,11 @@ export type NewEmergencyProposalStep2Props = {
   step1: Step1,
   onBack: () => void,
   onNext: (data: FormCall[]) => void
+  calls: FormCall[]
 }
 
 export function NewEmergencyProposalStep2 (props: NewEmergencyProposalStep2Props) {
-  const [calls, setCalls] = useState<FormCall[]>([])
+  const [calls, setCalls] = useState<FormCall[]>(props.calls)
   const form = useForm<FormCall>({
     resolver: zodResolver(formCallSchema),
     defaultValues: defaultValue

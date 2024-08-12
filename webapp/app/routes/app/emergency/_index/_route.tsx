@@ -2,7 +2,6 @@ import { getAllEmergencyProposals } from "@/.server/db/dto/emergencyProposals";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import {
   saveEmergencyProposal,
-  validateEmergencyProposal,
 } from "@/.server/service/emergency-proposals";
 import { basicPropSchema, fullEmergencyPropSchema } from "@/common/emergency-proposal-schema";
 import type { EmergencyProposalStatus } from "@/common/proposal-status";
@@ -44,15 +43,6 @@ export async function loader(args: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const data = Object.fromEntries(formData);
-  if (data.intent === "validate") {
-    const parsed = basicPropSchema.parse(data);
-    const validation = await validateEmergencyProposal(parsed);
-    return json({
-      status: validation === null ? "success" : "failure",
-      intent: "validate",
-      error: validation,
-    });
-  }
 
   if (data.intent === "submit") {
     const parsedData = fullEmergencyPropSchema.parse(data);
