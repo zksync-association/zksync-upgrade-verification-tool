@@ -14,15 +14,15 @@ vi.mock("@hookform/resolvers/zod", () => ({
 }));
 
 describe("CreateEmergencyProposalModal", () => {
-  const mockOnClose = vi.fn();
-  const defaultProps = {
-    isOpen: true,
-    onClose: mockOnClose,
-    errors: {},
-    status: undefined,
-    proposerAddress: "0x1234567890123456789012345678901234567890" as Hex,
-    emergencyBoardAddress: "0x0011223344556677889900112233445566778899" as Hex,
-  };
+  // const mockOnClose = vi.fn();
+  // const defaultProps = {
+  //   isOpen: true,
+  //   onClose: mockOnClose,
+  //   errors: {},
+  //   status: undefined,
+  //   proposerAddress: "0x1234567890123456789012345678901234567890" as Hex,
+  //   emergencyBoardAddress: "0x0011223344556677889900112233445566778899" as Hex,
+  // };
 
   beforeEach(() => {
     vi.clearAllMocks();
