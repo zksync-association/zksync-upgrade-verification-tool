@@ -119,7 +119,7 @@ export function NewEmergencyProposalStep2 (props: NewEmergencyProposalStep2Props
         </form>
       </Form>
 
-      <Button onClick={props.onBack}>
+      <Button variant="outline" onClick={props.onBack}>
         Back
       </Button>
 

@@ -40,26 +40,21 @@ export async function validateCall(call: Call): Promise<null | string> {
 
 export const saveEmergencyProposal = async (data: FullEmergencyProp) => {
   const externalId = calculateUpgradeProposalHash(
-    [
-      {
-        data: data.calldata as Hex,
-        target: data.targetAddress as Hex,
-        value: parseEther(data.value),
-      },
-    ],
+    data.calls,
     data.salt as Hex,
     await emergencyBoardAddress()
   );
 
   const currentDate = new Date();
 
+  const callsToStore = data.calls.map(call => ({
+    ...call,
+    value: numberToHex(call.value)
+  }))
+
   await createOrIgnoreEmergencyProposal({
     status: "ACTIVE",
-    calls: [{
-      target: data.targetAddress as Hex,
-      data: data.calldata as Hex,
-      value: numberToHex(parseEther(data.value)),
-    }],
+    calls: callsToStore,
     proposer: data.proposer as Hex,
     proposedOn: currentDate,
     changedOn: currentDate,

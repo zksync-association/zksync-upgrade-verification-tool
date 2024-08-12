@@ -14,7 +14,7 @@ const digitsSchema = z.string()
   .refine((str) => /[0-9]+/.test(str), "Not a numerical string")
 
 
-const addressSchema = hexChars
+export const addressSchema = hexChars
   .refine(str => str.length === 42, "Address have to be 20 bytes long")
   .transform(str => getAddress(str))
 

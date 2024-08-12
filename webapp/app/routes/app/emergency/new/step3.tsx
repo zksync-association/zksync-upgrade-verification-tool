@@ -10,10 +10,11 @@ export type Step3Props = {
   step1: Step1;
   calls: FormCall[];
   onBack: () => void;
+  submit: () => void;
 }
 
 export function Step3(props: Step3Props) {
-  const { submit, data } = useFetcher<typeof action>();
+  const { submit, data, state } = useFetcher<typeof action>();
 
   useEffect(() => {
     submit(
@@ -21,6 +22,8 @@ export function Step3(props: Step3Props) {
       { method: "POST", action: $path("/app/emergency/new") }
     )
   }, []);
+
+  const valid = data && data.ok
 
   const coso = data === undefined ? "waiting.." : data
   return (
@@ -46,8 +49,14 @@ export function Step3(props: Step3Props) {
 
       { JSON.stringify(coso) }
 
-      <Button onClick={props.onBack}>
 
+
+      <Button variant="outline" onClick={props.onBack}>
+        Back
+      </Button>
+
+      <Button onClick={props.submit}>
+        Submit
       </Button>
     </div>
   )
