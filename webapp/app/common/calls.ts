@@ -1,4 +1,4 @@
-import { type Hex, getAddress } from "viem";
+import { type Hex, getAddress, parseEther, numberToHex } from "viem";
 import { z } from "zod";
 
 const hexRegexp = /0x[0-9a-fA-F]*/;
@@ -18,19 +18,17 @@ export const addressSchema = hexChars
 export const callSchema = z.object({
   target: hexSchema,
   data: hexSchema,
-  value: z.coerce.bigint(),
+  value: hexSchema,
 });
 
-export type Call = {
-  target: Hex;
-  data: Hex;
-  value: bigint;
-};
+export type Call = z.infer<typeof callSchema>;
 
 export const formCallSchema = z.object({
   target: addressSchema,
   data: hexSchema,
-  value: digitsSchema,
+  value: z.string()
+  .refine((str) => !isNaN(parseFloat(str)), "Should be a valid number")
+  .transform((str) => numberToHex(parseEther(str)))
 });
 
 export type FormCall = z.infer<typeof formCallSchema>;
@@ -38,7 +36,7 @@ export type FormCall = z.infer<typeof formCallSchema>;
 export function encodeCall(call: Call): FormCall {
   return {
     ...call,
-    value: call.value.toString(),
+    value: call.value,
   };
 }
 

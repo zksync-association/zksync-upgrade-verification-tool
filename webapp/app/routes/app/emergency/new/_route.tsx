@@ -96,7 +96,7 @@ export default function NewEmergencyUpgrade() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold pt-20 pb-5">Create new emergency proposal</h2>
+      <h2 className="text-3xl font-bold pt-20 pb-5">Create new emergency proposal</h2>
 
       <StepsWizard currentStep={currentStep} totalSteps={5}>
         <WizardStep step={1}>

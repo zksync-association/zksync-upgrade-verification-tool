@@ -11,7 +11,7 @@ import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { notFound } from "@/utils/http";
 import { env } from "@config/env.server";
-import { type Hex, numberToHex } from "viem";
+import { type Hex, hexToBigInt } from "viem";
 
 export async function broadcastSuccess(propsalId: Hex) {
   const proposal = await getEmergencyProposalByExternalId(propsalId);
@@ -33,7 +33,7 @@ export async function validateEmergencyProposalCalls(calls: Call[]): Promise<str
 
 export async function validateCall(call: Call): Promise<null | string> {
   try {
-    await l1Rpc.contractReadRaw(call.target, call.data, env.UPGRADE_HANDLER_ADDRESS, call.value);
+    await l1Rpc.contractReadRaw(call.target, call.data, env.UPGRADE_HANDLER_ADDRESS, hexToBigInt(call.value));
     return null;
   } catch (e) {
     return "eth_call execution failed";
@@ -49,14 +49,9 @@ export const saveEmergencyProposal = async (data: FullEmergencyProp) => {
 
   const currentDate = new Date();
 
-  const callsToStore = data.calls.map((call) => ({
-    ...call,
-    value: numberToHex(call.value),
-  }));
-
   await createOrIgnoreEmergencyProposal({
     status: "ACTIVE",
-    calls: callsToStore,
+    calls: data.calls,
     proposer: data.proposer as Hex,
     proposedOn: currentDate,
     changedOn: currentDate,
