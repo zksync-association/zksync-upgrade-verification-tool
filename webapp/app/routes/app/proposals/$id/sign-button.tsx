@@ -17,6 +17,7 @@ type SignButtonProps = {
   contractData: ContractData;
   children?: React.ReactNode;
   disabled?: boolean;
+  postAction: string;
 };
 
 export default function SignButton({
@@ -24,6 +25,7 @@ export default function SignButton({
   proposalId,
   contractData,
   disabled,
+  postAction,
 }: SignButtonProps) {
   const { signTypedData, isPending, isSuccess, isError, data: signature } = useSignTypedData();
   const [chain] = useChains();
@@ -32,16 +34,14 @@ export default function SignButton({
   useEffect(() => {
     if (isSuccess) {
       fetcher.submit(
-        { signature, actionName: contractData.actionName, proposalId },
-        { method: "POST" }
+        { intent: "newSignature", signature, actionName: contractData.actionName, proposalId },
+        { method: "POST", action: postAction }
       );
     }
-  }, [isSuccess, contractData.actionName, fetcher.submit, proposalId, signature]);
+  }, [isSuccess, contractData.actionName, fetcher.submit, proposalId, signature, postAction]);
 
   const loading = isPending || fetcher.state === "submitting" || fetcher.state === "loading";
   const success = isSuccess && fetcher.state === "idle" && fetcher.data?.ok;
-  const error = isError;
-
   useEffect(() => {
     if (loading) {
       toast.loading("Signing...", { id: "sign_button" });
@@ -49,10 +49,10 @@ export default function SignButton({
     if (success) {
       toast.success("Signed successfully", { id: "sign_button" });
     }
-    if (error) {
+    if (isError) {
       toast.error("Failed to sign", { id: "sign_button" });
     }
-  }, [loading, success, error]);
+  }, [loading, success, isError]);
 
   function onClick() {
     signTypedData({

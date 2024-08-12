@@ -8,7 +8,6 @@ import { type Hex, decodeAbiParameters, getAbiItem } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
 
 type ExecuteUpgradeButtonProps = {
-  proposalId: Hex;
   target: Hex;
   proposalCalldata: Hex;
   children?: React.ReactNode;
@@ -20,7 +19,6 @@ export default function ExecuteUpgradeButton({
   target,
   proposalCalldata,
   disabled,
-  proposalId,
 }: ExecuteUpgradeButtonProps) {
   const { address } = useAccount();
   const { writeContract, isPending } = useWriteContract();
@@ -51,8 +49,7 @@ export default function ExecuteUpgradeButton({
         onSuccess: (hash) => {
           toast.success("Transaction broadcasted successfully", { id: "broadcasting-tx" });
           navigate(
-            $path("/app/proposals/:id/transactions/:hash", {
-              id: proposalId,
+            $path("/app/transactions/:hash", {
               hash,
             })
           );

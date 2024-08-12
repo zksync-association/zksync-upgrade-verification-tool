@@ -1,4 +1,4 @@
-import type { UserRole } from "@/.server/service/authorized-users";
+import type { UserRole } from "@/common/user-role-schema";
 import ConnectButton from "@/components/connect-button";
 import EnvBadge from "@/components/env-badge";
 import Logo from "@/components/logo";
@@ -21,6 +21,7 @@ export default function NavbarWithUser({ role }: { role: UserRole | null }) {
               {role === "guardian" && "Guardian"}
               {role === "securityCouncil" && "Security Council"}
               {role === "visitor" && "Visitor"}
+              {role === "zkFoundation" && "ZkSync Foundation"}
             </Button>
           )}
           <ConnectButton />

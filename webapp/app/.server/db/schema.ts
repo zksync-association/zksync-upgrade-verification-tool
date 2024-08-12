@@ -1,4 +1,6 @@
 import { bytea } from "@/.server/db/custom-types";
+import { emergencyProposalStatusSchema } from "@/common/proposal-status";
+import { signActionSchema } from "@/common/sign-action";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -30,9 +32,6 @@ export const proposalsTable = pgTable(
     externalIdIdx: index("external_id_idx").on(table.externalId),
   })
 );
-export const emergencyProposalStatusSchema = z.enum(["ACTIVE", "READY", "BROADCAST", "CLOSED"]);
-
-export type EmergencyProposalStatus = z.infer<typeof emergencyProposalStatusSchema>;
 
 export const emergencyProposalsTable = pgTable(
   "emergency_proposals",
@@ -58,21 +57,6 @@ export const emergencyProposalsTable = pgTable(
   })
 );
 
-export const actionSchema = z.enum([
-  "ExtendLegalVetoPeriod",
-  "ApproveUpgradeGuardians",
-  "ApproveUpgradeSecurityCouncil",
-  "ExecuteEmergencyUpgradeGuardians",
-  "ExecuteEmergencyUpgradeSecurityCouncil",
-  "ExecuteEmergencyUpgradeZKFoundation",
-  "ApproveSoftFreeze",
-  "ApproveHardFreeze",
-  "ApproveUnfreeze",
-  "ApproveSetSoftFreezeThreshold",
-]);
-
-export type Action = z.infer<typeof actionSchema>;
-
 export const signaturesTable = pgTable(
   "signatures",
   {
@@ -85,7 +69,7 @@ export const signaturesTable = pgTable(
     signer: bytea("signer").notNull(),
     signature: bytea("signature").notNull(),
     action: text("action", {
-      enum: actionSchema.options,
+      enum: signActionSchema.options,
     }).notNull(),
   },
   ({ proposal, signer, action, emergencyProposal, freezeProposal }) => ({

@@ -1,3 +1,4 @@
+import { type EmergencyProp, emergencyPropSchema } from "@/common/emergency-proposal-schema";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -20,8 +21,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import type { action } from "@/routes/app/emergency/_route";
-import { EMERGENCY_BOARD, calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
+import type { action } from "@/routes/app/emergency/_index/_route";
+import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ChevronDownIcon,
@@ -32,58 +33,21 @@ import {
   Share2Icon,
 } from "@radix-ui/react-icons";
 import { useFetcher } from "@remix-run/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { type Hash, isAddress, padHex, parseEther } from "viem";
-import { z } from "zod";
+import { type Hex, parseEther } from "viem";
 import { StepIndicator } from "./step-indicator";
-
-export const emergencyPropSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  targetAddress: z.string().refine((value) => isAddress(value), {
-    message: "Invalid Ethereum address",
-  }),
-  calldata: z
-    .string()
-    .regex(/^0x[a-fA-F0-9]*$/, "Calldata must be a hex string starting with 0x")
-    .refine((value) => value.length % 2 === 0, {
-      message: "Calldata must be valid hex-encoded bytes",
-    }),
-  salt: z
-    .string()
-    .regex(/^0x[a-fA-F0-9]*$/, "Salt must be a hex string starting with 0x")
-    .refine((value) => value.length === 66, {
-      message: "Salt must be a 32-byte hex string (64 characters)",
-    })
-    .default(padHex("0x0")),
-  value: z
-    .string()
-    .regex(/^\d*\.?\d*$/, "Value must be a positive number")
-    .refine((value) => Number.parseFloat(value) >= 0, {
-      message: "Value must be a positive number",
-    }),
-  proposer: z
-    .string()
-    .refine((value) => isAddress(value), {
-      message: "Invalid proposer address",
-    })
-    .optional(),
-});
-
-export type EmergencyProp = z.infer<typeof emergencyPropSchema>;
 
 export function CreateEmergencyProposalModal({
   isOpen,
-  errors,
-  status,
   onClose,
   proposerAddress,
+  emergencyBoardAddress,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  errors: object;
-  status?: string;
-  proposerAddress?: `0x${string}`;
+  proposerAddress: Hex;
+  emergencyBoardAddress: Hex;
 }) {
   const [step, setStep] = useState(1);
   const [extId, setExtId] = useState("");
@@ -91,10 +55,18 @@ export function CreateEmergencyProposalModal({
   const [saltOpen, setSaltOpen] = useState(false);
   const fetcher = useFetcher<typeof action>();
 
+  useEffect(() => {
+    if (fetcher.data?.intent === "validate" && fetcher.data?.status === "success") {
+      setStep(2);
+    }
+  }, [fetcher.data]);
+
+  const validationError = fetcher.data?.error;
+
   const defaultFormValues = {
     title: "",
-    targetAddress: "0x" as Hash,
-    calldata: "0x",
+    targetAddress: "" as Hex,
+    calldata: "",
     value: "0",
     salt: "0x0000000000000000000000000000000000000000000000000000000000000000",
   };
@@ -105,7 +77,7 @@ export function CreateEmergencyProposalModal({
 
   const handleCreate = (data: EmergencyProp) => {
     if (form.formState.isValid) {
-      fetcher.submit({ ...data, proposer: proposerAddress ?? "" }, { method: "post" });
+      fetcher.submit({ ...data, proposer: proposerAddress, intent: "submit" }, { method: "post" });
       onClose();
       setStep(1);
       form.reset(defaultFormValues);
@@ -113,22 +85,34 @@ export function CreateEmergencyProposalModal({
   };
 
   const handleVerify = async () => {
+    await form.trigger();
     if (form.formState.isValid) {
-      setStep(2);
+      const [targetAddress, calldata, value] = form.getValues([
+        "targetAddress",
+        "calldata",
+        "value",
+      ]);
+      fetcher.submit(
+        {
+          targetAddress,
+          calldata,
+          value,
+          intent: "validate",
+        },
+        { method: "post" }
+      );
       const derivedExternalId = calculateUpgradeProposalHash(
         [
           {
             value: parseEther(form.getValues("value")),
-            data: form.getValues("calldata") as Hash,
-            target: form.getValues("targetAddress"),
+            data: form.getValues("calldata") as Hex,
+            target: form.getValues("targetAddress") as Hex,
           },
         ],
-        form.getValues("salt") as Hash,
-        EMERGENCY_BOARD
+        form.getValues("salt") as Hex,
+        emergencyBoardAddress
       );
       setExtId(derivedExternalId);
-    } else {
-      await form.trigger();
     }
   };
 
@@ -282,8 +266,15 @@ export function CreateEmergencyProposalModal({
                     </CollapsibleContent>
                   </Collapsible>
                 </div>
+                {validationError && <p className="text-red-500 italic">Error: {validationError}</p>}
+
                 <AlertDialogFooter>
-                  <Button type="button" onClick={handleVerify} data-testid="verify-button">
+                  <Button
+                    type="button"
+                    onClick={handleVerify}
+                    data-testid="verify-button"
+                    loading={fetcher.state === "submitting"}
+                  >
                     <MagnifyingGlassIcon className="mr-2 h-4 w-4" />
                     Verify
                   </Button>

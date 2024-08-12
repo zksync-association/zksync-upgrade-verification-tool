@@ -1,5 +1,7 @@
 FROM node:20-alpine
 
+LABEL org.opencontainers.image.source=https://github.com/zksync-association/zksync-upgrade-verification-tool
+
 # Configure pnpm
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"

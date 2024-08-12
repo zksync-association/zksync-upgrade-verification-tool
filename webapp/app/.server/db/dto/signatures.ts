@@ -25,3 +25,10 @@ export async function getSignaturesByFreezeProposalId(
 ) {
   return db.select().from(signaturesTable).where(eq(signaturesTable.freezeProposal, id));
 }
+
+export async function getSignaturesByEmergencyProposalId(
+  id: InferSelectModel<typeof proposalsTable>["externalId"],
+  { tx }: { tx?: typeof db } = {}
+) {
+  return (tx ?? db).select().from(signaturesTable).where(eq(signaturesTable.emergencyProposal, id));
+}

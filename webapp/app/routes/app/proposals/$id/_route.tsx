@@ -1,11 +1,11 @@
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
-import { actionSchema } from "@/.server/db/schema";
-import { councilAddress, guardiansAddress } from "@/.server/service/contracts";
+import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveProposalSignature } from "@/.server/service/signatures";
+import { signActionSchema } from "@/common/sign-action";
 import TxLink from "@/components/tx-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
@@ -29,6 +29,7 @@ import { defer, json } from "@remix-run/node";
 import { Await, useLoaderData } from "@remix-run/react";
 import { Suspense } from "react";
 import { getFormData, getParams } from "remix-params-helper";
+import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
@@ -125,7 +126,7 @@ export async function action({ request }: ActionFunctionArgs) {
     z.object({
       signature: zodHex,
       proposalId: zodHex,
-      actionName: actionSchema,
+      actionName: signActionSchema,
     })
   );
   if (!data.success) {
@@ -283,6 +284,7 @@ export default function Proposals() {
                             name: "Guardians",
                           }}
                           disabled={!signLegalVetoEnabled}
+                          postAction={$path("/app/proposals/:id", { id: proposalId })}
                         >
                           Approve extend veto period
                         </SignButton>
@@ -296,6 +298,7 @@ export default function Proposals() {
                             name: "Guardians",
                           }}
                           disabled={!signProposalEnabled}
+                          postAction={$path("/app/proposals/:id", { id: proposalId })}
                         >
                           Approve proposal
                         </SignButton>
@@ -309,6 +312,7 @@ export default function Proposals() {
                             name: "SecurityCouncil",
                           }}
                           disabled={!signProposalEnabled}
+                          postAction={$path("/app/proposals/:id", { id: proposalId })}
                         >
                           Approve proposal
                         </SignButton>
@@ -356,7 +360,6 @@ export default function Proposals() {
                         Execute legal veto extension
                       </ContractWriteButton>
                       <ExecuteUpgradeButton
-                        proposalId={proposalId}
                         target={addresses.upgradeHandler}
                         proposalCalldata={proposal.raw}
                         disabled={!executeProposalEnabled}
