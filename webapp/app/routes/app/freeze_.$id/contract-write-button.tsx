@@ -1,38 +1,37 @@
 import type { signaturesTable } from "@/.server/db/schema";
 import { Button } from "@/components/ui/button";
+import { dateToUnixTimestamp } from "@/utils/date";
 import { ALL_ABIS } from "@/utils/raw-abis";
 import { useNavigate } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
 import type React from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
-import type { Hex } from "viem";
+import type { ContractFunctionName, Hex } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
 
 type BroadcastTxButtonProps = {
   target: Hex;
-  functionName: string;
   signatures: InferSelectModel<typeof signaturesTable>[];
   threshold: number;
   disabled?: boolean;
-  abiName: keyof Pick<typeof ALL_ABIS, "guardians" | "council">;
   children?: React.ReactNode;
+  validUntil: Date;
+  functionName: ContractFunctionName<typeof ALL_ABIS.council, "nonpayable">;
 };
 
 export default function ContractWriteButton({
   children,
   target,
-  functionName,
   signatures,
   threshold,
   disabled,
-  abiName,
+  validUntil,
+  functionName,
 }: BroadcastTxButtonProps) {
   const { address } = useAccount();
   const { isPending, writeContract } = useWriteContract();
   const navigate = useNavigate();
-
-  const proposalId = 1; //FIXME
 
   const thresholdReached = signatures.length >= threshold;
 
@@ -44,13 +43,19 @@ export default function ContractWriteButton({
 
     toast.loading("Broadcasting transaction...", { id: "broadcasting-tx" });
 
+    const args = {
+      validUntil: BigInt(dateToUnixTimestamp(validUntil)),
+      signers: signatures.map((s) => s.signer),
+      signatures: signatures.map((s) => s.signature),
+    };
+
     writeContract(
       {
         account: address,
         address: target,
         functionName,
-        abi: ALL_ABIS[abiName],
-        args: [proposalId, signatures.map((s) => s.signer), signatures.map((s) => s.signature)],
+        abi: ALL_ABIS.council,
+        args: [args.validUntil, args.signers, args.signatures],
       },
       {
         onSuccess: (hash) => {

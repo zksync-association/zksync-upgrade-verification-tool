@@ -15,6 +15,8 @@ import VotingStatusIndicator from "@/components/voting-status-indicator";
 import ContractWriteButton from "@/routes/app/freeze_.$id/contract-write-button";
 import SignButton from "@/routes/app/freeze_.$id/sign-button";
 import { requireUserFromHeader } from "@/utils/auth-headers";
+import { compareHexValues } from "@/utils/compare-hex-values";
+import { dateToUnixTimestamp } from "@/utils/date";
 import { badRequest, notFound } from "@/utils/http";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, useLoaderData, useNavigate } from "@remix-run/react";
@@ -37,7 +39,9 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     throw notFound();
   }
 
-  const signatures = await getSignaturesByFreezeProposalId(proposal.id);
+  const signatures = (await getSignaturesByFreezeProposalId(proposal.id)).sort((a, b) =>
+    compareHexValues(a.signer, b.signer)
+  );
 
   let currentSoftFreezeThreshold: bigint | undefined;
   if (proposal.type === "SET_SOFT_FREEZE_THRESHOLD") {
@@ -111,24 +115,31 @@ export default function Freeze() {
 
   let proposalType: string;
   let action: SignAction;
+  let functionName: Parameters<typeof ContractWriteButton>[0]["functionName"];
   switch (proposal.type) {
     case "SOFT_FREEZE":
       proposalType = "Soft Freeze";
       action = "ApproveSoftFreeze";
+      functionName = "softFreeze";
       break;
     case "HARD_FREEZE":
       proposalType = "Hard Freeze";
       action = "ApproveHardFreeze";
+      functionName = "hardFreeze";
       break;
     case "SET_SOFT_FREEZE_THRESHOLD":
       proposalType = "Set Soft Freeze Threshold";
       action = "ApproveSetSoftFreezeThreshold";
+      functionName = "setSoftFreezeThreshold";
       break;
     case "UNFREEZE":
       proposalType = "Unfreeze";
       action = "ApproveUnfreeze";
+      functionName = "unfreeze";
       break;
   }
+
+  const proposalValidUntil = new Date(proposal.validUntil);
 
   const signDisabled =
     user.role !== "securityCouncil" ||
@@ -178,15 +189,15 @@ export default function Freeze() {
               <div className="flex justify-between">
                 <span>Valid Until:</span>
                 <div className="flex w-1/2 flex-col break-words text-right">
-                  <span>{new Date(proposal.validUntil).toLocaleString()}</span>
-                  <span>({Math.floor(new Date(proposal.validUntil).getTime() / 1000)})</span>
+                  <span>{proposalValidUntil.toLocaleString()}</span>
+                  <span>({dateToUnixTimestamp(proposalValidUntil)})</span>
                 </div>
               </div>
               <div className="flex justify-between">
                 <span>Proposed On:</span>
                 <div className="flex w-1/2 flex-col break-words text-right">
                   <span>{new Date(proposal.proposedOn).toLocaleString()}</span>
-                  <span>({Math.floor(new Date(proposal.proposedOn).getTime() / 1000)})</span>
+                  <span>({dateToUnixTimestamp(new Date(proposal.proposedOn))})</span>
                 </div>
               </div>
             </div>
@@ -219,11 +230,11 @@ export default function Freeze() {
                 contractData={{
                   actionName: action,
                   address: securityCouncilAddress,
-                  name: "Guardians",
+                  name: "SecurityCouncil",
                 }}
                 nonce={BigInt(proposal.externalId)}
                 type={proposal.type}
-                validUntil={BigInt(Math.floor(new Date(proposal.validUntil).getTime() / 1000))}
+                validUntil={BigInt(dateToUnixTimestamp(proposalValidUntil))}
                 softFreezeThreshold={BigInt(proposal.softFreezeThreshold ?? 0)}
                 disabled={signDisabled}
               >
@@ -239,11 +250,11 @@ export default function Freeze() {
           <CardContent className="flex flex-col space-y-3">
             <ContractWriteButton
               target={securityCouncilAddress}
+              functionName={functionName}
               signatures={signatures}
-              functionName={"approveUpgradeSecurityCouncil"}
-              abiName="council"
               threshold={necessarySignatures}
               disabled={!executeFreezeEnabled}
+              validUntil={proposalValidUntil}
             >
               Execute freeze
             </ContractWriteButton>

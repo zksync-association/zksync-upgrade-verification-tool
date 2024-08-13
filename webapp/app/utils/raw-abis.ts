@@ -773,7 +773,7 @@ export const PROTOCOL_UPGRADE_HANDLER_RAW_ABI = [
   },
 ] as const;
 
-export const GUARDIANS_RAW_ABI: Abi = [
+export const GUARDIANS_RAW_ABI = [
   {
     type: "constructor",
     inputs: [
@@ -1278,7 +1278,7 @@ export const GUARDIANS_RAW_ABI: Abi = [
   },
 ] as const;
 
-export const SEC_COUNCIL_RAW_ABI: Abi = [
+export const SEC_COUNCIL_RAW_ABI = [
   {
     type: "constructor",
     inputs: [

@@ -73,42 +73,29 @@ export default function SignButton({
     };
   } else {
     message = {
-      nonce,
+      nonce: 0n,
       validUntil,
     };
   }
 
-  let types = {};
+  const types = [
+    {
+      name: "nonce",
+      type: "uint256",
+    },
+    {
+      name: "validUntil",
+      type: "uint256",
+    },
+  ];
+
   if (type === "SET_SOFT_FREEZE_THRESHOLD") {
-    types = [
-      {
-        name: "threshold",
-        type: "uint256",
-      },
-      {
-        name: "nonce",
-        type: "uint256",
-      },
-      {
-        name: "validUntil",
-        type: "uint256",
-      },
-    ];
-  } else {
-    types = [
-      {
-        name: "nonce",
-        type: "uint256",
-      },
-      {
-        name: "validUntil",
-        type: "uint256",
-      },
-    ];
+    // First element is the threshold
+    types.unshift({ name: "threshold", type: "uint256" });
   }
 
   function onClick() {
-    signTypedData({
+    const data = {
       domain: {
         name: contractData.name,
         version: "1",
@@ -120,7 +107,8 @@ export default function SignButton({
       types: {
         [contractData.actionName]: types,
       },
-    });
+    };
+    signTypedData(data);
   }
 
   return (
