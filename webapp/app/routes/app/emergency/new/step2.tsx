@@ -1,14 +1,6 @@
-import { type FormCall, formCallSchema } from "@/common/calls";
+import { type Call, formCallSchema } from "@/common/calls";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage, } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Step1 } from "@/routes/app/emergency/new/step1";
@@ -16,8 +8,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatEther, hexToBigInt } from "viem";
-import { Trash2 } from "lucide-react";
+import { DisplayStep1 } from "@/routes/app/emergency/new/displayStep1";
+import { DisplayCalls } from "@/routes/app/emergency/new/display-calls";
 
 const defaultValue = {
   target: "",
@@ -28,18 +20,18 @@ const defaultValue = {
 export type NewEmergencyProposalStep2Props = {
   step1: Step1;
   onBack: () => void;
-  onNext: (data: FormCall[]) => void;
-  calls: FormCall[];
+  onNext: (data: Call[]) => void;
+  calls: Call[];
 };
 
 export function NewEmergencyProposalStep2(props: NewEmergencyProposalStep2Props) {
-  const [calls, setCalls] = useState<FormCall[]>(props.calls);
-  const form = useForm<FormCall>({
+  const [calls, setCalls] = useState<Call[]>(props.calls);
+  const form = useForm<Call>({
     resolver: zodResolver(formCallSchema),
-    defaultValues: defaultValue as FormCall,
+    defaultValues: defaultValue as Call,
   });
 
-  const submit = (newCall: FormCall) => {
+  const submit = (newCall: Call) => {
     setCalls([...calls, newCall]);
     form.reset();
   };
@@ -56,48 +48,9 @@ export function NewEmergencyProposalStep2(props: NewEmergencyProposalStep2Props)
     <div>
       <h2 className="text-2xl font-bold mb-10">Define upgrade calls</h2>
 
-      <div className="rounded-md bg-muted p-4 mb-8">
-        <p className="mb-1">
-          <span className="font-medium text-muted-foreground text-sm">Title:</span><span>{props.step1.title}</span>
-        </p>
-        <p className="mb-1">
-          <span className="font-medium text-muted-foreground text-sm">Salt:</span><span>{props.step1.salt}</span>
-        </p>
-      </div>
+      <DisplayStep1 {...props.step1} />
 
-      <div className="grid grid-cols-3 gap-x-4 pb-10">
-        {calls.map((call, i) => (
-          <div key={call.target + call.data + call.value} className="rounded-md bg-muted p-4 flex align-middle">
-            <div className="grid grid-cols-4">
-              <div className="font-medium text-muted-foreground text-sm col-span-1">
-                target:
-              </div>
-              <div className="col-span-3 overflow-x-hidden overflow-ellipsis font-mono">
-                {call.target}
-              </div>
-
-              <div className="font-medium text-muted-foreground text-sm col-span-1">
-                data:
-              </div>
-              <div className="col-span-3 overflow-x-hidden overflow-ellipsis font-mono">
-                {call.data}
-              </div>
-
-              <div className="font-medium text-muted-foreground text-sm col-span-1">
-                value:
-              </div>
-              <div className="col-span-3 overflow-x-hidden overflow-ellipsis font-mono">
-                {formatEther(hexToBigInt(call.value))}
-              </div>
-            </div>
-            <div className="px-3">
-              <div className="aspect-square border-2 rounded-md p-1 cursor-pointer" onClick={() => removeCall(i)}>
-                <Trash2 size={15}/>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <DisplayCalls calls={calls} removeCall={removeCall} />
 
       <Card className="mb-10">
         <CardHeader>
@@ -164,7 +117,7 @@ export function NewEmergencyProposalStep2(props: NewEmergencyProposalStep2Props)
           Next
         </Button>
 
-        <Button variant="outline" onClick={props.onBack}>
+        <Button variant="ghost" onClick={props.onBack}>
           Back
         </Button>
       </div>

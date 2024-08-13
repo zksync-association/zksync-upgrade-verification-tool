@@ -6,7 +6,6 @@ const hexRegexp = /0x[0-9a-fA-F]*/;
 const hexChars = z.string().refine((str) => hexRegexp.test(str), "Not a valid hex");
 
 export const hexSchema = hexChars
-  .refine((str) => str.length % 2 === 0, "Cannot have odd number of digits in hex string")
   .transform((str) => str as Hex);
 
 const digitsSchema = z.string().refine((str) => /[0-9]+/.test(str), "Not a numerical string");
@@ -31,15 +30,3 @@ export const formCallSchema = z.object({
   .transform((str) => numberToHex(parseEther(str)))
 });
 
-export type FormCall = z.infer<typeof formCallSchema>;
-
-export function encodeCall(call: Call): FormCall {
-  return {
-    ...call,
-    value: call.value,
-  };
-}
-
-export function decodeCall(formCall: FormCall): Call {
-  return callSchema.parse(formCall);
-}

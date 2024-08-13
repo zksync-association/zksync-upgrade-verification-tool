@@ -2,9 +2,9 @@ import {
   saveEmergencyProposal,
   validateEmergencyProposalCalls,
 } from "@/.server/service/emergency-proposals";
-import { type FormCall, callSchema, hexSchema } from "@/common/calls";
+import { callSchema, hexSchema, type Call } from "@/common/calls";
 import { StepsWizard, WizardStep } from "@/components/steps-wizard";
-import { NewEmergencyProposalStep1, type Step1 } from "@/routes/app/emergency/new/step1";
+import { NewEmergencyProposalStep1, type Step1, step1Schema } from "@/routes/app/emergency/new/step1";
 import { NewEmergencyProposalStep2 } from "@/routes/app/emergency/new/step2";
 import { Step3 } from "@/routes/app/emergency/new/step3";
 import { requireUserFromHeader } from "@/utils/auth-headers";
@@ -35,7 +35,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const calls = z.array(callSchema).safeParse(JSON.parse(body.data.calls));
 
   if (!calls.success) {
-    throw badRequest("Malformed calls array");
+    console.error(calls.error)
+    throw badRequest(`Malformed calls array: ${calls.error}`);
   }
 
   const errors = await validateEmergencyProposalCalls(calls.data);
@@ -55,7 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function NewEmergencyUpgrade() {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [step1, setStep1] = useState<Step1 | null>(null);
-  const [calls, setCalls] = useState<FormCall[]>([]);
+  const [calls, setCalls] = useState<Call[]>([]);
   const fetcher = useFetcher<typeof action>();
   const navigate = useNavigate();
 
@@ -68,7 +69,7 @@ export default function NewEmergencyUpgrade() {
     setCurrentStep(1);
   };
 
-  const step2Next = (newCalls: FormCall[]) => {
+  const step2Next = (newCalls: Call[]) => {
     setCalls(newCalls);
     setCurrentStep(3);
   };
@@ -98,7 +99,7 @@ export default function NewEmergencyUpgrade() {
     <div>
       <h2 className="text-3xl font-bold pt-20 pb-5">Create new emergency proposal</h2>
 
-      <StepsWizard currentStep={currentStep} totalSteps={5}>
+      <StepsWizard currentStep={currentStep} totalSteps={3}>
         <WizardStep step={1}>
           <NewEmergencyProposalStep1 callback={step1Submit} />
         </WizardStep>

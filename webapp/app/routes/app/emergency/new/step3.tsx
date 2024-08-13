@@ -1,14 +1,16 @@
-import type { FormCall } from "@/common/calls";
+import type { Call } from "@/common/calls";
 import { Button } from "@/components/ui/button";
 import type { Step1 } from "@/routes/app/emergency/new/step1";
 import { useFetcher } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
 import type { action } from "./_route";
+import { DisplayStep1 } from "@/routes/app/emergency/new/displayStep1";
+import { DisplayCalls } from "@/routes/app/emergency/new/display-calls";
 
 export type Step3Props = {
   step1: Step1;
-  calls: FormCall[];
+  calls: Call[];
   onBack: () => void;
   submit: () => void;
 };
@@ -26,54 +28,49 @@ export function Step3(props: Step3Props) {
       },
       { method: "POST", action: $path("/app/emergency/new") }
     );
-  });
+  }, []);
 
-  const valid = data?.ok && data.errors.length === 0;
+
+  const valid = data !== undefined && data.errors.length === 0;
+  console.log("valid", valid)
 
   return (
     <div>
-      <div>
-        <p>
-          <b>Title:</b> {props.step1.title}
-        </p>
-        <p>
-          <b>Salt:</b> {props.step1.salt}
-        </p>
-      </div>
+      <DisplayStep1 {...props.step1} />
 
-      <div>
-        {props.calls.map((call) => (
-          <div key={call.target + call.data + call.value}>
-            <p>
-              <b>target:</b> {call.target}
-            </p>
-            <p>
-              <b>data:</b> {call.data}
-            </p>
-            <p>
-              <b>value:</b> {call.value}
-            </p>
-          </div>
-        ))}
-      </div>
+      <DisplayCalls calls={props.calls} />
 
       {!data && <div>Validating...</div>}
 
-      {data?.errors && <div>Error validation transactions: {data.errors.join(", ")}</div>}
+      {!valid && <div className="my-10 font-bold mb-2">
+        <h2 className="text-2xl">Error validating transactions:</h2>
+        <p>
+          {data?.errors?.join(", ")}
+        </p>
+      </div>}
 
-      <div>{valid ? "Data validation ok" : "Error validating transactions"}</div>
+      {valid && <div className="my-10">
+        <h2 className="text-2xl font-bold mb-2">
+          Validations ok
+        </h2>
+        <p>
+          All checks ok
+        </p>
+      </div>}
 
-      <Button variant="outline" onClick={props.onBack}>
-        Back
-      </Button>
+      <div className="flex gap-5">
+        <Button
+          disabled={!valid}
+          onClick={props.submit}
+          loading={!data}
+        >
+          Submit
+        </Button>
 
-      <Button
-        disabled={!valid}
-        onClick={props.submit}
-        loading={state === "submitting" || state === "loading"}
-      >
-        Submit
-      </Button>
+        <Button variant="ghost" onClick={props.onBack}>
+          Back
+        </Button>
+      </div>
     </div>
   );
 }
