@@ -71,7 +71,8 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
           proposalStatus,
           proposalData.creationTimestamp,
           proposalData.guardiansExtendedLegalVeto,
-          await nowInSeconds()
+          await nowInSeconds(),
+          env.ETH_NETWORK
         ),
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         approvedByGuardians: proposalData.guardiansApproval,

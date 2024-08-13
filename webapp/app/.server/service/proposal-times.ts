@@ -1,3 +1,4 @@
+import type { EthNetwork } from "@/common/eth-network-enum";
 import { PROPOSAL_STATES, type StatusTime } from "@/utils/proposal-states";
 
 export function daysInSeconds(days: number): number {
@@ -20,12 +21,15 @@ export function calculateStatusPendingDays(
   status: PROPOSAL_STATES,
   creationTimestamp: number,
   guardiansExtendedLegalVeto: boolean,
-  nowInSeconds: number
+  nowInSeconds: number,
+  network: EthNetwork
 ): StatusTime | null {
+  const baseVetoPeriodDays = network === "sepolia" ? 0 : 3;
+
   if (status === PROPOSAL_STATES.LegalVetoPeriod) {
     const delta = nowInSeconds - creationTimestamp;
     const currentDay = Math.ceil(delta / daysInSeconds(1));
-    const totalDays = guardiansExtendedLegalVeto ? 7 : 3;
+    const totalDays = guardiansExtendedLegalVeto ? 7 : baseVetoPeriodDays;
 
     return {
       totalDays: totalDays,
@@ -34,7 +38,10 @@ export function calculateStatusPendingDays(
   }
 
   if (status === PROPOSAL_STATES.Waiting) {
-    const vetoPeriodDuration = guardiansExtendedLegalVeto ? SEVEN_DAYS_SECONDS : THREE_DAYS_SECONDS;
+    const baseVetoPeriodDuration = daysInSeconds(baseVetoPeriodDays);
+    const vetoPeriodDuration = guardiansExtendedLegalVeto
+      ? SEVEN_DAYS_SECONDS
+      : baseVetoPeriodDuration;
     const delta = nowInSeconds - (creationTimestamp + vetoPeriodDuration);
     const currentDay = Math.ceil(delta / daysInSeconds(1));
 
