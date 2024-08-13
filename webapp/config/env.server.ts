@@ -1,7 +1,7 @@
+import { EthNetworkEnum } from "@/common/eth-network-enum";
 import { createEnv } from "@t3-oss/env-core";
 import { zodHex } from "validate-cli";
 import { z } from "zod";
-import { EthNetworkEnum } from "@/common/eth-network-enum";
 
 export const NodeEnvEnum = z.enum(["development", "test", "production"]);
 export type NodeEnv = z.infer<typeof NodeEnvEnum>;

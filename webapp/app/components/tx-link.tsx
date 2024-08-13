@@ -3,9 +3,9 @@ import { getTransactionUrl } from "@/utils/etherscan";
 import { SquareArrowOutUpRight } from "lucide-react";
 import type { Hex } from "viem";
 
-import { EthNetwork } from "@/common/eth-network-enum";
+import type { EthNetwork } from "@/common/eth-network-enum";
 
-type TxLinkProps = { txid: Hex, network: EthNetwork };
+type TxLinkProps = { txid: Hex; network: EthNetwork };
 
 export default function TxLink({ txid, network }: TxLinkProps) {
   return (

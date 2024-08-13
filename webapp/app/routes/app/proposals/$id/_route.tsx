@@ -109,7 +109,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       userSignedLegalVeto: signatures
         .filter((s) => s.action === "ExtendLegalVetoPeriod")
         .some((s) => isAddressEqual(s.signer as Hex, user.address as Hex)),
-      ethNetwork: env.ETH_NETWORK
+      ethNetwork: env.ETH_NETWORK,
     };
   };
 
@@ -167,7 +167,7 @@ export default function Proposals() {
             reports,
             userSignedLegalVeto,
             userSignedProposal,
-            ethNetwork
+            ethNetwork,
           }) => {
             const securityCouncilSignaturesReached =
               proposal.signatures.approveUpgradeSecurityCouncil.length >=
