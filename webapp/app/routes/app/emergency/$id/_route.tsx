@@ -31,6 +31,7 @@ import { $path } from "remix-routes";
 import { zodHex } from "validate-cli";
 import { type Hex, formatEther, hexToBigInt, isAddressEqual } from "viem";
 import { type ZodTypeAny, z } from "zod";
+import { getCallsByProposalId } from "@/.server/db/dto/calls";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
@@ -45,18 +46,21 @@ export async function loader(args: LoaderFunctionArgs) {
 
   const proposal = await getEmergencyProposalByExternalId(proposalId);
 
+
   if (proposal === undefined) {
     throw notFound();
   }
 
+  const calls = await getCallsByProposalId(proposal.id)
+
   const signatures = await getSignaturesByEmergencyProposalId(proposal.externalId);
 
   return json({
+    calls: calls,
     proposal: {
       title: proposal?.title,
       externalId: proposal.externalId,
       proposedOn: proposal.proposedOn,
-      calls: proposal.calls,
       salt: proposal.salt,
       status: proposal.status,
     },
@@ -126,8 +130,15 @@ function actionForRole(role: UserRole): SignAction {
 export default function EmergencyUpgradeDetails() {
   const navigate = useNavigate();
 
-  const { user, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
-    useLoaderData<typeof loader>();
+  const {
+    calls,
+    user,
+    proposal,
+    addresses,
+    signatures,
+    allSecurityCouncil,
+    allGuardians
+  } = useLoaderData<typeof loader>();
 
   if (user.role === "visitor") {
     return "Unauthorized: Only valid signers can see this page.";
@@ -240,6 +251,7 @@ export default function EmergencyUpgradeDetails() {
               allCouncil={allSecurityCouncil}
               zkFoundationAddress={addresses.zkFoundation}
               proposal={proposal}
+              calls={calls}
             >
               Execute upgrade
             </ExecuteEmergencyUpgradeButton>

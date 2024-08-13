@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS "emergency_proposal_calls" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"proposal_id" integer NOT NULL,
 	"target" "bytea" NOT NULL,
-	"value" bigint,
+	"value" "bytea" NOT NULL,
 	"data" "bytea" NOT NULL
 );
 --> statement-breakpoint
@@ -14,7 +14,7 @@ END $$;
 
 -- migrate-data
 insert into emergency_proposal_calls ("target", "proposal_id", "value", "data")
-    select "target_address", "id", "value", "calldata" from emergency_proposals;
+    select "target_address", "id", decode(to_hex("value"), 'hex'), "calldata" from emergency_proposals;
 
 --> statement-breakpoint
 ALTER TABLE "emergency_proposals" DROP COLUMN IF EXISTS "target_address";--> statement-breakpoint

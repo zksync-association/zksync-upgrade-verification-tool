@@ -3,6 +3,7 @@ import { UpgradeImporter } from "../src";
 import { FileSystem } from "../src";
 import path from "node:path";
 import { MalformedUpgrade } from "../src/lib/errors";
+import { numberToHex } from "viem";
 
 class TestFS extends FileSystem {
   private registered: Map<string, string>;
@@ -246,5 +247,9 @@ describe("UpgradeImporter", () => {
     it<Ctx>("fails with propper error", async ({ importer }) => {
       await expect(importer.readFromFiles(baseDir, "mainnet")).rejects.toThrow(MalformedUpgrade);
     });
+
+    it("deleteme", () => {
+      expect(numberToHex(256)).toEqual("0xff")
+    })
   });
 });

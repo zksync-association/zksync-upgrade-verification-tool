@@ -55,7 +55,7 @@ export const emergencyProposalsTable = pgTable(
   })
 );
 
-export const emergencyProposalRelations = relations(emergencyProposalsTable, ({ many }) =>{
+export const emergencyProposalsTableRelations = relations(emergencyProposalsTable, ({ many }) =>{
   return {
     calls: many(emergencyProposalCalls)
   }
@@ -65,9 +65,18 @@ export const emergencyProposalCalls = pgTable("emergency_proposal_calls", {
   id: serial("id").primaryKey(),
   proposalId: integer("proposal_id").notNull().references(() => emergencyProposalsTable.id),
   target: bytea("target").notNull(),
-  value: bigint("value", { mode: "bigint" }),
+  value: bytea("value").notNull(),
   data: bytea("data").notNull(),
 });
+
+export const emergencyProposalCallsRelations = relations(emergencyProposalCalls, ({ one }) => {
+  return {
+    proposal: one(emergencyProposalsTable, {
+      fields: [emergencyProposalCalls.proposalId],
+      references: [emergencyProposalsTable.id]
+    })
+  }
+})
 
 export const signaturesTable = pgTable(
   "signatures",

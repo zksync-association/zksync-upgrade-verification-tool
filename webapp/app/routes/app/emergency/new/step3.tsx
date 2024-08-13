@@ -32,7 +32,6 @@ export function Step3(props: Step3Props) {
   }, []);
 
   const valid = data !== undefined && data.errors.length === 0;
-  console.log("valid", valid);
 
   return (
     <div>

@@ -3,11 +3,6 @@ import { type Hex, hexToBigInt, isAddressEqual } from "viem";
 
 export type BasicSignature = { signer: Hex; signature: Hex };
 export type BasicProposal = {
-  calls: {
-    target: Hex;
-    value: Hex;
-    data: Hex;
-  }[];
   salt: Hex;
   status: EmergencyProposalStatus;
   externalId: Hex;

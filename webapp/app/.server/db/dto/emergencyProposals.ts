@@ -26,13 +26,6 @@ export async function getEmergencyProposalByExternalId(
 ) {
   return getFirst(
     await (tx ?? db)
-      .query
-      .emergencyProposalsTable
-      .findFirst({
-        where: eq(emergencyProposalsTable.externalId, externalId),
-
-      })
-
       .select()
       .from(emergencyProposalsTable)
       .where(eq(emergencyProposalsTable.externalId, externalId))

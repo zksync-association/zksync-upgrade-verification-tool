@@ -70,7 +70,7 @@ export const saveEmergencyProposal = async (data: FullEmergencyProp, calls: Call
       await createCall({
         data: call.data,
         proposalId: id,
-        value: hexToBigInt(call.value),
+        value: call.value,
         target: call.target
       }, { tx: sqlTx })
     }
