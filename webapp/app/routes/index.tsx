@@ -66,7 +66,7 @@ export default function Index() {
           <div className="flex flex-1 flex-col items-center justify-center text-center md:max-w-3xl">
             <h1 className="font-bold text-3xl md:text-5xl">Upgrade Analysis & Voting Tool</h1>
             <p className="mt-10 text-lg md:max-w-xl">
-            Analyze proposals, coordinate signature gathering, and execute protocol upgrades.
+              Analyze proposals, coordinate signature gathering, and execute protocol upgrades.
             </p>
             <div className="mt-10">
               {!account.isConnected ? (
