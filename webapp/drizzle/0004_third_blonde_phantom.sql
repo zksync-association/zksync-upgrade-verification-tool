@@ -13,8 +13,8 @@ EXCEPTION
 END $$;
 
 -- migrate-data
-insert into "emergency_proposal_calls"
-    select () from "emergency_proposal_calls"
+insert into emergency_proposal_calls ("target", "proposal_id", "value", "data")
+    select "target_address", "id", "value", "calldata" from emergency_proposals;
 
 --> statement-breakpoint
 ALTER TABLE "emergency_proposals" DROP COLUMN IF EXISTS "target_address";--> statement-breakpoint
