@@ -2,9 +2,10 @@ import {
   saveEmergencyProposal,
   validateEmergencyProposalCalls,
 } from "@/.server/service/emergency-proposals";
-import { callSchema, type Call } from "@/common/calls";
+import { hexSchema } from "@/common/basic-schemas";
+import { type Call, callSchema } from "@/common/calls";
 import { StepsWizard, WizardStep } from "@/components/steps-wizard";
-import { NewEmergencyProposalStep1, type Step1, step1Schema } from "@/routes/app/emergency/new/step1";
+import { NewEmergencyProposalStep1, type Step1 } from "@/routes/app/emergency/new/step1";
 import { NewEmergencyProposalStep2 } from "@/routes/app/emergency/new/step2";
 import { Step3 } from "@/routes/app/emergency/new/step3";
 import { requireUserFromHeader } from "@/utils/auth-headers";
@@ -15,7 +16,6 @@ import { useEffect, useState } from "react";
 import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { z } from "zod";
-import { hexSchema } from "@/common/basic-schemas";
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -36,7 +36,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const calls = z.array(callSchema).safeParse(JSON.parse(body.data.calls));
 
   if (!calls.success) {
-    console.error(calls.error)
+    console.error(calls.error);
     throw badRequest(`Malformed calls array: ${calls.error}`);
   }
 
@@ -98,7 +98,7 @@ export default function NewEmergencyUpgrade() {
 
   return (
     <div>
-      <h2 className="text-3xl font-bold pt-20 pb-5">Create new emergency proposal</h2>
+      <h2 className="pt-20 pb-5 font-bold text-3xl">Create new emergency proposal</h2>
 
       <StepsWizard currentStep={currentStep} totalSteps={3}>
         <WizardStep step={1}>

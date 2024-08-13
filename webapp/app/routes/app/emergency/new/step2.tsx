@@ -1,15 +1,23 @@
 import { type Call, formCallSchema } from "@/common/calls";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage, } from "@/components/ui/form";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { DisplayCalls } from "@/routes/app/emergency/new/display-calls";
+import { DisplayStep1 } from "@/routes/app/emergency/new/displayStep1";
 import type { Step1 } from "@/routes/app/emergency/new/step1";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { DisplayStep1 } from "@/routes/app/emergency/new/displayStep1";
-import { DisplayCalls } from "@/routes/app/emergency/new/display-calls";
 
 const defaultValue = {
   target: "",
@@ -42,11 +50,11 @@ export function NewEmergencyProposalStep2(props: NewEmergencyProposalStep2Props)
 
   const removeCall = (index: number) => {
     setCalls(calls.filter((c, i) => i !== index));
-  }
+  };
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-10">Define upgrade calls</h2>
+      <h2 className="mb-10 font-bold text-2xl">Define upgrade calls</h2>
 
       <DisplayStep1 {...props.step1} />
 
@@ -63,48 +71,46 @@ export function NewEmergencyProposalStep2(props: NewEmergencyProposalStep2Props)
                 <FormField
                   control={form.control}
                   name="target"
-                  render={({field}) => (
+                  render={({ field }) => (
                     <FormItem>
                       <FormLabel>Target Address</FormLabel>
                       <FormControl>
                         <Input placeholder="0x..." {...field} />
                       </FormControl>
                       <FormDescription>Target address for upgrade transaction</FormDescription>
-                      <FormMessage data-testid="title-error"/>
+                      <FormMessage data-testid="title-error" />
                     </FormItem>
                   )}
                 />
                 <FormField
                   control={form.control}
                   name="data"
-                  render={({field}) => (
+                  render={({ field }) => (
                     <FormItem>
                       <FormLabel>Calldata</FormLabel>
                       <FormControl>
                         <Textarea placeholder="0x..." {...field} />
                       </FormControl>
                       <FormDescription>Calldata use in the upgrade transaction</FormDescription>
-                      <FormMessage/>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
                 <FormField
                   control={form.control}
                   name="value"
-                  render={({field}) => (
+                  render={({ field }) => (
                     <FormItem>
                       <FormLabel>Value</FormLabel>
                       <FormControl>
                         <Input placeholder="0x..." {...field} />
                       </FormControl>
                       <FormDescription>Calldata use in the upgrade transaction</FormDescription>
-                      <FormMessage/>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-
-
             </CardContent>
             <CardFooter>
               <Button type="submit">Add call</Button>
@@ -121,7 +127,6 @@ export function NewEmergencyProposalStep2(props: NewEmergencyProposalStep2Props)
           Back
         </Button>
       </div>
-
     </div>
   );
 }

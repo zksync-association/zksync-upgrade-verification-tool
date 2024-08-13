@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -13,7 +14,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { type Hex, padHex } from "viem";
 import { z } from "zod";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const step1Schema = z.object({
   title: z.string().min(1, "Cannot be empty"),
@@ -22,7 +22,7 @@ export const step1Schema = z.object({
     .regex(/^0x[a-fA-F0-9]*$/, "Salt must be a hex string starting with 0x")
     .refine((a) => a.length <= 66, "Should be 32 byte number")
     .transform((str) => str as Hex)
-    .transform((str) => padHex(str, {size: 32})),
+    .transform((str) => padHex(str, { size: 32 })),
 });
 
 export type Step1 = z.infer<typeof step1Schema>;
@@ -49,52 +49,50 @@ export function NewEmergencyProposalStep1(props: NewEmergencyProposalStep1Props)
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
-          Basic data:
-        </CardTitle>
+        <CardTitle>Basic data:</CardTitle>
       </CardHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(step1Submit)}>
-            <CardContent>
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({field}) => (
-                    <FormItem>
-                      <FormLabel>Title</FormLabel>
-                      <FormControl>
-                        <Input placeholder="..." {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        This is to help voters identify which proposal this is.
-                      </FormDescription>
-                      <FormMessage data-testid="title-error"/>
-                    </FormItem>
-                  )}
-                />
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(step1Submit)}>
+          <CardContent>
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Title</FormLabel>
+                  <FormControl>
+                    <Input placeholder="..." {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    This is to help voters identify which proposal this is.
+                  </FormDescription>
+                  <FormMessage data-testid="title-error" />
+                </FormItem>
+              )}
+            />
 
-                <FormField
-                  control={form.control}
-                  name="salt"
-                  render={({field}) => (
-                    <FormItem>
-                      <FormLabel>Salt</FormLabel>
-                      <FormControl>
-                        <Input placeholder="0x..." {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        A bytes32 value used for creating unique upgrade proposal hashes.
-                      </FormDescription>
-                      <FormMessage/>
-                    </FormItem>
-                  )}
-                />
-            </CardContent>
-            <CardFooter>
-              <Button type="submit">Next</Button>
-            </CardFooter>
-          </form>
-        </Form>
+            <FormField
+              control={form.control}
+              name="salt"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Salt</FormLabel>
+                  <FormControl>
+                    <Input placeholder="0x..." {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    A bytes32 value used for creating unique upgrade proposal hashes.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+          <CardFooter>
+            <Button type="submit">Next</Button>
+          </CardFooter>
+        </form>
+      </Form>
     </Card>
   );
 }

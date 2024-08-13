@@ -33,7 +33,12 @@ export async function validateEmergencyProposalCalls(calls: Call[]): Promise<str
 
 export async function validateCall(call: Call): Promise<null | string> {
   try {
-    await l1Rpc.contractReadRaw(call.target, call.data, env.UPGRADE_HANDLER_ADDRESS, hexToBigInt(call.value));
+    await l1Rpc.contractReadRaw(
+      call.target,
+      call.data,
+      env.UPGRADE_HANDLER_ADDRESS,
+      hexToBigInt(call.value)
+    );
     return null;
   } catch (e) {
     return "eth_call execution failed";
