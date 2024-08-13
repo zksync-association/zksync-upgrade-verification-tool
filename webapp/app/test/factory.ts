@@ -29,18 +29,20 @@ export const createRandomProposalParams = () => {
   } satisfies InferInsertModel<typeof proposalsTable>;
 };
 
-export const createRandomEmergencyProposalParams = () => {
+export const createCallParams = (proposalId: number) => {
   const randomLength = Math.floor(Math.random() * (50 - 16 + 1)) * 2 + 32;
+  return {
+    target: faker.string.hexadecimal({ length: 20 }) as Hex,
+    value: 0n,
+    data: faker.string.hexadecimal({ length: randomLength }) as Hex,
+    proposalId
+  };
+};
+
+export const createRandomEmergencyProposalParams = () => {
   const timestamp = faker.date.anytime();
   return {
     title: faker.lorem.sentence(),
-    calls: [
-      {
-        target: faker.string.hexadecimal({ length: 20 }) as Hex,
-        value: "0x0",
-        data: faker.string.hexadecimal({ length: randomLength }) as Hex,
-      },
-    ],
     status: "ACTIVE" as const,
     externalId: faker.string.hexadecimal({ length: 20 }) as `0x${string}`,
     salt: faker.string.hexadecimal({ length: 64 }) as `0x${string}`,

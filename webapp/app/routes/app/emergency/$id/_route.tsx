@@ -263,7 +263,7 @@ export default function EmergencyUpgradeDetails() {
 
               <h3 className="font-bold text-xl">Calls</h3>
 
-              {proposal.calls.map((call) => (
+              {calls.map((call) => (
                 <div
                   key={call.target + call.target + call.value}
                   className="mt-10 grid grid-cols-4 gap-y-3 border-t-2 pt-5"

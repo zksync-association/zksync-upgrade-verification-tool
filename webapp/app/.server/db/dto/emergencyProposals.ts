@@ -3,12 +3,17 @@ import { createOrIgnoreRecord, getFirst, getFirstOrThrow } from "@/.server/db/dt
 import { emergencyProposalsTable } from "@/.server/db/schema";
 import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
 import type { Hex } from "viem";
+import { badRequest } from "@/utils/http";
 
 export async function createOrIgnoreEmergencyProposal(
   data: InferInsertModel<typeof emergencyProposalsTable>,
   { tx }: { tx?: typeof db } = {}
-) {
-  await createOrIgnoreRecord(emergencyProposalsTable, data, { tx });
+): Promise<number> {
+  const [record] = await createOrIgnoreRecord(emergencyProposalsTable, data, { tx });
+  if (!record) {
+    throw new Error("Error saving on db.")
+  }
+  return record.id
 }
 
 export async function getAllEmergencyProposals() {
@@ -21,6 +26,13 @@ export async function getEmergencyProposalByExternalId(
 ) {
   return getFirst(
     await (tx ?? db)
+      .query
+      .emergencyProposalsTable
+      .findFirst({
+        where: eq(emergencyProposalsTable.externalId, externalId),
+
+      })
+
       .select()
       .from(emergencyProposalsTable)
       .where(eq(emergencyProposalsTable.externalId, externalId))

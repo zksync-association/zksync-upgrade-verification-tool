@@ -4,7 +4,6 @@ import { padHex } from "viem";
 import { z } from "zod";
 
 export const basicPropSchema = z.object({
-  calls: z.array(callSchema),
   salt: hexSchema,
 });
 

@@ -43,12 +43,14 @@ export async function action({ request }: ActionFunctionArgs) {
   const errors = await validateEmergencyProposalCalls(calls.data);
 
   if (errors.length === 0 && body.data.intent === "save") {
-    await saveEmergencyProposal({
-      salt: body.data.salt,
-      title: body.data.title,
-      calls: calls.data,
-      proposer: user.address,
-    });
+    await saveEmergencyProposal(
+      {
+        salt: body.data.salt,
+        title: body.data.title,
+        proposer: user.address,
+      },
+      calls.data
+    );
   }
 
   return json({ ok: true, errors });

@@ -12,6 +12,8 @@ import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { notFound } from "@/utils/http";
 import { env } from "@config/env.server";
 import { type Hex, hexToBigInt } from "viem";
+import { db } from "@/.server/db/index";
+import { createCall } from "@/.server/db/dto/calls";
 
 export async function broadcastSuccess(propsalId: Hex) {
   const proposal = await getEmergencyProposalByExternalId(propsalId);
@@ -45,23 +47,33 @@ export async function validateCall(call: Call): Promise<null | string> {
   }
 }
 
-export const saveEmergencyProposal = async (data: FullEmergencyProp) => {
+export const saveEmergencyProposal = async (data: FullEmergencyProp, calls: Call[]) => {
   const externalId = calculateUpgradeProposalHash(
-    data.calls,
+    calls,
     data.salt as Hex,
     await emergencyBoardAddress()
   );
 
   const currentDate = new Date();
 
-  await createOrIgnoreEmergencyProposal({
-    status: "ACTIVE",
-    calls: data.calls,
-    proposer: data.proposer as Hex,
-    proposedOn: currentDate,
-    changedOn: currentDate,
-    externalId,
-    salt: data.salt as Hex,
-    title: data.title,
-  });
+  await db.transaction(async sqlTx => {
+    const id = await createOrIgnoreEmergencyProposal({
+      status: "ACTIVE",
+      proposer: data.proposer as Hex,
+      proposedOn: currentDate,
+      changedOn: currentDate,
+      externalId,
+      salt: data.salt as Hex,
+      title: data.title
+    }, { tx: sqlTx });
+    for (const call of calls) {
+      await createCall({
+        data: call.data,
+        proposalId: id,
+        value: hexToBigInt(call.value),
+        target: call.target
+      }, { tx: sqlTx })
+    }
+  })
+
 };
