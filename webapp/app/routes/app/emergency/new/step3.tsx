@@ -18,6 +18,7 @@ export type Step3Props = {
 export function Step3(props: Step3Props) {
   const { submit, data } = useFetcher<typeof action>();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     submit(
       {
@@ -28,7 +29,7 @@ export function Step3(props: Step3Props) {
       },
       { method: "POST", action: $path("/app/emergency/new") }
     );
-  });
+  }, []);
 
   const valid = data !== undefined && data.errors.length === 0;
   console.log("valid", valid);
