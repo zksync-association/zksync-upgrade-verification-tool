@@ -1,8 +1,19 @@
 import { bytea } from "@/.server/db/custom-types";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { signActionSchema } from "@/common/sign-action";
-import { sql } from "drizzle-orm";
-import { check, index, json, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import {
+  bigint,
+  integer,
+  check,
+  index,
+  json,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core";
 import { zodHex } from "validate-cli";
 import { z } from "zod";
 
@@ -23,13 +34,6 @@ export const proposalsTable = pgTable(
   })
 );
 
-const callSchema = z.object({
-  target: zodHex,
-  value: zodHex,
-  data: zodHex,
-});
-type Call = z.infer<typeof callSchema>;
-
 export const emergencyProposalsTable = pgTable(
   "emergency_proposals",
   {
@@ -38,7 +42,6 @@ export const emergencyProposalsTable = pgTable(
     changedOn: timestamp("changed_on", { withTimezone: true }).notNull(),
     externalId: bytea("external_id").notNull().unique(),
     title: text("title").notNull(),
-    calls: json("calls").$type<Call[]>().notNull(),
     salt: bytea("salt").notNull(),
     status: text("status", {
       enum: emergencyProposalStatusSchema.options,
@@ -51,6 +54,20 @@ export const emergencyProposalsTable = pgTable(
     externalIdIdx: index("emergency_external_id_idx").on(table.externalId),
   })
 );
+
+export const emergencyProposalRelations = relations(emergencyProposalsTable, ({ many }) =>{
+  return {
+    calls: many(emergencyProposalCalls)
+  }
+})
+
+export const emergencyProposalCalls = pgTable("emergency_proposal_calls", {
+  id: serial("id").primaryKey(),
+  proposalId: integer("proposal_id").notNull().references(() => emergencyProposalsTable.id),
+  target: bytea("target").notNull(),
+  value: bigint("value", { mode: "bigint" }),
+  data: bytea("data").notNull(),
+});
 
 export const signaturesTable = pgTable(
   "signatures",

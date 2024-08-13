@@ -1,9 +1,63 @@
 {
-  "id": "a73329a0-1289-4ff0-998c-655574f280d7",
+  "id": "a0fd143b-801f-42c5-b94f-e0d043a4c7ae",
   "prevId": "d4dca875-5a17-438a-8a99-331e6225655d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.emergency_proposal_calls": {
+      "name": "emergency_proposal_calls",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "proposal_id": {
+          "name": "proposal_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target": {
+          "name": "target",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data": {
+          "name": "data",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "emergency_proposal_calls_proposal_id_emergency_proposals_id_fk": {
+          "name": "emergency_proposal_calls_proposal_id_emergency_proposals_id_fk",
+          "tableFrom": "emergency_proposal_calls",
+          "tableTo": "emergency_proposals",
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
     "public.emergency_proposals": {
       "name": "emergency_proposals",
       "schema": "",
@@ -35,12 +89,6 @@
         "title": {
           "name": "title",
           "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "calls": {
-          "name": "calls",
-          "type": "json",
           "primaryKey": false,
           "notNull": true
         },
