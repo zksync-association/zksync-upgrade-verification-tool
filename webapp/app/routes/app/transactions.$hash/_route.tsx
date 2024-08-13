@@ -12,14 +12,21 @@ import {
 import { displayBytes32 } from "@/routes/app/proposals/$id/common-tables";
 import { getTransactionUrl } from "@/utils/etherscan";
 import { capitalizeFirstLetter } from "@/utils/string";
-import { useNavigate, useParams } from "@remix-run/react";
+import { useLoaderData, useNavigate, useParams } from "@remix-run/react";
 import { ArrowLeft, CircleCheckBig, SquareArrowOutUpRight } from "lucide-react";
 import { type Hex, formatEther, formatGwei } from "viem";
 import { useWaitForTransactionReceipt } from "wagmi";
+import { json } from "@remix-run/node";
+import { env } from "@config/env.server";
+
+export async function loader() {
+  return json({ ethNetwork: env.ETH_NETWORK })
+}
 
 export default function Transactions() {
   const params = useParams();
   const navigate = useNavigate();
+  const { ethNetwork } = useLoaderData<typeof loader>()
   const { data, isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: params.hash as Hex });
 
   return (
@@ -41,7 +48,7 @@ export default function Transactions() {
           <CardTitle className="flex">
             Transaction
             <a
-              href={getTransactionUrl(params.hash as Hex)}
+              href={getTransactionUrl(params.hash as Hex, ethNetwork)}
               className="ml-2 flex items-center hover:underline"
               target="_blank"
               rel="noreferrer"
