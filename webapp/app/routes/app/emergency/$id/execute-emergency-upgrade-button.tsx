@@ -1,3 +1,4 @@
+import type { Call } from "@/common/calls";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { Button } from "@/components/ui/button";
 import { ALL_ABIS } from "@/utils/raw-abis";
@@ -8,7 +9,6 @@ import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
 import { type Hex, encodeAbiParameters, hexToBigInt } from "viem";
 import { useWriteContract } from "wagmi";
-import type { Call } from "@/common/calls";
 
 export type ExecuteEmergencyUpgradeButtonProps = {
   children?: React.ReactNode;
@@ -18,7 +18,7 @@ export type ExecuteEmergencyUpgradeButtonProps = {
   allCouncil: Hex[];
   zkFoundationAddress: Hex;
   proposal: BasicProposal;
-  calls: Call[]
+  calls: Call[];
 };
 
 function encodeSignatures(signatures: BasicSignature[]): Hex {
@@ -39,7 +39,7 @@ export function ExecuteEmergencyUpgradeButton({
   allCouncil,
   zkFoundationAddress,
   proposal,
-  calls
+  calls,
 }: ExecuteEmergencyUpgradeButtonProps) {
   const { writeContract, isPending } = useWriteContract();
   const { submit } = useFetcher();

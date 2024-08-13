@@ -1,6 +1,6 @@
+import { hexSchema } from "@/common/basic-schemas";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
-import { hexSchema } from "@/common/basic-schemas";
 
 export const NodeEnvEnum = z.enum(["development", "test", "production"]);
 export type NodeEnv = z.infer<typeof NodeEnvEnum>;

@@ -35,7 +35,7 @@ export const createCallParams = (proposalId: number) => {
     target: faker.string.hexadecimal({ length: 20 }) as Hex,
     value: 0n,
     data: faker.string.hexadecimal({ length: randomLength }) as Hex,
-    proposalId
+    proposalId,
   };
 };
 

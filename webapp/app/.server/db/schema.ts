@@ -3,9 +3,9 @@ import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { signActionSchema } from "@/common/sign-action";
 import { relations, sql } from "drizzle-orm";
 import {
-  integer,
   check,
   index,
+  integer,
   json,
   pgTable,
   serial,
@@ -52,15 +52,17 @@ export const emergencyProposalsTable = pgTable(
   })
 );
 
-export const emergencyProposalsTableRelations = relations(emergencyProposalsTable, ({ many }) =>{
+export const emergencyProposalsTableRelations = relations(emergencyProposalsTable, ({ many }) => {
   return {
-    calls: many(emergencyProposalCalls)
-  }
-})
+    calls: many(emergencyProposalCalls),
+  };
+});
 
 export const emergencyProposalCalls = pgTable("emergency_proposal_calls", {
   id: serial("id").primaryKey(),
-  proposalId: integer("proposal_id").notNull().references(() => emergencyProposalsTable.id),
+  proposalId: integer("proposal_id")
+    .notNull()
+    .references(() => emergencyProposalsTable.id),
   target: bytea("target").notNull(),
   value: bytea("value").notNull(),
   data: bytea("data").notNull(),
@@ -70,10 +72,10 @@ export const emergencyProposalCallsRelations = relations(emergencyProposalCalls,
   return {
     proposal: one(emergencyProposalsTable, {
       fields: [emergencyProposalCalls.proposalId],
-      references: [emergencyProposalsTable.id]
-    })
-  }
-})
+      references: [emergencyProposalsTable.id],
+    }),
+  };
+});
 
 export const signaturesTable = pgTable(
   "signatures",

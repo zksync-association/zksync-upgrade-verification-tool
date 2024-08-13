@@ -5,6 +5,7 @@ import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveSignature } from "@/.server/service/signatures";
+import { hexSchema } from "@/common/basic-schemas";
 import { signActionSchema } from "@/common/sign-action";
 import { StatusIndicator } from "@/components/status-indicator";
 import TxLink from "@/components/tx-link";
@@ -32,7 +33,6 @@ import { getFormData, getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
-import { hexSchema } from "@/common/basic-schemas";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);

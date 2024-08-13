@@ -19,7 +19,7 @@ export const bytea = customType<{
 
     // Avoid Buffer.from("0"). It returns an empty buffer, which gets later interpreted as empty hex.
     if (parsed === "0x0") {
-      return Buffer.from([0])
+      return Buffer.from([0]);
     }
     if (parsed.startsWith("0x")) {
       return Buffer.from(parsed.slice(2), "hex");

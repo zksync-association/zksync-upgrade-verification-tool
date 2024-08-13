@@ -1,8 +1,10 @@
+import { createCall } from "@/.server/db/dto/calls";
 import {
   createOrIgnoreEmergencyProposal,
   getEmergencyProposalByExternalId,
   updateEmergencyProposal,
 } from "@/.server/db/dto/emergencyProposals";
+import { db } from "@/.server/db/index";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import { l1Rpc } from "@/.server/service/clients";
 import type { Call } from "@/common/calls";
@@ -12,8 +14,6 @@ import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { notFound } from "@/utils/http";
 import { env } from "@config/env.server";
 import { type Hex, hexToBigInt } from "viem";
-import { db } from "@/.server/db/index";
-import { createCall } from "@/.server/db/dto/calls";
 
 export async function broadcastSuccess(propsalId: Hex) {
   const proposal = await getEmergencyProposalByExternalId(propsalId);
@@ -56,24 +56,29 @@ export const saveEmergencyProposal = async (data: FullEmergencyProp, calls: Call
 
   const currentDate = new Date();
 
-  await db.transaction(async sqlTx => {
-    const id = await createOrIgnoreEmergencyProposal({
-      status: "ACTIVE",
-      proposer: data.proposer as Hex,
-      proposedOn: currentDate,
-      changedOn: currentDate,
-      externalId,
-      salt: data.salt as Hex,
-      title: data.title
-    }, { tx: sqlTx });
+  await db.transaction(async (sqlTx) => {
+    const id = await createOrIgnoreEmergencyProposal(
+      {
+        status: "ACTIVE",
+        proposer: data.proposer as Hex,
+        proposedOn: currentDate,
+        changedOn: currentDate,
+        externalId,
+        salt: data.salt as Hex,
+        title: data.title,
+      },
+      { tx: sqlTx }
+    );
     for (const call of calls) {
-      await createCall({
-        data: call.data,
-        proposalId: id,
-        value: call.value,
-        target: call.target
-      }, { tx: sqlTx })
+      await createCall(
+        {
+          data: call.data,
+          proposalId: id,
+          value: call.value,
+          target: call.target,
+        },
+        { tx: sqlTx }
+      );
     }
-  })
-
+  });
 };

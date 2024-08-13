@@ -1,6 +1,6 @@
 import type { EmergencyProposalStatus } from "@/common/proposal-status";
-import { type Hex, isAddressEqual } from "viem";
 import { compareHexValues } from "@/utils/compare-hex-values";
+import { type Hex, isAddressEqual } from "viem";
 
 export type BasicSignature = { signer: Hex; signature: Hex };
 export type BasicProposal = {

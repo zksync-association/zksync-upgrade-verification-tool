@@ -1,8 +1,8 @@
 import { getUserAuthRole } from "@/.server/service/authorized-users";
+import { hexSchema } from "@/common/basic-schemas";
 import { readAuthSession } from "@server/utils/auth-session";
 import type { NextFunction, Request, Response } from "express";
 import { $path, type Routes } from "remix-routes";
-import { hexSchema } from "@/common/basic-schemas";
 
 export const USER_ADDRESS_HEADER = "x-user-address";
 export const USER_ROLE_HEADER = "x-user-role";

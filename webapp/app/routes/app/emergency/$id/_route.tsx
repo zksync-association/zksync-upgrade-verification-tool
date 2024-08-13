@@ -1,3 +1,4 @@
+import { getCallsByProposalId } from "@/.server/db/dto/calls";
 import { getEmergencyProposalByExternalId } from "@/.server/db/dto/emergencyProposals";
 import { getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures";
 import {
@@ -8,6 +9,7 @@ import {
 } from "@/.server/service/authorized-users";
 import { broadcastSuccess } from "@/.server/service/emergency-proposals";
 import { saveEmergencySignature } from "@/.server/service/signatures";
+import { hexSchema } from "@/common/basic-schemas";
 import { type SignAction, signActionSchema } from "@/common/sign-action";
 import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { StatusIndicator } from "@/components/status-indicator";
@@ -30,8 +32,6 @@ import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { type Hex, formatEther, hexToBigInt, isAddressEqual } from "viem";
 import { type ZodTypeAny, z } from "zod";
-import { getCallsByProposalId } from "@/.server/db/dto/calls";
-import { hexSchema } from "@/common/basic-schemas";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
@@ -46,12 +46,11 @@ export async function loader(args: LoaderFunctionArgs) {
 
   const proposal = await getEmergencyProposalByExternalId(proposalId);
 
-
   if (proposal === undefined) {
     throw notFound();
   }
 
-  const calls = await getCallsByProposalId(proposal.id)
+  const calls = await getCallsByProposalId(proposal.id);
 
   const signatures = await getSignaturesByEmergencyProposalId(proposal.externalId);
 
@@ -130,15 +129,8 @@ function actionForRole(role: UserRole): SignAction {
 export default function EmergencyUpgradeDetails() {
   const navigate = useNavigate();
 
-  const {
-    calls,
-    user,
-    proposal,
-    addresses,
-    signatures,
-    allSecurityCouncil,
-    allGuardians
-  } = useLoaderData<typeof loader>();
+  const { calls, user, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
+    useLoaderData<typeof loader>();
 
   if (user.role === "visitor") {
     return "Unauthorized: Only valid signers can see this page.";

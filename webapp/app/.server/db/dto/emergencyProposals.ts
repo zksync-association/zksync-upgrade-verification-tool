@@ -10,9 +10,9 @@ export async function createOrIgnoreEmergencyProposal(
 ): Promise<number> {
   const [record] = await createOrIgnoreRecord(emergencyProposalsTable, data, { tx });
   if (!record) {
-    throw new Error("Error saving on db.")
+    throw new Error("Error saving on db.");
   }
-  return record.id
+  return record.id;
 }
 
 export async function getAllEmergencyProposals() {

@@ -5,11 +5,11 @@ import {
   scAbi,
   upgradeHandlerAbi,
 } from "@/.server/service/contract-abis";
+import { hexSchema } from "@/common/basic-schemas";
 import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { env } from "@config/env.server";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
-import { hexSchema } from "@/common/basic-schemas";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 

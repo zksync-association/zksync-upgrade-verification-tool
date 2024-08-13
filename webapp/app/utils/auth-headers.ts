@@ -1,8 +1,8 @@
+import { hexSchema } from "@/common/basic-schemas";
 import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { unauthorized } from "@/utils/http";
 import { USER_ADDRESS_HEADER, USER_ROLE_HEADER } from "@server/middlewares/auth";
 import type { Hex } from "viem";
-import { hexSchema } from "@/common/basic-schemas";
 
 export function getUserFromHeader(request: Request) {
   const address = request.headers.get(USER_ADDRESS_HEADER);
