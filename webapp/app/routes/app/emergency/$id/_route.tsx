@@ -198,7 +198,7 @@ export default function EmergencyUpgradeDetails() {
                 necessarySignatures={GUARDIANS_COUNCIL_THRESHOLD}
               />
               <StatusIndicator
-                label="ZkFoundation approvals"
+                label="ZkFoundation Approval"
                 signatures={gatheredZkFoundationSignatures}
                 necessarySignatures={ZK_FOUNDATION_THRESHOLD}
               />
