@@ -30,14 +30,14 @@ import { Await, useLoaderData } from "@remix-run/react";
 import { Suspense } from "react";
 import { getFormData, getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
-import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
+import { hexSchema } from "@/common/basic-schemas";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
 
-  const params = getParams(remixParams, z.object({ id: zodHex }));
+  const params = getParams(remixParams, z.object({ id: hexSchema }));
   if (!params.success) {
     throw notFound();
   }
@@ -124,8 +124,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const data = await getFormData(
     request,
     z.object({
-      signature: zodHex,
-      proposalId: zodHex,
+      signature: hexSchema,
+      proposalId: hexSchema,
       actionName: signActionSchema,
     })
   );

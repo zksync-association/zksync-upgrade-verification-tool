@@ -3,7 +3,6 @@ import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { signActionSchema } from "@/common/sign-action";
 import { relations, sql } from "drizzle-orm";
 import {
-  bigint,
   integer,
   check,
   index,
@@ -14,8 +13,6 @@ import {
   timestamp,
   unique,
 } from "drizzle-orm/pg-core";
-import { zodHex } from "validate-cli";
-import { z } from "zod";
 
 export const proposalsTable = pgTable(
   "proposals",

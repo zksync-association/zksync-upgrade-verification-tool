@@ -10,8 +10,8 @@ import { useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import { useNavigate } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
-import { zodHex } from "validate-cli";
 import { useAccount } from "wagmi";
+import { hexSchema } from "@/common/basic-schemas";
 
 export function loader(_args: LoaderFunctionArgs) {
   const environment = clientEnv.NODE_ENV;
@@ -24,7 +24,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!address) {
     throw redirect($path("/"));
   }
-  const parsedAddress = zodHex.safeParse(address);
+  const parsedAddress = hexSchema.safeParse(address);
   if (!parsedAddress.success) {
     throw redirect($path("/"));
   }

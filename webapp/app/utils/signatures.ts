@@ -1,5 +1,6 @@
 import type { EmergencyProposalStatus } from "@/common/proposal-status";
-import { type Hex, hexToBigInt, isAddressEqual } from "viem";
+import { type Hex, isAddressEqual } from "viem";
+import { compareHexValues } from "@/utils/compare-hex-values";
 
 export type BasicSignature = { signer: Hex; signature: Hex };
 export type BasicProposal = {
@@ -11,7 +12,7 @@ export type BasicProposal = {
 export function filterSignatures<T extends BasicSignature>(members: Hex[], signatures: T[]): T[] {
   return signatures
     .filter((s) => members.some((member) => isAddressEqual(s.signer, member)))
-    .sort((a, b) => Number(hexToBigInt(a.signer) - hexToBigInt(b.signer)));
+    .sort((a, b) => compareHexValues(a.signer, b.signer));
 }
 
 export function classifySignatures<T extends BasicSignature>(

@@ -28,14 +28,14 @@ import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
-import { zodHex } from "validate-cli";
 import { type Hex, formatEther, hexToBigInt, isAddressEqual } from "viem";
 import { type ZodTypeAny, z } from "zod";
 import { getCallsByProposalId } from "@/.server/db/dto/calls";
+import { hexSchema } from "@/common/basic-schemas";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
-  const params = getParams(args.params, z.object({ id: zodHex }));
+  const params = getParams(args.params, z.object({ id: hexSchema }));
   if (!params.success) {
     throw notFound();
   }
@@ -96,11 +96,11 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 
   const intent = extract(formData, "intent", intentParser);
-  const proposalId = extract(formData, "proposalId", zodHex);
+  const proposalId = extract(formData, "proposalId", hexSchema);
 
   if (intent === intentParser.enum.newSignature) {
     const user = requireUserFromHeader(request);
-    const signature = extract(formData, "signature", zodHex);
+    const signature = extract(formData, "signature", hexSchema);
     const actionName = extract(formData, "actionName", signActionSchema);
 
     await saveEmergencySignature(signature, user.address, actionName, proposalId);
