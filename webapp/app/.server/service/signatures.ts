@@ -20,6 +20,7 @@ import { l1Rpc } from "@/.server/service/clients";
 import { guardiansAbi } from "@/.server/service/contract-abis";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import type { SignAction } from "@/common/sign-action";
+import { dateToUnixTimestamp } from "@/utils/date";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
@@ -290,7 +291,7 @@ export async function validateAndSaveFreezeSignature({
   }
 
   let message = {};
-  const validUntil = Math.floor(proposal.validUntil.getTime() / 1000);
+  const validUntil = dateToUnixTimestamp(proposal.validUntil);
   if (proposal.type === "SET_SOFT_FREEZE_THRESHOLD") {
     message = {
       threshold: proposal.softFreezeThreshold,

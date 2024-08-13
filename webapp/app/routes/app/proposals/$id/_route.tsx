@@ -21,6 +21,7 @@ import SignButton from "@/routes/app/proposals/$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { compareHexValues } from "@/utils/compare-hex-values";
+import { dateToUnixTimestamp } from "@/utils/date";
 import { badRequest, notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
@@ -221,9 +222,7 @@ export default function Proposals() {
                           <span>Proposed On:</span>
                           <div className="flex w-1/2 flex-col break-words text-right">
                             <span>{new Date(proposal.proposedOn).toISOString()}</span>
-                            <span>
-                              ({Math.floor(new Date(proposal.proposedOn).getTime() / 1000)})
-                            </span>
+                            <span>({dateToUnixTimestamp(new Date(proposal.proposedOn))})</span>
                           </div>
                         </div>
                         <div className="flex justify-between">
