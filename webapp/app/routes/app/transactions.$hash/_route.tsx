@@ -12,21 +12,32 @@ import {
 import { displayBytes32 } from "@/routes/app/proposals/$id/common-tables";
 import { getTransactionUrl } from "@/utils/etherscan";
 import { capitalizeFirstLetter } from "@/utils/string";
-import { env } from "@config/env.server";
-import { json } from "@remix-run/node";
+
+import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useNavigate, useParams } from "@remix-run/react";
 import { ArrowLeft, CircleCheckBig, SquareArrowOutUpRight } from "lucide-react";
 import { type Hex, formatEther, formatGwei } from "viem";
 import { useWaitForTransactionReceipt } from "wagmi";
+import { getParams } from "remix-params-helper";
+import { zodHex } from "validate-cli";
+import { z } from "zod";
+import { notFound } from "@/utils/http";
+import { env } from "@config/env.server";
 
-export async function loader() {
-  return json({ ethNetwork: env.ETH_NETWORK });
+export function loader(args: LoaderFunctionArgs) {
+  const params = getParams(args.params, z.object({ hash: zodHex }))
+  if (!params.success) {
+    throw notFound();
+  }
+
+  const txUrl = getTransactionUrl(params.data.hash, env.ETH_NETWORK)
+  return json({ txUrl: txUrl });
 }
 
 export default function Transactions() {
   const params = useParams();
   const navigate = useNavigate();
-  const { ethNetwork } = useLoaderData<typeof loader>();
+  const { txUrl } = useLoaderData<typeof loader>();
   const { data, isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: params.hash as Hex });
 
   return (
@@ -48,7 +59,7 @@ export default function Transactions() {
           <CardTitle className="flex">
             Transaction
             <a
-              href={getTransactionUrl(params.hash as Hex, ethNetwork)}
+              href={txUrl}
               className="ml-2 flex items-center hover:underline"
               target="_blank"
               rel="noreferrer"
