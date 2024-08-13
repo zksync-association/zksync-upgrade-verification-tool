@@ -3,7 +3,6 @@ import { createOrIgnoreRecord, getFirst, getFirstOrThrow } from "@/.server/db/dt
 import { emergencyProposalsTable } from "@/.server/db/schema";
 import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
 import type { Hex } from "viem";
-import { badRequest } from "@/utils/http";
 
 export async function createOrIgnoreEmergencyProposal(
   data: InferInsertModel<typeof emergencyProposalsTable>,
