@@ -2,7 +2,7 @@ import {
   saveEmergencyProposal,
   validateEmergencyProposalCalls,
 } from "@/.server/service/emergency-proposals";
-import { callSchema, hexSchema, type Call } from "@/common/calls";
+import { callSchema, type Call } from "@/common/calls";
 import { StepsWizard, WizardStep } from "@/components/steps-wizard";
 import { NewEmergencyProposalStep1, type Step1, step1Schema } from "@/routes/app/emergency/new/step1";
 import { NewEmergencyProposalStep2 } from "@/routes/app/emergency/new/step2";
@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { z } from "zod";
+import { hexSchema } from "@/common/basic-schemas";
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);

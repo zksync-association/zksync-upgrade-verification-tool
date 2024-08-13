@@ -1,6 +1,7 @@
-import { addressSchema, callSchema, hexSchema } from "@/common/calls";
+import { callSchema } from "@/common/calls";
 import { padHex } from "viem";
 import { z } from "zod";
+import { addressSchema, hexSchema } from "@/common/basic-schemas";
 
 export const basicPropSchema = z.object({
   calls: z.array(callSchema),
