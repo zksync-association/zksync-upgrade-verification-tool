@@ -13,24 +13,24 @@ import { displayBytes32 } from "@/routes/app/proposals/$id/common-tables";
 import { getTransactionUrl } from "@/utils/etherscan";
 import { capitalizeFirstLetter } from "@/utils/string";
 
-import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useNavigate, useParams } from "@remix-run/react";
-import { ArrowLeft, CircleCheckBig, SquareArrowOutUpRight } from "lucide-react";
-import { type Hex, formatEther, formatGwei } from "viem";
-import { useWaitForTransactionReceipt } from "wagmi";
-import { getParams } from "remix-params-helper";
-import { zodHex } from "validate-cli";
-import { z } from "zod";
 import { notFound } from "@/utils/http";
 import { env } from "@config/env.server";
+import { type LoaderFunctionArgs, json } from "@remix-run/node";
+import { useLoaderData, useNavigate, useParams } from "@remix-run/react";
+import { ArrowLeft, CircleCheckBig, SquareArrowOutUpRight } from "lucide-react";
+import { getParams } from "remix-params-helper";
+import { zodHex } from "validate-cli";
+import { type Hex, formatEther, formatGwei } from "viem";
+import { useWaitForTransactionReceipt } from "wagmi";
+import { z } from "zod";
 
 export function loader(args: LoaderFunctionArgs) {
-  const params = getParams(args.params, z.object({ hash: zodHex }))
+  const params = getParams(args.params, z.object({ hash: zodHex }));
   if (!params.success) {
     throw notFound();
   }
 
-  const txUrl = getTransactionUrl(params.data.hash, env.ETH_NETWORK)
+  const txUrl = getTransactionUrl(params.data.hash, env.ETH_NETWORK);
   return json({ txUrl: txUrl });
 }
 
