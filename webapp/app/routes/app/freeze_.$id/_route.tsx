@@ -12,6 +12,7 @@ import { type SignAction, signActionSchema } from "@/common/sign-action";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
+import ContractWriteButton from "@/routes/app/freeze_.$id/contract-write-button";
 import SignButton from "@/routes/app/freeze_.$id/sign-button";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { badRequest, notFound } from "@/utils/http";
@@ -129,7 +130,11 @@ export default function Freeze() {
       break;
   }
 
-  const signDisabled = signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
+  const signDisabled =
+    user.role !== "securityCouncil" ||
+    signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
+
+  const executeFreezeEnabled = signatures.length >= necessarySignatures;
 
   return (
     <div className="mt-10 flex flex-1 flex-col">
@@ -201,12 +206,14 @@ export default function Freeze() {
             </div>
           </CardContent>
         </Card>
-        {user.role === "securityCouncil" && (
-          <Card className="pb-10">
-            <CardHeader>
-              <CardTitle>Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col space-y-3">
+        <Card className="pb-10">
+          <CardHeader>
+            <CardTitle>
+              {user.role === "securityCouncil" ? "Security Council Actions" : "No role actions"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col space-y-3">
+            {user.role === "securityCouncil" && (
               <SignButton
                 proposalId={proposal.id}
                 contractData={{
@@ -222,9 +229,26 @@ export default function Freeze() {
               >
                 Approve
               </SignButton>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
+        <Card className="pb-10">
+          <CardHeader>
+            <CardTitle>Execute Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col space-y-3">
+            <ContractWriteButton
+              target={securityCouncilAddress}
+              signatures={signatures}
+              functionName={"approveUpgradeSecurityCouncil"}
+              abiName="council"
+              threshold={necessarySignatures}
+              disabled={!executeFreezeEnabled}
+            >
+              Execute freeze
+            </ContractWriteButton>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
