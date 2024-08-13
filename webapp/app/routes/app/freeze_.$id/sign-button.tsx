@@ -5,7 +5,7 @@ import type { action } from "@/routes/app/proposals/$id/_route";
 import { useFetcher } from "@remix-run/react";
 import { useEffect } from "react";
 import { toast } from "react-hot-toast";
-import type { Hex } from "viem";
+import { hashTypedData, Hex } from "viem";
 import { useChains, useSignTypedData } from "wagmi";
 
 type ContractData = {
@@ -108,6 +108,13 @@ export default function SignButton({
         [contractData.actionName]: types,
       },
     };
+    console.log(data);
+
+
+
+    const hash = hashTypedData(data)
+    console.log("hash", hash)
+
     signTypedData(data);
   }
 

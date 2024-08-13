@@ -49,7 +49,7 @@ async function verifySignature({
   message: { [key: string]: any };
   targetContract: Hex;
 }) {
-  const digest = hashTypedData({
+  const parameters = {
     domain: {
       name: contractName,
       version: "1",
@@ -61,7 +61,9 @@ async function verifySignature({
     types: {
       [action]: types,
     },
-  });
+  };
+  console.log(parameters);
+  const digest = hashTypedData(parameters);
 
   try {
     await l1Rpc.contractRead(targetContract, "checkSignatures", guardiansAbi.raw, z.any(), [
@@ -274,10 +276,10 @@ export async function validateAndSaveFreezeSignature({
 }) {
   if (
     ![
-      "ApproveSoftFreeze",
-      "ApproveHardFreeze",
-      "ApproveUnfreeze",
-      "ApproveSetSoftFreezeThreshold",
+      "SoftFreeze",
+      "HardFreeze",
+      "Unfreeze",
+      "SetSoftFreezeThreshold",
     ].includes(action)
   ) {
     throw badRequest("Invalid action");
@@ -342,7 +344,7 @@ export async function validateAndSaveFreezeSignature({
     action,
     message,
     types,
-    contractName: "Guardians",
+    contractName: "SecurityCouncil",
     targetContract: addr,
   });
 
