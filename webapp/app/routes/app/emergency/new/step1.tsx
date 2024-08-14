@@ -1,3 +1,4 @@
+import { hexSchema } from "@/common/basic-schemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -14,7 +15,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { type Hex, padHex } from "viem";
 import { z } from "zod";
-import { hexSchema } from "@/common/basic-schemas";
 
 export const step1Schema = z.object({
   title: z.string().min(1, "Cannot be empty"),

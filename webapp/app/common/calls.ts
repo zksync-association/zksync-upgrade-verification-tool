@@ -13,9 +13,8 @@ export type Call = z.infer<typeof callSchema>;
 export const formCallSchema = z.object({
   target: addressSchema,
   data: hexSchema,
-  value: z
-    .coerce
+  value: z.coerce
     .number()
-    .transform(n => n.toString())
+    .transform((n) => n.toString())
     .transform((str) => numberToHex(parseEther(str))),
 });

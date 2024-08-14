@@ -35,7 +35,7 @@ export function Step3(props: Step3Props) {
         salt: props.step1.salt,
         title: props.step1.title,
       },
-      { method: "POST", encType: "application/json", action: $path("/app/emergency/new",) }
+      { method: "POST", encType: "application/json", action: $path("/app/emergency/new") }
     );
   }, []);
 

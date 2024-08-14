@@ -1,5 +1,8 @@
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
-import { saveEmergencyProposal, validateEmergencyProposalCalls, } from "@/.server/service/emergency-proposals";
+import {
+  saveEmergencyProposal,
+  validateEmergencyProposalCalls,
+} from "@/.server/service/emergency-proposals";
 import { hexSchema } from "@/common/basic-schemas";
 import { type Call, callSchema } from "@/common/calls";
 import { StepsWizard, WizardStep } from "@/components/steps-wizard";
@@ -20,12 +23,14 @@ export async function loader() {
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const body = z.object({
-    intent: z.enum(["validate", "save"]),
-    calls: z.array(callSchema),
-    salt: hexSchema,
-    title: z.string().min(1),
-  }).safeParse(await request.json())
+  const body = z
+    .object({
+      intent: z.enum(["validate", "save"]),
+      calls: z.array(callSchema),
+      salt: hexSchema,
+      title: z.string().min(1),
+    })
+    .safeParse(await request.json());
 
   if (!body.success) {
     throw badRequest(`Error parsing body: ${body.error.toString()}`);
