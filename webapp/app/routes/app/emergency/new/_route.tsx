@@ -87,7 +87,7 @@ export default function NewEmergencyUpgrade() {
 
     fetcher.submit(
       { intent: "save", calls: calls, salt: step1.salt, title: step1.title },
-      { method: "POST" }
+      { method: "POST", encType: "application/json" }
     );
   };
 
