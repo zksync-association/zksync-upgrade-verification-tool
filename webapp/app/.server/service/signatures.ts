@@ -273,12 +273,10 @@ export async function validateAndSaveFreezeSignature({
   proposal: InferSelectModel<typeof freezeProposalsTable>;
 }) {
   if (
-    ![
-      "ApproveSoftFreeze",
-      "ApproveHardFreeze",
-      "ApproveUnfreeze",
-      "ApproveSetSoftFreezeThreshold",
-    ].includes(action)
+    action !== "SoftFreeze" &&
+    action !== "HardFreeze" &&
+    action !== "Unfreeze" &&
+    action !== "SetSoftFreezeThreshold"
   ) {
     throw badRequest("Invalid action");
   }
@@ -342,7 +340,7 @@ export async function validateAndSaveFreezeSignature({
     action,
     message,
     types,
-    contractName: "Guardians",
+    contractName: "SecurityCouncil",
     targetContract: addr,
   });
 

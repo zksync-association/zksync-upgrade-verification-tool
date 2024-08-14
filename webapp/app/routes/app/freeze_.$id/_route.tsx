@@ -119,22 +119,22 @@ export default function Freeze() {
   switch (proposal.type) {
     case "SOFT_FREEZE":
       proposalType = "Soft Freeze";
-      action = "ApproveSoftFreeze";
+      action = "SoftFreeze";
       functionName = "softFreeze";
       break;
     case "HARD_FREEZE":
       proposalType = "Hard Freeze";
-      action = "ApproveHardFreeze";
+      action = "HardFreeze";
       functionName = "hardFreeze";
       break;
     case "SET_SOFT_FREEZE_THRESHOLD":
       proposalType = "Set Soft Freeze Threshold";
-      action = "ApproveSetSoftFreezeThreshold";
+      action = "SetSoftFreezeThreshold";
       functionName = "setSoftFreezeThreshold";
       break;
     case "UNFREEZE":
       proposalType = "Unfreeze";
-      action = "ApproveUnfreeze";
+      action = "Unfreeze";
       functionName = "unfreeze";
       break;
   }

@@ -7,10 +7,10 @@ export const signActionSchema = z.enum([
   "ExecuteEmergencyUpgradeGuardians",
   "ExecuteEmergencyUpgradeSecurityCouncil",
   "ExecuteEmergencyUpgradeZKFoundation",
-  "ApproveSoftFreeze",
-  "ApproveHardFreeze",
-  "ApproveUnfreeze",
-  "ApproveSetSoftFreezeThreshold",
+  "SoftFreeze",
+  "HardFreeze",
+  "Unfreeze",
+  "SetSoftFreezeThreshold",
 ]);
 
 export type SignAction = z.infer<typeof signActionSchema>;
