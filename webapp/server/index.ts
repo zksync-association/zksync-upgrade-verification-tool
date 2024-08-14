@@ -36,7 +36,6 @@ app.set("trust proxy", true);
 app.use(requireHttps);
 app.get("*", removeTrailingSlash);
 app.use(compression());
-app.use(express.json());
 
 // http://expressjs.com/en/advanced/best-practice-security.html#at-a-minimum-disable-x-powered-by-header
 app.disable("x-powered-by");
