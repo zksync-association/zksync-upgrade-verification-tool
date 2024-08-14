@@ -11,11 +11,16 @@ import { Step3 } from "@/routes/app/emergency/new/step3";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { badRequest } from "@/utils/http";
 import { type ActionFunctionArgs, json } from "@remix-run/node";
-import { useFetcher, useNavigate } from "@remix-run/react";
+import { useFetcher, useLoaderData, useNavigate } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { z } from "zod";
+import { emergencyBoardAddress } from "@/.server/service/authorized-users";
+
+export async function loader() {
+  return json({ emergencyBoardAddress: await emergencyBoardAddress() });
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -57,6 +62,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function NewEmergencyUpgrade() {
+  const { emergencyBoardAddress } = useLoaderData<typeof loader>();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [step1, setStep1] = useState<Step1 | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
@@ -98,6 +104,7 @@ export default function NewEmergencyUpgrade() {
     }
   }, [fetcher.data, navigate]);
 
+  console.log(emergencyBoardAddress)
   return (
     <div>
       <h2 className="pt-20 pb-5 font-bold text-3xl">Create new emergency proposal</h2>
@@ -117,7 +124,7 @@ export default function NewEmergencyUpgrade() {
           )}
         </WizardStep>
         <WizardStep step={3}>
-          {step1 && <Step3 step1={step1} calls={calls} onBack={step3Back} submit={step3Submit} />}
+          {step1 && <Step3 step1={step1} calls={calls} onBack={step3Back} submit={step3Submit} executorAddress={emergencyBoardAddress} />}
         </WizardStep>
       </StepsWizard>
     </div>

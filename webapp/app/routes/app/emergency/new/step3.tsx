@@ -7,16 +7,20 @@ import { useFetcher } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
 import type { action } from "./_route";
+import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
+import type { Hex } from "viem";
 
 export type Step3Props = {
   step1: Step1;
   calls: Call[];
+  executorAddress: Hex;
   onBack: () => void;
   submit: () => void;
 };
 
 export function Step3(props: Step3Props) {
   const { submit, data } = useFetcher<typeof action>();
+  const upgradeId = calculateUpgradeProposalHash(props.calls, props.step1.salt, props.executorAddress)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
@@ -38,6 +42,10 @@ export function Step3(props: Step3Props) {
       <DisplayStep1 {...props.step1} />
 
       <DisplayCalls calls={props.calls} />
+
+      <p>
+        <b>Upgrade id:</b> {upgradeId}
+      </p>
 
       {!data && <div>Validating...</div>}
 
