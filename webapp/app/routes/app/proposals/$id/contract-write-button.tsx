@@ -6,12 +6,15 @@ import type { InferSelectModel } from "drizzle-orm";
 import type React from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
-import type { Hex } from "viem";
+import type { ContractFunctionName, Hex } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
 
 type BroadcastTxButtonProps = {
   target: Hex;
-  functionName: string;
+  functionName: ContractFunctionName<
+    typeof ALL_ABIS.council | typeof ALL_ABIS.guardians,
+    "nonpayable"
+  >;
   signatures: InferSelectModel<typeof signaturesTable>[];
   threshold: number;
   proposalId: Hex;
