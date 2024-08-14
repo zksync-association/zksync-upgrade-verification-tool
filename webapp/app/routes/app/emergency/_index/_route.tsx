@@ -36,10 +36,6 @@ export async function loader(args: LoaderFunctionArgs) {
 
 export default function Index() {
   const { activeEmergencyProposals, inactiveEmergencyProposals } = useLoaderData<typeof loader>();
-  const navigate = useNavigate();
-  const goToNewProposal = useCallback(() => {
-    navigate($path("/app/emergency/new"));
-  }, [navigate]);
 
   return (
     <div className="mt-10 space-y-4">
@@ -47,9 +43,12 @@ export default function Index() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Active Emergency Proposals</CardTitle>
-            <Button variant="secondary" size="icon" onClick={goToNewProposal}>
-              <PlusIcon className="h-4 w-4" />
-            </Button>
+            <a href={$path("/app/emergency/new")}>
+              <Button variant="secondary" size="icon">
+                <PlusIcon className="h-4 w-4" />
+              </Button>
+            </a>
+
           </div>
         </CardHeader>
         <CardContent>
