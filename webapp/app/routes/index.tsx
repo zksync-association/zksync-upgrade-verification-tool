@@ -1,5 +1,6 @@
 import { getUserAuthRole } from "@/.server/service/authorized-users";
 import { checkConnection } from "@/.server/service/clients";
+import { hexSchema } from "@/common/basic-schemas";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,6 @@ import { useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import { useNavigate } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
-import { zodHex } from "validate-cli";
 import { useAccount } from "wagmi";
 
 export function loader(_args: LoaderFunctionArgs) {
@@ -24,7 +24,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!address) {
     throw redirect($path("/"));
   }
-  const parsedAddress = zodHex.safeParse(address);
+  const parsedAddress = hexSchema.safeParse(address);
   if (!parsedAddress.success) {
     throw redirect($path("/"));
   }

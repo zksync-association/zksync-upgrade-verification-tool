@@ -16,10 +16,10 @@ export const bytea = customType<{
   },
   toDriver(val) {
     const parsed = hexSchema.parse(val);
-    if (parsed.startsWith("0x")) {
-      return Buffer.from(parsed.slice(2), "hex");
-    }
-    return Buffer.from(parsed, "hex");
+    const hex = parsed.slice(2);
+    // Avoid sending odd lengths. When length is odd Buffer.from ignores the first digit.
+    const prefix = hex.length % 2 === 0 ? "" : "0";
+    return Buffer.from(`${prefix}${hex}`, "hex");
   },
   fromDriver(val) {
     const hex = `0x${val.toString("hex")}`;

@@ -1,8 +1,8 @@
 import { getUserAuthRole } from "@/.server/service/authorized-users";
+import { hexSchema } from "@/common/basic-schemas";
 import { readAuthSession } from "@server/utils/auth-session";
 import type { NextFunction, Request, Response } from "express";
 import { $path, type Routes } from "remix-routes";
-import { zodHex } from "validate-cli";
 
 export const USER_ADDRESS_HEADER = "x-user-address";
 export const USER_ROLE_HEADER = "x-user-role";
@@ -20,13 +20,13 @@ function isProtectedRoute(req: Request) {
 export async function auth(req: Request, res: Response, next: NextFunction) {
   const session = readAuthSession(req);
 
-  const parsed = zodHex.safeParse(session.address);
+  const parsed = hexSchema.safeParse(session.address);
   if (parsed.error) {
     clearUserHeaders(req);
     return next();
   }
 
-  const role = await getUserAuthRole(zodHex.parse(parsed.data));
+  const role = await getUserAuthRole(hexSchema.parse(parsed.data));
   setUserHeaders(req, { address: parsed.data, role });
 
   if (isProtectedRoute(req) && role === "visitor") {

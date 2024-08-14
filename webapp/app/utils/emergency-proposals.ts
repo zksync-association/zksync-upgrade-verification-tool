@@ -1,10 +1,5 @@
+import type { Call } from "@/common/calls";
 import { type AbiParameter, type Hex, encodeAbiParameters, keccak256 } from "viem";
-
-type Call = {
-  target: Hex;
-  value: bigint;
-  data: Hex;
-};
 
 type UpgradeProposal = {
   calls: Call[];

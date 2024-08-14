@@ -1,10 +1,5 @@
 import { getAllEmergencyProposals } from "@/.server/db/dto/emergencyProposals";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
-import {
-  saveEmergencyProposal,
-  validateEmergencyProposal,
-} from "@/.server/service/emergency-proposals";
-import { basicPropSchema, fullEmergencyPropSchema } from "@/common/emergency-proposal-schema";
 import type { EmergencyProposalStatus } from "@/common/proposal-status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,14 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CreateEmergencyProposalModal } from "@/routes/app/emergency/_index/create-emergency-proposal-modal";
 import { requireUserFromHeader } from "@/utils/auth-headers";
-import { badRequest } from "@/utils/http";
 import { PlusIcon } from "@radix-ui/react-icons";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, Link, json, useLoaderData } from "@remix-run/react";
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { Link, json, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
-import { useState } from "react";
 import { $path } from "remix-routes";
 
 export async function loader(args: LoaderFunctionArgs) {
@@ -41,45 +33,20 @@ export async function loader(args: LoaderFunctionArgs) {
   });
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData();
-  const data = Object.fromEntries(formData);
-  if (data.intent === "validate") {
-    const parsed = basicPropSchema.parse(data);
-    const validation = await validateEmergencyProposal(parsed);
-    return json({
-      status: validation === null ? "success" : "failure",
-      intent: "validate",
-      error: validation,
-    });
-  }
-
-  if (data.intent === "submit") {
-    const parsedData = fullEmergencyPropSchema.parse(data);
-    await saveEmergencyProposal(parsedData);
-    return json({ status: "success", intent: "submit", error: null });
-  }
-
-  throw badRequest(`Unknown intent: ${data.intent}`);
-}
-
 export default function Index() {
-  const {
-    activeEmergencyProposals,
-    inactiveEmergencyProposals,
-    emergencyBoardAddress,
-    currentUser,
-  } = useLoaderData<typeof loader>();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { activeEmergencyProposals, inactiveEmergencyProposals } = useLoaderData<typeof loader>();
+
   return (
     <div className="mt-10 space-y-4">
       <Card className="pb-10">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Active Emergency Proposals</CardTitle>
-            <Button variant="secondary" size="icon" onClick={() => setIsModalOpen(true)}>
-              <PlusIcon className="h-4 w-4" />
-            </Button>
+            <a href={$path("/app/emergency/new")}>
+              <Button variant="secondary" size="icon">
+                <PlusIcon className="h-4 w-4" />
+              </Button>
+            </a>
           </div>
         </CardHeader>
         <CardContent>
@@ -206,14 +173,6 @@ export default function Index() {
           )}
         </CardContent>
       </Card>
-      <Form method="post">
-        <CreateEmergencyProposalModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          proposerAddress={currentUser}
-          emergencyBoardAddress={emergencyBoardAddress}
-        />
-      </Form>
     </div>
   );
 }
