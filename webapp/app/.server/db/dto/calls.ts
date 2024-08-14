@@ -6,10 +6,9 @@ export function createCall(
   data: InferInsertModel<typeof emergencyProposalCalls>,
   { tx }: { tx?: typeof db } = {}
 ) {
-  const value = data.value === "0x" ? "0x00" : data.value;
   return (tx ?? db)
     .insert(emergencyProposalCalls)
-    .values({ ...data, value })
+    .values(data)
     .returning();
 }
 
