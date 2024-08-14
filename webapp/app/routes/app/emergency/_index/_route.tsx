@@ -191,7 +191,7 @@ export default function Index() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Link to={$path("/app/proposals/:id", { id: ep.id })}>
+                        <Link to={$path("/app/proposals/:id", { id: ep.externalId })}>
                           <Button variant="outline" size="sm">
                             View
                             <ArrowRight className="ml-2 h-4 w-4" />
