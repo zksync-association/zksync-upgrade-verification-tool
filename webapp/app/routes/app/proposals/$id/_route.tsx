@@ -18,6 +18,7 @@ import FacetChangesTable from "@/routes/app/proposals/$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals/$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-changes-table";
 import ProposalState from "@/routes/app/proposals/$id/proposal-state";
+import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
@@ -33,7 +34,6 @@ import { getFormData, getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
-import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);

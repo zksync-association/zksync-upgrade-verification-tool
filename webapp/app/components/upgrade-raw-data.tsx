@@ -1,7 +1,7 @@
 import type { Call } from "@/common/calls";
 import { formatEther, hexToBigInt } from "viem";
 
-type UpgradeRawDataProps = { calls: Call[], salt: string };
+type UpgradeRawDataProps = { calls: Call[]; salt: string };
 
 export function UpgradeRawData({ calls, salt }: UpgradeRawDataProps) {
   return (
@@ -34,5 +34,5 @@ export function UpgradeRawData({ calls, salt }: UpgradeRawDataProps) {
         </div>
       ))}
     </div>
-  )
+  );
 }

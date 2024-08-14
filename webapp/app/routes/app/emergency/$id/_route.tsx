@@ -16,6 +16,7 @@ import { StatusIndicator } from "@/components/status-indicator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UpgradeRawData } from "@/components/upgrade-raw-data";
 import { ExecuteEmergencyUpgradeButton } from "@/routes/app/emergency/$id/execute-emergency-upgrade-button";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import { requireUserFromHeader } from "@/utils/auth-headers";
@@ -30,9 +31,8 @@ import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
-import { type Hex, formatEther, hexToBigInt, isAddressEqual } from "viem";
+import { type Hex, isAddressEqual } from "viem";
 import { type ZodTypeAny, z } from "zod";
-import { UpgradeRawData } from "@/components/upgrade-raw-data";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
