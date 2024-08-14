@@ -14,12 +14,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { type Hex, padHex } from "viem";
 import { z } from "zod";
+import { hexSchema } from "@/common/basic-schemas";
 
 export const step1Schema = z.object({
   title: z.string().min(1, "Cannot be empty"),
-  salt: z
-    .string()
-    .regex(/^0x[a-fA-F0-9]*$/, "Salt must be a hex string starting with 0x")
+  salt: hexSchema
     .refine((a) => a.length <= 66, "Should be 32 byte number")
     .transform((str) => str as Hex)
     .transform((str) => padHex(str, { size: 32 })),
