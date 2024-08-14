@@ -19,7 +19,7 @@ export type Step3Props = {
 };
 
 export function Step3(props: Step3Props) {
-  const { submit, data } = useFetcher<typeof action>();
+  const {submit, data} = useFetcher<typeof action>();
   const upgradeId = calculateUpgradeProposalHash(
     props.calls,
     props.step1.salt,
@@ -35,17 +35,18 @@ export function Step3(props: Step3Props) {
         salt: props.step1.salt,
         title: props.step1.title,
       },
-      { method: "POST", action: $path("/app/emergency/new") }
+      {method: "POST", action: $path("/app/emergency/new")}
     );
   }, []);
 
-  const valid = data !== undefined && data.errors.length === 0;
+
+  const valid = data !== undefined && data.ok;
 
   return (
     <div>
       <DisplayStep1 {...props.step1} />
 
-      <DisplayCalls calls={props.calls} />
+      <DisplayCalls calls={props.calls}/>
 
       <p>
         <b>Upgrade id:</b> {upgradeId}
@@ -56,7 +57,13 @@ export function Step3(props: Step3Props) {
       {!valid && (
         <div className="my-10 mb-2 font-bold">
           <h2 className="text-2xl">Error validating transactions:</h2>
-          <p>{data?.errors?.join(", ")}</p>
+          <ul>
+            {data?.validations?.map(({isValid}, i) => {
+              if (isValid) {
+                return <li><b>Error in call number {i}:</b> eth_call failed</li>;
+              }
+            })}
+          </ul>
         </div>
       )}
 

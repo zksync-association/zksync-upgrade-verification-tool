@@ -25,15 +25,20 @@ export async function broadcastSuccess(propsalId: Hex) {
   await updateEmergencyProposal(proposal);
 }
 
-export async function validateEmergencyProposalCalls(calls: Call[]): Promise<string[]> {
-  return await Promise.all(
+export type CallValidation = {
+  call: Call,
+  isValid: boolean
+}
+
+export async function validateEmergencyProposalCalls(calls: Call[]): Promise<CallValidation[]> {
+  return Promise.all(
     calls.map(async (call) => {
       return await validateCall(call);
     })
-  ).then((list) => list.filter((msg) => msg !== null) as string[]);
+  )
 }
 
-export async function validateCall(call: Call): Promise<null | string> {
+export async function validateCall(call: Call): Promise<CallValidation> {
   try {
     await l1Rpc.contractReadRaw(
       call.target,
@@ -41,9 +46,9 @@ export async function validateCall(call: Call): Promise<null | string> {
       env.UPGRADE_HANDLER_ADDRESS,
       hexToBigInt(call.value)
     );
-    return null;
+    return { call, isValid: true };
   } catch (e) {
-    return "eth_call execution failed";
+    return { call, isValid: false };
   }
 }
 

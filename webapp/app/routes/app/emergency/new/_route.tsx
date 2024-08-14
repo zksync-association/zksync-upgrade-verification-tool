@@ -45,9 +45,10 @@ export async function action({ request }: ActionFunctionArgs) {
     throw badRequest(`Malformed calls array: ${calls.error}`);
   }
 
-  const errors = await validateEmergencyProposalCalls(calls.data);
+  const validations = await validateEmergencyProposalCalls(calls.data);
 
-  if (errors.length === 0 && body.data.intent === "save") {
+  const allValid = validations.every(v => v.isValid);
+  if (allValid && body.data.intent === "save") {
     await saveEmergencyProposal(
       {
         salt: body.data.salt,
@@ -58,7 +59,7 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  return json({ ok: errors.length === 0, errors });
+  return json({ ok: allValid, validations });
 }
 
 export default function NewEmergencyUpgrade() {
