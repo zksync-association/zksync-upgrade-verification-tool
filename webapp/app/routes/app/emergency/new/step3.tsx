@@ -55,11 +55,11 @@ export function Step3(props: Step3Props) {
       {!data && <div>Validating...</div>}
 
       {!valid && (
-        <div className="my-10 mb-2 font-bold">
-          <h2 className="text-2xl">Error validating transactions:</h2>
-          <ul>
+        <div className="my-10 mb-2">
+          <h2 className="text-2xl pb-5">Error validating transactions:</h2>
+          <ul className="pb-10">
             {data?.validations?.map(({isValid}, i) => {
-              if (isValid) {
+              if (!isValid) {
                 return <li><b>Error in call number {i}:</b> eth_call failed</li>;
               }
             })}
