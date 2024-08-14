@@ -64,10 +64,9 @@ export default function Index() {
         <div className="cta-bg -z-10 pointer-events-none w-full" />
         <main className="flex flex-1 flex-col items-center justify-center">
           <div className="flex flex-1 flex-col items-center justify-center text-center md:max-w-3xl">
-            <h1 className="font-bold text-3xl md:text-5xl">Upgrade Analysis & Voting Tool</h1>
+            <h1 className="font-bold text-3xl md:text-5xl">Upgrade Analysis & Approval Tool</h1>
             <p className="mt-10 text-lg md:max-w-xl">
-              Analyze upgrade proposal transaction call data in human-readable format and cast your
-              vote.
+              Analyze proposals, coordinate signature gathering, and execute protocol upgrades.
             </p>
             <div className="mt-10">
               {!account.isConnected ? (

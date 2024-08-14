@@ -3,10 +3,14 @@ import { getTransactionUrl } from "@/utils/etherscan";
 import { SquareArrowOutUpRight } from "lucide-react";
 import type { Hex } from "viem";
 
-export default function TxLink({ txid }: { txid: Hex }) {
+import type { EthNetwork } from "@/common/eth-network-enum";
+
+type TxLinkProps = { txid: Hex; network: EthNetwork };
+
+export default function TxLink({ txid, network }: TxLinkProps) {
   return (
     <a
-      href={getTransactionUrl(txid as Hex)}
+      href={getTransactionUrl(txid as Hex, network)}
       className="flex w-1/2 items-center justify-end break-words underline"
       target="_blank"
       rel="noreferrer"
