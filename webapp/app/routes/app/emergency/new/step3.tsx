@@ -31,11 +31,11 @@ export function Step3(props: Step3Props) {
     submit(
       {
         intent: "validate",
-        calls: JSON.stringify(props.calls),
+        calls: props.calls,
         salt: props.step1.salt,
         title: props.step1.title,
       },
-      { method: "POST", action: $path("/app/emergency/new") }
+      { method: "POST", encType: "application/json", action: $path("/app/emergency/new",) }
     );
   }, []);
 

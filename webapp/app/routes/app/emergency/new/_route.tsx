@@ -1,8 +1,5 @@
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
-import {
-  saveEmergencyProposal,
-  validateEmergencyProposalCalls,
-} from "@/.server/service/emergency-proposals";
+import { saveEmergencyProposal, validateEmergencyProposalCalls, } from "@/.server/service/emergency-proposals";
 import { hexSchema } from "@/common/basic-schemas";
 import { type Call, callSchema } from "@/common/calls";
 import { StepsWizard, WizardStep } from "@/components/steps-wizard";
@@ -14,7 +11,6 @@ import { badRequest } from "@/utils/http";
 import { type ActionFunctionArgs, json } from "@remix-run/node";
 import { useFetcher, useLoaderData, useNavigate } from "@remix-run/react";
 import { useEffect, useState } from "react";
-import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { z } from "zod";
 
@@ -24,28 +20,19 @@ export async function loader() {
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const body = await getFormData(
-    request,
-    z.object({
-      intent: z.enum(["validate", "save"]),
-      calls: z.string(),
-      salt: hexSchema,
-      title: z.string().min(1),
-    })
-  );
+  const body = z.object({
+    intent: z.enum(["validate", "save"]),
+    calls: z.array(callSchema),
+    salt: hexSchema,
+    title: z.string().min(1),
+  }).safeParse(await request.json())
 
   if (!body.success) {
-    throw badRequest(body.errors.toString());
+    throw badRequest(`Error parsing body: ${body.error.toString()}`);
   }
 
-  const calls = z.array(callSchema).safeParse(JSON.parse(body.data.calls));
-
-  if (!calls.success) {
-    console.error(calls.error);
-    throw badRequest(`Malformed calls array: ${calls.error}`);
-  }
-
-  const validations = await validateEmergencyProposalCalls(calls.data);
+  const calls = body.data.calls;
+  const validations = await validateEmergencyProposalCalls(calls);
 
   const allValid = validations.every((v) => v.isValid);
   if (allValid && body.data.intent === "save") {
@@ -55,7 +42,7 @@ export async function action({ request }: ActionFunctionArgs) {
         title: body.data.title,
         proposer: user.address,
       },
-      calls.data
+      calls
     );
   }
 
