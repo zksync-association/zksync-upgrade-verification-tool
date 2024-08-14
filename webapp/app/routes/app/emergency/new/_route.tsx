@@ -1,3 +1,4 @@
+import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import {
   saveEmergencyProposal,
   validateEmergencyProposalCalls,
@@ -16,7 +17,6 @@ import { useEffect, useState } from "react";
 import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { z } from "zod";
-import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 
 export async function loader() {
   return json({ emergencyBoardAddress: await emergencyBoardAddress() });
@@ -104,7 +104,6 @@ export default function NewEmergencyUpgrade() {
     }
   }, [fetcher.data, navigate]);
 
-  console.log(emergencyBoardAddress)
   return (
     <div>
       <h2 className="pt-20 pb-5 font-bold text-3xl">Create new emergency proposal</h2>
@@ -124,7 +123,15 @@ export default function NewEmergencyUpgrade() {
           )}
         </WizardStep>
         <WizardStep step={3}>
-          {step1 && <Step3 step1={step1} calls={calls} onBack={step3Back} submit={step3Submit} executorAddress={emergencyBoardAddress} />}
+          {step1 && (
+            <Step3
+              step1={step1}
+              calls={calls}
+              onBack={step3Back}
+              submit={step3Submit}
+              executorAddress={emergencyBoardAddress}
+            />
+          )}
         </WizardStep>
       </StepsWizard>
     </div>

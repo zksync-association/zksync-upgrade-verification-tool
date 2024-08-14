@@ -3,12 +3,12 @@ import { Button } from "@/components/ui/button";
 import { DisplayCalls } from "@/routes/app/emergency/new/display-calls";
 import { DisplayStep1 } from "@/routes/app/emergency/new/displayStep1";
 import type { Step1 } from "@/routes/app/emergency/new/step1";
+import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { useFetcher } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
-import type { action } from "./_route";
-import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import type { Hex } from "viem";
+import type { action } from "./_route";
 
 export type Step3Props = {
   step1: Step1;
@@ -20,7 +20,11 @@ export type Step3Props = {
 
 export function Step3(props: Step3Props) {
   const { submit, data } = useFetcher<typeof action>();
-  const upgradeId = calculateUpgradeProposalHash(props.calls, props.step1.salt, props.executorAddress)
+  const upgradeId = calculateUpgradeProposalHash(
+    props.calls,
+    props.step1.salt,
+    props.executorAddress
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
