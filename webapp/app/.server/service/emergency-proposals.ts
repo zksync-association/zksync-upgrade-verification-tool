@@ -1,6 +1,6 @@
 import { createCall } from "@/.server/db/dto/calls";
 import {
-  createOrIgnoreEmergencyProposal,
+  createEmergencyProposal,
   getEmergencyProposalByExternalId,
   updateEmergencyProposal,
 } from "@/.server/db/dto/emergencyProposals";
@@ -57,7 +57,7 @@ export const saveEmergencyProposal = async (data: FullEmergencyProp, calls: Call
   const currentDate = new Date();
 
   await db.transaction(async (sqlTx) => {
-    const id = await createOrIgnoreEmergencyProposal(
+    const { id} = await createEmergencyProposal(
       {
         status: "ACTIVE",
         proposer: data.proposer as Hex,
