@@ -11,9 +11,9 @@ import { NewEmergencyProposalStep2 } from "@/routes/app/emergency/new/step2";
 import { Step3 } from "@/routes/app/emergency/new/step3";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { badRequest } from "@/utils/http";
-import { type ActionFunctionArgs, json } from "@remix-run/node";
-import { useFetcher, useLoaderData, useNavigate } from "@remix-run/react";
-import { useEffect, useState } from "react";
+import { type ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import { useFetcher, useLoaderData } from "@remix-run/react";
+import { useState } from "react";
 import { $path } from "remix-routes";
 import { z } from "zod";
 
@@ -49,6 +49,7 @@ export async function action({ request }: ActionFunctionArgs) {
       },
       calls
     );
+    return redirect($path("/app/emergency"));
   }
 
   return json({ ok: allValid, validations });
@@ -60,7 +61,6 @@ export default function NewEmergencyUpgrade() {
   const [step1, setStep1] = useState<Step1 | null>(null);
   const [calls, setCalls] = useState<Call[]>([]);
   const fetcher = useFetcher<typeof action>();
-  const navigate = useNavigate();
 
   const step1Submit = (newStep1: Step1) => {
     setStep1(newStep1);
@@ -90,12 +90,6 @@ export default function NewEmergencyUpgrade() {
       { method: "POST", encType: "application/json" }
     );
   };
-
-  useEffect(() => {
-    if (fetcher.data?.ok) {
-      navigate($path("/app/emergency"));
-    }
-  }, [fetcher.data, navigate]);
 
   return (
     <div>
