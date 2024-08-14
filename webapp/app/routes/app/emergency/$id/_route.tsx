@@ -32,6 +32,7 @@ import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { type Hex, formatEther, hexToBigInt, isAddressEqual } from "viem";
 import { type ZodTypeAny, z } from "zod";
+import { UpgradeRawData } from "@/components/upgrade-raw-data";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
@@ -259,33 +260,7 @@ export default function EmergencyUpgradeDetails() {
               <CardTitle>Raw Data</CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
-              <p className="pb-10">
-                <b>salt:</b> <span>{proposal.salt}</span>
-              </p>
-
-              <h3 className="font-bold text-xl">Calls</h3>
-
-              {calls.map((call) => (
-                <div
-                  key={call.target + call.target + call.value}
-                  className="mt-10 grid grid-cols-4 gap-y-3 border-t-2 pt-5"
-                >
-                  <div className="grid-col-span-1">Target</div>
-                  <div className="col-span-3 font-mono">
-                    <span className="break-words">{call.target}</span>
-                  </div>
-
-                  <div className="grid-col-span-1">Data</div>
-                  <div className="col-span-3 font-mono">
-                    <span className="break-words">{call.data}</span>
-                  </div>
-
-                  <div className="grid-col-span-1">Value</div>
-                  <div className="col-span-3 font-mono">
-                    <span className="break-words">{formatEther(hexToBigInt(call.value))}</span>
-                  </div>
-                </div>
-              ))}
+              <UpgradeRawData calls={calls} salt={proposal.salt} />
             </CardContent>
           </Card>
         </TabsContent>

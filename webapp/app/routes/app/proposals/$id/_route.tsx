@@ -33,6 +33,7 @@ import { getFormData, getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
+import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -388,6 +389,7 @@ export default function Proposals() {
                       </TabsTrigger>
                       <TabsTrigger value="field-changes">Field Changes</TabsTrigger>
                       <TabsTrigger value="field-storage-changes">Field Storage Changes</TabsTrigger>
+                      <TabsTrigger value="raw-data">Raw Data</TabsTrigger>
                     </TabsList>
                     <TabsContent value="facet-changes" className="w-full">
                       <Card className="pb-8">
@@ -426,6 +428,17 @@ export default function Proposals() {
                         </CardHeader>
                         <CardContent className="pt-4">
                           <FieldStorageChangesTable data={reports.fieldStorageChanges} />{" "}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    <TabsContent value="raw-data" className="w-full">
+                      <Card className="pb-8">
+                        <CardHeader>
+                          <CardTitle>Raw Data</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <RawStandardUpgrade encoded={proposal.raw} />
                         </CardContent>
                       </Card>
                     </TabsContent>
