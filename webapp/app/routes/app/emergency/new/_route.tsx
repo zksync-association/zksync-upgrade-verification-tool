@@ -53,7 +53,7 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  return json({ ok: true, errors });
+  return json({ ok: errors.length === 0, errors });
 }
 
 export default function NewEmergencyUpgrade() {
