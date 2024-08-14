@@ -71,7 +71,8 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
           proposalStatus,
           proposalData.creationTimestamp,
           proposalData.guardiansExtendedLegalVeto,
-          await nowInSeconds()
+          await nowInSeconds(),
+          env.ETH_NETWORK
         ),
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         approvedByGuardians: proposalData.guardiansApproval,
@@ -109,6 +110,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       userSignedLegalVeto: signatures
         .filter((s) => s.action === "ExtendLegalVetoPeriod")
         .some((s) => isAddressEqual(s.signer as Hex, user.address as Hex)),
+      ethNetwork: env.ETH_NETWORK,
     };
   };
 
@@ -160,7 +162,14 @@ export default function Proposals() {
         }
       >
         <Await resolve={asyncData}>
-          {({ addresses, proposal, reports, userSignedLegalVeto, userSignedProposal }) => {
+          {({
+            addresses,
+            proposal,
+            reports,
+            userSignedLegalVeto,
+            userSignedProposal,
+            ethNetwork,
+          }) => {
             const securityCouncilSignaturesReached =
               proposal.signatures.approveUpgradeSecurityCouncil.length >=
               NECESSARY_SECURITY_COUNCIL_SIGNATURES;
@@ -236,7 +245,7 @@ export default function Proposals() {
                         </div>
                         <div className="flex justify-between">
                           <span>Transaction hash:</span>
-                          <TxLink txid={proposal.transactionHash} />
+                          <TxLink txid={proposal.transactionHash} network={ethNetwork} />
                         </div>
                       </div>
                     </CardContent>
