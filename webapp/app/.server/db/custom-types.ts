@@ -1,5 +1,5 @@
 import { customType } from "drizzle-orm/pg-core";
-import { Hex } from "viem";
+import type { Hex } from "viem";
 import { z } from "zod";
 
 const hexSchema = z.string().regex(/^0x[0-9a-fA-F]*$/);
@@ -18,7 +18,7 @@ export const bytea = customType<{
     const parsed = hexSchema.parse(val);
     const hex = parsed.slice(2);
     // Avoid sending odd lengths. When length is odd Buffer.from ignores the first digit.
-    const prefix = hex.length % 2 === 0 ? "" : "0"
+    const prefix = hex.length % 2 === 0 ? "" : "0";
     return Buffer.from(`${prefix}${hex}`, "hex");
   },
   fromDriver(val) {

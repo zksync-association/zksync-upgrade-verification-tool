@@ -47,7 +47,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const validations = await validateEmergencyProposalCalls(calls.data);
 
-  const allValid = validations.every(v => v.isValid);
+  const allValid = validations.every((v) => v.isValid);
   if (allValid && body.data.intent === "save") {
     await saveEmergencyProposal(
       {

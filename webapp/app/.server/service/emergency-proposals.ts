@@ -1,10 +1,10 @@
+import { db } from "@/.server/db";
 import { createCall } from "@/.server/db/dto/calls";
 import {
   createEmergencyProposal,
   getEmergencyProposalByExternalId,
   updateEmergencyProposal,
 } from "@/.server/db/dto/emergencyProposals";
-import { db } from "@/.server/db/index";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import { l1Rpc } from "@/.server/service/clients";
 import type { Call } from "@/common/calls";
@@ -26,16 +26,16 @@ export async function broadcastSuccess(propsalId: Hex) {
 }
 
 export type CallValidation = {
-  call: Call,
-  isValid: boolean
-}
+  call: Call;
+  isValid: boolean;
+};
 
 export async function validateEmergencyProposalCalls(calls: Call[]): Promise<CallValidation[]> {
   return Promise.all(
     calls.map(async (call) => {
       return await validateCall(call);
     })
-  )
+  );
 }
 
 export async function validateCall(call: Call): Promise<CallValidation> {
@@ -62,7 +62,7 @@ export const saveEmergencyProposal = async (data: FullEmergencyProp, calls: Call
   const currentDate = new Date();
 
   await db.transaction(async (sqlTx) => {
-    const { id} = await createEmergencyProposal(
+    const { id } = await createEmergencyProposal(
       {
         status: "ACTIVE",
         proposer: data.proposer as Hex,

@@ -8,7 +8,7 @@ export async function createEmergencyProposal(
   data: InferInsertModel<typeof emergencyProposalsTable>,
   { tx }: { tx?: typeof db } = {}
 ): Promise<InferSelectModel<typeof emergencyProposalsTable>> {
-  const [record] = await (tx ?? db).insert(emergencyProposalsTable).values(data).returning()
+  const [record] = await (tx ?? db).insert(emergencyProposalsTable).values(data).returning();
   if (!record) {
     throw new Error("Error saving on db.");
   }
