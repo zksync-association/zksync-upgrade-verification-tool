@@ -14,9 +14,8 @@ import {
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { PlusIcon } from "@radix-ui/react-icons";
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { Link, json, useLoaderData, useNavigate } from "@remix-run/react";
+import { Link, json, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
-import { useCallback } from "react";
 import { $path } from "remix-routes";
 
 export async function loader(args: LoaderFunctionArgs) {
@@ -48,7 +47,6 @@ export default function Index() {
                 <PlusIcon className="h-4 w-4" />
               </Button>
             </a>
-
           </div>
         </CardHeader>
         <CardContent>
