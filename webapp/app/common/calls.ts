@@ -14,7 +14,8 @@ export const formCallSchema = z.object({
   target: addressSchema,
   data: hexSchema,
   value: z
-    .string()
-    .refine((str) => !Number.isNaN(Number.parseFloat(str)), "Should be a valid number")
+    .coerce
+    .number()
+    .transform(n => n.toString())
     .transform((str) => numberToHex(parseEther(str))),
 });
