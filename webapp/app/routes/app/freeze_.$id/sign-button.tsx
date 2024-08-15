@@ -73,7 +73,7 @@ export default function SignButton({
     };
   } else {
     message = {
-      nonce: 0n,
+      nonce,
       validUntil,
     };
   }
