@@ -14,7 +14,7 @@ END $$;
 
 -- migrate-data
 insert into emergency_proposal_calls ("target", "proposal_id", "value", "data")
-    select "target_address", "id", decode(to_hex("value"), 'hex'), "calldata" from emergency_proposals;
+    select "target_address", "id", decode(lpad(to_hex("value"), 64, '0'), 'hex'), "calldata" from emergency_proposals;
 
 --> statement-breakpoint
 ALTER TABLE "emergency_proposals" DROP COLUMN IF EXISTS "target_address";--> statement-breakpoint
