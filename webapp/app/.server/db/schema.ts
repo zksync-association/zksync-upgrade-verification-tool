@@ -3,6 +3,7 @@ import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { signActionSchema } from "@/common/sign-action";
 import { relations, sql } from "drizzle-orm";
 import {
+  bigint,
   check,
   index,
   integer,
