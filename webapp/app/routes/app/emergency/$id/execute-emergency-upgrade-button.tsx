@@ -1,3 +1,4 @@
+import type { Call } from "@/common/calls";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { Button } from "@/components/ui/button";
 import { ALL_ABIS } from "@/utils/raw-abis";
@@ -6,7 +7,7 @@ import { useFetcher, useNavigate } from "@remix-run/react";
 import type React from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
-import { type Hex, encodeAbiParameters } from "viem";
+import { type Hex, encodeAbiParameters, hexToBigInt } from "viem";
 import { useWriteContract } from "wagmi";
 
 export type ExecuteEmergencyUpgradeButtonProps = {
@@ -17,6 +18,7 @@ export type ExecuteEmergencyUpgradeButtonProps = {
   allCouncil: Hex[];
   zkFoundationAddress: Hex;
   proposal: BasicProposal;
+  calls: Call[];
 };
 
 function encodeSignatures(signatures: BasicSignature[]): Hex {
@@ -37,6 +39,7 @@ export function ExecuteEmergencyUpgradeButton({
   allCouncil,
   zkFoundationAddress,
   proposal,
+  calls,
 }: ExecuteEmergencyUpgradeButtonProps) {
   const { writeContract, isPending } = useWriteContract();
   const { submit } = useFetcher();
@@ -61,13 +64,7 @@ export function ExecuteEmergencyUpgradeButton({
         abi: ALL_ABIS.emergencyBoard,
         functionName: "executeEmergencyUpgrade",
         args: [
-          [
-            {
-              target: proposal.targetAddress,
-              value: BigInt(proposal.value),
-              data: proposal.calldata,
-            },
-          ],
+          calls.map((c) => ({ ...c, value: hexToBigInt(c.value) })),
           proposal.salt,
           encodeSignatures(guardianSignatures),
           encodeSignatures(councilSignatures),

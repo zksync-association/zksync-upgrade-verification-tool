@@ -1,6 +1,6 @@
 import { db } from "@/.server/db";
 import {
-  createOrIgnoreEmergencyProposal,
+  createEmergencyProposal,
   getEmergencyProposalByExternalId,
 } from "@/.server/db/dto/emergencyProposals";
 import { createOrIgnoreProposal, getProposalByExternalId } from "@/.server/db/dto/proposals";
@@ -72,7 +72,7 @@ describe("Proposal DB", () => {
 
   it("should create and retrieve an emergency proposal", async () => {
     const params = createRandomEmergencyProposalParams();
-    await createOrIgnoreEmergencyProposal({
+    await createEmergencyProposal({
       ...params,
     });
 

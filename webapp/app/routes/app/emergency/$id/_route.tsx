@@ -1,3 +1,4 @@
+import { getCallsByProposalId } from "@/.server/db/dto/calls";
 import { getEmergencyProposalByExternalId } from "@/.server/db/dto/emergencyProposals";
 import { getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures";
 import {
@@ -8,11 +9,14 @@ import {
 } from "@/.server/service/authorized-users";
 import { broadcastSuccess } from "@/.server/service/emergency-proposals";
 import { saveEmergencySignature } from "@/.server/service/signatures";
+import { hexSchema } from "@/common/basic-schemas";
 import { type SignAction, signActionSchema } from "@/common/sign-action";
 import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { StatusIndicator } from "@/components/status-indicator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UpgradeRawData } from "@/components/upgrade-raw-data";
 import { ExecuteEmergencyUpgradeButton } from "@/routes/app/emergency/$id/execute-emergency-upgrade-button";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import { requireUserFromHeader } from "@/utils/auth-headers";
@@ -27,13 +31,12 @@ import { useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowLeft } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
-import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
 import { type ZodTypeAny, z } from "zod";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
-  const params = getParams(args.params, z.object({ id: zodHex }));
+  const params = getParams(args.params, z.object({ id: hexSchema }));
   if (!params.success) {
     throw notFound();
   }
@@ -48,17 +51,17 @@ export async function loader(args: LoaderFunctionArgs) {
     throw notFound();
   }
 
+  const calls = await getCallsByProposalId(proposal.id);
+
   const signatures = await getSignaturesByEmergencyProposalId(proposal.externalId);
 
   return json({
+    calls: calls,
     proposal: {
       title: proposal?.title,
       externalId: proposal.externalId,
       proposedOn: proposal.proposedOn,
-      calldata: proposal.calldata,
-      targetAddress: proposal.targetAddress,
       salt: proposal.salt,
-      value: proposal.value.toString(),
       status: proposal.status,
     },
     addresses: {
@@ -93,11 +96,11 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 
   const intent = extract(formData, "intent", intentParser);
-  const proposalId = extract(formData, "proposalId", zodHex);
+  const proposalId = extract(formData, "proposalId", hexSchema);
 
   if (intent === intentParser.enum.newSignature) {
     const user = requireUserFromHeader(request);
-    const signature = extract(formData, "signature", zodHex);
+    const signature = extract(formData, "signature", hexSchema);
     const actionName = extract(formData, "actionName", signActionSchema);
 
     await saveEmergencySignature(signature, user.address, actionName, proposalId);
@@ -127,14 +130,9 @@ function actionForRole(role: UserRole): SignAction {
 export default function EmergencyUpgradeDetails() {
   const navigate = useNavigate();
 
-  const { user, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
+  const { calls, user, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
     useLoaderData<typeof loader>();
 
-  if (user.role === "visitor") {
-    return "Unauthorized: Only valid signers can see this page.";
-  }
-
-  const actionName = actionForRole(user.role);
   const haveAlreadySigned = signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
   const gatheredScSignatures = signatures.filter((sig) => {
     return allSecurityCouncil.some((addr) => isAddressEqual(addr, sig.signer));
@@ -203,7 +201,7 @@ export default function EmergencyUpgradeDetails() {
                 necessarySignatures={GUARDIANS_COUNCIL_THRESHOLD}
               />
               <StatusIndicator
-                label="ZkFoundation approvals"
+                label="ZkFoundation Approval"
                 signatures={gatheredZkFoundationSignatures}
                 necessarySignatures={ZK_FOUNDATION_THRESHOLD}
               />
@@ -215,18 +213,21 @@ export default function EmergencyUpgradeDetails() {
             <CardTitle>Signatures</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            <SignButton
-              proposalId={proposal.externalId}
-              contractData={{
-                actionName: actionName,
-                address: addresses.emergencyBoard,
-                name: "EmergencyUpgradeBoard",
-              }}
-              disabled={haveAlreadySigned}
-              postAction={$path("/app/emergency/:id", { id: proposal.externalId })}
-            >
-              Approve
-            </SignButton>
+            {user.role !== "visitor" && (
+              <SignButton
+                proposalId={proposal.externalId}
+                contractData={{
+                  actionName: actionForRole(user.role),
+                  address: addresses.emergencyBoard,
+                  name: "EmergencyUpgradeBoard",
+                }}
+                disabled={haveAlreadySigned}
+                postAction={$path("/app/emergency/:id", { id: proposal.externalId })}
+              >
+                Approve
+              </SignButton>
+            )}
+            {user.role === "visitor" && <p>No signing actions</p>}
           </CardContent>
         </Card>
         <Card className="pb-10">
@@ -241,12 +242,29 @@ export default function EmergencyUpgradeDetails() {
               allCouncil={allSecurityCouncil}
               zkFoundationAddress={addresses.zkFoundation}
               proposal={proposal}
+              calls={calls}
             >
               Execute upgrade
             </ExecuteEmergencyUpgradeButton>
           </CardContent>
         </Card>
       </div>
+
+      <Tabs className="mt-4 flex" defaultValue="raw-data">
+        <TabsList className="mt-12 mr-6">
+          <TabsTrigger value="raw-data">Raw upgrade data</TabsTrigger>
+        </TabsList>
+        <TabsContent value="raw-data" className="w-full">
+          <Card className="pb-8">
+            <CardHeader>
+              <CardTitle>Raw Data</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <UpgradeRawData calls={calls} salt={proposal.salt} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

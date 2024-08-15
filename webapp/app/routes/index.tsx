@@ -1,5 +1,6 @@
 import { getUserAuthRole } from "@/.server/service/authorized-users";
 import { checkConnection } from "@/.server/service/clients";
+import { hexSchema } from "@/common/basic-schemas";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
 import NavbarWithUser from "@/components/navbar-with-user";
@@ -11,7 +12,6 @@ import { useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import { useNavigate } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
-import { zodHex } from "validate-cli";
 import { useAccount } from "wagmi";
 
 export function loader({ request }: LoaderFunctionArgs) {
@@ -31,7 +31,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!address) {
     throw redirect($path("/"));
   }
-  const parsedAddress = zodHex.safeParse(address);
+  const parsedAddress = hexSchema.safeParse(address);
   if (!parsedAddress.success) {
     throw redirect($path("/"));
   }
@@ -75,10 +75,9 @@ export default function Index() {
         <div className="cta-bg -z-10 pointer-events-none w-full" />
         <main className="flex flex-1 flex-col items-center justify-center">
           <div className="flex flex-1 flex-col items-center justify-center text-center md:max-w-3xl">
-            <h1 className="font-bold text-3xl md:text-5xl">Upgrade Analysis & Voting Tool</h1>
+            <h1 className="font-bold text-3xl md:text-5xl">Upgrade Analysis & Approval Tool</h1>
             <p className="mt-10 text-lg md:max-w-xl">
-              Analyze upgrade proposal transaction call data in human-readable format and cast your
-              vote.
+              Analyze proposals, coordinate signature gathering, and execute protocol upgrades.
             </p>
             <div className="mt-10">
               {!account.isConnected ? (

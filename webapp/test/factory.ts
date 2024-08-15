@@ -2,6 +2,7 @@ import { createOrIgnoreProposal as createDbProposal } from "@/.server/db/dto/pro
 import type { emergencyProposalsTable, proposalsTable } from "@/.server/db/schema";
 import { faker } from "@faker-js/faker";
 import type { InferInsertModel } from "drizzle-orm";
+import type { Hex } from "viem";
 
 export const createRandomProposal = async () => {
   const params = createRandomProposalParams();
@@ -28,16 +29,22 @@ export const createRandomProposalParams = () => {
   } satisfies InferInsertModel<typeof proposalsTable>;
 };
 
-export const createRandomEmergencyProposalParams = () => {
+export const createCallParams = (proposalId: number) => {
   const randomLength = Math.floor(Math.random() * (50 - 16 + 1)) * 2 + 32;
+  return {
+    target: faker.string.hexadecimal({ length: 20 }) as Hex,
+    value: 0n,
+    data: faker.string.hexadecimal({ length: randomLength }) as Hex,
+    proposalId,
+  };
+};
+
+export const createRandomEmergencyProposalParams = () => {
   const timestamp = faker.date.anytime();
   return {
     title: faker.lorem.sentence(),
-    value: faker.number.int(),
     status: "ACTIVE" as const,
-    targetAddress: faker.string.hexadecimal({ length: 20 }) as `0x${string}`,
     externalId: faker.string.hexadecimal({ length: 20 }) as `0x${string}`,
-    calldata: faker.string.hexadecimal({ length: randomLength }) as `0x${string}`,
     salt: faker.string.hexadecimal({ length: 64 }) as `0x${string}`,
     changedOn: timestamp,
     proposedOn: timestamp,
