@@ -1,8 +1,8 @@
-import type { signaturesTable } from "@/.server/db/schema";
+import type { freezeProposalsTable, signaturesTable } from "@/.server/db/schema";
 import { Button } from "@/components/ui/button";
 import { dateToUnixTimestamp } from "@/utils/date";
 import { ALL_ABIS } from "@/utils/raw-abis";
-import { useNavigate } from "@remix-run/react";
+import { useFetcher } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
 import type React from "react";
 import { toast } from "react-hot-toast";
@@ -18,6 +18,7 @@ type BroadcastTxButtonProps = {
   children?: React.ReactNode;
   validUntil: Date;
   functionName: ContractFunctionName<typeof ALL_ABIS.council, "nonpayable">;
+  proposalId: InferSelectModel<typeof freezeProposalsTable>["id"];
 };
 
 export default function ContractWriteButton({
@@ -28,10 +29,11 @@ export default function ContractWriteButton({
   disabled,
   validUntil,
   functionName,
+  proposalId,
 }: BroadcastTxButtonProps) {
   const { address } = useAccount();
   const { isPending, writeContract } = useWriteContract();
-  const navigate = useNavigate();
+  const fetcher = useFetcher();
 
   const thresholdReached = signatures.length >= threshold;
 
@@ -60,10 +62,16 @@ export default function ContractWriteButton({
       {
         onSuccess: (hash) => {
           toast.success("Transaction broadcasted successfully", { id: "broadcasting-tx" });
-          navigate(
-            $path("/app/transactions/:hash", {
-              hash,
-            })
+
+          // Action redirects to the transaction page
+          fetcher.submit(
+            { hash },
+            {
+              method: "POST",
+              action: $path("/app/freeze/:id/write-transaction", {
+                id: proposalId,
+              }),
+            }
           );
         },
         onError: (e) => {

@@ -127,6 +127,7 @@ export const freezeProposalsTable = pgTable(
     validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
     proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
     softFreezeThreshold: bigint("soft_freeze_threshold", { mode: "number" }),
+    transactionHash: bytea("transaction_hash"),
   },
   ({ externalId, type }) => ({
     externalIdIdx: index("freeze_proposals_external_id_idx").on(externalId),

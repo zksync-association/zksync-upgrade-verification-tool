@@ -9,6 +9,7 @@ import {
 } from "@/.server/service/contracts";
 import { validateAndSaveFreezeSignature } from "@/.server/service/signatures";
 import { type SignAction, signActionSchema } from "@/common/sign-action";
+import TxLink from "@/components/tx-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
@@ -18,9 +19,10 @@ import { requireUserFromHeader } from "@/utils/auth-headers";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
 import { badRequest, notFound } from "@/utils/http";
+import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, useLoaderData, useNavigate } from "@remix-run/react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CircleCheckBig } from "lucide-react";
 import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
@@ -71,6 +73,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     necessarySignatures,
     user,
     securityCouncilAddress: await councilAddress(),
+    ethNetwork: env.ETH_NETWORK,
   });
 }
 
@@ -111,6 +114,7 @@ export default function Freeze() {
     necessarySignatures,
     user,
     securityCouncilAddress,
+    ethNetwork,
   } = useLoaderData<typeof loader>();
 
   let proposalType: string;
@@ -145,7 +149,8 @@ export default function Freeze() {
     user.role !== "securityCouncil" ||
     signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
 
-  const executeFreezeEnabled = signatures.length >= necessarySignatures;
+  const executeFreezeEnabled =
+    signatures.length >= necessarySignatures && !proposal.transactionHash;
 
   return (
     <div className="mt-10 flex flex-1 flex-col">
@@ -200,21 +205,33 @@ export default function Freeze() {
                   <span>({dateToUnixTimestamp(new Date(proposal.proposedOn))})</span>
                 </div>
               </div>
+              {proposal.transactionHash && (
+                <div className="flex justify-between">
+                  <span>Transaction Hash:</span>
+                  <TxLink txid={proposal.transactionHash} network={ethNetwork} />
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
-        <Card className="pb-10">
+        <Card className="flex flex-col pb-10">
           <CardHeader>
             <CardTitle>Proposal Status</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-5">
+          <CardContent className="flex flex-1">
+            {proposal.transactionHash ? (
+              <div className="flex flex-1 flex-col items-center justify-center space-y-2">
+                <CircleCheckBig className="h-16 w-16 stroke-green-500" />
+                <p>Executed</p>
+              </div>
+            ) : (
               <VotingStatusIndicator
+                className="flex-1"
                 label="Approvals"
                 signatures={signatures.length}
                 necessarySignatures={necessarySignatures}
               />
-            </div>
+            )}
           </CardContent>
         </Card>
         <Card className="pb-10">
@@ -249,6 +266,7 @@ export default function Freeze() {
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
             <ContractWriteButton
+              proposalId={proposal.id}
               target={securityCouncilAddress}
               functionName={functionName}
               signatures={signatures}

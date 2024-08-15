@@ -5,11 +5,12 @@ export default function VotingStatusIndicator({
   signatures,
   necessarySignatures,
   label,
-}: { signatures: number; necessarySignatures: number; label: string }) {
+  className,
+}: { signatures: number; necessarySignatures: number; label: string; className?: string }) {
   const necessarySignaturesReached = signatures >= necessarySignatures;
 
   return (
-    <div className="space-y-3">
+    <div className={cn("space-y-3", className)}>
       <div className="flex justify-between">
         <span>{label}</span>
         <span

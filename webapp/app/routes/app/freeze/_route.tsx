@@ -6,6 +6,7 @@ import {
   freezeProposalsTypeSchema,
 } from "@/.server/db/schema";
 import {
+  councilFreezeNonces,
   councilHardFreezeNonce,
   councilSoftFreezeNonce,
   councilSoftFreezeThresholdSettingNonce,
@@ -34,13 +35,29 @@ export async function loader() {
   const now = new Date();
   const validProposals = proposals.filter((p) => new Date(p.validUntil) > now);
 
+  // Filter proposals already executed or ignored
+  const { softFreezeNonce, hardFreezeNonce, softFreezeThresholdSettingNonce, unfreezeNonce } =
+    await councilFreezeNonces();
+  const validAndActiveProposals = validProposals.filter((p) => {
+    switch (p.type) {
+      case "SOFT_FREEZE":
+        return p.externalId >= softFreezeNonce;
+      case "HARD_FREEZE":
+        return p.externalId >= hardFreezeNonce;
+      case "SET_SOFT_FREEZE_THRESHOLD":
+        return p.externalId >= softFreezeThresholdSettingNonce;
+      case "UNFREEZE":
+        return p.externalId >= unfreezeNonce;
+    }
+  });
+
   return json({
-    softFreezeProposals: validProposals.filter((p) => p.type === "SOFT_FREEZE"),
-    hardFreezeProposals: validProposals.filter((p) => p.type === "HARD_FREEZE"),
-    setSoftFreezeThresholdProposals: validProposals.filter(
+    softFreezeProposals: validAndActiveProposals.filter((p) => p.type === "SOFT_FREEZE"),
+    hardFreezeProposals: validAndActiveProposals.filter((p) => p.type === "HARD_FREEZE"),
+    setSoftFreezeThresholdProposals: validAndActiveProposals.filter(
       (p) => p.type === "SET_SOFT_FREEZE_THRESHOLD"
     ),
-    unfreezeProposals: validProposals.filter((p) => p.type === "UNFREEZE"),
+    unfreezeProposals: validAndActiveProposals.filter((p) => p.type === "UNFREEZE"),
   });
 }
 

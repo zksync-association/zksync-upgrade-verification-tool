@@ -69,6 +69,13 @@ declare module "remix-routes" {
       query: ExportedQuery<import('app/routes/app/freeze_.$id/_route').SearchParams>,
     };
   
+    "/app/freeze/:id/write-transaction": {
+      params: {
+        id: string | number;
+      } ,
+      query: ExportedQuery<import('app/routes/app/freeze_.$id/write-transaction/_route').SearchParams>,
+    };
+  
     "/app/proposals": {
       params: never,
       query: ExportedQuery<import('app/routes/app/proposals/_index/_route').SearchParams>,
@@ -108,6 +115,7 @@ declare module "remix-routes" {
     | 'routes/app/emergency/$id/_route'
     | 'routes/app/emergency/new/_route'
     | 'routes/app/freeze_.$id/_route'
+    | 'routes/app/freeze_.$id/write-transaction/_route'
     | 'routes/app/freeze/_route'
     | 'routes/app/proposals/_index/_route'
     | 'routes/app/proposals/_layout'

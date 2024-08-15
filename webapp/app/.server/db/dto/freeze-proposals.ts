@@ -20,3 +20,15 @@ export async function getFreezeProposalById(
     .where(eq(freezeProposalsTable.id, id))
     .then(getFirst);
 }
+
+export async function updateFreezeProposal(
+  id: InferSelectModel<typeof freezeProposalsTable>["id"],
+  data: Partial<InferInsertModel<typeof freezeProposalsTable>>
+) {
+  return db
+    .update(freezeProposalsTable)
+    .set(data)
+    .where(eq(freezeProposalsTable.id, id))
+    .returning()
+    .then(getFirstOrThrow);
+}

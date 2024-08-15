@@ -43,25 +43,60 @@ export async function councilMembers(): Promise<Hex[]> {
   );
 }
 
-export async function councilSoftFreezeNonce(): Promise<bigint> {
-  return l1Rpc.contractRead(await councilAddress(), "softFreezeNonce", scAbi.raw, z.bigint());
-}
-
-export async function councilHardFreezeNonce(): Promise<bigint> {
-  return l1Rpc.contractRead(await councilAddress(), "hardFreezeNonce", scAbi.raw, z.bigint());
-}
-
-export async function councilSoftFreezeThresholdSettingNonce(): Promise<bigint> {
+export async function councilSoftFreezeNonce({
+  councilAddress: targetAddress,
+}: { councilAddress?: Hex } = {}): Promise<bigint> {
   return l1Rpc.contractRead(
-    await councilAddress(),
+    targetAddress ?? (await councilAddress()),
+    "softFreezeNonce",
+    scAbi.raw,
+    z.bigint()
+  );
+}
+
+export async function councilHardFreezeNonce({
+  councilAddress: targetAddress,
+}: { councilAddress?: Hex } = {}): Promise<bigint> {
+  return l1Rpc.contractRead(
+    targetAddress ?? (await councilAddress()),
+    "hardFreezeNonce",
+    scAbi.raw,
+    z.bigint()
+  );
+}
+
+export async function councilSoftFreezeThresholdSettingNonce({
+  councilAddress: targetAddress,
+}: { councilAddress?: Hex } = {}): Promise<bigint> {
+  return l1Rpc.contractRead(
+    targetAddress ?? (await councilAddress()),
     "softFreezeThresholdSettingNonce",
     scAbi.raw,
     z.bigint()
   );
 }
 
-export async function councilUnfreezeNonce(): Promise<bigint> {
-  return l1Rpc.contractRead(await councilAddress(), "unfreezeNonce", scAbi.raw, z.bigint());
+export async function councilUnfreezeNonce({
+  councilAddress: targetAddress,
+}: { councilAddress?: Hex } = {}): Promise<bigint> {
+  return l1Rpc.contractRead(
+    targetAddress ?? (await councilAddress()),
+    "unfreezeNonce",
+    scAbi.raw,
+    z.bigint()
+  );
+}
+
+export async function councilFreezeNonces() {
+  const address = await councilAddress();
+  const [softFreezeNonce, hardFreezeNonce, softFreezeThresholdSettingNonce, unfreezeNonce] =
+    await Promise.all([
+      councilSoftFreezeNonce({ councilAddress: address }),
+      councilHardFreezeNonce({ councilAddress: address }),
+      councilSoftFreezeThresholdSettingNonce({ councilAddress: address }),
+      councilUnfreezeNonce({ councilAddress: address }),
+    ]);
+  return { softFreezeNonce, hardFreezeNonce, softFreezeThresholdSettingNonce, unfreezeNonce };
 }
 
 export async function councilSoftFreezeThreshold(): Promise<bigint> {
