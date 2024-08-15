@@ -156,14 +156,14 @@ test("should be able to sign standard proposals", async ({
 });
 
 //TODO
-test.skip("should be able to enact signed standard proposals", async ({}) => {
+test.skip("should be able to enact signed standard proposals", async () => {
   // fake all the signatures somehow
   // click enact proposal
   // verify on chain that something is done
 });
 
 //TODO
-test.skip("should be able to see empty emergency upgrades", async ({}) => {
+test.skip("should be able to see empty emergency upgrades", async () => {
   // goto emergency upgrades
   // check that there are no active upgrades
   // check that there are no inactive upgrades
@@ -274,14 +274,14 @@ test("should be able to sign emergency upgrade", async ({ wallet, page, context 
 });
 
 //TODO
-test.skip("should change status of emergency proposals went enough signatures collected", async ({}) => {
+test.skip("should change status of emergency proposals went enough signatures collected", async () => {
   // goto emergency upgrades
   // click on emergency upgrade
   // sign with enough signers so that it can be enacted
   // go back to list and check status is ready
 });
 
-test.skip("should be able to enact signed emergency upgrade", async ({}) => {
+test.skip("should be able to enact signed emergency upgrade", async () => {
   // fake all the signatures somehow
   // click enact proposal
   // verify on chain that something is done
