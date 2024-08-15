@@ -1,15 +1,15 @@
 import { expect, test } from "../../helpers/dappwright.js";
 
-test.beforeEach(async ({ page }, testInfo) => {
+test.beforeEach(async ({ page }, _testInfo) => {
   await page.goto("http://localhost:3000");
 });
 
-test("should be able to connect", async ({ wallet, page }, testInfo) => {
+test("should be able to connect", async ({ page }, _testInfo) => {
   await expect(page.getByText("Emergency Upgrades")).toBeVisible();
   await expect(page.getByText("Standard Upgrades")).toBeVisible();
 });
 
-test("should be able to see an active standard proposal", async ({ wallet, page }, testInfo) => {
+test("should be able to see an active standard proposal", async ({ page }, _testInfo) => {
   await page.getByText("Standard Upgrades").click();
   await page.waitForLoadState("networkidle");
 
@@ -26,7 +26,7 @@ test("should be able to see an active standard proposal", async ({ wallet, page 
 });
 
 // fix this upstream in dappwright
-test.skip("should be able to login as visitor", async ({ wallet, page }, testInfo) => {
+test.skip("should be able to login as visitor", async ({ wallet, page }, _testInfo) => {
   await wallet.switchAccount(3);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
@@ -34,7 +34,7 @@ test.skip("should be able to login as visitor", async ({ wallet, page }, testInf
 });
 
 // fix this upstream in dappwright
-test.skip("should be able to login as sec council", async ({ wallet, page }, testInfo) => {
+test.skip("should be able to login as sec council", async ({ wallet, page }, _testInfo) => {
   await wallet.switchAccount(5);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
@@ -42,7 +42,7 @@ test.skip("should be able to login as sec council", async ({ wallet, page }, tes
 });
 
 // fix this upstream in dappwright
-test.skip("should be able to login as guardian", async ({ wallet, page }, testInfo) => {
+test.skip("should be able to login as guardian", async ({ wallet, page }, _testInfo) => {
   await wallet.switchAccount(7);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
@@ -156,20 +156,20 @@ test("should be able to sign standard proposals", async ({
 });
 
 //TODO
-test.skip("should be able to enact signed standard proposals", async ({ wallet, page }) => {
+test.skip("should be able to enact signed standard proposals", async ({}) => {
   // fake all the signatures somehow
   // click enact proposal
   // verify on chain that something is done
 });
 
 //TODO
-test.skip("should be able to see empty emergency upgrades", async ({ wallet, page }) => {
+test.skip("should be able to see empty emergency upgrades", async ({}) => {
   // goto emergency upgrades
   // check that there are no active upgrades
   // check that there are no inactive upgrades
 });
 
-test("should be able to add emergency upgrade", async ({ wallet, page }) => {
+test("should be able to add emergency upgrade", async ({ page }) => {
   // Investigate why have to click twice?
   await page.getByText("Emergency Upgrades").click({ clickCount: 2 });
   await page.waitForLoadState("networkidle");
@@ -274,19 +274,16 @@ test("should be able to sign emergency upgrade", async ({ wallet, page, context 
 });
 
 //TODO
-test.skip("should change status of emergency proposals went enough signatures collected", async ({
-  wallet,
-  page,
-}) => {
+test.skip("should change status of emergency proposals went enough signatures collected", async ({}) => {
   // goto emergency upgrades
   // click on emergency upgrade
   // sign with enough signers so that it can be enacted
   // go back to list and check status is ready
 });
 
-//TODO
-test.skip("should be able to enact signed emergency upgrade", async ({ wallet, page }) => {
+test.skip("should be able to enact signed emergency upgrade", async ({}) => {
   // fake all the signatures somehow
   // click enact proposal
   // verify on chain that something is done
 });
+//TODO
