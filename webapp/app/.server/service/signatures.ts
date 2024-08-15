@@ -18,9 +18,9 @@ import {
 } from "@/.server/service/authorized-users";
 import { l1Rpc } from "@/.server/service/clients";
 import { guardiansAbi } from "@/.server/service/contract-abis";
+import { getFreezeProposalSignatureArgs } from "@/common/freeze-proposal";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import type { SignAction } from "@/common/sign-action";
-import { dateToUnixTimestamp } from "@/utils/date";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
@@ -288,49 +288,7 @@ export async function validateAndSaveFreezeSignature({
     );
   }
 
-  let message = {};
-  const validUntil = dateToUnixTimestamp(proposal.validUntil);
-  if (proposal.type === "SET_SOFT_FREEZE_THRESHOLD") {
-    message = {
-      threshold: proposal.softFreezeThreshold,
-      nonce: proposal.externalId,
-      validUntil,
-    };
-  } else {
-    message = {
-      nonce: proposal.externalId,
-      validUntil,
-    };
-  }
-
-  let types = [];
-  if (proposal.type === "SET_SOFT_FREEZE_THRESHOLD") {
-    types = [
-      {
-        name: "threshold",
-        type: "uint256",
-      },
-      {
-        name: "nonce",
-        type: "uint256",
-      },
-      {
-        name: "validUntil",
-        type: "uint256",
-      },
-    ];
-  } else {
-    types = [
-      {
-        name: "nonce",
-        type: "uint256",
-      },
-      {
-        name: "validUntil",
-        type: "uint256",
-      },
-    ];
-  }
+  const { message, types } = getFreezeProposalSignatureArgs(proposal);
 
   const addr = await councilAddress();
   const validSignature = await verifySignature({

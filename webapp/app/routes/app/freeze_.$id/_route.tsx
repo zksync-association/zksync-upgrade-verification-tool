@@ -243,16 +243,17 @@ export default function Freeze() {
           <CardContent className="flex flex-col space-y-3">
             {user.role === "securityCouncil" && (
               <SignButton
-                proposalId={proposal.id}
+                proposal={{
+                  ...proposal,
+                  externalId: BigInt(proposal.externalId),
+                  proposedOn: new Date(proposal.proposedOn),
+                  validUntil: new Date(proposal.validUntil),
+                }}
                 contractData={{
                   actionName: action,
                   address: securityCouncilAddress,
                   name: "SecurityCouncil",
                 }}
-                nonce={BigInt(proposal.externalId)}
-                type={proposal.type}
-                validUntil={BigInt(dateToUnixTimestamp(proposalValidUntil))}
-                softFreezeThreshold={BigInt(proposal.softFreezeThreshold ?? 0)}
                 disabled={signDisabled}
               >
                 Approve

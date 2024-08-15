@@ -1,8 +1,10 @@
-import type { FreezeProposalsType } from "@/.server/db/schema";
+import type { freezeProposalsTable } from "@/.server/db/schema";
+import { getFreezeProposalSignatureArgs } from "@/common/freeze-proposal";
 import type { SignAction } from "@/common/sign-action";
 import { Button } from "@/components/ui/button";
 import type { action } from "@/routes/app/proposals/$id/_route";
 import { useFetcher } from "@remix-run/react";
+import type { InferSelectModel } from "drizzle-orm";
 import { useEffect } from "react";
 import { toast } from "react-hot-toast";
 import type { Hex } from "viem";
@@ -15,25 +17,17 @@ type ContractData = {
 };
 
 type SignButtonProps = {
-  proposalId: number;
-  nonce: bigint;
-  validUntil: bigint;
-  type: FreezeProposalsType;
-  softFreezeThreshold?: bigint;
   contractData: ContractData;
   children?: React.ReactNode;
   disabled?: boolean;
+  proposal: InferSelectModel<typeof freezeProposalsTable>;
 };
 
 export default function SignButton({
   children,
   contractData,
   disabled,
-  nonce,
-  type,
-  validUntil,
-  softFreezeThreshold,
-  proposalId,
+  proposal,
 }: SignButtonProps) {
   const { signTypedData, isPending, isSuccess, isError, data: signature } = useSignTypedData();
   const [chain] = useChains();
@@ -42,11 +36,11 @@ export default function SignButton({
   useEffect(() => {
     if (isSuccess) {
       fetcher.submit(
-        { signature, proposalId, action: contractData.actionName },
+        { signature, proposalId: proposal.id, action: contractData.actionName },
         { method: "POST" }
       );
     }
-  }, [isSuccess, fetcher.submit, proposalId, signature, contractData.actionName]);
+  }, [isSuccess, fetcher.submit, proposal.id, signature, contractData.actionName]);
 
   const loading = isPending || fetcher.state === "submitting" || fetcher.state === "loading";
   const success = isSuccess && fetcher.state === "idle" && fetcher.data?.ok;
@@ -64,35 +58,7 @@ export default function SignButton({
     }
   }, [loading, success, error]);
 
-  let message = {};
-  if (type === "SET_SOFT_FREEZE_THRESHOLD") {
-    message = {
-      threshold: softFreezeThreshold,
-      nonce,
-      validUntil,
-    };
-  } else {
-    message = {
-      nonce,
-      validUntil,
-    };
-  }
-
-  const types = [
-    {
-      name: "nonce",
-      type: "uint256",
-    },
-    {
-      name: "validUntil",
-      type: "uint256",
-    },
-  ];
-
-  if (type === "SET_SOFT_FREEZE_THRESHOLD") {
-    // First element is the threshold
-    types.unshift({ name: "threshold", type: "uint256" });
-  }
+  const { message, types } = getFreezeProposalSignatureArgs(proposal);
 
   function onClick() {
     const data = {
