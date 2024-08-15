@@ -1,4 +1,5 @@
-import { test, expect } from "../../helpers/dappwright.js";
+import { expect, test } from "../../helpers/dappwright.js";
+
 test.beforeEach(async ({ page }, testInfo) => {
   await page.goto("http://localhost:3000");
 });
@@ -177,15 +178,20 @@ test("should be able to add emergency upgrade", async ({ wallet, page }) => {
   await addButton.click();
 
   await page.getByLabel("Title").fill("Critical Security Fix");
+  await page.getByText("Next").click();
+
   await page.getByLabel("Target Address").fill("0x72D8dd6EE7ce73D545B229127E72c8AA013F4a9e");
   await page.getByLabel("Calldata").fill("0xDEADBEEF");
+  await page.getByText("Add call").click()
+  await page.getByText("Next").click();
 
-  // Investigate why have to click twice?
-  await page.getByRole("button", { name: "Verify" }).click({ timeout: 5000, clickCount: 2 });
-  const submitButton = page.getByRole("button", { name: "Create" });
-  await submitButton.click();
+  await page.waitForLoadState("networkidle")
 
+  await page.getByText("Submit").click();
+
+  await page.waitForURL("**/app/emergency");
   await page.waitForLoadState("networkidle");
+
   await expect(page.getByText("Critical Security Fix")).toBeVisible();
 });
 
