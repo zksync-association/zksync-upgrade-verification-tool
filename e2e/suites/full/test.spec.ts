@@ -182,10 +182,10 @@ test("should be able to add emergency upgrade", async ({ page }) => {
 
   await page.getByLabel("Target Address").fill("0x72D8dd6EE7ce73D545B229127E72c8AA013F4a9e");
   await page.getByLabel("Calldata").fill("0xDEADBEEF");
-  await page.getByText("Add call").click()
+  await page.getByText("Add call").click();
   await page.getByText("Next").click();
 
-  await page.waitForLoadState("networkidle")
+  await page.waitForLoadState("networkidle");
 
   await page.getByText("Submit").click();
 
