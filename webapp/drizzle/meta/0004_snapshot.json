@@ -1,9 +1,63 @@
 {
-  "id": "302d955b-9357-4d44-a851-ef1a9a984b68",
+  "id": "79cc2e21-6a40-4377-889a-1ab848266cc5",
   "prevId": "d4dca875-5a17-438a-8a99-331e6225655d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.emergency_proposal_calls": {
+      "name": "emergency_proposal_calls",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "proposal_id": {
+          "name": "proposal_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target": {
+          "name": "target",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "emergency_proposal_calls_proposal_id_emergency_proposals_id_fk": {
+          "name": "emergency_proposal_calls_proposal_id_emergency_proposals_id_fk",
+          "tableFrom": "emergency_proposal_calls",
+          "tableTo": "emergency_proposals",
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
     "public.emergency_proposals": {
       "name": "emergency_proposals",
       "schema": "",
@@ -38,18 +92,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "target_address": {
-          "name": "target_address",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "calldata": {
-          "name": "calldata",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
         "salt": {
           "name": "salt",
           "type": "bytea",
@@ -59,12 +101,6 @@
         "status": {
           "name": "status",
           "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "value": {
-          "name": "value",
-          "type": "bigint",
           "primaryKey": false,
           "notNull": true
         },
@@ -112,77 +148,6 @@
           "nullsNotDistinct": false,
           "columns": [
             "external_id"
-          ]
-        }
-      }
-    },
-    "public.freeze_proposals": {
-      "name": "freeze_proposals",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "external_id": {
-          "name": "external_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "valid_until": {
-          "name": "valid_until",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "proposed_on": {
-          "name": "proposed_on",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "soft_freeze_threshold": {
-          "name": "soft_freeze_threshold",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "freeze_proposals_external_id_idx": {
-          "name": "freeze_proposals_external_id_idx",
-          "columns": [
-            {
-              "expression": "external_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "freeze_proposals_external_id_type_unique": {
-          "name": "freeze_proposals_external_id_type_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "external_id",
-            "type"
           ]
         }
       }
@@ -291,12 +256,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "freeze_proposal_id": {
-          "name": "freeze_proposal_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "signer": {
           "name": "signer",
           "type": "bytea",
@@ -343,19 +302,6 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "signatures_freeze_proposal_id_freeze_proposals_id_fk": {
-          "name": "signatures_freeze_proposal_id_freeze_proposals_id_fk",
-          "tableFrom": "signatures",
-          "tableTo": "freeze_proposals",
-          "columnsFrom": [
-            "freeze_proposal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -365,24 +311,6 @@
           "nullsNotDistinct": false,
           "columns": [
             "proposal_id",
-            "signer",
-            "action"
-          ]
-        },
-        "signatures_emergency_proposal_id_signer_action_unique": {
-          "name": "signatures_emergency_proposal_id_signer_action_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "emergency_proposal_id",
-            "signer",
-            "action"
-          ]
-        },
-        "signatures_freeze_proposal_id_signer_action_unique": {
-          "name": "signatures_freeze_proposal_id_signer_action_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "freeze_proposal_id",
             "signer",
             "action"
           ]

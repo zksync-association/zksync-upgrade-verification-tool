@@ -1,14 +1,18 @@
 import { db } from "@/.server/db";
-import { createOrIgnoreRecord, getFirst, getFirstOrThrow } from "@/.server/db/dto/utils/common";
+import { getFirst, getFirstOrThrow } from "@/.server/db/dto/utils/common";
 import { emergencyProposalsTable } from "@/.server/db/schema";
 import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
 import type { Hex } from "viem";
 
-export async function createOrIgnoreEmergencyProposal(
+export async function createEmergencyProposal(
   data: InferInsertModel<typeof emergencyProposalsTable>,
   { tx }: { tx?: typeof db } = {}
-) {
-  await createOrIgnoreRecord(emergencyProposalsTable, data, { tx });
+): Promise<InferSelectModel<typeof emergencyProposalsTable>> {
+  const [record] = await (tx ?? db).insert(emergencyProposalsTable).values(data).returning();
+  if (!record) {
+    throw new Error("Error saving on db.");
+  }
+  return record;
 }
 
 export async function getAllEmergencyProposals() {

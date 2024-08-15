@@ -1,5 +1,6 @@
+import { hexSchema } from "@/common/basic-schemas";
+import { EthNetworkEnum } from "@/common/eth-network-enum";
 import { createEnv } from "@t3-oss/env-core";
-import { zodHex } from "validate-cli";
 import { z } from "zod";
 
 export const NodeEnvEnum = z.enum(["development", "test", "production"]);
@@ -14,9 +15,9 @@ export const env = createEnv({
     SERVER_PORT: z.coerce.number().default(3000),
     WALLET_CONNECT_PROJECT_ID: z.string(),
     L1_RPC_URL: z.string(),
-    ETH_NETWORK: z.enum(["mainnet", "sepolia", "local"]).default("mainnet"),
+    ETH_NETWORK: EthNetworkEnum.default("mainnet"),
     ETHERSCAN_API_KEY: z.string(),
-    UPGRADE_HANDLER_ADDRESS: zodHex,
+    UPGRADE_HANDLER_ADDRESS: hexSchema,
     SKIP_REPORTS: z.coerce.boolean().default(false),
   },
   // eslint-disable-next-line n/no-process-env

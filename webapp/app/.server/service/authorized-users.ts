@@ -5,9 +5,9 @@ import {
   scAbi,
   upgradeHandlerAbi,
 } from "@/.server/service/contract-abis";
+import { hexSchema } from "@/common/basic-schemas";
 import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { env } from "@config/env.server";
-import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
 
@@ -16,7 +16,7 @@ const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 const range = (l: number): number[] => new Array(l).fill(0).map((_, i) => i);
 
 export async function guardiansAddress(): Promise<Hex> {
-  return l1Rpc.contractRead(upgradeHandlerAddress, "guardians", upgradeHandlerAbi.raw, zodHex);
+  return l1Rpc.contractRead(upgradeHandlerAddress, "guardians", upgradeHandlerAbi.raw, hexSchema);
 }
 
 export async function emergencyBoardAddress(): Promise<Hex> {
@@ -24,7 +24,7 @@ export async function emergencyBoardAddress(): Promise<Hex> {
     upgradeHandlerAddress,
     "emergencyUpgradeBoard",
     upgradeHandlerAbi.raw,
-    zodHex
+    hexSchema
   );
 }
 
@@ -33,7 +33,7 @@ export async function councilAddress(): Promise<Hex> {
     upgradeHandlerAddress,
     "securityCouncil",
     upgradeHandlerAbi.raw,
-    zodHex
+    hexSchema
   );
 }
 
@@ -42,7 +42,7 @@ export async function zkFoundationAddress(): Promise<Hex> {
     await emergencyBoardAddress(),
     "ZK_FOUNDATION_SAFE",
     emergencyBoardAbi.raw,
-    zodHex
+    hexSchema
   );
 }
 

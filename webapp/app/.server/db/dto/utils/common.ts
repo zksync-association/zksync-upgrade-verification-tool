@@ -18,6 +18,6 @@ export async function createOrIgnoreRecord<T extends PgTable>(
   table: T,
   data: InferInsertModel<typeof table>,
   { tx }: { tx?: typeof db } = {}
-): Promise<void> {
-  await (tx ?? db).insert(table).values(data).onConflictDoNothing().returning();
+) {
+  return (tx ?? db).insert(table).values(data).onConflictDoNothing().returning();
 }

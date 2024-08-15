@@ -9,10 +9,10 @@ import getPort, { portNumbers } from "get-port";
 
 import { testDbConnection } from "@/.server/db";
 import { validateHandlerAddress } from "@/.server/service/clients";
+import { env } from "@config/env.server";
 import { auth } from "@server/middlewares/auth";
 import { cspNonce } from "@server/middlewares/csp-nonce";
 import { patchBigintToJSON } from "@server/utils/bigint";
-import { env } from "../config/env.server";
 import { helmet } from "./middlewares/helmet";
 import { logger } from "./middlewares/logger";
 import { rateLimit } from "./middlewares/rate-limit";
@@ -38,7 +38,6 @@ app.set("trust proxy", true);
 app.use(requireHttps);
 app.get("*", removeTrailingSlash);
 app.use(compression());
-app.use(express.json());
 
 // http://expressjs.com/en/advanced/best-practice-security.html#at-a-minimum-disable-x-powered-by-header
 app.disable("x-powered-by");

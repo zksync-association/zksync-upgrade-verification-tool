@@ -5,6 +5,7 @@ import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { validateAndSaveProposalSignature } from "@/.server/service/signatures";
+import { hexSchema } from "@/common/basic-schemas";
 import { signActionSchema } from "@/common/sign-action";
 import TxLink from "@/components/tx-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import FacetChangesTable from "@/routes/app/proposals/$id/facet-changes-table";
 import FieldChangesTable from "@/routes/app/proposals/$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-changes-table";
 import ProposalState from "@/routes/app/proposals/$id/proposal-state";
+import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
@@ -31,14 +33,13 @@ import { Await, useLoaderData } from "@remix-run/react";
 import { Suspense } from "react";
 import { getFormData, getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
-import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
 
-  const params = getParams(remixParams, z.object({ id: zodHex }));
+  const params = getParams(remixParams, z.object({ id: hexSchema }));
   if (!params.success) {
     throw notFound();
   }
@@ -72,7 +73,8 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
           proposalStatus,
           proposalData.creationTimestamp,
           proposalData.guardiansExtendedLegalVeto,
-          await nowInSeconds()
+          await nowInSeconds(),
+          env.ETH_NETWORK
         ),
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         approvedByGuardians: proposalData.guardiansApproval,
@@ -110,6 +112,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       userSignedLegalVeto: signatures
         .filter((s) => s.action === "ExtendLegalVetoPeriod")
         .some((s) => isAddressEqual(s.signer as Hex, user.address as Hex)),
+      ethNetwork: env.ETH_NETWORK,
     };
   };
 
@@ -125,8 +128,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const data = await getFormData(
     request,
     z.object({
-      signature: zodHex,
-      proposalId: zodHex,
+      signature: hexSchema,
+      proposalId: hexSchema,
       actionName: signActionSchema,
     })
   );
@@ -161,7 +164,14 @@ export default function Proposals() {
         }
       >
         <Await resolve={asyncData}>
-          {({ addresses, proposal, reports, userSignedLegalVeto, userSignedProposal }) => {
+          {({
+            addresses,
+            proposal,
+            reports,
+            userSignedLegalVeto,
+            userSignedProposal,
+            ethNetwork,
+          }) => {
             const securityCouncilSignaturesReached =
               proposal.signatures.approveUpgradeSecurityCouncil.length >=
               NECESSARY_SECURITY_COUNCIL_SIGNATURES;
@@ -235,7 +245,7 @@ export default function Proposals() {
                         </div>
                         <div className="flex justify-between">
                           <span>Transaction hash:</span>
-                          <TxLink txid={proposal.transactionHash} />
+                          <TxLink txid={proposal.transactionHash} network={ethNetwork} />
                         </div>
                       </div>
                     </CardContent>
@@ -378,6 +388,7 @@ export default function Proposals() {
                       </TabsTrigger>
                       <TabsTrigger value="field-changes">Field Changes</TabsTrigger>
                       <TabsTrigger value="field-storage-changes">Field Storage Changes</TabsTrigger>
+                      <TabsTrigger value="raw-data">Raw Data</TabsTrigger>
                     </TabsList>
                     <TabsContent value="facet-changes" className="w-full">
                       <Card className="pb-8">
@@ -416,6 +427,17 @@ export default function Proposals() {
                         </CardHeader>
                         <CardContent className="pt-4">
                           <FieldStorageChangesTable data={reports.fieldStorageChanges} />{" "}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    <TabsContent value="raw-data" className="w-full">
+                      <Card className="pb-8">
+                        <CardHeader>
+                          <CardTitle>Raw Data</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <RawStandardUpgrade encoded={proposal.raw} />
                         </CardContent>
                       </Card>
                     </TabsContent>
