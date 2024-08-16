@@ -6,23 +6,19 @@ import Navbar from "@/components/navbar";
 import NavbarWithUser from "@/components/navbar-with-user";
 import { Button } from "@/components/ui/button";
 import { getUserFromHeader } from "@/utils/auth-headers";
-import { clientEnv } from "@config/env.server";
-import { type ActionFunctionArgs, type LoaderFunctionArgs, json, redirect } from "@remix-run/node";
-import { useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
-import { useNavigate } from "@remix-run/react";
+import { type ActionFunctionArgs, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { Link, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
 import { useAccount } from "wagmi";
 
 export function loader({ request }: LoaderFunctionArgs) {
   try {
-    const user = getUserFromHeader(request);
-    const environment = clientEnv.NODE_ENV;
-    return { environment, user };
-  } catch {
-    console.log("No Connected User");
-    return { environment: clientEnv.NODE_ENV, user: { address: null, role: null } };
+    return { user: getUserFromHeader(request) }
+  } catch (error) {
+    return { user: null }
   }
+
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -48,8 +44,7 @@ export default function Index() {
   const account = useAccount();
   const fetcher = useFetcher<typeof action>();
   const navigation = useNavigation();
-  const { environment, user } = useLoaderData<typeof loader>();
-  const navigate = useNavigate();
+  const { user } = useLoaderData<typeof loader>();
 
   useEffect(() => {
     if (account.isConnected) {
@@ -57,19 +52,12 @@ export default function Index() {
     }
   }, [account.isConnected, fetcher.submit]);
 
-  const handleStandardUpgrades = () => {
-    navigate($path("/app"));
-  };
-
-  const handleEmergencyUpgrades = () => {
-    navigate($path("/app/emergency"));
-  };
   return (
     <>
-      {account.isConnected ? (
-        <NavbarWithUser role={user.role} environment={environment} />
+      {account.isConnected && user ? (
+    <NavbarWithUser role={user!.role} />
       ) : (
-        <Navbar environment={environment} />
+        <Navbar />
       )}
       <div className="relative mt-6 flex max-h-[700px] flex-1">
         <div className="cta-bg -z-10 pointer-events-none w-full" />
@@ -90,10 +78,15 @@ export default function Index() {
                 />
               ) : (
                 <div className="flex space-x-4">
-                  <Button onClick={handleStandardUpgrades}>Standard Upgrades</Button>
-                  <Button onClick={handleEmergencyUpgrades} variant={"ghost"}>
-                    Emergency Upgrades
-                  </Button>
+                  <Link to={$path("/app")}>
+                    <Button>Standard Upgrades</Button>
+                  </Link>
+                  <Link to={$path("/app/emergency")}>
+                    <Button variant="destructive">Emergency Upgrades</Button>
+                  </Link>
+                  <Link to={$path("/app/freeze")}>
+                    <Button variant="secondary">Freeze Requests</Button>
+                  </Link>
                 </div>
               )}
             </div>

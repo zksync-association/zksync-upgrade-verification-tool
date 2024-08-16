@@ -13,6 +13,7 @@ import {
 
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
+import AccountRevalidatorProvider from "@/components/providers/account-revalidator-provider";
 import ConnectRedirectProvider from "@/components/providers/connect-redirect-provider";
 
 export const links: LinksFunction = () => [
@@ -44,11 +45,13 @@ export default function App() {
         projectId={env.WALLET_CONNECT_PROJECT_ID}
         network={env.ETH_NETWORK}
       >
-        <ConnectRedirectProvider>
-          <div className="flex min-h-screen flex-col px-10 py-10 lg:px-40">
-            <Outlet />
-          </div>
-        </ConnectRedirectProvider>
+        <AccountRevalidatorProvider>
+          <ConnectRedirectProvider>
+            <div className="flex min-h-screen flex-col px-10 py-10 lg:px-40">
+              <Outlet />
+            </div>
+          </ConnectRedirectProvider>
+        </AccountRevalidatorProvider>
       </WalletProvider>
     </Document>
   );

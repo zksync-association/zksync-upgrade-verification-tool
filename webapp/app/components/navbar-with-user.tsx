@@ -3,13 +3,9 @@ import ConnectButton from "@/components/connect-button";
 import EnvBadge from "@/components/env-badge";
 import Logo from "@/components/logo";
 import { Button } from "@/components/ui/button";
-import type { NodeEnv } from "@config/env.server";
 import { $path } from "remix-routes";
 
-export default function NavbarWithUser({
-  role,
-  environment,
-}: { role: UserRole | null; environment: NodeEnv }) {
+export default function NavbarWithUser({ role }: { role: UserRole | null }) {
   return (
     <header className="w-full">
       <nav className="flex justify-between">
@@ -17,7 +13,7 @@ export default function NavbarWithUser({
           <a href={$path("/")}>
             <Logo />
           </a>
-          <EnvBadge environment={environment} />
+          <EnvBadge />
         </div>
         <div className="flex items-center space-x-2">
           {role && (
