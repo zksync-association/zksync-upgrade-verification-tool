@@ -93,12 +93,10 @@ test("should be able to see standard proposals", async ({ page: importedPage, co
   await expect(page.getByText(/day \d+ out of \d+/)).toBeVisible();
 });
 
-test("should be able to sign standard proposals", async ({
+test.only("should be able to sign standard proposals", async ({
   wallet,
-  page: importedPage,
-  context,
+  page
 }) => {
-  let page = importedPage;
   await page.getByText("Standard Upgrades").click();
   await page.waitForLoadState("domcontentloaded");
 
@@ -106,21 +104,6 @@ test("should be able to sign standard proposals", async ({
   // this should be fixed in the webapp instead of here
   const activeProposal = page.getByRole("button", { name: /^0x[a-fA-F0-9]{64}$/ }).first();
   await activeProposal.click();
-
-  try {
-    await page.waitForSelector("Proposal Details", { strict: false, timeout: 10000 });
-  } catch {
-    const locator = page.getByText("Go back to the home page");
-    if (await locator.isVisible()) {
-      page = await context.newPage();
-      await page.goto("http://localhost:3000");
-      await page.getByText("Standard Upgrades").click();
-      await page.waitForLoadState("domcontentloaded");
-
-      const activeProposal = page.getByRole("button", { name: /^0x[a-fA-F0-9]{64}$/ }).first();
-      await activeProposal.click();
-    }
-  }
 
   const initialApprovals = await page.getByTestId("security-signatures").textContent();
   if (!initialApprovals) {
@@ -141,7 +124,7 @@ test("should be able to sign standard proposals", async ({
   const updatedCount = Number.parseInt(updatedApprovals.split("/")[0]);
 
   expect(updatedCount).toBe(initialCount + 1);
-  expect(approveButton).toBeDisabled({ timeout: 5000 });
+  await expect(approveButton).toBeDisabled({ timeout: 5000 });
 });
 
 //TODO
@@ -184,7 +167,7 @@ test("should be able to add emergency upgrade", async ({ page }) => {
   await expect(page.getByText("Critical Security Fix")).toBeVisible();
 });
 
-test.only("should be able to see detail of emergency upgrade", async ({ context, page }) => {
+test("should be able to see detail of emergency upgrade", async ({ context, page }) => {
   await page.getByText("Emergency Upgrades").click({ clickCount: 2 });
   await page.waitForLoadState("networkidle");
 
