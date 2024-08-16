@@ -7,6 +7,9 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
+**/artifacts
+**/cache
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
@@ -132,3 +135,11 @@ dist
 .vscode
 
 .cursorignore
+
+
+
+
+# hardhat temp
+**/.hardhat*
+**/addresses.txt
+**/test-results/

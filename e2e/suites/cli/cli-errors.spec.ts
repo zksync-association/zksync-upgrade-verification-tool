@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { execAsync, expectToFailAsync } from "./util";
-import pkg from "../package.json" assert { type: "json" };
+import { execAsync, expectToFailAsync } from "../../helpers/util";
+import pkg from "../../../package.json" assert { type: "json" };
 
 describe("CLI Output Test Suite", () => {
   it("should error on invalid option", async () => {

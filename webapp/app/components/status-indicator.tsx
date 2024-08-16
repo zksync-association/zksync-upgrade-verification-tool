@@ -14,6 +14,7 @@ export function StatusIndicator({
         <span>{label}</span>
         <span
           className={cn("text-muted-foreground", necessarySignaturesReached && "text-green-400")}
+          data-testid={`${label.split(" ")[0]?.toLowerCase()}-signatures`}
         >
           {signatures}/{necessarySignatures}
         </span>

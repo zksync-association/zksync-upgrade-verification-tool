@@ -8,13 +8,7 @@ export default defineConfig({
     sequence: {
       concurrent: false,
     },
-    pool: "threads",
-    poolOptions: {
-      threads: {
-        singleThread: true,
-        maxThreads: 1,
-      },
-    },
-    maxWorkers: 1,
+    globalSetup: "./testDelays.ts",
+    include: ["suites/cli/*.{test,spec}.{ts,tsx}"],
   },
 });

@@ -1,4 +1,4 @@
 packages:
   - cli
-  - test
   - webapp
+  - e2e

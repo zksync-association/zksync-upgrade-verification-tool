@@ -3,13 +3,22 @@ import { checkConnection } from "@/.server/service/clients";
 import { hexSchema } from "@/common/basic-schemas";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
+import NavbarWithUser from "@/components/navbar-with-user";
 import { Button } from "@/components/ui/button";
 import { getUserFromHeader } from "@/utils/auth-headers";
-import { type ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { Link, useFetcher, useNavigation } from "@remix-run/react";
+import { type ActionFunctionArgs, type LoaderFunctionArgs, json, redirect } from "@remix-run/node";
+import { Link, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import { useEffect } from "react";
 import { $path } from "remix-routes";
 import { useAccount } from "wagmi";
+
+export function loader({ request }: LoaderFunctionArgs) {
+  try {
+    return { user: getUserFromHeader(request) };
+  } catch (error) {
+    return { user: null };
+  }
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   // On error redirect to the home page, address should be set by the backend
@@ -34,6 +43,7 @@ export default function Index() {
   const account = useAccount();
   const fetcher = useFetcher<typeof action>();
   const navigation = useNavigation();
+  const { user } = useLoaderData<typeof loader>();
 
   useEffect(() => {
     if (account.isConnected) {
@@ -43,7 +53,7 @@ export default function Index() {
 
   return (
     <>
-      <Navbar />
+      {account.isConnected && user ? <NavbarWithUser role={user.role} /> : <Navbar />}
       <div className="relative mt-6 flex max-h-[700px] flex-1">
         <div className="cta-bg -z-10 pointer-events-none w-full" />
         <main className="flex flex-1 flex-col items-center justify-center">

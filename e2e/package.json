@@ -1,0 +1,60 @@
+{
+  "name": "validate-e2e",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "./dist/main.js.js",
+  "module": "./dist/main.js",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=8"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "*.d.ts",
+    "*.mjs"
+  ],
+  "scripts": {
+    "update": "vitest -u",
+    "compile": "hardhat compile",
+    "check": "biome check .",
+    "check:fix": "biome check . --write",
+    "deploy:setup": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' pnpm hardhat run scripts/deploySetup.ts --network local",
+    "deploy:setup:remote": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' pnpm hardhat run scripts/deploySetup.ts --network remote",
+    "deploy:upgrade": "hardhat run scripts/startUpgrade.ts $HANDLER --network local",
+    "env:up": "hardhat node > .hardhat.log 2>&1 & echo $! > .hardhat-pid",
+    "env:down": "kill $(cat .hardhat-pid) && rm .hardhat-pid .hardhat.log",
+    "env:ls": "lsof -i :8545",
+    "fullenv:up": "docker compose -f fullstack-compose.yml up -d",
+    "fullenv:down": "docker compose -f fullstack-compose.yml down --volumes --remove-orphans",
+    "test:local": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' pnpm hardhat test --network local",
+    "test:cli": "vitest run --config ./vitest.cli.config.ts",
+    "test:e2e": "playwright test"
+  },
+  "keywords": [],
+  "author": "moonsong-labs",
+  "license": "GPL-3.0-only",
+  "dependencies": {
+    "@biomejs/biome": "1.8.3",
+    "@nomicfoundation/hardhat-ignition-viem": "^0.15.5",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.11",
+    "@nomicfoundation/hardhat-viem": "^2.0.3",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@playwright/test": "^1.46.0",
+    "@tenkeylabs/dappwright": "^2.8.5",
+    "@types/chai": "4",
+    "@types/mocha": "^10.0.7",
+    "@types/node": "^20.12.6",
+    "chai": "4",
+    "dotenv": "^16.4.5",
+    "glob": "^11.0.0",
+    "hardhat": "^2.22.6",
+    "tempy": "^3.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.4",
+    "validate-cli": "workspace:*",
+    "viem": "^2.17.5",
+    "vitest": "^2.0.5"
+  }
+}

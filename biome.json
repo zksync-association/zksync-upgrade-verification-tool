@@ -18,7 +18,10 @@
       "./node_modules/*",
       "package.json",
       "**/__snapshots__/*",
-      "**/coverage/*"
+      "**/coverage/*",
+      "**/artifacts",
+      "**/zk-gov",
+      "**/contracts"
     ]
   },
   "organizeImports": {
