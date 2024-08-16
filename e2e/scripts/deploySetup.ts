@@ -154,7 +154,7 @@ function deriveAllAddresses() {
   });
 
   const restCouncil = range(4, 4 + 11).map((n) => mnemonicToAccount(mnemonic, { addressIndex: n }));
-  const restGuardians = range(4 + 11, 4 + 11 + 5).map((n) =>
+  const restGuardians = range(4 + 11, 4 + 11 + 7).map((n) =>
     mnemonicToAccount(mnemonic, { addressIndex: n })
   );
 
