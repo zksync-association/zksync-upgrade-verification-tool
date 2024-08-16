@@ -10,14 +10,39 @@ DB_PORT=${POSTGRES_PORT:=5432}
 # Container name
 CONTAINER_NAME=zksync-upgrade-tool-db
 
-# Check if reliance-db container is not running
+# Check container status
+CONTAINER_RUNNING=false
+CONTAINER_EXISTS_STOPPED=false
 if [[ "$(docker ps -q -f name=$CONTAINER_NAME)" ]]; then
-    echo "$CONTAINER_NAME container is already running"
-    exit 0
+    CONTAINER_RUNNING=true
+elif [[ "$(docker ps -aq -f status=exited -f name=$CONTAINER_NAME)" ]]; then
+    CONTAINER_EXISTS_STOPPED=true
 fi
 
-# Check if container exists
-if [[ "$(docker ps -aq -f status=exited -f name=$CONTAINER_NAME)" ]]; then
+# Check if --reset flag is provided
+RESET_FLAG=false
+for arg in "$@"
+do
+    if [ "$arg" == "--reset" ]
+    then
+        RESET_FLAG=true
+    fi
+done
+
+# If --reset flag is set, stop and remove the container if it exists
+if [ "$RESET_FLAG" = true ] && ( $CONTAINER_RUNNING || $CONTAINER_EXISTS_STOPPED )
+then
+    docker stop $CONTAINER_NAME
+    docker rm $CONTAINER_NAME
+    CONTAINER_RUNNING=false
+    CONTAINER_EXISTS_STOPPED=false
+fi
+
+# Handle container status
+if $CONTAINER_RUNNING; then
+    echo "$CONTAINER_NAME container is already running"
+    exit 0
+elif $CONTAINER_EXISTS_STOPPED; then
     echo "$CONTAINER_NAME container exists but is not running"
     echo "Removing container"
     docker rm $CONTAINER_NAME
