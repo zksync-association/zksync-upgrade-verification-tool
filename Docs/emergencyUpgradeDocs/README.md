@@ -1,10 +1,10 @@
 # Emergency upgrade: Rehearsal script
 
-# Objective
+## 🎯 Objective
 
-The objective of the rehearsal is to make guardians and security council members comfortable with the tools used to approve emergency upgrades
+The objective of the rehearsal is to make guardians and security council members comfortable with the tools used to approve emergency upgrades.
 
-## Preparation
+## 📝 Preparation
 
 ### 1. Access to Safe and your signing wallet
 
@@ -21,7 +21,7 @@ Please ensure you have access to the ZkSync Upgrade Analysis & Approval Web App.
 ![Note]
 👍🏽 All interactions by the members of the security council and the guardians during this rehearsal are off-chain, **so they will not need ETH or any other tokens to fund transactions.** *On-chain transactions will be made by the facilitator of the rehearsal.*
 
-## **Creating & Approving an Emergency Upgrade**
+## ✅ **Creating & Approving an Emergency Upgrade**
 
 The governance tool will be used to track the [emergency upgrade flow](https://docs.zknation.io/zksync-governance/schedule-2-emergency-response-procedures#id-3.-emergency-upgrade). This tool will make the off-chain upgrade proposal and gather the signatures for approval. Finally, a single transaction will be built and broadcasted to validate the signatures on-chain and execute the upgrade.
 
@@ -100,7 +100,7 @@ Once you are ready, click "Next" at the bottom to verify the final data.
 
 Once you click "submit," the proposal will be created, and you will be redirected back to the index page.
 
-# Step 4: Find and review the Emergency Upgrade
+## Step 4: Find and review the Emergency Upgrade
 
 Once you select the target emergency proposal, you will see further details about the proposal and the approval process. After clicking on the "view" button, you will see a screen like this:
 
@@ -170,6 +170,6 @@ After checking the ID, you can click on the sign. From there, two possible flows
 ![Note]
  *If you are not the last signer of your safe, you will not see any change in the governor web app. That’s fine. When every signer of the safe approves the upgrade, a single signature is registered for the entire safe.* 
 
-# Step 7: Broadcasting the upgrade
+## Step 7: Broadcasting the upgrade
 
 Once the required members from the 3 bodies approved the upgrade, a transaction is needed to broadcast the upgrade on-chain. The facilitator of the process will handle this and will be the end of the process.
