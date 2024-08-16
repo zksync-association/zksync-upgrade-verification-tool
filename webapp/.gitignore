@@ -5,3 +5,5 @@ node_modules
 /server-build
 .env
 vite.config.ts.*
+
+remix-routes.d.ts
