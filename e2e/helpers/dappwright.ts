@@ -12,7 +12,7 @@ export const test = baseTest.extend<{
   context: async ({}, use) => {
     if (!sharedBrowserContext) {
       // Launch context with extension
-      const [wallet, page, browserContext] = await dappwright.bootstrap("", {
+      const [wallet, _page, browserContext] = await dappwright.bootstrap("", {
         wallet: "metamask",
         version: MetaMaskWallet.recommendedVersion,
         seed: "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
@@ -26,10 +26,23 @@ export const test = baseTest.extend<{
         symbol: "SepoliaETH",
       });
 
+
+      // 1 - council
+      // 2 - guardian
+      // 3 - zk association
+      // 4 - visitor
+      await wallet.createAccount()
+      await wallet.createAccount()
+      await wallet.createAccount()
+
+      // Default to security council
+      await wallet.switchAccount(1)
+
       // Navigate to the page and connect the wallet
-      await page.goto("http://localhost:3000");
-      await page.getByText("Connect Wallet").click();
-      await page.getByText("Metamask").click();
+      const newPage = await browserContext.newPage();
+      await newPage.goto("http://localhost:3000");
+      await newPage.getByText("Connect Wallet").click();
+      await newPage.getByText("Metamask").click();
       await wallet.approve();
 
       // Cache context

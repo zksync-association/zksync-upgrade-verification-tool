@@ -26,24 +26,27 @@ test("should be able to see an active standard proposal", async ({ page }, _test
 });
 
 // fix this upstream in dappwright
-test.skip("should be able to login as visitor", async ({ wallet, page }, _testInfo) => {
-  await wallet.switchAccount(3);
+test("should be able to login as visitor", async ({ wallet, page }, _testInfo) => {
+  await wallet.switchAccount(4)
+  await page.reload()
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Visitor");
 });
 
 // fix this upstream in dappwright
-test.skip("should be able to login as sec council", async ({ wallet, page }, _testInfo) => {
-  await wallet.switchAccount(5);
+test("should be able to login as sec council", async ({ wallet, page }, _testInfo) => {
+  await wallet.switchAccount(1);
+  await page.reload()
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Security Council");
 });
 
 // fix this upstream in dappwright
-test.skip("should be able to login as guardian", async ({ wallet, page }, _testInfo) => {
-  await wallet.switchAccount(7);
+test("should be able to login as guardian", async ({ wallet, page }, _testInfo) => {
+  await wallet.switchAccount(2);
+  await page.reload()
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Guardian");
@@ -54,25 +57,11 @@ test("should be able to see standard proposals", async ({ page: importedPage, co
   await page.getByText("Standard Upgrades").click();
   await page.waitForLoadState("networkidle");
 
-  // This test is flakey because webapp fails to load non-upgrade proposal correctly on first go
-  // this should be fixed in the webapp instead of here
   const activeProposal = page.getByRole("button", { name: /^0x[a-fA-F0-9]{64}$/ }).first();
   await activeProposal.click();
 
-  try {
-    await page.waitForSelector("Proposal Details", { strict: false, timeout: 10000 });
-  } catch {
-    const locator = page.getByText("Go back to the home page");
-    if (await locator.isVisible()) {
-      page = await context.newPage();
-      await page.goto("http://localhost:3000");
-      await page.getByText("Standard Upgrades").click();
-      await page.waitForLoadState("domcontentloaded");
-
-      const activeProposal = page.getByRole("button", { name: /^0x[a-fA-F0-9]{64}$/ }).first();
-      await activeProposal.click();
-    }
-  }
+  await page.waitForURL("**/proposals/**", { timeout: 1000 })
+  await page.waitForLoadState("networkidle")
 
   await expect(page.getByText("Proposal Details")).toBeVisible();
   await expect(page.getByText("Current Version:")).toBeVisible();
@@ -195,33 +184,21 @@ test("should be able to add emergency upgrade", async ({ page }) => {
   await expect(page.getByText("Critical Security Fix")).toBeVisible();
 });
 
-test("should be able to see detail of emergency upgrade", async ({ context, page }) => {
+test.only("should be able to see detail of emergency upgrade", async ({ context, page }) => {
   await page.getByText("Emergency Upgrades").click({ clickCount: 2 });
   await page.waitForLoadState("networkidle");
 
   await page.getByRole("button", { name: "View" }).click();
 
-  try {
-    await page.waitForSelector("Proposal Details", { strict: false, timeout: 10000 });
-  } catch {
-    const locator = page.getByText("Go back to the home page");
-    if (await locator.isVisible()) {
-      page = await context.newPage();
-      await page.goto("http://localhost:3000");
-      await page.getByText("Emergency Upgrades").click({ clickCount: 2 });
-      await page.waitForLoadState("domcontentloaded");
-
-      await page.getByRole("button", { name: "View" }).click();
-    }
-  }
+  await page.waitForURL("**/emergency/**", { timeout: 1000 });
 
   await expect(page.getByText("Critical Security Fix")).toBeVisible();
 
   await expect(page.getByText("Security Council Approvals")).toBeVisible();
   await expect(page.getByText("Guardian Approvals")).toBeVisible();
-  await expect(page.getByText("ZkFoundation approvals")).toBeVisible();
+  await expect(page.getByText("ZkFoundation approval")).toBeVisible();
 
-  expect(await page.getByTestId("security-signatures").textContent()).toContain("0/9");
+  expect(await page.getByTestId("security-signatures").textContent()).toMatch(/\d\/9/);
   expect(await page.getByTestId("guardian-signatures").textContent()).toContain("0/5");
   expect(await page.getByTestId("zkfoundation-signatures").textContent()).toContain("0/1");
 

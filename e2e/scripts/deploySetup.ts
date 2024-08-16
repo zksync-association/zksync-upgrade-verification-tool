@@ -1,7 +1,9 @@
 import hre from "hardhat";
-import { type Address, isAddress, padHex, parseEther, zeroAddress } from "viem";
+import { type Address, hexToBigInt, isAddress, padHex, parseEther, zeroAddress } from "viem";
 import dotenv from "dotenv";
 import fs from "node:fs/promises";
+import { mnemonicToAccount } from "viem/accounts";
+
 dotenv.config();
 
 async function main() {
@@ -33,23 +35,28 @@ async function main() {
     value: parseEther("1"),
   });
 
-  const guardianAddresses = getAddresses("guardian");
-  const { address: guardianAddress } = await hre.viem.deployContract("Guardians", [
+  const {
+    guardians: guardianAddresses,
+    council: scAddresses,
+    zkAssociation: zkFoundationAddress
+  } = deriveAllAddresses()
+
+
+  const {address: guardianAddress} = await hre.viem.deployContract("Guardians", [
     handlerAddress,
     "0x0000000000000000000000000000000000000008",
     guardianAddresses,
   ]);
   console.log("Guardians deployed to:", guardianAddress);
 
-  const scAddresses = getAddresses("security-council");
-  const { address: securityCouncilAddress } = await hre.viem.deployContract("SecurityCouncil", [
+  const {address: securityCouncilAddress} = await hre.viem.deployContract("SecurityCouncil", [
     handlerAddress,
     scAddresses,
   ]);
   console.log("SecurityCouncil deployed to:", securityCouncilAddress);
 
-  const zkFoundationAddress = getZkFoundationAddress();
-  const { address: emergencyBoardAddress } = await hre.viem.deployContract(
+
+  const {address: emergencyBoardAddress} = await hre.viem.deployContract(
     "EmergencyUpgradeBoard",
     [handlerAddress, securityCouncilAddress, guardianAddress, zkFoundationAddress]
   );
@@ -58,7 +65,7 @@ async function main() {
   // In order to associate the multisigs with the protocol upgrade handler, we need to impersonate
   // the main account, because those methods can only be executed by itself.
   const testClient = await hre.viem.getTestClient();
-  await testClient.impersonateAccount({ address: handlerAddress });
+  await testClient.impersonateAccount({address: handlerAddress});
   const [handlerSigner] = await hre.viem.getWalletClients({
     account: handlerAddress,
   });
@@ -80,9 +87,9 @@ async function main() {
     args: [emergencyBoardAddress],
     abi: handlerAbi,
   });
-  await testClient.stopImpersonatingAccount({ address: handlerAddress });
+  await testClient.stopImpersonatingAccount({address: handlerAddress});
 
-  const { address: counterAddress } = await hre.viem.deployContract("Counter", []);
+  const {address: counterAddress} = await hre.viem.deployContract("Counter", []);
   console.log("Counter deployed to:", counterAddress);
 
   await writeHandler.startUpgrade([
@@ -120,6 +127,47 @@ function fetchAddrFromEnv(name: string): Address {
     return address;
   }
   throw new Error(`Found: ${address} inside process.env.${name}. Expected address`);
+}
+
+function range(from: number, to: number): number[] {
+  return new Array(to - from).fill(0).map((_, i) => i + from)
+}
+
+function deriveAllAddresses() {
+  const mnemonic = process.env.MNEMONIC;
+  if (!mnemonic) {
+    throw new Error("Missing MNEMONIC env var")
+  }
+
+  const firstCouncil = mnemonicToAccount(mnemonic, {
+    addressIndex: 0
+  })
+
+  const firstGuardian = mnemonicToAccount(mnemonic, {
+    addressIndex: 1
+  })
+
+  const zkAssociation = mnemonicToAccount(mnemonic, {
+    addressIndex: 2
+  })
+
+  const visitor = mnemonicToAccount(mnemonic, {
+    addressIndex: 3
+  })
+
+  const restCouncil = range(4, 4 + 11).map(n => mnemonicToAccount(mnemonic, {addressIndex: n}))
+  const restGuardians = range(4 + 11, 4 + 11 + 5).map(n => mnemonicToAccount(mnemonic, {addressIndex: n}))
+
+  return {
+    council: [firstCouncil, ...restCouncil]
+      .map(hd => hd.address)
+      .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b))),
+    guardians: [firstGuardian, ...restGuardians]
+      .map(hd => hd.address)
+      .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b))),
+    zkAssociation: zkAssociation.address,
+    visitor: visitor.address
+  }
 }
 
 function getAddresses(type: "security-council" | "guardian"): Address[] {
