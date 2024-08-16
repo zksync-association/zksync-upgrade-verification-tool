@@ -20,7 +20,7 @@ describe("TxLink", () => {
   });
 
   it("renders the transaction link correctly", () => {
-    render(<TxLink txid={mockTxid} network={"mainnet"} />);
+    render(<TxLink hash={mockTxid} network={"mainnet"} />);
 
     const link = screen.getByRole("link");
     expect(link).toHaveAttribute("href", "https://example.com/tx/mock");
@@ -38,7 +38,7 @@ describe("TxLink", () => {
   });
 
   it("calls getTransactionUrl with the correct txid", () => {
-    render(<TxLink txid={mockTxid} network={"mainnet"} />);
+    render(<TxLink hash={mockTxid} network={"mainnet"} />);
     expect(getTransactionUrl).toHaveBeenCalledWith(mockTxid, "mainnet");
   });
 });

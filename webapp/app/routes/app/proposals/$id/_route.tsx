@@ -8,6 +8,7 @@ import { validateAndSaveProposalSignature } from "@/.server/service/signatures";
 import { hexSchema } from "@/common/basic-schemas";
 import { signActionSchema } from "@/common/sign-action";
 import TxLink from "@/components/tx-link";
+import TxStatus from "@/components/tx-status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
@@ -259,9 +260,13 @@ export default function Proposals() {
                                 : proposal.executor}
                             </span>
                           </div>
+
                           <div className="flex justify-between">
                             <span>Transaction hash:</span>
-                            <TxLink txid={proposal.transactionHash} network={ethNetwork} />
+                            <div className="flex flex-1 flex-col items-end space-y-1">
+                              <TxLink hash={proposal.transactionHash} network={ethNetwork} />
+                              <TxStatus hash={proposal.transactionHash} />
+                            </div>
                           </div>
                         </div>
                       </CardContent>

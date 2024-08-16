@@ -10,6 +10,7 @@ import {
 import { validateAndSaveFreezeSignature } from "@/.server/service/signatures";
 import { type SignAction, signActionSchema } from "@/common/sign-action";
 import TxLink from "@/components/tx-link";
+import TxStatus from "@/components/tx-status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
@@ -208,7 +209,10 @@ export default function Freeze() {
               {proposal.transactionHash && (
                 <div className="flex justify-between">
                   <span>Transaction Hash:</span>
-                  <TxLink txid={proposal.transactionHash} network={ethNetwork} />
+                  <div className="flex flex-1 flex-col items-end space-y-1">
+                    <TxLink hash={proposal.transactionHash} network={ethNetwork} />
+                    <TxStatus hash={proposal.transactionHash} />
+                  </div>
                 </div>
               )}
             </div>
