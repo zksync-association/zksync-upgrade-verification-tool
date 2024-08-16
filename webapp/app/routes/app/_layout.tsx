@@ -1,11 +1,10 @@
 import NavbarWithUser from "@/components/navbar-with-user";
-import { tryUserFromHeaders } from "@/utils/auth-headers";
+import { getUserFromHeader } from "@/utils/auth-headers";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { Outlet, useLoaderData } from "@remix-run/react";
 
 export function loader({ request }: LoaderFunctionArgs) {
-  const user = tryUserFromHeaders(request);
-  return { user };
+  return { user: getUserFromHeader(request) };
 }
 
 export default function App() {
