@@ -1,5 +1,4 @@
 import { getUserAuthRole } from "@/.server/service/authorized-users";
-import { addressSchema, hexSchema } from "@/common/basic-schemas";
 import { readAuthSession } from "@server/utils/auth-session";
 import type { NextFunction, Request, Response } from "express";
 import { $path, type Routes } from "remix-routes";
@@ -7,7 +6,7 @@ import { $path, type Routes } from "remix-routes";
 export const USER_ADDRESS_HEADER = "x-user-address";
 export const USER_ROLE_HEADER = "x-user-role";
 
-const protectedRoutes = [] satisfies (keyof Routes)[];
+const protectedRoutes = ["/app"] satisfies (keyof Routes)[];
 const unprotectedRoutes = ["/", "/app/denied", "/app/down"] satisfies (keyof Routes)[];
 
 function isProtectedRoute(req: Request) {
@@ -18,20 +17,25 @@ function isProtectedRoute(req: Request) {
 }
 
 export async function auth(req: Request, res: Response, next: NextFunction) {
-  const session = readAuthSession(req);
+  const { address } = readAuthSession(req);
 
-  const address = addressSchema.safeParse(session.address);
-  if (!address.success) {
+  // If the user is not logged in and tries to access a protected
+  // route, redirect to the home page
+  if (!address && isProtectedRoute(req)) {
+    clearUserHeaders(req);
+    return res.redirect($path("/"));
+  }
+
+  // If the user is not logged in and accesses any other route
+  // clear the user headers and continue
+  if (!address) {
     clearUserHeaders(req);
     return next();
   }
 
-  const role = await getUserAuthRole(hexSchema.parse(address.data));
-  setUserHeaders(req, { address: address.data, role });
-
-  if (isProtectedRoute(req) && role === "visitor") {
-    return res.redirect($path("/app/denied"));
-  }
+  // If user is logged in, just parse the user's role and set the headers
+  const role = await getUserAuthRole(address);
+  setUserHeaders(req, { address, role });
 
   next();
 }
