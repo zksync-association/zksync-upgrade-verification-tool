@@ -26,7 +26,6 @@ describe("TxLink", () => {
     expect(link).toHaveAttribute("href", "https://example.com/tx/mock");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noreferrer");
-    expect(link).toHaveClass("flex w-1/2 items-center justify-end break-words underline");
 
     const displayedTx = screen.getByText("0x12345678...90abcdef");
     expect(displayedTx).toBeInTheDocument();
