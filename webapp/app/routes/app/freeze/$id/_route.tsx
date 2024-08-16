@@ -13,8 +13,6 @@ import TxLink from "@/components/tx-link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
-import ContractWriteButton from "@/routes/app/freeze_.$id/contract-write-button";
-import SignButton from "@/routes/app/freeze_.$id/sign-button";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
@@ -27,6 +25,8 @@ import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
+import ContractWriteButton from "./contract-write-button";
+import SignButton from "./sign-button";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
