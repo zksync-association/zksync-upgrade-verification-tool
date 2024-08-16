@@ -40,3 +40,9 @@ until docker exec $CONTAINER_NAME pg_isready; do
 done
 
 >&2 echo "$CONTAINER_NAME is up and running on port ${DB_PORT}!"
+
+# Run migrations
+export DATABASE_URL=postgres://${DB_USER}:${DB_PASS}@localhost:${DB_PORT}/${DB_NAME}
+pnpm db:migrate
+
+>&2 echo "Database has been migrated, ready to go!"

@@ -12,6 +12,7 @@ import { validateHandlerAddress } from "@/.server/service/clients";
 import { env } from "@config/env.server";
 import { auth } from "@server/middlewares/auth";
 import { cspNonce } from "@server/middlewares/csp-nonce";
+import { patchBigintToJSON } from "@server/utils/bigint";
 import { helmet } from "./middlewares/helmet";
 import { logger } from "./middlewares/logger";
 import { rateLimit } from "./middlewares/rate-limit";
@@ -19,6 +20,7 @@ import { removeTrailingSlash } from "./middlewares/remove-trailing-slash";
 import { requireHttps } from "./middlewares/require-https";
 
 installGlobals();
+patchBigintToJSON();
 
 const viteDevServer =
   env.NODE_ENV === "production"

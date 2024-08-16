@@ -57,9 +57,28 @@ declare module "remix-routes" {
       query: ExportedQuery<import('app/routes/app/emergency/new/_route').SearchParams>,
     };
   
+    "/app/freeze": {
+      params: never,
+      query: ExportedQuery<import('app/routes/app/freeze/_route').SearchParams>,
+    };
+  
+    "/app/freeze/:id": {
+      params: {
+        id: string | number;
+      } ,
+      query: ExportedQuery<import('app/routes/app/freeze_.$id/_route').SearchParams>,
+    };
+  
+    "/app/freeze/:id/write-transaction": {
+      params: {
+        id: string | number;
+      } ,
+      query: ExportedQuery<import('app/routes/app/freeze_.$id/write-transaction/_route').SearchParams>,
+    };
+  
     "/app/proposals": {
       params: never,
-      query: ExportedQuery<import('app/routes/app/proposals/_layout').SearchParams>,
+      query: ExportedQuery<import('app/routes/app/proposals/_index/_route').SearchParams>,
     };
   
     "/app/proposals/:id": {
@@ -95,6 +114,10 @@ declare module "remix-routes" {
     | 'routes/app/emergency/_index/_route'
     | 'routes/app/emergency/$id/_route'
     | 'routes/app/emergency/new/_route'
+    | 'routes/app/freeze_.$id/_route'
+    | 'routes/app/freeze_.$id/write-transaction/_route'
+    | 'routes/app/freeze/_route'
+    | 'routes/app/proposals/_index/_route'
     | 'routes/app/proposals/_layout'
     | 'routes/app/proposals/$id/_route'
     | 'routes/app/transactions.$hash/_route'

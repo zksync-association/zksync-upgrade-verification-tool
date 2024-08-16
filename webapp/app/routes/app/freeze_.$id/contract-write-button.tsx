@@ -1,7 +1,8 @@
-import type { signaturesTable } from "@/.server/db/schema";
+import type { freezeProposalsTable, signaturesTable } from "@/.server/db/schema";
 import { Button } from "@/components/ui/button";
+import { dateToUnixTimestamp } from "@/utils/date";
 import { ALL_ABIS } from "@/utils/raw-abis";
-import { useNavigate } from "@remix-run/react";
+import { useFetcher } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
 import type React from "react";
 import { toast } from "react-hot-toast";
@@ -11,31 +12,28 @@ import { useAccount, useWriteContract } from "wagmi";
 
 type BroadcastTxButtonProps = {
   target: Hex;
-  functionName: ContractFunctionName<
-    typeof ALL_ABIS.council | typeof ALL_ABIS.guardians,
-    "nonpayable"
-  >;
   signatures: InferSelectModel<typeof signaturesTable>[];
   threshold: number;
-  proposalId: Hex;
   disabled?: boolean;
-  abiName: keyof Pick<typeof ALL_ABIS, "guardians" | "council">;
   children?: React.ReactNode;
+  validUntil: Date;
+  functionName: ContractFunctionName<typeof ALL_ABIS.council, "nonpayable">;
+  proposalId: InferSelectModel<typeof freezeProposalsTable>["id"];
 };
 
 export default function ContractWriteButton({
   children,
   target,
-  functionName,
   signatures,
   threshold,
-  proposalId,
   disabled,
-  abiName,
+  validUntil,
+  functionName,
+  proposalId,
 }: BroadcastTxButtonProps) {
   const { address } = useAccount();
   const { isPending, writeContract } = useWriteContract();
-  const navigate = useNavigate();
+  const fetcher = useFetcher();
 
   const thresholdReached = signatures.length >= threshold;
 
@@ -47,21 +45,33 @@ export default function ContractWriteButton({
 
     toast.loading("Broadcasting transaction...", { id: "broadcasting-tx" });
 
+    const args = {
+      validUntil: BigInt(dateToUnixTimestamp(validUntil)),
+      signers: signatures.map((s) => s.signer),
+      signatures: signatures.map((s) => s.signature),
+    };
+
     writeContract(
       {
         account: address,
         address: target,
         functionName,
-        abi: ALL_ABIS[abiName],
-        args: [proposalId, signatures.map((s) => s.signer), signatures.map((s) => s.signature)],
+        abi: ALL_ABIS.council,
+        args: [args.validUntil, args.signers, args.signatures],
       },
       {
         onSuccess: (hash) => {
           toast.success("Transaction broadcasted successfully", { id: "broadcasting-tx" });
-          navigate(
-            $path("/app/transactions/:hash", {
-              hash,
-            })
+
+          // Action redirects to the transaction page
+          fetcher.submit(
+            { hash },
+            {
+              method: "POST",
+              action: $path("/app/freeze/:id/write-transaction", {
+                id: proposalId,
+              }),
+            }
           );
         },
         onError: (e) => {

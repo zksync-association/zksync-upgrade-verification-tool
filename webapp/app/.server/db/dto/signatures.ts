@@ -1,6 +1,10 @@
 import { db } from "@/.server/db";
 import { createOrIgnoreRecord } from "@/.server/db/dto/utils/common";
-import { type proposalsTable, signaturesTable } from "@/.server/db/schema";
+import {
+  type freezeProposalsTable,
+  type proposalsTable,
+  signaturesTable,
+} from "@/.server/db/schema";
 import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
 
 export async function createOrIgnoreSignature(
@@ -14,6 +18,12 @@ export async function getSignaturesByExternalProposalId(
   id: InferSelectModel<typeof proposalsTable>["externalId"]
 ) {
   return db.select().from(signaturesTable).where(eq(signaturesTable.proposal, id));
+}
+
+export async function getSignaturesByFreezeProposalId(
+  id: InferSelectModel<typeof freezeProposalsTable>["id"]
+) {
+  return db.select().from(signaturesTable).where(eq(signaturesTable.freezeProposal, id));
 }
 
 export async function getSignaturesByEmergencyProposalId(
