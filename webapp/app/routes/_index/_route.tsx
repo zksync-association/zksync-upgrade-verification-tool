@@ -73,7 +73,7 @@ export default function Index() {
                 />
               ) : (
                 <div className="flex space-x-4">
-                  <Link to={$path("/app")}>
+                  <Link to={$path("/app/proposals")}>
                     <Button>Standard Upgrades</Button>
                   </Link>
                   <Link to={$path("/app/emergency")}>

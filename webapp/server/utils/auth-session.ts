@@ -1,3 +1,4 @@
+import { addressSchema } from "@/common/basic-schemas";
 import type { Request } from "express";
 import {
   type State,
@@ -12,5 +13,9 @@ export function readAuthSession(req: Request) {
   const cookie = wagmiCookie
     ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
     : undefined;
-  return { address: cookie?.connections.get(cookie.current ?? "")?.accounts[0] };
+
+  const address = cookie?.connections.get(cookie.current ?? "")?.accounts[0];
+  const validatedAddress = addressSchema.safeParse(address);
+
+  return { address: validatedAddress.success ? validatedAddress.data : undefined };
 }

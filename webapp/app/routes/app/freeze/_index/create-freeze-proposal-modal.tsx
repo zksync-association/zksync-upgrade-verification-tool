@@ -9,11 +9,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { action } from "@/routes/app/freeze/_route";
 import { Cross2Icon, Share2Icon } from "@radix-ui/react-icons";
 import { Form, useActionData, useNavigation, useRevalidator } from "@remix-run/react";
 import { add } from "date-fns";
 import { useState } from "react";
+import type { action } from "./_route";
 
 export function CreateFreezeProposalModal({
   type,

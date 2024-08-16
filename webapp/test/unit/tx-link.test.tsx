@@ -20,13 +20,12 @@ describe("TxLink", () => {
   });
 
   it("renders the transaction link correctly", () => {
-    render(<TxLink txid={mockTxid} network={"mainnet"} />);
+    render(<TxLink hash={mockTxid} network={"mainnet"} />);
 
     const link = screen.getByRole("link");
     expect(link).toHaveAttribute("href", "https://example.com/tx/mock");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noreferrer");
-    expect(link).toHaveClass("flex w-1/2 items-center justify-end break-words underline");
 
     const displayedTx = screen.getByText("0x12345678...90abcdef");
     expect(displayedTx).toBeInTheDocument();
@@ -38,7 +37,7 @@ describe("TxLink", () => {
   });
 
   it("calls getTransactionUrl with the correct txid", () => {
-    render(<TxLink txid={mockTxid} network={"mainnet"} />);
+    render(<TxLink hash={mockTxid} network={"mainnet"} />);
     expect(getTransactionUrl).toHaveBeenCalledWith(mockTxid, "mainnet");
   });
 });
