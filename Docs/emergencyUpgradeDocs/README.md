@@ -18,8 +18,6 @@ Please ensure you have access to the ZkSync Upgrade Analysis & Approval Web App.
 
 - Staging link: [https://zksync-upgrade-verification.staging.zknation.io/](https://zksync-upgrade-verification.staging.zknation.io/)
 
-
-
 ![Note]
 👍🏽 All interactions by the members of the security council and the guardians during this rehearsal are off-chain, **so they will not need ETH or any other tokens to fund transactions.** *On-chain transactions will be made by the facilitator of the rehearsal.*
 

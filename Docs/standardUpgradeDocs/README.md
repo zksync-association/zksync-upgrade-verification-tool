@@ -10,7 +10,7 @@ The objective of the rehearsal is to make guardians and security council members
 
 Every signer of this rehearsal will [sign through a safe](https://safe.global/). Please ensure you have access to your safe and everything needed to produce your signature. This includes having access to your EOA included in the safe (for example, your hardware wallet at hand and linked with MetaMask or your preferred interface for signing will be required). 
 
-***For rehearsals, please remember to choose Ethereum **Sepolia Testnet** as the network for all your interactions.***
+***For rehearsals, please remember to choose Ethereum **Sepolia Testnet** as the network for all your interactions.***`
 
 ### 2. Access to governance web app
 
