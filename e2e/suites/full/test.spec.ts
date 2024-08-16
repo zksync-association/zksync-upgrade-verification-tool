@@ -27,8 +27,8 @@ test("should be able to see an active standard proposal", async ({ page }, _test
 
 // fix this upstream in dappwright
 test("should be able to login as visitor", async ({ wallet, page }, _testInfo) => {
-  await wallet.switchAccount(4)
-  await page.reload()
+  await wallet.switchAccount(4);
+  await page.reload();
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Visitor");
@@ -37,7 +37,7 @@ test("should be able to login as visitor", async ({ wallet, page }, _testInfo) =
 // fix this upstream in dappwright
 test("should be able to login as sec council", async ({ wallet, page }, _testInfo) => {
   await wallet.switchAccount(1);
-  await page.reload()
+  await page.reload();
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Security Council");
@@ -46,22 +46,22 @@ test("should be able to login as sec council", async ({ wallet, page }, _testInf
 // fix this upstream in dappwright
 test("should be able to login as guardian", async ({ wallet, page }, _testInfo) => {
   await wallet.switchAccount(2);
-  await page.reload()
+  await page.reload();
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Guardian");
 });
 
 test("should be able to see standard proposals", async ({ page: importedPage, context }) => {
-  let page = importedPage;
+  const page = importedPage;
   await page.getByText("Standard Upgrades").click();
   await page.waitForLoadState("networkidle");
 
   const activeProposal = page.getByRole("button", { name: /^0x[a-fA-F0-9]{64}$/ }).first();
   await activeProposal.click();
 
-  await page.waitForURL("**/proposals/**", { timeout: 1000 })
-  await page.waitForLoadState("networkidle")
+  await page.waitForURL("**/proposals/**", { timeout: 1000 });
+  await page.waitForLoadState("networkidle");
 
   await expect(page.getByText("Proposal Details")).toBeVisible();
   await expect(page.getByText("Current Version:")).toBeVisible();
@@ -93,10 +93,7 @@ test("should be able to see standard proposals", async ({ page: importedPage, co
   await expect(page.getByText(/day \d+ out of \d+/)).toBeVisible();
 });
 
-test.only("should be able to sign standard proposals", async ({
-  wallet,
-  page
-}) => {
+test("should be able to sign standard proposals", async ({ wallet, page }) => {
   await page.getByText("Standard Upgrades").click();
   await page.waitForLoadState("domcontentloaded");
 
@@ -241,9 +238,9 @@ test.skip("should change status of emergency proposals went enough signatures co
   // go back to list and check status is ready
 });
 
+//TODO
 test.skip("should be able to enact signed emergency upgrade", async () => {
   // fake all the signatures somehow
   // click enact proposal
   // verify on chain that something is done
 });
-//TODO

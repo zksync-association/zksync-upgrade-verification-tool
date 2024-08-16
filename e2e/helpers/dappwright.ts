@@ -26,17 +26,16 @@ export const test = baseTest.extend<{
         symbol: "SepoliaETH",
       });
 
-
       // 1 - council
       // 2 - guardian
       // 3 - zk association
       // 4 - visitor
-      await wallet.createAccount()
-      await wallet.createAccount()
-      await wallet.createAccount()
+      await wallet.createAccount();
+      await wallet.createAccount();
+      await wallet.createAccount();
 
       // Default to security council
-      await wallet.switchAccount(1)
+      await wallet.switchAccount(1);
 
       // Navigate to the page and connect the wallet
       const newPage = await browserContext.newPage();
