@@ -170,28 +170,6 @@ function deriveAllAddresses() {
   }
 }
 
-function getAddresses(type: "security-council" | "guardian"): Address[] {
-  const prefix = type === "security-council" ? "SC_ADDR_" : "GUARDIAN_ADDR_";
-  const maxAddresses = type === "security-council" ? 12 : 8;
-  const addresses: Address[] = [];
-
-  for (let i = 1; i <= maxAddresses; i++) {
-    const envKey = `${prefix}${i}`;
-    const address = fetchAddrFromEnv(envKey);
-    addresses.push(address as Address);
-  }
-
-  if (addresses.length === 0) {
-    throw new Error(`No valid addresses found for ${type}`);
-  }
-
-  return addresses;
-}
-
-function getZkFoundationAddress(): Address {
-  return fetchAddrFromEnv("ZK_FOUNDATION_ADDRESS");
-}
-
 main()
   .then(() => {
     console.log("✅ Deploy:Setup completed");
