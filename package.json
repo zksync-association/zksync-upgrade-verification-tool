@@ -15,22 +15,19 @@
   ],
   "scripts": {
     "docker:build": "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t upgrade-checker:local .",
-    "docker:run": "docker compose up",
     "dev": "pnpm -r --filter='./cli' run start",
     "build": "pnpm -r --filter='*' run build",
     "test": "pnpm -r --filter='./test' run test",
-    "fmt": "pnpm -r --filter='*' run fmt",
-    "fmt:fix": "pnpm -r --filter='*' run fmt:fix",
-    "lint": "pnpm -r --filter='*' run lint",
-    "lint:fix": "pnpm -r --filter='*' run lint:fix",
+    "check": "pnpm -r --filter='*' run check",
+    "check:fix": "pnpm -r --filter='*' run check:fix",
     "typecheck": "pnpm run build && pnpm -r --filter='*' run typecheck"
   },
   "author": "moonsong-labs",
   "license": "GPL-3.0-only",
   "devDependencies": {
     "@biomejs/biome": "1.8.3",
-    "@types/node": "20.12.6",
-    "typescript": "5.4.4"
+    "@types/node": "22.1.0",
+    "typescript": "5.5.4"
   },
   "dependencies": {
     "validate-cli": "workspace:*"

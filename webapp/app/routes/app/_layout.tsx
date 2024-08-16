@@ -4,15 +4,14 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 import { Outlet, useLoaderData } from "@remix-run/react";
 
 export function loader({ request }: LoaderFunctionArgs) {
-  const user = getUserFromHeader(request);
-  return { user };
+  return { user: getUserFromHeader(request) };
 }
 
 export default function App() {
   const { user } = useLoaderData<typeof loader>();
   return (
     <>
-      <NavbarWithUser role={user.role} />
+      {user && <NavbarWithUser role={user.role} />}
       <div className="flex w-full flex-1 flex-col">
         <img
           className="-z-10 absolute top-0 left-0"

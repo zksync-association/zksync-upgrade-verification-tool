@@ -20,10 +20,8 @@
     "*.mjs"
   ],
   "scripts": {
-    "fmt": "biome format .",
-    "fmt:fix": "biome format . --write",
-    "lint": "pnpm biome lint ./src",
-    "lint:fix": "pnpm biome lint ./src --write",
+    "check": "pnpm biome check ./src",
+    "check:fix": "pnpm biome check ./src --write",
     "start": "tsx src/entrypoint.ts",
     "build": "tsup src --format esm --dts --no-splitting --sourcemap",
     "watch": "tsup src --format esm --sourcemap --no-splitting --watch",
@@ -35,15 +33,15 @@
   "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "1.8.3",
-    "@types/node": "^20.12.6",
-    "@vitest/coverage-v8": "^1.6.0",
-    "typescript": "^5.4.4",
-    "vitest": "^1.6.0"
+    "@types/node": "^22.1.0",
+    "@vitest/coverage-v8": "^2.0.5",
+  "typescript": "5.5.4",
+    "vitest": "^2.0.5"
   },
   "dependencies": {
     "@octokit/core": "^6.1.2",
+    "@swc/core": "1.7.6",
     "@types/yargs": "^17.0.32",
-    "@swc/core": "1.6.13",
     "chalk": "^5.3.0",
     "cli-table3": "^0.6.4",
     "dotenv": "^16.4.5",

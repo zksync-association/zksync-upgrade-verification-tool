@@ -11,10 +11,10 @@ env:
   LOG_LEVEL: debug
   ETH_NETWORK: "mainnet"
   DATABASE_URL: postgresql://user:password@localhost:5432/webapp
-  NODE_ENV: test
   L1_RPC_URL: ${{ secrets.TENDERLY_RPC_URL }}
   WALLET_CONNECT_PROJECT_ID: 00000000000000000000000000000000
   UPGRADE_HANDLER_ADDRESS: "0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9" # set to sepolia zkSync diamond just because it exists
+  FORK_URL: ${{ secrets.TENDERLY_RPC_URL }}
 
 jobs:
   cli-build-and-test:
@@ -112,3 +112,68 @@ jobs:
           cd webapp
           pnpm test:u  # unit tests
           pnpm test:s  # server tests
+
+  compile-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: pnpm install
+      - name: Run compile
+        run: |
+          cd e2e
+          pnpm run compile
+
+  test-local:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: cp .env.example .env
+      - run: pnpm install
+      - run: pnpm env:up
+      - run: pnpm deploy:setup
+      - run: pnpm test:local
+      - name: Stop local environment
+        if: always()
+        run: pnpm env:down
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: upgrade-checker:local
+      - name: Verify Docker image
+        run: |
+          docker image inspect upgrade-checker:local
+          if [ $? -ne 0 ]; then
+            echo "Docker image build failed"
+            exit 1
+          fi
