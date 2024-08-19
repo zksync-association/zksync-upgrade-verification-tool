@@ -5,17 +5,17 @@ import type { Hex } from "viem";
 
 import type { EthNetwork } from "@/common/eth-network-enum";
 
-type TxLinkProps = { txid: Hex; network: EthNetwork };
+type TxLinkProps = { hash: Hex; network: EthNetwork };
 
-export default function TxLink({ txid, network }: TxLinkProps) {
+export default function TxLink({ hash, network }: TxLinkProps) {
   return (
     <a
-      href={getTransactionUrl(txid as Hex, network)}
-      className="flex w-1/2 items-center justify-end break-words underline"
+      href={getTransactionUrl(hash, network)}
+      className="flex items-center justify-end break-words underline"
       target="_blank"
       rel="noreferrer"
     >
-      <span>{displayBytes32(txid)}</span>
+      <span>{displayBytes32(hash)}</span>
       <SquareArrowOutUpRight
         className="ml-1"
         width={12}

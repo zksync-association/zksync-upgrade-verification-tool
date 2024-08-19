@@ -15,7 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreateFreezeProposalModal } from "@/routes/app/freeze/create-freeze-proposal-modal";
+import { CreateFreezeProposalModal } from "@/routes/app/freeze/_index/create-freeze-proposal-modal";
 import { formError, generalError } from "@/utils/action-errors";
 import { cn } from "@/utils/cn";
 import type { ActionFunctionArgs } from "@remix-run/node";

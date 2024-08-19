@@ -16,11 +16,11 @@ import { capitalizeFirstLetter } from "@/utils/string";
 import { notFound } from "@/utils/http";
 import { env } from "@config/env.server";
 import { type LoaderFunctionArgs, json } from "@remix-run/node";
-import { useLoaderData, useNavigate, useParams } from "@remix-run/react";
-import { ArrowLeft, CircleCheckBig, SquareArrowOutUpRight } from "lucide-react";
+import { useLoaderData, useNavigate } from "@remix-run/react";
+import { ArrowLeft, CircleCheckBig, CircleX, SquareArrowOutUpRight } from "lucide-react";
 import { getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
-import { type Hex, formatEther, formatGwei } from "viem";
+import { formatEther, formatGwei } from "viem";
 import { useWaitForTransactionReceipt } from "wagmi";
 import { z } from "zod";
 
@@ -31,14 +31,13 @@ export function loader(args: LoaderFunctionArgs) {
   }
 
   const txUrl = getTransactionUrl(params.data.hash, env.ETH_NETWORK);
-  return json({ txUrl: txUrl });
+  return json({ txUrl, hash: params.data.hash });
 }
 
 export default function Transactions() {
-  const params = useParams();
   const navigate = useNavigate();
-  const { txUrl } = useLoaderData<typeof loader>();
-  const { data, isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: params.hash as Hex });
+  const { txUrl, hash } = useLoaderData<typeof loader>();
+  const { data, isSuccess, isLoading } = useWaitForTransactionReceipt({ hash });
 
   return (
     <div className="mt-10 flex flex-1 flex-col">
@@ -64,7 +63,7 @@ export default function Transactions() {
               target="_blank"
               rel="noreferrer"
             >
-              <span>{displayBytes32(params.hash ?? "")}</span>
+              <span>{displayBytes32(hash)}</span>
               <SquareArrowOutUpRight className="ml-1" width={12} height={12} />
             </a>
           </CardTitle>
@@ -76,11 +75,20 @@ export default function Transactions() {
               <h2>Waiting for transaction...</h2>
             </div>
           )}
-          {isSuccess && data && (
+          {isSuccess && (
             <div className="flex flex-1 flex-col items-center">
               <div className="mt-10 flex flex-col items-center space-y-4">
-                <CircleCheckBig className="h-24 w-24 stroke-green-500" />
-                <h2 className="text-green-400">Transaction successful</h2>
+                {data.status === "success" ? (
+                  <>
+                    <CircleCheckBig className="h-24 w-24 stroke-green-500" />
+                    <h2 className="text-green-400">Transaction successful</h2>
+                  </>
+                ) : (
+                  <>
+                    <CircleX className="h-24 w-24 stroke-red-500" />
+                    <h2 className="text-red-400">Transaction failed</h2>
+                  </>
+                )}
               </div>
               <Table className="mt-4">
                 <TableHeader>

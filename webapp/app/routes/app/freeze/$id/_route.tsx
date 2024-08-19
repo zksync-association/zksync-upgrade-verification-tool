@@ -10,11 +10,10 @@ import {
 import { validateAndSaveFreezeSignature } from "@/.server/service/signatures";
 import { type SignAction, signActionSchema } from "@/common/sign-action";
 import TxLink from "@/components/tx-link";
+import TxStatus from "@/components/tx-status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
-import ContractWriteButton from "@/routes/app/freeze_.$id/contract-write-button";
-import SignButton from "@/routes/app/freeze_.$id/sign-button";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
@@ -27,6 +26,8 @@ import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
+import ContractWriteButton from "./contract-write-button";
+import SignButton from "./sign-button";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -208,7 +209,10 @@ export default function Freeze() {
               {proposal.transactionHash && (
                 <div className="flex justify-between">
                   <span>Transaction Hash:</span>
-                  <TxLink txid={proposal.transactionHash} network={ethNetwork} />
+                  <div className="flex flex-1 flex-col items-end space-y-1">
+                    <TxLink hash={proposal.transactionHash} network={ethNetwork} />
+                    <TxStatus hash={proposal.transactionHash} />
+                  </div>
                 </div>
               )}
             </div>

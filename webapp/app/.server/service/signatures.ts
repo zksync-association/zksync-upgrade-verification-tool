@@ -113,7 +113,7 @@ export async function saveEmergencySignature(
         types: [
           {
             name: "id",
-            type: "uint256",
+            type: "bytes32",
           },
         ],
         contractName: "EmergencyUpgradeBoard",
@@ -136,7 +136,7 @@ export async function saveEmergencySignature(
         types: [
           {
             name: "id",
-            type: "uint256",
+            type: "bytes32",
           },
         ],
         contractName: "EmergencyUpgradeBoard",
@@ -213,7 +213,7 @@ export async function validateAndSaveProposalSignature(
       types: [
         {
           name: "id",
-          type: "uint256",
+          type: "bytes32",
         },
       ],
       contractName: "Guardians",
@@ -239,7 +239,7 @@ export async function validateAndSaveProposalSignature(
       types: [
         {
           name: "id",
-          type: "uint256",
+          type: "bytes32",
         },
       ],
       contractName: "SecurityCouncil",
