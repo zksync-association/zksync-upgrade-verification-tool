@@ -27,6 +27,7 @@
     "env:down": "kill $(cat .hardhat-pid) && rm .hardhat-pid .hardhat.log",
     "env:ls": "lsof -i :8545",
     "fullenv:up": "docker compose -f fullstack-compose.yml up -d",
+    "fullenv:up:services": "pnpm fullenv:up -- hh-deploy migrate",
     "fullenv:down": "docker compose -f fullstack-compose.yml down --volumes --remove-orphans",
     "test:local": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' pnpm hardhat test --network local",
     "test:cli": "vitest run --config ./vitest.cli.config.ts",
