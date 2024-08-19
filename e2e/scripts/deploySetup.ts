@@ -1,5 +1,5 @@
 import hre from "hardhat";
-import { hexToBigInt, padHex, parseEther, zeroAddress } from "viem";
+import { encodeFunctionData, hexToBigInt, padHex, parseEther, zeroAddress } from "viem";
 import dotenv from "dotenv";
 import fs from "node:fs/promises";
 import { mnemonicToAccount } from "viem/accounts";
@@ -87,7 +87,7 @@ async function main() {
   });
   await testClient.stopImpersonatingAccount({ address: handlerAddress });
 
-  const { address: counterAddress } = await hre.viem.deployContract("Counter", []);
+  const { address: counterAddress, abi: counterAbi } = await hre.viem.deployContract("Counter", []);
   console.log("Counter deployed to:", counterAddress);
 
   await writeHandler.startUpgrade([
@@ -110,6 +110,13 @@ async function main() {
   addressesContent += `SecurityCouncil: ${securityCouncilAddress}\n`;
   addressesContent += `Counter: ${counterAddress}\n`;
   addressesContent += `EmergencyUpgradeBoard: ${emergencyBoardAddress}\n`;
+
+  const calldata = encodeFunctionData({
+    abi: counterAbi,
+    functionName: "setNumber",
+    args: [12n],
+  });
+  addressesContent += `\nRealistic calldata: ${calldata}\n`;
 
   await fs.writeFile("addresses.txt", addressesContent);
   console.log("Addresses saved to addresses.txt");
