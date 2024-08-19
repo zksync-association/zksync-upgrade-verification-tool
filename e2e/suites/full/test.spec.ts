@@ -25,31 +25,32 @@ test("should be able to see an active standard proposal", async ({ page }, _test
   await expect(activeProposalAgain).toBeEnabled();
 });
 
-// fix this upstream in dappwright
-test("should be able to login as visitor", async ({ wallet, page }, _testInfo) => {
-  await wallet.switchAccount(4);
-  await page.reload();
+test.only("should be able to login as visitor", async ({ switcher, page }, _testInfo) => {
+  await switcher.visitor(page);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Visitor");
 });
 
-// fix this upstream in dappwright
-test("should be able to login as sec council", async ({ wallet, page }, _testInfo) => {
-  await wallet.switchAccount(1);
-  await page.reload();
+test.only("should be able to login as sec council", async ({ switcher, wallet, page }, _testInfo) => {
+  await switcher.council(page)
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Security Council");
 });
 
-// fix this upstream in dappwright
-test("should be able to login as guardian", async ({ wallet, page }, _testInfo) => {
-  await wallet.switchAccount(2);
-  await page.reload();
+test.only("should be able to login as guardian", async ({ switcher, page }, _testInfo) => {
+  await switcher.guardian(page)
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Guardian");
+});
+
+test.only("can login as zk association", async ({ switcher, page }, _testInfo) => {
+  await switcher.zkFoundation(page);
+  const userRole = page.getByTestId("user-role");
+  await expect(userRole).toBeVisible();
+  await expect(userRole).toHaveText("ZkSync Foundation");
 });
 
 test("should be able to see standard proposals", async ({ page: importedPage, context }) => {
