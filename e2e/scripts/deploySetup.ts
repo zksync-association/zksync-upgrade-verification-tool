@@ -115,18 +115,6 @@ async function main() {
   console.log("Addresses saved to addresses.txt");
 }
 
-function fetchAddrFromEnv(name: string): Address {
-  const address = process.env[name];
-  if (!address) {
-    throw new Error(`Env variable ${name} expected to be defined but it's not`);
-  }
-
-  if (isAddress(address)) {
-    return address;
-  }
-  throw new Error(`Found: ${address} inside process.env.${name}. Expected address`);
-}
-
 function range(from: number, to: number): number[] {
   return new Array(to - from).fill(0).map((_, i) => i + from);
 }
