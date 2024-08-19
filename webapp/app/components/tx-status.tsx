@@ -3,12 +3,13 @@ import { CircleCheck, CircleX, Clock } from "lucide-react";
 import type { Hex } from "viem";
 import { useWaitForTransactionReceipt } from "wagmi";
 import { Badge } from "./ui/badge";
+import Loading from "./ui/loading";
 
 export default function TxStatus({ hash, className }: { hash: Hex; className?: string }) {
   const tx = useWaitForTransactionReceipt({ hash });
 
   let text: string;
-  let Icon: typeof CircleCheck;
+  let Icon: typeof CircleCheck | typeof Loading;
   let badgeClassname: string;
 
   if (tx.data) {
@@ -21,11 +22,19 @@ export default function TxStatus({ hash, className }: { hash: Hex; className?: s
       Icon = CircleX;
       badgeClassname = "bg-red-600 hover:bg-red-700";
     }
+  } else if (tx.isLoading) {
+    text = "Loading";
+    Icon = Clock;
+    badgeClassname = "bg-gray-600 hover:bg-gray-700";
   } else {
     text = "Processing";
     Icon = Clock;
     badgeClassname = "bg-yellow-600 hover:bg-yellow-700";
   }
+
+  text = "Loading...";
+  Icon = Loading;
+  badgeClassname = "bg-gray-600 hover:bg-gray-700";
 
   return (
     <Badge className={cn("flex justify-center bg-green-600", badgeClassname, className)}>
