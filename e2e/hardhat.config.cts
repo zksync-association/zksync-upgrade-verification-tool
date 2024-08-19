@@ -50,15 +50,17 @@ const config: HardhatUserConfig = {
   },
   networks: {
     remote:{
+      chainId: 11155111,
       url: process.env.L1_RPC_URL || "ENV_VAR_L1_RPC_URL_MISSING"
     },
     local: {
+      chainId: 11155111,
       url: "http://localhost:8545",
     },
     hardhat: {
       chainId: 11155111,
       mining: {
-        auto: false,
+        auto: true,
         interval: 1000,
       },
       forking: {
@@ -66,7 +68,7 @@ const config: HardhatUserConfig = {
       },
       accounts: {
         mnemonic:
-          "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
+          process.env.MNEMONIC || "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
       },
     },
   },
