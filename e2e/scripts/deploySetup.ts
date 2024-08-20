@@ -110,11 +110,13 @@ async function main() {
   addressesContent += `Counter: ${counterAddress}\n`;
   addressesContent += `EmergencyUpgradeBoard: ${emergencyBoardAddress}\n`;
 
+
   const calldata = encodeFunctionData({
     abi: counterAbi,
     functionName: "setNumber",
     args: [12n],
   });
+  // It's useful to have a calldata at hand that does something easy to check to verify upgrade execution.
   addressesContent += `\nRealistic calldata: ${calldata}\n`;
 
   await fs.writeFile("addresses.txt", addressesContent);
