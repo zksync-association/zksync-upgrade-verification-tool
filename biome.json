@@ -8,6 +8,8 @@
       "*.mjs",
       "*.ts",
       "*.tsx",
+      "*.cts",
+      "*.mts",
       "*.json",
       "*.yml",
       "*.yaml",
@@ -21,7 +23,9 @@
       "**/coverage/*",
       "**/artifacts",
       "**/zk-gov",
-      "**/contracts"
+      "**/zk-gov-preprocessed",
+      "**/contracts",
+      "**/cache"
     ]
   },
   "organizeImports": {
