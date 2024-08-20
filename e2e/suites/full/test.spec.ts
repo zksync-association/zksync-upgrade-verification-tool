@@ -29,14 +29,14 @@ test("should be able to login as visitor", async ({ switcher, page }, _testInfo)
 });
 
 test("should be able to login as sec council", async ({ switcher, wallet, page }, _testInfo) => {
-  await switcher.council(page)
+  await switcher.council(page);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Security Council");
 });
 
 test("should be able to login as guardian", async ({ switcher, page }, _testInfo) => {
-  await switcher.guardian(page)
+  await switcher.guardian(page);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Guardian");
@@ -49,8 +49,8 @@ test("can login as zk association", async ({ switcher, page }, _testInfo) => {
   await expect(userRole).toHaveText("ZkSync Foundation");
 });
 
-test("should be able to see standard proposals", async ({ switcher, page, context }) => {
-  await switcher.council(page)
+test("should be able to see standard proposals", async ({ switcher, page }) => {
+  await switcher.council(page);
   await page.getByText("Standard Upgrades").click();
   await page.waitForLoadState("networkidle");
 
@@ -91,7 +91,7 @@ test("should be able to see standard proposals", async ({ switcher, page, contex
 });
 
 test("should be able to sign standard proposals", async ({ switcher, wallet, page }) => {
-  await switcher.council(page)
+  await switcher.council(page);
   await page.getByText("Standard Upgrades").click();
   await page.waitForLoadState("domcontentloaded");
 
@@ -137,7 +137,7 @@ test.skip("should be able to see empty emergency upgrades", async () => {
 });
 
 test("should be able to add emergency upgrade", async ({ switcher, page }) => {
-  await switcher.council(page)
+  await switcher.council(page);
   await page.getByText("Emergency Upgrades").click();
   await page.waitForLoadState("networkidle");
 
@@ -162,7 +162,7 @@ test("should be able to add emergency upgrade", async ({ switcher, page }) => {
   await expect(page.getByText("Critical Security Fix")).toBeVisible();
 });
 
-test("should be able to see detail of emergency upgrade", async ({ context, page }) => {
+test("should be able to see detail of emergency upgrade", async ({ page }) => {
   await page.getByText("Emergency Upgrades").click({ clickCount: 2 });
   await page.waitForLoadState("networkidle");
 

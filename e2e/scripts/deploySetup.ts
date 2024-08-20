@@ -1,5 +1,5 @@
 import hre from "hardhat";
-import { encodeFunctionData, Hex, hexToBigInt, padHex, parseEther, zeroAddress } from "viem";
+import { encodeFunctionData, type Hex, hexToBigInt, padHex, parseEther, zeroAddress } from "viem";
 import dotenv from "dotenv";
 import fs from "node:fs/promises";
 import { mnemonicToAccount } from "viem/accounts";
@@ -150,10 +150,9 @@ function deriveAllAddresses() {
 
   const extraGuardians = (process.env.EXTRA_GUARDIANS || "")
     .split(",")
-    .map(str => str.trim())
+    .map((str) => str.trim())
     .concat([firstGuardian.address])
-    .map(str => str as Hex)
-
+    .map((str) => str as Hex);
 
   const restCouncil = range(4, 4 + 11).map((n) => mnemonicToAccount(mnemonic, { addressIndex: n }));
   const restGuardians = range(4 + 11, 4 + 11 + (8 - extraGuardians.length)).map((n) =>
