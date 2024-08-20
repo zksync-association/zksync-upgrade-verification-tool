@@ -54,13 +54,11 @@ const config: HardhatUserConfig = {
     },
     local: {
       url: "http://localhost:8545",
+      allowUnlimitedContractSize: true,
     },
     hardhat: {
       chainId: 11155111,
-      mining: {
-        auto: false,
-        interval: 1000,
-      },
+      allowUnlimitedContractSize: true,
       forking: {
         url: forkUrl,
       },
