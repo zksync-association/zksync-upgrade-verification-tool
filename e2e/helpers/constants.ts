@@ -1,0 +1,11 @@
+export const COUNCIL_SIZE = 12;
+export const GUARDIANS_SIZE = 8;
+
+export const DERIVATION_INDEXES = {
+  FIRST_COUNCIL: 0,
+  FIRST_GUARDIAN: 1,
+  ZK_FOUNDATION: 2,
+  VISITOR: 3,
+  SECOND_COUNCIL: 5,
+  SECOND_GUARDIAN: 5 + COUNCIL_SIZE,
+} as const;

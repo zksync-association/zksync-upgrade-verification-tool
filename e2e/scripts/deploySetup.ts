@@ -3,6 +3,7 @@ import { encodeFunctionData, type Hex, hexToBigInt, padHex, parseEther, zeroAddr
 import dotenv from "dotenv";
 import fs from "node:fs/promises";
 import { mnemonicToAccount } from "viem/accounts";
+import { COUNCIL_SIZE, DERIVATION_INDEXES, GUARDIANS_SIZE } from "../helpers/constants.js";
 
 dotenv.config();
 
@@ -41,19 +42,19 @@ async function main() {
     zkAssociation: zkFoundationAddress,
   } = deriveAllAddresses();
 
-  const { address: guardianAddress } = await hre.viem.deployContract("Guardians", [
+  const {address: guardianAddress} = await hre.viem.deployContract("Guardians", [
     handlerAddress,
     "0x0000000000000000000000000000000000000008",
     guardianAddresses,
   ]);
   console.log("Guardians deployed to:", guardianAddress);
 
-  const { address: securityCouncilAddress } = await hre.viem.deployContract("SecurityCouncil", [
+  const {address: securityCouncilAddress} = await hre.viem.deployContract("SecurityCouncil", [
     handlerAddress,
     scAddresses,
   ]);
   console.log("SecurityCouncil deployed to:", securityCouncilAddress);
-  const { address: emergencyBoardAddress } = await hre.viem.deployContract(
+  const {address: emergencyBoardAddress} = await hre.viem.deployContract(
     "EmergencyUpgradeBoard",
     [handlerAddress, securityCouncilAddress, guardianAddress, zkFoundationAddress]
   );
@@ -62,7 +63,7 @@ async function main() {
   // In order to associate the multisigs with the protocol upgrade handler, we need to impersonate
   // the main account, because those methods can only be executed by itself.
   const testClient = await hre.viem.getTestClient();
-  await testClient.impersonateAccount({ address: handlerAddress });
+  await testClient.impersonateAccount({address: handlerAddress});
   const [handlerSigner] = await hre.viem.getWalletClients({
     account: handlerAddress,
   });
@@ -84,9 +85,9 @@ async function main() {
     args: [emergencyBoardAddress],
     abi: handlerAbi,
   });
-  await testClient.stopImpersonatingAccount({ address: handlerAddress });
+  await testClient.stopImpersonatingAccount({address: handlerAddress});
 
-  const { address: counterAddress, abi: counterAbi } = await hre.viem.deployContract("Counter", []);
+  const {address: counterAddress, abi: counterAbi} = await hre.viem.deployContract("Counter", []);
   console.log("Counter deployed to:", counterAddress);
 
   await writeHandler.startUpgrade([
@@ -127,59 +128,50 @@ function range(from: number, to: number): number[] {
   return new Array(to - from).fill(0).map((_, i) => i + from);
 }
 
+function deriveMembers(first: Hex, envVar: string, deriveStart: number, mnemonic: string): Hex[] {
+  const extras = (process.env[envVar] || "")
+    .split(",")
+    .filter(str => str.length !== 0)
+    .map((str) => str.trim())
+    .concat([first])
+    .map((str) => str as Hex);
+
+  const derived = range(deriveStart, deriveStart + (COUNCIL_SIZE - extras.length))
+    .map((n) => mnemonicToAccount(mnemonic, {addressIndex: n}));
+
+  return derived.map((hd) => hd.address)
+    .concat(extras)
+    .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b)))
+}
+
 function deriveAllAddresses() {
   const mnemonic = process.env.MNEMONIC;
   if (!mnemonic) {
     throw new Error("Missing MNEMONIC env var");
   }
 
-  const firstCouncil = mnemonicToAccount(mnemonic, {
-    addressIndex: 0,
-  });
+  const [
+    firstCouncil,
+    firstGuardian,
+    zkAssociation,
+    visitor
+  ] = ([
+    DERIVATION_INDEXES.FIRST_COUNCIL,
+    DERIVATION_INDEXES.FIRST_GUARDIAN,
+    DERIVATION_INDEXES.ZK_FOUNDATION,
+    DERIVATION_INDEXES.VISITOR
+  ] as const)
+    .map(index => mnemonicToAccount(mnemonic, {addressIndex: index}))
+    .map(hd => hd.address)
 
-  const firstGuardian = mnemonicToAccount(mnemonic, {
-    addressIndex: 1,
-  });
-
-  const zkAssociation = mnemonicToAccount(mnemonic, {
-    addressIndex: 2,
-  });
-
-  const visitor = mnemonicToAccount(mnemonic, {
-    addressIndex: 3,
-  });
-
-  const extraCouncil = (process.env.EXTRA_COUNCIL || "")
-    .split(",")
-    .filter(str => str.length !== 0)
-    .map((str) => str.trim())
-    .concat([firstCouncil.address])
-    .map((str) => str as Hex);
-
-  const extraGuardians = (process.env.EXTRA_GUARDIANS || "")
-    .split(",")
-    .filter(str => str.length !== 0)
-    .map((str) => str.trim())
-    .concat([firstGuardian.address])
-    .map((str) => str as Hex);
-
-
-  const derivedCouncil = range(4, 4 + (12 - extraCouncil.length)).map((n) => mnemonicToAccount(mnemonic, { addressIndex: n }));
-  const derivedGuardians = range(4 + 11, 4 + 11 + (8 - extraGuardians.length)).map((n) =>
-    mnemonicToAccount(mnemonic, { addressIndex: n })
-  );
+  const councilStart = DERIVATION_INDEXES.SECOND_COUNCIL - 1
+  const guardianStart = DERIVATION_INDEXES.SECOND_GUARDIAN - 1
 
   return {
-    council: derivedCouncil
-      .map((hd) => hd.address)
-      .concat(extraCouncil)
-      .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b))),
-    guardians: derivedGuardians
-      .map((hd) => hd.address)
-      .concat(extraGuardians)
-      .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b))),
-    zkAssociation: zkAssociation.address,
-    visitor: visitor.address,
+    council: deriveMembers(firstCouncil, "EXTRA_COUNCIL", councilStart, mnemonic),
+    guardians: deriveMembers(firstGuardian, "EXTRA_GUARDIANS", guardianStart, mnemonic),
+    zkAssociation: zkAssociation,
+    visitor: visitor,
   };
 }
 
