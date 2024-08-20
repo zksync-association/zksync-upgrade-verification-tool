@@ -1,5 +1,5 @@
 import hre from "hardhat";
-import { encodeFunctionData, hexToBigInt, padHex, parseEther, zeroAddress } from "viem";
+import { encodeFunctionData, Hex, hexToBigInt, padHex, parseEther, zeroAddress } from "viem";
 import dotenv from "dotenv";
 import fs from "node:fs/promises";
 import { mnemonicToAccount } from "viem/accounts";
@@ -148,8 +148,15 @@ function deriveAllAddresses() {
     addressIndex: 3,
   });
 
+  const extraGuardians = (process.env.EXTRA_GUARDIANS || "")
+    .split(",")
+    .map(str => str.trim())
+    .concat([firstGuardian.address])
+    .map(str => str as Hex)
+
+
   const restCouncil = range(4, 4 + 11).map((n) => mnemonicToAccount(mnemonic, { addressIndex: n }));
-  const restGuardians = range(4 + 11, 4 + 11 + 7).map((n) =>
+  const restGuardians = range(4 + 11, 4 + 11 + (8 - extraGuardians.length)).map((n) =>
     mnemonicToAccount(mnemonic, { addressIndex: n })
   );
 
@@ -157,8 +164,9 @@ function deriveAllAddresses() {
     council: [firstCouncil, ...restCouncil]
       .map((hd) => hd.address)
       .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b))),
-    guardians: [firstGuardian, ...restGuardians]
+    guardians: [...restGuardians]
       .map((hd) => hd.address)
+      .concat(extraGuardians)
       .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b))),
     zkAssociation: zkAssociation.address,
     visitor: visitor.address,
