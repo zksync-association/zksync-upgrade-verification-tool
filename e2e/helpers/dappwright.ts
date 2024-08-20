@@ -21,6 +21,7 @@ export class RoleSwitcher {
     }
     await this.switchToIndex(councilIndexes[councilNumber], page)
     await page.bringToFront()
+    await page.reload();
   }
 
   async guardian(page: Page, guardianNumber = 0): Promise<void> {

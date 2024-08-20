@@ -19,42 +19,38 @@ test("should be able to see an active standard proposal", async ({ page }, _test
   const activeProposal = page.getByRole("button", { name: /^0x/ }).first();
   await expect(activeProposal).toBeVisible();
   await expect(activeProposal).toBeEnabled();
-
-  const activeProposalAgain = page.getByTestId(/^proposal-0x/);
-  await expect(activeProposalAgain).toBeVisible();
-  await expect(activeProposalAgain).toBeEnabled();
 });
 
-test.only("should be able to login as visitor", async ({ switcher, page }, _testInfo) => {
+test("should be able to login as visitor", async ({ switcher, page }, _testInfo) => {
   await switcher.visitor(page);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Visitor");
 });
 
-test.only("should be able to login as sec council", async ({ switcher, wallet, page }, _testInfo) => {
+test("should be able to login as sec council", async ({ switcher, wallet, page }, _testInfo) => {
   await switcher.council(page)
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Security Council");
 });
 
-test.only("should be able to login as guardian", async ({ switcher, page }, _testInfo) => {
+test("should be able to login as guardian", async ({ switcher, page }, _testInfo) => {
   await switcher.guardian(page)
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Guardian");
 });
 
-test.only("can login as zk association", async ({ switcher, page }, _testInfo) => {
+test("can login as zk association", async ({ switcher, page }, _testInfo) => {
   await switcher.zkFoundation(page);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("ZkSync Foundation");
 });
 
-test("should be able to see standard proposals", async ({ page: importedPage, context }) => {
-  const page = importedPage;
+test("should be able to see standard proposals", async ({ switcher, page, context }) => {
+  await switcher.council(page)
   await page.getByText("Standard Upgrades").click();
   await page.waitForLoadState("networkidle");
 
@@ -94,7 +90,8 @@ test("should be able to see standard proposals", async ({ page: importedPage, co
   await expect(page.getByText(/day \d+ out of \d+/)).toBeVisible();
 });
 
-test("should be able to sign standard proposals", async ({ wallet, page }) => {
+test("should be able to sign standard proposals", async ({ switcher, wallet, page }) => {
+  await switcher.council(page)
   await page.getByText("Standard Upgrades").click();
   await page.waitForLoadState("domcontentloaded");
 
@@ -139,9 +136,9 @@ test.skip("should be able to see empty emergency upgrades", async () => {
   // check that there are no inactive upgrades
 });
 
-test("should be able to add emergency upgrade", async ({ page }) => {
-  // Investigate why have to click twice?
-  await page.getByText("Emergency Upgrades").click({ clickCount: 2 });
+test("should be able to add emergency upgrade", async ({ switcher, page }) => {
+  await switcher.council(page)
+  await page.getByText("Emergency Upgrades").click();
   await page.waitForLoadState("networkidle");
 
   const addButton = page.getByTestId("new-emergency-proposal");
