@@ -1,5 +1,5 @@
-import { getCallsByProposalId } from "@/.server/db/dto/calls";
-import { getEmergencyProposalByExternalId } from "@/.server/db/dto/emergencyProposals";
+import { getEmergencyProposalCallsByProposalId } from "@/.server/db/dto/emergency-proposal-calls";
+import { getEmergencyProposalByExternalId } from "@/.server/db/dto/emergency-proposals";
 import { getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures";
 import {
   councilMembers,
@@ -51,7 +51,7 @@ export async function loader(args: LoaderFunctionArgs) {
     throw notFound();
   }
 
-  const calls = await getCallsByProposalId(proposal.id);
+  const calls = await getEmergencyProposalCallsByProposalId(proposal.id);
 
   const signatures = await getSignaturesByEmergencyProposalId(proposal.externalId);
 

@@ -12,7 +12,7 @@
     "check": "biome check .",
     "check:fix": "biome check --write .",
     "typecheck": "tsc",
-    "ci:prepare": "run-s typecheck lint:fix",
+    "ci:prepare": "run-s typecheck check:fix",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "pnpm tsx ./scripts/migrate.ts",
     "db:wait": "sleep 2",

@@ -26,10 +26,6 @@ export async function getProposals(): Promise<Proposal[]> {
   const from = bigIntMax(currentHeight - maxUpgradeLiftimeInBlocks, 1n);
   const abi = upgradeHandlerAbi;
 
-  //FIXME: remove
-  if (env.NODE_ENV === "development") {
-    await new Promise((resolve) => setTimeout(resolve, 5)); // Avoid anvil crushing for mysterious reasons
-  }
   const logs = await l1Rpc.getLogs(upgradeHandlerAddress, numberToHex(from), "latest", [
     abi.eventIdFor("UpgradeStarted"),
   ]);

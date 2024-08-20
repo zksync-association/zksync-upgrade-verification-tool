@@ -1,4 +1,4 @@
-import { getAllEmergencyProposals } from "@/.server/db/dto/emergencyProposals";
+import { getAllEmergencyProposals } from "@/.server/db/dto/emergency-proposals";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import type { EmergencyProposalStatus } from "@/common/proposal-status";
 import { Button } from "@/components/ui/button";

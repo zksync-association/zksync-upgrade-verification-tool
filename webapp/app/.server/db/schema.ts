@@ -88,22 +88,27 @@ export const signaturesTable = pgTable(
       () => emergencyProposalsTable.externalId
     ),
     freezeProposal: integer("freeze_proposal_id").references(() => freezeProposalsTable.id),
+    l2GovernorProposal: integer("l2_governor_proposal_id").references(
+      () => l2GovernorProposalsTable.id
+    ),
     signer: bytea("signer").notNull(),
     signature: bytea("signature").notNull(),
     action: text("action", {
       enum: signActionSchema.options,
     }).notNull(),
   },
-  ({ proposal, signer, action, emergencyProposal, freezeProposal }) => ({
+  ({ proposal, signer, action, emergencyProposal, freezeProposal, l2GovernorProposal }) => ({
     uniqueProposalSigner: unique().on(proposal, signer, action),
     uniqueEmergencyProposalSigner: unique().on(emergencyProposal, signer, action),
     uniqueFreezeProposalSigner: unique().on(freezeProposal, signer, action),
+    uniqueL2GovernorProposalSigner: unique().on(l2GovernorProposal, signer, action),
     proposalCheck: check(
       "mutual_exclusivity",
       sql`(
-            (proposal_id IS NOT NULL AND emergency_proposal_id IS NULL     AND freeze_proposal_id IS NULL) OR
-            (proposal_id IS NULL     AND emergency_proposal_id IS NOT NULL AND freeze_proposal_id IS NULL) OR
-            (proposal_id IS NULL     AND emergency_proposal_id IS NULL     AND freeze_proposal_id IS NOT NULL)
+            (proposal_id IS NOT NULL AND emergency_proposal_id IS NULL     AND freeze_proposal_id IS NULL     AND l2_governor_proposal_id IS NULL) OR
+            (proposal_id IS NULL     AND emergency_proposal_id IS NOT NULL AND freeze_proposal_id IS NULL     AND l2_governor_proposal_id IS NULL) OR
+            (proposal_id IS NULL     AND emergency_proposal_id IS NULL     AND freeze_proposal_id IS NOT NULL AND l2_governor_proposal_id IS NULL) OR
+            (proposal_id IS NULL     AND emergency_proposal_id IS NULL     AND freeze_proposal_id IS NULL     AND l2_governor_proposal_id IS NOT NULL)
           )`
     ),
   })
@@ -141,3 +146,31 @@ export const freezeProposalsTable = pgTable(
     ),
   })
 );
+
+export const l2GovernorProposalsTypeSchema = z.enum(["ZK_GOV_OPS_GOVERNOR", "ZK_TOKEN_GOVERNOR"]);
+
+export type L2GovernorProposalsType = z.infer<typeof l2GovernorProposalsTypeSchema>;
+
+export const l2GovernorProposalsTable = pgTable("l2_governor_proposals", {
+  id: serial("id").primaryKey(),
+  externalId: bytea("external_id").notNull().unique(),
+  type: text("type", { enum: l2GovernorProposalsTypeSchema.options }).notNull(),
+  proposer: bytea("proposer").notNull(),
+  description: text("description").notNull(),
+});
+
+export const l2GovernorProposalsTableRelations = relations(l2GovernorProposalsTable, ({ many }) => {
+  return {
+    calls: many(l2GovernorProposalCalls),
+  };
+});
+
+export const l2GovernorProposalCalls = pgTable("l2_governor_proposal_calls", {
+  id: serial("id").primaryKey(),
+  proposalId: integer("proposal_id")
+    .notNull()
+    .references(() => l2GovernorProposalsTable.id),
+  target: bytea("target").notNull(),
+  value: bytea("value").notNull(),
+  data: bytea("data").notNull(),
+});

@@ -82,6 +82,9 @@ export default function Index() {
                   <Link to={$path("/app/freeze")}>
                     <Button variant="secondary">Freeze Requests</Button>
                   </Link>
+                  <Link to={$path("/app/l2-governor-proposals")}>
+                    <Button variant="secondary">L2 Governor Proposals</Button>
+                  </Link>
                 </div>
               )}
             </div>

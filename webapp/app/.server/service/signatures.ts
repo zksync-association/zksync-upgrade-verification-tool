@@ -2,7 +2,7 @@ import { db } from "@/.server/db";
 import {
   getEmergencyProposalByExternalId,
   updateEmergencyProposal,
-} from "@/.server/db/dto/emergencyProposals";
+} from "@/.server/db/dto/emergency-proposals";
 import {
   createOrIgnoreSignature,
   getSignaturesByEmergencyProposalId,
