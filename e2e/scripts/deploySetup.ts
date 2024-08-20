@@ -53,7 +53,6 @@ async function main() {
     scAddresses,
   ]);
   console.log("SecurityCouncil deployed to:", securityCouncilAddress);
-
   const { address: emergencyBoardAddress } = await hre.viem.deployContract(
     "EmergencyUpgradeBoard",
     [handlerAddress, securityCouncilAddress, guardianAddress, zkFoundationAddress]
@@ -148,22 +147,32 @@ function deriveAllAddresses() {
     addressIndex: 3,
   });
 
+  const extraCouncil = (process.env.EXTRA_COUNCIL || "")
+    .split(",")
+    .filter(str => str.length !== 0)
+    .map((str) => str.trim())
+    .concat([firstCouncil.address])
+    .map((str) => str as Hex);
+
   const extraGuardians = (process.env.EXTRA_GUARDIANS || "")
     .split(",")
+    .filter(str => str.length !== 0)
     .map((str) => str.trim())
     .concat([firstGuardian.address])
     .map((str) => str as Hex);
 
-  const restCouncil = range(4, 4 + 11).map((n) => mnemonicToAccount(mnemonic, { addressIndex: n }));
-  const restGuardians = range(4 + 11, 4 + 11 + (8 - extraGuardians.length)).map((n) =>
+
+  const derivedCouncil = range(4, 4 + (12 - extraCouncil.length)).map((n) => mnemonicToAccount(mnemonic, { addressIndex: n }));
+  const derivedGuardians = range(4 + 11, 4 + 11 + (8 - extraGuardians.length)).map((n) =>
     mnemonicToAccount(mnemonic, { addressIndex: n })
   );
 
   return {
-    council: [firstCouncil, ...restCouncil]
+    council: derivedCouncil
       .map((hd) => hd.address)
+      .concat(extraCouncil)
       .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b))),
-    guardians: [...restGuardians]
+    guardians: derivedGuardians
       .map((hd) => hd.address)
       .concat(extraGuardians)
       .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b))),
