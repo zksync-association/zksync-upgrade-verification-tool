@@ -1,4 +1,6 @@
-import type { L2CancellationType, signaturesTable } from "@/.server/db/schema";
+import { getl2CancellationCallsByProposalId } from "@/.server/db/dto/l2-cancellation-calls";
+import { getL2CancellationByExternalId } from "@/.server/db/dto/l2-cancellations";
+import type { signaturesTable } from "@/.server/db/schema";
 import { guardiansAddress } from "@/.server/service/contracts";
 import { hexSchema } from "@/common/basic-schemas";
 import ProposalHeaderWithBackButton from "@/components/proposal-header-with-back-button";
@@ -14,11 +16,9 @@ import { useLoaderData } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
 import { CircleCheckBig } from "lucide-react";
 import { getParams } from "remix-params-helper";
-import { type Address, parseEther, toHex } from "viem";
+import type { Address } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
-import { getL2CancellationByExternalId } from "@/.server/db/dto/l2-cancellations";
-import { getl2CancellationCallsByProposalId } from "@/.server/db/dto/l2-cancellation-calls";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -28,8 +28,8 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     throw notFound();
   }
 
-  const proposal = await getL2CancellationByExternalId(params.data.id)
-  const calls = await getl2CancellationCallsByProposalId(proposal.id)
+  const proposal = await getL2CancellationByExternalId(params.data.id);
+  const calls = await getl2CancellationCallsByProposalId(proposal.id);
 
   const signatures: InferSelectModel<typeof signaturesTable>[] = [
     {
@@ -102,7 +102,7 @@ export default function L2GovernorProposal() {
     signatures,
     necessarySignatures,
     guardiansAddress,
-    l2GovernorAddress
+    l2GovernorAddress,
   } = useLoaderData<typeof loader>();
 
   let proposalType: string;
@@ -150,25 +150,25 @@ export default function L2GovernorProposal() {
             <CardTitle>Veto Status</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1">
-            {proposal.status === "ACTIVE" &&
+            {proposal.status === "ACTIVE" && (
               <VotingStatusIndicator
                 className="flex-1"
                 label="Approvals"
                 signatures={signatures.length}
                 necessarySignatures={necessarySignatures}
               />
-            }
-            {proposal.status === "DONE" &&
+            )}
+            {proposal.status === "DONE" && (
               <div className="flex flex-1 flex-col items-center justify-center space-y-2">
-                <CircleCheckBig className="h-16 w-16 stroke-green-500"/>
+                <CircleCheckBig className="h-16 w-16 stroke-green-500" />
                 <p>Executed</p>
               </div>
-            }
+            )}
           </CardContent>
         </Card>
         <Card className="pb-10">
           <CardHeader>
-          <CardTitle>
+            <CardTitle>
               {user.role === "securityCouncil" ? "Security Council Actions" : "No role actions"}
             </CardTitle>
           </CardHeader>

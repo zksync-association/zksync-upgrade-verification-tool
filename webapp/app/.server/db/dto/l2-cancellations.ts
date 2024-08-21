@@ -1,8 +1,8 @@
 import { type InferInsertModel, eq } from "drizzle-orm";
+import type { Hex } from "viem";
 import { db } from "..";
-import { l2CancellationStatusEnum, l2CancellationsTable, l2CancellationCalls } from "../schema";
+import { l2CancellationStatusEnum, l2CancellationsTable } from "../schema";
 import { createOrIgnoreRecord, getFirst, getFirstOrThrow } from "./utils/common";
-import { Hex } from "viem";
 
 export async function createOrIgnoreL2Cancellation(
   data: InferInsertModel<typeof l2CancellationsTable>,
@@ -22,8 +22,10 @@ export async function getL2CancellationByExternalId(
   externalId: Hex,
   { tx }: { tx: typeof db } = { tx: db }
 ) {
-  return getFirstOrThrow(await tx
-    .select()
-    .from(l2CancellationsTable)
-    .where(eq(l2CancellationsTable.externalId, externalId)))
+  return getFirstOrThrow(
+    await tx
+      .select()
+      .from(l2CancellationsTable)
+      .where(eq(l2CancellationsTable.externalId, externalId))
+  );
 }
