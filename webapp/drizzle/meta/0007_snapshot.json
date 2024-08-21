@@ -1,5 +1,5 @@
 {
-  "id": "9f8f2b88-4877-4afc-8e49-98b19e9a61eb",
+  "id": "0c6b05fe-a99d-431f-b5eb-2aa8d705766f",
   "prevId": "fe4dfd5b-bc2e-4b0e-8547-f5ea5961e2cd",
   "version": "7",
   "dialect": "postgresql",
@@ -229,62 +229,8 @@
         }
       }
     },
-    "public.l2_governor_proposal_calls": {
-      "name": "l2_governor_proposal_calls",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "proposal_id": {
-          "name": "proposal_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "target": {
-          "name": "target",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "value": {
-          "name": "value",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "data": {
-          "name": "data",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "l2_governor_proposal_calls_proposal_id_l2_governor_proposals_id_fk": {
-          "name": "l2_governor_proposal_calls_proposal_id_l2_governor_proposals_id_fk",
-          "tableFrom": "l2_governor_proposal_calls",
-          "tableTo": "l2_governor_proposals",
-          "columnsFrom": [
-            "proposal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
-    },
-    "public.l2_governor_proposals": {
-      "name": "l2_governor_proposals",
+    "public.l2_governor_cancellations": {
+      "name": "l2_governor_cancellations",
       "schema": "",
       "columns": {
         "id": {
@@ -334,14 +280,68 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "l2_governor_proposals_external_id_unique": {
-          "name": "l2_governor_proposals_external_id_unique",
+        "l2_governor_cancellations_external_id_unique": {
+          "name": "l2_governor_cancellations_external_id_unique",
           "nullsNotDistinct": false,
           "columns": [
             "external_id"
           ]
         }
       }
+    },
+    "public.l2_governor_proposal_calls": {
+      "name": "l2_governor_proposal_calls",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "proposal_id": {
+          "name": "proposal_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target": {
+          "name": "target",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "l2_governor_proposal_calls_proposal_id_l2_governor_cancellations_id_fk": {
+          "name": "l2_governor_proposal_calls_proposal_id_l2_governor_cancellations_id_fk",
+          "tableFrom": "l2_governor_proposal_calls",
+          "tableTo": "l2_governor_cancellations",
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
     },
     "public.proposals": {
       "name": "proposals",
@@ -519,10 +519,10 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "signatures_l2_governor_proposal_id_l2_governor_proposals_id_fk": {
-          "name": "signatures_l2_governor_proposal_id_l2_governor_proposals_id_fk",
+        "signatures_l2_governor_proposal_id_l2_governor_cancellations_id_fk": {
+          "name": "signatures_l2_governor_proposal_id_l2_governor_cancellations_id_fk",
           "tableFrom": "signatures",
-          "tableTo": "l2_governor_proposals",
+          "tableTo": "l2_governor_cancellations",
           "columnsFrom": [
             "l2_governor_proposal_id"
           ],

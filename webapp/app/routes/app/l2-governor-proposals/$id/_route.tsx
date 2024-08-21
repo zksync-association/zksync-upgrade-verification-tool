@@ -1,4 +1,4 @@
-import type { L2GovernorProposalsType, signaturesTable } from "@/.server/db/schema";
+import type { L2CancellationType, signaturesTable } from "@/.server/db/schema";
 import { guardiansAddress } from "@/.server/service/contracts";
 import { hexSchema } from "@/common/basic-schemas";
 import ProposalHeaderWithBackButton from "@/components/proposal-header-with-back-button";
@@ -29,7 +29,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   const proposal = {
     id: 9,
     externalId: params.data.id,
-    type: "ZK_GOV_OPS_GOVERNOR" as L2GovernorProposalsType,
+    type: "ZK_GOV_OPS_GOVERNOR" as L2CancellationType,
     proposer: "0xea2139a4982859687CcbafbC400c3258D2B4FeC0" as Address,
     description: "Proposal to change the governor",
     calls: [

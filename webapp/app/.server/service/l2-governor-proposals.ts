@@ -1,4 +1,4 @@
-import { l2GovernorProposalsStatusEnum } from "@/.server/db/schema";
+import { l2CancellationStatusEnum } from "@/.server/db/schema";
 import { guardiansAddress } from "@/.server/service/contracts";
 import { hexSchema } from "@/common/basic-schemas";
 import { bigIntMax } from "@/utils/bigint";
@@ -86,7 +86,7 @@ export async function createVetoProposalFor(id: Hex) {
         description: rawProposal.description,
         type: "ZK_GOV_OPS_GOVERNOR",
         nonce: Number(nonce),
-        status: l2GovernorProposalsStatusEnum.enum.ACTIVE,
+        status: l2CancellationStatusEnum.enum.ACTIVE,
       },
       { tx }
     );

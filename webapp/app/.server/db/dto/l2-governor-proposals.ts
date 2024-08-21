@@ -1,18 +1,18 @@
 import { type InferInsertModel, eq } from "drizzle-orm";
 import { db } from "..";
-import { l2GovernorProposalsStatusEnum, l2GovernorProposalsTable } from "../schema";
+import { l2CancellationStatusEnum, l2CancellationsTable } from "../schema";
 import { createOrIgnoreRecord, getFirst } from "./utils/common";
 
 export async function createOrIgnoreL2GovernorProposal(
-  data: InferInsertModel<typeof l2GovernorProposalsTable>,
+  data: InferInsertModel<typeof l2CancellationsTable>,
   { tx }: { tx: typeof db } = { tx: db }
 ) {
-  return createOrIgnoreRecord(l2GovernorProposalsTable, data, { tx }).then(getFirst);
+  return createOrIgnoreRecord(l2CancellationsTable, data, { tx }).then(getFirst);
 }
 
 export async function getActiveL2Governors({ tx }: { tx: typeof db } = { tx: db }) {
   return tx
     .select()
-    .from(l2GovernorProposalsTable)
-    .where(eq(l2GovernorProposalsTable.status, l2GovernorProposalsStatusEnum.enum.ACTIVE));
+    .from(l2CancellationsTable)
+    .where(eq(l2CancellationsTable.status, l2CancellationStatusEnum.enum.ACTIVE));
 }
