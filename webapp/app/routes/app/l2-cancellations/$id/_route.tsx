@@ -17,6 +17,8 @@ import { getParams } from "remix-params-helper";
 import { type Address, parseEther, toHex } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
+import { getL2CancellationByExternalId } from "@/.server/db/dto/l2-cancellations";
+import { getl2CancellationCallsByProposalId } from "@/.server/db/dto/l2-cancellation-calls";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -26,29 +28,8 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     throw notFound();
   }
 
-  const proposal = {
-    id: 9,
-    externalId: params.data.id,
-    type: "ZK_GOV_OPS_GOVERNOR" as L2CancellationType,
-    proposer: "0xea2139a4982859687CcbafbC400c3258D2B4FeC0" as Address,
-    description: "Proposal to change the governor",
-    calls: [
-      {
-        id: 1,
-        target: "0xC85797aC1fdB88C879dC93040eBEb64F6b410974",
-        value: toHex(parseEther("2")),
-        data: "0x",
-      },
-      {
-        id: 2,
-        target: "0xB91d180d5c2f6269041f0eAFe581ed438Fc1c6c3",
-        value: toHex(parseEther("0.01")),
-        data: "0x211b09a0b91b5b97466e9b406a4575c736cb5baefd4e77cc1c834c502a2b4eabaf5ee69d13161bf87571c7bfb33d5c50f46bb6584e7132ad1a1a75927c4c2d69b116261fc70012d163b5d8df10a89645f1c00708a40a50620c66506b2b7ccc08",
-      },
-    ],
-    vetoTransactionHash: null as Address | null,
-    nonce: 2n,
-  };
+  const proposal = await getL2CancellationByExternalId(params.data.id)
+  const calls = await getl2CancellationCallsByProposalId(proposal.id)
 
   const signatures: InferSelectModel<typeof signaturesTable>[] = [
     {
@@ -78,6 +59,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     user,
     proposal,
     signatures,
+    calls,
     necessarySignatures,
     guardiansAddress: await guardiansAddress(),
     l2GovernorAddress,
@@ -113,8 +95,15 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 // }
 
 export default function L2GovernorProposal() {
-  const { user, proposal, signatures, necessarySignatures, guardiansAddress, l2GovernorAddress } =
-    useLoaderData<typeof loader>();
+  const {
+    user,
+    proposal,
+    calls,
+    signatures,
+    necessarySignatures,
+    guardiansAddress,
+    l2GovernorAddress
+  } = useLoaderData<typeof loader>();
 
   let proposalType: string;
   switch (proposal.type) {
@@ -161,24 +150,25 @@ export default function L2GovernorProposal() {
             <CardTitle>Veto Status</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1">
-            {proposal.vetoTransactionHash ? (
-              <div className="flex flex-1 flex-col items-center justify-center space-y-2">
-                <CircleCheckBig className="h-16 w-16 stroke-green-500" />
-                <p>Executed</p>
-              </div>
-            ) : (
+            {proposal.status === "ACTIVE" &&
               <VotingStatusIndicator
                 className="flex-1"
                 label="Approvals"
                 signatures={signatures.length}
                 necessarySignatures={necessarySignatures}
               />
-            )}
+            }
+            {proposal.status === "DONE" &&
+              <div className="flex flex-1 flex-col items-center justify-center space-y-2">
+                <CircleCheckBig className="h-16 w-16 stroke-green-500"/>
+                <p>Executed</p>
+              </div>
+            }
           </CardContent>
         </Card>
         <Card className="pb-10">
           <CardHeader>
-            <CardTitle>
+          <CardTitle>
               {user.role === "securityCouncil" ? "Security Council Actions" : "No role actions"}
             </CardTitle>
           </CardHeader>
