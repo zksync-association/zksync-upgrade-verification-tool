@@ -1,5 +1,5 @@
 {
-  "id": "0c6b05fe-a99d-431f-b5eb-2aa8d705766f",
+  "id": "b13201f4-1f26-4532-bdb6-63876e59d808",
   "prevId": "fe4dfd5b-bc2e-4b0e-8547-f5ea5961e2cd",
   "version": "7",
   "dialect": "postgresql",
@@ -229,6 +229,60 @@
         }
       }
     },
+    "public.l2_cancellation_calls": {
+      "name": "l2_cancellation_calls",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "proposal_id": {
+          "name": "proposal_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target": {
+          "name": "target",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "l2_cancellation_calls_proposal_id_l2_governor_cancellations_id_fk": {
+          "name": "l2_cancellation_calls_proposal_id_l2_governor_cancellations_id_fk",
+          "tableFrom": "l2_cancellation_calls",
+          "tableTo": "l2_governor_cancellations",
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
     "public.l2_governor_cancellations": {
       "name": "l2_governor_cancellations",
       "schema": "",
@@ -288,60 +342,6 @@
           ]
         }
       }
-    },
-    "public.l2_governor_proposal_calls": {
-      "name": "l2_governor_proposal_calls",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "proposal_id": {
-          "name": "proposal_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "target": {
-          "name": "target",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "value": {
-          "name": "value",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "data": {
-          "name": "data",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "l2_governor_proposal_calls_proposal_id_l2_governor_cancellations_id_fk": {
-          "name": "l2_governor_proposal_calls_proposal_id_l2_governor_cancellations_id_fk",
-          "tableFrom": "l2_governor_proposal_calls",
-          "tableTo": "l2_governor_cancellations",
-          "columnsFrom": [
-            "proposal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
     },
     "public.proposals": {
       "name": "proposals",

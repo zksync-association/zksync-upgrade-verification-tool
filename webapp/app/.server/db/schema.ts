@@ -165,11 +165,11 @@ export const l2CancellationsTable = pgTable("l2_governor_cancellations", {
 
 export const l2CancellationsTableRelations = relations(l2CancellationsTable, ({ many }) => {
   return {
-    calls: many(l2GovernorProposalCalls),
+    calls: many(l2CancellationCalls),
   };
 });
 
-export const l2GovernorProposalCalls = pgTable("l2_governor_proposal_calls", {
+export const l2CancellationCalls = pgTable("l2_cancellation_calls", {
   id: serial("id").primaryKey(),
   proposalId: integer("proposal_id")
     .notNull()
