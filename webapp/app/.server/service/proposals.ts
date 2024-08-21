@@ -10,8 +10,6 @@ import { z } from "zod";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 
-const bigIntMax = (...args: bigint[]) => args.reduce((m, e) => (e > m ? e : m));
-
 export type Proposal = {
   id: Hex;
   state: PROPOSAL_STATES;
@@ -20,16 +18,13 @@ export type Proposal = {
 export async function getProposals(): Promise<Proposal[]> {
   const latestBlock = await l1Rpc.getLatestBlock();
   const currentBlock = latestBlock.number;
-  const currentHeight = hexToBigInt(currentBlock);
-  const maxUpgradeLiftimeInBlocks = BigInt(40 * 24 * 360); // conservative estimation of oldest block with a valid upgrade
 
-  const from = bigIntMax(currentHeight - maxUpgradeLiftimeInBlocks, 1n);
+  // FIXME: logic has to be improved, this is just a temporary solution
+  // we should be able to get the logs from the last 40 * 24 * 360 blocks,
+  // as this is a conservative estimation of oldest block with a valid upgrade.
+  const from = hexToBigInt(currentBlock) - 90000n;
   const abi = upgradeHandlerAbi;
 
-  //FIXME: remove
-  if (env.NODE_ENV === "development") {
-    await new Promise((resolve) => setTimeout(resolve, 5)); // Avoid anvil crushing for mysterious reasons
-  }
   const logs = await l1Rpc.getLogs(upgradeHandlerAddress, numberToHex(from), "latest", [
     abi.eventIdFor("UpgradeStarted"),
   ]);
