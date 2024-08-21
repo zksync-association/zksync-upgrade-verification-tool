@@ -1,6 +1,6 @@
 import { db } from "@/.server/db";
 import { l2CancellationCalls } from "@/.server/db/schema";
-import { type InferInsertModel, eq } from "drizzle-orm";
+import type { InferInsertModel } from "drizzle-orm";
 
 export function createL2CancellationCall(
   data: InferInsertModel<typeof l2CancellationCalls>,

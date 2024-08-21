@@ -1,7 +1,4 @@
-import {
-  createVetoProposalFor,
-  getActiveL2Proposals,
-} from "@/.server/service/l2-cancellations";
+import { createVetoProposalFor, getActiveL2Proposals } from "@/.server/service/l2-cancellations";
 import { hexSchema } from "@/common/basic-schemas";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";

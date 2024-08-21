@@ -9,10 +9,7 @@ import { type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
-import {
-  createOrIgnoreL2Cancellation,
-  getActiveL2Cancellations,
-} from "../db/dto/l2-cancellations";
+import { createOrIgnoreL2Cancellation, getActiveL2Cancellations } from "../db/dto/l2-cancellations";
 import { l1Rpc } from "./clients";
 import { zkGovOpsGovernorAbi } from "./contract-abis";
 
