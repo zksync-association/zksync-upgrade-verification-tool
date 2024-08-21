@@ -19,6 +19,7 @@ type BroadcastTxButtonProps = {
   validUntil: Date;
   functionName: ContractFunctionName<typeof ALL_ABIS.council, "nonpayable">;
   proposalId: InferSelectModel<typeof freezeProposalsTable>["id"];
+  softFreezeThreshold: number | null;
 };
 
 export default function ContractWriteButton({
@@ -30,6 +31,7 @@ export default function ContractWriteButton({
   validUntil,
   functionName,
   proposalId,
+  softFreezeThreshold,
 }: BroadcastTxButtonProps) {
   const { address } = useAccount();
   const { isPending, writeContract } = useWriteContract();
@@ -49,6 +51,7 @@ export default function ContractWriteButton({
       validUntil: BigInt(dateToUnixTimestamp(validUntil)),
       signers: signatures.map((s) => s.signer),
       signatures: signatures.map((s) => s.signature),
+      softFreezeThreshold: BigInt(softFreezeThreshold ?? 0),
     };
 
     writeContract(
@@ -57,7 +60,10 @@ export default function ContractWriteButton({
         address: target,
         functionName,
         abi: ALL_ABIS.council,
-        args: [args.validUntil, args.signers, args.signatures],
+        args:
+          functionName === "setSoftFreezeThreshold"
+            ? [args.softFreezeThreshold, args.validUntil, args.signers, args.signatures]
+            : [args.validUntil, args.signers, args.signatures],
       },
       {
         onSuccess: (hash) => {
