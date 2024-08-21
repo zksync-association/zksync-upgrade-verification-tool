@@ -15,7 +15,7 @@ import { useAccount } from "wagmi";
 export function loader({ request }: LoaderFunctionArgs) {
   try {
     return { user: getUserFromHeader(request) };
-  } catch (error) {
+  } catch {
     return { user: null };
   }
 }

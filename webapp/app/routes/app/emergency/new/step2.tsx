@@ -49,7 +49,7 @@ export function NewEmergencyProposalStep2(props: NewEmergencyProposalStep2Props)
   }, [calls, props.onNext]);
 
   const removeCall = (index: number) => {
-    setCalls(calls.filter((c, i) => i !== index));
+    setCalls(calls.filter((_, i) => i !== index));
   };
 
   return (

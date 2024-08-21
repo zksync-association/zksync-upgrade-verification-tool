@@ -47,7 +47,7 @@ export async function validateCall(call: Call): Promise<CallValidation> {
       hexToBigInt(call.value)
     );
     return { call, isValid: true };
-  } catch (e) {
+  } catch {
     return { call, isValid: false };
   }
 }
