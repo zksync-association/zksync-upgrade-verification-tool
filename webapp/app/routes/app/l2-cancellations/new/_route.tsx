@@ -1,7 +1,4 @@
-import {
-  createVetoProposalFor,
-  getActiveL2Proposals,
-} from "@/.server/service/l2-governor-proposals";
+import { createVetoProposalFor, getActiveL2Proposals } from "@/.server/service/l2-cancellations";
 import { hexSchema } from "@/common/basic-schemas";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
@@ -18,7 +15,6 @@ import { badRequest } from "@/utils/http";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
@@ -35,7 +31,7 @@ export async function action({ request }: ActionFunctionArgs) {
     throw badRequest(`Failed to parse body: ${parsed.errors}`);
   }
   await createVetoProposalFor(parsed.data.proposalId);
-  return redirect($path("/app/l2-governor-proposals"));
+  return redirect($path("/app/l2-cancellations"));
 }
 
 const schema = z.object({
@@ -52,16 +48,6 @@ export default function NewL2GovernorVeto() {
     defaultValues,
     mode: "onTouched",
   });
-
-  const onSubmit = useCallback(
-    ({ proposalId }: Schema) => {
-      const l2Proposal = activeL2Proposals.find((prop) => prop.proposalId === proposalId);
-      if (!l2Proposal) {
-        throw new Error("Proposal is not present");
-      }
-    },
-    [activeL2Proposals]
-  );
 
   return (
     <div>

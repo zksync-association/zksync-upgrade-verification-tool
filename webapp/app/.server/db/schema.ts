@@ -89,7 +89,7 @@ export const signaturesTable = pgTable(
     ),
     freezeProposal: integer("freeze_proposal_id").references(() => freezeProposalsTable.id),
     l2GovernorProposal: integer("l2_governor_proposal_id").references(
-      () => l2GovernorProposalsTable.id
+      () => l2CancellationsTable.id
     ),
     signer: bytea("signer").notNull(),
     signature: bytea("signature").notNull(),
@@ -147,33 +147,33 @@ export const freezeProposalsTable = pgTable(
   })
 );
 
-export const l2GovernorProposalsTypeSchema = z.enum(["ZK_GOV_OPS_GOVERNOR", "ZK_TOKEN_GOVERNOR"]);
+export const l2CancellationTypeEnum = z.enum(["ZK_GOV_OPS_GOVERNOR", "ZK_TOKEN_GOVERNOR"]);
 
-export type L2GovernorProposalsType = z.infer<typeof l2GovernorProposalsTypeSchema>;
+export type L2CancellationType = z.infer<typeof l2CancellationTypeEnum>;
 
-export const l2GovernorProposalsStatusEnum = z.enum(["ACTIVE", "DONE", "CANCELED"]);
+export const l2CancellationStatusEnum = z.enum(["ACTIVE", "DONE", "CANCELED"]);
 
-export const l2GovernorProposalsTable = pgTable("l2_governor_proposals", {
+export const l2CancellationsTable = pgTable("l2_governor_cancellations", {
   id: serial("id").primaryKey(),
   externalId: bytea("external_id").notNull().unique(),
-  type: text("type", { enum: l2GovernorProposalsTypeSchema.options }).notNull(),
+  type: text("type", { enum: l2CancellationTypeEnum.options }).notNull(),
   proposer: bytea("proposer").notNull(),
   description: text("description").notNull(),
   nonce: bigint("nonce", { mode: "number" }).notNull(),
-  status: text("status", { enum: l2GovernorProposalsStatusEnum.options }).notNull(),
+  status: text("status", { enum: l2CancellationStatusEnum.options }).notNull(),
 });
 
-export const l2GovernorProposalsTableRelations = relations(l2GovernorProposalsTable, ({ many }) => {
+export const l2CancellationsTableRelations = relations(l2CancellationsTable, ({ many }) => {
   return {
-    calls: many(l2GovernorProposalCalls),
+    calls: many(l2CancellationCalls),
   };
 });
 
-export const l2GovernorProposalCalls = pgTable("l2_governor_proposal_calls", {
+export const l2CancellationCalls = pgTable("l2_cancellation_calls", {
   id: serial("id").primaryKey(),
   proposalId: integer("proposal_id")
     .notNull()
-    .references(() => l2GovernorProposalsTable.id),
+    .references(() => l2CancellationsTable.id),
   target: bytea("target").notNull(),
   value: bytea("value").notNull(),
   data: bytea("data").notNull(),

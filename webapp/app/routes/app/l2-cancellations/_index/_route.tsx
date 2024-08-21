@@ -1,4 +1,4 @@
-import { getZkGovOpsProposals } from "@/.server/service/l2-governor-proposals";
+import { getZkGovOpsProposals } from "@/.server/service/l2-cancellations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -27,7 +27,7 @@ export default function L2Proposals() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Active L2 Veto Proposals</CardTitle>
-          <Link to={$path("/app/l2-governor-proposals/new")}>
+          <Link to={$path("/app/l2-cancellations/new")}>
             <Button data-testid="new-emergency-proposal" variant="secondary" size="icon">
               <PlusIcon className="h-4 w-4" />
             </Button>
@@ -48,10 +48,12 @@ export default function L2Proposals() {
               <TableRow key={proposal.id}>
                 <TableCell>{proposal.description}</TableCell>
                 <TableCell>
-                  <Button variant="outline" size="sm">
-                    Go
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
+                  <Link to={$path("/app/l2-cancellations/:id", { id: proposal.externalId })}>
+                    <Button variant="outline" size="sm">
+                      Go
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
                 </TableCell>
               </TableRow>
             ))}

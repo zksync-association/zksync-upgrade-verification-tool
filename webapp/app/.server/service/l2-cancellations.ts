@@ -1,4 +1,4 @@
-import { l2GovernorProposalsStatusEnum } from "@/.server/db/schema";
+import { l2CancellationStatusEnum } from "@/.server/db/schema";
 import { guardiansAddress } from "@/.server/service/contracts";
 import { hexSchema } from "@/common/basic-schemas";
 import { bigIntMax } from "@/utils/bigint";
@@ -8,11 +8,8 @@ import { env } from "@config/env.server";
 import { type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
 import { db } from "../db";
-import { createL2GovernorProposalCall } from "../db/dto/l2-governor-proposal-calls";
-import {
-  createOrIgnoreL2GovernorProposal,
-  getActiveL2Governors,
-} from "../db/dto/l2-governor-proposals";
+import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
+import { createOrIgnoreL2Cancellation, getActiveL2Cancellations } from "../db/dto/l2-cancellations";
 import { l1Rpc } from "./clients";
 import { zkGovOpsGovernorAbi } from "./contract-abis";
 
@@ -71,39 +68,39 @@ async function getL2VetoNonce(): Promise<bigint> {
 
 export async function createVetoProposalFor(id: Hex) {
   const allActive = await getActiveL2Proposals();
-  const rawProposal = allActive.find((activeProposal) => activeProposal.proposalId === id);
-  if (!rawProposal) {
+  const proposalData = allActive.find((activeProposal) => activeProposal.proposalId === id);
+  if (!proposalData) {
     throw notFound();
   }
 
   const nonce = await getL2VetoNonce();
 
   await db.transaction(async (tx) => {
-    const l2GovernorProposal = await createOrIgnoreL2GovernorProposal(
+    const l2Cancellation = await createOrIgnoreL2Cancellation(
       {
-        externalId: rawProposal.proposalId,
-        proposer: rawProposal.proposer,
-        description: rawProposal.description,
+        externalId: proposalData.proposalId,
+        proposer: proposalData.proposer,
+        description: proposalData.description,
         type: "ZK_GOV_OPS_GOVERNOR",
         nonce: Number(nonce),
-        status: l2GovernorProposalsStatusEnum.enum.ACTIVE,
+        status: l2CancellationStatusEnum.enum.ACTIVE,
       },
       { tx }
     );
-    if (l2GovernorProposal === undefined) {
+    if (l2Cancellation === undefined) {
       return;
     }
 
-    for (const [i, data] of rawProposal.calldatas.entries()) {
-      const target = rawProposal.targets[i];
-      const value = rawProposal.values[i];
+    for (const [i, data] of proposalData.calldatas.entries()) {
+      const target = proposalData.targets[i];
+      const value = proposalData.values[i];
       if (target === undefined || value === undefined) {
         throw new Error("Invalid proposal");
       }
-      await createL2GovernorProposalCall(
+      await createL2CancellationCall(
         {
           data,
-          proposalId: l2GovernorProposal.id,
+          proposalId: l2Cancellation.id,
           target,
           value: value,
         },
@@ -114,7 +111,7 @@ export async function createVetoProposalFor(id: Hex) {
 }
 
 export async function getZkGovOpsProposals() {
-  return getActiveL2Governors();
+  return getActiveL2Cancellations();
 }
 
 // async function getProposalState({
