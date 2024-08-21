@@ -32,7 +32,7 @@ export async function action({ request }: ActionFunctionArgs) {
     throw badRequest(`Failed to parse body: ${parsed.errors}`);
   }
   await createVetoProposalFor(parsed.data.proposalId);
-  return redirect($path("/app/l2-governor-proposals"));
+  return redirect($path("/app/l2-cancellations"));
 }
 
 const schema = z.object({
