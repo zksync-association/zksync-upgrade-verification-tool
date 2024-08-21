@@ -9,6 +9,35 @@ import { l1Rpc, l2Rpc } from "./clients";
 import { zkGovOpsGovernorAbi } from "./contract-abis";
 import { bigIntMax } from "@/utils/bigint";
 
+export async function getActiveL2Proposals() {
+  const latestBlock = await l1Rpc.getLatestBlock();
+  const currentBlock = hexToBigInt(latestBlock.number);
+
+  // Proposal lifetime is:
+  // - 7 days vote delay period
+  // - 7 days voting period
+  // - 7 days optional extended voting period
+  // Another 7 days is added in the calculation to have a conservative
+  // estimation of the oldest block with a valid proposal.
+  // Max proposal time is calculated in blocks, 1 second per block in L2,
+  // therefore 3600 blocks per hour.
+  const maxProposalLifetimeInBlocks = BigInt((21 + 7) * 24 * 3600); // conservative estimation of oldest block with a valid proposal
+
+  const from = bigIntMax(currentBlock - maxProposalLifetimeInBlocks, 1n);
+  return await l1Rpc.getLogs(env.ZK_GOV_OPS_GOVERNOR_ADDRESS, numberToHex(from), "latest", [
+    zkGovOpsGovernorAbi.eventIdFor("ProposalCreated"),
+  ]).then(logs => logs.map(log => {
+    return decodeEventLog({
+      abi: ZK_GOV_OPS_GOVERNOR_ABI,
+      eventName: "ProposalCreated",
+      data: log.data,
+      topics: log.topics as any,
+    });
+  }));
+}
+
+
+
 export async function getZkGovOpsProposals() {
   const latestBlock = await l1Rpc.getLatestBlock();
   const currentBlock = hexToBigInt(latestBlock.number);
@@ -33,26 +62,22 @@ export async function getZkGovOpsProposals() {
     state: number;
   }[] = [];
 
-  for (const log of logs) {
-    const proposal = decodeEventLog({
-      abi: ZK_GOV_OPS_GOVERNOR_ABI,
-      eventName: "ProposalCreated",
-      data: log.data,
-      topics: log.topics as any,
-    });
+  const rawProposals = await getActiveL2Proposals();
+
+  for (const rawProposal of rawProposals) {
     const state = await getProposalState({
-      proposalId: proposal.args.proposalId,
+      proposalId: rawProposal.args.proposalId,
       targetAddress: env.ZK_GOV_OPS_GOVERNOR_ADDRESS,
     });
 
-    proposals.push({ id: proposal.args.proposalId, state });
+    proposals.push({ id: rawProposal.args.proposalId, state });
 
     await db.transaction(async (tx) => {
       const l2GovernorProposal = await createOrIgnoreL2GovernorProposal(
         {
-          externalId: numberToHex(proposal.args.proposalId),
-          proposer: proposal.args.proposer,
-          description: proposal.args.description,
+          externalId: numberToHex(rawProposal.args.proposalId),
+          proposer: rawProposal.args.proposer,
+          description: rawProposal.args.description,
           type: "ZK_GOV_OPS_GOVERNOR",
         },
         { tx }
@@ -61,9 +86,9 @@ export async function getZkGovOpsProposals() {
         return;
       }
 
-      for (const [i, data] of proposal.args.calldatas.entries()) {
-        const target = proposal.args.targets[i];
-        const value = proposal.args.values[i];
+      for (const [i, data] of rawProposal.args.calldatas.entries()) {
+        const target = rawProposal.args.targets[i];
+        const value = rawProposal.args.values[i];
         if (target === undefined || value === undefined) {
           throw new Error("Invalid proposal");
         }
