@@ -17,7 +17,7 @@ services:
   hh-deploy:
     platform: linux/amd64
     image: upgrade-checker:local
-    command: sh -c "cd .. && cd e2e && pnpm deploy:setup:remote"
+    command: sh -c "cd .. && cd e2e && pnpm compile:preprocess && pnpm deploy:setup:remote"
     env_file:
       - .env
     environment:

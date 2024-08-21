@@ -1,38 +1,98 @@
-import { getActiveL2Proposals } from "@/.server/service/l2-governor-proposals";
+import { createVetoProposalFor, getActiveL2Proposals } from "@/.server/service/l2-governor-proposals";
 import { useLoaderData } from "@remix-run/react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { hexSchema } from "@/common/basic-schemas";
+import { Input } from "@/components/ui/input";
+import { useCallback } from "react";
+import { getFormData } from "remix-params-helper";
+import { badRequest } from "@/utils/http";
+import { $path } from "remix-routes";
 
 export async function loader() {
-  return getActiveL2Proposals()
+  const activeL2Proposals = await getActiveL2Proposals();
+  return json({activeL2Proposals})
 }
 
+export async function action({ request }: ActionFunctionArgs) {
+  const parsed = await getFormData(request, z.object({ proposalId: hexSchema }))
+  if (!parsed.success) {
+    throw badRequest(`Failed to parse body: ${parsed.errors}`);
+  }
+  await createVetoProposalFor(parsed.data.proposalId)
+  return redirect($path("/app/l2-governor-proposals"))
+}
+
+const schema = z.object({
+  proposalId: hexSchema
+})
+type Schema = z.infer<typeof schema>
+
+const defaultValues = {}
+
 export default function NewL2GovernorVeto() {
-  const data = useLoaderData()
+  const {activeL2Proposals} = useLoaderData<typeof loader>()
+  const form = useForm<Schema>({
+    resolver: zodResolver(schema),
+    defaultValues,
+    mode: "onTouched"
+  })
+
+  const onSubmit = useCallback(({proposalId}: Schema) => {
+    const l2Proposal = activeL2Proposals.find(prop => prop.proposalId === proposalId)
+    if (!l2Proposal) {
+      throw new Error("Proposal is not present")
+    }
+
+
+
+  }, [activeL2Proposals])
 
   return (
     <div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead >ID</TableHead>
-            <TableHead >Description</TableHead>
-            <TableHead />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map(row => (
+      <Form {...form}>
+        <form method="POST">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead/>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {activeL2Proposals.map(row => (
+                <TableRow key={row.proposalId}>
+                  <TableCell>{row.proposalId}</TableCell>
+                  <TableCell>{row.description}</TableCell>
+                  <TableCell>
+                    <FormField
+                      control={form.control}
+                      name="proposalId"
+                      render={({ field }) =>
+                        <FormItem>
+                          <FormControl>
+                            <Input type={"radio"} {...field} value={row.proposalId} />
+                          </FormControl>
+                        </FormItem>
+                      }
+                    >
 
-          ))}
-          <TableRow>
-            <TableCell>
-              data[0]
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-      <pre>{JSON.stringify(data, null, 2)} </pre>
-      <Button>Create</Button>
+                    </FormField>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          <Button disabled={!form.formState.isValid}>Create</Button>
+        </form>
+      </Form>
     </div>
   )
 };
