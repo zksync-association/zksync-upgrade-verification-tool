@@ -16,7 +16,7 @@ Every signer of this rehearsal will [sign through a safe](https://safe.global/).
 
 Please ensure you have access to the ZkSync Upgrade Analysis & Approval Web App. This web app is used to coordinate the process of gathering signatures and, in the end, broadcasting the transaction that executes the upgrade.
 
-- Staging link: [https://zksync-upgrade-verification.staging.zknation.io/](https://zksync-upgrade-verification.staging.zknation.io/)
+- Staging link: [https://verify.staging.zknation.io/](https://verify.staging.zknation.io/)
 
 ![Note]
 👍🏽 All interactions by the members of the security council and the guardians during this rehearsal are off-chain, **so they will not need ETH or any other tokens to fund transactions.** *On-chain transactions will be made by the facilitator of the rehearsal.*
@@ -31,6 +31,9 @@ The first step involves logging into the governance tool using **SAFE through Wa
 
 
 ### **Connect Wallet using Wallet Connect**
+
+![Note]
+Remember that you will need to connect to the governance web app with your safe & choose Ethereum Sepolia Testnet as the network for all your interactions.
 
 **You will need to connect to the governance web app with your safe**. Use WalletConnect for that:
 
