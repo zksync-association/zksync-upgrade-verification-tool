@@ -61,7 +61,7 @@ const config: HardhatUserConfig = {
       allowUnlimitedContractSize: true,
       mining: {
         auto: true,
-        interval: 1000
+        interval: 1000,
       },
       forking: {
         url: forkUrl,
