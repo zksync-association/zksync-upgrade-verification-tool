@@ -59,6 +59,10 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 11155111,
       allowUnlimitedContractSize: true,
+      mining: {
+        auto: true,
+        interval: 1000
+      },
       forking: {
         url: forkUrl,
       },
