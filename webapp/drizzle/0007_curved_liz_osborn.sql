@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS "l2_governor_proposals" (
 	"type" text NOT NULL,
 	"proposer" "bytea" NOT NULL,
 	"description" text NOT NULL,
+	"nonce" bigint NOT NULL,
+	"status" text NOT NULL,
 	CONSTRAINT "l2_governor_proposals_external_id_unique" UNIQUE("external_id")
 );
 --> statement-breakpoint

@@ -1,5 +1,5 @@
 {
-  "id": "2399cc4b-21af-4ab5-bc33-107bf58556d7",
+  "id": "9f8f2b88-4877-4afc-8e49-98b19e9a61eb",
   "prevId": "fe4dfd5b-bc2e-4b0e-8547-f5ea5961e2cd",
   "version": "7",
   "dialect": "postgresql",
@@ -313,6 +313,18 @@
         },
         "description": {
           "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nonce": {
+          "name": "nonce",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
           "type": "text",
           "primaryKey": false,
           "notNull": true

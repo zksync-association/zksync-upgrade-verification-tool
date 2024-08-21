@@ -151,12 +151,16 @@ export const l2GovernorProposalsTypeSchema = z.enum(["ZK_GOV_OPS_GOVERNOR", "ZK_
 
 export type L2GovernorProposalsType = z.infer<typeof l2GovernorProposalsTypeSchema>;
 
+export const l2GovernorProposalsStatusEnum = z.enum(["ACTIVE", "DONE", "CANCELED"]);
+
 export const l2GovernorProposalsTable = pgTable("l2_governor_proposals", {
   id: serial("id").primaryKey(),
   externalId: bytea("external_id").notNull().unique(),
   type: text("type", { enum: l2GovernorProposalsTypeSchema.options }).notNull(),
   proposer: bytea("proposer").notNull(),
   description: text("description").notNull(),
+  nonce: bigint("nonce", { mode: "number" }).notNull(),
+  status: text("status", { enum: l2GovernorProposalsStatusEnum.options }).notNull(),
 });
 
 export const l2GovernorProposalsTableRelations = relations(l2GovernorProposalsTable, ({ many }) => {

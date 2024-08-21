@@ -1,15 +1,37 @@
-import { ZK_GOV_OPS_GOVERNOR_ABI } from "@/utils/raw-abis";
+import { l2GovernorProposalsStatusEnum } from "@/.server/db/schema";
+import { guardiansAddress } from "@/.server/service/contracts";
+import { hexSchema } from "@/common/basic-schemas";
+import { bigIntMax } from "@/utils/bigint";
+import { notFound } from "@/utils/http";
+import { ALL_ABIS, ZK_GOV_OPS_GOVERNOR_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
-import { type Address, decodeEventLog, hexToBigInt, numberToHex } from "viem";
+import { type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
 import { db } from "../db";
 import { createL2GovernorProposalCall } from "../db/dto/l2-governor-proposal-calls";
-import { createOrIgnoreL2GovernorProposal } from "../db/dto/l2-governor-proposals";
-import { l1Rpc, l2Rpc } from "./clients";
+import {
+  createOrIgnoreL2GovernorProposal,
+  getActiveL2Governors,
+} from "../db/dto/l2-governor-proposals";
+import { l1Rpc } from "./clients";
 import { zkGovOpsGovernorAbi } from "./contract-abis";
-import { bigIntMax } from "@/utils/bigint";
 
-export async function getZkGovOpsProposals() {
+const eventSchema = z.object({
+  eventName: z.string(),
+  args: z.object({
+    proposalId: z.bigint().transform((bn) => numberToHex(bn)),
+    proposer: hexSchema,
+    targets: z.array(hexSchema),
+    values: z.array(z.bigint().transform((bn) => numberToHex(bn))),
+    signatures: z.array(z.string()),
+    calldatas: z.array(hexSchema),
+    voteStart: z.bigint().transform((bn) => numberToHex(bn)),
+    voteEnd: z.bigint().transform((bn) => numberToHex(bn)),
+    description: z.string(),
+  }),
+});
+
+export async function getActiveL2Proposals() {
   const latestBlock = await l1Rpc.getLatestBlock();
   const currentBlock = hexToBigInt(latestBlock.number);
 
@@ -24,75 +46,86 @@ export async function getZkGovOpsProposals() {
   const maxProposalLifetimeInBlocks = BigInt((21 + 7) * 24 * 3600); // conservative estimation of oldest block with a valid proposal
 
   const from = bigIntMax(currentBlock - maxProposalLifetimeInBlocks, 1n);
-  const logs = await l1Rpc.getLogs(env.ZK_GOV_OPS_GOVERNOR_ADDRESS, numberToHex(from), "latest", [
-    zkGovOpsGovernorAbi.eventIdFor("ProposalCreated"),
-  ]);
+  return await l1Rpc
+    .getLogs(env.ZK_GOV_OPS_GOVERNOR_ADDRESS, numberToHex(from), "latest", [
+      zkGovOpsGovernorAbi.eventIdFor("ProposalCreated"),
+    ])
+    .then((logs) =>
+      logs.map((log) => {
+        return decodeEventLog({
+          abi: ZK_GOV_OPS_GOVERNOR_ABI,
+          eventName: "ProposalCreated",
+          data: log.data,
+          topics: log.topics as any,
+        });
+      })
+    )
+    .then((events) =>
+      events.map((event) => eventSchema.parse(event)).map((parsedEvent) => parsedEvent.args)
+    );
+}
 
-  const proposals: {
-    id: bigint;
-    state: number;
-  }[] = [];
+async function getL2VetoNonce(): Promise<bigint> {
+  return l1Rpc.contractRead(await guardiansAddress(), "nonce", ALL_ABIS.guardians, z.bigint());
+}
 
-  for (const log of logs) {
-    const proposal = decodeEventLog({
-      abi: ZK_GOV_OPS_GOVERNOR_ABI,
-      eventName: "ProposalCreated",
-      data: log.data,
-      topics: log.topics as any,
-    });
-    const state = await getProposalState({
-      proposalId: proposal.args.proposalId,
-      targetAddress: env.ZK_GOV_OPS_GOVERNOR_ADDRESS,
-    });
+export async function createVetoProposalFor(id: Hex) {
+  const allActive = await getActiveL2Proposals();
+  const rawProposal = allActive.find((activeProposal) => activeProposal.proposalId === id);
+  if (!rawProposal) {
+    throw notFound();
+  }
 
-    proposals.push({ id: proposal.args.proposalId, state });
+  const nonce = await getL2VetoNonce();
 
-    await db.transaction(async (tx) => {
-      const l2GovernorProposal = await createOrIgnoreL2GovernorProposal(
+  await db.transaction(async (tx) => {
+    const l2GovernorProposal = await createOrIgnoreL2GovernorProposal(
+      {
+        externalId: rawProposal.proposalId,
+        proposer: rawProposal.proposer,
+        description: rawProposal.description,
+        type: "ZK_GOV_OPS_GOVERNOR",
+        nonce: Number(nonce),
+        status: l2GovernorProposalsStatusEnum.enum.ACTIVE,
+      },
+      { tx }
+    );
+    if (l2GovernorProposal === undefined) {
+      return;
+    }
+
+    for (const [i, data] of rawProposal.calldatas.entries()) {
+      const target = rawProposal.targets[i];
+      const value = rawProposal.values[i];
+      if (target === undefined || value === undefined) {
+        throw new Error("Invalid proposal");
+      }
+      await createL2GovernorProposalCall(
         {
-          externalId: numberToHex(proposal.args.proposalId),
-          proposer: proposal.args.proposer,
-          description: proposal.args.description,
-          type: "ZK_GOV_OPS_GOVERNOR",
+          data,
+          proposalId: l2GovernorProposal.id,
+          target,
+          value: value,
         },
         { tx }
       );
-      if (l2GovernorProposal === undefined) {
-        return;
-      }
-
-      for (const [i, data] of proposal.args.calldatas.entries()) {
-        const target = proposal.args.targets[i];
-        const value = proposal.args.values[i];
-        if (target === undefined || value === undefined) {
-          throw new Error("Invalid proposal");
-        }
-        await createL2GovernorProposalCall(
-          {
-            data,
-            proposalId: l2GovernorProposal.id,
-            target,
-            value: numberToHex(value),
-          },
-          { tx }
-        );
-      }
-    });
-  }
-
-  return proposals;
+    }
+  });
 }
 
-async function getProposalState({
-  proposalId,
-  targetAddress,
-}: { proposalId: bigint; targetAddress: Address }) {
-  const state = await l2Rpc.contractRead(
-    targetAddress,
-    "state",
-    ZK_GOV_OPS_GOVERNOR_ABI,
-    z.number(),
-    [proposalId]
-  );
-  return state;
+export async function getZkGovOpsProposals() {
+  return getActiveL2Governors();
 }
+
+// async function getProposalState({
+//   proposalId,
+//   targetAddress,
+// }: { proposalId: bigint; targetAddress: Address }) {
+//   return await l2Rpc.contractRead(
+//     targetAddress,
+//     "state",
+//     ZK_GOV_OPS_GOVERNOR_ABI,
+//     z.number(),
+//     [proposalId]
+//   );
+// }
