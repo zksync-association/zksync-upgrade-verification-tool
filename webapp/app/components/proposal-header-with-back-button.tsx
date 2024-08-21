@@ -4,14 +4,14 @@ import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "./ui/button";
 
-export default function ProposalHeaderWithBackButton({
+export default function HeaderWithBackButton({
   children,
   className,
-}: { children: ReactNode; className?: string }) {
+}: { children?: ReactNode; className?: string }) {
   const navigate = useNavigate();
 
   return (
-    <div className={cn("flex items-center", className)}>
+    <div className={cn("flex items-center pb-4 pl-2", className)}>
       <Button
         size="icon"
         variant="ghost"

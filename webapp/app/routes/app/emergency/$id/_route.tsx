@@ -12,8 +12,8 @@ import { saveEmergencySignature } from "@/.server/service/signatures";
 import { hexSchema } from "@/common/basic-schemas";
 import { type SignAction, signActionSchema } from "@/common/sign-action";
 import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
+import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import { StatusIndicator } from "@/components/status-indicator";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UpgradeRawData } from "@/components/upgrade-raw-data";
@@ -27,8 +27,7 @@ import {
 } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
-import { useLoaderData, useNavigate } from "@remix-run/react";
-import { ArrowLeft } from "lucide-react";
+import { useLoaderData } from "@remix-run/react";
 import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual } from "viem";
@@ -128,8 +127,6 @@ function actionForRole(role: UserRole): SignAction {
 }
 
 export default function EmergencyUpgradeDetails() {
-  const navigate = useNavigate();
-
   const { calls, user, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
     useLoaderData<typeof loader>();
 
@@ -144,18 +141,8 @@ export default function EmergencyUpgradeDetails() {
     isAddressEqual(s.signer, addresses.zkFoundation)
   ).length;
   return (
-    <div className="flex min-h-screen flex-col pt-10">
-      <div className="mb-4 flex items-center pl-2">
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="mr-2 hover:bg-transparent"
-        >
-          <ArrowLeft />
-        </Button>
-        <h2 className="font-semibold">Proposal {proposal.externalId}</h2>
-      </div>
+    <div className="flex min-h-screen flex-col">
+      <HeaderWithBackButton>Proposal {proposal.externalId}</HeaderWithBackButton>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card className="pb-10">
