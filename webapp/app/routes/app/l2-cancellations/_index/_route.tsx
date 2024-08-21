@@ -1,4 +1,4 @@
-import { getZkGovOpsProposals } from "@/.server/service/l2-governor-proposals";
+import { getZkGovOpsProposals } from "@/.server/service/l2-cancellations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
