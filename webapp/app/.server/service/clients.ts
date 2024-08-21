@@ -4,6 +4,7 @@ import { BlockExplorerClient, RpcClient } from "validate-cli";
 const network = env.ETH_NETWORK === "local" ? "sepolia" : env.ETH_NETWORK;
 
 export const l1Explorer = BlockExplorerClient.forL1(env.ETHERSCAN_API_KEY, network);
+
 export const l1Rpc = new RpcClient(env.L1_RPC_URL);
 export const l2Explorer = BlockExplorerClient.forL2(network);
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;

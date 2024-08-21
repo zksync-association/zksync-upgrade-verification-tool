@@ -90,28 +90,28 @@ test("should be able to see standard proposals", async ({ switcher, page }) => {
   await expect(page.getByText(/day \d+ out of \d+/)).toBeVisible();
 });
 
-test("should be able to sign standard proposals", async ({ switcher, wallet, page }) => {
+test.only("should be able to sign standard proposals", async ({ switcher, wallet, page }) => {
   await switcher.council(page);
   await page.getByText("Standard Upgrades").click();
   await page.waitForLoadState("domcontentloaded");
 
-  // This test is flakey because webapp fails to load non-upgrade proposal correctly on first go
-  // this should be fixed in the webapp instead of here
   const activeProposal = page.getByRole("button", { name: /^0x[a-fA-F0-9]{64}$/ }).first();
   await activeProposal.click();
 
-  const initialApprovals = await page.getByTestId("security-signatures").textContent();
+  console.log("Arrived to proposal page")
+  const initialApprovals = await page.getByTestId("council-signature-count").textContent();
   if (!initialApprovals) {
     throw new Error("No Security Council Approvals found for initialApprovals");
   }
   const initialCount = Number.parseInt(initialApprovals.split("/")[0]);
   const approveButton = page.getByRole("button", { name: "Approve proposal" });
-  approveButton.click();
+  await approveButton.click();
 
   await wallet.sign();
 
   // To allow the count to update
-  await page.waitForTimeout(5000);
+  await page.waitForLoadState("networkidle");
+
   const updatedApprovals = await page.getByTestId("security-signatures").textContent();
   if (!updatedApprovals) {
     throw new Error("No Security Council Approvals found for updatedApprovals");
@@ -119,7 +119,7 @@ test("should be able to sign standard proposals", async ({ switcher, wallet, pag
   const updatedCount = Number.parseInt(updatedApprovals.split("/")[0]);
 
   expect(updatedCount).toBe(initialCount + 1);
-  await expect(approveButton).toBeDisabled({ timeout: 5000 });
+  await expect(approveButton).toBeDisabled();
 });
 
 //TODO

@@ -282,6 +282,7 @@ export default function Proposals() {
                             label="Security Council Approvals"
                             signatures={proposal.signatures.approveUpgradeSecurityCouncil.length}
                             necessarySignatures={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
+                            testId={"council-signature-count"}
                           />
                           <VotingStatusIndicator
                             label="Guardian Approvals"
