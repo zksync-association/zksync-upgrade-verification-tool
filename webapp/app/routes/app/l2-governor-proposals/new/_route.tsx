@@ -91,7 +91,7 @@ export default function NewL2GovernorVeto() {
                           </FormControl>
                         </FormItem>
                       )}
-                    ></FormField>
+                    />
                   </TableCell>
                 </TableRow>
               ))}
