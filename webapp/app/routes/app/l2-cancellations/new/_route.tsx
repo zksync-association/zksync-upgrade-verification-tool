@@ -50,16 +50,6 @@ export default function NewL2GovernorVeto() {
     mode: "onTouched",
   });
 
-  const onSubmit = useCallback(
-    ({ proposalId }: Schema) => {
-      const l2Proposal = activeL2Proposals.find((prop) => prop.proposalId === proposalId);
-      if (!l2Proposal) {
-        throw new Error("Proposal is not present");
-      }
-    },
-    [activeL2Proposals]
-  );
-
   return (
     <div>
       <Form {...form}>
