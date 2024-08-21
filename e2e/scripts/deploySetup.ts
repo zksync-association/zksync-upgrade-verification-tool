@@ -128,7 +128,7 @@ function range(from: number, to: number): number[] {
   return new Array(to - from).fill(0).map((_, i) => i + from);
 }
 
-function deriveMembers(first: Hex, envVar: string, deriveStart: number, mnemonic: string): Hex[] {
+function deriveMembers(first: Hex, envVar: string, deriveStart: number, membersSize: number, mnemonic: string): Hex[] {
   const extras = (process.env[envVar] || "")
     .split(",")
     .filter(str => str.length !== 0)
@@ -136,7 +136,7 @@ function deriveMembers(first: Hex, envVar: string, deriveStart: number, mnemonic
     .concat([first])
     .map((str) => str as Hex);
 
-  const derived = range(deriveStart, deriveStart + (COUNCIL_SIZE - extras.length))
+  const derived = range(deriveStart, deriveStart + (membersSize - extras.length))
     .map((n) => mnemonicToAccount(mnemonic, {addressIndex: n}));
 
   return derived.map((hd) => hd.address)
@@ -168,8 +168,8 @@ function deriveAllAddresses() {
   const guardianStart = DERIVATION_INDEXES.SECOND_GUARDIAN - 1
 
   return {
-    council: deriveMembers(firstCouncil, "EXTRA_COUNCIL", councilStart, mnemonic),
-    guardians: deriveMembers(firstGuardian, "EXTRA_GUARDIANS", guardianStart, mnemonic),
+    council: deriveMembers(firstCouncil, "EXTRA_COUNCIL", councilStart, COUNCIL_SIZE, mnemonic),
+    guardians: deriveMembers(firstGuardian, "EXTRA_GUARDIANS", guardianStart, GUARDIANS_SIZE, mnemonic),
     zkAssociation: zkAssociation,
     visitor: visitor,
   };
