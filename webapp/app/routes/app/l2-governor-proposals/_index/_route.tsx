@@ -3,14 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { $path } from "remix-routes";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "@radix-ui/react-icons";
-import { Link } from "@remix-run/react";
+import { Link, useLoaderData } from "@remix-run/react";
+import { json } from "@remix-run/node";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowRight } from "lucide-react";
 
 export async function loader() {
-  await getZkGovOpsProposals();
-  return null
+  const proposals = await getZkGovOpsProposals();
+  return json({proposals})
 }
 
 export default function L2Proposals() {
+  const {proposals} = useLoaderData<typeof loader>();
   return (
     <Card className="pb-10">
       <CardHeader>
@@ -18,12 +22,34 @@ export default function L2Proposals() {
           <CardTitle>Active L2 Veto Proposals</CardTitle>
           <Link to={$path("/app/l2-governor-proposals/new")}>
             <Button data-testid="new-emergency-proposal" variant="secondary" size="icon">
-              <PlusIcon className="h-4 w-4" />
+              <PlusIcon className="h-4 w-4"/>
             </Button>
           </Link>
         </div>
       </CardHeader>
       <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Description</TableHead>
+              <TableHead className="w-20"/>
+            </TableRow>
+          </TableHeader>
+
+          <TableBody>
+            {proposals.map((proposal) => (
+              <TableRow key={proposal.id}>
+                <TableCell>{proposal.description}</TableCell>
+                <TableCell>
+                  <Button variant="outline" size="sm">
+                    Go
+                    <ArrowRight className="ml-2 h-4 w-4"/>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );

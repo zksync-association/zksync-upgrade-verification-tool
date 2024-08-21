@@ -4,7 +4,7 @@ import { type Address, decodeEventLog, Hex, hexToBigInt, numberToHex } from "vie
 import { z } from "zod";
 import { db } from "../db";
 import { createL2GovernorProposalCall } from "../db/dto/l2-governor-proposal-calls";
-import { createOrIgnoreL2GovernorProposal } from "../db/dto/l2-governor-proposals";
+import { createOrIgnoreL2GovernorProposal, getActiveL2Governors } from "../db/dto/l2-governor-proposals";
 import { l1Rpc, l2Rpc } from "./clients";
 import { zkGovOpsGovernorAbi } from "./contract-abis";
 import { bigIntMax } from "@/utils/bigint";
@@ -116,7 +116,7 @@ export async function createVetoProposalFor(id: Hex) {
 
 
 export async function getZkGovOpsProposals() {
-  return [];
+  return getActiveL2Governors();
 }
 
 // async function getProposalState({
