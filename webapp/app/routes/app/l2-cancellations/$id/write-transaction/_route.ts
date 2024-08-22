@@ -1,3 +1,4 @@
+import { getL2CancellationById, updateL2Cancellation } from "@/.server/db/dto/l2-cancellations";
 import { hexSchema } from "@/common/basic-schemas";
 import { notFound } from "@/utils/http";
 import { type ActionFunctionArgs, redirect } from "@remix-run/node";
@@ -20,14 +21,15 @@ export async function action({ request, params: remixParams }: ActionFunctionArg
   if (!data.success) {
     throw notFound();
   }
-  //
-  // const freezeProposal = await getFreezeProposalById(params.data.id);
-  // if (!freezeProposal) {
-  //   throw notFound();
-  // }
-  //
-  // await updateFreezeProposal(freezeProposal.id, {
-  //   transactionHash: data.data.hash,
-  // });
+
+  const proposal = await getL2CancellationById(params.data.id);
+  if (!proposal) {
+    throw notFound();
+  }
+
+  await updateL2Cancellation(proposal.id, {
+    transactionHash: data.data.hash,
+  });
+
   return redirect($path("/app/transactions/:hash", { hash: data.data.hash }));
 }

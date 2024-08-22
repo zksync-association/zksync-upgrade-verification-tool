@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS "l2_governor_cancellations" (
 	"tx_request_to" "bytea" NOT NULL,
 	"tx_request_refund_recipient" "bytea" NOT NULL,
 	"tx_request_tx_mint_value" "bytea" NOT NULL,
+	"transaction_hash" "bytea",
 	CONSTRAINT "l2_governor_cancellations_external_id_unique" UNIQUE("external_id")
 );
 --> statement-breakpoint

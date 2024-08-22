@@ -33,10 +33,21 @@ export async function getL2CancellationByExternalId(
   externalId: Hex,
   { tx }: { tx: typeof db } = { tx: db }
 ) {
-  return getFirstOrThrow(
-    await tx
-      .select()
-      .from(l2CancellationsTable)
-      .where(eq(l2CancellationsTable.externalId, externalId))
-  );
+  return tx
+    .select()
+    .from(l2CancellationsTable)
+    .where(eq(l2CancellationsTable.externalId, externalId))
+    .then(getFirst);
+}
+
+export async function updateL2Cancellation(
+  id: InferSelectModel<typeof l2CancellationsTable>["id"],
+  data: Partial<InferInsertModel<typeof l2CancellationsTable>>
+) {
+  return db
+    .update(l2CancellationsTable)
+    .set(data)
+    .where(eq(l2CancellationsTable.id, id))
+    .returning()
+    .then(getFirstOrThrow);
 }

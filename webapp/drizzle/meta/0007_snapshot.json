@@ -1,5 +1,5 @@
 {
-  "id": "e228a0be-6fc9-4c94-9267-28bdc0658274",
+  "id": "1e0091af-0aae-437a-a281-62dd15cbfae1",
   "prevId": "fe4dfd5b-bc2e-4b0e-8547-f5ea5961e2cd",
   "version": "7",
   "dialect": "postgresql",
@@ -358,6 +358,12 @@
           "type": "bytea",
           "primaryKey": false,
           "notNull": true
+        },
+        "transaction_hash": {
+          "name": "transaction_hash",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},

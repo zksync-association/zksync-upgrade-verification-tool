@@ -9,6 +9,8 @@ import { getL2GovernorAddress } from "@/.server/service/l2-cancellations";
 import { validateAndSaveL2CancellationSignature } from "@/.server/service/signatures";
 import { hexSchema } from "@/common/basic-schemas";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
+import TxLink from "@/components/tx-link";
+import TxStatus from "@/components/tx-status";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CallsRawData } from "@/components/upgrade-raw-data";
@@ -17,6 +19,7 @@ import ExecL2VetoButton from "@/routes/app/l2-cancellations/$id/exec-l2-veto-but
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { badRequest, notFound } from "@/utils/http";
+import { env } from "@config/env.server";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { CircleCheckBig } from "lucide-react";
@@ -34,22 +37,27 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   }
 
   const proposal = await getL2CancellationByExternalId(params.data.id);
+  if (!proposal) {
+    throw notFound();
+  }
+
   const [calls, signatures, guardiansAddr, l2GovernorAddr] = await Promise.all([
     getl2CancellationCallsByProposalId(proposal.id),
     getSignaturesByL2CancellationId(proposal.id),
     guardiansAddress(),
     getL2GovernorAddress(proposal.type),
   ]);
-  const necessarySignatures = 5; //FIXME
+  const necessarySignatures = 5; //FIXME: centralize this information or pull from contract
 
   return json({
     user,
-    proposal: proposal,
+    proposal,
     signatures,
     calls,
     necessarySignatures,
     guardiansAddress: guardiansAddr,
     l2GovernorAddress: l2GovernorAddr,
+    ethNetwork: env.ETH_NETWORK,
   });
 }
 
@@ -80,7 +88,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function L2Cancellation() {
-  const { user, proposal, calls, signatures, necessarySignatures, guardiansAddress } =
+  const { user, proposal, calls, signatures, necessarySignatures, guardiansAddress, ethNetwork } =
     useLoaderData<typeof loader>();
 
   let proposalType: string;
@@ -96,7 +104,7 @@ export default function L2Cancellation() {
   const signDisabled =
     user.role !== "guardian" || signatures.some((s) => isAddressEqual(s.signer, user.address));
 
-  const execDisabled = signatures.length < necessarySignatures;
+  const execDisabled = signatures.length < necessarySignatures || proposal.transactionHash !== null;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -121,6 +129,15 @@ export default function L2Cancellation() {
                 <span>Proposer:</span>
                 <span className="w-1/2 break-words text-right">{proposal.proposer}</span>
               </div>
+              {proposal.transactionHash && (
+                <div className="flex justify-between">
+                  <span>Transaction Hash:</span>
+                  <div className="flex flex-1 flex-col items-end space-y-1">
+                    <TxLink hash={proposal.transactionHash} network={ethNetwork} />
+                    <TxStatus hash={proposal.transactionHash} />
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -190,7 +207,7 @@ export default function L2Cancellation() {
               disabled={execDisabled}
               calls={calls}
             >
-              Execute freeze
+              Execute Veto
             </ExecL2VetoButton>
           </CardContent>
         </Card>

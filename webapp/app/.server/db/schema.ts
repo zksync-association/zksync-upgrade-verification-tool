@@ -166,6 +166,7 @@ export const l2CancellationsTable = pgTable("l2_governor_cancellations", {
   txRequestTo: bytea("tx_request_to").notNull(),
   txRequestRefundRecipient: bytea("tx_request_refund_recipient").notNull(),
   txRequestTxMintValue: bytea("tx_request_tx_mint_value").notNull(),
+  transactionHash: bytea("transaction_hash"),
 });
 
 export const l2CancellationsTableRelations = relations(l2CancellationsTable, ({ many }) => {
