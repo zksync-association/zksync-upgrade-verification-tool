@@ -27,7 +27,7 @@ export default function SignButton({
   disabled,
   postAction,
 }: SignButtonProps) {
-  const { signTypedData, isPending, isSuccess, isError, data: signature } = useSignTypedData();
+  const { signTypedData, isPending, isSuccess, isError } = useSignTypedData();
   const [chain] = useChains();
   const fetcher = useFetcher<typeof action>();
 
@@ -46,33 +46,36 @@ export default function SignButton({
   }, [loading, success, isError]);
 
   function onClick() {
-    signTypedData({
-      domain: {
-        name: contractData.name,
-        version: "1",
-        chainId: chain.id,
-        verifyingContract: contractData.address,
+    signTypedData(
+      {
+        domain: {
+          name: contractData.name,
+          version: "1",
+          chainId: chain.id,
+          verifyingContract: contractData.address,
+        },
+        primaryType: contractData.actionName,
+        message: {
+          id: proposalId,
+        },
+        types: {
+          [contractData.actionName]: [
+            {
+              name: "id",
+              type: "bytes32",
+            },
+          ],
+        },
       },
-      primaryType: contractData.actionName,
-      message: {
-        id: proposalId,
-      },
-      types: {
-        [contractData.actionName]: [
-          {
-            name: "id",
-            type: "bytes32",
-          },
-        ],
-      },
-    }, {
-      onSuccess: (signature) => {
-        fetcher.submit(
-          { intent: "newSignature", signature, actionName: contractData.actionName, proposalId },
-          { method: "POST", action: postAction }
-        );
+      {
+        onSuccess: (signature) => {
+          fetcher.submit(
+            { intent: "newSignature", signature, actionName: contractData.actionName, proposalId },
+            { method: "POST", action: postAction }
+          );
+        },
       }
-    });
+    );
   }
 
   return (
