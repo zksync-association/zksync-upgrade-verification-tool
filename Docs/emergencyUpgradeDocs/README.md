@@ -10,6 +10,7 @@ The objective of the rehearsal is to make guardians and security council members
 
 Every signer of this rehearsal will [sign through a safe](https://safe.global/). Please ensure you have access to your safe and everything needed to produce your signature. This includes having access to your EOA included in the safe (for example, your hardware wallet at hand and linked with MetaMask or your preferred interface for signing will be required). 
 
+> [!Note]
 **For rehearsals, please remember to choose Ethereum Sepolia Testnet as the network for all your interactions.**
 
 ### 2. Access to governance web app
@@ -18,7 +19,7 @@ Please ensure you have access to the ZkSync Upgrade Analysis & Approval Web App.
 
 - Staging link: [https://verify.staging.zknation.io/](https://verify.staging.zknation.io/)
 
-![Note]
+> [!Note]
 👍🏽 All interactions by the members of the security council and the guardians during this rehearsal are off-chain, **so they will not need ETH or any other tokens to fund transactions.** *On-chain transactions will be made by the facilitator of the rehearsal.*
 
 ## ✅ **Creating & Approving an Emergency Upgrade**
@@ -32,7 +33,7 @@ The first step involves logging into the governance tool using **SAFE through Wa
 
 ### **Connect Wallet using Wallet Connect**
 
-![Note]
+> [!Note]
 Remember that you will need to connect to the governance web app with your safe & choose Ethereum Sepolia Testnet as the network for all your interactions.
 
 **You will need to connect to the governance web app with your safe**. Use WalletConnect for that:
@@ -77,7 +78,7 @@ Here is a **quick guide to navigate** through this visualization:
 
 ## Step 3: Creating a new emergency upgrade proposal [Optional]
 
-![Note]
+> [!Note]
 If you only need to approve an emergency upgrade proposal, go to step 4.
 
 If you click on the plus sign, you will be redirected to a new page:
@@ -123,7 +124,7 @@ Here is a **quick guide to navigate** through this visualization:
 
 → **Proposal Actions:** The actions on the bottom right are not tied to any specific role. Anyone can perform them at the appropriate time, but they all involve on-chain transactions. For example, "Broadcast Upgrade" can only be done when all signatures of the 3 bodies were collected. 
 
-![Caution]
+> [!Caution]
 🚨 To complete this step, please verify that is the correct emergency proposal. Check it multiple times, compare it with your own data, and double-check that it's the upgrade you expect to approve.
 
 ## Step 5: Verify Upgrade Proposal integrity
@@ -136,7 +137,7 @@ This is the moment when the upgrade information should be verified and double-ch
 
 However, each signer needs to do their own verification. **Remember that this is a security-focused procedure, so you should not trust anything, not even the information displayed by the browser**. You must keep an eye out for anything that may seem off and review with external tools that the data showcases what you expect. Even if it looks as expected in the app, you must do your outside verification before proceeding. 
 
-![Caution]
+> [!Caution]
 Each signer is responsible for the verification process. You should perform your own integrity analysis and verify all web app data with external sources to confirm before proceeding.
 
 As a general reminder, signers should review:
@@ -170,7 +171,7 @@ After checking the ID, you can click on the sign. From there, two possible flows
 
 ![signature](signature.png)
 
-![Note]
+> [!Note]
  *If you are not the last signer of your safe, you will not see any change in the governor web app. That’s fine. When every signer of the safe approves the upgrade, a single signature is registered for the entire safe.* 
 
 ## Step 7: Broadcasting the upgrade

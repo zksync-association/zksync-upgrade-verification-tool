@@ -10,6 +10,7 @@ The objective of this documentation is to guide the security council members thr
 
 Every signer of this rehearsal will [sign through a safe](https://safe.global/). Please ensure you have access to your safe and everything needed to produce your signature. This includes having access to your EOA included in the safe (for example, your hardware wallet at hand and linked with MetaMask or your preferred interface for signing will be required). 
 
+> [!Note]
 ***For rehearsals, please remember to choose Ethereum **Sepolia Testnet** as the network for all your interactions.***`
 
 ### 2. Access to governance web app
@@ -33,7 +34,7 @@ The first step involves logging into the governance tool using **SAFE through Wa
 
 ### **Connect Wallet using Wallet Connect**
 
-![Note]
+> [!Note]
 Remember that you will need to connect to the governance web app with your **SAFE** & choose **Ethereum Sepolia Testnet** as the network for all your interactions.
 
 **You will need to connect to the governance web app with your safe**. Use WalletConnect for that:
@@ -90,7 +91,7 @@ There are two common reasons why a freezing proposal can become inactive:
 
 In both cases, the proposal will be marked as inactive and will not be able to be executed. 
 
-![Note]
+> [!Note]
 **Navigation**: You can click on **the arrow (->)** to view more details about each proposal or the **“+” button** to add a new proposal. **Creation of a new proposal is only possible if there is no active proposal with the same nonce.**
 
 ![freezingHome2](freezingHome2.png)
@@ -99,7 +100,7 @@ In both cases, the proposal will be marked as inactive and will not be able to b
 
 This is the moment when the freezing proposal information should be reviewed.
 
-![Note]
+> [!Note]
 The 4 types of freezing proposals follow the same structure, so it is important to review the information for each type of proposal. In the case of setting the soft freeze threshold, it is important to review actual threshold and the proposed threshold.
 
 For this example, we will review the information for a *soft freeze* proposal.
@@ -148,5 +149,5 @@ Once the confirmations are reached and the message is signed through SAFE, the s
 
 Once approval threshold is reached, a transaction is needed to register those approvals on-chain. The facilitator of the process will handle this.
 
-![Note]
+> [!Note]
 For more information on the freezing process, please refer to the [the freeze section](https://docs.zknation.io/zksync-governance/schedule-2-emergency-response-procedures#id-2.-freeze).
