@@ -22,6 +22,8 @@ import { getFormData, getParams } from "remix-params-helper";
 import { isAddressEqual } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CallsRawData, UpgradeRawData } from "@/components/upgrade-raw-data";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -70,7 +72,6 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   await validateAndSaveL2CancellationSignature({
-    //FIXME: use the correct values
     proposal,
     signature: data.data.signature,
     signer: user.address,
@@ -163,7 +164,6 @@ export default function L2Cancellation() {
                   address: guardiansAddress,
                   name: "Guardians",
                 }}
-                //FIXME: use the correct values
                 l2GasLimit={proposal.txRequestGasLimit}
                 l2GasPerPubdataByteLimit={proposal.txRequestL2GasPerPubdataByteLimit}
                 l2GovernorAddress={proposal.txRequestTo}
@@ -195,6 +195,22 @@ export default function L2Cancellation() {
           </CardContent>
         </Card>
       </div>
+
+      <Tabs className="mt-4 flex" defaultValue="raw-data">
+        <TabsList className="mt-12 mr-6">
+          <TabsTrigger value="raw-data">L2 Calls</TabsTrigger>
+        </TabsList>
+        <TabsContent value="raw-data" className="w-full">
+          <Card className="pb-8">
+            <CardHeader>
+              <CardTitle>L2 Calls</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <CallsRawData calls={calls} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
