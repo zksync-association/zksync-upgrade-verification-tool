@@ -16,7 +16,7 @@ Every signer of this rehearsal will [sign through a safe](https://safe.global/).
 
 Please ensure you have access to the ZkSync Upgrade Analysis & Approval Web App. This web app is used to coordinate the process of gathering signatures and, in the end, broadcasting the transaction that executes the upgrade.
 
-- Staging link: [https://zksync-upgrade-verification.staging.zknation.io/](https://zksync-upgrade-verification.staging.zknation.io/)
+- Staging link: [https://verify.staging.zknation.io/](https://verify.staging.zknation.io/)
 
 ### 3. Tally proposal
 
@@ -41,6 +41,9 @@ The first step involves logging into the governance tool using **SAFE through Wa
 ![ConnectWallet](connectWallet.png)
 
 ### **Connect Wallet using Wallet Connect**
+
+![Note]
+Remember that you will need to connect to the governance web app with your **SAFE** & choose **Ethereum Sepolia Testnet** as the network for all your interactions.
 
 **You will need to connect to the governance web app with your safe**. Use WalletConnect for that:
 
