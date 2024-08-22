@@ -267,6 +267,7 @@ export default function Freeze() {
               threshold={necessarySignatures}
               disabled={!executeFreezeEnabled}
               validUntil={proposalValidUntil}
+              softFreezeThreshold={proposal.softFreezeThreshold}
             >
               Execute freeze
             </ContractWriteButton>
