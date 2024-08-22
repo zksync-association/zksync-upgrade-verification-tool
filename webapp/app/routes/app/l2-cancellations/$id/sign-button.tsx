@@ -1,4 +1,4 @@
-import { getVetoL2GovernorProposalSignatureArgs } from "@/common/l2-governor-proposal";
+import { getL2CancellationSignatureArgs } from "@/common/l2-cancellations";
 import type { SignAction } from "@/common/sign-action";
 import { Button } from "@/components/ui/button";
 import type { action } from "@/routes/app/proposals/$id/_route";
@@ -21,7 +21,7 @@ type SignButtonProps = {
   proposal: {
     id: number;
     externalId: Hash;
-    nonce: bigint;
+    nonce: number;
   };
   l2GovernorAddress: Address;
   l2GasLimit: bigint;
@@ -41,7 +41,14 @@ export default function SignButton({
   txMintValue,
   refundRecipient,
 }: SignButtonProps) {
-  const { signTypedData, isPending, isSuccess, isError, data: signature } = useSignTypedData();
+  const {
+    signTypedData,
+    isPending,
+    isSuccess,
+    isError,
+    error: errorData,
+    data: signature,
+  } = useSignTypedData();
   const [chain] = useChains();
   const fetcher = useFetcher<typeof action>();
 
@@ -66,11 +73,12 @@ export default function SignButton({
       toast.success("Signed successfully", { id: "sign_button" });
     }
     if (error) {
+      console.error(errorData);
       toast.error("Failed to sign", { id: "sign_button" });
     }
-  }, [loading, success, error]);
+  }, [loading, success, error, errorData]);
 
-  const { message, types } = getVetoL2GovernorProposalSignatureArgs({
+  const { message, types } = getL2CancellationSignatureArgs({
     proposal,
     l2GovernorAddress,
     l2GasLimit,

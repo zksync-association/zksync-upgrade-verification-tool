@@ -178,3 +178,12 @@ export const l2CancellationCalls = pgTable("l2_cancellation_calls", {
   value: bytea("value").notNull(),
   data: bytea("data").notNull(),
 });
+
+export const l2CancellationCallsRelations = relations(l2CancellationCalls, ({ one }) => {
+  return {
+    proposal: one(l2CancellationsTable, {
+      fields: [l2CancellationCalls.proposalId],
+      references: [l2CancellationsTable.id],
+    }),
+  };
+});

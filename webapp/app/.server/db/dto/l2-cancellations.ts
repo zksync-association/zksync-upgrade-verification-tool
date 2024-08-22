@@ -1,4 +1,4 @@
-import { type InferInsertModel, eq } from "drizzle-orm";
+import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
 import type { Hex } from "viem";
 import { db } from "..";
 import { l2CancellationStatusEnum, l2CancellationsTable } from "../schema";
@@ -16,6 +16,17 @@ export async function getActiveL2Cancellations({ tx }: { tx: typeof db } = { tx:
     .select()
     .from(l2CancellationsTable)
     .where(eq(l2CancellationsTable.status, l2CancellationStatusEnum.enum.ACTIVE));
+}
+
+export async function getL2CancellationById(
+  id: InferSelectModel<typeof l2CancellationsTable>["id"],
+  { tx }: { tx: typeof db } = { tx: db }
+) {
+  return tx
+    .select()
+    .from(l2CancellationsTable)
+    .where(eq(l2CancellationsTable.id, id))
+    .then(getFirst);
 }
 
 export async function getL2CancellationByExternalId(

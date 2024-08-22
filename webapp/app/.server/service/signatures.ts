@@ -7,7 +7,11 @@ import {
   createOrIgnoreSignature,
   getSignaturesByEmergencyProposalId,
 } from "@/.server/db/dto/signatures";
-import { type freezeProposalsTable, signaturesTable } from "@/.server/db/schema";
+import {
+  type freezeProposalsTable,
+  type l2CancellationsTable,
+  signaturesTable,
+} from "@/.server/db/schema";
 import {
   councilAddress,
   councilMembers,
@@ -19,6 +23,7 @@ import {
 import { l1Rpc } from "@/.server/service/clients";
 import { guardiansAbi } from "@/.server/service/contract-abis";
 import { getFreezeProposalSignatureArgs } from "@/common/freeze-proposal";
+import { getL2CancellationSignatureArgs } from "@/common/l2-cancellations";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import type { SignAction } from "@/common/sign-action";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
@@ -26,9 +31,10 @@ import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
 import { env } from "@config/env.server";
 import { type InferSelectModel, and, asc, eq } from "drizzle-orm";
-import { type Hex, hashTypedData } from "viem";
+import { type Address, type Hex, hashTypedData } from "viem";
 import { mainnet, sepolia } from "wagmi/chains";
 import { z } from "zod";
+import { getL2GovernorAddress } from "./l2-cancellations";
 
 async function verifySignature({
   signer,
@@ -71,7 +77,7 @@ async function verifySignature({
       1,
     ]);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 }
@@ -311,6 +317,68 @@ export async function validateAndSaveFreezeSignature({
     signature,
     signer,
     freezeProposal: proposal.id,
+  });
+}
+
+export async function validateAndSaveL2CancellationSignature({
+  signature,
+  signer,
+  proposal,
+  l2GasLimit,
+  l2GasPerPubdataByteLimit,
+  txMintValue,
+  refundRecipient,
+}: {
+  signature: Hex;
+  signer: Hex;
+  proposal: InferSelectModel<typeof l2CancellationsTable>;
+  l2GasLimit: bigint;
+  l2GasPerPubdataByteLimit: bigint;
+  txMintValue: bigint;
+  refundRecipient: Address;
+}) {
+  const enabledMembers = await guardianMembers();
+  if (!enabledMembers.includes(signer)) {
+    throw badRequest(
+      "Signer is not part of the guardians. Only guardian members can execute this action."
+    );
+  }
+
+  const l2GovernorAddress = await getL2GovernorAddress(proposal.type);
+
+  const { message, types } = getL2CancellationSignatureArgs({
+    proposal: {
+      externalId: proposal.externalId,
+      nonce: proposal.nonce,
+    },
+    l2GasLimit,
+    l2GasPerPubdataByteLimit,
+    txMintValue,
+    refundRecipient,
+    l2GovernorAddress,
+  });
+
+  const addr = await guardiansAddress();
+  const validSignature = await verifySignature({
+    signer,
+    signature,
+    verifierAddr: addr,
+    action: "L2GovernorVetoProposal",
+    message,
+    types,
+    contractName: "Guardians",
+    targetContract: addr,
+  });
+
+  if (!validSignature) {
+    throw badRequest("Invalid signature");
+  }
+
+  await createOrIgnoreSignature({
+    action: "L2GovernorVetoProposal",
+    signature,
+    signer,
+    l2GovernorProposal: proposal.id,
   });
 }
 

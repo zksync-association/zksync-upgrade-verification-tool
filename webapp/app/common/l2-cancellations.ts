@@ -1,6 +1,6 @@
 import type { Address, Hex } from "viem";
 
-export function getVetoL2GovernorProposalSignatureArgs({
+export function getL2CancellationSignatureArgs({
   proposal,
   l2GovernorAddress,
   l2GasLimit,
@@ -10,7 +10,7 @@ export function getVetoL2GovernorProposalSignatureArgs({
 }: {
   proposal: {
     externalId: Hex;
-    nonce: bigint;
+    nonce: number;
   };
   l2GovernorAddress: Address;
   l2GasLimit: bigint;

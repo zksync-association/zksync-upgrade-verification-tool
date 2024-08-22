@@ -50,7 +50,7 @@ export default function L2Proposals() {
                 <TableCell>
                   <Link to={$path("/app/l2-cancellations/:id", { id: proposal.externalId })}>
                     <Button variant="outline" size="sm">
-                      Go
+                      View
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                   </Link>

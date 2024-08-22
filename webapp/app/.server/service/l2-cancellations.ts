@@ -1,11 +1,11 @@
-import { l2CancellationStatusEnum } from "@/.server/db/schema";
+import { type L2CancellationType, l2CancellationStatusEnum } from "@/.server/db/schema";
 import { guardiansAddress } from "@/.server/service/contracts";
 import { hexSchema } from "@/common/basic-schemas";
 import { bigIntMax } from "@/utils/bigint";
 import { notFound } from "@/utils/http";
 import { ALL_ABIS, ZK_GOV_OPS_GOVERNOR_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
-import { type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
+import { type Address, type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
@@ -112,6 +112,19 @@ export async function createVetoProposalFor(id: Hex) {
 
 export async function getZkGovOpsProposals() {
   return getActiveL2Cancellations();
+}
+
+export function getL2GovernorAddress(proposalType: L2CancellationType) {
+  let l2GovernorAddress: Address;
+  switch (proposalType) {
+    case "ZK_GOV_OPS_GOVERNOR":
+      l2GovernorAddress = env.ZK_GOV_OPS_GOVERNOR_ADDRESS;
+      break;
+    case "ZK_TOKEN_GOVERNOR":
+      l2GovernorAddress = env.ZK_TOKEN_GOVERNOR_ADDRESS;
+      break;
+  }
+  return l2GovernorAddress;
 }
 
 // async function getProposalState({
