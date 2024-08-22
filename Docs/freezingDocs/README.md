@@ -1,8 +1,8 @@
-# Standard Upgrades: User Guide
+# Freezing Rehearsal: User Guide
 
 ## 🎯 **Objective**
 
-The objective of the rehearsal is to make  security council members comfortable with the tools used to freeze the protocol.
+The objective of this documentation is to guide the security council members through the tool & process used to freeze/unfreeze the protocol.
 
 ## 📝 **Preparation**
 
@@ -21,11 +21,11 @@ Please ensure you have access to the ZkSync Upgrade Analysis & Approval Web App.
 > [!Note]
 👍🏽 All interactions by the members of the security council during this rehearsal are off-chain, **so they will not need ETH or any other tokens to fund transactions.** *On-chain transactions will be made by the facilitator of the rehearsal.*
 
-## ✅ **Approval through the web app**
+## ❄️ **Freezing/Unfreezing through the web app**
 
 ### Step 1: Logging into the governance tool using SAFE
 
-The governance web app is used to follow the [standard protocol upgrade procedure](https://docs.zknation.io/zksync-governance/schedule-1-standard-governance-procedures#id-3.-protocol-governor-proposal-process). It facilitates gathering the necessary signatures for updating the protocol. Finally, it builds the transactions that validate all the gathered signatures on-chain and execute the upgrade.
+The governance web app is used to follow the [soft/hard freeze, unfreezing & setting a new soft freeze threshold procedure](https://docs.zknation.io/zksync-governance/schedule-2-emergency-response-procedures#id-2.-freeze). It facilitates creating proposals & gathering the necessary signatures for this actions. Finally, it builds the transactions that validate all the gathered signatures on-chain and execute the proposal.
 
 The first step involves logging into the governance tool using **SAFE through WalletConnect integration.** 
 
