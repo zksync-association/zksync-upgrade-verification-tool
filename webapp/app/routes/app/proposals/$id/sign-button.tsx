@@ -31,15 +31,6 @@ export default function SignButton({
   const [chain] = useChains();
   const fetcher = useFetcher<typeof action>();
 
-  useEffect(() => {
-    if (isSuccess) {
-      fetcher.submit(
-        { intent: "newSignature", signature, actionName: contractData.actionName, proposalId },
-        { method: "POST", action: postAction }
-      );
-    }
-  }, [isSuccess, contractData.actionName, fetcher.submit, proposalId, signature, postAction]);
-
   const loading = isPending || fetcher.state === "submitting" || fetcher.state === "loading";
   const success = isSuccess && fetcher.state === "idle" && fetcher.data?.ok;
   useEffect(() => {
@@ -74,6 +65,13 @@ export default function SignButton({
           },
         ],
       },
+    }, {
+      onSuccess: (signature) => {
+        fetcher.submit(
+          { intent: "newSignature", signature, actionName: contractData.actionName, proposalId },
+          { method: "POST", action: postAction }
+        );
+      }
     });
   }
 
