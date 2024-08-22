@@ -219,16 +219,3 @@ export function getL2GovernorAddress(proposalType: L2CancellationType) {
   }
   return l2GovernorAddress;
 }
-
-// async function getProposalState({
-//   proposalId,
-//   targetAddress,
-// }: { proposalId: bigint; targetAddress: Address }) {
-//   return await l2Rpc.contractRead(
-//     targetAddress,
-//     "state",
-//     ZK_GOV_OPS_GOVERNOR_ABI,
-//     z.number(),
-//     [proposalId]
-//   );
-// }
