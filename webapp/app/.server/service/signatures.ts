@@ -363,7 +363,7 @@ export async function validateAndSaveL2CancellationSignature({
     signer,
     signature,
     verifierAddr: addr,
-    action: "L2GovernorVetoProposal",
+    action: "CancelL2GovernorProposal",
     message,
     types,
     contractName: "Guardians",
@@ -375,7 +375,7 @@ export async function validateAndSaveL2CancellationSignature({
   }
 
   await createOrIgnoreSignature({
-    action: "L2GovernorVetoProposal",
+    action: "CancelL2GovernorProposal",
     signature,
     signer,
     l2GovernorProposal: proposal.id,

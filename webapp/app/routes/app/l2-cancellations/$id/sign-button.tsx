@@ -5,7 +5,7 @@ import type { action } from "@/routes/app/proposals/$id/_route";
 import { useFetcher } from "@remix-run/react";
 import { useEffect } from "react";
 import { toast } from "react-hot-toast";
-import type { Address, Hash, Hex } from "viem";
+import { Address, Hash, Hex, hexToBigInt } from "viem";
 import { useChains, useSignTypedData } from "wagmi";
 
 type ContractData = {
@@ -24,9 +24,9 @@ type SignButtonProps = {
     nonce: number;
   };
   l2GovernorAddress: Address;
-  l2GasLimit: bigint;
-  l2GasPerPubdataByteLimit: bigint;
-  txMintValue: bigint;
+  l2GasLimit: Hex;
+  l2GasPerPubdataByteLimit: Hex;
+  txMintValue: Hex;
   refundRecipient: Address;
 };
 
@@ -81,9 +81,9 @@ export default function SignButton({
   const { message, types } = getL2CancellationSignatureArgs({
     proposal,
     l2GovernorAddress,
-    l2GasLimit,
-    l2GasPerPubdataByteLimit,
-    txMintValue,
+    l2GasLimit: hexToBigInt(l2GasLimit),
+    l2GasPerPubdataByteLimit: hexToBigInt(l2GasPerPubdataByteLimit),
+    txMintValue: hexToBigInt(txMintValue),
     refundRecipient,
   });
 

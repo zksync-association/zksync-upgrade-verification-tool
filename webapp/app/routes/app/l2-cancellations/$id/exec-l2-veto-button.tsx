@@ -1,35 +1,45 @@
 import type { l2CancellationsTable, signaturesTable } from "@/.server/db/schema";
 import { Button } from "@/components/ui/button";
-import { dateToUnixTimestamp } from "@/utils/date";
 import { ALL_ABIS } from "@/utils/raw-abis";
 import { useFetcher } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
 import type React from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
-import type { ContractFunctionName, Hex } from "viem";
+import { Hex, hexToBigInt } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
+import { Call } from "@/common/calls";
+import { compareHexValues } from "@/utils/compare-hex-values";
 
 type BroadcastTxButtonProps = {
-  target: Hex;
+  guardiansAddress: Hex;
   signatures: InferSelectModel<typeof signaturesTable>[];
   threshold: number;
   disabled?: boolean;
   children?: React.ReactNode;
-  validUntil: Date;
-  functionName: ContractFunctionName<typeof ALL_ABIS.council, "nonpayable">;
   proposalId: InferSelectModel<typeof l2CancellationsTable>["id"];
+  calls: Call[],
+  proposal: Proposal
 };
 
-export default function ContractWriteButton({
+type Proposal = {
+  description: string;
+  txRequestTo: Hex;
+  txRequestGasLimit: Hex;
+  txRequestL2GasPerPubdataByteLimit: Hex;
+  txRequestRefundRecipient: Hex;
+  txRequestTxMintValue: Hex;
+}
+
+export default function ExecL2VetoButton({
   children,
-  target,
+  guardiansAddress,
   signatures,
   threshold,
   disabled,
-  validUntil,
-  functionName,
   proposalId,
+  calls,
+  proposal
 }: BroadcastTxButtonProps) {
   const { address } = useAccount();
   const { isPending, writeContract } = useWriteContract();
@@ -45,19 +55,32 @@ export default function ContractWriteButton({
 
     toast.loading("Broadcasting transaction...", { id: "broadcasting-tx" });
 
-    const args = {
-      validUntil: BigInt(dateToUnixTimestamp(validUntil)),
-      signers: signatures.map((s) => s.signer),
-      signatures: signatures.map((s) => s.signature),
-    };
+    const l2Proposal = {
+      targets: calls.map(c => c.target),
+      values: calls.map(c => hexToBigInt(c.value)),
+      calldatas: calls.map(c => c.data),
+      description: proposal.description
+    } as const;
+
+    const txRequest = {
+      to: proposal.txRequestTo,
+      l2GasLimit: hexToBigInt(proposal.txRequestGasLimit),
+      l2GasPerPubdataByteLimit: hexToBigInt(proposal.txRequestL2GasPerPubdataByteLimit),
+      refundRecipient: proposal.txRequestRefundRecipient,
+      txMintValue: hexToBigInt(proposal.txRequestTxMintValue)
+    } as const;
+
+    const orderedSignatures = signatures.sort((a, b) => compareHexValues(a.signer, b.signer))
+    const signers = orderedSignatures.map(s => s.signer)
+    const signatureValues = orderedSignatures.map(s => s.signature)
 
     writeContract(
       {
         account: address,
-        address: target,
-        functionName,
-        abi: ALL_ABIS.council,
-        args: [args.validUntil, args.signers, args.signatures],
+        address: guardiansAddress,
+        functionName: "cancelL2GovernorProposal",
+        abi: ALL_ABIS.guardians,
+        args: [l2Proposal, txRequest, signers, signatureValues],
       },
       {
         onSuccess: (hash) => {

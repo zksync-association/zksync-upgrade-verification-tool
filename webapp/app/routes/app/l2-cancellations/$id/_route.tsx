@@ -4,7 +4,7 @@ import {
   getL2CancellationById,
 } from "@/.server/db/dto/l2-cancellations";
 import { getSignaturesByL2CancellationId } from "@/.server/db/dto/signatures";
-import { guardiansAddress } from "@/.server/service/contracts";
+import { councilAddress, guardiansAddress } from "@/.server/service/contracts";
 import { getL2GovernorAddress } from "@/.server/service/l2-cancellations";
 import { validateAndSaveL2CancellationSignature } from "@/.server/service/signatures";
 import { hexSchema } from "@/common/basic-schemas";
@@ -18,9 +18,10 @@ import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-r
 import { useLoaderData } from "@remix-run/react";
 import { CircleCheckBig } from "lucide-react";
 import { getFormData, getParams } from "remix-params-helper";
-import { isAddressEqual } from "viem";
+import { Hex, isAddressEqual, numberToHex, zeroAddress } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
+import ExecL2VetoButton from "@/routes/app/l2-cancellations/$id/exec-l2-veto-button";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -41,7 +42,14 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
   return json({
     user,
-    proposal,
+    proposal: {
+      ...proposal,
+      txRequestGasLimit: numberToHex(1000000),
+      txRequestL2GasPerPubdataByteLimit: numberToHex(BigInt(1000)),
+      txRequestTo: l2GovernorAddr,
+      txRequestRefundRecipient: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as Hex,
+      txRequestTxMintValue: numberToHex(0)
+    },
     signatures,
     calls,
     necessarySignatures,
@@ -105,6 +113,8 @@ export default function L2GovernorProposal() {
   const signDisabled =
     user.role !== "guardian" || signatures.some((s) => isAddressEqual(s.signer, user.address));
 
+  const execDisabled = signatures.length < necessarySignatures
+
   return (
     <div className="flex flex-1 flex-col">
       <HeaderWithBackButton>Proposal {displayBytes32(proposal.externalId)}</HeaderWithBackButton>
@@ -167,16 +177,16 @@ export default function L2GovernorProposal() {
                   nonce: proposal.nonce,
                 }}
                 contractData={{
-                  actionName: "L2GovernorVetoProposal",
+                  actionName: "CancelL2GovernorProposal",
                   address: guardiansAddress,
                   name: "Guardians",
                 }}
                 //FIXME: use the correct values
-                l2GasLimit={BigInt(1000000)}
-                l2GasPerPubdataByteLimit={BigInt(1000)}
-                l2GovernorAddress={l2GovernorAddress}
-                refundRecipient="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                txMintValue={BigInt(0)}
+                l2GasLimit={proposal.txRequestGasLimit}
+                l2GasPerPubdataByteLimit={proposal.txRequestL2GasPerPubdataByteLimit}
+                l2GovernorAddress={proposal.txRequestTo}
+                refundRecipient={proposal.txRequestRefundRecipient}
+                txMintValue={proposal.txRequestTxMintValue}
                 disabled={signDisabled}
               >
                 Approve
@@ -189,17 +199,17 @@ export default function L2GovernorProposal() {
             <CardTitle>Execute Actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            {/* <ContractWriteButton
+            <ExecL2VetoButton
               proposalId={proposal.id}
-              target={securityCouncilAddress}
-              functionName={functionName}
+              guardiansAddress={guardiansAddress}
               signatures={signatures}
               threshold={necessarySignatures}
-              disabled={!executeFreezeEnabled}
-              validUntil={proposalValidUntil}
+              proposal={proposal}
+              disabled={execDisabled}
+              calls={calls}
             >
               Execute freeze
-            </ContractWriteButton> */}
+            </ExecL2VetoButton>
           </CardContent>
         </Card>
       </div>

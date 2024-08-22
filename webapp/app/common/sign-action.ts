@@ -11,7 +11,7 @@ export const signActionSchema = z.enum([
   "HardFreeze",
   "Unfreeze",
   "SetSoftFreezeThreshold",
-  "L2GovernorVetoProposal",
+  "CancelL2GovernorProposal",
 ]);
 
 export type SignAction = z.infer<typeof signActionSchema>;
