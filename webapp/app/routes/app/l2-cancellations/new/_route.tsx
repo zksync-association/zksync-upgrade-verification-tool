@@ -85,43 +85,48 @@ export default function NewL2GovernorVeto() {
     <div>
       <Form {...form}>
         <form method="POST" className="space-y-4">
-          <Card>
+          <Card className="pb-10">
             <CardHeader>
               <CardTitle>1. Select an active proposal</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activeL2Proposals.map((row) => (
-                    <TableRow key={row.proposalId}>
-                      <TableCell>{row.proposalId}</TableCell>
-                      <TableCell>{row.type}</TableCell>
-                      <TableCell>{row.description}</TableCell>
-                      <TableCell>
-                        <FormField
-                          control={form.control}
-                          name="proposalId"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input type={"radio"} {...field} value={row.proposalId} />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </TableCell>
+              {activeL2Proposals.length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead />
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {activeL2Proposals.map((row) => (
+                      <TableRow key={row.proposalId}>
+                        <TableCell>{row.proposalId}</TableCell>
+                        <TableCell>{row.type}</TableCell>
+                        <TableCell>{row.description}</TableCell>
+                        <TableCell>
+                          <FormField
+                            control={form.control}
+                            name="proposalId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input type={"radio"} {...field} value={row.proposalId} />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              {activeL2Proposals.length === 0 && (
+                <div className="text-center text-gray-500">No active proposals found.</div>
+              )}
             </CardContent>
           </Card>
 

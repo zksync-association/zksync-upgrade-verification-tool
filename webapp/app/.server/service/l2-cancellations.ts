@@ -33,19 +33,19 @@ const eventSchema = z.object({
 });
 
 async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigint) {
-  return l2Rpc
+  const proposalCreatedLogsPromise = l2Rpc
     .getLogs(getL2GovernorAddress(type), numberToHex(from), "latest", [
       zkGovOpsGovernorAbi.eventIdFor("ProposalCreated"),
     ])
     .then((logs) =>
-      logs.map((log) => {
-        return decodeEventLog({
+      logs.map((log) =>
+        decodeEventLog({
           abi: ZK_GOV_OPS_GOVERNOR_ABI,
           eventName: "ProposalCreated",
           data: log.data,
           topics: log.topics as any,
-        });
-      })
+        })
+      )
     )
     .then((events) =>
       events
@@ -53,6 +53,67 @@ async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigi
         .map((parsedEvent) => parsedEvent.args)
         .map((event) => ({ ...event, type }))
     );
+  const proposalCanceledPromise = l2Rpc
+    .getLogs(getL2GovernorAddress(type), numberToHex(from), "latest", [
+      zkGovOpsGovernorAbi.eventIdFor("ProposalCanceled"),
+    ])
+    .then((logs) =>
+      logs.map((log) =>
+        decodeEventLog({
+          abi: ZK_GOV_OPS_GOVERNOR_ABI,
+          eventName: "ProposalCanceled",
+          data: log.data,
+          topics: log.topics as any,
+        })
+      )
+    )
+    .then((events) =>
+      events.reduce(
+        (obj, event) => {
+          obj[numberToHex(event.args.proposalId)] = true;
+          return obj;
+        },
+        {} as Record<string, boolean>
+      )
+    );
+
+  const proposalExecutedPromise = l2Rpc
+    .getLogs(getL2GovernorAddress(type), numberToHex(from), "latest", [
+      zkGovOpsGovernorAbi.eventIdFor("ProposalExecuted"),
+    ])
+    .then((logs) =>
+      logs.map((log) =>
+        decodeEventLog({
+          abi: ZK_GOV_OPS_GOVERNOR_ABI,
+          eventName: "ProposalExecuted",
+          data: log.data,
+          topics: log.topics as any,
+        })
+      )
+    )
+    .then((events) =>
+      events.reduce(
+        (obj, event) => {
+          obj[numberToHex(event.args.proposalId)] = true;
+          return obj;
+        },
+        {} as Record<string, boolean>
+      )
+    );
+
+  const [proposalCreatedLogs, proposalCanceled, proposalExecuted] = await Promise.all([
+    proposalCreatedLogsPromise,
+    proposalCanceledPromise,
+    proposalExecutedPromise,
+  ]);
+
+  const activeProposals = proposalCreatedLogs.filter(
+    (proposal) =>
+      proposalCanceled[proposal.proposalId] !== true &&
+      proposalExecuted[proposal.proposalId] !== true
+  );
+
+  return activeProposals;
 }
 
 export async function getActiveL2Proposals() {
