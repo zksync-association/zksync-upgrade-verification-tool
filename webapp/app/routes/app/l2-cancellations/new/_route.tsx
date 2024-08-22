@@ -159,7 +159,7 @@ export default function NewL2GovernorVeto() {
                   <FormItem>
                     <FormLabel>L2 gas per pubdata byte limit</FormLabel>
                     <FormControl>
-                      <Input type="number" min={1} {...field} />
+                      <Input type="number" min={0} {...field} />
                     </FormControl>
                     <FormDescription>
                       Limits the amount of gas per byte of public data on L2.
@@ -193,7 +193,7 @@ export default function NewL2GovernorVeto() {
                   <FormItem>
                     <FormLabel>Transaction mint value</FormLabel>
                     <FormControl>
-                      <Input type="number" min={1} {...field} />
+                      <Input type="number" min={0} {...field} />
                     </FormControl>
                     <FormDescription>
                       The ether minted on L2 in this L1 {"->"} L2 transaction.
