@@ -85,6 +85,7 @@ export default function NewL2GovernorVeto() {
             <TableHeader>
               <TableRow>
                 <TableHead>ID</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead />
               </TableRow>
@@ -93,6 +94,7 @@ export default function NewL2GovernorVeto() {
               {activeL2Proposals.map((row) => (
                 <TableRow key={row.proposalId}>
                   <TableCell>{row.proposalId}</TableCell>
+                  <TableCell>{row.type}</TableCell>
                   <TableCell>{row.description}</TableCell>
                   <TableCell>
                     <FormField
