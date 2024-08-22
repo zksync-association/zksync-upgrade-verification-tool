@@ -154,7 +154,6 @@ jobs:
       - run: cp .env.example .env
       - run: pnpm install
       - run: pnpm env:up
-      - run: pnpm compile:preprocess
       - run: pnpm deploy:setup
       - run: pnpm test:local
       - name: Stop local environment
