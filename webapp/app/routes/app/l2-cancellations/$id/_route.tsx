@@ -10,6 +10,8 @@ import { validateAndSaveL2CancellationSignature } from "@/.server/service/signat
 import { hexSchema } from "@/common/basic-schemas";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CallsRawData } from "@/components/upgrade-raw-data";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
 import ExecL2VetoButton from "@/routes/app/l2-cancellations/$id/exec-l2-veto-button";
 import { requireUserFromHeader } from "@/utils/auth-headers";
@@ -22,8 +24,6 @@ import { getFormData, getParams } from "remix-params-helper";
 import { isAddressEqual } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CallsRawData, UpgradeRawData } from "@/components/upgrade-raw-data";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);

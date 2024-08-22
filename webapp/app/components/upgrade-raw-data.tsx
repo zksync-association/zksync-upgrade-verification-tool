@@ -30,10 +30,10 @@ export function CallsRawData({ calls }: { calls: Call[] }) {
         </div>
       ))}
     </div>
-  )
+  );
 }
 
-export function UpgradeRawData({calls, salt }: UpgradeRawDataProps) {
+export function UpgradeRawData({ calls, salt }: UpgradeRawDataProps) {
   return (
     <div>
       <p className="pb-10">
