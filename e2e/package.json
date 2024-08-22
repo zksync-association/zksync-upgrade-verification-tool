@@ -17,12 +17,11 @@
   ],
   "scripts": {
     "update": "vitest -u",
-    "compile": "run-s compile:preprocess compile:hardhat",
+    "compile": "hardhat compile",
     "check": "biome check .",
     "check:fix": "biome check . --write",
     "clean": "hardhat clean",
     "compile:preprocess": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' node scripts/preprocessZkGov.ts",
-    "compile:hardhat": "hardhat compile",
     "deploy:setup": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' pnpm hardhat run scripts/deploySetup.ts --network local",
     "deploy:setup:remote": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' pnpm hardhat run scripts/deploySetup.ts --network remote",
     "deploy:upgrade": "hardhat run scripts/startUpgrade.ts $HANDLER --network local",

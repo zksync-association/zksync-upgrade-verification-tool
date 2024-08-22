@@ -9,20 +9,16 @@ import { subtask } from "hardhat/config";
 import path from "node:path";
 import Dotenv from "dotenv";
 import { glob } from "glob";
+import { execSync } from "node:child_process";
 
 Dotenv.config();
 
 const ZK_GOV_PATH = path.join(__dirname, "contracts", "zk-gov-preprocessed");
 
-subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, hre) => {
-  const l1Contracts = path.join(ZK_GOV_PATH, "l1-contracts", "src", "**", "*.sol");
-  const l2Contracts = path.join(ZK_GOV_PATH, "l2-contracts", "src", "**", "*.sol");
-  const devContracts = path.join(hre.config.paths.sources, "local-contracts", "**", "*.sol");
-  const contractPaths = glob.sync([l1Contracts, l2Contracts, devContracts]);
-  return contractPaths;
-});
-
 subtask(TASK_COMPILE_SOLIDITY).setAction(async (_, { config }, runSuper) => {
+  // Preprocess zkGov contracts
+  execSync("npm run compile:preprocess", { stdio: "inherit" });
+
   const superRes = await runSuper();
 
   try {
@@ -32,6 +28,14 @@ subtask(TASK_COMPILE_SOLIDITY).setAction(async (_, { config }, runSuper) => {
   }
 
   return superRes;
+});
+
+subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, hre) => {
+  const l1Contracts = path.join(ZK_GOV_PATH, "l1-contracts", "src", "**", "*.sol");
+  const l2Contracts = path.join(ZK_GOV_PATH, "l2-contracts", "src", "**", "*.sol");
+  const devContracts = path.join(hre.config.paths.sources, "local-contracts", "**", "*.sol");
+  const contractPaths = glob.sync([l1Contracts, l2Contracts, devContracts]);
+  return contractPaths;
 });
 
 const forkUrl = process.env.FORK_URL;
