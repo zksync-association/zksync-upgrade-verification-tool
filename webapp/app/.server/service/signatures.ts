@@ -52,7 +52,7 @@ async function verifySignature({
   action: SignAction;
   contractName: string;
   types: { name: string; type: string }[];
-  message: { [key: string]: any };
+  message: { [_key: string]: any };
   targetContract: Hex;
 }) {
   const digest = hashTypedData({
