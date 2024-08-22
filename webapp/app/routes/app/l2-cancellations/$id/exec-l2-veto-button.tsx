@@ -1,15 +1,15 @@
 import type { l2CancellationsTable, signaturesTable } from "@/.server/db/schema";
+import type { Call } from "@/common/calls";
 import { Button } from "@/components/ui/button";
+import { compareHexValues } from "@/utils/compare-hex-values";
 import { ALL_ABIS } from "@/utils/raw-abis";
 import { useFetcher } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
 import type React from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
-import { Hex, hexToBigInt } from "viem";
+import { type Hex, hexToBigInt } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
-import { Call } from "@/common/calls";
-import { compareHexValues } from "@/utils/compare-hex-values";
 
 type BroadcastTxButtonProps = {
   guardiansAddress: Hex;
@@ -18,8 +18,8 @@ type BroadcastTxButtonProps = {
   disabled?: boolean;
   children?: React.ReactNode;
   proposalId: InferSelectModel<typeof l2CancellationsTable>["id"];
-  calls: Call[],
-  proposal: Proposal
+  calls: Call[];
+  proposal: Proposal;
 };
 
 type Proposal = {
@@ -29,7 +29,7 @@ type Proposal = {
   txRequestL2GasPerPubdataByteLimit: Hex;
   txRequestRefundRecipient: Hex;
   txRequestTxMintValue: Hex;
-}
+};
 
 export default function ExecL2VetoButton({
   children,
@@ -39,7 +39,7 @@ export default function ExecL2VetoButton({
   disabled,
   proposalId,
   calls,
-  proposal
+  proposal,
 }: BroadcastTxButtonProps) {
   const { address } = useAccount();
   const { isPending, writeContract } = useWriteContract();
@@ -56,10 +56,10 @@ export default function ExecL2VetoButton({
     toast.loading("Broadcasting transaction...", { id: "broadcasting-tx" });
 
     const l2Proposal = {
-      targets: calls.map(c => c.target),
-      values: calls.map(c => hexToBigInt(c.value)),
-      calldatas: calls.map(c => c.data),
-      description: proposal.description
+      targets: calls.map((c) => c.target),
+      values: calls.map((c) => hexToBigInt(c.value)),
+      calldatas: calls.map((c) => c.data),
+      description: proposal.description,
     } as const;
 
     const txRequest = {
@@ -67,12 +67,12 @@ export default function ExecL2VetoButton({
       l2GasLimit: hexToBigInt(proposal.txRequestGasLimit),
       l2GasPerPubdataByteLimit: hexToBigInt(proposal.txRequestL2GasPerPubdataByteLimit),
       refundRecipient: proposal.txRequestRefundRecipient,
-      txMintValue: hexToBigInt(proposal.txRequestTxMintValue)
+      txMintValue: hexToBigInt(proposal.txRequestTxMintValue),
     } as const;
 
-    const orderedSignatures = signatures.sort((a, b) => compareHexValues(a.signer, b.signer))
-    const signers = orderedSignatures.map(s => s.signer)
-    const signatureValues = orderedSignatures.map(s => s.signature)
+    const orderedSignatures = signatures.sort((a, b) => compareHexValues(a.signer, b.signer));
+    const signers = orderedSignatures.map((s) => s.signer);
+    const signatureValues = orderedSignatures.map((s) => s.signature);
 
     writeContract(
       {

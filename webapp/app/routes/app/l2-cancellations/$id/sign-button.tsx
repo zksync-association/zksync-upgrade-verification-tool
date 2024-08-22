@@ -5,7 +5,7 @@ import type { action } from "@/routes/app/proposals/$id/_route";
 import { useFetcher } from "@remix-run/react";
 import { useEffect } from "react";
 import { toast } from "react-hot-toast";
-import { Address, Hash, Hex, hexToBigInt } from "viem";
+import { type Address, type Hash, type Hex, hexToBigInt } from "viem";
 import { useChains, useSignTypedData } from "wagmi";
 
 type ContractData = {

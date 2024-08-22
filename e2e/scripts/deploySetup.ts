@@ -1,5 +1,5 @@
 import hre from "hardhat";
-import { type Address, hexToBigInt, isAddress, padHex, parseEther, zeroAddress } from "viem";
+import { hexToBigInt, padHex, parseEther, zeroAddress } from "viem";
 import dotenv from "dotenv";
 import fs from "node:fs/promises";
 import { mnemonicToAccount } from "viem/accounts";
@@ -158,18 +158,6 @@ async function main() {
 
   await fs.writeFile("addresses.txt", addressesContent);
   console.log("Addresses saved to addresses.txt");
-}
-
-function fetchAddrFromEnv(name: string): Address {
-  const address = process.env[name];
-  if (!address) {
-    throw new Error(`Env variable ${name} expected to be defined but it's not`);
-  }
-
-  if (isAddress(address)) {
-    return address;
-  }
-  throw new Error(`Found: ${address} inside process.env.${name}. Expected address`);
 }
 
 function range(from: number, to: number): number[] {

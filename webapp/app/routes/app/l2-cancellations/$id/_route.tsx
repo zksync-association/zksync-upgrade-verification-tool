@@ -4,13 +4,14 @@ import {
   getL2CancellationById,
 } from "@/.server/db/dto/l2-cancellations";
 import { getSignaturesByL2CancellationId } from "@/.server/db/dto/signatures";
-import { councilAddress, guardiansAddress } from "@/.server/service/contracts";
+import { guardiansAddress } from "@/.server/service/contracts";
 import { getL2GovernorAddress } from "@/.server/service/l2-cancellations";
 import { validateAndSaveL2CancellationSignature } from "@/.server/service/signatures";
 import { hexSchema } from "@/common/basic-schemas";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
+import ExecL2VetoButton from "@/routes/app/l2-cancellations/$id/exec-l2-veto-button";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { badRequest, notFound } from "@/utils/http";
@@ -18,10 +19,9 @@ import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-r
 import { useLoaderData } from "@remix-run/react";
 import { CircleCheckBig } from "lucide-react";
 import { getFormData, getParams } from "remix-params-helper";
-import { Hex, isAddressEqual, numberToHex, zeroAddress } from "viem";
+import { type Hex, isAddressEqual, numberToHex } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
-import ExecL2VetoButton from "@/routes/app/l2-cancellations/$id/exec-l2-veto-button";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -48,7 +48,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       txRequestL2GasPerPubdataByteLimit: numberToHex(BigInt(1000)),
       txRequestTo: l2GovernorAddr,
       txRequestRefundRecipient: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as Hex,
-      txRequestTxMintValue: numberToHex(0)
+      txRequestTxMintValue: numberToHex(0),
     },
     signatures,
     calls,
@@ -89,16 +89,9 @@ export async function action({ request }: ActionFunctionArgs) {
   return json({ ok: true });
 }
 
-export default function L2GovernorProposal() {
-  const {
-    user,
-    proposal,
-    calls,
-    signatures,
-    necessarySignatures,
-    guardiansAddress,
-    l2GovernorAddress,
-  } = useLoaderData<typeof loader>();
+export default function L2Cancellation() {
+  const { user, proposal, calls, signatures, necessarySignatures, guardiansAddress } =
+    useLoaderData<typeof loader>();
 
   let proposalType: string;
   switch (proposal.type) {
@@ -113,7 +106,7 @@ export default function L2GovernorProposal() {
   const signDisabled =
     user.role !== "guardian" || signatures.some((s) => isAddressEqual(s.signer, user.address));
 
-  const execDisabled = signatures.length < necessarySignatures
+  const execDisabled = signatures.length < necessarySignatures;
 
   return (
     <div className="flex flex-1 flex-col">

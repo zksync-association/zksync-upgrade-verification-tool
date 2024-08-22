@@ -52,7 +52,7 @@ test("should be able to login as guardian", async ({ wallet, page }, _testInfo) 
   await expect(userRole).toHaveText("Guardian");
 });
 
-test("should be able to see standard proposals", async ({ page: importedPage, context }) => {
+test("should be able to see standard proposals", async ({ page: importedPage }) => {
   const page = importedPage;
   await page.getByText("Standard Upgrades").click();
   await page.waitForLoadState("networkidle");
@@ -164,7 +164,7 @@ test("should be able to add emergency upgrade", async ({ page }) => {
   await expect(page.getByText("Critical Security Fix")).toBeVisible();
 });
 
-test("should be able to see detail of emergency upgrade", async ({ context, page }) => {
+test("should be able to see detail of emergency upgrade", async ({ page }) => {
   await page.getByText("Emergency Upgrades").click({ clickCount: 2 });
   await page.waitForLoadState("networkidle");
 

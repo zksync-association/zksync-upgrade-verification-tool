@@ -1,4 +1,3 @@
-import { getFreezeProposalById, updateFreezeProposal } from "@/.server/db/dto/freeze-proposals";
 import { hexSchema } from "@/common/basic-schemas";
 import { notFound } from "@/utils/http";
 import { type ActionFunctionArgs, redirect } from "@remix-run/node";
