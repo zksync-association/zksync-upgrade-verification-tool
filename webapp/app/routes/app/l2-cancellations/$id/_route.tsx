@@ -19,7 +19,7 @@ import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-r
 import { useLoaderData } from "@remix-run/react";
 import { CircleCheckBig } from "lucide-react";
 import { getFormData, getParams } from "remix-params-helper";
-import { type Hex, isAddressEqual, numberToHex } from "viem";
+import { isAddressEqual } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
 
@@ -42,14 +42,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
   return json({
     user,
-    proposal: {
-      ...proposal,
-      txRequestGasLimit: numberToHex(1000000),
-      txRequestL2GasPerPubdataByteLimit: numberToHex(BigInt(1000)),
-      txRequestTo: l2GovernorAddr,
-      txRequestRefundRecipient: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as Hex,
-      txRequestTxMintValue: numberToHex(0),
-    },
+    proposal: proposal,
     signatures,
     calls,
     necessarySignatures,
@@ -78,10 +71,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
   await validateAndSaveL2CancellationSignature({
     //FIXME: use the correct values
-    l2GasLimit: BigInt(1000000),
-    l2GasPerPubdataByteLimit: BigInt(1000),
-    refundRecipient: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    txMintValue: BigInt(0),
     proposal,
     signature: data.data.signature,
     signer: user.address,

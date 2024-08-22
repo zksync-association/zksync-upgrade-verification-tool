@@ -14,6 +14,11 @@ CREATE TABLE IF NOT EXISTS "l2_governor_cancellations" (
 	"description" text NOT NULL,
 	"nonce" bigint NOT NULL,
 	"status" text NOT NULL,
+	"tx_request_gas_limit" "bytea" NOT NULL,
+	"tx_request_l2_gas_per_pubdata_byte_limit" "bytea" NOT NULL,
+	"tx_request_to" "bytea" NOT NULL,
+	"tx_request_refund_recipient" "bytea" NOT NULL,
+	"tx_request_tx_mint_value" "bytea" NOT NULL,
 	CONSTRAINT "l2_governor_cancellations_external_id_unique" UNIQUE("external_id")
 );
 --> statement-breakpoint

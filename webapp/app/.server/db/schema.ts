@@ -161,6 +161,11 @@ export const l2CancellationsTable = pgTable("l2_governor_cancellations", {
   description: text("description").notNull(),
   nonce: bigint("nonce", { mode: "number" }).notNull(),
   status: text("status", { enum: l2CancellationStatusEnum.options }).notNull(),
+  txRequestGasLimit: bytea("tx_request_gas_limit").notNull(),
+  txRequestL2GasPerPubdataByteLimit: bytea("tx_request_l2_gas_per_pubdata_byte_limit").notNull(),
+  txRequestTo: bytea("tx_request_to").notNull(),
+  txRequestRefundRecipient: bytea("tx_request_refund_recipient").notNull(),
+  txRequestTxMintValue: bytea("tx_request_tx_mint_value").notNull(),
 });
 
 export const l2CancellationsTableRelations = relations(l2CancellationsTable, ({ many }) => {

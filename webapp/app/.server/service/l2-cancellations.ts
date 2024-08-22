@@ -2,7 +2,7 @@ import { type L2CancellationType, l2CancellationStatusEnum } from "@/.server/db/
 import { guardiansAddress } from "@/.server/service/contracts";
 import { hexSchema } from "@/common/basic-schemas";
 import { bigIntMax } from "@/utils/bigint";
-import { notFound } from "@/utils/http";
+import { badRequest, notFound } from "@/utils/http";
 import { ALL_ABIS, ZK_GOV_OPS_GOVERNOR_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 import { type Address, type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
@@ -66,7 +66,13 @@ async function getL2VetoNonce(): Promise<bigint> {
   return l1Rpc.contractRead(await guardiansAddress(), "nonce", ALL_ABIS.guardians, z.bigint());
 }
 
-export async function createVetoProposalFor(id: Hex) {
+export async function createVetoProposalFor(
+  id: Hex,
+  l2GasLimit: Hex,
+  l2GasPerPubdataByteLimit: Hex,
+  refundRecipient: Hex,
+  txMintValue: Hex
+) {
   const allActive = await getActiveL2Proposals();
   const proposalData = allActive.find((activeProposal) => activeProposal.proposalId === id);
   if (!proposalData) {
@@ -84,6 +90,11 @@ export async function createVetoProposalFor(id: Hex) {
         type: "ZK_GOV_OPS_GOVERNOR",
         nonce: Number(nonce),
         status: l2CancellationStatusEnum.enum.ACTIVE,
+        txRequestGasLimit: l2GasLimit,
+        txRequestTo: getL2GovernorAddress("ZK_GOV_OPS_GOVERNOR"),
+        txRequestL2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
+        txRequestRefundRecipient: refundRecipient,
+        txRequestTxMintValue: txMintValue,
       },
       { tx }
     );
@@ -123,6 +134,8 @@ export function getL2GovernorAddress(proposalType: L2CancellationType) {
     case "ZK_TOKEN_GOVERNOR":
       l2GovernorAddress = env.ZK_TOKEN_GOVERNOR_ADDRESS;
       break;
+    default:
+      throw badRequest("Invalid proposalType");
   }
   return l2GovernorAddress;
 }

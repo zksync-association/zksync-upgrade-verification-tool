@@ -1,5 +1,5 @@
 {
-  "id": "b13201f4-1f26-4532-bdb6-63876e59d808",
+  "id": "e228a0be-6fc9-4c94-9267-28bdc0658274",
   "prevId": "fe4dfd5b-bc2e-4b0e-8547-f5ea5961e2cd",
   "version": "7",
   "dialect": "postgresql",
@@ -326,6 +326,36 @@
         "status": {
           "name": "status",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tx_request_gas_limit": {
+          "name": "tx_request_gas_limit",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tx_request_l2_gas_per_pubdata_byte_limit": {
+          "name": "tx_request_l2_gas_per_pubdata_byte_limit",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tx_request_to": {
+          "name": "tx_request_to",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tx_request_refund_recipient": {
+          "name": "tx_request_refund_recipient",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tx_request_tx_mint_value": {
+          "name": "tx_request_tx_mint_value",
+          "type": "bytea",
           "primaryKey": false,
           "notNull": true
         }

@@ -31,10 +31,9 @@ import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
 import { env } from "@config/env.server";
 import { type InferSelectModel, and, asc, eq } from "drizzle-orm";
-import { type Address, type Hex, hashTypedData } from "viem";
+import { type Hex, hashTypedData, hexToBigInt } from "viem";
 import { mainnet, sepolia } from "wagmi/chains";
 import { z } from "zod";
-import { getL2GovernorAddress } from "./l2-cancellations";
 
 async function verifySignature({
   signer,
@@ -324,18 +323,10 @@ export async function validateAndSaveL2CancellationSignature({
   signature,
   signer,
   proposal,
-  l2GasLimit,
-  l2GasPerPubdataByteLimit,
-  txMintValue,
-  refundRecipient,
 }: {
   signature: Hex;
   signer: Hex;
   proposal: InferSelectModel<typeof l2CancellationsTable>;
-  l2GasLimit: bigint;
-  l2GasPerPubdataByteLimit: bigint;
-  txMintValue: bigint;
-  refundRecipient: Address;
 }) {
   const enabledMembers = await guardianMembers();
   if (!enabledMembers.includes(signer)) {
@@ -344,18 +335,16 @@ export async function validateAndSaveL2CancellationSignature({
     );
   }
 
-  const l2GovernorAddress = await getL2GovernorAddress(proposal.type);
-
   const { message, types } = getL2CancellationSignatureArgs({
     proposal: {
       externalId: proposal.externalId,
       nonce: proposal.nonce,
     },
-    l2GasLimit,
-    l2GasPerPubdataByteLimit,
-    txMintValue,
-    refundRecipient,
-    l2GovernorAddress,
+    l2GasLimit: hexToBigInt(proposal.txRequestGasLimit),
+    l2GasPerPubdataByteLimit: hexToBigInt(proposal.txRequestL2GasPerPubdataByteLimit),
+    txMintValue: hexToBigInt(proposal.txRequestTxMintValue),
+    refundRecipient: proposal.txRequestRefundRecipient,
+    l2GovernorAddress: proposal.txRequestTo,
   });
 
   const addr = await guardiansAddress();
