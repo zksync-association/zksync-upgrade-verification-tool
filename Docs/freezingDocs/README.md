@@ -124,7 +124,7 @@ When you click on a specific proposal, such as “Soft Freeze Proposal 0,” you
 **Everything that is considered necessary to verify the integrity of the proposal must be reviewed during this process.**
 
 
-## Step 4: Sign for the approval of the Upgrade Proposal
+## Step 4: Sign for the approval of the Freezing Proposal
 
 Once you verify all the data and feel comfortable with the upgrade, you can add your signature to approve the proposal by **clicking the "approve proposal” button**. 
 
