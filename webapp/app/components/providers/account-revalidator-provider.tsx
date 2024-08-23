@@ -1,18 +1,21 @@
 import { useRevalidator } from "@remix-run/react";
-import { type ReactNode, useEffect, useState } from "react";
-import { useAccount } from "wagmi";
+import { type ReactNode, useEffect } from "react";
+import { useConfig } from "wagmi";
+import { watchAccount } from "wagmi/actions";
 
 export default function AccountRevalidatorProvider({ children }: { children: ReactNode }) {
-  const account = useAccount();
-  const [previousAddress, setPreviousAddress] = useState(account.address);
   const revalidator = useRevalidator();
+  const config = useConfig();
 
   useEffect(() => {
-    if (account.address !== previousAddress) {
-      setPreviousAddress(account.address);
-      revalidator.revalidate();
-    }
-  }, [account.address, previousAddress, revalidator]);
+    return watchAccount(config, {
+      onChange(account, prevAccount) {
+        if (account.address !== prevAccount.address) {
+          revalidator.revalidate();
+        }
+      },
+    });
+  }, [config, revalidator.revalidate]);
 
   return children;
 }
