@@ -14,7 +14,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
 import { createOrIgnoreL2Cancellation, getActiveL2Cancellations } from "../db/dto/l2-cancellations";
-import { l2Rpc } from "./clients";
+import { l1Rpc, l2Rpc } from "./clients";
 import { zkGovOpsGovernorAbi } from "./contract-abis";
 
 const eventSchema = z.object({
@@ -143,7 +143,7 @@ export async function getActiveL2Proposals() {
 }
 
 async function getL2VetoNonce(): Promise<bigint> {
-  return l2Rpc.contractRead(await guardiansAddress(), "nonce", ALL_ABIS.guardians, z.bigint());
+  return l1Rpc.contractRead(await guardiansAddress(), "nonce", ALL_ABIS.guardians, z.bigint());
 }
 
 export async function createVetoProposalFor(
