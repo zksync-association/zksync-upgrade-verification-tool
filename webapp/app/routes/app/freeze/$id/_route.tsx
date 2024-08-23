@@ -9,9 +9,9 @@ import {
 } from "@/.server/service/contracts";
 import { validateAndSaveFreezeSignature } from "@/.server/service/signatures";
 import { type SignAction, signActionSchema } from "@/common/sign-action";
+import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
 import TxStatus from "@/components/tx-status";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
 import { requireUserFromHeader } from "@/utils/auth-headers";
@@ -20,8 +20,8 @@ import { dateToUnixTimestamp } from "@/utils/date";
 import { badRequest, notFound } from "@/utils/http";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json, useLoaderData, useNavigate } from "@remix-run/react";
-import { ArrowLeft, CircleCheckBig } from "lucide-react";
+import { json, useLoaderData } from "@remix-run/react";
+import { CircleCheckBig } from "lucide-react";
 import { getFormData, getParams } from "remix-params-helper";
 import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
@@ -107,7 +107,6 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Freeze() {
-  const navigate = useNavigate();
   const {
     proposal,
     currentSoftFreezeThreshold,
@@ -154,22 +153,12 @@ export default function Freeze() {
     signatures.length >= necessarySignatures && !proposal.transactionHash;
 
   return (
-    <div className="mt-10 flex flex-1 flex-col">
-      <div className="flex items-center pl-2">
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="mr-2 hover:bg-transparent"
-        >
-          <ArrowLeft />
-        </Button>
-        <h2 className="font-semibold">
-          {proposalType} Proposal {proposal.externalId}
-        </h2>
-      </div>
+    <div className="flex flex-1 flex-col">
+      <HeaderWithBackButton>
+        {proposalType} Proposal {proposal.externalId}
+      </HeaderWithBackButton>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card className="pb-10">
           <CardHeader>
             <CardTitle>Proposal Details</CardTitle>

@@ -40,7 +40,7 @@ export default function Transactions() {
   const { data, isSuccess, isLoading } = useWaitForTransactionReceipt({ hash });
 
   return (
-    <div className="mt-10 flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col">
       <div className="mb-4 flex items-center pl-2">
         <Button
           size="icon"

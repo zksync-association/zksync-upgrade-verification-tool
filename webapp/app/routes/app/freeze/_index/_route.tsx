@@ -132,7 +132,7 @@ export default function Index() {
   const [modalType, setModalType] = useState<FreezeProposalsType | null>(null);
 
   return (
-    <div className="mt-10 space-y-4">
+    <div className="space-y-4">
       <ProposalCard
         title="Soft Freeze Proposals"
         proposals={softFreezeProposals}

@@ -3,11 +3,11 @@ import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 
 export default function ConnectionFailed() {
   return (
-    <Card className="mt-10 flex flex-col items-center space-y-4 p-14 py-20">
+    <Card className="flex flex-col items-center space-y-4 p-14 py-20">
       <ExclamationTriangleIcon width={134} height={134} />
 
-      <h2 className="font-bold text-4xl">ConnectionFailed</h2>
-      <p>Server's connection to BlockChain cannot be made.</p>
+      <h2 className="font-bold text-4xl">Connection Failed</h2>
+      <p>The server has been disconnected from the blockchain.</p>
       <p>Please try again later.</p>
     </Card>
   );

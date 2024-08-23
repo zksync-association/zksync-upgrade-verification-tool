@@ -8,6 +8,8 @@
       "*.mjs",
       "*.ts",
       "*.tsx",
+      "*.cts",
+      "*.mts",
       "*.json",
       "*.yml",
       "*.yaml",
@@ -21,7 +23,9 @@
       "**/coverage/*",
       "**/artifacts",
       "**/zk-gov",
-      "**/contracts"
+      "**/zk-gov-preprocessed",
+      "**/contracts",
+      "**/cache"
     ]
   },
   "organizeImports": {
@@ -44,7 +48,8 @@
     "rules": {
       "recommended": true,
       "correctness": {
-        "noUnusedImports": "warn"
+        "noUnusedImports": "warn",
+        "noUnusedVariables": "warn"
       },
       "suspicious": {
         "noExplicitAny": "off",

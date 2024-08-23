@@ -1,4 +1,4 @@
-import { hexSchema } from "@/common/basic-schemas";
+import { addressSchema } from "@/common/basic-schemas";
 import { EthNetworkEnum } from "@/common/eth-network-enum";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
@@ -14,11 +14,14 @@ export const env = createEnv({
     NODE_ENV: NodeEnvEnum.default("production"),
     SERVER_PORT: z.coerce.number().default(3000),
     WALLET_CONNECT_PROJECT_ID: z.string(),
-    L1_RPC_URL: z.string(),
+    L1_RPC_URL: z.string().url(),
+    L2_RPC_URL: z.string().url(),
     ETH_NETWORK: EthNetworkEnum.default("mainnet"),
     ETHERSCAN_API_KEY: z.string(),
-    UPGRADE_HANDLER_ADDRESS: hexSchema,
+    UPGRADE_HANDLER_ADDRESS: addressSchema,
     SKIP_REPORTS: z.coerce.boolean().default(false),
+    ZK_GOV_OPS_GOVERNOR_ADDRESS: addressSchema,
+    ZK_TOKEN_GOVERNOR_ADDRESS: addressSchema,
   },
   // eslint-disable-next-line n/no-process-env
   runtimeEnv: process.env,

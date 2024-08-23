@@ -27,54 +27,54 @@ export default function SignButton({
   disabled,
   postAction,
 }: SignButtonProps) {
-  const { signTypedData, isPending, isSuccess, isError, data: signature } = useSignTypedData();
+  const { signTypedData, isPending, isSuccess } = useSignTypedData();
   const [chain] = useChains();
   const fetcher = useFetcher<typeof action>();
 
-  useEffect(() => {
-    if (isSuccess) {
-      fetcher.submit(
-        { intent: "newSignature", signature, actionName: contractData.actionName, proposalId },
-        { method: "POST", action: postAction }
-      );
-    }
-  }, [isSuccess, contractData.actionName, fetcher.submit, proposalId, signature, postAction]);
-
   const loading = isPending || fetcher.state === "submitting" || fetcher.state === "loading";
   const success = isSuccess && fetcher.state === "idle" && fetcher.data?.ok;
+
   useEffect(() => {
-    if (loading) {
-      toast.loading("Signing...", { id: "sign_button" });
-    }
     if (success) {
       toast.success("Signed successfully", { id: "sign_button" });
     }
-    if (isError) {
-      toast.error("Failed to sign", { id: "sign_button" });
-    }
-  }, [loading, success, isError]);
+  }, [success]);
 
   function onClick() {
-    signTypedData({
-      domain: {
-        name: contractData.name,
-        version: "1",
-        chainId: chain.id,
-        verifyingContract: contractData.address,
+    toast.loading("Signing...", { id: "sign_button" });
+    signTypedData(
+      {
+        domain: {
+          name: contractData.name,
+          version: "1",
+          chainId: chain.id,
+          verifyingContract: contractData.address,
+        },
+        primaryType: contractData.actionName,
+        message: {
+          id: proposalId,
+        },
+        types: {
+          [contractData.actionName]: [
+            {
+              name: "id",
+              type: "bytes32",
+            },
+          ],
+        },
       },
-      primaryType: contractData.actionName,
-      message: {
-        id: proposalId,
-      },
-      types: {
-        [contractData.actionName]: [
-          {
-            name: "id",
-            type: "bytes32",
-          },
-        ],
-      },
-    });
+      {
+        onSuccess: (signature) => {
+          fetcher.submit(
+            { intent: "newSignature", signature, actionName: contractData.actionName, proposalId },
+            { method: "POST", action: postAction }
+          );
+        },
+        onError() {
+          toast.error("Failed to sign", { id: "sign_button" });
+        },
+      }
+    );
   }
 
   return (

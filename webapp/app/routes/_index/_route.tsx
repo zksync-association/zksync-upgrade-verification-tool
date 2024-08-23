@@ -8,14 +8,13 @@ import { Button } from "@/components/ui/button";
 import { getUserFromHeader } from "@/utils/auth-headers";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json, redirect } from "@remix-run/node";
 import { Link, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
-import { useEffect } from "react";
 import { $path } from "remix-routes";
-import { useAccount } from "wagmi";
+import { useAccount, useAccountEffect } from "wagmi";
 
 export function loader({ request }: LoaderFunctionArgs) {
   try {
     return { user: getUserFromHeader(request) };
-  } catch (error) {
+  } catch {
     return { user: null };
   }
 }
@@ -45,11 +44,11 @@ export default function Index() {
   const navigation = useNavigation();
   const { user } = useLoaderData<typeof loader>();
 
-  useEffect(() => {
-    if (account.isConnected) {
+  useAccountEffect({
+    onConnect() {
       fetcher.submit({}, { method: "POST" });
-    }
-  }, [account.isConnected, fetcher.submit]);
+    },
+  });
 
   return (
     <>
@@ -81,6 +80,9 @@ export default function Index() {
                   </Link>
                   <Link to={$path("/app/freeze")}>
                     <Button variant="secondary">Freeze Requests</Button>
+                  </Link>
+                  <Link to={$path("/app/l2-cancellations")}>
+                    <Button variant="secondary">L2 Proposals Veto</Button>
                   </Link>
                 </div>
               )}

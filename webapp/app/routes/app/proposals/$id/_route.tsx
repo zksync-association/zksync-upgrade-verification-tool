@@ -7,9 +7,9 @@ import { getCheckReport, getStorageChangeReport } from "@/.server/service/report
 import { validateAndSaveProposalSignature } from "@/.server/service/signatures";
 import { hexSchema } from "@/common/basic-schemas";
 import { signActionSchema } from "@/common/sign-action";
+import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
 import TxStatus from "@/components/tx-status";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,8 +32,7 @@ import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { defer, json } from "@remix-run/node";
-import { Await, useLoaderData, useNavigate } from "@remix-run/react";
-import { ArrowLeft } from "lucide-react";
+import { Await, useLoaderData } from "@remix-run/react";
 import { Suspense } from "react";
 import { getFormData, getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
@@ -156,21 +155,10 @@ const NECESSARY_LEGAL_VETO_SIGNATURES = 2;
 
 export default function Proposals() {
   const { user, asyncData, proposalId } = useLoaderData<typeof loader>();
-  const navigate = useNavigate();
 
   return (
-    <div className="mt-10 flex flex-1 flex-col">
-      <div className="mb-4 flex items-center pl-2">
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="mr-2 hover:bg-transparent"
-        >
-          <ArrowLeft />
-        </Button>
-        <h2 className="font-semibold">Proposal {displayBytes32(proposalId)}</h2>
-      </div>
+    <div className="flex flex-1 flex-col">
+      <HeaderWithBackButton>Proposal {displayBytes32(proposalId)}</HeaderWithBackButton>
       <div className="flex flex-1 flex-col space-y-4">
         <Suspense
           fallback={

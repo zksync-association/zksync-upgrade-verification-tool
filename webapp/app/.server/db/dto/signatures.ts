@@ -2,6 +2,7 @@ import { db } from "@/.server/db";
 import { createOrIgnoreRecord } from "@/.server/db/dto/utils/common";
 import {
   type freezeProposalsTable,
+  type l2CancellationsTable,
   type proposalsTable,
   signaturesTable,
 } from "@/.server/db/schema";
@@ -31,4 +32,14 @@ export async function getSignaturesByEmergencyProposalId(
   { tx }: { tx?: typeof db } = {}
 ) {
   return (tx ?? db).select().from(signaturesTable).where(eq(signaturesTable.emergencyProposal, id));
+}
+
+export async function getSignaturesByL2CancellationId(
+  id: InferSelectModel<typeof l2CancellationsTable>["id"],
+  { tx }: { tx?: typeof db } = {}
+) {
+  return (tx ?? db)
+    .select()
+    .from(signaturesTable)
+    .where(eq(signaturesTable.l2GovernorProposal, id));
 }

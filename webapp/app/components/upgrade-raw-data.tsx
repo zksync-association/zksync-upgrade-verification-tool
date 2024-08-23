@@ -3,13 +3,9 @@ import { formatEther, hexToBigInt } from "viem";
 
 type UpgradeRawDataProps = { calls: Call[]; salt: string };
 
-export function UpgradeRawData({ calls, salt }: UpgradeRawDataProps) {
+export function CallsRawData({ calls }: { calls: Call[] }) {
   return (
     <div>
-      <p className="pb-10">
-        <b>salt:</b> <span>{salt}</span>
-      </p>
-
       <h3 className="font-bold text-xl">Calls</h3>
 
       {calls.map((call) => (
@@ -33,6 +29,18 @@ export function UpgradeRawData({ calls, salt }: UpgradeRawDataProps) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+export function UpgradeRawData({ calls, salt }: UpgradeRawDataProps) {
+  return (
+    <div>
+      <p className="pb-10">
+        <b>salt:</b> <span>{salt}</span>
+      </p>
+
+      <CallsRawData calls={calls} />
     </div>
   );
 }

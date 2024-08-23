@@ -98,7 +98,6 @@ test.only("should be able to sign standard proposals", async ({ switcher, wallet
   const activeProposal = page.getByRole("button", { name: /^0x[a-fA-F0-9]{64}$/ }).first();
   await activeProposal.click();
 
-  console.log("Arrived to proposal page")
   const initialApprovals = await page.getByTestId("council-signature-count").textContent();
   if (!initialApprovals) {
     throw new Error("No Security Council Approvals found for initialApprovals");

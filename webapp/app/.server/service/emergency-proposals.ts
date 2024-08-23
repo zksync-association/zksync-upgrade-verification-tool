@@ -1,10 +1,10 @@
 import { db } from "@/.server/db";
-import { createCall } from "@/.server/db/dto/calls";
+import { createEmergencyProposalCall } from "@/.server/db/dto/emergency-proposal-calls";
 import {
   createEmergencyProposal,
   getEmergencyProposalByExternalId,
   updateEmergencyProposal,
-} from "@/.server/db/dto/emergencyProposals";
+} from "@/.server/db/dto/emergency-proposals";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import { l1Rpc } from "@/.server/service/clients";
 import type { Call } from "@/common/calls";
@@ -47,7 +47,7 @@ export async function validateCall(call: Call): Promise<CallValidation> {
       hexToBigInt(call.value)
     );
     return { call, isValid: true };
-  } catch (e) {
+  } catch {
     return { call, isValid: false };
   }
 }
@@ -75,7 +75,7 @@ export const saveEmergencyProposal = async (data: FullEmergencyProp, calls: Call
       { tx: sqlTx }
     );
     for (const call of calls) {
-      await createCall(
+      await createEmergencyProposalCall(
         {
           data: call.data,
           proposalId: id,
