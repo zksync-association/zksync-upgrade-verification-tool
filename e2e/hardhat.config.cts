@@ -1,6 +1,9 @@
 import "@nomicfoundation/hardhat-viem";
 import { writeFile } from "node:fs/promises";
-import { TASK_COMPILE_SOLIDITY, TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS, } from "hardhat/builtin-tasks/task-names";
+import {
+  TASK_COMPILE_SOLIDITY,
+  TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS,
+} from "hardhat/builtin-tasks/task-names";
 import type { HardhatUserConfig } from "hardhat/config";
 import { subtask } from "hardhat/config";
 import path from "node:path";
@@ -70,7 +73,8 @@ const config: HardhatUserConfig = {
       },
       accounts: {
         mnemonic:
-          process.env.MNEMONIC || "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
+          process.env.MNEMONIC ||
+          "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
       },
     },
   },

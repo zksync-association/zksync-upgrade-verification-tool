@@ -94,7 +94,7 @@ export class UpgradeImporter {
 
     try {
       return parser.parse(json);
-    } catch (e) {
+    } catch (_e) {
       throw new MalformedUpgrade(`"${filePath}" does not follow expected schema.`);
     }
   }
