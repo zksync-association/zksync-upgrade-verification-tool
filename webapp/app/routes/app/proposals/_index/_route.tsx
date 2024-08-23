@@ -23,7 +23,7 @@ export default function Index() {
   const { activeProposals, inactiveProposals } = useLoaderData<typeof loader>();
 
   return (
-    <div className="mt-10 space-y-4">
+    <div className="space-y-4">
       <Card className="pb-10">
         <CardHeader>
           <CardTitle>Active Standard Proposals</CardTitle>

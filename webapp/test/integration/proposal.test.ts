@@ -2,7 +2,7 @@ import { db } from "@/.server/db";
 import {
   createEmergencyProposal,
   getEmergencyProposalByExternalId,
-} from "@/.server/db/dto/emergencyProposals";
+} from "@/.server/db/dto/emergency-proposals";
 import { createOrIgnoreProposal, getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { proposalsTable } from "@/.server/db/schema";
 import { eq } from "drizzle-orm";

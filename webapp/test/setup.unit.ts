@@ -1,1 +1,1 @@
-beforeEach((ctx) => {});
+beforeEach(() => {});
