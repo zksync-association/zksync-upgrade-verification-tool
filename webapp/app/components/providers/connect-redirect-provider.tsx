@@ -1,18 +1,19 @@
 import { useLocation, useNavigate } from "@remix-run/react";
-import { type ReactNode, useEffect } from "react";
+import type { ReactNode } from "react";
 import { $path } from "remix-routes";
-import { useAccount } from "wagmi";
+import { useAccountEffect } from "wagmi";
 
 export default function ConnectRedirectProvider({ children }: { children?: ReactNode }) {
-  const account = useAccount();
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
-    if (account.isDisconnected && location.pathname !== "/") {
-      navigate($path("/"));
-    }
-  }, [account.isDisconnected, navigate, location.pathname]);
+  useAccountEffect({
+    onDisconnect() {
+      if (location.pathname !== "/") {
+        navigate($path("/"));
+      }
+    },
+  });
 
   return children;
 }

@@ -27,25 +27,21 @@ export default function SignButton({
   disabled,
   postAction,
 }: SignButtonProps) {
-  const { signTypedData, isPending, isSuccess, isError } = useSignTypedData();
+  const { signTypedData, isPending, isSuccess } = useSignTypedData();
   const [chain] = useChains();
   const fetcher = useFetcher<typeof action>();
 
   const loading = isPending || fetcher.state === "submitting" || fetcher.state === "loading";
   const success = isSuccess && fetcher.state === "idle" && fetcher.data?.ok;
+
   useEffect(() => {
-    if (loading) {
-      toast.loading("Signing...", { id: "sign_button" });
-    }
     if (success) {
       toast.success("Signed successfully", { id: "sign_button" });
     }
-    if (isError) {
-      toast.error("Failed to sign", { id: "sign_button" });
-    }
-  }, [loading, success, isError]);
+  }, [success]);
 
   function onClick() {
+    toast.loading("Signing...", { id: "sign_button" });
     signTypedData(
       {
         domain: {
@@ -73,6 +69,9 @@ export default function SignButton({
             { intent: "newSignature", signature, actionName: contractData.actionName, proposalId },
             { method: "POST", action: postAction }
           );
+        },
+        onError() {
+          toast.error("Failed to sign", { id: "sign_button" });
         },
       }
     );
