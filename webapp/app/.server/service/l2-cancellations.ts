@@ -117,7 +117,7 @@ async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigi
 }
 
 export async function getActiveL2Proposals() {
-  const latestBlock = await l1Rpc.getLatestBlock();
+  const latestBlock = await l2Rpc.getLatestBlock();
   const currentBlock = hexToBigInt(latestBlock.number);
 
   // Proposal lifetime is:
