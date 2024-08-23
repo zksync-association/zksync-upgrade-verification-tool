@@ -136,10 +136,10 @@ dist
 
 .cursorignore
 
-
-
-
 # hardhat temp
 **/.hardhat*
 **/addresses.txt
 **/test-results/
+
+# zk-gov preprocessed contracts
+e2e/contracts/zk-gov-preprocessed/

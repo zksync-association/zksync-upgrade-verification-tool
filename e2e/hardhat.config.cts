@@ -1,32 +1,28 @@
 import "@nomicfoundation/hardhat-viem";
-import { writeFile } from "fs/promises";
-import { TASK_COMPILE_SOLIDITY, TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from "hardhat/builtin-tasks/task-names";
+import { writeFile } from "node:fs/promises";
+import {
+  TASK_COMPILE_SOLIDITY,
+  TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS,
+} from "hardhat/builtin-tasks/task-names";
 import type { HardhatUserConfig } from "hardhat/config";
 import { subtask } from "hardhat/config";
-import { join } from "path";
+import path from "node:path";
 import Dotenv from "dotenv";
-const glob = require('glob')
-import path from "path";
-Dotenv.config()
+import { glob } from "glob";
+import { execSync } from "node:child_process";
 
-subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, hre, runSuper) => {
-  const paths = await runSuper();
+Dotenv.config();
 
-  const l1contracts = path.join(hre.config.paths.sources, "zk-gov","l1-contracts","src", "**", "*.sol");
-  // const l2contracts = path.join(hre.config.paths.sources, "zk-gov","l2-contracts","src", "**", "*.sol");
-  const devcontracts = path.join(hre.config.paths.sources, "local-contracts", "**", "*.sol");
-  const otherPaths = glob.sync([l1contracts, devcontracts]);
-  return [...otherPaths];
-});
+const ZK_GOV_PATH = path.join(__dirname, "contracts", "zk-gov-preprocessed");
 
 subtask(TASK_COMPILE_SOLIDITY).setAction(async (_, { config }, runSuper) => {
+  // Preprocess zkGov contracts
+  execSync("npm run compile:preprocess", { stdio: "inherit" });
+
   const superRes = await runSuper();
 
   try {
-    await writeFile(
-      join(config.paths.artifacts, "package.json"),
-      '{ "type": "commonjs" }'
-    );
+    await writeFile(path.join(config.paths.artifacts, "package.json"), '{ "type": "commonjs" }');
   } catch (error) {
     console.error("Error writing package.json: ", error);
   }
@@ -34,39 +30,48 @@ subtask(TASK_COMPILE_SOLIDITY).setAction(async (_, { config }, runSuper) => {
   return superRes;
 });
 
-const forkUrl = process.env.FORK_URL
+subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, hre) => {
+  const l1Contracts = path.join(ZK_GOV_PATH, "l1-contracts", "src", "**", "*.sol");
+  const l2Contracts = path.join(ZK_GOV_PATH, "l2-contracts", "src", "**", "*.sol");
+  const devContracts = path.join(hre.config.paths.sources, "local-contracts", "**", "*.sol");
+  const contractPaths = glob.sync([l1Contracts, l2Contracts, devContracts]);
+  return contractPaths;
+});
+
+const forkUrl = process.env.FORK_URL;
 
 if (!forkUrl) {
-  throw new Error("Missing ENV_VAR FORK_URL")
+  throw new Error("Missing ENV_VAR FORK_URL");
 }
 
 const config: HardhatUserConfig = {
   solidity: "0.8.24",
-  paths:{
-    sources:"contracts",
-        cache: "cache",
+  paths: {
+    sources: "contracts",
+    cache: "cache",
     artifacts: "artifacts",
-    tests:"suites/contracts"
+    tests: "suites/contracts",
   },
   networks: {
-    remote:{
-      url: process.env.L1_RPC_URL || "ENV_VAR_L1_RPC_URL_MISSING"
+    remote: {
+      url: process.env.L1_RPC_URL || "ENV_VAR_L1_RPC_URL_MISSING",
     },
     local: {
       url: "http://localhost:8545",
+      allowUnlimitedContractSize: true,
     },
     hardhat: {
       chainId: 11155111,
+      allowUnlimitedContractSize: true,
       mining: {
-        auto: false,
+        auto: true,
         interval: 1000,
       },
       forking: {
         url: forkUrl,
       },
       accounts: {
-        mnemonic:
-          "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
+        mnemonic: "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
       },
     },
   },

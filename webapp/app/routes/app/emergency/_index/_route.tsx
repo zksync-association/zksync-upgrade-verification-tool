@@ -1,4 +1,4 @@
-import { getAllEmergencyProposals } from "@/.server/db/dto/emergencyProposals";
+import { getAllEmergencyProposals } from "@/.server/db/dto/emergency-proposals";
 import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import type { EmergencyProposalStatus } from "@/common/proposal-status";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ export default function Index() {
   const { activeEmergencyProposals, inactiveEmergencyProposals } = useLoaderData<typeof loader>();
 
   return (
-    <div className="mt-10 space-y-4">
+    <div className="space-y-4">
       <Card className="pb-10">
         <CardHeader>
           <div className="flex items-center justify-between">

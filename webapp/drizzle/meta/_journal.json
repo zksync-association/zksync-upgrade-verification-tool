@@ -50,6 +50,13 @@
       "when": 1723735630785,
       "tag": "0006_dapper_malcolm_colcord",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1724340770922,
+      "tag": "0007_typical_scarecrow",
+      "breakpoints": true
     }
   ]
 }

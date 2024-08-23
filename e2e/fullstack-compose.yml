@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 2s
-  
+
   hh-deploy:
     platform: linux/amd64
     image: upgrade-checker:local
@@ -59,6 +59,7 @@ services:
     environment:
       DATABASE_URL: postgresql://user:password@db:5432/webapp
       L1_RPC_URL: http://hh-node:8545
+      L2_RPC_URL: http://hh-node:8545
       NODE_ENV: production
     ports:
       - "3000:3000"

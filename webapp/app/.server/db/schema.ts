@@ -88,22 +88,27 @@ export const signaturesTable = pgTable(
       () => emergencyProposalsTable.externalId
     ),
     freezeProposal: integer("freeze_proposal_id").references(() => freezeProposalsTable.id),
+    l2GovernorProposal: integer("l2_governor_proposal_id").references(
+      () => l2CancellationsTable.id
+    ),
     signer: bytea("signer").notNull(),
     signature: bytea("signature").notNull(),
     action: text("action", {
       enum: signActionSchema.options,
     }).notNull(),
   },
-  ({ proposal, signer, action, emergencyProposal, freezeProposal }) => ({
+  ({ proposal, signer, action, emergencyProposal, freezeProposal, l2GovernorProposal }) => ({
     uniqueProposalSigner: unique().on(proposal, signer, action),
     uniqueEmergencyProposalSigner: unique().on(emergencyProposal, signer, action),
     uniqueFreezeProposalSigner: unique().on(freezeProposal, signer, action),
+    uniqueL2GovernorProposalSigner: unique().on(l2GovernorProposal, signer, action),
     proposalCheck: check(
       "mutual_exclusivity",
       sql`(
-            (proposal_id IS NOT NULL AND emergency_proposal_id IS NULL     AND freeze_proposal_id IS NULL) OR
-            (proposal_id IS NULL     AND emergency_proposal_id IS NOT NULL AND freeze_proposal_id IS NULL) OR
-            (proposal_id IS NULL     AND emergency_proposal_id IS NULL     AND freeze_proposal_id IS NOT NULL)
+            (proposal_id IS NOT NULL AND emergency_proposal_id IS NULL     AND freeze_proposal_id IS NULL     AND l2_governor_proposal_id IS NULL) OR
+            (proposal_id IS NULL     AND emergency_proposal_id IS NOT NULL AND freeze_proposal_id IS NULL     AND l2_governor_proposal_id IS NULL) OR
+            (proposal_id IS NULL     AND emergency_proposal_id IS NULL     AND freeze_proposal_id IS NOT NULL AND l2_governor_proposal_id IS NULL) OR
+            (proposal_id IS NULL     AND emergency_proposal_id IS NULL     AND freeze_proposal_id IS NULL     AND l2_governor_proposal_id IS NOT NULL)
           )`
     ),
   })
@@ -141,3 +146,50 @@ export const freezeProposalsTable = pgTable(
     ),
   })
 );
+
+export const l2CancellationTypeEnum = z.enum(["ZK_GOV_OPS_GOVERNOR", "ZK_TOKEN_GOVERNOR"]);
+
+export type L2CancellationType = z.infer<typeof l2CancellationTypeEnum>;
+
+export const l2CancellationStatusEnum = z.enum(["ACTIVE", "DONE", "CANCELED"]);
+
+export const l2CancellationsTable = pgTable("l2_governor_cancellations", {
+  id: serial("id").primaryKey(),
+  externalId: bytea("external_id").notNull().unique(),
+  type: text("type", { enum: l2CancellationTypeEnum.options }).notNull(),
+  proposer: bytea("proposer").notNull(),
+  description: text("description").notNull(),
+  nonce: bigint("nonce", { mode: "number" }).notNull(),
+  status: text("status", { enum: l2CancellationStatusEnum.options }).notNull(),
+  txRequestGasLimit: bytea("tx_request_gas_limit").notNull(),
+  txRequestL2GasPerPubdataByteLimit: bytea("tx_request_l2_gas_per_pubdata_byte_limit").notNull(),
+  txRequestTo: bytea("tx_request_to").notNull(),
+  txRequestRefundRecipient: bytea("tx_request_refund_recipient").notNull(),
+  txRequestTxMintValue: bytea("tx_request_tx_mint_value").notNull(),
+  transactionHash: bytea("transaction_hash"),
+});
+
+export const l2CancellationsTableRelations = relations(l2CancellationsTable, ({ many }) => {
+  return {
+    calls: many(l2CancellationCalls),
+  };
+});
+
+export const l2CancellationCalls = pgTable("l2_cancellation_calls", {
+  id: serial("id").primaryKey(),
+  proposalId: integer("proposal_id")
+    .notNull()
+    .references(() => l2CancellationsTable.id),
+  target: bytea("target").notNull(),
+  value: bytea("value").notNull(),
+  data: bytea("data").notNull(),
+});
+
+export const l2CancellationCallsRelations = relations(l2CancellationCalls, ({ one }) => {
+  return {
+    proposal: one(l2CancellationsTable, {
+      fields: [l2CancellationCalls.proposalId],
+      references: [l2CancellationsTable.id],
+    }),
+  };
+});
