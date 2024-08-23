@@ -24,7 +24,7 @@ import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-r
 import { useLoaderData } from "@remix-run/react";
 import { CircleCheckBig } from "lucide-react";
 import { getFormData, getParams } from "remix-params-helper";
-import { isAddressEqual } from "viem";
+import { hexToBigInt, isAddressEqual } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
 
@@ -128,6 +128,34 @@ export default function L2Cancellation() {
               <div className="flex justify-between">
                 <span>Proposer:</span>
                 <span className="w-1/2 break-words text-right">{proposal.proposer}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Veto L2 Gas Limit:</span>
+                <span className="w-1/2 break-words text-right">
+                  {hexToBigInt(proposal.txRequestGasLimit).toString()}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Veto L2 gas per pubdata byte limit:</span>
+                <span className="w-1/2 break-words text-right">
+                  {hexToBigInt(proposal.txRequestL2GasPerPubdataByteLimit).toString()}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Veto Refund Recipient:</span>
+                <span className="w-1/2 break-words text-right">
+                  {proposal.txRequestRefundRecipient}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Veto Transaction Mint Value:</span>
+                <span className="w-1/2 break-words text-right">
+                  {hexToBigInt(proposal.txRequestTxMintValue).toString()}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Veto Transaction To:</span>
+                <span className="w-1/2 break-words text-right">{proposal.txRequestTo}</span>
               </div>
               {proposal.transactionHash && (
                 <div className="flex justify-between">
