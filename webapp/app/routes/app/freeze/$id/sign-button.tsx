@@ -29,38 +29,23 @@ export default function SignButton({
   disabled,
   proposal,
 }: SignButtonProps) {
-  const { signTypedData, isPending, isSuccess, isError, data: signature } = useSignTypedData();
+  const { signTypedData, isPending, isSuccess } = useSignTypedData();
   const [chain] = useChains();
   const fetcher = useFetcher<typeof action>();
 
-  useEffect(() => {
-    if (isSuccess) {
-      fetcher.submit(
-        { signature, proposalId: proposal.id, action: contractData.actionName },
-        { method: "POST" }
-      );
-    }
-  }, [isSuccess, fetcher.submit, proposal.id, signature, contractData.actionName]);
-
   const loading = isPending || fetcher.state === "submitting" || fetcher.state === "loading";
   const success = isSuccess && fetcher.state === "idle" && fetcher.data?.ok;
-  const error = isError;
 
   useEffect(() => {
-    if (loading) {
-      toast.loading("Signing...", { id: "sign_button" });
-    }
     if (success) {
       toast.success("Signed successfully", { id: "sign_button" });
     }
-    if (error) {
-      toast.error("Failed to sign", { id: "sign_button" });
-    }
-  }, [loading, success, error]);
+  }, [success]);
 
   const { message, types } = getFreezeProposalSignatureArgs(proposal);
 
   function onClick() {
+    toast.loading("Signing...", { id: "sign_button" });
     const data = {
       domain: {
         name: contractData.name,
@@ -74,7 +59,17 @@ export default function SignButton({
         [contractData.actionName]: types,
       },
     };
-    signTypedData(data);
+    signTypedData(data, {
+      onError() {
+        toast.error("Failed to sign", { id: "sign_button" });
+      },
+      onSuccess(signature) {
+        fetcher.submit(
+          { signature, proposalId: proposal.id, action: contractData.actionName },
+          { method: "POST" }
+        );
+      },
+    });
   }
 
   return (
