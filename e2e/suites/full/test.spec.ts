@@ -28,7 +28,7 @@ test("should be able to login as visitor", async ({ switcher, page }, _testInfo)
   await expect(userRole).toHaveText("Visitor");
 });
 
-test("should be able to login as sec council", async ({ switcher, wallet, page }, _testInfo) => {
+test("should be able to login as sec council", async ({ switcher, page }, _testInfo) => {
   await switcher.council(page);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
@@ -90,7 +90,7 @@ test("should be able to see standard proposals", async ({ switcher, page }) => {
   await expect(page.getByText(/day \d+ out of \d+/)).toBeVisible();
 });
 
-test.only("should be able to sign standard proposals", async ({ switcher, wallet, page }) => {
+test("should be able to sign standard proposals", async ({ switcher, wallet, page }) => {
   await switcher.council(page);
   await page.getByText("Standard Upgrades").click();
   await page.waitForLoadState("domcontentloaded");

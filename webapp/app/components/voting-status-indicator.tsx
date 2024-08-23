@@ -6,8 +6,14 @@ export default function VotingStatusIndicator({
   necessarySignatures,
   label,
   className,
-  testId
-}: { signatures: number; necessarySignatures: number; label: string; className?: string, testId?: string }) {
+  testId,
+}: {
+  signatures: number;
+  necessarySignatures: number;
+  label: string;
+  className?: string;
+  testId?: string;
+}) {
   const necessarySignaturesReached = signatures >= necessarySignatures;
 
   return (
