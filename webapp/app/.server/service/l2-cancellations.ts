@@ -7,6 +7,7 @@ import { guardiansAddress } from "@/.server/service/contracts";
 import { hexSchema } from "@/common/basic-schemas";
 import { bigIntMax } from "@/utils/bigint";
 import { badRequest, notFound } from "@/utils/http";
+import { L2_CANCELATION_STATES } from "@/utils/l2-cancellation-states";
 import { ALL_ABIS, ZK_GOV_OPS_GOVERNOR_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 import { type Address, type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
@@ -113,7 +114,20 @@ async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigi
       proposalExecuted[proposal.proposalId] !== true
   );
 
-  return activeProposals;
+  const states = await Promise.all(
+    activeProposals.map((p) =>
+      l2Rpc.contractRead(getL2GovernorAddress(type), "state", ZK_GOV_OPS_GOVERNOR_ABI, z.number(), [
+        p.proposalId,
+      ])
+    )
+  );
+
+  const activeProposalWithStates = activeProposals.filter(
+    (_, i) =>
+      states[i] === L2_CANCELATION_STATES.Active || states[i] === L2_CANCELATION_STATES.Pending
+  );
+
+  return activeProposalWithStates;
 }
 
 export async function getActiveL2Proposals() {
