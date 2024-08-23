@@ -128,7 +128,8 @@ export async function getActiveL2Proposals() {
   // estimation of the oldest block with a valid proposal.
   // Max proposal time is calculated in blocks, 1 second per block in L2,
   // therefore 3600 blocks per hour.
-  const maxProposalLifetimeInBlocks = BigInt((21 + 7) * 24 * 3600); // conservative estimation of oldest block with a valid proposal
+  // const maxProposalLifetimeInBlocks = BigInt((21 + 7) * 24 * 3600); // conservative estimation of oldest block with a valid proposal
+  const maxProposalLifetimeInBlocks = BigInt(3000); // FIXME: max value to use in sepolia, should be changed for mainnet
 
   const from = bigIntMax(currentBlock - maxProposalLifetimeInBlocks, 1n);
   const govOpsProposals = await fetchProposalsFromL2Governor(
