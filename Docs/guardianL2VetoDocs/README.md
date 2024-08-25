@@ -35,28 +35,8 @@ The first step involves logging into the governance tool using **SAFE through Wa
 
 ![ConnectWallet](connectWallet.png)
 
-### **Connect Wallet using Wallet Connect**
-
 > [!Note]
-Remember that you will need to connect to the governance web app with your **SAFE** & choose **Ethereum Sepolia Testnet** as the network for all your interactions.
-
-**You will need to connect to the governance web app with your safe**. Use WalletConnect for that:
-
-![walletConnect](walletConnect.png)
-
-![walletConnect2](walletConnect2.png)
-
-If you are using a **mobile wallet you can scan the QR code to continue.** 
-
-Otherwise, **you can open the full wallet connect popup to get the connection URL:**
-
-![walletConnect3](walletConnect3.png)
-
-Once you have copied that link, you can use it inside your safe to connect with the governance web app:
-
-![walletConnect4](walletConnect4.png)
-
-![walletConnect5](walletConnect5.png)
+For more info, please refer to the connect using SAFE section of the docs.
 
 Now, back to the governance web app, you will see that you are already logged in, and you should see something as follows:
 
@@ -72,6 +52,8 @@ If you click on "Veto Requests", you will enter the following section with exist
 
 ![active&inactiveVeto](active&inactive.png)
 
+![alt text](image.png)
+
 > [!TIP]
 💡 Remember that you will only see here "veto proposals" that are meant to be voted by the guardians. In other words, you will only see here lists of proposals created to veto an underlying GovOps or Token Governor proposal.
 
@@ -82,8 +64,10 @@ Below are the two key sections on this page:
 2. **Inactive L2 Veto Proposals:** This section displays the inactive veto proposals due to them being already approved or the underlying proposal not actually active to be vetoed anymore. 
 
 > [!Note]
-**Navigation**: You can click on **the arrow (->)** to view more details about each proposal or the **“+” button** to add a new proposal. **Creation of a new veto approval is only possible for proposals on GovOps & Token Governor contracts in active or pending status.**
+**Navigation**: You can click on **the arrow (->)** to view more details about each proposal or the **“+” button** to add a new proposal.
 
+> [!Note]
+Remember that to create a new veto proposal, you will need to have a proposal on the **GovOps or Token Governor contract in active or pending status**. 
 
 ## Step 3: Verify Veto Proposal Information
 
@@ -104,7 +88,7 @@ When you click on a specific veto proposal, you are brought to a detailed view w
 
 4. **Execute Actions:** In this section, the execute veto button will allow you to carry out the veto specified in the proposal. However, it will only be clickable (i.e., not grayed out) once all conditions, like approvals, are satisfied.
 
-5.**L2 Call**: This section displays information related to the underlying GovOps or Token Governor proposal calls that are being voted to be vetoed.
+5.**L2 Call**: This section displays information related to the underlying GovOps or Token Governor proposal that is being voted to be vetoed.
 
 
 > [!Caution]

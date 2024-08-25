@@ -30,34 +30,12 @@ The governance tool will be used to track the [emergency upgrade flow](https://d
 
 The first step involves logging into the governance tool using **SAFE through WalletConnect integration.** 
 
-
-### **Connect Wallet using Wallet Connect**
-
 > [!Note]
-Remember that you will need to connect to the governance web app with your safe & choose Ethereum Sepolia Testnet as the network for all your interactions.
-
-**You will need to connect to the governance web app with your safe**. Use WalletConnect for that:
-
-![walletConnect](walletConnect.png)
-
-![walletConnect2](walletConnect2.png)
-
-If you are using a **mobile wallet you can scan the QR code to continue.** 
-
-Otherwise, **you can open the full wallet connect popup to get the connection URL:**
-
-![walletConnect3](walletConnect3.png)
-
-Once you have copied that link, you can use it inside your safe to connect with the governance web app:
-
-![walletConnect4](walletConnect4.png)
-
-![walletConnect5](walletConnect5.png)
+For more info, please refer to the connect using SAFE section of the docs.
 
 Now, back to the governance web app, you will see that you are already logged in, and you should see something as follows:
 
 ![walletConnect6](walletConnect6.png)
-
 
 ## Step 2: Navigate to the Emergency Upgrade Section
 
