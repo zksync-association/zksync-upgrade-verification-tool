@@ -11,10 +11,8 @@
     "test": "turbo test",
     "check": "turbo check",
     "check:fix": "turbo check:fix",
-    "typecheck": "turbo typecheck"
-  },
-  "dependencies": {
-    "validate-cli": "workspace:*"
+    "typecheck": "turbo typecheck",
+    "ci:fix": "turbo ci:fix"
   },
   "devDependencies": {
     "@biomejs/biome": "1.8.3",
