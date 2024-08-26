@@ -182,7 +182,7 @@ export async function createVetoProposalFor(
         externalId: proposalData.proposalId,
         proposer: proposalData.proposer,
         description: proposalData.description,
-        type: "ZK_GOV_OPS_GOVERNOR",
+        type: proposalData.type,
         nonce: Number(nonce),
         status: l2CancellationStatusEnum.enum.ACTIVE,
         txRequestGasLimit: l2GasLimit,
