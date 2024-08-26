@@ -1,6 +1,10 @@
 import { type BrowserContext, type Page, test as baseTest } from "@playwright/test";
 import dappwright, { type Dappwright, MetaMaskWallet } from "@tenkeylabs/dappwright";
 import "dotenv/config";
+import {
+  ALL_COUNCIL_INDEXES,
+  ALL_GUARDIAN_INDEXES,
+} from "./constants.js";
 
 export { expect } from "@playwright/test";
 
@@ -14,7 +18,7 @@ export class RoleSwitcher {
   }
 
   async council(page: Page, councilNumber = 0): Promise<void> {
-    const councilIndexes = [1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    const councilIndexes = ALL_COUNCIL_INDEXES;
 
     if (councilNumber >= councilIndexes.length) {
       throw new Error(
@@ -27,7 +31,7 @@ export class RoleSwitcher {
   }
 
   async guardian(page: Page, guardianNumber = 0): Promise<void> {
-    const guardianIndexes = [2, 17, 18, 19, 20, 21, 22, 23, 24];
+    const guardianIndexes = ALL_GUARDIAN_INDEXES;
 
     if (guardianNumber >= guardianIndexes.length) {
       throw new Error(
