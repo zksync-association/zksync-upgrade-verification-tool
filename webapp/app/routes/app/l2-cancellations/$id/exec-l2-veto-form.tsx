@@ -44,7 +44,7 @@ type Proposal = {
   txRequestTxMintValue: Hex;
 };
 
-export default function ExecL2VetoButton({
+export default function ExecL2VetoForm({
   children,
   guardiansAddress,
   signatures,
