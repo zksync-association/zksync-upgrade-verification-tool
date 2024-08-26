@@ -141,5 +141,8 @@ dist
 **/addresses.txt
 **/test-results/
 
+# turborepo
+.turbo
+
 # zk-gov preprocessed contracts
 e2e/contracts/zk-gov-preprocessed/

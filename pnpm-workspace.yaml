@@ -1,4 +1,3 @@
 packages:
-  - cli
-  - webapp
+  - "apps/*"
   - e2e
