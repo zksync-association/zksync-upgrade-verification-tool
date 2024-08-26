@@ -31,6 +31,7 @@ import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { numberToHex } from "viem";
 import { z } from "zod";
+import { useAccount } from "wagmi";
 
 export async function loader() {
   return defer({ activeL2Proposals: getActiveL2Proposals() });
@@ -71,13 +72,18 @@ const schema = z.object({
 });
 type Schema = z.infer<typeof schema>;
 
-const defaultValues = {};
-
 export default function NewL2GovernorVeto() {
   const { activeL2Proposals } = useLoaderData<typeof loader>();
+  const {address} =  useAccount();
+
   const form = useForm<Schema>({
     resolver: zodResolver(schema),
-    defaultValues,
+    defaultValues: {
+      l2GasLimit: 600000,
+      l2GasPerPubdataByteLimit: 60000,
+      refundRecipient: address,
+      txMintValue: 1000000000000000
+    },
     mode: "onTouched",
   });
   const navigation = useNavigation();
