@@ -136,7 +136,7 @@ async function main() {
       token: zkToken.address,
       timelock: zeroAddress,
       initialVotingDelay: 0,
-      initialVotingPeriod: 100,
+      initialVotingPeriod: 10000,
       initialProposalThreshold: 0,
       initialQuorum: 0,
       initialVoteExtension: 0,
@@ -163,10 +163,10 @@ async function main() {
   console.log("ZkTokenGovernor deployed to:", zkTokenGovernor.address);
 
   await zkGovOpsGovernor.write.propose([[zeroAddress], [0n], ["0x"], "Test GovOps proposal"]);
-  // await zkTokenGovernor.write.propose([[zeroAddress], [0n], ["0x"], "Test Token proposal"]);
+  await zkTokenGovernor.write.propose([[zeroAddress], [1n], ["0x"], "Test Token proposal"]);
 
   addressesContent += `ZkGovOpsGovernor: ${zkGovOpsGovernor.address}\n`;
-  // addressesContent += `ZkTokenGovernor: ${zkTokenGovernor.address}\n`;
+  addressesContent += `ZkTokenGovernor: ${zkTokenGovernor.address}\n`;
 
   const calldata = encodeFunctionData({
     abi: counterAbi,
