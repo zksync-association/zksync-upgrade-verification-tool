@@ -34,7 +34,7 @@ const eventSchema = z.object({
 });
 
 function blocksInADay() {
-  if (env.ETH_NETWORK === "mainnet") {
+  if (env.ETH_NETWORK === "mainnet" || env.ETH_NETWORK === "local") {
     return 24 * 3600; // 24 hours, 1 block per second
   }
   return 24 * (3600 / 20); // 20 seconds per block.
