@@ -8,7 +8,7 @@ export async function directoryExists(path: string): Promise<boolean> {
   let targetDirStat: Stats;
   try {
     targetDirStat = await fs.stat(path);
-  } catch (e) {
+  } catch (_e) {
     return false;
   }
   return targetDirStat.isDirectory();

@@ -6,7 +6,14 @@ export default function VotingStatusIndicator({
   necessarySignatures,
   label,
   className,
-}: { signatures: number; necessarySignatures: number; label: string; className?: string }) {
+  testId,
+}: {
+  signatures: number;
+  necessarySignatures: number;
+  label: string;
+  className?: string;
+  testId?: string;
+}) {
   const necessarySignaturesReached = signatures >= necessarySignatures;
 
   return (
@@ -15,6 +22,7 @@ export default function VotingStatusIndicator({
         <span>{label}</span>
         <span
           className={cn("text-muted-foreground", necessarySignaturesReached && "text-green-400")}
+          data-testid={testId}
         >
           {signatures}/{necessarySignatures}
         </span>

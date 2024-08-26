@@ -3,6 +3,6 @@ import { cli } from "./lib";
 
 try {
   await cli().catch((_e) => process.exit(1));
-} catch (e) {
+} catch (_e) {
   process.exit(1);
 }
