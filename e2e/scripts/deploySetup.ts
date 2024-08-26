@@ -172,11 +172,7 @@ async function main() {
   console.log("Addresses saved to addresses.txt");
 }
 
-function deriveMembers(
-  extrasEnvVar: string,
-  indexes: number[],
-  mnemonic: string
-): Hex[] {
+function deriveMembers(extrasEnvVar: string, indexes: number[], mnemonic: string): Hex[] {
   // In case special addresses want to be used, these can be defined in env vars.
   const extras = (process.env[extrasEnvVar] || "")
     .split(",")
@@ -184,16 +180,15 @@ function deriveMembers(
     .map((str) => str.trim()) as Hex[];
 
   // Derive all addresses from mnemonic
-  const derived = indexes.map((n) =>
-    mnemonicToAccount(mnemonic, { addressIndex: n })
-  ).map(hd => hd.address);
+  const derived = indexes
+    .map((n) => mnemonicToAccount(mnemonic, { addressIndex: n }))
+    .map((hd) => hd.address);
 
   // Addresses from env var take priority, but only the right amount of addresses is kept.
   const final = [...extras, ...derived].slice(0, indexes.length);
 
   // Contract require addresses to be sorted.
-  return final
-    .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b)));
+  return final.sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b)));
 }
 
 function deriveAllAddresses() {
@@ -202,9 +197,10 @@ function deriveAllAddresses() {
     throw new Error("Missing MNEMONIC env var");
   }
 
-
-  const zkAssociation = mnemonicToAccount(mnemonic, { addressIndex: DERIVATION_INDEXES.ZK_FOUNDATION }).address
-  const visitor = mnemonicToAccount(mnemonic, { addressIndex: DERIVATION_INDEXES.VISITOR }).address
+  const zkAssociation = mnemonicToAccount(mnemonic, {
+    addressIndex: DERIVATION_INDEXES.ZK_FOUNDATION,
+  }).address;
+  const visitor = mnemonicToAccount(mnemonic, { addressIndex: DERIVATION_INDEXES.VISITOR }).address;
 
   return {
     council: deriveMembers("EXTRA_COUNCIL", ALL_COUNCIL_INDEXES, mnemonic),

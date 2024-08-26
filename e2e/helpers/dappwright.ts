@@ -1,10 +1,7 @@
 import { type BrowserContext, type Page, test as baseTest } from "@playwright/test";
 import dappwright, { type Dappwright, MetaMaskWallet } from "@tenkeylabs/dappwright";
 import "dotenv/config";
-import {
-  ALL_COUNCIL_INDEXES,
-  ALL_GUARDIAN_INDEXES,
-} from "./constants.js";
+import { ALL_COUNCIL_INDEXES, ALL_GUARDIAN_INDEXES } from "./constants.js";
 
 export { expect } from "@playwright/test";
 
@@ -17,7 +14,12 @@ export class RoleSwitcher {
     this.wallet = wallet;
   }
 
-  private async changeToMember(indexes: number[], memberNumber: number, groupName: string, page: Page) {
+  private async changeToMember(
+    indexes: number[],
+    memberNumber: number,
+    groupName: string,
+    page: Page
+  ) {
     const selectedCouncil = indexes[memberNumber];
     if (selectedCouncil === undefined) {
       throw new Error(
@@ -30,11 +32,11 @@ export class RoleSwitcher {
   }
 
   async council(page: Page, councilNumber = 0): Promise<void> {
-    await this.changeToMember(ALL_COUNCIL_INDEXES, councilNumber, "security council", page)
+    await this.changeToMember(ALL_COUNCIL_INDEXES, councilNumber, "security council", page);
   }
 
   async guardian(page: Page, guardianNumber = 0): Promise<void> {
-    await this.changeToMember(ALL_GUARDIAN_INDEXES, guardianNumber, "guardians", page)
+    await this.changeToMember(ALL_GUARDIAN_INDEXES, guardianNumber, "guardians", page);
   }
 
   async zkFoundation(page: Page): Promise<void> {
