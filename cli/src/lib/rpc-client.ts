@@ -194,7 +194,6 @@ export class RpcClient {
       topics,
     };
 
-    console.log("eth_getLogs", JSON.stringify(arg, null, 2));
     const data = await this.rawCall("eth_getLogs", [arg]);
 
     if (data.error) {
