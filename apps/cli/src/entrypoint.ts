@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { cli } from "./lib";
+import { cli } from "./lib/index.js";
 
 try {
   await cli().catch((_e) => process.exit(1));

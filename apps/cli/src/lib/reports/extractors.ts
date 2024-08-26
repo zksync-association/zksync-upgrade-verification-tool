@@ -1,8 +1,8 @@
 import { bytesToHex, type Hex } from "viem";
-import type { StorageVisitor } from "./storage-visitor";
-import type { StorageValue } from "../storage/values/storage-value";
-import type { ValueField } from "../storage/values/struct-value";
-import { zodHex } from "../../schema/zod-optionals";
+import type { StorageVisitor } from "./storage-visitor.js";
+import type { StorageValue } from "../storage/values/storage-value.js";
+import type { ValueField } from "../storage/values/struct-value.js";
+import { zodHex } from "../../schema/zod-optionals.js";
 import { z } from "zod";
 
 export class ValueExtractor<T> implements StorageVisitor<T> {
@@ -40,33 +40,33 @@ export class ValueExtractor<T> implements StorageVisitor<T> {
 }
 
 export class BigNumberExtractor extends ValueExtractor<bigint> {
-  visitBigNumber(n: bigint): bigint {
+  override visitBigNumber(n: bigint): bigint {
     return n;
   }
 }
 
 export class BlobExtractor extends ValueExtractor<Hex> {
-  visitBuf(buf: Buffer): Hex {
+  override visitBuf(buf: Buffer): Hex {
     return bytesToHex(buf);
   }
 }
 
 export class AddressExtractor extends ValueExtractor<Hex> {
-  visitAddress(addr: Hex): Hex {
+  override visitAddress(addr: Hex): Hex {
     return addr;
   }
 }
 
 export class ListOfAddressesExtractor extends ValueExtractor<Hex[]> {
-  visitAddress(addr: Hex): Hex[] {
+  override visitAddress(addr: Hex): Hex[] {
     return [addr];
   }
 
-  visitArray(inner: StorageValue[]): Hex[] {
+  override visitArray(inner: StorageValue[]): Hex[] {
     return inner.flatMap((v) => v.accept(this));
   }
 
-  visitEmpty(): Hex[] {
+  override visitEmpty(): Hex[] {
     return [];
   }
 }
@@ -74,22 +74,22 @@ export class ListOfAddressesExtractor extends ValueExtractor<Hex[]> {
 type FacetsToSelectorsValue = Hex | Hex[] | Map<Hex, Hex[]>;
 
 export class FacetsToSelectorsVisitor extends ValueExtractor<FacetsToSelectorsValue> {
-  visitBuf(buf: Buffer): FacetsToSelectorsValue {
+  override visitBuf(buf: Buffer): FacetsToSelectorsValue {
     return bytesToHex(buf);
   }
 
-  visitArray(inner: StorageValue[]): Hex[] {
+  override visitArray(inner: StorageValue[]): Hex[] {
     return inner.map((v) => {
       const data = v.accept(this);
       return zodHex.parse(data);
     });
   }
 
-  visitEmpty(): FacetsToSelectorsValue {
+  override visitEmpty(): FacetsToSelectorsValue {
     return [];
   }
 
-  visitStruct(fields: ValueField[]): FacetsToSelectorsValue {
+  override visitStruct(fields: ValueField[]): FacetsToSelectorsValue {
     const field = fields.find((f) => f.key === "selectors");
     if (!field) {
       throw new Error("selectors should be present");
@@ -97,7 +97,7 @@ export class FacetsToSelectorsVisitor extends ValueExtractor<FacetsToSelectorsVa
     return z.array(zodHex).parse(field.value.accept(this));
   }
 
-  visitMapping(fields: ValueField[]): Map<Hex, Hex[]> {
+  override visitMapping(fields: ValueField[]): Map<Hex, Hex[]> {
     const map = new Map<Hex, Hex[]>();
 
     for (const field of fields) {

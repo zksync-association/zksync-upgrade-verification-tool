@@ -17,7 +17,7 @@ import {
   contractEventSchema,
   memoryDiffParser,
   type MemoryDiffRaw,
-} from "../schema/rpc";
+} from "../schema/rpc.js";
 import { getStorageAt } from "viem/actions";
 
 const L1_DEFAULT_URLS = {

@@ -1,15 +1,15 @@
-import type { EnvBuilder } from "../lib/env-builder";
-import { DIAMOND_ADDRS, type UpgradeChanges, UpgradeImporter } from "../lib";
-import { StorageChanges } from "../lib";
+import type { EnvBuilder } from "../lib/env-builder.js";
+import { DIAMOND_ADDRS, type UpgradeChanges, UpgradeImporter } from "../lib/index.js";
+import { StorageChanges } from "../lib/index.js";
 import type { Hex } from "viem";
 import { Option } from "nochoices";
-import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc";
-import { StringStorageChangeReport } from "../lib/reports/string-storage-change-report";
-import { RpcStorageSnapshot } from "../lib";
-import { RecordStorageSnapshot } from "../lib";
-import { MAIN_CONTRACT_FIELDS } from "../lib/storage/storage-props";
-import { FacetsToSelectorsVisitor, ListOfAddressesExtractor } from "../lib/reports/extractors";
-import { withSpinner } from "../lib/with-spinner";
+import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc.js";
+import { StringStorageChangeReport } from "../lib/reports/string-storage-change-report.js";
+import { RpcStorageSnapshot } from "../lib/index.js";
+import { RecordStorageSnapshot } from "../lib/index.js";
+import { MAIN_CONTRACT_FIELDS } from "../lib/storage/storage-props.js";
+import { FacetsToSelectorsVisitor, ListOfAddressesExtractor } from "../lib/reports/extractors.js";
+import { withSpinner } from "../lib/with-spinner.js";
 
 async function getMemoryPath(
   preCalculatedPath: Option<string>,

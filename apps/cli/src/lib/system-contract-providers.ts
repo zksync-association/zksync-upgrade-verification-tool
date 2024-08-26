@@ -1,10 +1,10 @@
 import type { Hex } from "viem";
-import type { L2ContractData } from "./zksync-era-state";
-import type { RpcClient } from "./rpc-client";
-import type { BlockExplorerClient } from "./block-explorer-client";
+import type { L2ContractData } from "./zksync-era-state.js";
+import type { RpcClient } from "./rpc-client.js";
+import type { BlockExplorerClient } from "./block-explorer-client.js";
 import { utils } from "zksync-ethers";
 import { Option } from "nochoices";
-import type { ContractData } from "./contract-data";
+import type { ContractData } from "./contract-data.js";
 
 export interface SystemContractProvider {
   dataFor(addr: Hex): Promise<Option<L2ContractData>>;

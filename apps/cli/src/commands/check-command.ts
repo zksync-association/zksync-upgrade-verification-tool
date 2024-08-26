@@ -1,8 +1,8 @@
-import type { EnvBuilder } from "../lib/env-builder";
-import { DIAMOND_ADDRS, StringCheckReport, ZkSyncEraDiff, ZksyncEraState } from "../lib/index";
+import type { EnvBuilder } from "../lib/env-builder.js";
+import { DIAMOND_ADDRS, StringCheckReport, ZkSyncEraDiff, ZksyncEraState } from "../lib/index.js";
 import { hexToBytes } from "viem";
-import { withSpinner } from "../lib/with-spinner";
-import { MalformedUpgrade } from "../lib/errors";
+import { withSpinner } from "../lib/with-spinner.js";
+import { MalformedUpgrade } from "../lib/errors.js";
 
 export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
   const current = await withSpinner(

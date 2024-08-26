@@ -1,9 +1,9 @@
 import { Option } from "nochoices";
 import { type Hex, hexToBigInt } from "viem";
-import type { ContractField } from "./contractField";
-import type { StorageSnapshot } from "./snapshot";
-import { PropertyChange } from "./property-change";
-import { mainDiamondFields } from "./storage-props";
+import type { ContractField } from "./contractField.js";
+import type { StorageSnapshot } from "./snapshot/index.js";
+import { PropertyChange } from "./property-change.js";
+import { mainDiamondFields } from "./storage-props.js";
 
 export const DIAMOND_STORAGE_SLOT = hexToBigInt(
   "0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b"

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { account20String, selectorHash } from "../schema";
+import { account20String, selectorHash } from "../schema/index.js";
 
 export const facetCutsSchema = z.array(
   z.object({

@@ -28,7 +28,7 @@ export {
   type StorageSnapshot,
   type SystemContractProvider,
   type SystemContractUpgrade,
-} from "./lib";
+} from "./lib/index.js";
 
-export { memoryDiffParser } from "./schema/rpc";
-export { zodHex } from "./schema/hex-parser";
+export { memoryDiffParser } from "./schema/rpc.js";
+export { zodHex } from "./schema/hex-parser.js";

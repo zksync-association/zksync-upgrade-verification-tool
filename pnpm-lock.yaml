@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      validate-cli:
-        specifier: workspace:*
-        version: link:apps/cli
     devDependencies:
       '@biomejs/biome':
         specifier: 1.8.3
@@ -76,6 +72,9 @@ importers:
       '@biomejs/biome':
         specifier: 1.8.3
         version: 1.8.3
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
       '@types/node':
         specifier: ^22.1.0
         version: 22.1.0
@@ -437,6 +436,14 @@ importers:
       vitest:
         specifier: ^2.0.5
         version: 2.0.5(@types/node@20.12.6)(happy-dom@14.12.3)(jsdom@24.1.1(bufferutil@4.0.8)(utf-8-validate@5.0.10))(terser@5.31.6)
+
+  packages/common:
+    devDependencies:
+      typescript:
+        specifier: ^5.5.4
+        version: 5.5.4
+
+  packages/typescript-config: {}
 
 packages:
 

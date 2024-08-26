@@ -1,9 +1,9 @@
-import type { EnvBuilder } from "../lib/env-builder";
-import { RpcStorageSnapshot } from "../lib";
-import { SnapshotReport } from "../lib/reports/storage-snapshot-report";
-import { mainDiamondFields } from "../lib/storage/storage-props";
-import { DIAMOND_ADDRS } from "../lib";
-import { ZksyncEraState } from "../lib";
+import type { EnvBuilder } from "../lib/env-builder.js";
+import { RpcStorageSnapshot } from "../lib/index.js";
+import { SnapshotReport } from "../lib/reports/storage-snapshot-report.js";
+import { mainDiamondFields } from "../lib/storage/storage-props.js";
+import { DIAMOND_ADDRS } from "../lib/index.js";
+import { ZksyncEraState } from "../lib/index.js";
 
 export async function storageSnapshotCommand(env: EnvBuilder): Promise<void> {
   const rpc = env.rpcL1();

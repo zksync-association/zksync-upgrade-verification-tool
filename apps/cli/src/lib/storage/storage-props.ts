@@ -1,14 +1,14 @@
-import { ContractField } from "./contractField";
-import { FixedArrayType } from "./types/fixed-array-type";
-import { AddressType } from "./types/address-type";
-import { MappingType } from "./mapping-type";
-import { BooleanType } from "./types/boolean-type";
-import { BigNumberType } from "./types/big-number-type";
-import { StructType } from "./types/struct-type";
-import { BlobType } from "./types/blob-type";
+import { ContractField } from "./contractField.js";
+import { FixedArrayType } from "./types/fixed-array-type.js";
+import { AddressType } from "./types/address-type.js";
+import { MappingType } from "./mapping-type.js";
+import { BooleanType } from "./types/boolean-type.js";
+import { BigNumberType } from "./types/big-number-type.js";
+import { StructType } from "./types/struct-type.js";
+import { BlobType } from "./types/blob-type.js";
 import { type Hex, hexToBytes } from "viem";
-import { ArrayType } from "./types/array-type";
-import { DIAMOND_STORAGE_SLOT } from "./storage-changes";
+import { ArrayType } from "./types/array-type.js";
+import { DIAMOND_STORAGE_SLOT } from "./storage-changes.js";
 
 export const MAIN_CONTRACT_FIELDS = {
   protocolVersion: new ContractField(

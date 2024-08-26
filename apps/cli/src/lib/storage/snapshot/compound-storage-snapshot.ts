@@ -1,4 +1,4 @@
-import type { StorageSnapshot } from "./storage-snapshot";
+import type { StorageSnapshot } from "./storage-snapshot.js";
 import type { Option } from "nochoices";
 
 export class CompoundStorageSnapshot implements StorageSnapshot {

@@ -1,6 +1,6 @@
-import type { ContractField } from "./contractField";
+import type { ContractField } from "./contractField.js";
 import type { Option } from "nochoices";
-import type { StorageValue } from "./values/storage-value";
+import type { StorageValue } from "./values/storage-value.js";
 
 export class PropertyChange {
   prop: ContractField;

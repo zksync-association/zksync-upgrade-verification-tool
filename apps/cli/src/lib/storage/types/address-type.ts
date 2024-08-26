@@ -1,10 +1,10 @@
-import type { MemoryDataType } from "./data-type";
+import type { MemoryDataType } from "./data-type.js";
 import type { Option } from "nochoices";
 import { bytesToHex, type Hex } from "viem";
 
-import type { StorageSnapshot } from "../snapshot";
-import { AddressValue } from "../values/address-value";
-import type { StorageValue } from "../values/storage-value";
+import type { StorageSnapshot } from "../snapshot/index.js";
+import { AddressValue } from "../values/address-value.js";
+import type { StorageValue } from "../values/storage-value.js";
 
 export class AddressType implements MemoryDataType {
   async extract(memory: StorageSnapshot, slot: bigint, _offset = 0): Promise<Option<StorageValue>> {

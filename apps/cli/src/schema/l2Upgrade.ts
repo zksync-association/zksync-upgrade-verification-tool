@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { account20String, bytes32Hash } from "../schema";
+import { account20String, bytes32Hash } from "../schema/index.js";
 
 const systemContracts = z.array(
   z.object({

@@ -1,5 +1,5 @@
-import type { StorageChanges } from "../storage/storage-changes";
-import { type ExtractedValue, ObjStorageVisitor } from "./obj-storage-visitor";
+import type { StorageChanges } from "../storage/storage-changes.js";
+import { type ExtractedValue, ObjStorageVisitor } from "./obj-storage-visitor.js";
 
 export type FieldStorageChange = {
   name: string;

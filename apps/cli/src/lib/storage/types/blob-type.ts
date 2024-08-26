@@ -1,9 +1,9 @@
-import type { MemoryDataType } from "./data-type";
+import type { MemoryDataType } from "./data-type.js";
 import type { Option } from "nochoices";
 
-import type { StorageSnapshot } from "../snapshot";
-import type { StorageValue } from "../values/storage-value";
-import { BlobValue } from "../values/blob-value";
+import type { StorageSnapshot } from "../snapshot/index.js";
+import type { StorageValue } from "../values/storage-value.js";
+import { BlobValue } from "../values/blob-value.js";
 
 export class BlobType implements MemoryDataType {
   private size: number;

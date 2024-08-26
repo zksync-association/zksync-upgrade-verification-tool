@@ -1,33 +1,33 @@
 import { bytesToBigInt, bytesToHex, bytesToNumber, type Hex, numberToBytes } from "viem";
-import type { FacetData } from "./upgrade-changes";
+import type { FacetData } from "./upgrade-changes.js";
 import { Option } from "nochoices";
-import { MissingRequiredProp } from "./errors";
-import { DIAMOND_ADDRS, type Network, UPGRADE_FN_SELECTOR } from "./constants";
-import { Diamond } from "./diamond";
-import { type BlockExplorer, BlockExplorerClient } from "./block-explorer-client";
-import { RpcClient } from "./rpc-client";
-import { zodHex } from "../schema/zod-optionals";
-import { RpcStorageSnapshot } from "./storage/snapshot";
-import { StringStorageVisitor } from "./reports/string-storage-visitor";
-import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props";
+import { MissingRequiredProp } from "./errors.js";
+import { DIAMOND_ADDRS, type Network, UPGRADE_FN_SELECTOR } from "./constants.js";
+import { Diamond } from "./diamond.js";
+import { type BlockExplorer, BlockExplorerClient } from "./block-explorer-client.js";
+import { RpcClient } from "./rpc-client.js";
+import { zodHex } from "../schema/zod-optionals.js";
+import { RpcStorageSnapshot } from "./storage/snapshot/index.js";
+import { StringStorageVisitor } from "./reports/string-storage-visitor.js";
+import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props.js";
 import {
   RpcSystemContractProvider,
   SystemContractList,
   type SystemContractProvider,
-} from "./system-contract-providers";
+} from "./system-contract-providers.js";
 import { z } from "zod";
-import { RecordStorageSnapshot } from "./storage/snapshot";
+import { RecordStorageSnapshot } from "./storage/snapshot/index.js";
 import {
   AddressExtractor,
   BigNumberExtractor,
   BlobExtractor,
   FacetsToSelectorsVisitor,
   ListOfAddressesExtractor,
-} from "./reports/extractors";
-import type { ContractField } from "./storage/contractField";
-import type { StorageSnapshot } from "./storage/snapshot";
-import type { StorageVisitor } from "./reports/storage-visitor";
-import { type CallTrace, l2UpgradeSchema, upgradeCallDataSchema } from "../schema/rpc";
+} from "./reports/extractors.js";
+import type { ContractField } from "./storage/contractField.js";
+import type { StorageSnapshot } from "./storage/snapshot/index.js";
+import type { StorageVisitor } from "./reports/storage-visitor.js";
+import { type CallTrace, l2UpgradeSchema, upgradeCallDataSchema } from "../schema/rpc.js";
 
 export type L2ContractData = {
   address: Hex;

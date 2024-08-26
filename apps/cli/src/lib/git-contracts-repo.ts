@@ -1,13 +1,13 @@
 import { type SimpleGit, simpleGit } from "simple-git";
-import { cacheDir, directoryExists } from "./fs-utils";
+import { cacheDir, directoryExists } from "./fs-utils.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { compiledArtifactParser } from "../schema/compiled";
+import { compiledArtifactParser } from "../schema/compiled.js";
 import { utils } from "zksync-ethers";
-import { type SystemContractHashes, systemContractHashesParser } from "../schema/github-schemas";
-import type { Sources } from "../schema";
+import { type SystemContractHashes, systemContractHashesParser } from "../schema/github-schemas.js";
+import type { Sources } from "../schema/index.js";
 import { Option } from "nochoices";
 
 const execPromise = promisify(exec);

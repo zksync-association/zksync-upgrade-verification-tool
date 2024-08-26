@@ -1,6 +1,6 @@
 import { bytesToBigInt, type Hex } from "viem";
 import { Option } from "nochoices";
-import type { StorageSnapshot } from "./storage-snapshot";
+import type { StorageSnapshot } from "./storage-snapshot.js";
 
 export class RecordStorageSnapshot implements StorageSnapshot {
   data: Map<bigint, Buffer>;

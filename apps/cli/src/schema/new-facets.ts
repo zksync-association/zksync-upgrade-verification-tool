@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { zodHex } from "./hex-parser";
+import { zodHex } from "./hex-parser.js";
 
 export const facetsResponseSchema = z.array(
   z.object({

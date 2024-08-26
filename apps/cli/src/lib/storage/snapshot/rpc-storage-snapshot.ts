@@ -1,8 +1,8 @@
-import type { StorageSnapshot } from "./storage-snapshot";
+import type { StorageSnapshot } from "./storage-snapshot.js";
 import { Option } from "nochoices";
-import type { RpcClient } from "../../rpc-client";
+import type { RpcClient } from "../../rpc-client.js";
 import { type Hex, hexToBytes } from "viem";
-import { CompoundStorageSnapshot } from "./compound-storage-snapshot";
+import { CompoundStorageSnapshot } from "./compound-storage-snapshot.js";
 
 export class RpcStorageSnapshot implements StorageSnapshot {
   private rpc: RpcClient;

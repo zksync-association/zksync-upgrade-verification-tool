@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { zodOptional } from "./zod-optionals";
-import { zodHex } from "./hex-parser";
+import { zodOptional } from "./zod-optionals.js";
+import { zodHex } from "./hex-parser.js";
 
 const stateParser = z.record(
   z.string(),

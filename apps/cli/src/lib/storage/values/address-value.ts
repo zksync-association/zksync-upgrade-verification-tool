@@ -1,5 +1,5 @@
-import type { StorageVisitor } from "../../reports/storage-visitor";
-import type { StorageValue } from "./storage-value";
+import type { StorageVisitor } from "../../reports/storage-visitor.js";
+import type { StorageValue } from "./storage-value.js";
 import type { Hex } from "viem";
 
 export class AddressValue implements StorageValue {

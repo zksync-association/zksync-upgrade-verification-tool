@@ -1,12 +1,12 @@
 import type { EnvBuilder } from "../lib/env-builder.js";
-import { withSpinner } from "../lib/with-spinner";
-import { ZksyncEraState, type HexEraPropName } from "../lib/zksync-era-state";
+import { withSpinner } from "../lib/with-spinner.js";
+import { ZksyncEraState, type HexEraPropName } from "../lib/zksync-era-state.js";
 import path from "node:path";
 import { hexToBigInt, hexToBytes } from "viem";
-import { hexAreEq, ZkSyncEraDiff } from "../lib/zk-sync-era-diff";
-import { ADDRESS_ZERO, ContractData, OPEN_ZEP_PROXY_IMPL_SLOT } from "../lib";
-import { MalformedUpgrade } from "../lib/errors";
-import type { GitContractsRepo } from "../lib/git-contracts-repo";
+import { hexAreEq, ZkSyncEraDiff } from "../lib/zk-sync-era-diff.js";
+import { ADDRESS_ZERO, ContractData, OPEN_ZEP_PROXY_IMPL_SLOT } from "../lib/index.js";
+import { MalformedUpgrade } from "../lib/errors.js";
+import type { GitContractsRepo } from "../lib/git-contracts-repo.js";
 
 async function downloadAllCode(
   diff: ZkSyncEraDiff,

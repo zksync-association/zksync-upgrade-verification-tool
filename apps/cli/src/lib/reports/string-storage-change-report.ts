@@ -1,6 +1,6 @@
 import chalk from "chalk";
-import type { StorageChanges } from "../storage/storage-changes";
-import { StringStorageVisitor } from "./string-storage-visitor";
+import type { StorageChanges } from "../storage/storage-changes.js";
+import { StringStorageVisitor } from "./string-storage-visitor.js";
 
 export class StringStorageChangeReport {
   lines: string[];

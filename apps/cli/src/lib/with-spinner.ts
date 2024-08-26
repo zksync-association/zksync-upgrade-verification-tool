@@ -1,5 +1,5 @@
 import ora from "ora";
-import type { EnvBuilder } from "./env-builder";
+import type { EnvBuilder } from "./env-builder.js";
 
 export async function withSpinner<T>(
   fn: () => Promise<T>,

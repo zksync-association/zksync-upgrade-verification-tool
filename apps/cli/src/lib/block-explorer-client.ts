@@ -5,12 +5,12 @@ import {
   getAbiSchema,
   sourceCodeResponseSchema,
   sourceCodeSchema,
-} from "../schema";
+} from "../schema/index.js";
 import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
 import { z, type ZodType } from "zod";
 import { ContractData } from "./contract-data.js";
 import { ContractNotVerified, ExternalApiError } from "./errors.js";
-import { ContractAbi } from "./contract-abi";
+import { ContractAbi } from "./contract-abi.js";
 import type { Hex } from "viem";
 
 export interface BlockExplorer {

@@ -1,5 +1,5 @@
 import type { Network } from "./constants.js";
-import type { Terminal } from "./terminal";
+import type { Terminal } from "./terminal.js";
 
 export class MissingRequiredProp extends Error {
   constructor(prop: string) {

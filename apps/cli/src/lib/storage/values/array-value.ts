@@ -1,5 +1,5 @@
-import type { StorageValue } from "./storage-value";
-import type { StorageVisitor } from "../../reports/storage-visitor";
+import type { StorageValue } from "./storage-value.js";
+import type { StorageVisitor } from "../../reports/storage-visitor.js";
 
 export class ArrayValue implements StorageValue {
   inner: StorageValue[];

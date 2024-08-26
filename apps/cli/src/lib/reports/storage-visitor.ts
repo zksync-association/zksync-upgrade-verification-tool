@@ -1,6 +1,6 @@
 import type { Hex } from "viem";
-import type { StorageValue } from "../storage/values/storage-value";
-import type { ValueField } from "../storage/values/struct-value";
+import type { StorageValue } from "../storage/values/storage-value.js";
+import type { ValueField } from "../storage/values/struct-value.js";
 
 export interface StorageVisitor<T> {
   visitAddress(addr: Hex): T;

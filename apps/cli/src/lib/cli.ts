@@ -1,16 +1,16 @@
 import yargs, { type Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
-import { NetworkSchema } from ".";
+import { NetworkSchema } from "./index.js";
 import {
   checkCommand,
   downloadCodeCommand,
   storageChangeCommand,
   storageSnapshotCommand,
-} from "../commands";
+} from "../commands/index.js";
 import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
 import { Option } from "nochoices";
-import { failHandler } from "../commands/fail-handler";
+import { failHandler } from "../commands/fail-handler.js";
 
 export function buildCli(
   args: string[],

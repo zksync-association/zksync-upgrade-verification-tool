@@ -2,29 +2,16 @@
   "name": "validate-cli",
   "version": "1.0.0",
   "description": "cli tool to check details about zk-sync era upgrades.",
-  "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "bin": {
-    "validate": "./bin/validate.js"
-  },
   "engines": {
     "node": ">=20",
     "pnpm": ">=8"
   },
-  "files": [
-    "dist",
-    "bin",
-    "*.d.ts",
-    "*.mjs"
-  ],
   "scripts": {
     "check": "pnpm biome check ./src",
     "check:fix": "pnpm biome check ./src --write",
     "start": "tsx src/entrypoint.ts",
-    "build": "tsup src --format esm --dts --no-splitting --sourcemap",
-    "watch": "tsup src --format esm --sourcemap --no-splitting --watch",
+    "build": "tsc",
+    "watch": "tsc --watch",
     "test": "vitest run",
     "test:ci": "vitest run --coverage --coverage.reporter=lcov"
   },
@@ -33,9 +20,10 @@
   "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "1.8.3",
+    "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.1.0",
     "@vitest/coverage-v8": "^2.0.5",
-  "typescript": "5.5.4",
+    "typescript": "5.5.4",
     "vitest": "^2.0.5"
   },
   "dependencies": {

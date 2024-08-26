@@ -1,8 +1,8 @@
 import { type Abi, bytesToHex, type Hex, hexToBytes, toFunctionSelector } from "viem";
-import type { BlockExplorerClient, ContractData, FacetData, BlockExplorer } from "./index";
-import type { ContractAbi } from "./contract-abi";
-import type { RpcClient } from "./rpc-client";
-import { facetsResponseSchema } from "../schema/new-facets";
+import type { BlockExplorerClient, ContractData, FacetData, BlockExplorer } from "./index.js";
+import type { ContractAbi } from "./contract-abi.js";
+import type { RpcClient } from "./rpc-client.js";
+import { facetsResponseSchema } from "../schema/new-facets.js";
 import type { ZodType } from "zod";
 
 const DIAMOND_FUNCTIONS = {

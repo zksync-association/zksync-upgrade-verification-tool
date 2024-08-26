@@ -1,10 +1,10 @@
 import { BlockExplorerClient } from "./block-explorer-client.js";
 import { NET_VERSIONS, type Network } from "./constants.js";
 import { RpcClient } from "./rpc-client.js";
-import { GitContractsRepo } from "./git-contracts-repo";
-import { FileSystem } from "./file-system";
-import { UpgradeImporter } from "./importer";
-import { Terminal } from "./terminal";
+import { GitContractsRepo } from "./git-contracts-repo.js";
+import { FileSystem } from "./file-system.js";
+import { UpgradeImporter } from "./importer.js";
+import { Terminal } from "./terminal.js";
 
 export class EnvBuilder {
   private _etherscanApiKey?: string;

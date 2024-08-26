@@ -1,9 +1,14 @@
 import path from "node:path";
-import { commonJsonSchema, facetsSchema, l2UpgradeSchema, transactionsSchema } from "../schema";
-import type { Network } from "./constants";
+import {
+  commonJsonSchema,
+  facetsSchema,
+  l2UpgradeSchema,
+  transactionsSchema,
+} from "../schema/index.js";
+import type { Network } from "./constants.js";
 import { MalformedUpgrade, MissingNetwork, NotAnUpgradeDir } from "./errors.js";
-import { UpgradeChanges } from "./upgrade-changes";
-import type { FileSystem } from "./file-system";
+import { UpgradeChanges } from "./upgrade-changes.js";
+import type { FileSystem } from "./file-system.js";
 import type { z, ZodType } from "zod";
 
 const POSSIBLE_DIRS_PER_NETWORK = {

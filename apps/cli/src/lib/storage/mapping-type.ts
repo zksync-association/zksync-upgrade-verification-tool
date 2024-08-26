@@ -1,11 +1,11 @@
-import type { MemoryDataType } from "./types/data-type";
+import type { MemoryDataType } from "./types/data-type.js";
 import { Option } from "nochoices";
 import { bytesToHex, hexToBigInt, keccak256, numberToBytes } from "viem";
 
-import type { StorageSnapshot } from "./snapshot";
-import type { StorageValue } from "./values/storage-value";
-import { EmptyValue } from "./values/empty-value";
-import { MappingValue } from "./values/mapping-value";
+import type { StorageSnapshot } from "./snapshot/index.js";
+import type { StorageValue } from "./values/storage-value.js";
+import { EmptyValue } from "./values/empty-value.js";
+import { MappingValue } from "./values/mapping-value.js";
 
 export class MappingType implements MemoryDataType {
   private keys: Buffer[];

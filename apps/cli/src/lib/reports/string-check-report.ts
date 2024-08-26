@@ -1,8 +1,8 @@
-import { hexAreEq, type ZkSyncEraDiff } from "../zk-sync-era-diff";
-import type { ContractsRepo } from "../git-contracts-repo";
+import { hexAreEq, type ZkSyncEraDiff } from "../zk-sync-era-diff.js";
+import type { ContractsRepo } from "../git-contracts-repo.js";
 import CliTable from "cli-table3";
-import type { BlockExplorer } from "../block-explorer-client";
-import { HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS } from "../zksync-era-state";
+import type { BlockExplorer } from "../block-explorer-client.js";
+import { HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS } from "../zksync-era-state.js";
 import type { Hex } from "viem";
 import chalk from "chalk";
 

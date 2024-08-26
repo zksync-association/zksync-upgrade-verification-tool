@@ -1,9 +1,9 @@
-import type { MemoryDataType } from "./data-type";
-import type { StorageSnapshot } from "../snapshot";
+import type { MemoryDataType } from "./data-type.js";
+import type { StorageSnapshot } from "../snapshot/index.js";
 import { Option } from "nochoices";
-import type { StorageValue } from "../values/storage-value";
-import { ArrayValue } from "../values/array-value";
-import { EmptyValue } from "../values/empty-value";
+import type { StorageValue } from "../values/storage-value.js";
+import { ArrayValue } from "../values/array-value.js";
+import { EmptyValue } from "../values/empty-value.js";
 
 export class FixedArrayType implements MemoryDataType {
   private size: number;

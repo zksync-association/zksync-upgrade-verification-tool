@@ -1,4 +1,9 @@
-import type { FacetsJson, L2UpgradeJson, TransactionsJson, UpgradeManifest } from "../schema";
+import type {
+  FacetsJson,
+  L2UpgradeJson,
+  TransactionsJson,
+  UpgradeManifest,
+} from "../schema/index.js";
 import { VerifierContract } from "./verifier.js";
 import type { Hex } from "viem";
 import { Option } from "nochoices";

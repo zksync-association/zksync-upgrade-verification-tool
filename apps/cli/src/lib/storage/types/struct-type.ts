@@ -1,10 +1,10 @@
-import type { MemoryDataType } from "./data-type";
+import type { MemoryDataType } from "./data-type.js";
 import { Option } from "nochoices";
 
-import type { StorageSnapshot } from "../snapshot";
-import type { StorageValue } from "../values/storage-value";
-import { StructValue } from "../values/struct-value";
-import { EmptyValue } from "../values/empty-value";
+import type { StorageSnapshot } from "../snapshot/index.js";
+import type { StorageValue } from "../values/storage-value.js";
+import { StructValue } from "../values/struct-value.js";
+import { EmptyValue } from "../values/empty-value.js";
 
 type StructField = { name: string; type: MemoryDataType };
 export class StructType implements MemoryDataType {

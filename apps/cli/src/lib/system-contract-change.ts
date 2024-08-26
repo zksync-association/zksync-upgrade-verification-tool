@@ -1,8 +1,8 @@
 import type { Hex } from "viem";
-import type { BlockExplorer } from "./block-explorer-client";
+import type { BlockExplorer } from "./block-explorer-client.js";
 import { ContractData } from "./contract-data.js";
 import { ContractNotVerified } from "./errors.js";
-import type { GitContractsRepo } from "./git-contracts-repo";
+import type { GitContractsRepo } from "./git-contracts-repo.js";
 import type { Option } from "nochoices";
 
 export class SystemContractChange {

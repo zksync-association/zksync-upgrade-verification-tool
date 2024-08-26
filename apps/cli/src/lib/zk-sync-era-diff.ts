@@ -1,9 +1,9 @@
 import type { Hex } from "viem";
-import type { ZksyncEraState, HexEraPropName, NumberEraPropNames } from "./zksync-era-state";
-import { MissingRequiredProp } from "./errors";
+import type { ZksyncEraState, HexEraPropName, NumberEraPropNames } from "./zksync-era-state.js";
+import { MissingRequiredProp } from "./errors.js";
 import { Option } from "nochoices";
-import type { FacetData } from "./upgrade-changes";
-import { SystemContractChange } from "./system-contract-change";
+import type { FacetData } from "./upgrade-changes.js";
+import { SystemContractChange } from "./system-contract-change.js";
 
 export type FacetDataDiff = {
   name: string;

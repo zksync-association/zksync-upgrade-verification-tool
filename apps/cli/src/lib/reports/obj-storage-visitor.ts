@@ -1,7 +1,7 @@
-import type { StorageVisitor } from "./storage-visitor";
+import type { StorageVisitor } from "./storage-visitor.js";
 import { bytesToHex, type Hex } from "viem";
-import type { StorageValue } from "../storage/values/storage-value";
-import type { ValueField } from "../storage/values/struct-value";
+import type { StorageValue } from "../storage/values/storage-value.js";
+import type { ValueField } from "../storage/values/struct-value.js";
 
 export type ExtractedMapping = {
   type: "mapping";

@@ -1,8 +1,8 @@
-import type { MemoryDataType } from "./data-type";
-import type { StorageSnapshot } from "../snapshot";
+import type { MemoryDataType } from "./data-type.js";
+import type { StorageSnapshot } from "../snapshot/index.js";
 import type { Option } from "nochoices";
-import type { StorageValue } from "../values/storage-value";
-import { BooleanValue } from "../values/boolean-value";
+import type { StorageValue } from "../values/storage-value.js";
+import { BooleanValue } from "../values/boolean-value.js";
 
 export class BooleanType implements MemoryDataType {
   async extract(memory: StorageSnapshot, slot: bigint, offset = 0): Promise<Option<StorageValue>> {

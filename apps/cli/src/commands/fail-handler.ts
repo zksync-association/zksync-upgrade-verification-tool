@@ -1,6 +1,6 @@
 import type { Argv } from "yargs";
-import { printError } from "../lib/errors";
-import type { EnvBuilder } from "../lib/env-builder";
+import { printError } from "../lib/errors.js";
+import type { EnvBuilder } from "../lib/env-builder.js";
 
 export async function failHandler(
   env: EnvBuilder,

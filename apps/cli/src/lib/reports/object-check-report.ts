@@ -1,10 +1,10 @@
-import type { ZkSyncEraDiff } from "../zk-sync-era-diff";
-import type { BlockExplorer } from "../block-explorer-client";
+import type { ZkSyncEraDiff } from "../zk-sync-era-diff.js";
+import type { BlockExplorer } from "../block-explorer-client.js";
 import {
   ADDR_ZKSYNC_FIELDS,
   BYTES32_ZKSYNC_FIELDS,
   NUMERIC_ZKSYNC_FIELDS,
-} from "../zksync-era-state";
+} from "../zksync-era-state.js";
 import type { Hex } from "viem";
 import type { Option } from "nochoices";
 

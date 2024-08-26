@@ -1,6 +1,6 @@
-import type { StorageValue } from "./storage-value";
-import type { StorageVisitor } from "../../reports/storage-visitor";
-import type { ValueField } from "./struct-value";
+import type { StorageValue } from "./storage-value.js";
+import type { StorageVisitor } from "../../reports/storage-visitor.js";
+import type { ValueField } from "./struct-value.js";
 
 export class MappingValue implements StorageValue {
   fields: ValueField[];
