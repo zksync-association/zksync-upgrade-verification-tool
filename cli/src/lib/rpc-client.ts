@@ -139,7 +139,7 @@ export class RpcClient {
     });
 
     if (!res.ok) {
-      throw new Error(`Error with rpc method "${method}".`);
+      throw new Error(`Error with rpc method "${method}" (${res.status}): ${await res.text()}`);
     }
 
     return res.json();
