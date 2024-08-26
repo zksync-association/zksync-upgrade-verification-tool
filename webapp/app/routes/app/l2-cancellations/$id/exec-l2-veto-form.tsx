@@ -1,28 +1,35 @@
-import type { l2CancellationsTable, signaturesTable } from "@/.server/db/schema";
 import type { Call } from "@/common/calls";
 import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { ALL_ABIS } from "@/utils/raw-abis";
+import type { BasicSignature } from "@/utils/signatures";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useFetcher } from "@remix-run/react";
 import type React from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
 import { type Hex, hexToBigInt, parseEther } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
-import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { BasicSignature } from "@/utils/signatures";
-
 
 const submitSchema = z.object({
-  value: z.string()
-    .refine(str => /^\d+\.?\d*$/.test(str), { message: "Should be a numeric value" } )
-})
+  value: z
+    .string()
+    .refine((str) => /^\d+\.?\d*$/.test(str), { message: "Should be a numeric value" }),
+});
 
-type SubmitType = z.infer<typeof submitSchema>
+type SubmitType = z.infer<typeof submitSchema>;
 
 type BroadcastTxButtonProps = {
   guardiansAddress: Hex;
@@ -94,7 +101,7 @@ export default function ExecL2VetoForm({
         functionName: "cancelL2GovernorProposal",
         abi: ALL_ABIS.guardians,
         args: [l2Proposal, txRequest, signers, signatureValues],
-        value: parseEther(value)
+        value: parseEther(value),
       },
       {
         onSuccess: (hash) => {
@@ -122,7 +129,7 @@ export default function ExecL2VetoForm({
   const form = useForm<SubmitType>({
     resolver: zodResolver(submitSchema),
     defaultValues: {},
-    mode: "onTouched"
+    mode: "onTouched",
   });
 
   return (
@@ -138,19 +145,19 @@ export default function ExecL2VetoForm({
                 <FormControl>
                   <Input placeholder="ETH" {...field} />
                 </FormControl>
-                <FormDescription>
-                  Value of ether to send in the tx
-                </FormDescription>
+                <FormDescription>Value of ether to send in the tx</FormDescription>
                 <FormMessage data-testid="title-error" />
               </FormItem>
             )}
           />
-          <Button disabled={!form.formState.isValid ||  disabled || !thresholdReached} loading={isPending}>
+          <Button
+            disabled={!form.formState.isValid || disabled || !thresholdReached}
+            loading={isPending}
+          >
             {children}
           </Button>
         </form>
       </Form>
-
     </div>
   );
 }
