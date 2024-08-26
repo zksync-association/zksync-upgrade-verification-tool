@@ -33,6 +33,13 @@ const eventSchema = z.object({
   }),
 });
 
+function blocksInADay() {
+  if (env.ETH_NETWORK === "mainnet") {
+    return 24 * 3600; // 24 hours, 1 block per second
+  }
+  return 24 * (3600 / 20); // 20 seconds per block.
+}
+
 async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigint) {
   const proposalCreatedLogsPromise = l2Rpc
     .getLogs(getL2GovernorAddress(type), numberToHex(from), "latest", [
@@ -122,12 +129,10 @@ async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigi
     )
   );
 
-  const activeProposalWithStates = activeProposals.filter(
+  return activeProposals.filter(
     (_, i) =>
       states[i] === L2_CANCELATION_STATES.Active || states[i] === L2_CANCELATION_STATES.Pending
   );
-
-  return activeProposalWithStates;
 }
 
 export async function getActiveL2Proposals() {
@@ -138,12 +143,12 @@ export async function getActiveL2Proposals() {
   // - 7 days vote delay period
   // - 7 days voting period
   // - 7 days optional extended voting period
-  // Another 7 days is added in the calculation to have a conservative
+  // Another 3 days is added in the calculation to have a conservative
   // estimation of the oldest block with a valid proposal.
   // Max proposal time is calculated in blocks, 1 second per block in L2,
   // therefore 3600 blocks per hour.
   // const maxProposalLifetimeInBlocks = BigInt((21 + 7) * 24 * 3600); // conservative estimation of oldest block with a valid proposal
-  const maxProposalLifetimeInBlocks = BigInt(3000); // FIXME: max value to use in sepolia, should be changed for mainnet
+  const maxProposalLifetimeInBlocks = BigInt((21 + 3) * blocksInADay());
 
   const from = bigIntMax(currentBlock - maxProposalLifetimeInBlocks, 1n);
   const govOpsProposals = await fetchProposalsFromL2Governor(
