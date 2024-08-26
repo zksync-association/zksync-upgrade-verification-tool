@@ -1,5 +1,5 @@
 {
-  "name": "webapp",
+  "name": "web",
   "private": true,
   "sideEffects": false,
   "type": "module",
