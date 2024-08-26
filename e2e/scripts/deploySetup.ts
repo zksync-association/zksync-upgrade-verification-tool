@@ -1,5 +1,13 @@
 import hre from "hardhat";
-import { encodeFunctionData, type Hex, hexToBigInt, padHex, parseEther, zeroAddress } from "viem";
+import {
+  encodeFunctionData,
+  getAddress,
+  type Hex,
+  hexToBigInt,
+  padHex,
+  parseEther,
+  zeroAddress,
+} from "viem";
 import dotenv from "dotenv";
 import fs from "node:fs/promises";
 import { mnemonicToAccount } from "viem/accounts";
@@ -205,7 +213,9 @@ function deriveAllAddresses() {
   return {
     council: deriveMembers("EXTRA_COUNCIL", ALL_COUNCIL_INDEXES, mnemonic),
     guardians: deriveMembers("EXTRA_GUARDIANS", ALL_GUARDIAN_INDEXES, mnemonic),
-    zkAssociation: zkAssociation,
+    zkAssociation: process.env.EXTRA_ZK_FOUNDATION
+      ? getAddress(process.env.EXTRA_ZK_FOUNDATION)
+      : zkAssociation,
     visitor: visitor,
   };
 }
