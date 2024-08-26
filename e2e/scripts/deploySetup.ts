@@ -181,8 +181,7 @@ function deriveMembers(
   const extras = (process.env[extrasEnvVar] || "")
     .split(",")
     .filter((str) => str.length !== 0)
-    .map((str) => str.trim())
-    .map((str) => str as Hex);
+    .map((str) => str.trim()) as Hex[];
 
   // Derive all addresses from mnemonic
   const derived = indexes.map((n) =>
