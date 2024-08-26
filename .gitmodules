@@ -1,4 +1,4 @@
 [submodule "e2e/contracts/zk-gov"]
 	path = e2e/contracts/zk-gov
 	url = git@github.com:Moonsong-Labs/zk-governance.git
-	branch = governance-webapp
+	branch = master

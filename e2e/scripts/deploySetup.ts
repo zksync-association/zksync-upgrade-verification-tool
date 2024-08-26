@@ -1,13 +1,5 @@
 import hre from "hardhat";
-import {
-  encodeFunctionData,
-  getAddress,
-  type Hex,
-  hexToBigInt,
-  padHex,
-  parseEther,
-  zeroAddress,
-} from "viem";
+import { encodeFunctionData, type Hex, hexToBigInt, padHex, parseEther, zeroAddress } from "viem";
 import dotenv from "dotenv";
 import fs from "node:fs/promises";
 import { mnemonicToAccount } from "viem/accounts";

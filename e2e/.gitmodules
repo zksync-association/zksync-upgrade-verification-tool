@@ -1,0 +1,2 @@
+[submodule "e2e/contracts/zk-gov"]
+	branch = main
