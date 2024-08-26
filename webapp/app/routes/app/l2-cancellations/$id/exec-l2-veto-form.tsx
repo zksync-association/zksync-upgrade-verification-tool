@@ -145,7 +145,7 @@ export default function ExecL2VetoForm({
               </FormItem>
             )}
           />
-          <Button disabled={disabled || !thresholdReached} loading={isPending}>
+          <Button disabled={!form.formState.isValid ||  disabled || !thresholdReached} loading={isPending}>
             {children}
           </Button>
         </form>
