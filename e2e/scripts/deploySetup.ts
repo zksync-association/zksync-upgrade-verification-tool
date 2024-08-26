@@ -1,9 +1,13 @@
 import hre from "hardhat";
-import { encodeFunctionData, type Hex, hexToBigInt, padHex, parseEther, zeroAddress } from "viem";
+import { encodeFunctionData, getAddress, type Hex, hexToBigInt, padHex, parseEther, zeroAddress } from "viem";
 import dotenv from "dotenv";
 import fs from "node:fs/promises";
 import { mnemonicToAccount } from "viem/accounts";
-import { COUNCIL_SIZE, DERIVATION_INDEXES, GUARDIANS_SIZE } from "../helpers/constants.js";
+import {
+  ALL_COUNCIL_INDEXES,
+  ALL_GUARDIAN_INDEXES,
+  DERIVATION_INDEXES,
+} from "../helpers/constants.js";
 
 dotenv.config();
 
@@ -168,32 +172,23 @@ async function main() {
   console.log("Addresses saved to addresses.txt");
 }
 
-function range(from: number, to: number): number[] {
-  return new Array(to - from).fill(0).map((_, i) => i + from);
-}
-
-function deriveMembers(
-  first: Hex,
-  envVar: string,
-  deriveStart: number,
-  membersSize: number,
-  mnemonic: string
-): Hex[] {
-  const extras = (process.env[envVar] || "")
+function deriveMembers(extrasEnvVar: string, indexes: number[], mnemonic: string): Hex[] {
+  // In case special addresses want to be used, these can be defined in env vars.
+  const extras = (process.env[extrasEnvVar] || "")
     .split(",")
     .filter((str) => str.length !== 0)
-    .map((str) => str.trim())
-    .concat([first])
-    .map((str) => str as Hex);
+    .map((str) => str.trim()) as Hex[];
 
-  const derived = range(deriveStart, deriveStart + (membersSize - extras.length)).map((n) =>
-    mnemonicToAccount(mnemonic, { addressIndex: n })
-  );
+  // Derive all addresses from mnemonic
+  const derived = indexes
+    .map((n) => mnemonicToAccount(mnemonic, { addressIndex: n }))
+    .map((hd) => hd.address);
 
-  return derived
-    .map((hd) => hd.address)
-    .concat(extras)
-    .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b)));
+  // Addresses from env var take priority, but only the right amount of addresses is kept.
+  const final = [...extras, ...derived].slice(0, indexes.length);
+
+  // Contract require addresses to be sorted.
+  return final.sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b)));
 }
 
 function deriveAllAddresses() {
@@ -202,29 +197,14 @@ function deriveAllAddresses() {
     throw new Error("Missing MNEMONIC env var");
   }
 
-  const [firstCouncil, firstGuardian, zkAssociation, visitor] = (
-    [
-      DERIVATION_INDEXES.FIRST_COUNCIL,
-      DERIVATION_INDEXES.FIRST_GUARDIAN,
-      DERIVATION_INDEXES.ZK_FOUNDATION,
-      DERIVATION_INDEXES.VISITOR,
-    ] as const
-  )
-    .map((index) => mnemonicToAccount(mnemonic, { addressIndex: index }))
-    .map((hd) => hd.address);
-
-  const councilStart = DERIVATION_INDEXES.SECOND_COUNCIL - 1;
-  const guardianStart = DERIVATION_INDEXES.SECOND_GUARDIAN - 1;
+  const zkAssociation = mnemonicToAccount(mnemonic, {
+    addressIndex: DERIVATION_INDEXES.ZK_FOUNDATION,
+  }).address;
+  const visitor = mnemonicToAccount(mnemonic, { addressIndex: DERIVATION_INDEXES.VISITOR }).address;
 
   return {
-    council: deriveMembers(firstCouncil, "EXTRA_COUNCIL", councilStart, COUNCIL_SIZE, mnemonic),
-    guardians: deriveMembers(
-      firstGuardian,
-      "EXTRA_GUARDIANS",
-      guardianStart,
-      GUARDIANS_SIZE,
-      mnemonic
-    ),
+    council: deriveMembers("EXTRA_COUNCIL", ALL_COUNCIL_INDEXES, mnemonic),
+    guardians: deriveMembers("EXTRA_GUARDIANS", ALL_GUARDIAN_INDEXES, mnemonic),
     zkAssociation: process.env.EXTRA_ZK_FOUNDATION
       ? getAddress(process.env.EXTRA_ZK_FOUNDATION)
       : zkAssociation,

@@ -64,7 +64,7 @@ export class UpgradeChanges {
   }
 
   static fromFiles(
-    common: UpgradeManifest,
+    _common: UpgradeManifest,
     txFile: TransactionsJson,
     facets?: FacetsJson,
     l2Upgrade?: L2UpgradeJson

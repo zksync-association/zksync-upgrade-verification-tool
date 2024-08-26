@@ -1,6 +1,7 @@
 import { type BrowserContext, type Page, test as baseTest } from "@playwright/test";
 import dappwright, { type Dappwright, MetaMaskWallet } from "@tenkeylabs/dappwright";
 import "dotenv/config";
+import { ALL_COUNCIL_INDEXES, ALL_GUARDIAN_INDEXES } from "./constants.js";
 
 export { expect } from "@playwright/test";
 
@@ -13,29 +14,29 @@ export class RoleSwitcher {
     this.wallet = wallet;
   }
 
-  async council(page: Page, councilNumber = 0): Promise<void> {
-    const councilIndexes = [1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-
-    if (councilNumber >= councilIndexes.length) {
+  private async changeToMember(
+    indexes: number[],
+    memberNumber: number,
+    groupName: string,
+    page: Page
+  ) {
+    const selectedCouncil = indexes[memberNumber];
+    if (selectedCouncil === undefined) {
       throw new Error(
-        `There is only ${councilIndexes.length} security council members. Received: ${councilNumber}`
+        `There is only ${indexes.length} ${groupName} members. Received: ${memberNumber}`
       );
     }
-    await this.switchToIndex(councilIndexes[councilNumber], page);
+    await this.switchToIndex(selectedCouncil, page);
     await page.bringToFront();
     await page.reload();
   }
 
-  async guardian(page: Page, guardianNumber = 0): Promise<void> {
-    const guardianIndexes = [2, 17, 18, 19, 20, 21, 22, 23, 24];
+  async council(page: Page, councilNumber = 0): Promise<void> {
+    await this.changeToMember(ALL_COUNCIL_INDEXES, councilNumber, "security council", page);
+  }
 
-    if (guardianNumber >= guardianIndexes.length) {
-      throw new Error(
-        `There is only ${guardianIndexes.length} security council members. Received: ${guardianIndexes}`
-      );
-    }
-    await this.switchToIndex(guardianIndexes[guardianNumber], page);
-    await page.bringToFront();
+  async guardian(page: Page, guardianNumber = 0): Promise<void> {
+    await this.changeToMember(ALL_GUARDIAN_INDEXES, guardianNumber, "guardians", page);
   }
 
   async zkFoundation(page: Page): Promise<void> {
