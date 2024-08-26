@@ -139,7 +139,7 @@ export class RpcClient {
     });
 
     if (!res.ok) {
-      throw new Error(`Error with rpc method "${method}".`);
+      throw new Error(`Error with rpc method "${method}" (${res.status}): ${await res.text()}`);
     }
 
     return res.json();
@@ -194,6 +194,7 @@ export class RpcClient {
       topics,
     };
 
+    console.log("eth_getLogs", JSON.stringify(arg, null, 2));
     const data = await this.rawCall("eth_getLogs", [arg]);
 
     if (data.error) {
