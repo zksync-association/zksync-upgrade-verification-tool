@@ -20,12 +20,13 @@ export class RoleSwitcher {
   async council(page: Page, councilNumber = 0): Promise<void> {
     const councilIndexes = ALL_COUNCIL_INDEXES;
 
-    if (councilNumber >= councilIndexes.length) {
+    const selectedCouncil = councilIndexes[councilNumber];
+    if (selectedCouncil === undefined) {
       throw new Error(
         `There is only ${councilIndexes.length} security council members. Received: ${councilNumber}`
       );
     }
-    await this.switchToIndex(councilIndexes[councilNumber], page);
+    await this.switchToIndex(selectedCouncil, page);
     await page.bringToFront();
     await page.reload();
   }
