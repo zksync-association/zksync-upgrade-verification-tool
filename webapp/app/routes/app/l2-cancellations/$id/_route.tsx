@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CallsRawData } from "@/components/upgrade-raw-data";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
-import ExecL2VetoButton from "@/routes/app/l2-cancellations/$id/exec-l2-veto-button";
+import ExecL2VetoForm from "@/routes/app/l2-cancellations/$id/exec-l2-veto-form";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { badRequest, notFound } from "@/utils/http";
@@ -226,7 +226,7 @@ export default function L2Cancellation() {
             <CardTitle>Execute Actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            <ExecL2VetoButton
+            <ExecL2VetoForm
               proposalId={proposal.id}
               guardiansAddress={guardiansAddress}
               signatures={signatures}
@@ -236,7 +236,7 @@ export default function L2Cancellation() {
               calls={calls}
             >
               Execute Veto
-            </ExecL2VetoButton>
+            </ExecL2VetoForm>
           </CardContent>
         </Card>
       </div>
