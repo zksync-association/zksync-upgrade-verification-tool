@@ -1,7 +1,7 @@
 import { getFreezeProposalById, updateFreezeProposal } from "@/.server/db/dto/freeze-proposals";
-import { hexSchema } from "@/common/basic-schemas";
 import { notFound } from "@/utils/http";
 import { type ActionFunctionArgs, redirect } from "@remix-run/node";
+import { hexSchema } from "@repo/common/schemas";
 import { getFormData, getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { z } from "zod";

@@ -1,4 +1,3 @@
-import { hexSchema } from "@/common/basic-schemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -12,6 +11,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { hexSchema } from "@repo/common/schemas";
 import { useForm } from "react-hook-form";
 import { type Hex, padHex } from "viem";
 import { z } from "zod";

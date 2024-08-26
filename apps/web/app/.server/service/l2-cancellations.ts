@@ -5,7 +5,6 @@ import {
   type l2CancellationsTable,
 } from "@/.server/db/schema";
 import { guardiansAddress } from "@/.server/service/contracts";
-import { hexSchema } from "@/common/basic-schemas";
 import { bigIntMax } from "@/utils/bigint";
 import { badRequest, notFound } from "@/utils/http";
 import {
@@ -15,6 +14,7 @@ import {
 import { ALL_ABIS, ZK_GOV_OPS_GOVERNOR_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 import type { InferSelectModel } from "drizzle-orm";
+import { hexSchema } from "@repo/common/schemas";
 import { type Address, type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
 import { db } from "../db";

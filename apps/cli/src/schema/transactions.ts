@@ -1,19 +1,18 @@
 import { z } from "zod";
-import { account20String, bytes32Hash } from "./common.js";
 import { facetCutsSchema } from "./facetCuts.js";
-import { zodHex } from "./hex-parser.js";
+import { addressSchema, bytes32Schema, hexSchema } from "@repo/common/schemas";
 
 export const verifierParamsSchema = z.object({
-  recursionNodeLevelVkHash: bytes32Hash,
-  recursionLeafLevelVkHash: bytes32Hash,
-  recursionCircuitsSetVksHash: bytes32Hash,
+  recursionNodeLevelVkHash: bytes32Schema,
+  recursionLeafLevelVkHash: bytes32Schema,
+  recursionCircuitsSetVksHash: bytes32Schema,
 });
 
 export const transactionsSchema = z.object({
   proposeUpgradeTx: z.object({
-    bootloaderHash: bytes32Hash,
-    defaultAccountHash: bytes32Hash,
-    verifier: account20String,
+    bootloaderHash: bytes32Schema,
+    defaultAccountHash: bytes32Schema,
+    verifier: addressSchema,
     verifierParams: verifierParamsSchema,
   }),
   transparentUpgrade: z.object({
@@ -24,7 +23,7 @@ export const transactionsSchema = z.object({
       calls: z.array(
         z.object({
           target: z.string(),
-          data: zodHex,
+          data: hexSchema,
         })
       ),
     })

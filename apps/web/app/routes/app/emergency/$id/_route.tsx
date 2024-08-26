@@ -9,7 +9,6 @@ import {
 } from "@/.server/service/authorized-users";
 import { broadcastSuccess } from "@/.server/service/emergency-proposals";
 import { saveEmergencySignature } from "@/.server/service/signatures";
-import { hexSchema } from "@/common/basic-schemas";
 import { type SignAction, signActionSchema } from "@/common/sign-action";
 import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
@@ -28,6 +27,7 @@ import {
 import { badRequest, notFound } from "@/utils/http";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
+import { hexSchema } from "@repo/common/schemas";
 import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual } from "viem";

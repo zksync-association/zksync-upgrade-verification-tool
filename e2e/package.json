@@ -9,12 +9,7 @@
     "node": ">=20",
     "pnpm": ">=8"
   },
-  "files": [
-    "dist",
-    "bin",
-    "*.d.ts",
-    "*.mjs"
-  ],
+  "files": ["dist", "bin", "*.d.ts", "*.mjs"],
   "scripts": {
     "update": "vitest -u",
     "compile": "hardhat compile",

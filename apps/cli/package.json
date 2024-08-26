@@ -2,6 +2,7 @@
   "name": "validate-cli",
   "version": "1.0.0",
   "description": "cli tool to check details about zk-sync era upgrades.",
+  "type": "module",
   "engines": {
     "node": ">=20",
     "pnpm": ">=8"
@@ -13,21 +14,15 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "test": "vitest run",
-    "test:ci": "vitest run --coverage --coverage.reporter=lcov"
+    "test:ci": "vitest run --coverage --coverage.reporter=lcov",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "moonsong-labs",
   "license": "MIT",
-  "devDependencies": {
-    "@biomejs/biome": "1.8.3",
-    "@repo/typescript-config": "workspace:*",
-    "@types/node": "^22.1.0",
-    "@vitest/coverage-v8": "^2.0.5",
-    "typescript": "5.5.4",
-    "vitest": "^2.0.5"
-  },
   "dependencies": {
     "@octokit/core": "^6.1.2",
+    "@repo/common": "workspace:*",
     "@swc/core": "1.7.6",
     "@types/yargs": "^17.0.32",
     "chalk": "^5.3.0",
@@ -43,5 +38,13 @@
     "yargs": "^17.7.2",
     "zksync-ethers": "^6.7.0",
     "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.8.3",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.1.0",
+    "@vitest/coverage-v8": "^2.0.5",
+    "typescript": "5.5.4",
+    "vitest": "^2.0.5"
   }
 }

@@ -31,4 +31,3 @@ export {
 } from "./lib/index.js";
 
 export { memoryDiffParser } from "./schema/rpc.js";
-export { zodHex } from "./schema/hex-parser.js";

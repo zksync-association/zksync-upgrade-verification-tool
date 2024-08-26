@@ -15,7 +15,7 @@ export class FileSystem {
     let targetDirStat: Stats;
     try {
       targetDirStat = await fs.stat(path);
-    } catch (_e) {
+    } catch {
       return false;
     }
     return targetDirStat.isDirectory();

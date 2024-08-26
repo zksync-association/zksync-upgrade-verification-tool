@@ -1,10 +1,10 @@
+import { addressSchema, selectorSchema } from "@repo/common/schemas";
 import { z } from "zod";
-import { zodHex } from "./hex-parser.js";
 
 export const facetsResponseSchema = z.array(
   z.object({
-    addr: zodHex,
-    selectors: z.array(zodHex),
+    addr: addressSchema,
+    selectors: z.array(selectorSchema),
   })
 );
 // export type NewFacet = z.infer<typeof facetsResponseSchema>

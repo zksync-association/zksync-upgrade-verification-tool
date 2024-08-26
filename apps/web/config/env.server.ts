@@ -1,5 +1,5 @@
-import { addressSchema } from "@/common/basic-schemas";
 import { EthNetworkEnum } from "@/common/eth-network-enum";
+import { addressSchema } from "@repo/common/schemas";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 

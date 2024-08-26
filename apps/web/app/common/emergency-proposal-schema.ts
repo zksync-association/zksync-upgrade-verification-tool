@@ -1,4 +1,4 @@
-import { addressSchema } from "@/common/basic-schemas";
+import { addressSchema } from "@repo/common/schemas";
 import { padHex } from "viem";
 import { z } from "zod";
 

@@ -1,8 +1,8 @@
 import { getL2CancellationById, updateL2Cancellation } from "@/.server/db/dto/l2-cancellations";
 import { l2CancellationStatusEnum } from "@/.server/db/schema";
-import { hexSchema } from "@/common/basic-schemas";
 import { notFound } from "@/utils/http";
 import { type ActionFunctionArgs, redirect } from "@remix-run/node";
+import { hexSchema } from "@repo/common/schemas";
 import { getFormData, getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { z } from "zod";

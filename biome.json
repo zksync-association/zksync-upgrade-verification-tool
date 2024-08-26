@@ -18,7 +18,6 @@
     "ignore": [
       "./dist/*",
       "./node_modules/*",
-      "package.json",
       "**/__snapshots__/*",
       "**/coverage/*",
       "**/artifacts",

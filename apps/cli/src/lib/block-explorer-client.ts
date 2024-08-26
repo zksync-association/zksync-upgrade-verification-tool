@@ -1,5 +1,4 @@
 import {
-  account20String,
   type ContractEvent,
   contractEventSchema,
   getAbiSchema,
@@ -12,6 +11,7 @@ import { ContractData } from "./contract-data.js";
 import { ContractNotVerified, ExternalApiError } from "./errors.js";
 import { ContractAbi } from "./contract-abi.js";
 import type { Hex } from "viem";
+import { addressSchema } from "@repo/common/schemas";
 
 export interface BlockExplorer {
   getAbi(rawAddress: string): Promise<ContractAbi>;
@@ -70,7 +70,7 @@ export class BlockExplorerClient implements BlockExplorer {
       return existing;
     }
 
-    const contractAddr = account20String.parse(rawAddress);
+    const contractAddr = addressSchema.parse(rawAddress);
 
     const { message, result } = await this.fetch(
       {
@@ -100,7 +100,7 @@ export class BlockExplorerClient implements BlockExplorer {
       throw new ContractNotVerified(rawAddress);
     }
 
-    const contractAddr = account20String.parse(rawAddress);
+    const contractAddr = addressSchema.parse(rawAddress);
 
     const { message, result } = await this.fetch(
       {

@@ -4,7 +4,6 @@ import {
   getActiveL2Proposals,
   getL2VetoNonce,
 } from "@/.server/service/l2-cancellations";
-import { addressSchema, hexSchema } from "@/common/basic-schemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -31,6 +30,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { type ActionFunctionArgs, defer, redirect } from "@remix-run/node";
 import { Await, useLoaderData, useNavigation } from "@remix-run/react";
 import { Form as RemixForm } from "@remix-run/react";
+import { addressSchema, hexSchema } from "@repo/common/schemas";
 import { Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { getFormData } from "remix-params-helper";

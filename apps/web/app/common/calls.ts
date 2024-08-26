@@ -1,4 +1,4 @@
-import { addressSchema, hexSchema } from "@/common/basic-schemas";
+import { addressSchema, hexSchema } from "@repo/common/schemas";
 import { numberToHex, parseEther } from "viem";
 import { z } from "zod";
 

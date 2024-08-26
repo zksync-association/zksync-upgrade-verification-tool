@@ -8,7 +8,6 @@ import {
   getL2VetoNonce,
 } from "@/.server/service/l2-cancellations";
 import { validateAndSaveL2CancellationSignature } from "@/.server/service/signatures";
-import { hexSchema } from "@/common/basic-schemas";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
 import TxStatus from "@/components/tx-status";
@@ -24,6 +23,7 @@ import { env } from "@config/env.server";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { CircleCheckBig, CircleX } from "lucide-react";
+import { hexSchema } from "@repo/common/schemas";
 import { getFormData, getParams } from "remix-params-helper";
 import { hexToBigInt, isAddressEqual } from "viem";
 import { z } from "zod";

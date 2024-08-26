@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { zodOptional } from "./zod-optionals.js";
-import { zodHex } from "./hex-parser.js";
+import { hexSchema } from "@repo/common/schemas";
 
 const stateParser = z.record(
   z.string(),
   z.object({
     nonce: zodOptional(z.number()),
-    storage: zodOptional(z.record(z.string(), zodHex)),
+    storage: zodOptional(z.record(z.string(), hexSchema)),
   })
 );
 
@@ -18,10 +18,10 @@ export const memoryDiffParser = z.object({
 });
 
 const facetCutSchema = z.object({
-  facet: zodHex,
+  facet: hexSchema,
   action: z.number(),
   isFreezable: z.boolean(),
-  selectors: z.array(zodHex),
+  selectors: z.array(hexSchema),
 });
 
 export const callDataSchema = z.object({
@@ -29,8 +29,8 @@ export const callDataSchema = z.object({
   args: z.tuple([
     z.object({
       facetCuts: z.array(facetCutSchema),
-      initAddress: zodHex,
-      initCalldata: zodHex,
+      initAddress: hexSchema,
+      initCalldata: hexSchema,
     }),
   ]),
 });
@@ -42,15 +42,15 @@ export const upgradeCallDataSchema = z.object({
       l2ProtocolUpgradeTx: z.object({
         to: z.bigint(),
         from: z.bigint(),
-        data: zodHex,
+        data: hexSchema,
       }),
       factoryDeps: z.array(z.any()),
-      bootloaderHash: zodHex,
-      defaultAccountHash: zodHex,
-      verifier: zodHex,
+      bootloaderHash: hexSchema,
+      defaultAccountHash: hexSchema,
+      verifier: hexSchema,
       verifierParams: z.any(),
       l1ContractsUpgradeCalldata: z.string(),
-      postUpgradeCalldata: zodHex,
+      postUpgradeCalldata: hexSchema,
       upgradeTimestamp: z.bigint(),
       newProtocolVersion: z.bigint(),
     }),
@@ -62,8 +62,8 @@ export const l2UpgradeSchema = z.object({
   args: z.tuple([
     z.array(
       z.object({
-        bytecodeHash: zodHex,
-        newAddress: zodHex,
+        bytecodeHash: hexSchema,
+        newAddress: hexSchema,
         callConstructor: z.boolean(),
         value: z.bigint(),
         input: z.string(),
@@ -73,11 +73,11 @@ export const l2UpgradeSchema = z.object({
 });
 
 export const contractEventSchema = z.object({
-  address: zodHex,
-  topics: z.array(zodHex),
-  data: zodHex,
-  transactionHash: zodHex,
-  blockNumber: zodHex,
+  address: hexSchema,
+  topics: z.array(hexSchema),
+  data: hexSchema,
+  transactionHash: hexSchema,
+  blockNumber: hexSchema,
 });
 
 const baseCallTracerSchema = z.object({

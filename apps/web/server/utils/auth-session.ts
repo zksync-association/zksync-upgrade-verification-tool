@@ -1,4 +1,4 @@
-import { addressSchema } from "@/common/basic-schemas";
+import { addressSchema } from "@repo/common/schemas";
 import type { Request } from "express";
 import {
   type State,

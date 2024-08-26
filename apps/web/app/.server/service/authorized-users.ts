@@ -5,9 +5,9 @@ import {
   scAbi,
   upgradeHandlerAbi,
 } from "@/.server/service/contract-abis";
-import { hexSchema } from "@/common/basic-schemas";
 import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { env } from "@config/env.server";
+import { hexSchema } from "@repo/common/schemas";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
 

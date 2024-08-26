@@ -1,6 +1,6 @@
-import { addressSchema } from "@/common/basic-schemas";
 import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
 import { unauthorized } from "@/utils/http";
+import { addressSchema } from "@repo/common/schemas";
 import { USER_ADDRESS_HEADER, USER_ROLE_HEADER } from "@server/middlewares/auth";
 import type { Hex } from "viem";
 

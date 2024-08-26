@@ -1,6 +1,5 @@
 import { getUserAuthRole } from "@/.server/service/authorized-users";
 import { checkConnection } from "@/.server/service/clients";
-import { hexSchema } from "@/common/basic-schemas";
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
 import NavbarWithUser from "@/components/navbar-with-user";
@@ -8,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { getUserFromHeader } from "@/utils/auth-headers";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json, redirect } from "@remix-run/node";
 import { Link, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
+import { hexSchema } from "@repo/common/schemas";
 import { $path } from "remix-routes";
 import { useAccount, useAccountEffect } from "wagmi";
 

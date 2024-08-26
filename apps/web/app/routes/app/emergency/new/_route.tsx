@@ -3,7 +3,6 @@ import {
   saveEmergencyProposal,
   validateEmergencyProposalCalls,
 } from "@/.server/service/emergency-proposals";
-import { hexSchema } from "@/common/basic-schemas";
 import { type Call, callSchema } from "@/common/calls";
 import { StepsWizard, WizardStep } from "@/components/steps-wizard";
 import { NewEmergencyProposalStep1, type Step1 } from "@/routes/app/emergency/new/step1";
@@ -13,6 +12,7 @@ import { requireUserFromHeader } from "@/utils/auth-headers";
 import { badRequest } from "@/utils/http";
 import { type ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
+import { hexSchema } from "@repo/common/schemas";
 import { useState } from "react";
 import { $path } from "remix-routes";
 import { z } from "zod";
