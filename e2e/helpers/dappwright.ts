@@ -17,13 +17,11 @@ export class RoleSwitcher {
     this.wallet = wallet;
   }
 
-  async council(page: Page, councilNumber = 0): Promise<void> {
-    const councilIndexes = ALL_COUNCIL_INDEXES;
-
-    const selectedCouncil = councilIndexes[councilNumber];
+  private async changeToMember(indexes: number[], memberNumber: number, groupName: string, page: Page) {
+    const selectedCouncil = indexes[memberNumber];
     if (selectedCouncil === undefined) {
       throw new Error(
-        `There is only ${councilIndexes.length} security council members. Received: ${councilNumber}`
+        `There is only ${indexes.length} ${groupName} members. Received: ${memberNumber}`
       );
     }
     await this.switchToIndex(selectedCouncil, page);
@@ -31,16 +29,12 @@ export class RoleSwitcher {
     await page.reload();
   }
 
-  async guardian(page: Page, guardianNumber = 0): Promise<void> {
-    const guardianIndexes = ALL_GUARDIAN_INDEXES;
+  async council(page: Page, councilNumber = 0): Promise<void> {
+    await this.changeToMember(ALL_COUNCIL_INDEXES, councilNumber, "security council", page)
+  }
 
-    if (guardianNumber >= guardianIndexes.length) {
-      throw new Error(
-        `There is only ${guardianIndexes.length} security council members. Received: ${guardianIndexes}`
-      );
-    }
-    await this.switchToIndex(guardianIndexes[guardianNumber], page);
-    await page.bringToFront();
+  async guardian(page: Page, guardianNumber = 0): Promise<void> {
+    await this.changeToMember(ALL_GUARDIAN_INDEXES, guardianNumber, "guardians", page)
   }
 
   async zkFoundation(page: Page): Promise<void> {
