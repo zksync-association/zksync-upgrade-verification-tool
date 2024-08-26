@@ -129,7 +129,7 @@ export default function ExecL2VetoForm({
   const form = useForm<SubmitType>({
     resolver: zodResolver(submitSchema),
     defaultValues: {
-      value: "0.001"
+      value: "0.001",
     },
     mode: "onTouched",
   });

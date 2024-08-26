@@ -30,8 +30,8 @@ import { useForm } from "react-hook-form";
 import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { numberToHex } from "viem";
-import { z } from "zod";
 import { useAccount } from "wagmi";
+import { z } from "zod";
 
 export async function loader() {
   return defer({ activeL2Proposals: getActiveL2Proposals() });
@@ -74,7 +74,7 @@ type Schema = z.infer<typeof schema>;
 
 export default function NewL2GovernorVeto() {
   const { activeL2Proposals } = useLoaderData<typeof loader>();
-  const {address} =  useAccount();
+  const { address } = useAccount();
 
   const form = useForm<Schema>({
     resolver: zodResolver(schema),
@@ -82,7 +82,7 @@ export default function NewL2GovernorVeto() {
       l2GasLimit: 600000,
       l2GasPerPubdataByteLimit: 60000,
       refundRecipient: address,
-      txMintValue: 1000000000000000
+      txMintValue: 1000000000000000,
     },
     mode: "onTouched",
   });
