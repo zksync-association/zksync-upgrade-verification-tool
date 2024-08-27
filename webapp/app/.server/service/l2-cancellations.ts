@@ -150,9 +150,7 @@ async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigi
     activeProposals.map((p) => getL2ProposalState(p.type, p.proposalId))
   );
 
-  return activeProposals.filter((_, i) =>
-    VALID_CANCELLATION_STATES.some((state) => state === states[i])
-  );
+  return activeProposals.filter((_, i) => isValidCancellationState(states[i]));
 }
 
 export async function getActiveL2Proposals() {
