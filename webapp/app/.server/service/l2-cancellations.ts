@@ -305,7 +305,7 @@ async function upgradeCancellationStatus(
 
   const state = await getL2ProposalState(cancellation.type, cancellation.externalId);
   if (!isValidCancellationState(state)) {
-    cancellation.status = l2CancellationStatusEnum.enum.EXPIRED;
+    cancellation.status = l2CancellationStatusEnum.enum.L2_PROPOSAL_EXPIRED;
     await updateL2Cancellation(cancellation.id, cancellation);
   }
 
