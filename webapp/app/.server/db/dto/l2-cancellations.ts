@@ -54,7 +54,7 @@ export async function getMaxRegisteredNonce(): Promise<number | null> {
     .select({ value: max(l2CancellationsTable.nonce) })
     .from(l2CancellationsTable)
     .then(getFirst);
-  return row ? Number(row.value) : null;
+  return row && row.value !== null ? Number(row.value) : null;
 }
 
 export async function existActiveProposalWithNonce(nonce: number): Promise<boolean> {
