@@ -23,7 +23,7 @@ import { badRequest, notFound } from "@/utils/http";
 import { env } from "@config/env.server";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { CircleCheckBig } from "lucide-react";
+import { CircleCheckBig, CircleX } from "lucide-react";
 import { getFormData, getParams } from "remix-params-helper";
 import { hexToBigInt, isAddressEqual } from "viem";
 import { z } from "zod";
@@ -202,6 +202,18 @@ export default function L2Cancellation() {
                 <p>Executed</p>
               </div>
             )}
+            {proposal.status === "NONCE_TOO_LOW" && (
+              <div className="flex flex-1 flex-col items-center justify-center space-y-2">
+                <CircleX className="h-16 w-16 stroke-red-500" />
+                <p>Nonce too low.</p>
+              </div>
+            )}
+            {proposal.status === "L2_PROPOSAL_EXPIRED" && (
+              <div className="flex flex-1 flex-col items-center justify-center space-y-2">
+                <CircleX className="h-16 w-16 stroke-red-500" />
+                <p>Proposal expired in l2</p>
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card className="pb-10">
@@ -240,22 +252,27 @@ export default function L2Cancellation() {
             <CardTitle>Execute Actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            <ExecL2VetoForm
-              proposalId={proposal.id}
-              guardiansAddress={guardiansAddress}
-              signatures={signatures}
-              threshold={necessarySignatures}
-              proposal={proposal}
-              disabled={execDisabled}
-              calls={calls}
-            >
-              Execute Veto
-            </ExecL2VetoForm>
+            {proposal.status === "ACTIVE" && (
+              <>
+                <ExecL2VetoForm
+                  proposalId={proposal.id}
+                  guardiansAddress={guardiansAddress}
+                  signatures={signatures}
+                  threshold={necessarySignatures}
+                  proposal={proposal}
+                  disabled={execDisabled}
+                  calls={calls}
+                >
+                  Execute Veto
+                </ExecL2VetoForm>
 
-            {!isExactNonce && (
-              <p className="text-red-500 text-s">
-                Nonce does not match with contract. Maybe some other veto has to be executed before.
-              </p>
+                {!isExactNonce && (
+                  <p className="text-red-500 text-s">
+                    Nonce does not match with contract. Maybe some other veto has to be executed
+                    before.
+                  </p>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
