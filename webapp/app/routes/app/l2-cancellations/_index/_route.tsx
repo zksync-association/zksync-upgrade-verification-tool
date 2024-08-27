@@ -1,4 +1,4 @@
-import { getZkGovOpsProposals } from "@/.server/service/l2-cancellations";
+import { getUpdatedL2Cancellations } from "@/.server/service/l2-cancellations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -16,7 +16,7 @@ import { ArrowRight } from "lucide-react";
 import { $path } from "remix-routes";
 
 export async function loader() {
-  const proposals = await getZkGovOpsProposals();
+  const proposals = await getUpdatedL2Cancellations();
   return json({ proposals });
 }
 

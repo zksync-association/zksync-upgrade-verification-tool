@@ -1,22 +1,22 @@
 import {
-  type L2CancellationType,
-  l2CancellationStatusEnum,
-  l2CancellationTypeEnum,
   type l2CancellationsTable,
+  l2CancellationStatusEnum,
+  type L2CancellationType,
+  l2CancellationTypeEnum,
 } from "@/.server/db/schema";
 import { guardiansAddress } from "@/.server/service/contracts";
 import { hexSchema } from "@/common/basic-schemas";
 import { bigIntMax } from "@/utils/bigint";
 import { badRequest, notFound } from "@/utils/http";
 import {
+  isValidCancellationState,
   type L2_CANCELLATION_STATES,
   VALID_CANCELLATION_STATES,
-  isValidCancellationState,
 } from "@/utils/l2-cancellation-states";
 import { ALL_ABIS, ZK_GOV_OPS_GOVERNOR_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 import type { InferSelectModel } from "drizzle-orm";
-import { type Address, type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
+import { type Address, decodeEventLog, type Hex, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
@@ -240,8 +240,12 @@ export async function createVetoProposalFor(
   });
 }
 
-export async function getZkGovOpsProposals() {
-  return getL2Cancellations();
+export async function getUpdatedL2Cancellations() {
+  const currentNonce = Number(await getL2VetoNonce())
+  return await getL2Cancellations()
+    .then(cancellations => Promise.all(
+      cancellations.map(c => upgradeCancellationStatus(c, currentNonce))
+    ));
 }
 
 export function getL2GovernorAddress(proposalType: L2CancellationType) {
