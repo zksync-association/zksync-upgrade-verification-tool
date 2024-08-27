@@ -1,4 +1,4 @@
-import { eq, type InferInsertModel, type InferSelectModel } from "drizzle-orm";
+import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
 import type { Hex } from "viem";
 import { db } from "..";
 import { l2CancellationsTable } from "../schema";
@@ -12,9 +12,7 @@ export async function createOrIgnoreL2Cancellation(
 }
 
 export async function getL2Cancellations({ tx }: { tx: typeof db } = { tx: db }) {
-  return tx
-    .select()
-    .from(l2CancellationsTable)
+  return tx.select().from(l2CancellationsTable);
 }
 
 export async function getL2CancellationById(

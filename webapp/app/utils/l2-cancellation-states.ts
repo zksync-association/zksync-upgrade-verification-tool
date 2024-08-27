@@ -9,8 +9,11 @@ export enum L2_CANCELLATION_STATES {
   Executed = 7,
 }
 
-export const VALID_CANCELLATION_STATES = [L2_CANCELLATION_STATES.Active, L2_CANCELLATION_STATES.Pending];
+export const VALID_CANCELLATION_STATES = [
+  L2_CANCELLATION_STATES.Active,
+  L2_CANCELLATION_STATES.Pending,
+];
 
 export function isValidCancellationState(state: L2_CANCELLATION_STATES | undefined): boolean {
-  return VALID_CANCELLATION_STATES.some(s => s === state);
+  return VALID_CANCELLATION_STATES.some((s) => s === state);
 }
