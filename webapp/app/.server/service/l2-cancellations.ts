@@ -10,7 +10,6 @@ import { bigIntMax } from "@/utils/bigint";
 import { badRequest, notFound } from "@/utils/http";
 import {
   type L2_CANCELLATION_STATES,
-  VALID_CANCELLATION_STATES,
   isValidCancellationState,
 } from "@/utils/l2-cancellation-states";
 import { ALL_ABIS, ZK_GOV_OPS_GOVERNOR_ABI } from "@/utils/raw-abis";
@@ -305,13 +304,13 @@ async function upgradeCancellationStatus(
   if (!isValidCancellationState(state)) {
     cancellation.status = l2CancellationStatusEnum.enum.L2_PROPOSAL_EXPIRED;
     await updateL2Cancellation(cancellation.id, cancellation);
-    return cancellation
+    return cancellation;
   }
 
   if (cancellation.nonce < currentNonce) {
     cancellation.status = l2CancellationStatusEnum.enum.NONCE_TOO_LOW;
     await updateL2Cancellation(cancellation.id, cancellation);
-    return cancellation
+    return cancellation;
   }
 
   return cancellation;

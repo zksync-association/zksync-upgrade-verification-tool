@@ -4,7 +4,8 @@ import { getSignaturesByL2CancellationId } from "@/.server/db/dto/signatures";
 import { guardiansAddress } from "@/.server/service/contracts";
 import {
   getAndUpdateL2CancellationByExternalId,
-  getL2GovernorAddress, getL2VetoNonce,
+  getL2GovernorAddress,
+  getL2VetoNonce,
 } from "@/.server/service/l2-cancellations";
 import { validateAndSaveL2CancellationSignature } from "@/.server/service/signatures";
 import { hexSchema } from "@/common/basic-schemas";
@@ -55,7 +56,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     guardiansAddress: guardiansAddr,
     l2GovernorAddress: l2GovernorAddr,
     ethNetwork: env.ETH_NETWORK,
-    currentNonce: await getL2VetoNonce()
+    currentNonce: await getL2VetoNonce(),
   });
 }
 
@@ -94,7 +95,7 @@ export default function L2Cancellation() {
     necessarySignatures,
     guardiansAddress,
     ethNetwork,
-    currentNonce
+    currentNonce,
   } = useLoaderData<typeof loader>();
 
   let proposalType: string;
@@ -112,7 +113,8 @@ export default function L2Cancellation() {
   const signDisabled =
     user.role !== "guardian" || signatures.some((s) => isAddressEqual(s.signer, user.address));
 
-  const execDisabled = signatures.length < necessarySignatures || proposal.transactionHash !== null || !isExactNonce;
+  const execDisabled =
+    signatures.length < necessarySignatures || proposal.transactionHash !== null || !isExactNonce;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -139,9 +141,7 @@ export default function L2Cancellation() {
               </div>
               <div className="flex justify-between">
                 <span>Nonce:</span>
-                <span className="w-1/2 break-words text-right">
-                  {proposal.nonce}
-                </span>
+                <span className="w-1/2 break-words text-right">{proposal.nonce}</span>
               </div>
               <div className="flex justify-between">
                 <span>Veto L2 Gas Limit:</span>
@@ -175,8 +175,8 @@ export default function L2Cancellation() {
                 <div className="flex justify-between">
                   <span>Transaction Hash:</span>
                   <div className="flex flex-1 flex-col items-end space-y-1">
-                    <TxLink hash={proposal.transactionHash} network={ethNetwork}/>
-                    <TxStatus hash={proposal.transactionHash}/>
+                    <TxLink hash={proposal.transactionHash} network={ethNetwork} />
+                    <TxStatus hash={proposal.transactionHash} />
                   </div>
                 </div>
               )}
@@ -252,13 +252,12 @@ export default function L2Cancellation() {
               Execute Veto
             </ExecL2VetoForm>
 
-            { !isExactNonce && (
-              <p className="text-s text-red-500">
+            {!isExactNonce && (
+              <p className="text-red-500 text-s">
                 Nonce does not match with contract. Maybe some other veto has to be executed before.
               </p>
             )}
           </CardContent>
-
         </Card>
       </div>
 
