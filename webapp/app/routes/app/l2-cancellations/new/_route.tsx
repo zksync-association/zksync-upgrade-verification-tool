@@ -79,7 +79,7 @@ export default function NewL2GovernorVeto() {
   const form = useForm<Schema>({
     resolver: zodResolver(schema),
     defaultValues: {
-      l2GasLimit: 600000,
+      l2GasLimit: 80000000,
       l2GasPerPubdataByteLimit: 60000,
       refundRecipient: address,
       txMintValue: 1000000000000000,
