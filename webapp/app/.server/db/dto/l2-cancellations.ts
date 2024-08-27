@@ -1,4 +1,4 @@
-import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
+import { type InferInsertModel, type InferSelectModel, and, eq, max } from "drizzle-orm";
 import type { Hex } from "viem";
 import { db } from "..";
 import { l2CancellationStatusEnum, l2CancellationsTable } from "../schema";
@@ -11,11 +11,8 @@ export async function createOrIgnoreL2Cancellation(
   return createOrIgnoreRecord(l2CancellationsTable, data, { tx }).then(getFirst);
 }
 
-export async function getActiveL2Cancellations({ tx }: { tx: typeof db } = { tx: db }) {
-  return tx
-    .select()
-    .from(l2CancellationsTable)
-    .where(eq(l2CancellationsTable.status, l2CancellationStatusEnum.enum.ACTIVE));
+export async function getL2Cancellations({ tx }: { tx: typeof db } = { tx: db }) {
+  return tx.select().from(l2CancellationsTable);
 }
 
 export async function getL2CancellationById(
@@ -50,4 +47,25 @@ export async function updateL2Cancellation(
     .where(eq(l2CancellationsTable.id, id))
     .returning()
     .then(getFirstOrThrow);
+}
+
+export async function getMaxRegisteredNonce(): Promise<number | null> {
+  const row = await db
+    .select({ value: max(l2CancellationsTable.nonce) })
+    .from(l2CancellationsTable)
+    .then(getFirst);
+  return row && row.value !== null ? Number(row.value) : null;
+}
+
+export async function existActiveProposalWithNonce(nonce: number): Promise<boolean> {
+  const [row] = await db
+    .select({ id: l2CancellationsTable.id })
+    .from(l2CancellationsTable)
+    .where(
+      and(
+        eq(l2CancellationsTable.nonce, nonce),
+        eq(l2CancellationsTable.status, l2CancellationStatusEnum.enum.ACTIVE)
+      )
+    );
+  return row !== undefined;
 }

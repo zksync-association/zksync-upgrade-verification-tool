@@ -1,4 +1,5 @@
 import { getL2CancellationById, updateL2Cancellation } from "@/.server/db/dto/l2-cancellations";
+import { l2CancellationStatusEnum } from "@/.server/db/schema";
 import { hexSchema } from "@/common/basic-schemas";
 import { notFound } from "@/utils/http";
 import { type ActionFunctionArgs, redirect } from "@remix-run/node";
@@ -29,6 +30,7 @@ export async function action({ request, params: remixParams }: ActionFunctionArg
 
   await updateL2Cancellation(proposal.id, {
     transactionHash: data.data.hash,
+    status: l2CancellationStatusEnum.enum.DONE,
   });
 
   return redirect($path("/app/transactions/:hash", { hash: data.data.hash }));
