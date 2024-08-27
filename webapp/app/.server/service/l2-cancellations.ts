@@ -1,22 +1,28 @@
 import {
-  type L2CancellationType,
+  l2CancellationsTable,
   l2CancellationStatusEnum,
+  type L2CancellationType,
   l2CancellationTypeEnum,
 } from "@/.server/db/schema";
 import { guardiansAddress } from "@/.server/service/contracts";
 import { hexSchema } from "@/common/basic-schemas";
 import { bigIntMax } from "@/utils/bigint";
 import { badRequest, notFound } from "@/utils/http";
-import { L2_CANCELATION_STATES } from "@/utils/l2-cancellation-states";
+import {
+  isValidCancellationState,
+  L2_CANCELLATION_STATES,
+  VALID_CANCELLATION_STATES
+} from "@/utils/l2-cancellation-states";
 import { ALL_ABIS, ZK_GOV_OPS_GOVERNOR_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
-import { type Address, type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
+import { type Address, decodeEventLog, type Hex, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
-import { createOrIgnoreL2Cancellation, getActiveL2Cancellations } from "../db/dto/l2-cancellations";
+import { createOrIgnoreL2Cancellation, getL2Cancellations, updateL2Cancellation } from "../db/dto/l2-cancellations";
 import { l1Rpc, l2Rpc } from "./clients";
 import { zkGovOpsGovernorAbi } from "./contract-abis";
+import { InferSelectModel } from "drizzle-orm";
 
 const eventSchema = z.object({
   eventName: z.string(),
@@ -38,6 +44,12 @@ function blocksInADay() {
     return 24 * 3600; // 24 hours, 1 block per second
   }
   return 24 * (3600 / 20); // 20 seconds per block.
+}
+
+async function getL2ProposalState(type: L2CancellationType,  proposalId: Hex): Promise<L2_CANCELLATION_STATES> {
+  return l2Rpc.contractRead(getL2GovernorAddress(type), "state", ZK_GOV_OPS_GOVERNOR_ABI, z.number(), [
+    proposalId,
+  ])
 }
 
 async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigint) {
@@ -121,17 +133,11 @@ async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigi
       proposalExecuted[proposal.proposalId] !== true
   );
 
-  const states = await Promise.all(
-    activeProposals.map((p) =>
-      l2Rpc.contractRead(getL2GovernorAddress(type), "state", ZK_GOV_OPS_GOVERNOR_ABI, z.number(), [
-        p.proposalId,
-      ])
-    )
-  );
+  const states = await Promise.all(activeProposals.map((p) => getL2ProposalState(p.type, p.proposalId)));
 
   return activeProposals.filter(
     (_, i) =>
-      states[i] === L2_CANCELATION_STATES.Active || states[i] === L2_CANCELATION_STATES.Pending
+      VALID_CANCELLATION_STATES.some(state => state === states[i])
   );
 }
 
@@ -222,7 +228,7 @@ export async function createVetoProposalFor(
 }
 
 export async function getZkGovOpsProposals() {
-  return getActiveL2Cancellations();
+  return getL2Cancellations();
 }
 
 export function getL2GovernorAddress(proposalType: L2CancellationType) {
@@ -238,4 +244,19 @@ export function getL2GovernorAddress(proposalType: L2CancellationType) {
       throw badRequest("Invalid proposalType");
   }
   return l2GovernorAddress;
+}
+
+export async function upgradeCancellationStatus(cancellation: InferSelectModel<typeof l2CancellationsTable>): Promise<InferSelectModel<typeof l2CancellationsTable>> {
+  if (cancellation.status !== l2CancellationStatusEnum.enum.ACTIVE) {
+    return cancellation
+  }
+
+  const state = await getL2ProposalState(cancellation.type, cancellation.externalId)
+
+  if (!isValidCancellationState(state)) {
+    cancellation.status = l2CancellationStatusEnum.enum.EXPIRED
+    await updateL2Cancellation(cancellation.id, cancellation)
+  }
+
+  return cancellation
 }

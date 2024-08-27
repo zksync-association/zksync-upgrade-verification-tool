@@ -1,7 +1,7 @@
-import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
+import { eq, type InferInsertModel, type InferSelectModel } from "drizzle-orm";
 import type { Hex } from "viem";
 import { db } from "..";
-import { l2CancellationStatusEnum, l2CancellationsTable } from "../schema";
+import { l2CancellationsTable } from "../schema";
 import { createOrIgnoreRecord, getFirst, getFirstOrThrow } from "./utils/common";
 
 export async function createOrIgnoreL2Cancellation(
@@ -11,11 +11,10 @@ export async function createOrIgnoreL2Cancellation(
   return createOrIgnoreRecord(l2CancellationsTable, data, { tx }).then(getFirst);
 }
 
-export async function getActiveL2Cancellations({ tx }: { tx: typeof db } = { tx: db }) {
+export async function getL2Cancellations({ tx }: { tx: typeof db } = { tx: db }) {
   return tx
     .select()
     .from(l2CancellationsTable)
-    .where(eq(l2CancellationsTable.status, l2CancellationStatusEnum.enum.ACTIVE));
 }
 
 export async function getL2CancellationById(

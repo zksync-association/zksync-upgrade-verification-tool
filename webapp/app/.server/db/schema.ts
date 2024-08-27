@@ -151,7 +151,7 @@ export const l2CancellationTypeEnum = z.enum(["ZK_GOV_OPS_GOVERNOR", "ZK_TOKEN_G
 
 export type L2CancellationType = z.infer<typeof l2CancellationTypeEnum>;
 
-export const l2CancellationStatusEnum = z.enum(["ACTIVE", "DONE", "CANCELED"]);
+export const l2CancellationStatusEnum = z.enum(["ACTIVE", "DONE", "NONCE_TOO_LOW", "EXPIRED"]);
 
 export const l2CancellationsTable = pgTable("l2_governor_cancellations", {
   id: serial("id").primaryKey(),

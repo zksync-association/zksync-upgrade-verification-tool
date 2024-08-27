@@ -14,6 +14,7 @@ import { json } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { $path } from "remix-routes";
+import { l2CancellationStatusEnum } from "@/.server/db/schema";
 
 export async function loader() {
   const proposals = await getZkGovOpsProposals();
@@ -23,8 +24,8 @@ export async function loader() {
 export default function L2Proposals() {
   const { proposals } = useLoaderData<typeof loader>();
 
-  const activeProposals = proposals.filter((p) => p.transactionHash === null);
-  const inactiveProposals = proposals.filter((p) => p.transactionHash !== null);
+  const activeProposals = proposals.filter((p) => p.status === l2CancellationStatusEnum.enum.ACTIVE);
+  const inactiveProposals = proposals.filter((p) => p.status !== l2CancellationStatusEnum.enum.ACTIVE);
 
   return (
     <div className="space-y-4">
