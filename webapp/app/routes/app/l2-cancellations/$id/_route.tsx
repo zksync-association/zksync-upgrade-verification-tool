@@ -5,7 +5,10 @@ import {
 } from "@/.server/db/dto/l2-cancellations";
 import { getSignaturesByL2CancellationId } from "@/.server/db/dto/signatures";
 import { guardiansAddress } from "@/.server/service/contracts";
-import { getL2GovernorAddress, upgradeCancellationStatus } from "@/.server/service/l2-cancellations";
+import {
+  getAndUpdateL2Cancellation,
+  getL2GovernorAddress
+} from "@/.server/service/l2-cancellations";
 import { validateAndSaveL2CancellationSignature } from "@/.server/service/signatures";
 import { hexSchema } from "@/common/basic-schemas";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
@@ -36,12 +39,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     throw notFound();
   }
 
-  let proposal = await getL2CancellationByExternalId(params.data.id);
-  if (!proposal) {
-    throw notFound();
-  }
-
-  proposal = await upgradeCancellationStatus(proposal);
+  let proposal = await getAndUpdateL2Cancellation(params.data.id);
 
   const [calls, signatures, guardiansAddr, l2GovernorAddr] = await Promise.all([
     getl2CancellationCallsByProposalId(proposal.id),
