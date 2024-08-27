@@ -305,11 +305,13 @@ async function upgradeCancellationStatus(
   if (!isValidCancellationState(state)) {
     cancellation.status = l2CancellationStatusEnum.enum.L2_PROPOSAL_EXPIRED;
     await updateL2Cancellation(cancellation.id, cancellation);
+    return cancellation
   }
 
   if (cancellation.nonce < currentNonce) {
     cancellation.status = l2CancellationStatusEnum.enum.NONCE_TOO_LOW;
     await updateL2Cancellation(cancellation.id, cancellation);
+    return cancellation
   }
 
   return cancellation;
