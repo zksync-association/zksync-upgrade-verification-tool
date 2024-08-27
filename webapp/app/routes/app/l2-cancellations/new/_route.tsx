@@ -1,4 +1,9 @@
-import { createVetoProposalFor, getActiveL2Proposals, getL2VetoNonce } from "@/.server/service/l2-cancellations";
+import { getMaxRegisteredNonce } from "@/.server/db/dto/l2-cancellations";
+import {
+  createVetoProposalFor,
+  getActiveL2Proposals,
+  getL2VetoNonce,
+} from "@/.server/service/l2-cancellations";
 import { addressSchema, hexSchema } from "@/common/basic-schemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,17 +30,16 @@ import { badRequest } from "@/utils/http";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type ActionFunctionArgs, defer, redirect } from "@remix-run/node";
 import { Await, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form as RemixForm } from "@remix-run/react";
 import { Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { numberToHex } from "viem";
 import { z } from "zod";
-import { getMaxRegisteredNonce } from "@/.server/db/dto/l2-cancellations";
-import { Form as RemixForm } from "@remix-run/react";
 
 export async function loader() {
-  const maybeBiggestNonce = await getMaxRegisteredNonce()
+  const maybeBiggestNonce = await getMaxRegisteredNonce();
   const biggestNonce = maybeBiggestNonce === null ? -1 : maybeBiggestNonce;
   const currentNonce = await getL2VetoNonce();
   return defer({
@@ -79,16 +83,18 @@ const schema = z.object({
   }),
   refundRecipient: addressSchema,
   txMintValue: z.coerce.number({ message: "Transaction mint value must be a number" }),
-  nonce: z.coerce.number({ message: "Nonce value must be a number"})
+  nonce: z.coerce.number({ message: "Nonce value must be a number" }),
 });
 type Schema = z.infer<typeof schema>;
 
 export default function NewL2GovernorVeto() {
   const { activeL2Proposals, currentNonce, suggestedNonce } = useLoaderData<typeof loader>();
   const form = useForm<Schema>({
-    resolver: zodResolver(schema.extend({
-      nonce: z.coerce.number().min(currentNonce)
-    })),
+    resolver: zodResolver(
+      schema.extend({
+        nonce: z.coerce.number().min(currentNonce),
+      })
+    ),
     defaultValues: { nonce: suggestedNonce },
     mode: "onTouched",
   });

@@ -1,27 +1,28 @@
 import {
-  type l2CancellationsTable,
-  l2CancellationStatusEnum,
   type L2CancellationType,
+  l2CancellationStatusEnum,
   l2CancellationTypeEnum,
+  type l2CancellationsTable,
 } from "@/.server/db/schema";
 import { guardiansAddress } from "@/.server/service/contracts";
 import { hexSchema } from "@/common/basic-schemas";
 import { bigIntMax } from "@/utils/bigint";
 import { badRequest, notFound } from "@/utils/http";
 import {
-  isValidCancellationState,
   type L2_CANCELLATION_STATES,
   VALID_CANCELLATION_STATES,
+  isValidCancellationState,
 } from "@/utils/l2-cancellation-states";
 import { ALL_ABIS, ZK_GOV_OPS_GOVERNOR_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 import type { InferSelectModel } from "drizzle-orm";
-import { type Address, decodeEventLog, type Hex, hexToBigInt, numberToHex } from "viem";
+import { type Address, type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
 import {
-  createOrIgnoreL2Cancellation, existActiveProposalWithNonce,
+  createOrIgnoreL2Cancellation,
+  existActiveProposalWithNonce,
   getL2CancellationByExternalId,
   getL2Cancellations,
   updateL2Cancellation,
@@ -182,7 +183,12 @@ export async function getActiveL2Proposals() {
 }
 
 export async function getL2VetoNonce(): Promise<number> {
-  const bigIntNonce = await l1Rpc.contractRead(await guardiansAddress(), "nonce", ALL_ABIS.guardians, z.bigint());
+  const bigIntNonce = await l1Rpc.contractRead(
+    await guardiansAddress(),
+    "nonce",
+    ALL_ABIS.guardians,
+    z.bigint()
+  );
   return Number(bigIntNonce);
 }
 
@@ -203,11 +209,11 @@ export async function createVetoProposalFor(
   const currentNonce = await getL2VetoNonce();
 
   if (newNonce < currentNonce) {
-    throw badRequest("Nonce too low.")
+    throw badRequest("Nonce too low.");
   }
 
   if (await existActiveProposalWithNonce(newNonce)) {
-    throw badRequest(`There is already an active proposal with ${newNonce} as nonce`)
+    throw badRequest(`There is already an active proposal with ${newNonce} as nonce`);
   }
 
   await db.transaction(async (tx) => {
@@ -251,11 +257,10 @@ export async function createVetoProposalFor(
 }
 
 export async function getUpdatedL2Cancellations() {
-  const currentNonce = await getL2VetoNonce()
-  return await getL2Cancellations()
-    .then(cancellations => Promise.all(
-      cancellations.map(c => upgradeCancellationStatus(c, currentNonce))
-    ));
+  const currentNonce = await getL2VetoNonce();
+  return await getL2Cancellations().then((cancellations) =>
+    Promise.all(cancellations.map((c) => upgradeCancellationStatus(c, currentNonce)))
+  );
 }
 
 export function getL2GovernorAddress(proposalType: L2CancellationType) {
