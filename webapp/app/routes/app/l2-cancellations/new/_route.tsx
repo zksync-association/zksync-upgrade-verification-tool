@@ -100,7 +100,7 @@ export default function NewL2GovernorVeto() {
     defaultValues: {
       nonce: suggestedNonce,
       l2GasLimit: 80000000,
-      l2GasPerPubdataByteLimit: 60000,
+      l2GasPerPubdataByteLimit: 800,
       refundRecipient: address,
       txMintValue: 1000000000000000,
     },
