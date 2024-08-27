@@ -181,8 +181,9 @@ export async function getActiveL2Proposals() {
   return [...govOpsProposals, ...tokenProposals];
 }
 
-async function getL2VetoNonce(): Promise<bigint> {
-  return l1Rpc.contractRead(await guardiansAddress(), "nonce", ALL_ABIS.guardians, z.bigint());
+export async function getL2VetoNonce(): Promise<number> {
+  const bigIntNonce = await l1Rpc.contractRead(await guardiansAddress(), "nonce", ALL_ABIS.guardians, z.bigint());
+  return Number(bigIntNonce);
 }
 
 export async function createVetoProposalFor(
@@ -190,7 +191,8 @@ export async function createVetoProposalFor(
   l2GasLimit: Hex,
   l2GasPerPubdataByteLimit: Hex,
   refundRecipient: Hex,
-  txMintValue: Hex
+  txMintValue: Hex,
+  suggestedNonce: number
 ) {
   const allActive = await getActiveL2Proposals();
   const proposalData = allActive.find((activeProposal) => activeProposal.proposalId === id);
@@ -198,7 +200,11 @@ export async function createVetoProposalFor(
     throw notFound();
   }
 
-  const nonce = await getL2VetoNonce();
+  const currentNonce = await getL2VetoNonce();
+
+  if (suggestedNonce < currentNonce) {
+    throw badRequest("Nonce too low.")
+  }
 
   await db.transaction(async (tx) => {
     const l2Cancellation = await createOrIgnoreL2Cancellation(
@@ -207,7 +213,7 @@ export async function createVetoProposalFor(
         proposer: proposalData.proposer,
         description: proposalData.description,
         type: proposalData.type,
-        nonce: Number(nonce),
+        nonce: suggestedNonce,
         status: l2CancellationStatusEnum.enum.ACTIVE,
         txRequestGasLimit: l2GasLimit,
         txRequestTo: getL2GovernorAddress(proposalData.type),
@@ -241,7 +247,7 @@ export async function createVetoProposalFor(
 }
 
 export async function getUpdatedL2Cancellations() {
-  const currentNonce = Number(await getL2VetoNonce())
+  const currentNonce = await getL2VetoNonce()
   return await getL2Cancellations()
     .then(cancellations => Promise.all(
       cancellations.map(c => upgradeCancellationStatus(c, currentNonce))
@@ -271,7 +277,7 @@ export async function getAndUpdateL2CancellationByExternalId(
     throw notFound();
   }
 
-  return await upgradeCancellationStatus(proposal, Number(await getL2VetoNonce()));
+  return await upgradeCancellationStatus(proposal, await getL2VetoNonce());
 }
 
 async function upgradeCancellationStatus(

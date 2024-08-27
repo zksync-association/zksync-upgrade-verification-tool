@@ -1,4 +1,4 @@
-import { createVetoProposalFor, getActiveL2Proposals } from "@/.server/service/l2-cancellations";
+import { createVetoProposalFor, getActiveL2Proposals, getL2VetoNonce } from "@/.server/service/l2-cancellations";
 import { addressSchema, hexSchema } from "@/common/basic-schemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +33,10 @@ import { numberToHex } from "viem";
 import { z } from "zod";
 
 export async function loader() {
-  return defer({ activeL2Proposals: getActiveL2Proposals() });
+  return defer({
+    activeL2Proposals: getActiveL2Proposals(),
+    nonce: await getL2VetoNonce()
+  });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -45,6 +48,7 @@ export async function action({ request }: ActionFunctionArgs) {
       l2GasPerPubdataByteLimit: z.coerce.number(),
       refundRecipient: addressSchema,
       txMintValue: z.coerce.number(),
+      nonce: z.coerce.number(),
     })
   );
   if (!parsed.success) {
@@ -55,7 +59,8 @@ export async function action({ request }: ActionFunctionArgs) {
     numberToHex(parsed.data.l2GasLimit),
     numberToHex(parsed.data.l2GasPerPubdataByteLimit),
     parsed.data.refundRecipient,
-    numberToHex(parsed.data.txMintValue)
+    numberToHex(parsed.data.txMintValue),
+    parsed.data.nonce
   );
   return redirect($path("/app/l2-cancellations"));
 }
@@ -68,16 +73,17 @@ const schema = z.object({
   }),
   refundRecipient: addressSchema,
   txMintValue: z.coerce.number({ message: "Transaction mint value must be a number" }),
+  nonce: z.coerce.number({ message: "Nonce value must be a number"})
 });
 type Schema = z.infer<typeof schema>;
 
-const defaultValues = {};
-
 export default function NewL2GovernorVeto() {
-  const { activeL2Proposals } = useLoaderData<typeof loader>();
+  const { activeL2Proposals, nonce } = useLoaderData<typeof loader>();
   const form = useForm<Schema>({
-    resolver: zodResolver(schema),
-    defaultValues,
+    resolver: zodResolver(schema.extend({
+      nonce: z.coerce.number().min(nonce)
+    })),
+    defaultValues: { nonce },
     mode: "onTouched",
   });
   const navigation = useNavigation();
@@ -205,6 +211,23 @@ export default function NewL2GovernorVeto() {
                           <FormLabel>Transaction mint value</FormLabel>
                           <FormControl>
                             <Input type="number" min={0} {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            The ether minted on L2 in this L1 {"->"} L2 transaction.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="nonce"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nonce</FormLabel>
+                          <FormControl>
+                            <Input type="number" min={nonce} {...field} />
                           </FormControl>
                           <FormDescription>
                             The ether minted on L2 in this L1 {"->"} L2 transaction.
