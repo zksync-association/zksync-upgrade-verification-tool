@@ -1,7 +1,7 @@
-import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
+import { type InferInsertModel, type InferSelectModel, eq, max, and } from "drizzle-orm";
 import type { Hex } from "viem";
 import { db } from "..";
-import { l2CancellationsTable } from "../schema";
+import { l2CancellationsTable, l2CancellationStatusEnum } from "../schema";
 import { createOrIgnoreRecord, getFirst, getFirstOrThrow } from "./utils/common";
 
 export async function createOrIgnoreL2Cancellation(

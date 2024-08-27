@@ -21,7 +21,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
 import {
-  createOrIgnoreL2Cancellation,
+  createOrIgnoreL2Cancellation, existActiveProposalWithNonce,
   getL2CancellationByExternalId,
   getL2Cancellations,
   updateL2Cancellation,
@@ -192,7 +192,7 @@ export async function createVetoProposalFor(
   l2GasPerPubdataByteLimit: Hex,
   refundRecipient: Hex,
   txMintValue: Hex,
-  suggestedNonce: number
+  newNonce: number
 ) {
   const allActive = await getActiveL2Proposals();
   const proposalData = allActive.find((activeProposal) => activeProposal.proposalId === id);
@@ -202,8 +202,12 @@ export async function createVetoProposalFor(
 
   const currentNonce = await getL2VetoNonce();
 
-  if (suggestedNonce < currentNonce) {
+  if (newNonce < currentNonce) {
     throw badRequest("Nonce too low.")
+  }
+
+  if (await existActiveProposalWithNonce(newNonce)) {
+    throw badRequest(`There is already an active proposal with ${newNonce} as nonce`)
   }
 
   await db.transaction(async (tx) => {
@@ -213,7 +217,7 @@ export async function createVetoProposalFor(
         proposer: proposalData.proposer,
         description: proposalData.description,
         type: proposalData.type,
-        nonce: suggestedNonce,
+        nonce: newNonce,
         status: l2CancellationStatusEnum.enum.ACTIVE,
         txRequestGasLimit: l2GasLimit,
         txRequestTo: getL2GovernorAddress(proposalData.type),
