@@ -4,9 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "check": "biome check .",
-    "check:fix": "biome check --write ."
+    "typecheck": "tsc --noEmit"
   },
   "exports": {
     "./*": "./src/*.ts"

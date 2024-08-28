@@ -9,13 +9,12 @@
     "docker:build": "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t upgrade-checker:local .",
     "build": "turbo build",
     "test": "turbo test",
-    "check": "turbo check",
-    "check:fix": "turbo check:fix",
+    "check": "biome check",
+    "check:fix": "biome check --write",
     "typecheck": "turbo typecheck",
     "ci:fix": "turbo ci:fix",
     "dev:web": "turbo web#dev",
     "clean": "./scripts/clean.sh"
-
   },
   "devDependencies": {
     "@biomejs/biome": "1.8.3",

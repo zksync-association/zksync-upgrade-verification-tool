@@ -15,17 +15,7 @@
       "*.yaml",
       "*.md"
     ],
-    "ignore": [
-      "./dist/*",
-      "./node_modules/*",
-      "**/__snapshots__/*",
-      "**/coverage/*",
-      "**/artifacts",
-      "**/zk-gov",
-      "**/zk-gov-preprocessed",
-      "**/contracts",
-      "**/cache"
-    ]
+    "ignore": ["apps/web/drizzle", "e2e/contracts/zk-gov"]
   },
   "organizeImports": {
     "enabled": false
@@ -54,9 +44,21 @@
         "noExplicitAny": "off",
         "noAsyncPromiseExecutor": "off"
       },
-      "a11y":{
+      "a11y": {
         "useValidAriaRole": "off"
+      },
+      "nursery": {
+        "useSortedClasses": {
+          "fix": "safe",
+          "level": "info",
+          "options": {}
+        }
       }
     }
+  },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
   }
 }

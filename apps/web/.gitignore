@@ -1,9 +1,0 @@
-node_modules
-
-/.cache
-/build
-/server-build
-.env
-vite.config.ts.*
-
-remix-routes.d.ts

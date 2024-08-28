@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import hre from "hardhat";
 import fs from "node:fs";
-import type { Address, PublicClient, WalletClient } from "viem";
+import type { Address, PublicClient } from "viem";
 
 function getDeployedAddresses() {
   const content = fs.readFileSync("addresses.txt", "utf-8");
@@ -18,11 +18,9 @@ function getDeployedAddresses() {
 
 describe("Deploy:All tests", () => {
   let client: PublicClient;
-  let signer: WalletClient;
   let addresses: Record<string, `0x${string}`>;
 
   before(async () => {
-    signer = (await hre.viem.getWalletClients())[0];
     client = await hre.viem.getPublicClient();
     addresses = getDeployedAddresses();
     console.log("Deployed addresses:", addresses);
