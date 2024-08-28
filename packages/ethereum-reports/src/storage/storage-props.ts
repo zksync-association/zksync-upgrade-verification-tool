@@ -6,9 +6,12 @@ import { BooleanType } from "./types/boolean-type.js";
 import { BigNumberType } from "./types/big-number-type.js";
 import { StructType } from "./types/struct-type.js";
 import { BlobType } from "./types/blob-type.js";
-import { type Hex, hexToBytes } from "viem";
+import { type Hex, hexToBigInt, hexToBytes } from "viem";
 import { ArrayType } from "./types/array-type.js";
-import { DIAMOND_STORAGE_SLOT } from "./storage-changes.js";
+
+export const DIAMOND_STORAGE_SLOT = hexToBigInt(
+  "0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b"
+);
 
 export const MAIN_CONTRACT_FIELDS = {
   protocolVersion: new ContractField(

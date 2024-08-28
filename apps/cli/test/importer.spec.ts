@@ -3,6 +3,7 @@ import path from "node:path";
 import { MalformedUpgrade } from "@repo/common/ethereum";
 import { FileSystem } from "../src/lib/file-system.js";
 import { UpgradeImporter } from "../src/lib/importer.js";
+import { isAddressEqual } from "viem";
 
 class TestFS extends FileSystem {
   private registered: Map<string, string>;
@@ -31,7 +32,7 @@ class TestFS extends FileSystem {
   }
 }
 
-function repeated(n: number, times: number): string {
+function repeated(n: number, times: number): `0x${string}` {
   return `0x${Buffer.from([n]).toString("hex").repeat(times)}`;
 }
 
@@ -172,13 +173,12 @@ describe("UpgradeImporter", () => {
 
     it<Ctx>("adds new system contracts in upgrade", async ({ importer }) => {
       const upgrades = await importer.readFromFiles(baseDir, "mainnet");
-      expect(upgrades.systemContractChanges).to.eql([
-        {
-          name: "SomeSystemContract",
-          codeHash: repeated(10, 32),
-          address: repeated(11, 20),
-        },
-      ]);
+
+      expect(upgrades.systemContractChanges).to.have.lengthOf(1);
+      expect(upgrades.systemContractChanges[0]?.name).to.equal("SomeSystemContract");
+      expect(upgrades.systemContractChanges[0]?.codeHash).to.equal(repeated(10, 32));
+      expect(isAddressEqual(upgrades.systemContractChanges[0]?.address ?? "0x", repeated(11, 20)))
+        .to.be.true;
     });
   });
 

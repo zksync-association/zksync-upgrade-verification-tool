@@ -12,7 +12,7 @@ describe("FileSystem class", () => {
       const fs = subject();
       const pkgBuf = await fs.readFile(path.join(import.meta.dirname, "../package.json"));
       const pkg = JSON.parse(pkgBuf.toString()) as any;
-      expect(pkg.name).to.eql("validate-cli");
+      expect(pkg.name).to.eql("cli");
     });
 
     it("throws an error when a file does not exists", async () => {
