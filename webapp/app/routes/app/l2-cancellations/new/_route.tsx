@@ -36,6 +36,7 @@ import { useForm } from "react-hook-form";
 import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { numberToHex } from "viem";
+import { useAccount } from "wagmi";
 import { z } from "zod";
 
 export async function loader() {
@@ -89,13 +90,20 @@ type Schema = z.infer<typeof schema>;
 
 export default function NewL2GovernorVeto() {
   const { activeL2Proposals, currentNonce, suggestedNonce } = useLoaderData<typeof loader>();
+  const { address } = useAccount();
   const form = useForm<Schema>({
     resolver: zodResolver(
       schema.extend({
         nonce: z.coerce.number().min(currentNonce),
       })
     ),
-    defaultValues: { nonce: suggestedNonce },
+    defaultValues: {
+      nonce: suggestedNonce,
+      l2GasLimit: 80000000,
+      l2GasPerPubdataByteLimit: 800,
+      refundRecipient: address,
+      txMintValue: 1000000000000000,
+    },
     mode: "onTouched",
   });
   const navigation = useNavigation();
