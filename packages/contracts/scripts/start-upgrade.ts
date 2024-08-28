@@ -3,6 +3,10 @@ import hre from "hardhat";
 
 async function main() {
   const signer = (await hre.viem.getWalletClients())[0];
+  if (!signer) {
+    throw new Error("Signer not found");
+  }
+
   signer.extend(publicActions);
 
   const handlerAddress = process.env.HANDLER_ADDRESS;

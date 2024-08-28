@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import "dotenv/config";
-import { createTempDir, execAsync, expectToFailAsync } from "../../helpers/util";
+import { createTempDir, execAsync, expectToFailAsync } from "../../helpers/util.js";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 

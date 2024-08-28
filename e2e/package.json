@@ -1,5 +1,5 @@
 {
-  "name": "validate-e2e",
+  "name": "@repo/e2e",
   "version": "1.0.0",
   "description": "",
   "type": "module",
@@ -11,28 +11,14 @@
   "files": ["dist", "bin", "*.d.ts", "*.mjs"],
   "scripts": {
     "update": "vitest -u",
-    "compile": "hardhat compile",
-    "clean": "hardhat clean",
-    "compile:preprocess": "tsx scripts/preprocessZkGov.ts",
-    "deploy:setup": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' pnpm hardhat run scripts/deploySetup.ts --network local",
-    "deploy:setup:remote": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' pnpm hardhat run scripts/deploySetup.ts --network remote",
-    "deploy:upgrade": "hardhat run scripts/startUpgrade.ts $HANDLER --network local",
-    "env:up": "hardhat node > .hardhat.log 2>&1 & echo $! > .hardhat-pid",
-    "env:down": "kill $(cat .hardhat-pid) && rm .hardhat-pid .hardhat.log",
-    "env:ls": "lsof -i :8545",
     "fullenv:up": "docker compose -f fullstack-compose.yml up -d",
     "fullenv:up:services": "pnpm fullenv:up -- hh-deploy migrate",
     "fullenv:down": "docker compose -f fullstack-compose.yml down --volumes --remove-orphans",
-    "test:local": "hardhat test --network local",
+    "test:local": "NODE_OPTIONS=\"--loader ts-node/esm\" hardhat test --network local",
     "test:cli": "vitest run --config ./vitest.cli.config.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@nomicfoundation/hardhat-viem": "^2.0.3",
-    "@openzeppelin-v4/contracts": "npm:@openzeppelin/contracts@4",
-    "@openzeppelin-v4/contracts-upgradeable": "npm:@openzeppelin/contracts-upgradeable@4",
-    "@openzeppelin/contracts": "^5.0.2",
-    "@openzeppelin/contracts-upgradeable": "^5.0.2",
     "@playwright/test": "^1.46.0",
     "@tenkeylabs/dappwright": "^2.8.5",
     "@types/mocha": "^10.0.7",
@@ -40,7 +26,6 @@
     "chalk": "^5.3.0",
     "dotenv": "^16.4.5",
     "glob": "^11.0.0",
-    "hardhat": "^2.22.6",
     "ora": "^8.0.1",
     "tempy": "^3.1.0",
     "typescript": "^5.4.4",
@@ -52,6 +37,8 @@
     "pnpm": ">=8"
   },
   "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "hardhat": "^2.22.6",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.0"
   }

@@ -3,9 +3,9 @@ import { writeFile } from "node:fs/promises";
 import {
   TASK_COMPILE_SOLIDITY,
   TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS,
-} from "hardhat/builtin-tasks/task-names";
-import type { HardhatUserConfig } from "hardhat/config";
-import { subtask } from "hardhat/config";
+} from "hardhat/builtin-tasks/task-names.js";
+import type { HardhatUserConfig } from "hardhat/config.js";
+import { subtask } from "hardhat/config.js";
 import path from "node:path";
 import Dotenv from "dotenv";
 import { glob } from "glob";
@@ -13,11 +13,11 @@ import { execSync } from "node:child_process";
 
 Dotenv.config();
 
-const ZK_GOV_PATH = path.join(__dirname, "contracts", "zk-gov-preprocessed");
+const ZK_GOV_PATH = path.join(__dirname, "src", "zk-gov-preprocessed");
 
 subtask(TASK_COMPILE_SOLIDITY).setAction(async (_, { config }, runSuper) => {
   // Preprocess zkGov contracts
-  execSync("npm run compile:preprocess", { stdio: "inherit" });
+  execSync("npm run preprocess:zk-gov", { stdio: "inherit" });
 
   const superRes = await runSuper();
 
@@ -46,10 +46,10 @@ if (!forkUrl) {
 const config: HardhatUserConfig = {
   solidity: "0.8.24",
   paths: {
-    sources: "contracts",
+    sources: "src",
     cache: "cache",
     artifacts: "artifacts",
-    tests: "suites/contracts",
+    tests: "tests",
   },
   networks: {
     remote: {

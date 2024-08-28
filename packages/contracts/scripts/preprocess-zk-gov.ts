@@ -16,7 +16,7 @@ import ora from "ora";
 import fs from "node:fs";
 import chalk from "chalk";
 
-const ZK_GOV_PATH = path.join(import.meta.dirname, "..", "contracts", "zk-gov");
+const ZK_GOV_PATH = path.join(import.meta.dirname, "..", "src", "zk-gov");
 const TARGET_NAME = "zk-gov-preprocessed";
 
 async function main() {
