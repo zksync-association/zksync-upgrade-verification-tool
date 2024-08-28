@@ -37,12 +37,6 @@ subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, hre) => {
   return glob.sync([l1Contracts, l2Contracts, devContracts]);
 });
 
-const forkUrl = process.env.FORK_URL;
-
-if (!forkUrl) {
-  throw new Error("Missing ENV_VAR FORK_URL");
-}
-
 const config: HardhatUserConfig = {
   solidity: "0.8.24",
   paths: {
@@ -69,7 +63,8 @@ const config: HardhatUserConfig = {
         interval: 1000,
       },
       forking: {
-        url: forkUrl,
+        enabled: !!process.env.FORK_URL,
+        url: process.env.FORK_URL || "ENV_VAR_FORK_URL_MISSING",
       },
       accounts: {
         mnemonic:
