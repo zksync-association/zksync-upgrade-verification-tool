@@ -17,15 +17,15 @@ import { notFound } from "@/utils/http";
 import { env } from "@config/env.server";
 import { type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
+import { hexSchema } from "@repo/common/schemas";
 import { ArrowLeft, CircleCheckBig, CircleX, SquareArrowOutUpRight } from "lucide-react";
 import { getParams } from "remix-params-helper";
-import { zodHex } from "validate-cli";
 import { formatEther, formatGwei } from "viem";
 import { useWaitForTransactionReceipt } from "wagmi";
 import { z } from "zod";
 
 export function loader(args: LoaderFunctionArgs) {
-  const params = getParams(args.params, z.object({ hash: zodHex }));
+  const params = getParams(args.params, z.object({ hash: hexSchema }));
   if (!params.success) {
     throw notFound();
   }

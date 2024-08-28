@@ -1,4 +1,4 @@
-import type { ContractsRepo } from "../../src/lib/git-contracts-repo";
+import type { ContractsRepo } from "@repo/ethereum-reports/git-contracts-repo";
 import { Option } from "nochoices";
 
 export class TestContractRepo implements ContractsRepo {

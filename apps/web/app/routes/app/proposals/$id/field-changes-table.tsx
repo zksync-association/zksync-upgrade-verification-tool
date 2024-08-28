@@ -12,7 +12,7 @@ import {
   displayEmpty,
 } from "@/routes/app/proposals/$id/common-tables";
 import { cn } from "@/utils/cn";
-import type { ContractFieldChange } from "validate-cli";
+import type { ContractFieldChange } from "@repo/ethereum-reports/reports/object-check-report";
 
 export default function FieldChangesTable({
   className,

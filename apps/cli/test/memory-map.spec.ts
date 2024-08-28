@@ -1,20 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { memoryDiffParser, StorageChanges } from "../src";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { bytesToHex, type Hex, hexToBigInt } from "viem";
-import { AddressType } from "../src/lib/storage/types/address-type";
-import { StructType } from "../src/lib/storage/types/struct-type";
-import { BigNumberType } from "../src/lib/storage/types/big-number-type";
-import { ContractField } from "../src/lib/storage/contractField";
-import { BooleanType } from "../src/lib/storage/types/boolean-type";
-import type { StorageVisitor } from "../src/lib/reports/storage-visitor";
-import { type PropertyChange } from "../src/lib/storage/property-change";
-import type { StorageValue } from "../src/lib/storage/values/storage-value";
-import type { ValueField } from "../src/lib/storage/values/struct-value";
 import { Option } from "nochoices";
-import { RecordStorageSnapshot } from "../src";
-import type { StorageSnapshot } from "../src";
+import { memoryDiffParser } from "@repo/common/schemas";
+import type { StorageVisitor } from "@repo/ethereum-reports/reports/storage-visitor";
+import { ContractField } from "@repo/ethereum-reports/storage/contractField";
+import type { PropertyChange } from "@repo/ethereum-reports/storage/property-change";
+import { RecordStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/record-storage-snapshot";
+import type { StorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/storage-snapshot";
+import { StorageChanges } from "@repo/ethereum-reports/storage/storage-changes";
+import { AddressType } from "@repo/ethereum-reports/storage/types/address-type";
+import { BigNumberType } from "@repo/ethereum-reports/storage/types/big-number-type";
+import { BooleanType } from "@repo/ethereum-reports/storage/types/boolean-type";
+import { StructType } from "@repo/ethereum-reports/storage/types/struct-type";
+import type { StorageValue } from "@repo/ethereum-reports/storage/values/storage-value";
+import type { ValueField } from "@repo/ethereum-reports/storage/values/struct-value";
 
 class TestReport implements StorageVisitor<string> {
   beforeData: Option<string>;
@@ -106,9 +107,9 @@ describe("MemoryMap", () => {
 
     const pre = json.result.pre[ADDRESS].storage.map((s) => new RecordStorageSnapshot(s)).unwrap();
 
-    const post = json.result.post[ADDRESS]!.storage.map(
-      (s) => new RecordStorageSnapshot(s)
-    ).unwrap();
+    const post = json.result.post[ADDRESS].storage
+      .map((s) => new RecordStorageSnapshot(s))
+      .unwrap();
 
     return [pre, post];
   };

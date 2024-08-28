@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { UpgradeImporter } from "../src";
-import { FileSystem } from "../src";
 import path from "node:path";
-import { MalformedUpgrade } from "../src/lib/errors";
+import { MalformedUpgrade } from "@repo/common/ethereum";
+import { FileSystem } from "../src/lib/file-system.js";
+import { UpgradeImporter } from "../src/lib/importer.js";
 
 class TestFS extends FileSystem {
   private registered: Map<string, string>;

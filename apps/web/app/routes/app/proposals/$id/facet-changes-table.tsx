@@ -7,7 +7,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { removeFunctionParams } from "@/routes/app/proposals/$id/common-tables";
 import { cn } from "@/utils/cn";
-import type { FacetDataReportDiff } from "validate-cli";
+import type { FacetDataReportDiff } from "@repo/ethereum-reports/reports/object-check-report";
 
 export default function FacetChangesTable({ data }: { data: FacetDataReportDiff[] }) {
   return (

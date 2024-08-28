@@ -11,7 +11,7 @@ import {
   displayBytes32,
   displayEmpty,
 } from "@/routes/app/proposals/$id/common-tables";
-import type { SystemContractUpgrade } from "validate-cli";
+import type { SystemContractUpgrade } from "@repo/ethereum-reports/reports/object-check-report";
 
 export default function SystemContractChangesTable({
   className,

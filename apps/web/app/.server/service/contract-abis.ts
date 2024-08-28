@@ -6,7 +6,7 @@ import {
   ZK_GOV_OPS_GOVERNOR_ABI,
   ZK_TOKEN_GOVERNOR_ABI,
 } from "@/utils/raw-abis";
-import { ContractAbi } from "validate-cli";
+import { ContractAbi } from "@repo/common/ethereum";
 
 export const upgradeHandlerAbi = new ContractAbi(PROTOCOL_UPGRADE_HANDLER_RAW_ABI);
 export const guardiansAbi = new ContractAbi(GUARDIANS_RAW_ABI);

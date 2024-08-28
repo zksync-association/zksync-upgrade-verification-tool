@@ -1,19 +1,24 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { type ContractsRepo, StringCheckReport, SystemContractList, ZkSyncEraDiff } from "../src";
+import { ContractAbi, type BlockExplorer } from "@repo/common/ethereum";
+import type { ContractsRepo } from "@repo/ethereum-reports/git-contracts-repo";
 import {
-  HEX_ZKSYNC_FIELDS,
+  type CheckReportObj,
+  ObjectCheckReport,
+} from "@repo/ethereum-reports/reports/object-check-report";
+import { StringCheckReport } from "@repo/ethereum-reports/reports/string-check-report";
+import { SystemContractList } from "@repo/ethereum-reports/system-contract-providers";
+import { ZkSyncEraDiff } from "@repo/ethereum-reports/zk-sync-era-diff";
+import {
   type L2ContractData,
-  NUMERIC_ZKSYNC_FIELDS,
   type ZkEraStateData,
   ZksyncEraState,
-} from "../src/lib/zksync-era-state";
-import { TestBlockExplorer } from "./utilities/test-block-explorer";
-import { ContractAbi } from "../src/lib/contract-abi";
-import type { BlockExplorer } from "../src";
-import { type Hex, hexToBigInt } from "viem";
-import { TestContractRepo } from "./utilities/test-contract-repo";
+  HEX_ZKSYNC_FIELDS,
+  NUMERIC_ZKSYNC_FIELDS,
+} from "@repo/ethereum-reports/zksync-era-state";
 import { Option } from "nochoices";
-import { type CheckReportObj, ObjectCheckReport } from "../src";
+import { type Hex, hexToBigInt } from "viem";
+import { beforeEach, describe, expect, it } from "vitest";
+import { TestBlockExplorer } from "./utilities/test-block-explorer.js";
+import { TestContractRepo } from "./utilities/test-contract-repo.js";
 
 interface Ctx {
   abi1: ContractAbi;
@@ -36,6 +41,7 @@ interface Ctx {
   diff: ZkSyncEraDiff;
 }
 
+// biome-ignore lint/suspicious/noShadowRestrictedNames: <explanation>
 function escape(str: string): string {
   return str.replace(/[\-\[\]\/{}()*+?.\\^$|]/g, "\\$&");
 }
@@ -50,6 +56,7 @@ describe("CheckReport", () => {
     ctx.sysAddr3 = "0x0000000000000000000000000000000000000007";
   });
 
+  // biome-ignore lint/suspicious/noDuplicateTestHooks: <explanation>
   beforeEach<Ctx>((ctx) => {
     const repo = new TestContractRepo("somegitsha", Option.Some("main"), {});
 
@@ -202,6 +209,7 @@ describe("CheckReport", () => {
     ctx.contractsRepo = repo;
   });
 
+  // biome-ignore lint/suspicious/noDuplicateTestHooks: <explanation>
   beforeEach<Ctx>((ctx) => {
     ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
       ctx.sysAddr1,
@@ -293,7 +301,7 @@ describe("CheckReport", () => {
         expect(line).not.toEqual(-1);
         expect(lines[line]).toContain(address);
         expect(lines[line + 1]).toContain(`Proposed: ${bytecodeHash}`);
-        expect(lines[line + 1]).toContain(`✔`);
+        expect(lines[line + 1]).toContain("✔");
       }
     });
 
@@ -505,6 +513,7 @@ describe("CheckReport", () => {
       for (const a of ctx.sysContractsAfter.slice(0, 2)) {
         repo.addHash(a.name, a.bytecodeHash);
       }
+      // biome-ignore lint/style/noNonNullAssertion: <explanation>
       repo.addHash(ctx.sysContractsAfter[2]!.name, "WrongHash");
 
       ctx.contractsRepo = repo;

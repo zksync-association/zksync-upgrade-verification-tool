@@ -21,9 +21,9 @@ import { badRequest, notFound } from "@/utils/http";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, useLoaderData } from "@remix-run/react";
+import { hexSchema } from "@repo/common/schemas";
 import { CircleCheckBig } from "lucide-react";
 import { getFormData, getParams } from "remix-params-helper";
-import { zodHex } from "validate-cli";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
 import ContractWriteButton from "./contract-write-button";
@@ -83,7 +83,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const data = await getFormData(
     request,
     z.object({
-      signature: zodHex,
+      signature: hexSchema,
       proposalId: z.number(),
       action: signActionSchema,
     })

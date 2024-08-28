@@ -1,5 +1,5 @@
+import { ContractData } from "@repo/common/ethereum";
 import { describe, it, expect } from "vitest";
-import { ContractData } from "../src/lib";
 
 describe("ContractData", () => {
   it("can remap keys", async () => {

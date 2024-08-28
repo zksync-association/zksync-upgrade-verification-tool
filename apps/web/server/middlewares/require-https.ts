@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { getHost } from "server/utils/get-host";
+import { getHost } from "../utils/get-host";
 
 export function requireHttps(req: Request, res: Response, next: NextFunction) {
   const proto = req.get("X-Forwarded-Proto");

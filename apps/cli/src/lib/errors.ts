@@ -1,4 +1,4 @@
-import type { Network } from "./constants.js";
+import type { Network } from "@repo/common/ethereum";
 import type { Terminal } from "./terminal.js";
 
 export class MissingRequiredProp extends Error {

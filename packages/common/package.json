@@ -1,21 +1,25 @@
 {
   "name": "@repo/common",
+  "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsc --watch",
-    "build": "tsc"
+    "typecheck": "tsc --noEmit",
+    "check": "biome check .",
+    "check:fix": "biome check --write ."
   },
   "exports": {
-    "./schemas": {
-      "types": "./src/schemas.ts",
-      "default": "./dist/schemas.js"
-    }
+    "./ethereum": "./src/ethereum/index.ts",
+    "./schemas": "./src/schemas/index.ts"
   },
   "dependencies": {
+    "nochoices": "^1.1.4",
     "viem": "^2.20.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.5.0",
     "typescript": "^5.5.4"
   }
 }

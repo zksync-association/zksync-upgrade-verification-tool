@@ -1,6 +1,5 @@
 import yargs, { type Argv } from "yargs";
 import { hideBin } from "yargs/helpers";
-import { NetworkSchema } from "./index.js";
 import {
   checkCommand,
   downloadCodeCommand,
@@ -11,6 +10,7 @@ import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
 import { Option } from "nochoices";
 import { failHandler } from "../commands/fail-handler.js";
+import { NetworkSchema } from "@repo/common/ethereum";
 
 export function buildCli(
   args: string[],

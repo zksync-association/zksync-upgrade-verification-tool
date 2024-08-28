@@ -1,6 +1,5 @@
+import { BlockExplorerClient, ExternalApiError } from "@repo/common/ethereum";
 import { beforeEach, describe, expect, it } from "vitest";
-import { BlockExplorerClient } from "../src";
-import { ExternalApiError } from "../src/lib/errors";
 
 describe("BlockExplorerClient", () => {
   describe("#getAbi", () => {

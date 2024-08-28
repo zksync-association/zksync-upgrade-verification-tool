@@ -1,7 +1,7 @@
 import { l1Rpc } from "@/.server/service/clients";
 import { guardiansAbi, scAbi, upgradeHandlerAbi } from "@/.server/service/contract-abis";
 import { env } from "@config/env.server";
-import { zodHex } from "validate-cli";
+import { hexSchema } from "@repo/common/schemas";
 import type { Hex } from "viem";
 import { z } from "zod";
 
@@ -13,7 +13,7 @@ export async function guardiansAddress(): Promise<Hex> {
     env.UPGRADE_HANDLER_ADDRESS,
     "guardians",
     upgradeHandlerAbi.raw,
-    zodHex
+    hexSchema
   );
 }
 
@@ -31,7 +31,7 @@ export async function councilAddress(): Promise<Hex> {
     env.UPGRADE_HANDLER_ADDRESS,
     "securityCouncil",
     upgradeHandlerAbi.raw,
-    zodHex
+    hexSchema
   );
 }
 

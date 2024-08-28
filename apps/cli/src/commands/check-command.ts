@@ -1,8 +1,10 @@
 import type { EnvBuilder } from "../lib/env-builder.js";
-import { DIAMOND_ADDRS, StringCheckReport, ZkSyncEraDiff, ZksyncEraState } from "../lib/index.js";
 import { hexToBytes } from "viem";
 import { withSpinner } from "../lib/with-spinner.js";
-import { MalformedUpgrade } from "../lib/errors.js";
+import { ZksyncEraState } from "@repo/ethereum-reports/zksync-era-state";
+import { ZkSyncEraDiff } from "@repo/ethereum-reports/zk-sync-era-diff";
+import { DIAMOND_ADDRS, MalformedUpgrade } from "@repo/common/ethereum";
+import { StringCheckReport } from "@repo/ethereum-reports/reports/string-check-report";
 
 export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
   const current = await withSpinner(

@@ -12,8 +12,8 @@ import {
   displayEmpty,
 } from "@/routes/app/proposals/$id/common-tables";
 import { cn } from "@/utils/cn";
-import type { FieldStorageChange } from "validate-cli";
-import type { ExtractedValue } from "validate-cli/dist/lib/reports/obj-storage-visitor";
+import type { ExtractedValue } from "@repo/ethereum-reports/reports/obj-storage-visitor";
+import type { FieldStorageChange } from "@repo/ethereum-reports/reports/object-storage-change-report";
 
 export default function FieldStorageChangesTable({
   className,

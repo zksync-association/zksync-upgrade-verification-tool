@@ -3,20 +3,20 @@ import { l1Explorer, l1Rpc, l2Explorer } from "@/.server/service/clients";
 import { ALL_ABIS } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 import { defaultLogger } from "@config/log.server";
+import { type BlockExplorerClient, DIAMOND_ADDRS, type Network } from "@repo/common/ethereum";
 import {
-  type BlockExplorerClient,
   type CheckReportObj,
-  DIAMOND_ADDRS,
-  type FieldStorageChange,
-  type Network,
   ObjectCheckReport,
+} from "@repo/ethereum-reports/reports/object-check-report";
+import {
+  type FieldStorageChange,
   ObjectStorageChangeReport,
-  RecordStorageSnapshot,
-  RpcStorageSnapshot,
-  StorageChanges,
-  ZkSyncEraDiff,
-  ZksyncEraState,
-} from "validate-cli";
+} from "@repo/ethereum-reports/reports/object-storage-change-report";
+import { RecordStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/record-storage-snapshot";
+import { RpcStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/rpc-storage-snapshot";
+import { StorageChanges } from "@repo/ethereum-reports/storage/storage-changes";
+import { ZkSyncEraDiff } from "@repo/ethereum-reports/zk-sync-era-diff";
+import { ZksyncEraState } from "@repo/ethereum-reports/zksync-era-state";
 import { type Hex, decodeAbiParameters, getAbiItem, hexToBytes } from "viem";
 
 const network = env.ETH_NETWORK === "local" ? "sepolia" : env.ETH_NETWORK;

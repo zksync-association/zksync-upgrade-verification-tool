@@ -1,5 +1,5 @@
 import { env } from "@config/env.server";
-import { BlockExplorerClient, RpcClient } from "validate-cli";
+import { BlockExplorerClient, RpcClient } from "@repo/common/ethereum";
 
 const network = env.ETH_NETWORK === "local" ? "sepolia" : env.ETH_NETWORK;
 

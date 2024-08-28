@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { failHandler } from "../src/commands/fail-handler";
+import { failHandler } from "../src/commands/fail-handler.js";
 import yargs from "yargs";
-import { EnvBuilder } from "../src/lib/env-builder";
-import { Terminal } from "../src/lib/terminal";
+import { EnvBuilder } from "../src/lib/env-builder.js";
+import { Terminal } from "../src/lib/terminal.js";
 import { Stream } from "node:stream";
 import {
   ContractNotVerified,
@@ -11,7 +11,7 @@ import {
   MissingNetwork,
   NotADir,
   NotAnUpgradeDir,
-} from "../src/lib/errors";
+} from "@repo/common/ethereum";
 
 const doNothing = () => {};
 

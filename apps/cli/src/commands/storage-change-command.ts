@@ -1,15 +1,20 @@
 import type { EnvBuilder } from "../lib/env-builder.js";
-import { DIAMOND_ADDRS, type UpgradeChanges, UpgradeImporter } from "../lib/index.js";
-import { StorageChanges } from "../lib/index.js";
 import type { Hex } from "viem";
 import { Option } from "nochoices";
-import { memoryDiffParser, type MemoryDiffRaw } from "../schema/rpc.js";
-import { StringStorageChangeReport } from "../lib/reports/string-storage-change-report.js";
-import { RpcStorageSnapshot } from "../lib/index.js";
-import { RecordStorageSnapshot } from "../lib/index.js";
-import { MAIN_CONTRACT_FIELDS } from "../lib/storage/storage-props.js";
-import { FacetsToSelectorsVisitor, ListOfAddressesExtractor } from "../lib/reports/extractors.js";
 import { withSpinner } from "../lib/with-spinner.js";
+import { DIAMOND_ADDRS } from "@repo/common/ethereum";
+import { type MemoryDiffRaw, memoryDiffParser } from "@repo/common/schemas";
+import {
+  ListOfAddressesExtractor,
+  FacetsToSelectorsVisitor,
+} from "@repo/ethereum-reports/reports/extractors";
+import { StringStorageChangeReport } from "@repo/ethereum-reports/reports/string-storage-change-report";
+import { RecordStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/record-storage-snapshot";
+import { RpcStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/rpc-storage-snapshot";
+import { StorageChanges } from "@repo/ethereum-reports/storage/storage-changes";
+import { MAIN_CONTRACT_FIELDS } from "@repo/ethereum-reports/storage/storage-props";
+import type { UpgradeChanges } from "@repo/ethereum-reports/upgrade-changes";
+import { UpgradeImporter } from "../lib/importer.js";
 
 async function getMemoryPath(
   preCalculatedPath: Option<string>,

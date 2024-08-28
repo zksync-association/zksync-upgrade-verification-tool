@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import type { Stats } from "node:fs";
-import { NotADir } from "./errors.js";
+import { NotADir } from "@repo/common/ethereum";
 
 export class FileSystem {
   async readFile(path: string): Promise<Buffer> {

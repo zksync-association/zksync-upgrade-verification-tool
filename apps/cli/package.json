@@ -8,11 +8,11 @@
     "pnpm": ">=8"
   },
   "scripts": {
-    "check": "pnpm biome check ./src",
-    "check:fix": "pnpm biome check ./src --write",
+    "check": "pnpm biome check",
+    "check:fix": "pnpm biome check --write",
     "start": "tsx src/entrypoint.ts",
-    "build": "tsc",
-    "watch": "tsc --watch",
+    "build": "tsx esbuild.ts",
+    "watch": "tsx esbuild.ts --watch",
     "test": "vitest run",
     "test:ci": "vitest run --coverage --coverage.reporter=lcov",
     "typecheck": "tsc --noEmit"
@@ -23,6 +23,7 @@
   "dependencies": {
     "@octokit/core": "^6.1.2",
     "@repo/common": "workspace:*",
+    "@repo/ethereum-reports": "workspace:*",
     "@swc/core": "1.7.6",
     "@types/yargs": "^17.0.32",
     "chalk": "^5.3.0",
@@ -44,6 +45,8 @@
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.1.0",
     "@vitest/coverage-v8": "^2.0.5",
+    "esbuild": "^0.23.1",
+    "esbuild-node-externals": "^1.14.0",
     "typescript": "5.5.4",
     "vitest": "^2.0.5"
   }

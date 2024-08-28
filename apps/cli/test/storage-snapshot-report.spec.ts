@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { SnapshotReport } from "../src/lib/reports/storage-snapshot-report";
-import { RecordStorageSnapshot } from "../src";
-import { BigNumberType } from "../src/lib/storage/types/big-number-type";
-import { ContractField } from "../src/lib/storage/contractField";
-import { BlobType } from "../src/lib/storage/types/blob-type";
-import { AddressType } from "../src/lib/storage/types/address-type";
 import { bytesToHex, hexToBigInt, hexToBytes, keccak256, numberToHex } from "viem";
-import { ArrayType } from "../src/lib/storage/types/array-type";
-import { StructType } from "../src/lib/storage/types/struct-type";
-import { MappingType } from "../src/lib/storage/mapping-type";
+import { SnapshotReport } from "@repo/ethereum-reports/reports/storage-snapshot-report";
+import { ContractField } from "@repo/ethereum-reports/storage/contractField";
+import { MappingType } from "@repo/ethereum-reports/storage/mapping-type";
+import { RecordStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/record-storage-snapshot";
+import { AddressType } from "@repo/ethereum-reports/storage/types/address-type";
+import { ArrayType } from "@repo/ethereum-reports/storage/types/array-type";
+import { BigNumberType } from "@repo/ethereum-reports/storage/types/big-number-type";
+import { BlobType } from "@repo/ethereum-reports/storage/types/blob-type";
+import { StructType } from "@repo/ethereum-reports/storage/types/struct-type";
 
 describe("SnapshotReport", () => {
   it("can return a number prop ", async () => {
@@ -174,7 +174,7 @@ value:
   });
 
   it("can return a struct mapping", async () => {
-    let key = hexToBytes("0x0000000000000000000000000000000000000000000000000000000000000001");
+    const key = hexToBytes("0x0000000000000000000000000000000000000000000000000000000000000001");
     const hashed = keccak256(
       Buffer.concat([
         key,
@@ -205,7 +205,7 @@ value:
   });
 
   it("formats correctly a map of structs with a list", async () => {
-    let key = hexToBytes("0x0000000000000000000000000000000000000000000000000000000000000001");
+    const key = hexToBytes("0x0000000000000000000000000000000000000000000000000000000000000001");
     const hashedMapping = keccak256(
       Buffer.concat([
         key,

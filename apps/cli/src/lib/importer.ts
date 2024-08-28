@@ -4,12 +4,16 @@ import {
   facetsSchema,
   l2UpgradeSchema,
   transactionsSchema,
-} from "../schema/index.js";
-import type { Network } from "./constants.js";
-import { MalformedUpgrade, MissingNetwork, NotAnUpgradeDir } from "./errors.js";
-import { UpgradeChanges } from "./upgrade-changes.js";
+} from "@repo/ethereum-reports/schema/index";
+import { UpgradeChanges } from "@repo/ethereum-reports/upgrade-changes";
 import type { FileSystem } from "./file-system.js";
 import type { z, ZodType } from "zod";
+import {
+  MalformedUpgrade,
+  MissingNetwork,
+  NotAnUpgradeDir,
+  type Network,
+} from "@repo/common/ethereum";
 
 const POSSIBLE_DIRS_PER_NETWORK = {
   mainnet: ["mainnet", "mainnet2"],

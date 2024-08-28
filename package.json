@@ -12,7 +12,10 @@
     "check": "turbo check",
     "check:fix": "turbo check:fix",
     "typecheck": "turbo typecheck",
-    "ci:fix": "turbo ci:fix"
+    "ci:fix": "turbo ci:fix",
+    "dev:web": "turbo web#dev",
+    "clean": "./scripts/clean.sh"
+
   },
   "devDependencies": {
     "@biomejs/biome": "1.8.3",

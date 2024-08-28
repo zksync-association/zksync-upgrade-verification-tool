@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildCli } from "../src/lib";
-import type { EnvBuilder } from "../src/lib/env-builder";
 import type { Option } from "nochoices";
 import type { Argv } from "yargs";
+import { buildCli } from "../src/lib/cli.js";
+import type { EnvBuilder } from "../src/lib/env-builder.js";
 
 const fail = () => expect.fail("should not be called");
 

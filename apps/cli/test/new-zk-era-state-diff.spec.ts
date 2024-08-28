@@ -1,21 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { ZkSyncEraDiff } from "../src/index";
-import {
-  type ZkEraStateData,
-  ZksyncEraState,
-  type NumberEraPropNames,
-  type HexEraPropName,
-  type L2ContractData,
-} from "../src/lib/zksync-era-state";
-import { MissingRequiredProp } from "../src/lib/errors";
 import { type Hex, hexToBigInt } from "viem";
-import { BlockExplorerClient, type FacetData } from "../src/lib";
 import { Option } from "nochoices";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { SystemContractList } from "../src/index";
-import { RpcClient } from "../src/index";
 import { bytesToBigint } from "viem/utils";
+import {
+  ZksyncEraState,
+  type HexEraPropName,
+  type L2ContractData,
+  type NumberEraPropNames,
+  type ZkEraStateData,
+} from "@repo/ethereum-reports/zksync-era-state";
+import { MissingRequiredProp, BlockExplorerClient, RpcClient } from "@repo/common/ethereum";
+import { SystemContractList } from "@repo/ethereum-reports/system-contract-providers";
+import type { FacetData } from "@repo/ethereum-reports/upgrade-changes";
+import { ZkSyncEraDiff } from "@repo/ethereum-reports/zk-sync-era-diff";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): ZkSyncEraDiff {
@@ -75,7 +74,7 @@ describe("NewZkSyncStateDiff", () => {
     ];
     for (const propertyName of propertyNames) {
       describe(propertyName, () => {
-        it(`shows changes when both present`, () => {
+        it("shows changes when both present", () => {
           const oldData = 1n;
           const newData = 10n;
 

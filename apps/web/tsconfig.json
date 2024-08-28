@@ -1,4 +1,12 @@
 {
+  "extends": "@repo/typescript-config/remix.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./app/*"],
+      "@config/*": ["./config/*"],
+      "@server/*": ["./server/*"]
+    }
+  },
   "include": [
     "**/*.ts",
     "**/*.tsx",
@@ -10,36 +18,5 @@
     "**/*.mjs",
     "**/*.cjs"
   ],
-  "exclude": ["build", "node_modules", "server-build"],
-  "compilerOptions": {
-    "lib": ["DOM", "DOM.Iterable", "ES2022"],
-    "types": [
-      "@remix-run/node",
-      "vite/client",
-      "vitest/globals",
-      "react",
-      "@vitest/browser/providers/playwright"
-    ],
-    "isolatedModules": true,
-    "esModuleInterop": true,
-    "jsx": "react-jsx",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "resolveJsonModule": true,
-    "target": "ES2022",
-    "strict": true,
-    "allowJs": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./app/*"],
-      "@config/*": ["./config/*"],
-      "@server/*": ["./server/*"]
-    },
-    "noUncheckedIndexedAccess": true,
-
-    // Vite takes care of building everything, not tsc.
-    "noEmit": true
-  }
+  "exclude": ["build", "node_modules", "server-build"]
 }
