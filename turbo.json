@@ -5,18 +5,7 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "build/**", "server-build/**"]
     },
-    "check": {},
-    "check:fix": {},
     "typecheck": {},
-    "test": {
-      "dependsOn": ["typecheck", "check"]
-    },
-    "ci:fix": {
-      "dependsOn": ["typecheck", "check:fix"]
-    },
-    "web#dev": {
-      "cache": false,
-      "persistent": true
-    }
+    "test": {}
   }
 }

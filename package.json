@@ -13,7 +13,6 @@
     "check:fix": "biome check --write",
     "typecheck": "turbo typecheck",
     "ci:fix": "turbo ci:fix",
-    "dev:web": "turbo web#dev",
     "clean": "./scripts/clean.sh"
   },
   "devDependencies": {
