@@ -88,13 +88,13 @@ export class UpgradeImporter {
 
     try {
       json = JSON.parse(fileContent);
-    } catch (e) {
+    } catch (_e) {
       throw new MalformedUpgrade(`"${filePath}" expected to be a json but it's not.`);
     }
 
     try {
       return parser.parse(json);
-    } catch (e) {
+    } catch (_e) {
       throw new MalformedUpgrade(`"${filePath}" does not follow expected schema.`);
     }
   }

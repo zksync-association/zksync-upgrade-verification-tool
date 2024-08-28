@@ -34,8 +34,7 @@ subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, hre) => {
   const l1Contracts = path.join(ZK_GOV_PATH, "l1-contracts", "src", "**", "*.sol");
   const l2Contracts = path.join(ZK_GOV_PATH, "l2-contracts", "src", "**", "*.sol");
   const devContracts = path.join(hre.config.paths.sources, "local-contracts", "**", "*.sol");
-  const contractPaths = glob.sync([l1Contracts, l2Contracts, devContracts]);
-  return contractPaths;
+  return glob.sync([l1Contracts, l2Contracts, devContracts]);
 });
 
 const forkUrl = process.env.FORK_URL;
@@ -54,9 +53,11 @@ const config: HardhatUserConfig = {
   },
   networks: {
     remote: {
+      chainId: 11155111,
       url: process.env.L1_RPC_URL || "ENV_VAR_L1_RPC_URL_MISSING",
     },
     local: {
+      chainId: 11155111,
       url: "http://localhost:8545",
       allowUnlimitedContractSize: true,
     },
@@ -71,7 +72,9 @@ const config: HardhatUserConfig = {
         url: forkUrl,
       },
       accounts: {
-        mnemonic: "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
+        mnemonic:
+          process.env.MNEMONIC ||
+          "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
       },
     },
   },

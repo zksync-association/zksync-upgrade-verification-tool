@@ -25,15 +25,96 @@ import { guardiansAbi } from "@/.server/service/contract-abis";
 import { getFreezeProposalSignatureArgs } from "@/common/freeze-proposal";
 import { getL2CancellationSignatureArgs } from "@/common/l2-cancellations";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
-import type { SignAction } from "@/common/sign-action";
+import { type SignAction, signActionSchema } from "@/common/sign-action";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
 import { env } from "@config/env.server";
 import { type InferSelectModel, and, asc, eq } from "drizzle-orm";
-import { type Hex, hashTypedData, hexToBigInt } from "viem";
+import { type AbiFunction, type Hex, hashTypedData, hexToBigInt, verifyTypedData } from "viem";
 import { mainnet, sepolia } from "wagmi/chains";
 import { z } from "zod";
+
+function createTypedDigest({
+  verifierAddr,
+  action,
+  contractName,
+  types,
+  message,
+}: {
+  verifierAddr: Hex;
+  action: SignAction;
+  contractName: string;
+  types: { name: string; type: string }[];
+  message: { [_key: string]: any };
+}) {
+  return hashTypedData({
+    domain: {
+      name: contractName,
+      version: "1",
+      chainId: env.ETH_NETWORK === "mainnet" ? mainnet.id : sepolia.id,
+      verifyingContract: verifierAddr,
+    },
+    primaryType: action,
+    message,
+    types: {
+      [action]: types,
+    },
+  });
+}
+
+async function isValidSignatureZkFoundation(
+  foundationAddress: Hex,
+  signature: Hex,
+  verifierAddr: Hex,
+  action: SignAction,
+  message: Record<string, string>,
+  types: { name: string; type: string }[],
+  contractName: string
+): Promise<boolean> {
+  const digest = createTypedDigest({
+    verifierAddr,
+    action,
+    message,
+    types,
+    contractName,
+  });
+  const code = await l1Rpc.getByteCode(foundationAddress);
+
+  if (code === undefined) {
+    return verifyTypedData({
+      domain: {
+        name: contractName,
+        version: "1",
+        chainId: env.ETH_NETWORK === "mainnet" ? mainnet.id : sepolia.id,
+        verifyingContract: verifierAddr,
+      },
+      primaryType: action,
+      message,
+      types: {
+        [action]: types,
+      },
+      signature,
+      address: foundationAddress,
+    });
+  }
+
+  const IERC1271Abi: AbiFunction = {
+    name: "isValidSignature",
+    inputs: [
+      { name: "hash", type: "bytes32" },
+      { name: "signature", type: "bytes" },
+    ],
+    outputs: [{ name: "magicValue", type: "bytes4" }],
+    type: "function",
+    stateMutability: "view",
+  };
+
+  return await l1Rpc.contractRead(foundationAddress, "isValidSignature", [IERC1271Abi], z.any(), [
+    digest,
+    signature,
+  ]);
+}
 
 async function verifySignature({
   signer,
@@ -54,18 +135,12 @@ async function verifySignature({
   message: { [_key: string]: any };
   targetContract: Hex;
 }) {
-  const digest = hashTypedData({
-    domain: {
-      name: contractName,
-      version: "1",
-      chainId: env.ETH_NETWORK === "mainnet" ? mainnet.id : sepolia.id,
-      verifyingContract: verifierAddr,
-    },
-    primaryType: action,
+  const digest = createTypedDigest({
+    verifierAddr,
+    action,
     message,
-    types: {
-      [action]: types,
-    },
+    types,
+    contractName,
   });
 
   try {
@@ -152,9 +227,21 @@ export async function saveEmergencySignature(
       }
       break;
     }
-    case "ExecuteEmergencyUpgradeZKFoundation":
-      // TODO: Check how to validate this signature.
+    case "ExecuteEmergencyUpgradeZKFoundation": {
+      const isValid = await isValidSignatureZkFoundation(
+        await zkFoundationAddress(),
+        signature,
+        await emergencyBoardAddress(),
+        signActionSchema.enum.ExecuteEmergencyUpgradeZKFoundation,
+        { id: emergencyProposalId },
+        [{ name: "id", type: "bytes32" }],
+        "EmergencyUpgradeBoard"
+      );
+      if (!isValid) {
+        throw badRequest("Invalid signature provided");
+      }
       break;
+    }
     default:
       throw badRequest(`Unknown signature action: ${action}`);
   }

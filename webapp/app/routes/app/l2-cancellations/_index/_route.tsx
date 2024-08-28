@@ -1,4 +1,4 @@
-import { getZkGovOpsProposals } from "@/.server/service/l2-cancellations";
+import { getUpdatedL2Cancellations } from "@/.server/service/l2-cancellations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -16,15 +16,15 @@ import { ArrowRight } from "lucide-react";
 import { $path } from "remix-routes";
 
 export async function loader() {
-  const proposals = await getZkGovOpsProposals();
+  const proposals = await getUpdatedL2Cancellations();
   return json({ proposals });
 }
 
 export default function L2Proposals() {
   const { proposals } = useLoaderData<typeof loader>();
 
-  const activeProposals = proposals.filter((p) => p.transactionHash === null);
-  const inactiveProposals = proposals.filter((p) => p.transactionHash !== null);
+  const activeProposals = proposals.filter((p) => p.status === "ACTIVE");
+  const inactiveProposals = proposals.filter((p) => p.status !== "ACTIVE");
 
   return (
     <div className="space-y-4">

@@ -1,8 +1,21 @@
 import hre from "hardhat";
-import { hexToBigInt, padHex, parseEther, zeroAddress } from "viem";
+import {
+  encodeFunctionData,
+  getAddress,
+  type Hex,
+  hexToBigInt,
+  padHex,
+  parseEther,
+  zeroAddress,
+} from "viem";
 import dotenv from "dotenv";
 import fs from "node:fs/promises";
 import { mnemonicToAccount } from "viem/accounts";
+import {
+  ALL_COUNCIL_INDEXES,
+  ALL_GUARDIAN_INDEXES,
+  DERIVATION_INDEXES,
+} from "../helpers/constants.js";
 
 dotenv.config();
 
@@ -53,7 +66,6 @@ async function main() {
     scAddresses,
   ]);
   console.log("SecurityCouncil deployed to:", securityCouncilAddress);
-
   const { address: emergencyBoardAddress } = await hre.viem.deployContract(
     "EmergencyUpgradeBoard",
     [handlerAddress, securityCouncilAddress, guardianAddress, zkFoundationAddress]
@@ -87,7 +99,7 @@ async function main() {
   });
   await testClient.stopImpersonatingAccount({ address: handlerAddress });
 
-  const { address: counterAddress } = await hre.viem.deployContract(
+  const { address: counterAddress, abi: counterAbi } = await hre.viem.deployContract(
     "contracts/local-contracts/dev/Counter.sol:Counter",
     []
   );
@@ -124,7 +136,7 @@ async function main() {
       token: zkToken.address,
       timelock: zeroAddress,
       initialVotingDelay: 0,
-      initialVotingPeriod: 100,
+      initialVotingPeriod: 100000,
       initialProposalThreshold: 0,
       initialQuorum: 0,
       initialVoteExtension: 0,
@@ -139,7 +151,7 @@ async function main() {
       token: zkToken.address,
       timelock: zeroAddress,
       initialVotingDelay: 0,
-      initialVotingPeriod: 100,
+      initialVotingPeriod: 100000,
       initialProposalThreshold: 0,
       initialQuorum: 0,
       initialVoteExtension: 0,
@@ -151,17 +163,45 @@ async function main() {
   console.log("ZkTokenGovernor deployed to:", zkTokenGovernor.address);
 
   await zkGovOpsGovernor.write.propose([[zeroAddress], [0n], ["0x"], "Test GovOps proposal"]);
-  // await zkTokenGovernor.write.propose([[zeroAddress], [0n], ["0x"], "Test Token proposal"]);
+  await zkTokenGovernor.write.propose([
+    [zeroAddress, zeroAddress],
+    [0n, 0n],
+    ["0x", "0x"],
+    "Test Token proposal",
+  ]);
 
   addressesContent += `ZkGovOpsGovernor: ${zkGovOpsGovernor.address}\n`;
-  // addressesContent += `ZkTokenGovernor: ${zkTokenGovernor.address}\n`;
+  addressesContent += `ZkTokenGovernor: ${zkTokenGovernor.address}\n`;
+
+  const calldata = encodeFunctionData({
+    abi: counterAbi,
+    functionName: "setNumber",
+    args: [12n],
+  });
+  // It's useful to have a calldata at hand that does something easy to check to verify upgrade execution.
+  addressesContent += `\nRealistic calldata: ${calldata}\n`;
 
   await fs.writeFile("addresses.txt", addressesContent);
   console.log("Addresses saved to addresses.txt");
 }
 
-function range(from: number, to: number): number[] {
-  return new Array(to - from).fill(0).map((_, i) => i + from);
+function deriveMembers(extrasEnvVar: string, indexes: number[], mnemonic: string): Hex[] {
+  // In case special addresses want to be used, these can be defined in env vars.
+  const extras = (process.env[extrasEnvVar] || "")
+    .split(",")
+    .filter((str) => str.length !== 0)
+    .map((str) => str.trim()) as Hex[];
+
+  // Derive all addresses from mnemonic
+  const derived = indexes
+    .map((n) => mnemonicToAccount(mnemonic, { addressIndex: n }))
+    .map((hd) => hd.address);
+
+  // Addresses from env var take priority, but only the right amount of addresses is kept.
+  const final = [...extras, ...derived].slice(0, indexes.length);
+
+  // Contract require addresses to be sorted.
+  return final.sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b)));
 }
 
 function deriveAllAddresses() {
@@ -170,36 +210,18 @@ function deriveAllAddresses() {
     throw new Error("Missing MNEMONIC env var");
   }
 
-  const firstCouncil = mnemonicToAccount(mnemonic, {
-    addressIndex: 0,
-  });
-
-  const firstGuardian = mnemonicToAccount(mnemonic, {
-    addressIndex: 1,
-  });
-
   const zkAssociation = mnemonicToAccount(mnemonic, {
-    addressIndex: 2,
-  });
-
-  const visitor = mnemonicToAccount(mnemonic, {
-    addressIndex: 3,
-  });
-
-  const restCouncil = range(4, 4 + 11).map((n) => mnemonicToAccount(mnemonic, { addressIndex: n }));
-  const restGuardians = range(4 + 11, 4 + 11 + 7).map((n) =>
-    mnemonicToAccount(mnemonic, { addressIndex: n })
-  );
+    addressIndex: DERIVATION_INDEXES.ZK_FOUNDATION,
+  }).address;
+  const visitor = mnemonicToAccount(mnemonic, { addressIndex: DERIVATION_INDEXES.VISITOR }).address;
 
   return {
-    council: [firstCouncil, ...restCouncil]
-      .map((hd) => hd.address)
-      .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b))),
-    guardians: [firstGuardian, ...restGuardians]
-      .map((hd) => hd.address)
-      .sort((a, b) => Number(hexToBigInt(a) - hexToBigInt(b))),
-    zkAssociation: zkAssociation.address,
-    visitor: visitor.address,
+    council: deriveMembers("EXTRA_COUNCIL", ALL_COUNCIL_INDEXES, mnemonic),
+    guardians: deriveMembers("EXTRA_GUARDIANS", ALL_GUARDIAN_INDEXES, mnemonic),
+    zkAssociation: process.env.EXTRA_ZK_FOUNDATION
+      ? getAddress(process.env.EXTRA_ZK_FOUNDATION)
+      : zkAssociation,
+    visitor: visitor,
   };
 }
 

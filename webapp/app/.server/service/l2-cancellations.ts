@@ -2,19 +2,30 @@ import {
   type L2CancellationType,
   l2CancellationStatusEnum,
   l2CancellationTypeEnum,
+  type l2CancellationsTable,
 } from "@/.server/db/schema";
 import { guardiansAddress } from "@/.server/service/contracts";
 import { hexSchema } from "@/common/basic-schemas";
 import { bigIntMax } from "@/utils/bigint";
 import { badRequest, notFound } from "@/utils/http";
-import { L2_CANCELATION_STATES } from "@/utils/l2-cancellation-states";
+import {
+  type L2_CANCELLATION_STATES,
+  isValidCancellationState,
+} from "@/utils/l2-cancellation-states";
 import { ALL_ABIS, ZK_GOV_OPS_GOVERNOR_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
+import type { InferSelectModel } from "drizzle-orm";
 import { type Address, type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
-import { createOrIgnoreL2Cancellation, getActiveL2Cancellations } from "../db/dto/l2-cancellations";
+import {
+  createOrIgnoreL2Cancellation,
+  existActiveProposalWithNonce,
+  getL2CancellationByExternalId,
+  getL2Cancellations,
+  updateL2Cancellation,
+} from "../db/dto/l2-cancellations";
 import { l1Rpc, l2Rpc } from "./clients";
 import { zkGovOpsGovernorAbi } from "./contract-abis";
 
@@ -32,6 +43,26 @@ const eventSchema = z.object({
     description: z.string(),
   }),
 });
+
+function blocksInADay() {
+  if (env.ETH_NETWORK === "mainnet" || env.ETH_NETWORK === "local") {
+    return 24 * 3600; // 24 hours, 1 block per second
+  }
+  return 24 * (3600 / 20); // 20 seconds per block.
+}
+
+async function getL2ProposalState(
+  type: L2CancellationType,
+  proposalId: Hex
+): Promise<L2_CANCELLATION_STATES> {
+  return l2Rpc.contractRead(
+    getL2GovernorAddress(type),
+    "state",
+    ZK_GOV_OPS_GOVERNOR_ABI,
+    z.number(),
+    [proposalId]
+  );
+}
 
 async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigint) {
   const proposalCreatedLogsPromise = l2Rpc
@@ -115,19 +146,10 @@ async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigi
   );
 
   const states = await Promise.all(
-    activeProposals.map((p) =>
-      l2Rpc.contractRead(getL2GovernorAddress(type), "state", ZK_GOV_OPS_GOVERNOR_ABI, z.number(), [
-        p.proposalId,
-      ])
-    )
+    activeProposals.map((p) => getL2ProposalState(p.type, p.proposalId))
   );
 
-  const activeProposalWithStates = activeProposals.filter(
-    (_, i) =>
-      states[i] === L2_CANCELATION_STATES.Active || states[i] === L2_CANCELATION_STATES.Pending
-  );
-
-  return activeProposalWithStates;
+  return activeProposals.filter((_, i) => isValidCancellationState(states[i]));
 }
 
 export async function getActiveL2Proposals() {
@@ -138,12 +160,12 @@ export async function getActiveL2Proposals() {
   // - 7 days vote delay period
   // - 7 days voting period
   // - 7 days optional extended voting period
-  // Another 7 days is added in the calculation to have a conservative
+  // Another 3 days is added in the calculation to have a conservative
   // estimation of the oldest block with a valid proposal.
   // Max proposal time is calculated in blocks, 1 second per block in L2,
   // therefore 3600 blocks per hour.
   // const maxProposalLifetimeInBlocks = BigInt((21 + 7) * 24 * 3600); // conservative estimation of oldest block with a valid proposal
-  const maxProposalLifetimeInBlocks = BigInt(3000); // FIXME: max value to use in sepolia, should be changed for mainnet
+  const maxProposalLifetimeInBlocks = BigInt((21 + 3) * blocksInADay());
 
   const from = bigIntMax(currentBlock - maxProposalLifetimeInBlocks, 1n);
   const govOpsProposals = await fetchProposalsFromL2Governor(
@@ -157,8 +179,14 @@ export async function getActiveL2Proposals() {
   return [...govOpsProposals, ...tokenProposals];
 }
 
-async function getL2VetoNonce(): Promise<bigint> {
-  return l1Rpc.contractRead(await guardiansAddress(), "nonce", ALL_ABIS.guardians, z.bigint());
+export async function getL2VetoNonce(): Promise<number> {
+  const bigIntNonce = await l1Rpc.contractRead(
+    await guardiansAddress(),
+    "nonce",
+    ALL_ABIS.guardians,
+    z.bigint()
+  );
+  return Number(bigIntNonce);
 }
 
 export async function createVetoProposalFor(
@@ -166,7 +194,8 @@ export async function createVetoProposalFor(
   l2GasLimit: Hex,
   l2GasPerPubdataByteLimit: Hex,
   refundRecipient: Hex,
-  txMintValue: Hex
+  txMintValue: Hex,
+  newNonce: number
 ) {
   const allActive = await getActiveL2Proposals();
   const proposalData = allActive.find((activeProposal) => activeProposal.proposalId === id);
@@ -174,7 +203,15 @@ export async function createVetoProposalFor(
     throw notFound();
   }
 
-  const nonce = await getL2VetoNonce();
+  const currentNonce = await getL2VetoNonce();
+
+  if (newNonce < currentNonce) {
+    throw badRequest("Nonce too low.");
+  }
+
+  if (await existActiveProposalWithNonce(newNonce)) {
+    throw badRequest(`There is already an active proposal with ${newNonce} as nonce`);
+  }
 
   await db.transaction(async (tx) => {
     const l2Cancellation = await createOrIgnoreL2Cancellation(
@@ -183,7 +220,7 @@ export async function createVetoProposalFor(
         proposer: proposalData.proposer,
         description: proposalData.description,
         type: proposalData.type,
-        nonce: Number(nonce),
+        nonce: newNonce,
         status: l2CancellationStatusEnum.enum.ACTIVE,
         txRequestGasLimit: l2GasLimit,
         txRequestTo: getL2GovernorAddress(proposalData.type),
@@ -216,8 +253,11 @@ export async function createVetoProposalFor(
   });
 }
 
-export async function getZkGovOpsProposals() {
-  return getActiveL2Cancellations();
+export async function getUpdatedL2Cancellations() {
+  const currentNonce = await getL2VetoNonce();
+  return await getL2Cancellations().then((cancellations) =>
+    Promise.all(cancellations.map((c) => upgradeCancellationStatus(c, currentNonce)))
+  );
 }
 
 export function getL2GovernorAddress(proposalType: L2CancellationType) {
@@ -233,4 +273,45 @@ export function getL2GovernorAddress(proposalType: L2CancellationType) {
       throw badRequest("Invalid proposalType");
   }
   return l2GovernorAddress;
+}
+
+export async function getAndUpdateL2CancellationByExternalId(
+  externalId: Hex
+): Promise<InferSelectModel<typeof l2CancellationsTable>> {
+  const proposal = await getL2CancellationByExternalId(externalId);
+  if (!proposal) {
+    throw notFound();
+  }
+
+  return await upgradeCancellationStatus(proposal, await getL2VetoNonce());
+}
+
+async function upgradeCancellationStatus(
+  cancellation: InferSelectModel<typeof l2CancellationsTable>,
+  currentNonce: number
+): Promise<InferSelectModel<typeof l2CancellationsTable>> {
+  if (cancellation.status !== l2CancellationStatusEnum.enum.ACTIVE) {
+    return cancellation;
+  }
+
+  if (hexSchema.safeParse(cancellation.transactionHash).success) {
+    cancellation.status = l2CancellationStatusEnum.enum.DONE;
+    await updateL2Cancellation(cancellation.id, cancellation);
+    return cancellation;
+  }
+
+  const state = await getL2ProposalState(cancellation.type, cancellation.externalId);
+  if (!isValidCancellationState(state)) {
+    cancellation.status = l2CancellationStatusEnum.enum.L2_PROPOSAL_EXPIRED;
+    await updateL2Cancellation(cancellation.id, cancellation);
+    return cancellation;
+  }
+
+  if (cancellation.nonce < currentNonce) {
+    cancellation.status = l2CancellationStatusEnum.enum.NONCE_TOO_LOW;
+    await updateL2Cancellation(cancellation.id, cancellation);
+    return cancellation;
+  }
+
+  return cancellation;
 }

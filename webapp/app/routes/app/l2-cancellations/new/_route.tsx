@@ -1,4 +1,9 @@
-import { createVetoProposalFor, getActiveL2Proposals } from "@/.server/service/l2-cancellations";
+import { getMaxRegisteredNonce } from "@/.server/db/dto/l2-cancellations";
+import {
+  createVetoProposalFor,
+  getActiveL2Proposals,
+  getL2VetoNonce,
+} from "@/.server/service/l2-cancellations";
 import { addressSchema, hexSchema } from "@/common/basic-schemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,15 +30,24 @@ import { badRequest } from "@/utils/http";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type ActionFunctionArgs, defer, redirect } from "@remix-run/node";
 import { Await, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form as RemixForm } from "@remix-run/react";
 import { Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { numberToHex } from "viem";
+import { useAccount } from "wagmi";
 import { z } from "zod";
 
 export async function loader() {
-  return defer({ activeL2Proposals: getActiveL2Proposals() });
+  const maybeBiggestNonce = await getMaxRegisteredNonce();
+  const biggestNonce = maybeBiggestNonce === null ? -1 : maybeBiggestNonce;
+  const currentNonce = await getL2VetoNonce();
+  return defer({
+    activeL2Proposals: getActiveL2Proposals(),
+    currentNonce: currentNonce,
+    suggestedNonce: Math.max(currentNonce, biggestNonce + 1),
+  });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -45,6 +59,7 @@ export async function action({ request }: ActionFunctionArgs) {
       l2GasPerPubdataByteLimit: z.coerce.number(),
       refundRecipient: addressSchema,
       txMintValue: z.coerce.number(),
+      nonce: z.coerce.number(),
     })
   );
   if (!parsed.success) {
@@ -55,7 +70,8 @@ export async function action({ request }: ActionFunctionArgs) {
     numberToHex(parsed.data.l2GasLimit),
     numberToHex(parsed.data.l2GasPerPubdataByteLimit),
     parsed.data.refundRecipient,
-    numberToHex(parsed.data.txMintValue)
+    numberToHex(parsed.data.txMintValue),
+    parsed.data.nonce
   );
   return redirect($path("/app/l2-cancellations"));
 }
@@ -68,16 +84,26 @@ const schema = z.object({
   }),
   refundRecipient: addressSchema,
   txMintValue: z.coerce.number({ message: "Transaction mint value must be a number" }),
+  nonce: z.coerce.number({ message: "Nonce value must be a number" }),
 });
 type Schema = z.infer<typeof schema>;
 
-const defaultValues = {};
-
 export default function NewL2GovernorVeto() {
-  const { activeL2Proposals } = useLoaderData<typeof loader>();
+  const { activeL2Proposals, currentNonce, suggestedNonce } = useLoaderData<typeof loader>();
+  const { address } = useAccount();
   const form = useForm<Schema>({
-    resolver: zodResolver(schema),
-    defaultValues,
+    resolver: zodResolver(
+      schema.extend({
+        nonce: z.coerce.number().min(currentNonce),
+      })
+    ),
+    defaultValues: {
+      nonce: suggestedNonce,
+      l2GasLimit: 80000000,
+      l2GasPerPubdataByteLimit: 800,
+      refundRecipient: address,
+      txMintValue: 1000000000000000,
+    },
     mode: "onTouched",
   });
   const navigation = useNavigation();
@@ -95,7 +121,7 @@ export default function NewL2GovernorVeto() {
         {(activeL2Proposals) => (
           <div>
             <Form {...form}>
-              <form method="POST" className="space-y-4">
+              <RemixForm method="POST" className="space-y-4">
                 <Card className="pb-10">
                   <CardHeader>
                     <CardTitle>1. Select an active proposal</CardTitle>
@@ -213,13 +239,30 @@ export default function NewL2GovernorVeto() {
                         </FormItem>
                       )}
                     />
+
+                    <FormField
+                      control={form.control}
+                      name="nonce"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nonce</FormLabel>
+                          <FormControl>
+                            <Input type="number" min={currentNonce} {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            The ether minted on L2 in this L1 {"->"} L2 transaction.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </CardContent>
                 </Card>
 
                 <Button disabled={!form.formState.isValid} loading={navigation.state !== "idle"}>
                   Create Veto Proposal
                 </Button>
-              </form>
+              </RemixForm>
             </Form>
           </div>
         )}
