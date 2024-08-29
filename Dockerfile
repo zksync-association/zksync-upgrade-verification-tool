@@ -23,5 +23,5 @@ RUN pnpm run build
 ENV SERVER_PORT=3000
 EXPOSE 3000
 
-WORKDIR /app/webapp
+WORKDIR /app/apps/web
 CMD ["node", "./server-build/index.js"]
