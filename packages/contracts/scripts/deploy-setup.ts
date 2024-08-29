@@ -81,7 +81,7 @@ async function main() {
   });
 
   if (handlerSigner === undefined) {
-    throw new Error("handlerSigner should be present")
+    throw new Error("handlerSigner should be present");
   }
 
   await handlerSigner.writeContract({
