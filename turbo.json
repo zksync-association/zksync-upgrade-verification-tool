@@ -9,6 +9,9 @@
     "@repo/contracts#typecheck": {
       "dependsOn": ["@repo/contracts#build"]
     },
+    "web#typecheck": {
+      "dependsOn": ["web#build"]
+    },
     "test": {}
   }
 }
