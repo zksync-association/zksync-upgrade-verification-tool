@@ -1,3 +1,0 @@
-[submodule "packages/contracts/src/zk-gov"]
-	path = packages/contracts/src/zk-gov
-	url = git@github.com:zksync-association/zk-governance.git
