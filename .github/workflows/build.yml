@@ -127,9 +127,6 @@ jobs:
 
   test-local:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: e2e
     steps:
       - uses: actions/checkout@v4
         with:
@@ -139,14 +136,17 @@ jobs:
         with:
           node-version: 22
           cache: "pnpm"
-      - run: cp .env.example .env
       - run: pnpm install
-      - run: pnpm env:up
-      - run: pnpm deploy:setup
-      - run: pnpm test:local
+      - run: cd packages/e2e && cp .env.example .env
+      - run: cd packages/contracts && pnpm env:up
+      - run: cd packages/contracts && pnpm deploy:setup
+      - run: cd packages/e2e && pnpm test:local
       - name: Stop local environment
         if: always()
-        run: pnpm env:down
+        run: cd packages/contracts && pnpm env:down
+      - name: Hardhat node logs
+        if: always()
+        run: cat packages/contracts/.hardhat.log
 
   docker-build:
     runs-on: ubuntu-latest
