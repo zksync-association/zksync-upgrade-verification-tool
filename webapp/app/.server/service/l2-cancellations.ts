@@ -51,16 +51,8 @@ function blocksInADay() {
   return 24 * (3600 / 20); // 20 seconds per block.
 }
 
-async function getL2ProposalState(
-  address: Hex,
-  proposalId: Hex): Promise<L2_CANCELLATION_STATES> {
-  return l2Rpc.contractRead(
-    address,
-    "state",
-    ZK_GOV_OPS_GOVERNOR_ABI,
-    z.number(),
-    [proposalId]
-  );
+async function getL2ProposalState(address: Hex, proposalId: Hex): Promise<L2_CANCELLATION_STATES> {
+  return l2Rpc.contractRead(address, "state", ZK_GOV_OPS_GOVERNOR_ABI, z.number(), [proposalId]);
 }
 
 async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigint) {
