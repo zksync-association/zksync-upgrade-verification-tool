@@ -2,7 +2,7 @@ services:
   hh-node:
     platform: linux/amd64
     image: upgrade-checker:local
-    command:  sh -c "cd .. && cd e2e && pnpm hardhat node"
+    command:  sh -c "cd .. && cd .. && cd packages && cd contracts && pnpm hardhat node"
     ports:
       - "8545:8545"
     env_file:
@@ -17,7 +17,7 @@ services:
   hh-deploy:
     platform: linux/amd64
     image: upgrade-checker:local
-    command: sh -c "cd .. && cd e2e && pnpm deploy:setup:remote"
+    command: sh -c "cd .. && cd .. && cd packages && cd contracts && pnpm deploy:setup:remote"
     env_file:
       - .env
     environment:
@@ -57,7 +57,7 @@ services:
     image: upgrade-checker:local
     platform: linux/amd64
     env_file:
-      - ../webapp/.env
+      - ../../apps/web/.env
     environment:
       DATABASE_URL: postgresql://user:password@db:5432/webapp
       L1_RPC_URL: http://hh-node:8545
