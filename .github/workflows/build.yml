@@ -143,10 +143,8 @@ jobs:
       - run: cd packages/e2e && pnpm test:local
       - name: Stop local environment
         if: always()
-        run: cd packages/contracts && pnpm env:down
-      - name: Hardhat node logs
-        if: always()
-        run: cat packages/contracts/.hardhat.log
+        run:
+          cd packages/contracts && cat .hardhat.log && pnpm env:down
 
   docker-build:
     runs-on: ubuntu-latest
