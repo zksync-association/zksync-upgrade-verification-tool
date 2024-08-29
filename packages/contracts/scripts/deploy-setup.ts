@@ -79,6 +79,11 @@ async function main() {
   const [handlerSigner] = await hre.viem.getWalletClients({
     account: handlerAddress,
   });
+
+  if (handlerSigner === undefined) {
+    throw new Error("handlerSigner should be present")
+  }
+
   await handlerSigner.writeContract({
     address: handlerAddress,
     functionName: "updateGuardians",
@@ -100,7 +105,7 @@ async function main() {
   await testClient.stopImpersonatingAccount({ address: handlerAddress });
 
   const { address: counterAddress, abi: counterAbi } = await hre.viem.deployContract(
-    "contracts/local-contracts/dev/Counter.sol:Counter",
+    "src/local-contracts/dev/Counter.sol:Counter",
     []
   );
   console.log("Counter deployed to:", counterAddress);

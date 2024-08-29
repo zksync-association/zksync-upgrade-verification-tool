@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "node": "hardhat node",
     "deploy:setup": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat run scripts/deploy-setup.ts --network local",
+    "deploy:setup:remote": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat run scripts/deploy-setup.ts --network remote",
     "deploy:upgrade": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat run scripts/start-upgrade.ts $HANDLER --network local",
     "clean": "hardhat clean",
     "test": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat test"
