@@ -137,6 +137,7 @@ jobs:
           node-version: 22
           cache: "pnpm"
       - run: pnpm install
+      - run: cd packages/contracts && cp .env.example .env
       - run: cd packages/e2e && cp .env.example .env
       - run: cd packages/contracts && pnpm env:up
       - run: cd packages/contracts && pnpm deploy:setup
