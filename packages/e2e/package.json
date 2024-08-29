@@ -12,7 +12,6 @@
     "fullenv:up": "docker compose -f fullstack-compose.yml up -d",
     "fullenv:up:services": "pnpm fullenv:up -- hh-deploy migrate",
     "fullenv:down": "docker compose -f fullstack-compose.yml down --volumes --remove-orphans",
-    "test:local": "NODE_OPTIONS=\"--loader ts-node/esm\" hardhat test --network local",
     "test:cli": "vitest run --config ./vitest.cli.config.ts",
     "test:e2e": "playwright test"
   },

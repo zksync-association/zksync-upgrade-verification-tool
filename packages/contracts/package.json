@@ -14,7 +14,7 @@
     "clean": "hardhat clean",
     "env:up": "hardhat node > .hardhat.log 2>&1 & echo $! > .hardhat-pid",
     "env:down": "kill $(cat .hardhat-pid) && rm .hardhat-pid .hardhat.log",
-    "test": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat test"
+    "test:local": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat test --network local"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-viem": "2.0.3",
