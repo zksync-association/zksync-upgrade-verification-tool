@@ -6,6 +6,9 @@
       "outputs": ["dist/**", "build/**", "server-build/**"]
     },
     "typecheck": {},
+    "@repo/contracts#typecheck": {
+      "dependsOn": ["@repo/contracts#build"]
+    },
     "test": {}
   }
 }

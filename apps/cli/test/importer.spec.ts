@@ -17,7 +17,7 @@ class TestFS extends FileSystem {
     this.registered.set(path.join(...filePath), content);
   }
 
-  async readFile(path: string): Promise<Buffer> {
+  override async readFile(path: string): Promise<Buffer> {
     const content = this.registered.get(path);
     if (!content) {
       throw new Error(`File not found: ${path}`);
@@ -25,9 +25,9 @@ class TestFS extends FileSystem {
     return Buffer.from(content);
   }
 
-  async writeFile(_path: string, _content: Buffer): Promise<void> {}
+  override async writeFile(_path: string, _content: Buffer): Promise<void> {}
 
-  async directoryExists(dirPath: string): Promise<boolean> {
+  override async directoryExists(dirPath: string): Promise<boolean> {
     return [...this.registered.keys()].some((key) => key.startsWith(dirPath));
   }
 }
