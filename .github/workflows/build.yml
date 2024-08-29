@@ -57,14 +57,14 @@ jobs:
           pnpm build
       - name: Start DB
         run: |
-          cd webapp
+          cd apps/web
           ./scripts/init_db.sh
           docker ps -a
           sleep 10
           pnpm db:migrate
       - name: Start WebApp
         run: |
-          cd webapp
+          cd apps/web
           timeout 60s pnpm start &
           PID=$!
           sleep 20
@@ -104,7 +104,7 @@ jobs:
       - run: pnpm build
       - name: Run unit tests
         run: |
-          cd webapp
+          cd apps/web
           pnpm test:u  # unit tests
           pnpm test:s  # server tests
 
