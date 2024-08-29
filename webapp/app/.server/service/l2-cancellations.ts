@@ -52,11 +52,10 @@ function blocksInADay() {
 }
 
 async function getL2ProposalState(
-  type: L2CancellationType,
-  proposalId: Hex
-): Promise<L2_CANCELLATION_STATES> {
+  address: Hex,
+  proposalId: Hex): Promise<L2_CANCELLATION_STATES> {
   return l2Rpc.contractRead(
-    getL2GovernorAddress(type),
+    address,
     "state",
     ZK_GOV_OPS_GOVERNOR_ABI,
     z.number(),
@@ -146,7 +145,7 @@ async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigi
   );
 
   const states = await Promise.all(
-    activeProposals.map((p) => getL2ProposalState(p.type, p.proposalId))
+    activeProposals.map((p) => getL2ProposalState(getL2GovernorAddress(p.type), p.proposalId))
   );
 
   return activeProposals.filter((_, i) => isValidCancellationState(states[i]));
@@ -300,7 +299,7 @@ async function upgradeCancellationStatus(
     return cancellation;
   }
 
-  const state = await getL2ProposalState(cancellation.type, cancellation.externalId);
+  const state = await getL2ProposalState(cancellation.txRequestTo, cancellation.externalId);
   if (!isValidCancellationState(state)) {
     cancellation.status = l2CancellationStatusEnum.enum.L2_PROPOSAL_EXPIRED;
     await updateL2Cancellation(cancellation.id, cancellation);
