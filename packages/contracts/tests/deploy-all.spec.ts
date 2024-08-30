@@ -3,14 +3,25 @@ import hre from "hardhat";
 import fs from "node:fs";
 import type { Address, PublicClient } from "viem";
 
+const availableAddresses = [
+  "ProtocolUpgradeHandler",
+  "Guardians",
+  "SecurityCouncil",
+  "Counter",
+  "EmergencyUpgradeBoard",
+  "ZkGovOpsGovernor",
+  "ZkTokenGovernor",
+] as const;
+type AvailableAddresses = (typeof availableAddresses)[number];
+
 function getDeployedAddresses() {
   const content = fs.readFileSync("addresses.txt", "utf-8");
-  const addresses: Record<string, Address> = {};
+  const addresses: Record<AvailableAddresses, Address> = {} as Record<AvailableAddresses, Address>;
 
   for (const line of content.split("\n")) {
     const [key, value] = line.split(":");
     if (key && value) {
-      addresses[key.trim()] = value.trim() as Address;
+      addresses[key.trim() as AvailableAddresses] = value.trim() as Address;
     }
   }
   return addresses;
@@ -18,7 +29,7 @@ function getDeployedAddresses() {
 
 describe("Deploy:All tests", () => {
   let client: PublicClient;
-  let addresses: Record<string, `0x${string}`>;
+  let addresses: Record<AvailableAddresses, `0x${string}`>;
 
   before(async () => {
     client = await hre.viem.getPublicClient();

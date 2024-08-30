@@ -102,7 +102,7 @@ test("should be able to sign standard proposals", async ({ switcher, wallet, pag
   if (!initialApprovals) {
     throw new Error("No Security Council Approvals found for initialApprovals");
   }
-  const initialCount = Number.parseInt(initialApprovals.split("/")[0]);
+  const initialCount = Number.parseInt(initialApprovals.split("/")[0] ?? "");
   const approveButton = page.getByRole("button", { name: "Approve proposal" });
   await approveButton.click();
 
@@ -115,7 +115,7 @@ test("should be able to sign standard proposals", async ({ switcher, wallet, pag
   if (!updatedApprovals) {
     throw new Error("No Security Council Approvals found for updatedApprovals");
   }
-  const updatedCount = Number.parseInt(updatedApprovals.split("/")[0]);
+  const updatedCount = Number.parseInt(updatedApprovals.split("/")[0] ?? "");
 
   expect(updatedCount).toBe(initialCount + 1);
   await expect(approveButton).toBeDisabled();
@@ -211,7 +211,7 @@ test("should be able to sign emergency upgrade", async ({ wallet, page, context 
   if (!initialApprovals) {
     throw new Error("No Security Council Approvals found for initialApprovals");
   }
-  const initialCount = Number.parseInt(initialApprovals.split("/")[0]);
+  const initialCount = Number.parseInt(initialApprovals.split("/")[0] ?? "");
   await page.getByRole("button", { name: "Approve" }).click();
 
   await wallet.sign();
@@ -222,7 +222,7 @@ test("should be able to sign emergency upgrade", async ({ wallet, page, context 
   if (!updatedApprovals) {
     throw new Error("No Security Council Approvals found for updatedApprovals");
   }
-  const updatedCount = Number.parseInt(updatedApprovals.split("/")[0]);
+  const updatedCount = Number.parseInt(updatedApprovals.split("/")[0] ?? "");
 
   expect(updatedCount).toBe(initialCount + 1);
 });

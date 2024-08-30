@@ -1,8 +1,8 @@
 name: Build / Test CLI & WebApp
 on:
+  pull_request:
   push:
-    branches:
-      - "**"
+    branches: ["main"]
 env:
   FORCE_COLOR: 1
   ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
@@ -26,12 +26,10 @@ jobs:
       FORCE_COLOR: 1
     defaults:
       run:
-        working-directory: ./cli
+        working-directory: ./apps/cli
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -50,8 +48,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -61,14 +57,14 @@ jobs:
           pnpm build
       - name: Start DB
         run: |
-          cd webapp
+          cd apps/web
           ./scripts/init_db.sh
           docker ps -a
           sleep 10
           pnpm db:migrate
       - name: Start WebApp
         run: |
-          cd webapp
+          cd apps/web
           timeout 60s pnpm start &
           PID=$!
           sleep 20
@@ -84,8 +80,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -94,7 +88,7 @@ jobs:
       - run: pnpm build
       - name: Run integration tests
         run: |
-          cd webapp
+          cd apps/web
           pnpm test:i
 
   webapp-unit-test:
@@ -102,8 +96,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -112,19 +104,17 @@ jobs:
       - run: pnpm build
       - name: Run unit tests
         run: |
-          cd webapp
+          cd apps/web
           pnpm test:u  # unit tests
           pnpm test:s  # server tests
 
   compile-contracts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: "recursive"
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -132,38 +122,37 @@ jobs:
       - run: pnpm install
       - name: Run compile
         run: |
-          cd e2e
-          pnpm run compile
+          cd packages/contracts
+          pnpm build
 
   test-local:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: e2e
+        working-directory: ./packages/contracts
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: "recursive"
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: "pnpm"
-      - run: cp .env.example .env
       - run: pnpm install
+      - run: cp .env.example .env
       - run: pnpm env:up
       - run: pnpm deploy:setup
       - run: pnpm test:local
       - name: Stop local environment
         if: always()
-        run: pnpm env:down
+        run:
+          cat .hardhat.log && pnpm env:down
 
   docker-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build Docker image

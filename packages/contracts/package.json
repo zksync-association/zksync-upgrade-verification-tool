@@ -12,7 +12,9 @@
     "deploy:setup:remote": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat run scripts/deploy-setup.ts --network remote",
     "deploy:upgrade": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat run scripts/start-upgrade.ts $HANDLER --network local",
     "clean": "hardhat clean",
-    "test": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat test"
+    "env:up": "hardhat node > .hardhat.log 2>&1 & echo $! > .hardhat-pid",
+    "env:down": "kill $(cat .hardhat-pid) && rm .hardhat-pid .hardhat.log",
+    "test:local": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat test --network local"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-viem": "2.0.3",
