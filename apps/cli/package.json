@@ -5,13 +5,17 @@
   "type": "module",
   "author": "moonsong-labs",
   "license": "MIT",
+  "bin": {
+    "validate": "./bin/validate.js"
+  },
   "scripts": {
     "start": "tsx src/entrypoint.ts",
     "build": "tsx esbuild.ts",
     "watch": "tsx esbuild.ts --watch",
     "test": "vitest run",
     "test:ci": "vitest run --coverage --coverage.reporter=lcov",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "validate": "./bin/validate.js"
   },
   "dependencies": {
     "@repo/common": "workspace:*",

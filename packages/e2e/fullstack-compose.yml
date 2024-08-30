@@ -25,8 +25,6 @@ services:
     depends_on:
       hh-node:
         condition: service_healthy
-    volumes:
-      - ./addresses.txt:/app/e2e/addresses.txt
 
   db:
     image: postgres:14
