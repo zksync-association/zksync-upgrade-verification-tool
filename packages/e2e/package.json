@@ -1,0 +1,41 @@
+{
+  "name": "@repo/e2e",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "keywords": [],
+  "author": "moonsong-labs",
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "update": "vitest -u",
+    "fullenv:up": "docker compose -f fullstack-compose.yml up -d",
+    "fullenv:up:services": "pnpm fullenv:up -- hh-deploy migrate",
+    "fullenv:down": "docker compose -f fullstack-compose.yml down --volumes --remove-orphans",
+    "test:cli": "vitest run --config ./vitest.cli.config.ts",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.46.0",
+    "@tenkeylabs/dappwright": "^2.8.5",
+    "@types/mocha": "^10.0.7",
+    "@types/node": "^22.5.1",
+    "chalk": "^5.3.0",
+    "dotenv": "^16.4.5",
+    "glob": "^11.0.0",
+    "ora": "^8.0.1",
+    "tempy": "^3.1.0",
+    "viem": "^2.17.5",
+    "vitest": "^2.0.5"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "hardhat": "^2.22.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=8"
+  }
+}

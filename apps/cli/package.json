@@ -1,0 +1,50 @@
+{
+  "name": "cli",
+  "version": "1.0.0",
+  "description": "cli tool to check details about zk-sync era upgrades.",
+  "type": "module",
+  "author": "moonsong-labs",
+  "license": "MIT",
+  "bin": {
+    "validate": "./bin/validate.js"
+  },
+  "scripts": {
+    "start": "tsx src/entrypoint.ts",
+    "build": "tsx esbuild.ts",
+    "watch": "tsx esbuild.ts --watch",
+    "test": "vitest run",
+    "test:ci": "vitest run --coverage --coverage.reporter=lcov",
+    "typecheck": "tsc --noEmit",
+    "validate": "./bin/validate.js"
+  },
+  "dependencies": {
+    "@repo/common": "workspace:*",
+    "@repo/ethereum-reports": "workspace:*",
+    "chalk": "^5.3.0",
+    "cli-table3": "^0.6.4",
+    "dotenv": "^16.4.5",
+    "nochoices": "^1.1.4",
+    "ora": "^8.0.1",
+    "simple-git": "^3.24.0",
+    "tempy": "^3.1.0",
+    "viem": "^2.9.15",
+    "yargs": "^17.7.2",
+    "zksync-ethers": "^6.7.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^22.1.0",
+    "@types/yargs": "^17.0.32",
+    "@vitest/coverage-v8": "^2.0.5",
+    "esbuild": "^0.23.1",
+    "esbuild-node-externals": "^1.14.0",
+    "tsx": "^4.7.2",
+    "typescript": "5.5.4",
+    "vitest": "^2.0.5"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=8"
+  }
+}

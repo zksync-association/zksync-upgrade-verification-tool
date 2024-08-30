@@ -14,21 +14,14 @@ RUN apk add git
 RUN mkdir /app
 WORKDIR /app
 
-COPY webapp/package.json webapp/package.json
-COPY cli/package.json cli/package.json
-COPY e2e/package.json e2e/package.json
-COPY package.json package.json
-COPY pnpm-lock.yaml pnpm-lock.yaml
-COPY pnpm-workspace.yaml pnpm-workspace.yaml
+COPY . .
 
 RUN pnpm install --prod=false --frozen-lockfile
-
-COPY . .
 
 RUN pnpm run build
 
 ENV SERVER_PORT=3000
 EXPOSE 3000
 
-WORKDIR /app/webapp
+WORKDIR /app/apps/web
 CMD ["node", "./server-build/index.js"]

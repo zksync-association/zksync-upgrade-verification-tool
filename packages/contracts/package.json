@@ -1,0 +1,38 @@
+{
+  "name": "@repo/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "hardhat compile",
+    "preprocess:zk-gov": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' node scripts/preprocess-zk-gov.ts",
+    "typecheck": "tsc --noEmit",
+    "node": "hardhat node",
+    "deploy:setup": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat run scripts/deploy-setup.ts --network local",
+    "deploy:setup:remote": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat run scripts/deploy-setup.ts --network remote",
+    "deploy:upgrade": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat run scripts/start-upgrade.ts $HANDLER --network local",
+    "clean": "hardhat clean",
+    "env:up": "hardhat node > .hardhat.log 2>&1 & echo $! > .hardhat-pid",
+    "env:down": "kill $(cat .hardhat-pid) && rm .hardhat-pid .hardhat.log",
+    "test:local": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' hardhat test --network local"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-viem": "2.0.3",
+    "@openzeppelin-v4/contracts": "npm:@openzeppelin/contracts@4",
+    "@openzeppelin-v4/contracts-upgradeable": "npm:@openzeppelin/contracts-upgradeable@4",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@openzeppelin/contracts-upgradeable": "^5.0.2",
+    "@repo/typescript-config": "workspace:*",
+    "@types/chai": "^4.3.19",
+    "@types/node": "^22.5.1",
+    "chai": "^5.1.1",
+    "chalk": "^5.3.0",
+    "dotenv": "^16.4.5",
+    "glob": "^11.0.0",
+    "hardhat": "^2.22.6",
+    "ora": "^8.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4",
+    "viem": "2.17.5"
+  }
+}

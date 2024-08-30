@@ -1,35 +1,28 @@
 {
-  "name": "era-l1-upgrade-checker",
+  "name": "zksync-upgrade-verification-tool",
+  "private": true,
   "version": "0.1.1",
   "description": "",
-  "type": "module",
+  "author": "moonsong-labs",
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "docker:build": "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t upgrade-checker:local .",
+    "build": "turbo build",
+    "test": "turbo test",
+    "check": "biome check",
+    "check:fix": "biome check --write",
+    "typecheck": "turbo typecheck",
+    "ci:fix": "turbo ci:fix",
+    "clean": "./scripts/clean.sh"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.8.3",
+    "turbo": "^2.0.14",
+    "typescript": "5.5.4"
+  },
+  "packageManager": "pnpm@9.7.1",
   "engines": {
     "node": ">=20",
     "pnpm": ">=8"
-  },
-  "files": [
-    "dist",
-    "cli/bin",
-    "*.d.ts",
-    "*.mjs"
-  ],
-  "scripts": {
-    "docker:build": "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t upgrade-checker:local .",
-    "dev": "pnpm -r --filter='./cli' run start",
-    "build": "pnpm -r --filter='*' run build",
-    "test": "pnpm -r --filter='./test' run test",
-    "check": "pnpm -r --filter='*' run check",
-    "check:fix": "pnpm -r --filter='*' run check:fix",
-    "typecheck": "pnpm run build && pnpm -r --filter='*' run typecheck"
-  },
-  "author": "moonsong-labs",
-  "license": "GPL-3.0-only",
-  "devDependencies": {
-    "@biomejs/biome": "1.8.3",
-    "@types/node": "22.1.0",
-    "typescript": "5.5.4"
-  },
-  "dependencies": {
-    "validate-cli": "workspace:*"
   }
 }

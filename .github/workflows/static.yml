@@ -1,8 +1,8 @@
 name: Static Analyses
 on:
+  pull_request:
   push:
-    branches:
-      - "**"
+    branches: ["main"]
 
 jobs:
   build:
@@ -10,40 +10,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: "pnpm"
-      - run: pnpm install
-      - run: pnpm run build
-
-  biome-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: "pnpm"
       - run: pnpm install
       - run: pnpm build
-      - run: pnpm run check
-      
-  typecheck:
+
+  biome-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          version: 9
+          node-version: 22
+          cache: "pnpm"
+      - run: pnpm install
+      - run: pnpm check
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20.11.1
           cache: "pnpm"
       - run: pnpm install
-      - run: pnpm run typecheck
+      - run: pnpm typecheck
