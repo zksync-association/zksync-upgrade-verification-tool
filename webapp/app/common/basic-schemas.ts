@@ -10,10 +10,7 @@ export const addressSchema = hexChars
   .refine((str) => str.length === 42, "Address have to be 20 bytes long")
   .transform((str) => getAddress(str));
 
-export const numericStrSchema = z.coerce
+export const nonZeroNumericStrSchema = z.coerce
   .bigint({ message: "Must be a integer number" })
+  .refine(num => num !== 0n, { message: "Cannot be zero" })
   .transform((num) => num.toString());
-
-export const nonZeroNumericStrSchema = numericStrSchema.refine((s) => !/^0+$/.test(s), {
-  message: "Cannot be zero.",
-});
