@@ -4,7 +4,7 @@ import {
   getActiveL2Proposals,
   getL2VetoNonce,
 } from "@/.server/service/l2-cancellations";
-import { addressSchema, hexSchema, nonZeroNumericStrSchema } from "@/common/basic-schemas";
+import { addressSchema, hexSchema, nonZeroBigIntStrSchema } from "@/common/basic-schemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -75,10 +75,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
 const schema = z.object({
   proposalId: hexSchema,
-  l2GasLimit: nonZeroNumericStrSchema,
-  l2GasPerPubdataByteLimit: nonZeroNumericStrSchema,
+  l2GasLimit: nonZeroBigIntStrSchema,
+  l2GasPerPubdataByteLimit: nonZeroBigIntStrSchema,
   refundRecipient: addressSchema,
-  txMintValue: nonZeroNumericStrSchema,
+  txMintValue: nonZeroBigIntStrSchema,
   nonce: z.coerce.number({ message: "Nonce value must be a number" }),
 });
 type Schema = z.infer<typeof schema>;
