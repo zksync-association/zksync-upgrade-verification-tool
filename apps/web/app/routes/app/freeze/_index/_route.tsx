@@ -1,5 +1,5 @@
 import { createFreezeProposal, getAllFreezeProposals } from "@/.server/db/dto/freeze-proposals";
-import { isUniqueConstraintError } from "@/.server/db/errors";
+import { isValidationError } from "@/.server/db/errors";
 import {
   type FreezeProposalsType,
   type freezeProposalsTable,
@@ -113,7 +113,7 @@ export async function action({ request }: ActionFunctionArgs) {
       externalId: nonce,
     });
   } catch (err) {
-    if (isUniqueConstraintError(err)) {
+    if (isValidationError(err)) {
       return json(generalError("Pending proposal already exists."), 400);
     }
     throw err;

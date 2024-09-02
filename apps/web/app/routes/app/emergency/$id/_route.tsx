@@ -24,6 +24,7 @@ import {
   SEC_COUNCIL_THRESHOLD,
   ZK_FOUNDATION_THRESHOLD,
 } from "@/utils/emergency-proposals";
+import { extract } from "@/utils/extract-from-formdata";
 import { badRequest, notFound } from "@/utils/http";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
@@ -31,7 +32,7 @@ import { hexSchema } from "@repo/common/schemas";
 import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual } from "viem";
-import { type ZodTypeAny, z } from "zod";
+import { z } from "zod";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
@@ -72,19 +73,6 @@ export async function loader(args: LoaderFunctionArgs) {
     allGuardians: await guardianMembers(),
     allSecurityCouncil: await councilMembers(),
   });
-}
-
-function extract<T extends ZodTypeAny>(
-  formData: FormData,
-  key: string,
-  parser: T
-): z.infer<typeof parser> {
-  const value = formData.get(key);
-  const parsed = parser.safeParse(value);
-  if (parsed.error) {
-    throw badRequest(`Wrong value for ${key}`);
-  }
-  return parsed.data;
 }
 
 const intentParser = z.enum(["newSignature", "broadcastSuccess"]);
