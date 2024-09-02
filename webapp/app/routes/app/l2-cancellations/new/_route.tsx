@@ -4,7 +4,7 @@ import {
   getActiveL2Proposals,
   getL2VetoNonce,
 } from "@/.server/service/l2-cancellations";
-import { addressSchema, hexSchema } from "@/common/basic-schemas";
+import { addressSchema, hexSchema, nonZeroNumericStrSchema } from "@/common/basic-schemas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { extract } from "@/utils/extract-from-formdata";
 import { badRequest } from "@/utils/http";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type ActionFunctionArgs, defer, redirect } from "@remix-run/node";
@@ -33,7 +34,6 @@ import { Await, useLoaderData, useNavigation } from "@remix-run/react";
 import { Form as RemixForm } from "@remix-run/react";
 import { Suspense } from "react";
 import { useForm } from "react-hook-form";
-import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { numberToHex } from "viem";
 import { useAccount } from "wagmi";
@@ -51,39 +51,34 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const parsed = await getFormData(
-    request,
-    z.object({
-      proposalId: hexSchema,
-      l2GasLimit: z.coerce.number(),
-      l2GasPerPubdataByteLimit: z.coerce.number(),
-      refundRecipient: addressSchema,
-      txMintValue: z.coerce.number(),
-      nonce: z.coerce.number(),
-    })
-  );
-  if (!parsed.success) {
-    throw badRequest(`Failed to parse body: ${parsed.errors}`);
-  }
+  const formData = await request.formData().catch(() => {
+    throw badRequest("Failed to parse body");
+  });
+
+  const proposalId = extract(formData, "proposalId", hexSchema);
+  const l2GasLimit = extract(formData, "l2GasLimit", z.coerce.bigint());
+  const l2GasPerPubdataByteLimit = extract(formData, "l2GasPerPubdataByteLimit", z.coerce.bigint());
+  const refundRecipient = extract(formData, "refundRecipient", addressSchema);
+  const txMintValue = extract(formData, "txMintValue", z.coerce.bigint());
+  const nonce = extract(formData, "nonce", z.coerce.number());
+
   await createVetoProposalFor(
-    parsed.data.proposalId,
-    numberToHex(parsed.data.l2GasLimit),
-    numberToHex(parsed.data.l2GasPerPubdataByteLimit),
-    parsed.data.refundRecipient,
-    numberToHex(parsed.data.txMintValue),
-    parsed.data.nonce
+    proposalId,
+    numberToHex(l2GasLimit),
+    numberToHex(l2GasPerPubdataByteLimit),
+    refundRecipient,
+    numberToHex(txMintValue),
+    nonce
   );
   return redirect($path("/app/l2-cancellations"));
 }
 
 const schema = z.object({
   proposalId: hexSchema,
-  l2GasLimit: z.coerce.number({ message: "L2 Gas Limit must be a number" }),
-  l2GasPerPubdataByteLimit: z.coerce.number({
-    message: "L2 Gas per pubdata byte limit must be a number",
-  }),
+  l2GasLimit: nonZeroNumericStrSchema,
+  l2GasPerPubdataByteLimit: nonZeroNumericStrSchema,
   refundRecipient: addressSchema,
-  txMintValue: z.coerce.number({ message: "Transaction mint value must be a number" }),
+  txMintValue: nonZeroNumericStrSchema,
   nonce: z.coerce.number({ message: "Nonce value must be a number" }),
 });
 type Schema = z.infer<typeof schema>;
@@ -99,10 +94,10 @@ export default function NewL2GovernorVeto() {
     ),
     defaultValues: {
       nonce: suggestedNonce,
-      l2GasLimit: 80000000,
-      l2GasPerPubdataByteLimit: 800,
+      l2GasLimit: "80000000",
+      l2GasPerPubdataByteLimit: "800",
       refundRecipient: address,
-      txMintValue: 1000000000000000,
+      txMintValue: "1000000000000000",
     },
     mode: "onTouched",
   });
