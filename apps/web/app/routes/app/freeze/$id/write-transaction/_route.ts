@@ -2,9 +2,10 @@ import { getFreezeProposalById, updateFreezeProposal } from "@/.server/db/dto/fr
 import { notFound } from "@/utils/http";
 import { type ActionFunctionArgs, redirect } from "@remix-run/node";
 import { hexSchema } from "@repo/common/schemas";
-import { getFormData, getParams } from "remix-params-helper";
+import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { z } from "zod";
+import { extractFromFormData } from "@/utils/extract-from-formdata";
 
 export async function action({ request, params: remixParams }: ActionFunctionArgs) {
   const params = getParams(remixParams, z.object({ id: z.coerce.number() }));
@@ -12,15 +13,13 @@ export async function action({ request, params: remixParams }: ActionFunctionArg
     throw notFound();
   }
 
-  const data = await getFormData(
+  const { hash } = await extractFromFormData(
     request,
-    z.object({
+    {
       hash: hexSchema,
-    })
+    },
+    notFound()
   );
-  if (!data.success) {
-    throw notFound();
-  }
 
   const freezeProposal = await getFreezeProposalById(params.data.id);
   if (!freezeProposal) {
@@ -28,7 +27,7 @@ export async function action({ request, params: remixParams }: ActionFunctionArg
   }
 
   await updateFreezeProposal(freezeProposal.id, {
-    transactionHash: data.data.hash,
+    transactionHash: hash,
   });
-  return redirect($path("/app/transactions/:hash", { hash: data.data.hash }));
+  return redirect($path("/app/transactions/:hash", { hash }));
 }

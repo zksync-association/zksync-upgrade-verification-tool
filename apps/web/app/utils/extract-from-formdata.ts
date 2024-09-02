@@ -65,12 +65,13 @@ export type WithFormData = {
 
 export async function extractFromFormData<T extends PlainObjectSchema>(
   request: WithFormData,
-  schema: T
+  schema: T,
+  error = badRequest("Error parsing body")
 ): Promise<ParsedPlainObject<T>> {
   const formData = await request.formData();
   const res = parseFormData(formData, schema);
   if (!res.success) {
-    throw badRequest("Error parsing body");
+    throw error;
   }
 
   return res.data;

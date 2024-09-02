@@ -23,11 +23,12 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
 import { CircleCheckBig } from "lucide-react";
-import { getFormData, getParams } from "remix-params-helper";
+import { getParams } from "remix-params-helper";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
 import ContractWriteButton from "./contract-write-button";
 import SignButton from "./sign-button";
+import { extractFromFormData } from "@/utils/extract-from-formdata";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -80,27 +81,21 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const data = await getFormData(
-    request,
-    z.object({
-      signature: hexSchema,
-      proposalId: z.number(),
-      action: signActionSchema,
-    })
-  );
-  if (!data.success) {
-    throw badRequest("Failed to parse signature data");
-  }
+  const data = await extractFromFormData(request, {
+    signature: hexSchema,
+    proposalId: z.number(),
+    action: signActionSchema,
+  });
 
-  const proposal = await getFreezeProposalById(data.data.proposalId);
+  const proposal = await getFreezeProposalById(data.proposalId);
   if (!proposal) {
     throw badRequest("Proposal not found");
   }
 
   await validateAndSaveFreezeSignature({
-    action: data.data.action,
+    action: data.action,
     proposal,
-    signature: data.data.signature,
+    signature: data.signature,
     signer: user.address as Hex,
   });
   return json({ ok: true });
