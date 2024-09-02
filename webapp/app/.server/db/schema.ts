@@ -134,9 +134,8 @@ export const freezeProposalsTable = pgTable(
     softFreezeThreshold: bigint("soft_freeze_threshold", { mode: "number" }),
     transactionHash: bytea("transaction_hash"),
   },
-  ({ externalId, type }) => ({
+  ({ externalId }) => ({
     externalIdIdx: index("freeze_proposals_external_id_idx").on(externalId),
-    uniqueProposal: unique().on(externalId, type),
     proposalCheck: check(
       "soft_freeze_threshold",
       sql`(
