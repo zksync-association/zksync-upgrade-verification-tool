@@ -57,6 +57,13 @@
       "when": 1724340770922,
       "tag": "0007_typical_scarecrow",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1725287474597,
+      "tag": "0008_cloudy_proteus",
+      "breakpoints": true
     }
   ]
 }
