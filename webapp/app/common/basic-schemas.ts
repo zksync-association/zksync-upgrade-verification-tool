@@ -9,3 +9,8 @@ export const hexSchema = hexChars.transform((str) => str as Hex);
 export const addressSchema = hexChars
   .refine((str) => str.length === 42, "Address have to be 20 bytes long")
   .transform((str) => getAddress(str));
+
+export const nonZeroBigIntStrSchema = z.coerce
+  .bigint({ message: "Must be a integer number" })
+  .refine((num) => num !== 0n, { message: "Cannot be zero" })
+  .transform((num) => num.toString());
