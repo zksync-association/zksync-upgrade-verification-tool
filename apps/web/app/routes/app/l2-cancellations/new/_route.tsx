@@ -25,8 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { extract } from "@/utils/extract-from-formdata";
-import { badRequest } from "@/utils/http";
+import { extractFromFormData } from "@/utils/extract-from-formdata";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type ActionFunctionArgs, defer, redirect } from "@remix-run/node";
 import { Await, useLoaderData, useNavigation } from "@remix-run/react";
@@ -51,16 +50,15 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData().catch(() => {
-    throw badRequest("Failed to parse body");
-  });
-
-  const proposalId = extract(formData, "proposalId", hexSchema);
-  const l2GasLimit = extract(formData, "l2GasLimit", z.coerce.bigint());
-  const l2GasPerPubdataByteLimit = extract(formData, "l2GasPerPubdataByteLimit", z.coerce.bigint());
-  const refundRecipient = extract(formData, "refundRecipient", addressSchema);
-  const txMintValue = extract(formData, "txMintValue", z.coerce.bigint());
-  const nonce = extract(formData, "nonce", z.coerce.number());
+  const { proposalId, l2GasLimit, l2GasPerPubdataByteLimit, refundRecipient, txMintValue, nonce } =
+    await extractFromFormData(request, {
+      proposalId: hexSchema,
+      l2GasLimit: z.coerce.bigint(),
+      l2GasPerPubdataByteLimit: z.coerce.bigint(),
+      refundRecipient: addressSchema,
+      txMintValue: z.coerce.bigint(),
+      nonce: z.coerce.number(),
+    });
 
   await createVetoProposalFor(
     proposalId,
