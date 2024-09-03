@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./helpers/*": "./helpers/*.ts"
+  },
   "scripts": {
     "build": "hardhat compile",
     "preprocess:zk-gov": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' node scripts/preprocess-zk-gov.ts",

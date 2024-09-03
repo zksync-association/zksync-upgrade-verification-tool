@@ -11,11 +11,7 @@ import {
 import dotenv from "dotenv";
 import fs from "node:fs/promises";
 import { mnemonicToAccount } from "viem/accounts";
-import {
-  ALL_COUNCIL_INDEXES,
-  ALL_GUARDIAN_INDEXES,
-  DERIVATION_INDEXES,
-} from "../helpers/constants.js";
+import { COUNCIL_INDEXES, GUARDIAN_INDEXES, DERIVATION_INDEXES } from "../helpers/constants.js";
 
 dotenv.config();
 
@@ -190,7 +186,7 @@ async function main() {
   console.log("Addresses saved to addresses.txt");
 }
 
-function deriveMembers(extrasEnvVar: string, indexes: number[], mnemonic: string): Hex[] {
+function deriveMembers(extrasEnvVar: string, indexes: readonly number[], mnemonic: string): Hex[] {
   // In case special addresses want to be used, these can be defined in env vars.
   const extras = (process.env[extrasEnvVar] || "")
     .split(",")
@@ -221,8 +217,8 @@ function deriveAllAddresses() {
   const visitor = mnemonicToAccount(mnemonic, { addressIndex: DERIVATION_INDEXES.VISITOR }).address;
 
   return {
-    council: deriveMembers("EXTRA_COUNCIL", ALL_COUNCIL_INDEXES, mnemonic),
-    guardians: deriveMembers("EXTRA_GUARDIANS", ALL_GUARDIAN_INDEXES, mnemonic),
+    council: deriveMembers("EXTRA_COUNCIL", COUNCIL_INDEXES, mnemonic),
+    guardians: deriveMembers("EXTRA_GUARDIANS", GUARDIAN_INDEXES, mnemonic),
     zkAssociation: process.env.EXTRA_ZK_FOUNDATION
       ? getAddress(process.env.EXTRA_ZK_FOUNDATION)
       : zkAssociation,
