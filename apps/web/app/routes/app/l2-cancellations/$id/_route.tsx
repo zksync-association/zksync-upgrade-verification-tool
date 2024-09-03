@@ -24,21 +24,17 @@ import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-r
 import { useLoaderData } from "@remix-run/react";
 import { CircleCheckBig, CircleX } from "lucide-react";
 import { hexSchema } from "@repo/common/schemas";
-import { getParams } from "remix-params-helper";
 import { hexToBigInt, isAddressEqual } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
-import { extractFromFormData } from "@/utils/extract-from-formdata";
+import { extractFromFormData, extractFromParams } from "@/utils/extract-from-formdata";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
 
-  const params = getParams(remixParams, z.object({ id: hexSchema }));
-  if (!params.success) {
-    throw notFound();
-  }
+  const { id } = extractFromParams(remixParams, z.object({ id: hexSchema }), notFound());
 
-  const proposal = await getAndUpdateL2CancellationByExternalId(params.data.id);
+  const proposal = await getAndUpdateL2CancellationByExternalId(id);
 
   const [calls, signatures, guardiansAddr, l2GovernorAddr] = await Promise.all([
     getl2CancellationCallsByProposalId(proposal.id),

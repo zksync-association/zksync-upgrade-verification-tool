@@ -19,19 +19,16 @@ import { type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
 import { ArrowLeft, CircleCheckBig, CircleX, SquareArrowOutUpRight } from "lucide-react";
-import { getParams } from "remix-params-helper";
 import { formatEther, formatGwei } from "viem";
 import { useWaitForTransactionReceipt } from "wagmi";
 import { z } from "zod";
+import { extractFromParams } from "@/utils/extract-from-formdata";
 
 export function loader(args: LoaderFunctionArgs) {
-  const params = getParams(args.params, z.object({ hash: hexSchema }));
-  if (!params.success) {
-    throw notFound();
-  }
+  const { hash } = extractFromParams(args.params, z.object({ hash: hexSchema }), notFound());
 
-  const txUrl = getTransactionUrl(params.data.hash, env.ETH_NETWORK);
-  return json({ txUrl, hash: params.data.hash });
+  const txUrl = getTransactionUrl(hash, env.ETH_NETWORK);
+  return json({ txUrl, hash });
 }
 
 export default function Transactions() {

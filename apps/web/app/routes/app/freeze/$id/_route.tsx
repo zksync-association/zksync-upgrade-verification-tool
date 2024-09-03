@@ -23,22 +23,18 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
 import { CircleCheckBig } from "lucide-react";
-import { getParams } from "remix-params-helper";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
 import ContractWriteButton from "./contract-write-button";
 import SignButton from "./sign-button";
-import { extractFromFormData } from "@/utils/extract-from-formdata";
+import { extractFromFormData, extractFromParams } from "@/utils/extract-from-formdata";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
 
-  const params = getParams(remixParams, z.object({ id: z.coerce.number() }));
-  if (!params.success) {
-    throw notFound();
-  }
+  const { id } = extractFromParams(remixParams, z.object({ id: z.coerce.number() }), notFound());
 
-  const proposal = await getFreezeProposalById(params.data.id);
+  const proposal = await getFreezeProposalById(id);
   if (!proposal) {
     throw notFound();
   }

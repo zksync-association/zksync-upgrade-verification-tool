@@ -64,3 +64,15 @@ export async function extractFromFormData<T extends ZodObject<any>>(
 
   return res.data;
 }
+
+export function extractFromParams<T extends ZodTypeAny>(
+  params: Record<string, string | undefined>,
+  schema: T,
+  error = badRequest("Invalid query params")
+): z.infer<typeof schema> {
+  const parsed = schema.safeParse(params);
+  if (!parsed.success) {
+    throw error;
+  }
+  return parsed.data;
+}

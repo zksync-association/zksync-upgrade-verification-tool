@@ -34,35 +34,31 @@ import { defer, json } from "@remix-run/node";
 import { Await, useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
 import { Suspense } from "react";
-import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
-import { extractFromFormData } from "@/utils/extract-from-formdata";
+import { extractFromFormData, extractFromParams } from "@/utils/extract-from-formdata";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
 
-  const params = getParams(remixParams, z.object({ id: hexSchema }));
-  if (!params.success) {
-    throw notFound();
-  }
+  const { id } = extractFromParams(remixParams, z.object({ id: hexSchema }), notFound());
 
   // Id is external_id coming from the smart contract
-  const proposal = await getProposalByExternalId(params.data.id);
+  const proposal = await getProposalByExternalId(id);
   if (!proposal) {
     throw notFound();
   }
 
   const getAsyncData = async () => {
-    const checkReport = await getCheckReport(params.data.id);
-    const storageChangeReport = await getStorageChangeReport(params.data.id);
+    const checkReport = await getCheckReport(id);
+    const storageChangeReport = await getStorageChangeReport(id);
     const [guardians, council, proposalStatus, signatures, proposalData] = await Promise.all([
       guardiansAddress(),
       councilAddress(),
-      getProposalStatus(params.data.id),
-      getSignaturesByExternalProposalId(params.data.id),
-      getProposalData(params.data.id),
+      getProposalStatus(id),
+      getSignaturesByExternalProposalId(id),
+      getProposalData(id),
     ]);
     const upgradeHandler = env.UPGRADE_HANDLER_ADDRESS;
 

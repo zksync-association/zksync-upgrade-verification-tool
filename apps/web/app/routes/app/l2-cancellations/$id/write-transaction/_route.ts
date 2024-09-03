@@ -3,16 +3,12 @@ import { l2CancellationStatusEnum } from "@/.server/db/schema";
 import { notFound } from "@/utils/http";
 import { type ActionFunctionArgs, redirect } from "@remix-run/node";
 import { hexSchema } from "@repo/common/schemas";
-import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { z } from "zod";
-import { extractFromFormData } from "@/utils/extract-from-formdata";
+import { extractFromFormData, extractFromParams } from "@/utils/extract-from-formdata";
 
 export async function action({ request, params: remixParams }: ActionFunctionArgs) {
-  const params = getParams(remixParams, z.object({ id: z.coerce.number() }));
-  if (!params.success) {
-    throw notFound();
-  }
+  const { id } = extractFromParams(remixParams, z.object({ id: z.coerce.number() }), notFound());
 
   const { hash } = await extractFromFormData(
     request,
@@ -22,7 +18,7 @@ export async function action({ request, params: remixParams }: ActionFunctionArg
     notFound()
   );
 
-  const proposal = await getL2CancellationById(params.data.id);
+  const proposal = await getL2CancellationById(id);
   if (!proposal) {
     throw notFound();
   }
