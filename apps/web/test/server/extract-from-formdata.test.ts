@@ -7,9 +7,9 @@ describe("extractMany", () => {
     const formData = new FormData();
     formData.set("foo", "bar");
 
-    const data = parseFormData(formData, { foo: z.string() });
-    expect(data.success).toEqual(true);
-    expect(data.errors).toEqual([]);
+    const data = parseFormData(formData, z.object({ foo: z.string() }) );
+    expect(data.success).toBe(true);
+    expect(data.error).toBe(null);
     expect(data.data).toEqual({ foo: "bar" });
   });
 
@@ -18,9 +18,9 @@ describe("extractMany", () => {
     formData.set("shouldRead", "true");
     formData.set("ignorePlease", "ok");
 
-    const data = parseFormData(formData, { shouldRead: z.coerce.boolean() });
-    expect(data.success).toEqual(true);
-    expect(data.errors).toEqual([]);
+    const data = parseFormData(formData, z.object({ shouldRead: z.coerce.boolean() }));
+    expect(data.success).toBe(true);
+    expect(data.error).toBe(null);
     expect(data.data).toEqual({ shouldRead: true });
   });
 
@@ -28,19 +28,23 @@ describe("extractMany", () => {
     const formData = new FormData();
     formData.set("foo", "bar");
 
-    const data = parseFormData(formData, { foo: z.string(), requiredField: z.string() });
-    expect(data.success).toEqual(false);
-    expect(data.errors).toHaveLength(1);
-    expect(data.data).toEqual(null);
+    const data = parseFormData(formData, z.object({ foo: z.string(), requiredField: z.string() }));
+    expect(data.success).toBe(false);
+    expect(data.error).not.toBe(null);
+    expect(data.error?.errors).toHaveLength(1);
+    expect(data.error?.errors[0]?.path).toEqual(["requiredField"]);
+    expect(data.data).toBe(null);
   });
 
   it("fails if a field cannot be parsed", () => {
     const formData = new FormData();
     formData.set("foo", "bar");
 
-    const data = parseFormData(formData, { foo: z.coerce.number() });
+    const data = parseFormData(formData, z.object({ foo: z.coerce.number() }));
     expect(data.success).toEqual(false);
-    expect(data.errors).toHaveLength(1);
+    expect(data.error).not.toBe(null);
+    expect(data.error?.errors).toHaveLength(1);
+    expect(data.error?.errors[0]?.path).toEqual(["foo"]);
     expect(data.data).toEqual(null);
   });
 
@@ -48,22 +52,9 @@ describe("extractMany", () => {
     const formData = new FormData();
     formData.set("foo", "bar");
 
-    const data = parseFormData(formData, { foo: z.string(), opt: z.string().nullable() });
+    const data = parseFormData(formData, z.object({ foo: z.string(), opt: z.string().nullable() }));
     expect(data.success).toBe(true);
-    expect(data.errors).toHaveLength(0);
-    expect(data.data).toEqual({
-      foo: "bar",
-      opt: null,
-    });
-  });
-
-  it("accepts optional values (using nullable)", () => {
-    const formData = new FormData();
-    formData.set("foo", "bar");
-
-    const data = parseFormData(formData, { foo: z.string(), opt: z.string().nullable() });
-    expect(data.success).toBe(true);
-    expect(data.errors).toHaveLength(0);
+    expect(data.error).toBe(null);
     expect(data.data).toEqual({
       foo: "bar",
       opt: null,

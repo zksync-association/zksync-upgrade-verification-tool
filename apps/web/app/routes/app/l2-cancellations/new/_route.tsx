@@ -51,14 +51,14 @@ export async function loader() {
 
 export async function action({ request }: ActionFunctionArgs) {
   const { proposalId, l2GasLimit, l2GasPerPubdataByteLimit, refundRecipient, txMintValue, nonce } =
-    await extractFromFormData(request, {
+    await extractFromFormData(request, z.object({
       proposalId: hexSchema,
       l2GasLimit: z.coerce.bigint(),
       l2GasPerPubdataByteLimit: z.coerce.bigint(),
       refundRecipient: addressSchema,
       txMintValue: z.coerce.bigint(),
       nonce: z.coerce.number(),
-    });
+    }));
 
   await createVetoProposalFor(
     proposalId,

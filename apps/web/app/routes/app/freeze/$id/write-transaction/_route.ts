@@ -15,9 +15,9 @@ export async function action({ request, params: remixParams }: ActionFunctionArg
 
   const { hash } = await extractFromFormData(
     request,
-    {
+    z.object({
       hash: hexSchema,
-    },
+    }),
     notFound()
   );
 

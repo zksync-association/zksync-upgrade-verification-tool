@@ -81,11 +81,11 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const data = await extractFromFormData(request, {
+  const data = await extractFromFormData(request, z.object({
     signature: hexSchema,
-    proposalId: z.number(),
+    proposalId: z.coerce.number(),
     action: signActionSchema,
-  });
+  }));
 
   const proposal = await getFreezeProposalById(data.proposalId);
   if (!proposal) {

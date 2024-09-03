@@ -1,5 +1,6 @@
 import { badRequest } from "@/utils/http";
-import type { ZodTypeAny, z, ZodError } from "zod";
+import { type ZodTypeAny, type z, type ZodError, ZodObject } from "zod";
+import { ObjectCheckReport } from "@repo/ethereum-reports/reports/object-check-report";
 
 export function extract<T extends ZodTypeAny>(
   formData: FormData,
@@ -14,60 +15,49 @@ export function extract<T extends ZodTypeAny>(
   return parsed.data;
 }
 
-export type PlainObjectSchema = {
-  [key: string]: ZodTypeAny;
-};
 
-export type ParsedPlainObject<T extends PlainObjectSchema> = {
-  [K in keyof T]: z.infer<T[K]>;
-};
-
-export type ParseFromDataRes<T extends PlainObjectSchema> =
+export type ParseFromDataRes<T extends ZodObject<any>> =
   | {
       success: true;
-      data: ParsedPlainObject<T>;
-      errors: [];
+      data: z.infer<T>;
+      error: null;
     }
   | {
       success: false;
       data: null;
-      errors: ZodError[];
+      error: ZodError;
     };
 
-export function parseFormData<T extends PlainObjectSchema>(
+export function parseFormData<T extends ZodObject<any>>(
   formData: FormData,
   parser: T
 ): ParseFromDataRes<T> {
-  const keys = Object.entries(parser);
-  const res: any = {};
-  const errors: ZodError[] = [];
+  const keys = Object.keys(parser.shape);
 
-  for (const [key, schema] of keys) {
-    const data = formData.get(key);
-    const parsed = schema.safeParse(data);
-    if (parsed.success) {
-      res[key] = parsed.data;
-    } else {
-      errors.push(parsed.error);
-    }
+  const data: Record<string, any> = {}
+
+  for (const key of keys) {
+    data[key] = formData.get(key)
   }
 
-  if (errors.length > 0) {
-    return { success: false, data: null, errors: errors };
+  const parsed = parser.safeParse(data)
+
+  if (!parsed.success) {
+    return { success: false, data: null, error: parsed.error };
   }
 
-  return { success: true, data: res as ParsedPlainObject<T>, errors: [] };
+  return { success: true, data: parsed.data, error: null };
 }
 
 export type WithFormData = {
   formData: () => Promise<FormData>;
 };
 
-export async function extractFromFormData<T extends PlainObjectSchema>(
+export async function extractFromFormData<T extends ZodObject<any>>(
   request: WithFormData,
   schema: T,
   error = badRequest("Error parsing body")
-): Promise<ParsedPlainObject<T>> {
+): Promise<z.infer<T>> {
   const formData = await request.formData();
   const res = parseFormData(formData, schema);
   if (!res.success) {
