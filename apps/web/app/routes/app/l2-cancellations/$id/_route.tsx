@@ -28,6 +28,7 @@ import { getFormData, getParams } from "remix-params-helper";
 import { hexToBigInt, isAddressEqual } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
+import { extractFromFormData } from "@/utils/extract-from-formdata";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -62,25 +63,22 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const data = await getFormData(
+  const data = await extractFromFormData(
     request,
     z.object({
       signature: hexSchema,
-      proposalId: z.number(),
+      proposalId: z.coerce.number(),
     })
   );
-  if (!data.success) {
-    throw badRequest("Failed to parse signature data");
-  }
 
-  const proposal = await getL2CancellationById(data.data.proposalId);
+  const proposal = await getL2CancellationById(data.proposalId);
   if (!proposal) {
     throw badRequest("Proposal not found");
   }
 
   await validateAndSaveL2CancellationSignature({
     proposal,
-    signature: data.data.signature,
+    signature: data.signature,
     signer: user.address,
   });
   return json({ ok: true });
