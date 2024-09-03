@@ -36,9 +36,16 @@ export type ParseFromDataRes<T extends ObjectSchema> =
       errors: ParsedObjectError<T>;
     };
 
+export type ExtraValidation<T extends ObjectSchema> = {
+  key: string;
+  check: (o: ParsedObject<T>) => boolean;
+  message: (o: ParsedObject<T>) => string;
+}
+
 export function parseFormData<T extends ObjectSchema>(
   formData: FormData,
-  parser: T
+  parser: T,
+  extraValidations: ExtraValidation<T>[] = []
 ): ParseFromDataRes<T> {
   const keys = Object.entries(parser);
 
@@ -58,11 +65,24 @@ export function parseFormData<T extends ObjectSchema>(
     }
   }
 
+
   if (Object.keys(errors).length > 0) {
     return { success: false, data: null, errors: errors as ParsedObjectError<T> };
   }
 
-  return { success: true, data: data as ParsedObject<T>, errors: null };
+  const parsed = data as ParsedObject<T>;
+
+  for (const extraValidation of extraValidations) {
+    if (extraValidation.check(parsed)) {
+      errors[extraValidation.key] = extraValidation.message(parsed)
+    }
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { success: false, data: null, errors: errors as ParsedObjectError<T> };
+  }
+
+  return { success: true, data: parsed, errors: null };
 }
 
 export type WithFormData = {
