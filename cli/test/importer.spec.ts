@@ -248,8 +248,4 @@ describe("UpgradeImporter", () => {
       await expect(importer.readFromFiles(baseDir, "mainnet")).rejects.toThrow(MalformedUpgrade);
     });
   });
-
-  it("deleteme", () => {
-    console.log(z.coerce.boolean().default(false).parse("false"))
-  })
 });
