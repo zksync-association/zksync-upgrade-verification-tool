@@ -24,7 +24,7 @@ import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-r
 import { useLoaderData } from "@remix-run/react";
 import { CircleCheckBig, CircleX } from "lucide-react";
 import { hexSchema } from "@repo/common/schemas";
-import { getFormData, getParams } from "remix-params-helper";
+import { getParams } from "remix-params-helper";
 import { hexToBigInt, isAddressEqual } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";

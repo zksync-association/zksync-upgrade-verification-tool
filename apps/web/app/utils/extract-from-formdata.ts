@@ -1,6 +1,5 @@
 import { badRequest } from "@/utils/http";
 import { type ZodTypeAny, type z, type ZodError, ZodObject } from "zod";
-import { ObjectCheckReport } from "@repo/ethereum-reports/reports/object-check-report";
 
 export function extract<T extends ZodTypeAny>(
   formData: FormData,
