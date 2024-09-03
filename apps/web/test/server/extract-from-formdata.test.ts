@@ -7,7 +7,7 @@ describe("extractMany", () => {
     const formData = new FormData();
     formData.set("foo", "bar");
 
-    const data = parseFormData(formData, z.object({ foo: z.string() }) );
+    const data = parseFormData(formData, z.object({ foo: z.string() }));
     expect(data.success).toBe(true);
     expect(data.error).toBe(null);
     expect(data.data).toEqual({ foo: "bar" });

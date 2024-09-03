@@ -1,5 +1,5 @@
 import { badRequest } from "@/utils/http";
-import { type ZodTypeAny, type z, type ZodError, ZodObject } from "zod";
+import type { ZodTypeAny, z, ZodError, ZodObject } from "zod";
 
 export function extract<T extends ZodTypeAny>(
   formData: FormData,
@@ -13,7 +13,6 @@ export function extract<T extends ZodTypeAny>(
   }
   return parsed.data;
 }
-
 
 export type ParseFromDataRes<T extends ZodObject<any>> =
   | {
@@ -33,13 +32,13 @@ export function parseFormData<T extends ZodObject<any>>(
 ): ParseFromDataRes<T> {
   const keys = Object.keys(parser.shape);
 
-  const data: Record<string, any> = {}
+  const data: Record<string, any> = {};
 
   for (const key of keys) {
-    data[key] = formData.get(key)
+    data[key] = formData.get(key);
   }
 
-  const parsed = parser.safeParse(data)
+  const parsed = parser.safeParse(data);
 
   if (!parsed.success) {
     return { success: false, data: null, error: parsed.error };

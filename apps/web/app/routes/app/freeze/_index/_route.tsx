@@ -66,17 +66,17 @@ export async function action({ request }: ActionFunctionArgs) {
   const data = await extractFromFormData(
     request,
     z.object({
-        validUntil: z.coerce.date().min(new Date()),
-        threshold: z.coerce.number().min(1).max(9).nullable(),
-        type: freezeProposalsTypeSchema,
-      })
+      validUntil: z.coerce.date().min(new Date()),
+      threshold: z.coerce.number().min(1).max(9).nullable(),
+      type: freezeProposalsTypeSchema,
+    })
   );
 
   if (data.type === "SET_SOFT_FREEZE_THRESHOLD" && data.threshold === null) {
-    throw badRequest("Missing threshold.")
+    throw badRequest("Missing threshold.");
   }
   if (data.type !== "SET_SOFT_FREEZE_THRESHOLD" && data.threshold !== null) {
-    throw badRequest(`type ${data.type} cannot have a threshold`)
+    throw badRequest(`type ${data.type} cannot have a threshold`);
   }
 
   let nonce: bigint;

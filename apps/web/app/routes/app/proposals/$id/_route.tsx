@@ -26,7 +26,7 @@ import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
-import { badRequest, notFound } from "@/utils/http";
+import { notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
@@ -34,10 +34,11 @@ import { defer, json } from "@remix-run/node";
 import { Await, useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
 import { Suspense } from "react";
-import { getFormData, getParams } from "remix-params-helper";
+import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
+import { extractFromFormData } from "@/utils/extract-from-formdata";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -128,7 +129,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const data = await getFormData(
+  const data = await extractFromFormData(
     request,
     z.object({
       signature: hexSchema,
@@ -136,15 +137,12 @@ export async function action({ request }: ActionFunctionArgs) {
       actionName: signActionSchema,
     })
   );
-  if (!data.success) {
-    throw badRequest("Failed to parse signature data");
-  }
 
   await validateAndSaveProposalSignature(
-    data.data.signature,
+    data.signature,
     user.address as Hex,
-    data.data.actionName,
-    data.data.proposalId
+    data.actionName,
+    data.proposalId
   );
   return json({ ok: true });
 }
