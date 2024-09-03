@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateFreezeProposalModal } from "@/routes/app/freeze/_index/create-freeze-proposal-modal";
-import { generalError } from "@/utils/action-errors";
+import { formError, generalError } from "@/utils/action-errors";
 import { cn } from "@/utils/cn";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { Link, json, redirect, useLoaderData } from "@remix-run/react";
@@ -26,8 +26,7 @@ import { useState } from "react";
 import { $path } from "remix-routes";
 import type { Jsonify } from "type-fest";
 import { z } from "zod";
-import { extractFromFormData } from "@/utils/extract-from-formdata";
-import { badRequest } from "@/utils/http";
+import { parseFormData } from "@/utils/read-from-request";
 
 export async function loader() {
   const proposals = await getAllFreezeProposals();
@@ -63,20 +62,25 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const data = await extractFromFormData(
-    request,
-    z.object({
-      validUntil: z.coerce.date().min(new Date()),
-      threshold: z.coerce.number().min(1).max(9).nullable(),
-      type: freezeProposalsTypeSchema,
-    })
-  );
+  const parsed = await parseFormData(await request.formData(), {
+    validUntil: z.coerce.date().min(new Date()),
+    threshold: z.coerce.number().min(1).max(9).nullable(),
+    type: freezeProposalsTypeSchema,
+  });
+
+  if (parsed.errors) {
+    return json(formError(parsed.errors));
+  }
+
+  const data = parsed.data;
 
   if (data.type === "SET_SOFT_FREEZE_THRESHOLD" && data.threshold === null) {
-    throw badRequest("Missing threshold.");
+    return json(formError({ threshold: "cannot be empty" }));
   }
   if (data.type !== "SET_SOFT_FREEZE_THRESHOLD" && data.threshold !== null) {
-    throw badRequest(`type ${data.type} cannot have a threshold`);
+    return json(
+      formError({ threshold: `${data.type} do not use threshold, but threshold was sent.` })
+    );
   }
 
   let nonce: bigint;

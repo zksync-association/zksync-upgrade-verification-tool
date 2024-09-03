@@ -27,7 +27,7 @@ import { hexSchema } from "@repo/common/schemas";
 import { hexToBigInt, isAddressEqual } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
-import { extractFromFormData, extractFromParams } from "@/utils/extract-from-formdata";
+import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -59,13 +59,10 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const data = await extractFromFormData(
-    request,
-    z.object({
-      signature: hexSchema,
-      proposalId: z.coerce.number(),
-    })
-  );
+  const data = await getFormDataOrThrow(request, {
+    signature: hexSchema,
+    proposalId: z.coerce.number(),
+  });
 
   const proposal = await getL2CancellationById(data.proposalId);
   if (!proposal) {

@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { extractFromFormData } from "@/utils/extract-from-formdata";
+import { getFormDataOrThrow } from "@/utils/read-from-request";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type ActionFunctionArgs, defer, redirect } from "@remix-run/node";
 import { Await, useLoaderData, useNavigation } from "@remix-run/react";
@@ -51,17 +51,14 @@ export async function loader() {
 
 export async function action({ request }: ActionFunctionArgs) {
   const { proposalId, l2GasLimit, l2GasPerPubdataByteLimit, refundRecipient, txMintValue, nonce } =
-    await extractFromFormData(
-      request,
-      z.object({
-        proposalId: hexSchema,
-        l2GasLimit: z.coerce.bigint(),
-        l2GasPerPubdataByteLimit: z.coerce.bigint(),
-        refundRecipient: addressSchema,
-        txMintValue: z.coerce.bigint(),
-        nonce: z.coerce.number(),
-      })
-    );
+    await getFormDataOrThrow(request, {
+      proposalId: hexSchema,
+      l2GasLimit: z.coerce.bigint(),
+      l2GasPerPubdataByteLimit: z.coerce.bigint(),
+      refundRecipient: addressSchema,
+      txMintValue: z.coerce.bigint(),
+      nonce: z.coerce.number(),
+    });
 
   await createVetoProposalFor(
     proposalId,

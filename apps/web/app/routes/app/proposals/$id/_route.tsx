@@ -37,7 +37,7 @@ import { Suspense } from "react";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
-import { extractFromFormData, extractFromParams } from "@/utils/extract-from-formdata";
+import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -125,14 +125,11 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const data = await extractFromFormData(
-    request,
-    z.object({
-      signature: hexSchema,
-      proposalId: hexSchema,
-      actionName: signActionSchema,
-    })
-  );
+  const data = await getFormDataOrThrow(request, {
+    signature: hexSchema,
+    proposalId: hexSchema,
+    actionName: signActionSchema,
+  });
 
   await validateAndSaveProposalSignature(
     data.signature,

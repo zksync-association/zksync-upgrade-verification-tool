@@ -22,7 +22,7 @@ import { ArrowLeft, CircleCheckBig, CircleX, SquareArrowOutUpRight } from "lucid
 import { formatEther, formatGwei } from "viem";
 import { useWaitForTransactionReceipt } from "wagmi";
 import { z } from "zod";
-import { extractFromParams } from "@/utils/extract-from-formdata";
+import { extractFromParams } from "@/utils/read-from-request";
 
 export function loader(args: LoaderFunctionArgs) {
   const { hash } = extractFromParams(args.params, z.object({ hash: hexSchema }), notFound());

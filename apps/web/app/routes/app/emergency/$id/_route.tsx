@@ -24,7 +24,7 @@ import {
   SEC_COUNCIL_THRESHOLD,
   ZK_FOUNDATION_THRESHOLD,
 } from "@/utils/emergency-proposals";
-import { extract, extractFromParams } from "@/utils/extract-from-formdata";
+import { extract, extractFromParams } from "@/utils/read-from-request";
 import { badRequest, notFound } from "@/utils/http";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";

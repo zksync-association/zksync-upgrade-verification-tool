@@ -27,7 +27,8 @@ import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
 import ContractWriteButton from "./contract-write-button";
 import SignButton from "./sign-button";
-import { extractFromFormData, extractFromParams } from "@/utils/extract-from-formdata";
+import { extractFromParams, parseFormData } from "@/utils/read-from-request";
+import { formError } from "@/utils/action-errors";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -77,24 +78,27 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const data = await extractFromFormData(
-    request,
-    z.object({
-      signature: hexSchema,
-      proposalId: z.coerce.number(),
-      action: signActionSchema,
-    })
-  );
+  const parsed = parseFormData(await request.formData(), {
+    signature: hexSchema,
+    proposalId: z.coerce.number(),
+    action: signActionSchema,
+  });
 
-  const proposal = await getFreezeProposalById(data.proposalId);
+  if (!parsed.success) {
+    throw formError(parsed.errors);
+  }
+
+  const body = parsed.data;
+
+  const proposal = await getFreezeProposalById(body.proposalId);
   if (!proposal) {
     throw badRequest("Proposal not found");
   }
 
   await validateAndSaveFreezeSignature({
-    action: data.action,
+    action: body.action,
     proposal,
-    signature: data.signature,
+    signature: body.signature,
     signer: user.address as Hex,
   });
   return json({ ok: true });
