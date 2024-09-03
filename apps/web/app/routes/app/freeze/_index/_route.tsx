@@ -72,14 +72,14 @@ export async function action({ request }: ActionFunctionArgs) {
     [
       {
         key: "threshold",
-        check: data => data.type === "SET_SOFT_FREEZE_THRESHOLD" && data.threshold === null,
-        message: () => "cannot be empty"
+        check: (data) => data.type === "SET_SOFT_FREEZE_THRESHOLD" && data.threshold === null,
+        message: () => "cannot be empty",
       },
       {
         key: "threshold",
-        check: data => data.type !== "SET_SOFT_FREEZE_THRESHOLD" && data.threshold !== null,
-        message: data => `${data.type} do not use threshold, but threshold was sent.`
-      }
+        check: (data) => data.type !== "SET_SOFT_FREEZE_THRESHOLD" && data.threshold !== null,
+        message: (data) => `${data.type} do not use threshold, but threshold was sent.`,
+      },
     ]
   );
 
@@ -87,7 +87,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return json(formError(parsed.errors));
   }
 
-  const data = parsed.data
+  const data = parsed.data;
 
   let nonce: bigint;
   switch (data.type) {
