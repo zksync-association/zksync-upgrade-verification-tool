@@ -1,17 +1,16 @@
 import { expect, test } from "../../helpers/dappwright.js";
 
-test.beforeEach(async ({ page }, _testInfo) => {
-  await page.goto("http://localhost:3000");
+test.beforeEach(async ({ page }) => {
+  await page.goto("/");
 });
 
-test("should be able to connect", async ({ page }, _testInfo) => {
+test("should be able to connect", async ({ page }) => {
   await expect(page.getByText("Emergency Upgrades")).toBeVisible();
   await expect(page.getByText("Standard Upgrades")).toBeVisible();
 });
 
-test("should be able to see an active standard proposal", async ({ page }, _testInfo) => {
+test("should be able to see an active standard proposal", async ({ page }) => {
   await page.getByText("Standard Upgrades").click();
-  await page.waitForLoadState("networkidle");
 
   await expect(page.getByText("No active standard proposals found")).not.toBeVisible();
   await expect(page.getByText("No inactive standard proposals found")).toBeVisible();
@@ -21,28 +20,28 @@ test("should be able to see an active standard proposal", async ({ page }, _test
   await expect(activeProposal).toBeEnabled();
 });
 
-test("should be able to login as visitor", async ({ switcher, page }, _testInfo) => {
+test("should be able to login as visitor", async ({ switcher, page }) => {
   await switcher.visitor(page);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Visitor");
 });
 
-test("should be able to login as sec council", async ({ switcher, page }, _testInfo) => {
-  await switcher.council(page);
+test("should be able to login as sec council", async ({ switcher, page }) => {
+  await switcher.council(1, page);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Security Council");
 });
 
-test("should be able to login as guardian", async ({ switcher, page }, _testInfo) => {
-  await switcher.guardian(page);
+test("should be able to login as guardian", async ({ switcher, page }) => {
+  await switcher.guardian(1, page);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Guardian");
 });
 
-test("can login as zk association", async ({ switcher, page }, _testInfo) => {
+test("can login as zk association", async ({ switcher, page }) => {
   await switcher.zkFoundation(page);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
@@ -50,15 +49,11 @@ test("can login as zk association", async ({ switcher, page }, _testInfo) => {
 });
 
 test("should be able to see standard proposals", async ({ switcher, page }) => {
-  await switcher.council(page);
+  await switcher.council(1, page);
   await page.getByText("Standard Upgrades").click();
-  await page.waitForLoadState("networkidle");
 
   const activeProposal = page.getByRole("button", { name: /^0x[a-fA-F0-9]{64}$/ }).first();
   await activeProposal.click();
-
-  await page.waitForURL("**/proposals/**", { timeout: 1000 });
-  await page.waitForLoadState("networkidle");
 
   await expect(page.getByText("Proposal Details")).toBeVisible();
   await expect(page.getByText("Current Version:")).toBeVisible();
@@ -91,9 +86,8 @@ test("should be able to see standard proposals", async ({ switcher, page }) => {
 });
 
 test("should be able to sign standard proposals", async ({ switcher, wallet, page }) => {
-  await switcher.council(page);
+  await switcher.council(1, page);
   await page.getByText("Standard Upgrades").click();
-  await page.waitForLoadState("domcontentloaded");
 
   const activeProposal = page.getByRole("button", { name: /^0x[a-fA-F0-9]{64}$/ }).first();
   await activeProposal.click();
@@ -103,45 +97,39 @@ test("should be able to sign standard proposals", async ({ switcher, wallet, pag
     throw new Error("No Security Council Approvals found for initialApprovals");
   }
   const initialCount = Number.parseInt(initialApprovals.split("/")[0] ?? "");
+
   const approveButton = page.getByRole("button", { name: "Approve proposal" });
   await approveButton.click();
 
   await wallet.sign();
 
-  // To allow the count to update
-  await page.waitForLoadState("networkidle");
-
-  const updatedApprovals = await page.getByTestId("security-signatures").textContent();
-  if (!updatedApprovals) {
-    throw new Error("No Security Council Approvals found for updatedApprovals");
-  }
-  const updatedCount = Number.parseInt(updatedApprovals.split("/")[0] ?? "");
-
-  expect(updatedCount).toBe(initialCount + 1);
+  await expect(page.getByTestId("council-signature-count")).toHaveText(`${initialCount + 1}/6`);
   await expect(approveButton).toBeDisabled();
 });
 
-//TODO
-test.skip("should be able to enact signed standard proposals", async () => {
-  // fake all the signatures somehow
-  // click enact proposal
-  // verify on chain that something is done
-});
+// //TODO
+// test.skip("should be able to enact signed standard proposals", async () => {
+//   // fake all the signatures somehow
+//   // click enact proposal
+//   // verify on chain that something is done
+// });
 
-//TODO
-test.skip("should be able to see empty emergency upgrades", async () => {
-  // goto emergency upgrades
-  // check that there are no active upgrades
-  // check that there are no inactive upgrades
-});
+// //TODO
+// test.skip("should be able to see empty emergency upgrades", async () => {
+//   // goto emergency upgrades
+//   // check that there are no active upgrades
+//   // check that there are no inactive upgrades
+// });
 
 test("should be able to add emergency upgrade", async ({ switcher, page }) => {
-  await switcher.council(page);
+  await switcher.council(1, page);
   await page.getByText("Emergency Upgrades").click();
-  await page.waitForLoadState("networkidle");
 
   const addButton = page.getByTestId("new-emergency-proposal");
   await addButton.click();
+
+  // FIXME: remove when we move away from react-hook-form
+  await page.waitForTimeout(500);
 
   await page.getByLabel("Title").fill("Critical Security Fix");
   await page.getByText("Next").click();
@@ -151,23 +139,17 @@ test("should be able to add emergency upgrade", async ({ switcher, page }) => {
   await page.getByText("Add call").click();
   await page.getByText("Next").click();
 
-  await page.waitForLoadState("networkidle");
-
   await page.getByText("Submit").click();
 
   await page.waitForURL("**/app/emergency");
-  await page.waitForLoadState("networkidle");
 
   await expect(page.getByText("Critical Security Fix")).toBeVisible();
 });
 
 test("should be able to see detail of emergency upgrade", async ({ page }) => {
-  await page.getByText("Emergency Upgrades").click({ clickCount: 2 });
-  await page.waitForLoadState("networkidle");
+  await page.getByText("Emergency Upgrades").click();
 
   await page.getByRole("button", { name: "View" }).click();
-
-  await page.waitForURL("**/emergency/**", { timeout: 1000 });
 
   await expect(page.getByText("Critical Security Fix")).toBeVisible();
 
@@ -175,69 +157,44 @@ test("should be able to see detail of emergency upgrade", async ({ page }) => {
   await expect(page.getByText("Guardian Approvals")).toBeVisible();
   await expect(page.getByText("ZkFoundation approval")).toBeVisible();
 
-  expect(await page.getByTestId("security-signatures").textContent()).toMatch(/\d\/9/);
-  expect(await page.getByTestId("guardian-signatures").textContent()).toContain("0/5");
-  expect(await page.getByTestId("zkfoundation-signatures").textContent()).toContain("0/1");
+  await expect(page.getByTestId("security-signatures")).toHaveText(/\d\/9/);
+  await expect(page.getByTestId("guardian-signatures")).toHaveText("0/5");
+  await expect(page.getByTestId("zkfoundation-signatures")).toHaveText("0/1");
 
   const approveButton = page.getByRole("button", { name: "Approve" });
-  await expect(approveButton).toBeVisible();
   await expect(approveButton).toBeEnabled();
 
   const executeUpgradeButton = page.getByRole("button", { name: "Execute upgrade" });
-  await expect(executeUpgradeButton).toBeVisible();
   await expect(executeUpgradeButton).toBeDisabled();
 });
 
-test("should be able to sign emergency upgrade", async ({ wallet, page, context }) => {
-  await page.getByText("Emergency Upgrades").click({ clickCount: 2 });
-  await page.waitForLoadState("networkidle");
-
+test("should be able to sign emergency upgrade", async ({ wallet, page }) => {
+  await page.getByText("Emergency Upgrades").click();
   await page.getByRole("button", { name: "View" }).click();
 
-  try {
-    await page.waitForSelector("Proposal Details", { strict: false, timeout: 10000 });
-  } catch {
-    const locator = page.getByText("Go back to the home page");
-    if (await locator.isVisible()) {
-      page = await context.newPage();
-      await page.goto("http://localhost:3000");
-      await page.getByText("Emergency Upgrades").click({ clickCount: 2 });
-      await page.waitForLoadState("domcontentloaded");
-
-      await page.getByRole("button", { name: "View" }).click();
-    }
-  }
   const initialApprovals = await page.getByTestId("security-signatures").textContent();
   if (!initialApprovals) {
     throw new Error("No Security Council Approvals found for initialApprovals");
   }
   const initialCount = Number.parseInt(initialApprovals.split("/")[0] ?? "");
-  await page.getByRole("button", { name: "Approve" }).click();
 
+  await page.getByRole("button", { name: "Approve" }).click();
   await wallet.sign();
 
-  // To allow the count to update
-  await page.waitForTimeout(5000);
-  const updatedApprovals = await page.getByTestId("security-signatures").textContent();
-  if (!updatedApprovals) {
-    throw new Error("No Security Council Approvals found for updatedApprovals");
-  }
-  const updatedCount = Number.parseInt(updatedApprovals.split("/")[0] ?? "");
-
-  expect(updatedCount).toBe(initialCount + 1);
+  await expect(page.getByTestId("security-signatures")).toHaveText(`${initialCount + 1}/9`);
 });
 
-//TODO
-test.skip("should change status of emergency proposals went enough signatures collected", async () => {
-  // goto emergency upgrades
-  // click on emergency upgrade
-  // sign with enough signers so that it can be enacted
-  // go back to list and check status is ready
-});
+// // //TODO
+// // test.skip("should change status of emergency proposals went enough signatures collected", async () => {
+// //   // goto emergency upgrades
+// //   // click on emergency upgrade
+// //   // sign with enough signers so that it can be enacted
+// //   // go back to list and check status is ready
+// // });
 
-//TODO
-test.skip("should be able to enact signed emergency upgrade", async () => {
-  // fake all the signatures somehow
-  // click enact proposal
-  // verify on chain that something is done
-});
+// // //TODO
+// // test.skip("should be able to enact signed emergency upgrade", async () => {
+// //   // fake all the signatures somehow
+// //   // click enact proposal
+// //   // verify on chain that something is done
+// // });

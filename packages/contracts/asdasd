@@ -1,6 +1,0 @@
-ETHERSCAN_API_KEY=<key goes here>
-MNEMONIC="draw drastic exercise toilet stove bone grit clutch any stand phone ten"
-FORK_URL="https://sepolia.gateway.tenderly.co/6Il9TsxStvMLqwORY5XOJh"
-
-TS_NODE_FILES=true
-NODE_ENV=development
