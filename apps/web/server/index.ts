@@ -12,6 +12,7 @@ import { validateHandlerAddress } from "@/.server/service/clients";
 import { env } from "@config/env.server";
 import { auth } from "@server/middlewares/auth";
 import { cspNonce } from "@server/middlewares/csp-nonce";
+import { protectPrivateRoutes } from "@server/middlewares/protect-private-routes";
 import { patchBigintToJSON } from "@server/utils/bigint";
 import { helmet } from "./middlewares/helmet";
 import { logger } from "./middlewares/logger";
@@ -60,6 +61,7 @@ app.get(["/img/*", "/favicons/*"], (_req, res) => {
 });
 
 app.use(logger);
+app.use(protectPrivateRoutes);
 app.use(auth);
 app.use(cspNonce);
 app.use(helmet());
