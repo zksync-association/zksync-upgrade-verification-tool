@@ -24,24 +24,22 @@ import {
   SEC_COUNCIL_THRESHOLD,
   ZK_FOUNDATION_THRESHOLD,
 } from "@/utils/emergency-proposals";
-import { extract } from "@/utils/extract-from-formdata";
+import { extract, extractFromParams } from "@/utils/read-from-request";
 import { badRequest, notFound } from "@/utils/http";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
-import { getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
-  const params = getParams(args.params, z.object({ id: hexSchema }));
-  if (!params.success) {
-    throw notFound();
-  }
-
-  const { id: proposalId } = params.data;
+  const { id: proposalId } = extractFromParams(
+    args.params,
+    z.object({ id: hexSchema }),
+    notFound()
+  );
 
   const boardAddress = await emergencyBoardAddress();
 

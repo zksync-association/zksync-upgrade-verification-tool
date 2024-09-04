@@ -76,7 +76,6 @@
     "react-dom": "18.2.0",
     "react-hook-form": "^7.52.1",
     "react-hot-toast": "^2.4.1",
-    "remix-params-helper": "^0.5.1",
     "tailwind-merge": "^2.4.0",
     "tailwindcss-animate": "^1.0.7",
     "type-fest": "^4.23.0",

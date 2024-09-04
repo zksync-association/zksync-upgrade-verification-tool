@@ -26,7 +26,7 @@ import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
-import { badRequest, notFound } from "@/utils/http";
+import { notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
@@ -34,34 +34,31 @@ import { defer, json } from "@remix-run/node";
 import { Await, useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
 import { Suspense } from "react";
-import { getFormData, getParams } from "remix-params-helper";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
+import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
 
-  const params = getParams(remixParams, z.object({ id: hexSchema }));
-  if (!params.success) {
-    throw notFound();
-  }
+  const { id } = extractFromParams(remixParams, z.object({ id: hexSchema }), notFound());
 
   // Id is external_id coming from the smart contract
-  const proposal = await getProposalByExternalId(params.data.id);
+  const proposal = await getProposalByExternalId(id);
   if (!proposal) {
     throw notFound();
   }
 
   const getAsyncData = async () => {
-    const checkReport = await getCheckReport(params.data.id);
-    const storageChangeReport = await getStorageChangeReport(params.data.id);
+    const checkReport = await getCheckReport(id);
+    const storageChangeReport = await getStorageChangeReport(id);
     const [guardians, council, proposalStatus, signatures, proposalData] = await Promise.all([
       guardiansAddress(),
       councilAddress(),
-      getProposalStatus(params.data.id),
-      getSignaturesByExternalProposalId(params.data.id),
-      getProposalData(params.data.id),
+      getProposalStatus(id),
+      getSignaturesByExternalProposalId(id),
+      getProposalData(id),
     ]);
     const upgradeHandler = env.UPGRADE_HANDLER_ADDRESS;
 
@@ -128,23 +125,17 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const data = await getFormData(
-    request,
-    z.object({
-      signature: hexSchema,
-      proposalId: hexSchema,
-      actionName: signActionSchema,
-    })
-  );
-  if (!data.success) {
-    throw badRequest("Failed to parse signature data");
-  }
+  const data = await getFormDataOrThrow(request, {
+    signature: hexSchema,
+    proposalId: hexSchema,
+    actionName: signActionSchema,
+  });
 
   await validateAndSaveProposalSignature(
-    data.data.signature,
+    data.signature,
     user.address as Hex,
-    data.data.actionName,
-    data.data.proposalId
+    data.actionName,
+    data.proposalId
   );
   return json({ ok: true });
 }

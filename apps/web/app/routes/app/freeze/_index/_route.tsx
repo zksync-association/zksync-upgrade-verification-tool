@@ -23,10 +23,10 @@ import { Link, json, redirect, useLoaderData } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
 import { ArrowRight, PlusIcon } from "lucide-react";
 import { useState } from "react";
-import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import type { Jsonify } from "type-fest";
 import { z } from "zod";
+import { parseFormData } from "@/utils/read-from-request";
 
 export async function loader() {
   const proposals = await getAllFreezeProposals();
@@ -62,33 +62,35 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const data = await getFormData(
-    request,
-    z
-      .object({
-        validUntil: z.coerce.date().min(new Date()),
-        threshold: z.number().min(1).max(9).optional(),
-        type: freezeProposalsTypeSchema,
-      })
-      .refine(
-        (data) => {
-          if (data.type === "SET_SOFT_FREEZE_THRESHOLD") {
-            return data.threshold !== undefined;
-          }
-          return data.threshold === undefined;
-        },
-        {
-          message: "Threshold must be defined only when type is SET_SOFT_FREEZE_THRESHOLD",
-          path: ["threshold"],
-        }
-      )
+  const parsed = parseFormData(
+    await request.formData(),
+    {
+      validUntil: z.coerce.date().min(new Date()),
+      threshold: z.coerce.number().min(1).max(9).nullable(),
+      type: freezeProposalsTypeSchema,
+    },
+    [
+      {
+        key: "threshold",
+        check: (data) => data.type === "SET_SOFT_FREEZE_THRESHOLD" && data.threshold === null,
+        message: () => "cannot be empty",
+      },
+      {
+        key: "threshold",
+        check: (data) => data.type !== "SET_SOFT_FREEZE_THRESHOLD" && data.threshold !== null,
+        message: (data) => `${data.type} do not use threshold, but threshold was sent.`,
+      },
+    ]
   );
-  if (!data.success) {
-    return json(formError(data.errors));
+
+  if (parsed.errors) {
+    return json(formError(parsed.errors));
   }
 
+  const data = parsed.data;
+
   let nonce: bigint;
-  switch (data.data.type) {
+  switch (data.type) {
     case "SOFT_FREEZE":
       nonce = await councilSoftFreezeNonce();
       break;
@@ -107,9 +109,9 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     proposal = await createFreezeProposal({
       proposedOn: new Date(),
-      type: data.data.type,
-      softFreezeThreshold: data.data.threshold,
-      validUntil: data.data.validUntil,
+      type: data.type,
+      softFreezeThreshold: data.threshold,
+      validUntil: data.validUntil,
       externalId: nonce,
     });
   } catch (err) {

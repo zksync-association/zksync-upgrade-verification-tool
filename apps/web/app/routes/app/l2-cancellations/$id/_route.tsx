@@ -24,20 +24,17 @@ import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-r
 import { useLoaderData } from "@remix-run/react";
 import { CircleCheckBig, CircleX } from "lucide-react";
 import { hexSchema } from "@repo/common/schemas";
-import { getFormData, getParams } from "remix-params-helper";
 import { hexToBigInt, isAddressEqual } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
+import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
 
-  const params = getParams(remixParams, z.object({ id: hexSchema }));
-  if (!params.success) {
-    throw notFound();
-  }
+  const { id } = extractFromParams(remixParams, z.object({ id: hexSchema }), notFound());
 
-  const proposal = await getAndUpdateL2CancellationByExternalId(params.data.id);
+  const proposal = await getAndUpdateL2CancellationByExternalId(id);
 
   const [calls, signatures, guardiansAddr, l2GovernorAddr] = await Promise.all([
     getl2CancellationCallsByProposalId(proposal.id),
@@ -62,25 +59,19 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const data = await getFormData(
-    request,
-    z.object({
-      signature: hexSchema,
-      proposalId: z.number(),
-    })
-  );
-  if (!data.success) {
-    throw badRequest("Failed to parse signature data");
-  }
+  const data = await getFormDataOrThrow(request, {
+    signature: hexSchema,
+    proposalId: z.coerce.number(),
+  });
 
-  const proposal = await getL2CancellationById(data.data.proposalId);
+  const proposal = await getL2CancellationById(data.proposalId);
   if (!proposal) {
     throw badRequest("Proposal not found");
   }
 
   await validateAndSaveL2CancellationSignature({
     proposal,
-    signature: data.data.signature,
+    signature: data.signature,
     signer: user.address,
   });
   return json({ ok: true });

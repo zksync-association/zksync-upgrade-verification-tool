@@ -23,21 +23,19 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
 import { CircleCheckBig } from "lucide-react";
-import { getFormData, getParams } from "remix-params-helper";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
 import ContractWriteButton from "./contract-write-button";
 import SignButton from "./sign-button";
+import { extractFromParams, parseFormData } from "@/utils/read-from-request";
+import { formError } from "@/utils/action-errors";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
 
-  const params = getParams(remixParams, z.object({ id: z.coerce.number() }));
-  if (!params.success) {
-    throw notFound();
-  }
+  const { id } = extractFromParams(remixParams, z.object({ id: z.coerce.number() }), notFound());
 
-  const proposal = await getFreezeProposalById(params.data.id);
+  const proposal = await getFreezeProposalById(id);
   if (!proposal) {
     throw notFound();
   }
@@ -80,27 +78,27 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = requireUserFromHeader(request);
-  const data = await getFormData(
-    request,
-    z.object({
-      signature: hexSchema,
-      proposalId: z.number(),
-      action: signActionSchema,
-    })
-  );
-  if (!data.success) {
-    throw badRequest("Failed to parse signature data");
+  const parsed = parseFormData(await request.formData(), {
+    signature: hexSchema,
+    proposalId: z.coerce.number(),
+    action: signActionSchema,
+  });
+
+  if (!parsed.success) {
+    throw formError(parsed.errors);
   }
 
-  const proposal = await getFreezeProposalById(data.data.proposalId);
+  const body = parsed.data;
+
+  const proposal = await getFreezeProposalById(body.proposalId);
   if (!proposal) {
     throw badRequest("Proposal not found");
   }
 
   await validateAndSaveFreezeSignature({
-    action: data.data.action,
+    action: body.action,
     proposal,
-    signature: data.data.signature,
+    signature: body.signature,
     signer: user.address as Hex,
   });
   return json({ ok: true });

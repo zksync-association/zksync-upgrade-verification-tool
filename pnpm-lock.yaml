@@ -237,9 +237,6 @@ importers:
       react-hot-toast:
         specifier: ^2.4.1
         version: 2.4.1(csstype@3.1.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      remix-params-helper:
-        specifier: ^0.5.1
-        version: 0.5.1(zod@3.23.8)
       tailwind-merge:
         specifier: ^2.4.0
         version: 2.5.2
@@ -7480,11 +7477,6 @@ packages:
     hasBin: true
     peerDependencies:
       '@remix-run/dev': ^1.15.0 || ^2
-
-  remix-params-helper@0.5.1:
-    resolution: {integrity: sha512-aYn//NPpVD5igSbn04QLTfHkxjoDCW2SbArfaAxczW2MNvwV+ow0nDDpBsVRDQJE3UajeINVMXIgdO8JxL8RdQ==}
-    peerDependencies:
-      zod: ^3.11.6
 
   remix-routes@1.7.7:
     resolution: {integrity: sha512-Cj6PhrLkNHu4Vb+eSCnoFslqKmEtcZcvZkBHhrB2zsyJH+uLKBjETp0o3dR5vj0q+iUgxwnHFdEE1ThmKbWBKw==}
@@ -17251,10 +17243,6 @@ snapshots:
       '@remix-run/v1-route-convention': 0.1.4(@remix-run/dev@2.11.2(@remix-run/react@2.11.2(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.5.4))(@remix-run/serve@2.11.2(typescript@5.5.4))(@types/node@22.5.1)(bufferutil@4.0.8)(terser@5.31.6)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10)(vite@5.4.2(@types/node@22.5.1)(terser@5.31.6)))
       fs-extra: 11.2.0
       minimatch: 5.1.6
-
-  remix-params-helper@0.5.1(zod@3.23.8):
-    dependencies:
-      zod: 3.23.8
 
   remix-routes@1.7.7:
     dependencies:
