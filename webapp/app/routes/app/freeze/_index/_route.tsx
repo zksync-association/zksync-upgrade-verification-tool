@@ -27,6 +27,7 @@ import { getFormData } from "remix-params-helper";
 import { $path } from "remix-routes";
 import type { Jsonify } from "type-fest";
 import { z } from "zod";
+import { env } from "@config/env.server";
 
 export async function loader() {
   const proposals = await getAllFreezeProposals();
@@ -62,6 +63,10 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  if (!env.SHOW_PRIVATE_ACTIONS) {
+    return redirect($path("/"))
+  }
+
   const data = await getFormData(
     request,
     z

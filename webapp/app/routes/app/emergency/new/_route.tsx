@@ -16,12 +16,16 @@ import { useFetcher, useLoaderData } from "@remix-run/react";
 import { useState } from "react";
 import { $path } from "remix-routes";
 import { z } from "zod";
+import { env } from "@config/env.server";
 
 export async function loader() {
   return json({ emergencyBoardAddress: await emergencyBoardAddress() });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  if (!env.SHOW_PRIVATE_ACTIONS) {
+    return redirect($path("/"))
+  }
   const user = requireUserFromHeader(request);
   const body = z
     .object({

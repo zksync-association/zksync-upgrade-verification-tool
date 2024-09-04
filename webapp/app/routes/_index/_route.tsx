@@ -13,7 +13,7 @@ import { useAccount, useAccountEffect } from "wagmi";
 import { env } from "@config/env.server";
 
 export function loader({ request }: LoaderFunctionArgs) {
-  const showButtons = env.RENDER_EMERGENCY_BUTTONS;
+  const showButtons = env.SHOW_PRIVATE_ACTIONS;
   console.log("showButtons", showButtons, process.env.RENDER_EMERGENCY_BUTTONS);
   try {
     return { user: getUserFromHeader(request), showButtons };

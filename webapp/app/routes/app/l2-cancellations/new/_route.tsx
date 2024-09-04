@@ -38,6 +38,7 @@ import { $path } from "remix-routes";
 import { numberToHex } from "viem";
 import { useAccount } from "wagmi";
 import { z } from "zod";
+import { env } from "@config/env.server";
 
 export async function loader() {
   const maybeBiggestNonce = await getMaxRegisteredNonce();
@@ -51,6 +52,10 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  if (!env.SHOW_PRIVATE_ACTIONS) {
+    return redirect($path("/"))
+  }
+
   const formData = await request.formData().catch(() => {
     throw badRequest("Failed to parse body");
   });
