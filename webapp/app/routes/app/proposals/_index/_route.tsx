@@ -15,8 +15,6 @@ const isProposalInactive = (p: Proposal) => !isProposalActive(p);
 export function loader() {
   const getFilteredProposals = async () => {
     const proposals = await getProposals();
-    const sleep = () => new Promise((resolve) => setTimeout(resolve, 5000));
-    await sleep();
     return {
       active: proposals.filter(isProposalActive),
       inactive: proposals.filter(isProposalInactive),
