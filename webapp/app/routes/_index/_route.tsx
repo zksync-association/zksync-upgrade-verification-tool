@@ -6,16 +6,18 @@ import Navbar from "@/components/navbar";
 import NavbarWithUser from "@/components/navbar-with-user";
 import { Button } from "@/components/ui/button";
 import { getUserFromHeader } from "@/utils/auth-headers";
+import { env } from "@config/env.server";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json, redirect } from "@remix-run/node";
 import { Link, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import { $path } from "remix-routes";
 import { useAccount, useAccountEffect } from "wagmi";
 
 export function loader({ request }: LoaderFunctionArgs) {
+  const showButtons = env.ALLOW_PRIVATE_ACTIONS;
   try {
-    return { user: getUserFromHeader(request) };
+    return { user: getUserFromHeader(request), showButtons };
   } catch {
-    return { user: null };
+    return { user: null, showButtons };
   }
 }
 
@@ -42,7 +44,7 @@ export default function Index() {
   const account = useAccount();
   const fetcher = useFetcher<typeof action>();
   const navigation = useNavigation();
-  const { user } = useLoaderData<typeof loader>();
+  const { user, showButtons } = useLoaderData<typeof loader>();
 
   useAccountEffect({
     onConnect() {
@@ -75,15 +77,19 @@ export default function Index() {
                   <Link to={$path("/app/proposals")}>
                     <Button>Standard Upgrades</Button>
                   </Link>
-                  <Link to={$path("/app/emergency")}>
-                    <Button variant="destructive">Emergency Upgrades</Button>
-                  </Link>
-                  <Link to={$path("/app/freeze")}>
-                    <Button variant="secondary">Freeze Requests</Button>
-                  </Link>
-                  <Link to={$path("/app/l2-cancellations")}>
-                    <Button variant="secondary">L2 Proposals Veto</Button>
-                  </Link>
+                  {showButtons && (
+                    <>
+                      <Link to={$path("/app/emergency")}>
+                        <Button variant="destructive">Emergency Upgrades</Button>
+                      </Link>
+                      <Link to={$path("/app/freeze")}>
+                        <Button variant="secondary">Freeze Requests</Button>
+                      </Link>
+                      <Link to={$path("/app/l2-cancellations")}>
+                        <Button variant="secondary">L2 Proposals Veto</Button>
+                      </Link>
+                    </>
+                  )}
                 </div>
               )}
             </div>

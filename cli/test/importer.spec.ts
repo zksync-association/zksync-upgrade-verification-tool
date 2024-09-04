@@ -3,6 +3,7 @@ import { UpgradeImporter } from "../src";
 import { FileSystem } from "../src";
 import path from "node:path";
 import { MalformedUpgrade } from "../src/lib/errors";
+import { z } from "zod";
 
 class TestFS extends FileSystem {
   private registered: Map<string, string>;
