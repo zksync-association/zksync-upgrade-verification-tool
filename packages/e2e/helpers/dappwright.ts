@@ -3,12 +3,11 @@ import dappwright, { type Dappwright, MetaMaskWallet } from "@tenkeylabs/dappwri
 import "dotenv/config";
 import {
   COUNCIL_INDEXES,
-  COUNCIL_SIZE,
+  type COUNCIL_SIZE,
   DERIVATION_INDEXES,
   GUARDIAN_INDEXES,
-  GUARDIANS_SIZE,
+  type GUARDIANS_SIZE,
 } from "@repo/contracts/helpers/constants";
-import { faker } from "@faker-js/faker";
 
 export { expect } from "@playwright/test";
 
@@ -16,6 +15,7 @@ type Enumerate<N extends number, Acc extends number[] = []> = Acc["length"] exte
   ? Acc[number]
   : Enumerate<N, [...Acc, Acc["length"]]>;
 
+/** IntRange is a type that represents a range of numbers from F to T inclusive */
 type IntRange<F extends number, T extends number> = Exclude<Enumerate<T>, Enumerate<F>> | T;
 
 let sharedBrowserContext: BrowserContext;
@@ -52,26 +52,6 @@ export class RoleSwitcher {
 
   async visitor(page?: Page) {
     await this.switchToIndex(DERIVATION_INDEXES.VISITOR, page);
-  }
-
-  async randomCouncil(page?: Page) {
-    if (fastMode) {
-      return this.council(1, page);
-    }
-    return this.council(
-      faker.number.int({ min: 1, max: COUNCIL_SIZE }) as IntRange<1, typeof COUNCIL_SIZE>,
-      page
-    );
-  }
-
-  async randomGuardian(page?: Page) {
-    if (fastMode) {
-      return this.guardian(1, page);
-    }
-    return this.guardian(
-      faker.number.int({ min: 1, max: GUARDIANS_SIZE }) as IntRange<1, typeof GUARDIANS_SIZE>,
-      page
-    );
   }
 
   private async switchToIndex(index: number, page?: Page) {

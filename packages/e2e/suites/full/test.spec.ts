@@ -28,14 +28,14 @@ test("should be able to login as visitor", async ({ switcher, page }) => {
 });
 
 test("should be able to login as sec council", async ({ switcher, page }) => {
-  await switcher.randomCouncil(page);
+  await switcher.council(1, page);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Security Council");
 });
 
 test("should be able to login as guardian", async ({ switcher, page }) => {
-  await switcher.randomGuardian(page);
+  await switcher.guardian(1, page);
   const userRole = page.getByTestId("user-role");
   await expect(userRole).toBeVisible();
   await expect(userRole).toHaveText("Guardian");
@@ -49,7 +49,7 @@ test("can login as zk association", async ({ switcher, page }) => {
 });
 
 test("should be able to see standard proposals", async ({ switcher, page }) => {
-  await switcher.randomCouncil(page);
+  await switcher.council(1, page);
   await page.getByText("Standard Upgrades").click();
 
   const activeProposal = page.getByRole("button", { name: /^0x[a-fA-F0-9]{64}$/ }).first();
@@ -86,7 +86,7 @@ test("should be able to see standard proposals", async ({ switcher, page }) => {
 });
 
 test("should be able to sign standard proposals", async ({ switcher, wallet, page }) => {
-  await switcher.randomCouncil(page);
+  await switcher.council(1, page);
   await page.getByText("Standard Upgrades").click();
 
   const activeProposal = page.getByRole("button", { name: /^0x[a-fA-F0-9]{64}$/ }).first();
@@ -122,7 +122,7 @@ test("should be able to sign standard proposals", async ({ switcher, wallet, pag
 // });
 
 test("should be able to add emergency upgrade", async ({ switcher, page }) => {
-  await switcher.randomCouncil(page);
+  await switcher.council(1, page);
   await page.getByText("Emergency Upgrades").click();
 
   const addButton = page.getByTestId("new-emergency-proposal");
