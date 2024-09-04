@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { extract } from "@/utils/extract-from-formdata";
 import { badRequest } from "@/utils/http";
+import { env } from "@config/env.server";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type ActionFunctionArgs, defer, redirect } from "@remix-run/node";
 import { Await, useLoaderData, useNavigation } from "@remix-run/react";
@@ -38,7 +39,6 @@ import { $path } from "remix-routes";
 import { numberToHex } from "viem";
 import { useAccount } from "wagmi";
 import { z } from "zod";
-import { env } from "@config/env.server";
 
 export async function loader() {
   const maybeBiggestNonce = await getMaxRegisteredNonce();
@@ -53,7 +53,7 @@ export async function loader() {
 
 export async function action({ request }: ActionFunctionArgs) {
   if (!env.SHOW_PRIVATE_ACTIONS) {
-    return redirect($path("/"))
+    return redirect($path("/"));
   }
 
   const formData = await request.formData().catch(() => {

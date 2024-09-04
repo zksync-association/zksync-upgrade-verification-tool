@@ -5,8 +5,10 @@ import { z } from "zod";
 
 export const NodeEnvEnum = z.enum(["development", "test", "production"]);
 
-const boolFromStrSchema = z.enum(["true", "false"])
-  .default("true").transform(v => v === "true")
+const boolFromStrSchema = z
+  .enum(["true", "false"])
+  .default("true")
+  .transform((v) => v === "true");
 
 export const env = createEnv({
   server: {
@@ -36,7 +38,7 @@ export const clientEnv = {
   NODE_ENV: env.NODE_ENV,
   ETH_NETWORK: env.ETH_NETWORK,
   WALLET_CONNECT_PROJECT_ID: env.WALLET_CONNECT_PROJECT_ID,
-  SHOW_PRIVATE_ACTIONS: env.SHOW_PRIVATE_ACTIONS
+  SHOW_PRIVATE_ACTIONS: env.SHOW_PRIVATE_ACTIONS,
 };
 
 export type CLIENT_ENV = typeof clientEnv;

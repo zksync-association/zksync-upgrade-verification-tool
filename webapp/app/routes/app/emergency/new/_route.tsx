@@ -11,12 +11,12 @@ import { NewEmergencyProposalStep2 } from "@/routes/app/emergency/new/step2";
 import { Step3 } from "@/routes/app/emergency/new/step3";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { badRequest } from "@/utils/http";
+import { env } from "@config/env.server";
 import { type ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
 import { useState } from "react";
 import { $path } from "remix-routes";
 import { z } from "zod";
-import { env } from "@config/env.server";
 
 export async function loader() {
   return json({ emergencyBoardAddress: await emergencyBoardAddress() });
@@ -24,7 +24,7 @@ export async function loader() {
 
 export async function action({ request }: ActionFunctionArgs) {
   if (!env.SHOW_PRIVATE_ACTIONS) {
-    return redirect($path("/"))
+    return redirect($path("/"));
   }
   const user = requireUserFromHeader(request);
   const body = z
