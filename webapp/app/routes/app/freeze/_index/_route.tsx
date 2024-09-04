@@ -18,7 +18,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateFreezeProposalModal } from "@/routes/app/freeze/_index/create-freeze-proposal-modal";
 import { formError, generalError } from "@/utils/action-errors";
 import { cn } from "@/utils/cn";
-import { env } from "@config/env.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { Link, json, redirect, useLoaderData } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
@@ -63,10 +62,6 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  if (!env.SHOW_PRIVATE_ACTIONS) {
-    return redirect($path("/"));
-  }
-
   const data = await getFormData(
     request,
     z

@@ -11,7 +11,6 @@ import { NewEmergencyProposalStep2 } from "@/routes/app/emergency/new/step2";
 import { Step3 } from "@/routes/app/emergency/new/step3";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { badRequest } from "@/utils/http";
-import { env } from "@config/env.server";
 import { type ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
 import { useState } from "react";
@@ -23,9 +22,6 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  if (!env.SHOW_PRIVATE_ACTIONS) {
-    return redirect($path("/"));
-  }
   const user = requireUserFromHeader(request);
   const body = z
     .object({

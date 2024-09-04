@@ -13,8 +13,7 @@ import { $path } from "remix-routes";
 import { useAccount, useAccountEffect } from "wagmi";
 
 export function loader({ request }: LoaderFunctionArgs) {
-  const showButtons = env.SHOW_PRIVATE_ACTIONS;
-  console.log("showButtons", showButtons, process.env.RENDER_EMERGENCY_BUTTONS);
+  const showButtons = env.ALLOW_PRIVATE_ACTIONS;
   try {
     return { user: getUserFromHeader(request), showButtons };
   } catch {

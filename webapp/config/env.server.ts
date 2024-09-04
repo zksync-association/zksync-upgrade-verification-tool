@@ -26,7 +26,7 @@ export const env = createEnv({
     SKIP_REPORTS: z.coerce.boolean().default(false),
     ZK_GOV_OPS_GOVERNOR_ADDRESS: addressSchema,
     ZK_TOKEN_GOVERNOR_ADDRESS: addressSchema,
-    SHOW_PRIVATE_ACTIONS: boolFromStrSchema,
+    ALLOW_PRIVATE_ACTIONS: boolFromStrSchema,
   },
   // eslint-disable-next-line n/no-process-env
   runtimeEnv: process.env,
@@ -38,7 +38,7 @@ export const clientEnv = {
   NODE_ENV: env.NODE_ENV,
   ETH_NETWORK: env.ETH_NETWORK,
   WALLET_CONNECT_PROJECT_ID: env.WALLET_CONNECT_PROJECT_ID,
-  SHOW_PRIVATE_ACTIONS: env.SHOW_PRIVATE_ACTIONS,
+  ALLOW_PRIVATE_ACTIONS: env.ALLOW_PRIVATE_ACTIONS,
 };
 
 export type CLIENT_ENV = typeof clientEnv;

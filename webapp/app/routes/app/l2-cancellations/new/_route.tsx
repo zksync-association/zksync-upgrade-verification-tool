@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/table";
 import { extract } from "@/utils/extract-from-formdata";
 import { badRequest } from "@/utils/http";
-import { env } from "@config/env.server";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type ActionFunctionArgs, defer, redirect } from "@remix-run/node";
 import { Await, useLoaderData, useNavigation } from "@remix-run/react";
@@ -52,10 +51,6 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  if (!env.SHOW_PRIVATE_ACTIONS) {
-    return redirect($path("/"));
-  }
-
   const formData = await request.formData().catch(() => {
     throw badRequest("Failed to parse body");
   });
