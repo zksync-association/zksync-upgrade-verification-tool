@@ -13,7 +13,6 @@ function isPrivateRoute(req: Request) {
 }
 
 export async function protectPrivateRoutes(req: Request, res: Response, next: NextFunction) {
-  console.log("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", !env.ALLOW_PRIVATE_ACTIONS, isPrivateRoute(req));
   if (!env.ALLOW_PRIVATE_ACTIONS && isPrivateRoute(req)) {
     return res.redirect($path("/"));
   }
