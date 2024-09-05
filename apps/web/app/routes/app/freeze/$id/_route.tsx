@@ -8,7 +8,7 @@ import {
   councilUnfreezeThreshold,
 } from "@/.server/service/contracts";
 import { validateAndSaveFreezeSignature } from "@/.server/service/signatures";
-import { type SignAction, signActionSchema } from "@/common/sign-action";
+import { type SignAction, signActionEnum } from "@/common/sign-action";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
 import TxStatus from "@/components/tx-status";
@@ -81,7 +81,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const parsed = parseFormData(await request.formData(), {
     signature: hexSchema,
     proposalId: z.coerce.number(),
-    action: signActionSchema,
+    action: signActionEnum,
   });
 
   if (!parsed.success) {

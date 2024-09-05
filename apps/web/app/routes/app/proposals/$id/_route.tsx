@@ -135,7 +135,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   if (data.intent === "extendVeto") {
-    throw badRequest("not implemented")
+    await SIGNATURE_FACTORIES.extendVetoPeriod(data.proposalId, user.address, data.signature)
   }
 
   return json({ ok: true });

@@ -1,6 +1,6 @@
 import { bytea } from "@/.server/db/custom-types";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
-import { signActionSchema } from "@/common/sign-action";
+import { signActionEnum } from "@/common/sign-action";
 import { relations, sql } from "drizzle-orm";
 import {
   bigint,
@@ -94,7 +94,7 @@ export const signaturesTable = pgTable(
     signer: bytea("signer").notNull(),
     signature: bytea("signature").notNull(),
     action: text("action", {
-      enum: signActionSchema.options,
+      enum: signActionEnum.options,
     }).notNull(),
   },
   ({ proposal, signer, action, emergencyProposal, freezeProposal, l2GovernorProposal }) => ({

@@ -24,14 +24,19 @@ import {
 import { getFreezeProposalSignatureArgs } from "@/common/freeze-proposal";
 import { getL2CancellationSignatureArgs } from "@/common/l2-cancellations";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
-import { emergencyUpgradeActionForRole, type SignAction, standardUpgradeActionForRole } from "@/common/sign-action";
+import {
+  emergencyUpgradeActionForRole,
+  type SignAction,
+  signActionEnum,
+  standardUpgradeActionForRole
+} from "@/common/sign-action";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
 import { and, asc, eq, type InferSelectModel } from "drizzle-orm";
 import { type Hex, hexToBigInt } from "viem";
 import { verifySignature } from "@/.server/service/verify-signature";
-import type { UserRole } from "@/common/user-role-schema";
+import { type UserRole, UserRoleEnum } from "@/common/user-role-schema";
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 
 async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
@@ -67,7 +72,7 @@ async function targetContractForRole(role: UserRole): Promise<Hex> {
   }
 }
 
-const emergencyUpgrade = async (externalId: Hex, signer: Hex, signature: Hex) => {
+async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
   const proposal = await getEmergencyProposalByExternalId(externalId);
 
   if (!proposal) {
@@ -127,9 +132,9 @@ const emergencyUpgrade = async (externalId: Hex, signer: Hex, signature: Hex) =>
       await updateEmergencyProposal(proposal);
     }
 
-    await createOrIgnoreSignature(dto, { tx: sqltx });
+    await createOrIgnoreSignature(dto, {tx: sqltx});
   });
-};
+}
 
 function regularUpgradeContractNameByRole(role: UserRole): string {
   switch (role) {
@@ -153,7 +158,7 @@ async function regularUpgradeTargetAddressByRole(role: UserRole): Promise<Hex> {
   }
 }
 
-const regularUpgrade = async (externalId: Hex, signer: Hex, signature: Hex) => {
+async function regularUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
   const proposal = await getProposalByExternalId(externalId);
   if (!proposal) {
     throw notFound();
@@ -195,85 +200,56 @@ const regularUpgrade = async (externalId: Hex, signer: Hex, signature: Hex) => {
   await createOrIgnoreSignature(dto);
 }
 
-export const SIGNATURE_FACTORIES = {
-  emergencyUpgrade,
-  regularUpgrade
-} as const;
-
-export async function validateAndSaveProposalSignature(
-  signature: Hex,
-  signer: Hex,
-  action: SignAction,
-  proposalId: Hex
-) {
-  let validSignature: boolean;
-  if (action === "ExtendLegalVetoPeriod" || action === "ApproveUpgradeGuardians") {
-    const guardians = await guardianMembers();
-    if (!guardians.includes(signer)) {
-      throw badRequest(
-        `Signer is not a guardian. Only guardians can execute this action: ${action}`
-      );
-    }
-
-    const addr = await guardiansAddress();
-    validSignature = await verifySignature({
-      signer,
-      signature,
-      verifierAddr: addr,
-      action,
-      message: {
-        id: proposalId,
-      },
-      types: [
-        {
-          name: "id",
-          type: "bytes32",
-        },
-      ],
-      contractName: "Guardians",
-      targetContract: addr,
-    });
-  } else {
-    const members = await councilMembers();
-    if (!members.includes(signer)) {
-      throw badRequest(
-        `Signer is not a security council member. Only the security council can execute this action: ${action}`
-      );
-    }
-
-    const addr = await councilAddress();
-    validSignature = await verifySignature({
-      signer,
-      signature,
-      verifierAddr: addr,
-      action,
-      message: {
-        id: proposalId,
-      },
-      types: [
-        {
-          name: "id",
-          type: "bytes32",
-        },
-      ],
-      contractName: "SecurityCouncil",
-      targetContract: addr,
-    });
+async function extendVetoPeriod (externalId: Hex, signer: Hex, signature: Hex) {
+  const proposal = await getProposalByExternalId(externalId);
+  if (!proposal) {
+    throw notFound();
   }
 
-  if (!validSignature) {
-    throw badRequest("Invalid signature");
+  const role = await getUserAuthRole(signer);
+
+  if (role !== UserRoleEnum.enum.guardian) {
+    throw badRequest("Only guardians can extend legal veto period");
   }
+
+  const contractAddress = await guardiansAddress();
+
+  const types = [
+    {
+      name: "id",
+      type: "bytes32",
+    },
+  ]
+
+  const action = signActionEnum.enum.ExtendLegalVetoPeriod;
+  await verifySignature({
+    signer,
+    signature,
+    verifierAddr: contractAddress,
+    action,
+    message: {
+      id: proposal.externalId,
+    },
+    types,
+    contractName: regularUpgradeContractNameByRole(role),
+    targetContract: contractAddress,
+  })
 
   const dto = {
     action,
     signature,
-    proposal: proposalId,
+    proposal: proposal.externalId,
     signer,
   };
 
   await createOrIgnoreSignature(dto);
 }
+
+export const SIGNATURE_FACTORIES = {
+  emergencyUpgrade,
+  regularUpgrade,
+  extendVetoPeriod
+} as const;
 
 export async function validateAndSaveFreezeSignature({
   signature,

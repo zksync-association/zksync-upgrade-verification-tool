@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { type UserRole, UserRoleEnum } from "@/common/user-role-schema";
 
-export const signActionSchema = z.enum([
+export const signActionEnum = z.enum([
   "ExtendLegalVetoPeriod",
   "ApproveUpgradeGuardians",
   "ApproveUpgradeSecurityCouncil",
@@ -15,17 +15,17 @@ export const signActionSchema = z.enum([
   "CancelL2GovernorProposal",
 ]);
 
-export type SignAction = z.infer<typeof signActionSchema>;
+export type SignAction = z.infer<typeof signActionEnum>;
 
 const EMERGENCY_UPGRADE_ACTION_NAMES = {
-  guardian: signActionSchema.enum.ExecuteEmergencyUpgradeGuardians,
-  securityCouncil: signActionSchema.enum.ExecuteEmergencyUpgradeSecurityCouncil,
-  zkFoundation: signActionSchema.enum.ExecuteEmergencyUpgradeZKFoundation,
+  guardian: signActionEnum.enum.ExecuteEmergencyUpgradeGuardians,
+  securityCouncil: signActionEnum.enum.ExecuteEmergencyUpgradeSecurityCouncil,
+  zkFoundation: signActionEnum.enum.ExecuteEmergencyUpgradeZKFoundation,
 };
 
 const REGULAR_UPGRADE_ACTION_NAMES: Partial<Record<UserRole, SignAction>> = {
-  securityCouncil: signActionSchema.enum.ApproveUpgradeSecurityCouncil,
-  guardian: signActionSchema.enum.ApproveUpgradeGuardians
+  securityCouncil: signActionEnum.enum.ApproveUpgradeSecurityCouncil,
+  guardian: signActionEnum.enum.ApproveUpgradeGuardians
 }
 
 export function emergencyUpgradeActionForRole(role: UserRole): SignAction {
