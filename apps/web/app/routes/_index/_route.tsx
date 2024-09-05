@@ -5,10 +5,12 @@ import Navbar from "@/components/navbar";
 import NavbarWithUser from "@/components/navbar-with-user";
 import { Button } from "@/components/ui/button";
 import { getUserFromHeader } from "@/utils/auth-headers";
+import { parseFormData } from "@/utils/read-from-request";
 import { env } from "@config/env.server";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json, redirect } from "@remix-run/node";
 import { Link, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
-import { hexSchema } from "@repo/common/schemas";
+import { addressSchema } from "@repo/common/schemas";
+import { getUserRoleCookie } from "@server/utils/user-role-cookie";
 import { $path } from "remix-routes";
 import { useAccount, useAccountEffect } from "wagmi";
 
@@ -22,22 +24,22 @@ export function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  // On error redirect to the home page, address should be set by the backend
-  const { address } = getUserFromHeader(request);
-  if (!address) {
-    throw redirect($path("/"));
+  const data = parseFormData(await request.formData(), { address: addressSchema });
+  if (!data.success) {
+    return json({ status: "error", message: "Failed to get form data" }, { status: 400 });
   }
-  const parsedAddress = hexSchema.safeParse(address);
-  if (!parsedAddress.success) {
-    throw redirect($path("/"));
-  }
+  const address = data.data.address;
+
+  // Check if connection is up and running
   const isUp = await checkConnection();
   if (!isUp) {
     throw redirect($path("/app/down"));
   }
-  const role = await getUserAuthRole(parsedAddress.data);
 
-  return json({ status: "success", role });
+  // Get user role and save it in a cookie
+  const role = await getUserAuthRole(address);
+  const cookie = getUserRoleCookie(role);
+  return json({ ok: true }, { headers: { "Set-Cookie": cookie } });
 }
 
 export default function Index() {
@@ -47,8 +49,9 @@ export default function Index() {
   const { user, showButtons } = useLoaderData<typeof loader>();
 
   useAccountEffect({
-    onConnect() {
-      fetcher.submit({}, { method: "POST" });
+    // On connection, we want to set the user role in a cookie
+    onConnect({ address }) {
+      fetcher.submit({ address }, { method: "POST" });
     },
   });
 

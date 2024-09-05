@@ -1,5 +1,5 @@
-import { getUserAuthRole } from "@/.server/service/authorized-users";
 import { readAuthSession } from "@server/utils/auth-session";
+import { parseUserRoleCookie } from "@server/utils/user-role-cookie";
 import type { NextFunction, Request, Response } from "express";
 import { $path, type Routes } from "remix-routes";
 
@@ -17,26 +17,26 @@ function isProtectedRoute(req: Request) {
 }
 
 export async function auth(req: Request, res: Response, next: NextFunction) {
+  // Read the user's address and role
   const { address } = readAuthSession(req);
+  const role = parseUserRoleCookie(req.headers.cookie || "");
 
   // If the user is not logged in and tries to access a protected
   // route, redirect to the home page
-  if (!address && isProtectedRoute(req)) {
+  if ((!address || !role) && isProtectedRoute(req)) {
     clearUserHeaders(req);
     return res.redirect($path("/"));
   }
 
   // If the user is not logged in and accesses any other route
   // clear the user headers and continue
-  if (!address) {
+  if (!address || !role) {
     clearUserHeaders(req);
     return next();
   }
 
   // If user is logged in, just parse the user's role and set the headers
-  const role = await getUserAuthRole(address);
   setUserHeaders(req, { address, role });
-
   next();
 }
 
