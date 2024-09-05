@@ -7,11 +7,7 @@ import {
   createOrIgnoreSignature,
   getSignaturesByEmergencyProposalId,
 } from "@/.server/db/dto/signatures";
-import {
-  type FreezeProposalsType,
-  FreezeProposalsTypeEnum,
-  type l2CancellationsTable,
-} from "@/.server/db/schema";
+import { type FreezeProposalsType, FreezeProposalsTypeEnum } from "@/.server/db/schema";
 import {
   councilAddress,
   councilMembers,
@@ -32,9 +28,8 @@ import {
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
-import type { InferSelectModel } from "drizzle-orm";
 import { type Hex, hexToBigInt } from "viem";
-import { assertSignatureIsValid, verifySignature } from "@/.server/service/verify-signature";
+import { assertSignatureIsValid } from "@/.server/service/verify-signature";
 import { type UserRole, UserRoleEnum } from "@/common/user-role-schema";
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getFreezeProposalById } from "@/.server/db/dto/freeze-proposals";
@@ -297,7 +292,7 @@ async function freeze(freezeId: number, signer: Hex, signature: Hex) {
 }
 
 async function l2Cancellation(vetoId: number, signer: Hex, signature: Hex) {
-  const cancellation = await getL2CancellationById(vetoId)
+  const cancellation = await getL2CancellationById(vetoId);
   if (!cancellation) {
     throw notFound();
   }
@@ -340,5 +335,5 @@ export const SIGNATURE_FACTORIES = {
   regularUpgrade,
   extendVetoPeriod,
   freeze,
-  l2Cancellation
+  l2Cancellation,
 } as const;

@@ -69,11 +69,7 @@ export async function action({ request }: ActionFunctionArgs) {
     throw badRequest("Proposal not found");
   }
 
-  await SIGNATURE_FACTORIES.l2Cancellation(
-    data.proposalId,
-    user.address,
-    data.signature
-  )
+  await SIGNATURE_FACTORIES.l2Cancellation(data.proposalId, user.address, data.signature);
 
   return json({ ok: true });
 }

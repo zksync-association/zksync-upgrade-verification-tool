@@ -130,10 +130,9 @@ export async function verifySignature({
   }
 }
 
-
 export async function assertSignatureIsValid(args: VerifySignatureArgs): Promise<void> {
-  const isValid = await verifySignature(args)
+  const isValid = await verifySignature(args);
   if (!isValid) {
-    throw badRequest("Invalid signature")
+    throw badRequest("Invalid signature");
   }
 }
