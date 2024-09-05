@@ -354,19 +354,3 @@ export async function validateAndSaveL2CancellationSignature({
     l2GovernorProposal: proposal.id,
   });
 }
-
-export async function buildExtendVetoArgs(proposalId: Hex): Promise<null | any[]> {
-  const records = await db.query.signaturesTable.findMany({
-    where: and(
-      eq(signaturesTable.proposal, proposalId),
-      eq(signaturesTable.action, "ExtendLegalVetoPeriod")
-    ),
-    orderBy: asc(signaturesTable.signer),
-  });
-
-  if (records.length < 2) {
-    return null;
-  }
-
-  return [proposalId, records.map((r) => r.signer), records.map((r) => r.signature)];
-}
