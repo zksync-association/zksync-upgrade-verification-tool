@@ -297,6 +297,12 @@ async function l2Cancellation(vetoId: number, signer: Hex, signature: Hex) {
     throw notFound();
   }
 
+  const role = await getUserAuthRole(signer);
+
+  if (role !== UserRoleEnum.enum.guardian) {
+    throw badRequest("only guardians can extend legal veto period");
+  }
+
   const { message, types } = getL2CancellationSignatureArgs({
     proposal: {
       externalId: cancellation.externalId,
