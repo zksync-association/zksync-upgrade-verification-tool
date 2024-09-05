@@ -23,10 +23,23 @@ const EMERGENCY_UPGRADE_ACTION_NAMES = {
   zkFoundation: signActionSchema.enum.ExecuteEmergencyUpgradeZKFoundation,
 };
 
+const REGULAR_UPGRADE_ACTION_NAMES: Partial<Record<UserRole, SignAction>> = {
+  securityCouncil: signActionSchema.enum.ApproveUpgradeSecurityCouncil,
+  guardian: signActionSchema.enum.ApproveUpgradeGuardians
+}
+
 export function emergencyUpgradeActionForRole(role: UserRole): SignAction {
   if (role === UserRoleEnum.enum.visitor) {
     throw new Error("Visitors are not allowed to sign emergency upgrades");
   }
 
   return EMERGENCY_UPGRADE_ACTION_NAMES[role];
+}
+
+export function standardUpgradeActionForRole(role: UserRole): SignAction {
+  const action = REGULAR_UPGRADE_ACTION_NAMES[role];
+  if (!action) {
+    throw new Error(`${role} are not allowed to sign standard upgrades`)
+  }
+  return action
 }

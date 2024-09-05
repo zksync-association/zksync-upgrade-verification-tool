@@ -18,6 +18,7 @@ type SignButtonProps = {
   children?: React.ReactNode;
   disabled?: boolean;
   postAction: string;
+  intent: "extendVeto" | "approve"
 };
 
 export default function SignButton({
@@ -26,6 +27,7 @@ export default function SignButton({
   contractData,
   disabled,
   postAction,
+  intent
 }: SignButtonProps) {
   const { signTypedData, isPending, isSuccess } = useSignTypedData();
   const [chain] = useChains();
@@ -66,7 +68,7 @@ export default function SignButton({
       {
         onSuccess: (signature) => {
           fetcher.submit(
-            { intent: "newSignature", signature, proposalId },
+            { intent, signature, proposalId },
             { method: "POST", action: postAction }
           );
         },

@@ -4,8 +4,7 @@ import { councilAddress, guardiansAddress } from "@/.server/service/authorized-u
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
-import { validateAndSaveProposalSignature } from "@/.server/service/signatures";
-import { signActionSchema } from "@/common/sign-action";
+import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
 import TxStatus from "@/components/tx-status";
@@ -26,7 +25,7 @@ import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
-import { notFound } from "@/utils/http";
+import { badRequest, notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
@@ -119,7 +118,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   return defer({
     user,
     proposalId: proposal.externalId as Hex,
-    asyncData: getAsyncData(),
+    asyncData: getAsyncData()
   });
 }
 
@@ -128,15 +127,17 @@ export async function action({ request }: ActionFunctionArgs) {
   const data = await getFormDataOrThrow(request, {
     signature: hexSchema,
     proposalId: hexSchema,
-    actionName: signActionSchema,
+    intent: z.enum(["approve", "extendVeto"], { message: "Unknown intent" })
   });
 
-  await validateAndSaveProposalSignature(
-    data.signature,
-    user.address as Hex,
-    data.actionName,
-    data.proposalId
-  );
+  if (data.intent === "approve") {
+    await SIGNATURE_FACTORIES.regularUpgrade(data.proposalId, user.address, data.signature);
+  }
+
+  if (data.intent === "extendVeto") {
+    throw badRequest("not implemented")
+  }
+
   return json({ ok: true });
 }
 
@@ -295,6 +296,7 @@ export default function Proposals() {
                             }}
                             disabled={!signLegalVetoEnabled}
                             postAction={$path("/app/proposals/:id", { id: proposalId })}
+                            intent={"extendVeto"}
                           >
                             Approve extend veto period
                           </SignButton>
@@ -309,6 +311,7 @@ export default function Proposals() {
                             }}
                             disabled={!signProposalEnabled}
                             postAction={$path("/app/proposals/:id", { id: proposalId })}
+                            intent={"approve"}
                           >
                             Approve proposal
                           </SignButton>
@@ -323,6 +326,7 @@ export default function Proposals() {
                             }}
                             disabled={!signProposalEnabled}
                             postAction={$path("/app/proposals/:id", { id: proposalId })}
+                            intent={"approve"}
                           >
                             Approve proposal
                           </SignButton>

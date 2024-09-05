@@ -24,7 +24,7 @@ import {
 import { getFreezeProposalSignatureArgs } from "@/common/freeze-proposal";
 import { getL2CancellationSignatureArgs } from "@/common/l2-cancellations";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
-import { emergencyUpgradeActionForRole, type SignAction } from "@/common/sign-action";
+import { emergencyUpgradeActionForRole, type SignAction, standardUpgradeActionForRole } from "@/common/sign-action";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
@@ -32,6 +32,7 @@ import { and, asc, eq, type InferSelectModel } from "drizzle-orm";
 import { type Hex, hexToBigInt } from "viem";
 import { verifySignature } from "@/.server/service/verify-signature";
 import type { UserRole } from "@/common/user-role-schema";
+import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 
 async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
   const guardians = await guardianMembers();
@@ -130,8 +131,73 @@ const emergencyUpgrade = async (externalId: Hex, signer: Hex, signature: Hex) =>
   });
 };
 
+function regularUpgradeContractNameByRole(role: UserRole): string {
+  switch (role) {
+    case "securityCouncil":
+      return "SecurityCouncil"
+    case "guardian":
+      return "Guardians"
+    default:
+      throw new Error(`${role} cannot sign regular upgrades`)
+  }
+}
+
+async function regularUpgradeTargetAddressByRole(role: UserRole): Promise<Hex> {
+  switch (role) {
+    case "securityCouncil":
+      return councilAddress()
+    case "guardian":
+      return guardiansAddress()
+    default:
+      throw new Error(`${role} cannot sign regular upgrades`)
+  }
+}
+
+const regularUpgrade = async (externalId: Hex, signer: Hex, signature: Hex) => {
+  const proposal = await getProposalByExternalId(externalId);
+  if (!proposal) {
+    throw notFound();
+  }
+
+  const role = await getUserAuthRole(signer);
+
+  const action = standardUpgradeActionForRole(role)
+
+  const types = [
+    {
+      name: "id",
+      type: "bytes32",
+    },
+  ]
+
+  const contractAddress = await regularUpgradeTargetAddressByRole(role);
+
+  await verifySignature({
+    signer,
+    signature,
+    verifierAddr: contractAddress,
+    action,
+    message: {
+      id: proposal.externalId,
+    },
+    types,
+    contractName: regularUpgradeContractNameByRole(role),
+    targetContract: contractAddress,
+  })
+
+  const dto = {
+    action,
+    signature,
+    proposal: proposal.externalId,
+    signer,
+  };
+
+  await createOrIgnoreSignature(dto);
+}
+
 export const SIGNATURE_FACTORIES = {
   emergencyUpgrade,
+  regularUpgrade
 } as const;
 
 export async function validateAndSaveProposalSignature(
