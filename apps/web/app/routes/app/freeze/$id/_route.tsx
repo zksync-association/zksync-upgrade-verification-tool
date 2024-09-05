@@ -8,7 +8,7 @@ import {
   councilUnfreezeThreshold,
 } from "@/.server/service/contracts";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
-import { type SignAction, signActionEnum } from "@/common/sign-action";
+import type { SignAction } from "@/common/sign-action";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
 import TxStatus from "@/components/tx-status";
@@ -89,11 +89,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const body = parsed.data;
 
-  await SIGNATURE_FACTORIES.freeze(
-    body.proposalId,
-    user.address,
-    body.signature
-  )
+  await SIGNATURE_FACTORIES.freeze(body.proposalId, user.address, body.signature);
 
   return json({ ok: true });
 }

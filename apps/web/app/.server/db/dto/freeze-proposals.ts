@@ -34,7 +34,8 @@ export async function getFreezeProposalById(
   return await db
     .select()
     .from(freezeProposalsTable)
-    .where(eq(freezeProposalsTable.id, id)).then(getFirst);
+    .where(eq(freezeProposalsTable.id, id))
+    .then(getFirst);
 }
 
 export async function updateFreezeProposal(

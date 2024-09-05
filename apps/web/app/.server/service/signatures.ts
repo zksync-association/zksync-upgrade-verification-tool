@@ -8,9 +8,9 @@ import {
   getSignaturesByEmergencyProposalId,
 } from "@/.server/db/dto/signatures";
 import {
-  type freezeProposalsTable, type FreezeProposalsType, FreezeProposalsTypeEnum,
+  type FreezeProposalsType,
+  FreezeProposalsTypeEnum,
   type l2CancellationsTable,
-  signaturesTable,
 } from "@/.server/db/schema";
 import {
   councilAddress,
@@ -26,14 +26,13 @@ import { getL2CancellationSignatureArgs } from "@/common/l2-cancellations";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import {
   emergencyUpgradeActionForRole,
-  type SignAction,
   signActionEnum,
   standardUpgradeActionForRole,
 } from "@/common/sign-action";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
-import { and, asc, eq, type InferSelectModel } from "drizzle-orm";
+import type { InferSelectModel } from "drizzle-orm";
 import { type Hex, hexToBigInt } from "viem";
 import { verifySignature } from "@/.server/service/verify-signature";
 import { type UserRole, UserRoleEnum } from "@/common/user-role-schema";
@@ -257,14 +256,14 @@ function freezeActionFromType(type: FreezeProposalsType) {
     case FreezeProposalsTypeEnum.enum.UNFREEZE:
       return signActionEnum.enum.Unfreeze;
     default:
-      throw new Error(`Unknown freeze type: ${type}`)
+      throw new Error(`Unknown freeze type: ${type}`);
   }
 }
 
 async function freeze(freezeId: number, signer: Hex, signature: Hex) {
   const freeze = await getFreezeProposalById(freezeId);
   if (!freeze) {
-    throw notFound()
+    throw notFound();
   }
 
   const role = await getUserAuthRole(signer);
@@ -275,7 +274,7 @@ async function freeze(freezeId: number, signer: Hex, signature: Hex) {
 
   const action = freezeActionFromType(freeze.type);
 
-  const { message, types } = getFreezeProposalSignatureArgs(freeze)
+  const { message, types } = getFreezeProposalSignatureArgs(freeze);
 
   await verifySignature({
     signer,
@@ -286,7 +285,7 @@ async function freeze(freezeId: number, signer: Hex, signature: Hex) {
     types,
     contractName: "SecurityCouncil",
     targetContract: await councilAddress(),
-  })
+  });
 
   await createOrIgnoreSignature({
     action,
@@ -300,7 +299,7 @@ export const SIGNATURE_FACTORIES = {
   emergencyUpgrade,
   regularUpgrade,
   extendVetoPeriod,
-  freeze
+  freeze,
 } as const;
 
 export async function validateAndSaveL2CancellationSignature({
