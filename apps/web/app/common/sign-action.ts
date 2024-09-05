@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { type UserRole, UserRoleEnum } from "@/common/user-role-schema";
 
 export const signActionSchema = z.enum([
   "ExtendLegalVetoPeriod",
@@ -15,3 +16,17 @@ export const signActionSchema = z.enum([
 ]);
 
 export type SignAction = z.infer<typeof signActionSchema>;
+
+const EMERGENCY_UPGRADE_ACTION_NAMES = {
+  guardian: signActionSchema.enum.ExecuteEmergencyUpgradeGuardians,
+  securityCouncil: signActionSchema.enum.ExecuteEmergencyUpgradeSecurityCouncil,
+  zkFoundation: signActionSchema.enum.ExecuteEmergencyUpgradeZKFoundation,
+};
+
+export function emergencyUpgradeActionForRole(role: UserRole): SignAction {
+  if (role === UserRoleEnum.enum.visitor) {
+    throw new Error("Visitors are not allowed to sign emergency upgrades");
+  }
+
+  return EMERGENCY_UPGRADE_ACTION_NAMES[role];
+}

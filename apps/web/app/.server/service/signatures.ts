@@ -16,145 +16,22 @@ import {
   councilAddress,
   councilMembers,
   emergencyBoardAddress,
+  getUserAuthRole,
   guardianMembers,
   guardiansAddress,
   zkFoundationAddress,
 } from "@/.server/service/authorized-users";
-import { l1Rpc } from "@/.server/service/clients";
-import { guardiansAbi } from "@/.server/service/contract-abis";
 import { getFreezeProposalSignatureArgs } from "@/common/freeze-proposal";
 import { getL2CancellationSignatureArgs } from "@/common/l2-cancellations";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
-import { type SignAction, signActionSchema } from "@/common/sign-action";
+import { emergencyUpgradeActionForRole, type SignAction } from "@/common/sign-action";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
-import { env } from "@config/env.server";
-import { type InferSelectModel, and, asc, eq } from "drizzle-orm";
-import { type AbiFunction, type Hex, hashTypedData, hexToBigInt, verifyTypedData } from "viem";
-import { mainnet, sepolia } from "wagmi/chains";
-import { z } from "zod";
-
-function createTypedDigest({
-  verifierAddr,
-  action,
-  contractName,
-  types,
-  message,
-}: {
-  verifierAddr: Hex;
-  action: SignAction;
-  contractName: string;
-  types: { name: string; type: string }[];
-  message: { [_key: string]: any };
-}) {
-  return hashTypedData({
-    domain: {
-      name: contractName,
-      version: "1",
-      chainId: env.ETH_NETWORK === "mainnet" ? mainnet.id : sepolia.id,
-      verifyingContract: verifierAddr,
-    },
-    primaryType: action,
-    message,
-    types: {
-      [action]: types,
-    },
-  });
-}
-
-async function isValidSignatureZkFoundation(
-  foundationAddress: Hex,
-  signature: Hex,
-  verifierAddr: Hex,
-  action: SignAction,
-  message: Record<string, string>,
-  types: { name: string; type: string }[],
-  contractName: string
-): Promise<boolean> {
-  const digest = createTypedDigest({
-    verifierAddr,
-    action,
-    message,
-    types,
-    contractName,
-  });
-  const code = await l1Rpc.getByteCode(foundationAddress);
-
-  if (code === undefined) {
-    return verifyTypedData({
-      domain: {
-        name: contractName,
-        version: "1",
-        chainId: env.ETH_NETWORK === "mainnet" ? mainnet.id : sepolia.id,
-        verifyingContract: verifierAddr,
-      },
-      primaryType: action,
-      message,
-      types: {
-        [action]: types,
-      },
-      signature,
-      address: foundationAddress,
-    });
-  }
-
-  const IERC1271Abi: AbiFunction = {
-    name: "isValidSignature",
-    inputs: [
-      { name: "hash", type: "bytes32" },
-      { name: "signature", type: "bytes" },
-    ],
-    outputs: [{ name: "magicValue", type: "bytes4" }],
-    type: "function",
-    stateMutability: "view",
-  };
-
-  return await l1Rpc.contractRead(foundationAddress, "isValidSignature", [IERC1271Abi], z.any(), [
-    digest,
-    signature,
-  ]);
-}
-
-async function verifySignature({
-  signer,
-  signature,
-  verifierAddr,
-  action,
-  contractName,
-  types,
-  message,
-  targetContract,
-}: {
-  signer: Hex;
-  signature: Hex;
-  verifierAddr: Hex;
-  action: SignAction;
-  contractName: string;
-  types: { name: string; type: string }[];
-  message: { [_key: string]: any };
-  targetContract: Hex;
-}) {
-  const digest = createTypedDigest({
-    verifierAddr,
-    action,
-    message,
-    types,
-    contractName,
-  });
-
-  try {
-    await l1Rpc.contractRead(targetContract, "checkSignatures", guardiansAbi.raw, z.any(), [
-      digest,
-      [signer],
-      [signature],
-      1,
-    ]);
-    return true;
-  } catch {
-    return false;
-  }
-}
+import { and, asc, eq, type InferSelectModel } from "drizzle-orm";
+import { type Hex, hexToBigInt } from "viem";
+import { verifySignature } from "@/.server/service/verify-signature";
+import type { UserRole } from "@/common/user-role-schema";
 
 async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
   const guardians = await guardianMembers();
@@ -174,99 +51,74 @@ async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promi
   );
 }
 
-export async function saveEmergencySignature(
-  signature: Hex,
-  signer: Hex,
-  action: SignAction,
-  emergencyProposalId: Hex
-) {
-  switch (action) {
-    case "ExecuteEmergencyUpgradeGuardians": {
-      const isValid = await verifySignature({
-        signer,
-        signature,
-        verifierAddr: await emergencyBoardAddress(),
-        action,
-        message: {
-          id: emergencyProposalId,
-        },
-        types: [
-          {
-            name: "id",
-            type: "bytes32",
-          },
-        ],
-        contractName: "EmergencyUpgradeBoard",
-        targetContract: await guardiansAddress(),
-      });
-      if (!isValid) {
-        throw badRequest("Invalid signature provided");
-      }
-      break;
-    }
-    case "ExecuteEmergencyUpgradeSecurityCouncil": {
-      const isValid = await verifySignature({
-        signer,
-        signature,
-        verifierAddr: await emergencyBoardAddress(),
-        action,
-        message: {
-          id: emergencyProposalId,
-        },
-        types: [
-          {
-            name: "id",
-            type: "bytes32",
-          },
-        ],
-        contractName: "EmergencyUpgradeBoard",
-        targetContract: await councilAddress(),
-      });
-      if (!isValid) {
-        throw badRequest("Invalid signature provided");
-      }
-      break;
-    }
-    case "ExecuteEmergencyUpgradeZKFoundation": {
-      const isValid = await isValidSignatureZkFoundation(
-        await zkFoundationAddress(),
-        signature,
-        await emergencyBoardAddress(),
-        signActionSchema.enum.ExecuteEmergencyUpgradeZKFoundation,
-        { id: emergencyProposalId },
-        [{ name: "id", type: "bytes32" }],
-        "EmergencyUpgradeBoard"
-      );
-      if (!isValid) {
-        throw badRequest("Invalid signature provided");
-      }
-      break;
-    }
+async function targetContractForRole(role: UserRole): Promise<Hex> {
+  switch (role) {
+    case "guardian":
+      return await guardiansAddress();
+    case "visitor":
+      throw new Error("Visitors cannot sign");
+    case "securityCouncil":
+      return await councilAddress();
+    case "zkFoundation":
+      return zkFoundationAddress();
     default:
-      throw badRequest(`Unknown signature action: ${action}`);
+      throw new Error("Unknown role");
+  }
+}
+
+const emergencyUpgrade = async (externalId: Hex, signer: Hex, signature: Hex) => {
+  const proposal = await getEmergencyProposalByExternalId(externalId);
+
+  if (!proposal) {
+    throw notFound();
   }
 
+  if (
+    proposal.status === emergencyProposalStatusSchema.enum.CLOSED ||
+    proposal.status === emergencyProposalStatusSchema.enum.BROADCAST
+  ) {
+    throw badRequest(
+      `Emergency proposal ${proposal.externalId} is on status ${proposal.status} which does not support new signatures.`
+    );
+  }
+
+  const role = await getUserAuthRole(signer);
+
+  const types = [
+    {
+      name: "id",
+      type: "bytes32",
+    },
+  ];
+
+  const action = emergencyUpgradeActionForRole(role);
+
+  const targetContract = await targetContractForRole(role);
+  await verifySignature({
+    signer,
+    signature,
+    verifierAddr: await emergencyBoardAddress(),
+    action,
+    message: {
+      id: proposal.externalId,
+    },
+    types,
+    contractName: "EmergencyUpgradeBoard",
+    targetContract,
+  });
+
   await db.transaction(async (sqltx) => {
-    const proposal = await getEmergencyProposalByExternalId(emergencyProposalId, { tx: sqltx });
-
-    if (!proposal) {
-      throw notFound();
-    }
-
-    if (proposal.status !== emergencyProposalStatusSchema.enum.ACTIVE) {
-      throw badRequest("Proposal is not accepting more signatures");
-    }
-
     const dto = {
       action,
       signature,
-      emergencyProposal: emergencyProposalId,
+      emergencyProposal: proposal.externalId,
       signer,
     };
 
-    const oldSignatures = await getSignaturesByEmergencyProposalId(emergencyProposalId, {
+    const oldSignatures = await getSignaturesByEmergencyProposalId(proposal.externalId, {
       tx: sqltx,
     });
+
     const allSignatures = [...oldSignatures, dto];
 
     if (await shouldMarkProposalAsReady(allSignatures)) {
@@ -276,7 +128,11 @@ export async function saveEmergencySignature(
 
     await createOrIgnoreSignature(dto, { tx: sqltx });
   });
-}
+};
+
+export const SIGNATURE_FACTORIES = {
+  emergencyUpgrade,
+} as const;
 
 export async function validateAndSaveProposalSignature(
   signature: Hex,

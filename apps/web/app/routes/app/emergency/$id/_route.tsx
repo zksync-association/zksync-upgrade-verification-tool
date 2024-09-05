@@ -8,9 +8,8 @@ import {
   zkFoundationAddress,
 } from "@/.server/service/authorized-users";
 import { broadcastSuccess } from "@/.server/service/emergency-proposals";
-import { saveEmergencySignature } from "@/.server/service/signatures";
-import { type SignAction, signActionSchema } from "@/common/sign-action";
-import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
+import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
+import { emergencyUpgradeActionForRole } from "@/common/sign-action";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import { StatusIndicator } from "@/components/status-indicator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +25,7 @@ import {
 } from "@/utils/emergency-proposals";
 import { extract, extractFromParams } from "@/utils/read-from-request";
 import { badRequest, notFound } from "@/utils/http";
-import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
+import { type ActionFunctionArgs, json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
 import { $path } from "remix-routes";
@@ -86,9 +85,8 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === intentParser.enum.newSignature) {
     const user = requireUserFromHeader(request);
     const signature = extract(formData, "signature", hexSchema);
-    const actionName = extract(formData, "actionName", signActionSchema);
 
-    await saveEmergencySignature(signature, user.address, actionName, proposalId);
+    await SIGNATURE_FACTORIES.emergencyUpgrade(proposalId, user.address, signature);
   }
 
   if (intent === intentParser.enum.broadcastSuccess) {
@@ -96,20 +94,6 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   return json({ ok: true });
-}
-
-const ACTION_NAMES = {
-  guardian: signActionSchema.enum.ExecuteEmergencyUpgradeGuardians,
-  securityCouncil: signActionSchema.enum.ExecuteEmergencyUpgradeSecurityCouncil,
-  zkFoundation: signActionSchema.enum.ExecuteEmergencyUpgradeZKFoundation,
-};
-
-function actionForRole(role: UserRole): SignAction {
-  if (role === UserRoleSchema.enum.visitor) {
-    throw new Error("Visitors are not allowed to sign emergency upgrades");
-  }
-
-  return ACTION_NAMES[role];
 }
 
 export default function EmergencyUpgradeDetails() {
@@ -190,7 +174,7 @@ export default function EmergencyUpgradeDetails() {
               <SignButton
                 proposalId={proposal.externalId}
                 contractData={{
-                  actionName: actionForRole(user.role),
+                  actionName: emergencyUpgradeActionForRole(user.role),
                   address: addresses.emergencyBoard,
                   name: "EmergencyUpgradeBoard",
                 }}

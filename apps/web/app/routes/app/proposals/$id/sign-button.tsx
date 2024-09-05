@@ -66,7 +66,7 @@ export default function SignButton({
       {
         onSuccess: (signature) => {
           fetcher.submit(
-            { intent: "newSignature", signature, actionName: contractData.actionName, proposalId },
+            { intent: "newSignature", signature, proposalId },
             { method: "POST", action: postAction }
           );
         },

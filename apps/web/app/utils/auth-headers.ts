@@ -1,4 +1,4 @@
-import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
+import { type UserRole, UserRoleEnum } from "@/common/user-role-schema";
 import { unauthorized } from "@/utils/http";
 import { addressSchema } from "@repo/common/schemas";
 import { USER_ADDRESS_HEADER, USER_ROLE_HEADER } from "@server/middlewares/auth";
@@ -10,7 +10,7 @@ export function getUserFromHeader(request: Request) {
   const parsedAddress = addressSchema.parse(address);
 
   const role = request.headers.get(USER_ROLE_HEADER);
-  const parsedRole = UserRoleSchema.optional().safeParse(role);
+  const parsedRole = UserRoleEnum.optional().safeParse(role);
 
   return { address: parsedAddress, role: parsedRole.data ?? null };
 }
@@ -18,7 +18,7 @@ export function getUserFromHeader(request: Request) {
 export function requireUserFromHeader(request: Request): { address: Hex; role: UserRole } {
   const { address, role } = getUserFromHeader(request);
 
-  const parsedRole = UserRoleSchema.safeParse(role);
+  const parsedRole = UserRoleEnum.safeParse(role);
   if (!parsedRole.success) {
     throw unauthorized();
   }
