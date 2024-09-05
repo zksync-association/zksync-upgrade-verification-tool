@@ -7,7 +7,7 @@ import {
   getL2GovernorAddress,
   getL2VetoNonce,
 } from "@/.server/service/l2-cancellations";
-import { validateAndSaveL2CancellationSignature } from "@/.server/service/signatures";
+import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
 import TxStatus from "@/components/tx-status";
@@ -69,11 +69,12 @@ export async function action({ request }: ActionFunctionArgs) {
     throw badRequest("Proposal not found");
   }
 
-  await validateAndSaveL2CancellationSignature({
-    proposal,
-    signature: data.signature,
-    signer: user.address,
-  });
+  await SIGNATURE_FACTORIES.l2Cancellation(
+    data.proposalId,
+    user.address,
+    data.signature
+  )
+
   return json({ ok: true });
 }
 

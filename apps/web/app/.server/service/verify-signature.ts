@@ -5,6 +5,7 @@ import { env } from "@config/env.server";
 import { mainnet, sepolia } from "wagmi/chains";
 import { z } from "zod";
 import { guardiansAbi } from "@/.server/service/contract-abis";
+import { badRequest } from "@/utils/http";
 
 function createTypedDigest({
   verifierAddr,
@@ -87,6 +88,17 @@ export async function isValidSignatureZkFoundation(
   ]);
 }
 
+type VerifySignatureArgs = {
+  signer: Hex;
+  signature: Hex;
+  verifierAddr: Hex;
+  action: SignAction;
+  contractName: string;
+  types: { name: string; type: string }[];
+  message: { [_key: string]: any };
+  targetContract: Hex;
+};
+
 export async function verifySignature({
   signer,
   signature,
@@ -96,16 +108,7 @@ export async function verifySignature({
   types,
   message,
   targetContract,
-}: {
-  signer: Hex;
-  signature: Hex;
-  verifierAddr: Hex;
-  action: SignAction;
-  contractName: string;
-  types: { name: string; type: string }[];
-  message: { [_key: string]: any };
-  targetContract: Hex;
-}) {
+}: VerifySignatureArgs) {
   const digest = createTypedDigest({
     verifierAddr,
     action,
@@ -124,5 +127,13 @@ export async function verifySignature({
     return true;
   } catch {
     return false;
+  }
+}
+
+
+export async function assertSignatureIsValid(args: VerifySignatureArgs): Promise<void> {
+  const isValid = await verifySignature(args)
+  if (!isValid) {
+    throw badRequest("Invalid signature")
   }
 }

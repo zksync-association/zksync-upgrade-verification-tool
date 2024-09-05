@@ -34,10 +34,11 @@ import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
 import type { InferSelectModel } from "drizzle-orm";
 import { type Hex, hexToBigInt } from "viem";
-import { verifySignature } from "@/.server/service/verify-signature";
+import { assertSignatureIsValid, verifySignature } from "@/.server/service/verify-signature";
 import { type UserRole, UserRoleEnum } from "@/common/user-role-schema";
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getFreezeProposalById } from "@/.server/db/dto/freeze-proposals";
+import { getL2CancellationById } from "@/.server/db/dto/l2-cancellations";
 
 async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
   const guardians = await guardianMembers();
@@ -100,7 +101,7 @@ async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
   const action = emergencyUpgradeActionForRole(role);
 
   const targetContract = await targetContractForRole(role);
-  await verifySignature({
+  await assertSignatureIsValid({
     signer,
     signature,
     verifierAddr: await emergencyBoardAddress(),
@@ -177,7 +178,7 @@ async function regularUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
 
   const contractAddress = await regularUpgradeTargetAddressByRole(role);
 
-  await verifySignature({
+  await assertSignatureIsValid({
     signer,
     signature,
     verifierAddr: contractAddress,
@@ -222,7 +223,7 @@ async function extendVetoPeriod(externalId: Hex, signer: Hex, signature: Hex) {
   ];
 
   const action = signActionEnum.enum.ExtendLegalVetoPeriod;
-  await verifySignature({
+  await assertSignatureIsValid({
     signer,
     signature,
     verifierAddr: contractAddress,
@@ -276,7 +277,7 @@ async function freeze(freezeId: number, signer: Hex, signature: Hex) {
 
   const { message, types } = getFreezeProposalSignatureArgs(freeze);
 
-  await verifySignature({
+  await assertSignatureIsValid({
     signer,
     signature,
     verifierAddr: await councilAddress(),
@@ -295,61 +296,49 @@ async function freeze(freezeId: number, signer: Hex, signature: Hex) {
   });
 }
 
-export const SIGNATURE_FACTORIES = {
-  emergencyUpgrade,
-  regularUpgrade,
-  extendVetoPeriod,
-  freeze,
-} as const;
-
-export async function validateAndSaveL2CancellationSignature({
-  signature,
-  signer,
-  proposal,
-}: {
-  signature: Hex;
-  signer: Hex;
-  proposal: InferSelectModel<typeof l2CancellationsTable>;
-}) {
-  const enabledMembers = await guardianMembers();
-  if (!enabledMembers.includes(signer)) {
-    throw badRequest(
-      "Signer is not part of the guardians. Only guardian members can execute this action."
-    );
+async function l2Cancellation(vetoId: number, signer: Hex, signature: Hex) {
+  const cancellation = await getL2CancellationById(vetoId)
+  if (!cancellation) {
+    throw notFound();
   }
 
   const { message, types } = getL2CancellationSignatureArgs({
     proposal: {
-      externalId: proposal.externalId,
-      nonce: proposal.nonce,
+      externalId: cancellation.externalId,
+      nonce: cancellation.nonce,
     },
-    l2GasLimit: hexToBigInt(proposal.txRequestGasLimit),
-    l2GasPerPubdataByteLimit: hexToBigInt(proposal.txRequestL2GasPerPubdataByteLimit),
-    txMintValue: hexToBigInt(proposal.txRequestTxMintValue),
-    refundRecipient: proposal.txRequestRefundRecipient,
-    l2GovernorAddress: proposal.txRequestTo,
+    l2GasLimit: hexToBigInt(cancellation.txRequestGasLimit),
+    l2GasPerPubdataByteLimit: hexToBigInt(cancellation.txRequestL2GasPerPubdataByteLimit),
+    txMintValue: hexToBigInt(cancellation.txRequestTxMintValue),
+    refundRecipient: cancellation.txRequestRefundRecipient,
+    l2GovernorAddress: cancellation.txRequestTo,
   });
 
-  const addr = await guardiansAddress();
-  const validSignature = await verifySignature({
+  const contractAddress = await guardiansAddress();
+
+  await assertSignatureIsValid({
     signer,
     signature,
-    verifierAddr: addr,
+    verifierAddr: contractAddress,
     action: "CancelL2GovernorProposal",
     message,
     types,
     contractName: "Guardians",
-    targetContract: addr,
+    targetContract: contractAddress,
   });
-
-  if (!validSignature) {
-    throw badRequest("Invalid signature");
-  }
 
   await createOrIgnoreSignature({
     action: "CancelL2GovernorProposal",
     signature,
     signer,
-    l2GovernorProposal: proposal.id,
+    l2GovernorProposal: cancellation.id,
   });
 }
+
+export const SIGNATURE_FACTORIES = {
+  emergencyUpgrade,
+  regularUpgrade,
+  extendVetoPeriod,
+  freeze,
+  l2Cancellation
+} as const;
