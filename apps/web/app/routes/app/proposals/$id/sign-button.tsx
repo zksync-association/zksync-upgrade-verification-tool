@@ -18,7 +18,7 @@ type SignButtonProps = {
   children?: React.ReactNode;
   disabled?: boolean;
   postAction: string;
-  intent: "extendVeto" | "approve"
+  intent: "extendVeto" | "approve";
 };
 
 export default function SignButton({
@@ -27,7 +27,7 @@ export default function SignButton({
   contractData,
   disabled,
   postAction,
-  intent
+  intent,
 }: SignButtonProps) {
   const { signTypedData, isPending, isSuccess } = useSignTypedData();
   const [chain] = useChains();
@@ -67,10 +67,7 @@ export default function SignButton({
       },
       {
         onSuccess: (signature) => {
-          fetcher.submit(
-            { intent, signature, proposalId },
-            { method: "POST", action: postAction }
-          );
+          fetcher.submit({ intent, signature, proposalId }, { method: "POST", action: postAction });
         },
         onError() {
           toast.error("Failed to sign", { id: "sign_button" });

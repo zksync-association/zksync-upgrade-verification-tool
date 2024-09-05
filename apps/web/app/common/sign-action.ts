@@ -25,8 +25,8 @@ const EMERGENCY_UPGRADE_ACTION_NAMES = {
 
 const REGULAR_UPGRADE_ACTION_NAMES: Partial<Record<UserRole, SignAction>> = {
   securityCouncil: signActionEnum.enum.ApproveUpgradeSecurityCouncil,
-  guardian: signActionEnum.enum.ApproveUpgradeGuardians
-}
+  guardian: signActionEnum.enum.ApproveUpgradeGuardians,
+};
 
 export function emergencyUpgradeActionForRole(role: UserRole): SignAction {
   if (role === UserRoleEnum.enum.visitor) {
@@ -39,7 +39,7 @@ export function emergencyUpgradeActionForRole(role: UserRole): SignAction {
 export function standardUpgradeActionForRole(role: UserRole): SignAction {
   const action = REGULAR_UPGRADE_ACTION_NAMES[role];
   if (!action) {
-    throw new Error(`${role} are not allowed to sign standard upgrades`)
+    throw new Error(`${role} are not allowed to sign standard upgrades`);
   }
-  return action
+  return action;
 }

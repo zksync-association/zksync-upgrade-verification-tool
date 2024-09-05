@@ -28,7 +28,7 @@ import {
   emergencyUpgradeActionForRole,
   type SignAction,
   signActionEnum,
-  standardUpgradeActionForRole
+  standardUpgradeActionForRole,
 } from "@/common/sign-action";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
@@ -132,29 +132,29 @@ async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
       await updateEmergencyProposal(proposal);
     }
 
-    await createOrIgnoreSignature(dto, {tx: sqltx});
+    await createOrIgnoreSignature(dto, { tx: sqltx });
   });
 }
 
 function regularUpgradeContractNameByRole(role: UserRole): string {
   switch (role) {
     case "securityCouncil":
-      return "SecurityCouncil"
+      return "SecurityCouncil";
     case "guardian":
-      return "Guardians"
+      return "Guardians";
     default:
-      throw new Error(`${role} cannot sign regular upgrades`)
+      throw new Error(`${role} cannot sign regular upgrades`);
   }
 }
 
 async function regularUpgradeTargetAddressByRole(role: UserRole): Promise<Hex> {
   switch (role) {
     case "securityCouncil":
-      return councilAddress()
+      return councilAddress();
     case "guardian":
-      return guardiansAddress()
+      return guardiansAddress();
     default:
-      throw new Error(`${role} cannot sign regular upgrades`)
+      throw new Error(`${role} cannot sign regular upgrades`);
   }
 }
 
@@ -166,14 +166,14 @@ async function regularUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
 
   const role = await getUserAuthRole(signer);
 
-  const action = standardUpgradeActionForRole(role)
+  const action = standardUpgradeActionForRole(role);
 
   const types = [
     {
       name: "id",
       type: "bytes32",
     },
-  ]
+  ];
 
   const contractAddress = await regularUpgradeTargetAddressByRole(role);
 
@@ -188,7 +188,7 @@ async function regularUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
     types,
     contractName: regularUpgradeContractNameByRole(role),
     targetContract: contractAddress,
-  })
+  });
 
   const dto = {
     action,
@@ -200,7 +200,7 @@ async function regularUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
   await createOrIgnoreSignature(dto);
 }
 
-async function extendVetoPeriod (externalId: Hex, signer: Hex, signature: Hex) {
+async function extendVetoPeriod(externalId: Hex, signer: Hex, signature: Hex) {
   const proposal = await getProposalByExternalId(externalId);
   if (!proposal) {
     throw notFound();
@@ -219,7 +219,7 @@ async function extendVetoPeriod (externalId: Hex, signer: Hex, signature: Hex) {
       name: "id",
       type: "bytes32",
     },
-  ]
+  ];
 
   const action = signActionEnum.enum.ExtendLegalVetoPeriod;
   await verifySignature({
@@ -233,7 +233,7 @@ async function extendVetoPeriod (externalId: Hex, signer: Hex, signature: Hex) {
     types,
     contractName: regularUpgradeContractNameByRole(role),
     targetContract: contractAddress,
-  })
+  });
 
   const dto = {
     action,
@@ -248,7 +248,7 @@ async function extendVetoPeriod (externalId: Hex, signer: Hex, signature: Hex) {
 export const SIGNATURE_FACTORIES = {
   emergencyUpgrade,
   regularUpgrade,
-  extendVetoPeriod
+  extendVetoPeriod,
 } as const;
 
 export async function validateAndSaveFreezeSignature({

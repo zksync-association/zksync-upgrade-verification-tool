@@ -25,7 +25,7 @@ import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
-import { badRequest, notFound } from "@/utils/http";
+import { notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
@@ -118,7 +118,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   return defer({
     user,
     proposalId: proposal.externalId as Hex,
-    asyncData: getAsyncData()
+    asyncData: getAsyncData(),
   });
 }
 
@@ -127,7 +127,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const data = await getFormDataOrThrow(request, {
     signature: hexSchema,
     proposalId: hexSchema,
-    intent: z.enum(["approve", "extendVeto"], { message: "Unknown intent" })
+    intent: z.enum(["approve", "extendVeto"], { message: "Unknown intent" }),
   });
 
   if (data.intent === "approve") {
@@ -135,7 +135,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   if (data.intent === "extendVeto") {
-    await SIGNATURE_FACTORIES.extendVetoPeriod(data.proposalId, user.address, data.signature)
+    await SIGNATURE_FACTORIES.extendVetoPeriod(data.proposalId, user.address, data.signature);
   }
 
   return json({ ok: true });
