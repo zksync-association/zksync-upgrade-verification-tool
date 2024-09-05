@@ -2,7 +2,7 @@ import { db } from "@/.server/db";
 import { getFirst, getFirstOrThrow } from "@/.server/db/dto/utils/common";
 import { ValidationError } from "@/.server/db/errors";
 import { freezeProposalsTable } from "@/.server/db/schema";
-import { type InferInsertModel, type InferSelectModel, and, eq } from "drizzle-orm";
+import { and, eq, type InferInsertModel, type InferSelectModel } from "drizzle-orm";
 
 export async function createFreezeProposal(data: InferInsertModel<typeof freezeProposalsTable>) {
   const existing = await db
@@ -30,12 +30,11 @@ export async function getAllFreezeProposals() {
 
 export async function getFreezeProposalById(
   id: InferSelectModel<typeof freezeProposalsTable>["id"]
-) {
-  return db
+): Promise<InferSelectModel<typeof freezeProposalsTable> | undefined> {
+  return await db
     .select()
     .from(freezeProposalsTable)
-    .where(eq(freezeProposalsTable.id, id))
-    .then(getFirst);
+    .where(eq(freezeProposalsTable.id, id)).then(getFirst);
 }
 
 export async function updateFreezeProposal(

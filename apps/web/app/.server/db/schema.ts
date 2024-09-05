@@ -114,20 +114,20 @@ export const signaturesTable = pgTable(
   })
 );
 
-export const freezeProposalsTypeSchema = z.enum([
+export const FreezeProposalsTypeEnum = z.enum([
   "SOFT_FREEZE",
   "HARD_FREEZE",
   "UNFREEZE",
   "SET_SOFT_FREEZE_THRESHOLD",
 ]);
 
-export type FreezeProposalsType = z.infer<typeof freezeProposalsTypeSchema>;
+export type FreezeProposalsType = z.infer<typeof FreezeProposalsTypeEnum>;
 
 export const freezeProposalsTable = pgTable(
   "freeze_proposals",
   {
     id: serial("id").primaryKey(),
-    type: text("type", { enum: freezeProposalsTypeSchema.options }).notNull(),
+    type: text("type", { enum: FreezeProposalsTypeEnum.options }).notNull(),
     externalId: bigint("external_id", { mode: "bigint" }).notNull(),
     validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
     proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
@@ -139,8 +139,8 @@ export const freezeProposalsTable = pgTable(
     proposalCheck: check(
       "soft_freeze_threshold",
       sql`(
-        (type = ${freezeProposalsTypeSchema.Values.SET_SOFT_FREEZE_THRESHOLD} AND soft_freeze_threshold IS NOT NULL) OR
-        (type != ${freezeProposalsTypeSchema.Values.SET_SOFT_FREEZE_THRESHOLD} AND soft_freeze_threshold IS NULL)
+        (type = ${FreezeProposalsTypeEnum.Values.SET_SOFT_FREEZE_THRESHOLD} AND soft_freeze_threshold IS NOT NULL) OR
+        (type != ${FreezeProposalsTypeEnum.Values.SET_SOFT_FREEZE_THRESHOLD} AND soft_freeze_threshold IS NULL)
       )`
     ),
   })

@@ -8,7 +8,7 @@ import {
   getSignaturesByEmergencyProposalId,
 } from "@/.server/db/dto/signatures";
 import {
-  type freezeProposalsTable,
+  type freezeProposalsTable, type FreezeProposalsType, FreezeProposalsTypeEnum,
   type l2CancellationsTable,
   signaturesTable,
 } from "@/.server/db/schema";
@@ -38,6 +38,7 @@ import { type Hex, hexToBigInt } from "viem";
 import { verifySignature } from "@/.server/service/verify-signature";
 import { type UserRole, UserRoleEnum } from "@/common/user-role-schema";
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
+import { getFreezeProposalById } from "@/.server/db/dto/freeze-proposals";
 
 async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
   const guardians = await guardianMembers();
@@ -245,64 +246,62 @@ async function extendVetoPeriod(externalId: Hex, signer: Hex, signature: Hex) {
   await createOrIgnoreSignature(dto);
 }
 
-export const SIGNATURE_FACTORIES = {
-  emergencyUpgrade,
-  regularUpgrade,
-  extendVetoPeriod,
-} as const;
+function freezeActionFromType(type: FreezeProposalsType) {
+  switch (type) {
+    case FreezeProposalsTypeEnum.enum.SOFT_FREEZE:
+      return signActionEnum.enum.SoftFreeze;
+    case FreezeProposalsTypeEnum.enum.HARD_FREEZE:
+      return signActionEnum.enum.HardFreeze;
+    case FreezeProposalsTypeEnum.enum.SET_SOFT_FREEZE_THRESHOLD:
+      return signActionEnum.enum.SetSoftFreezeThreshold;
+    case FreezeProposalsTypeEnum.enum.UNFREEZE:
+      return signActionEnum.enum.Unfreeze;
+    default:
+      throw new Error(`Unknown freeze type: ${type}`)
+  }
+}
 
-export async function validateAndSaveFreezeSignature({
-  signature,
-  signer,
-  action,
-  proposal,
-}: {
-  signature: Hex;
-  signer: Hex;
-  action: SignAction;
-  proposal: InferSelectModel<typeof freezeProposalsTable>;
-}) {
-  if (
-    action !== "SoftFreeze" &&
-    action !== "HardFreeze" &&
-    action !== "Unfreeze" &&
-    action !== "SetSoftFreezeThreshold"
-  ) {
-    throw badRequest("Invalid action");
+async function freeze(freezeId: number, signer: Hex, signature: Hex) {
+  const freeze = await getFreezeProposalById(freezeId);
+  if (!freeze) {
+    throw notFound()
   }
 
-  const securityCouncilMembers = await councilMembers();
-  if (!securityCouncilMembers.includes(signer)) {
-    throw badRequest(
-      `Signer is not part of the security council. Only security council members can execute this action: ${action}`
-    );
+  const role = await getUserAuthRole(signer);
+
+  if (role !== UserRoleEnum.enum.securityCouncil) {
+    throw badRequest("only security council members can freeze contract");
   }
 
-  const { message, types } = getFreezeProposalSignatureArgs(proposal);
+  const action = freezeActionFromType(freeze.type);
 
-  const addr = await councilAddress();
-  const validSignature = await verifySignature({
+  const { message, types } = getFreezeProposalSignatureArgs(freeze)
+
+  await verifySignature({
     signer,
     signature,
-    verifierAddr: addr,
+    verifierAddr: await councilAddress(),
     action,
     message,
     types,
     contractName: "SecurityCouncil",
-    targetContract: addr,
-  });
-
-  if (!validSignature) {
-    throw badRequest("Invalid signature");
-  }
+    targetContract: await councilAddress(),
+  })
 
   await createOrIgnoreSignature({
     action,
     signature,
     signer,
-    freezeProposal: proposal.id,
+    freezeProposal: freeze.id,
   });
 }
+
+export const SIGNATURE_FACTORIES = {
+  emergencyUpgrade,
+  regularUpgrade,
+  extendVetoPeriod,
+  freeze
+} as const;
 
 export async function validateAndSaveL2CancellationSignature({
   signature,

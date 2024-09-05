@@ -3,7 +3,7 @@ import { isValidationError } from "@/.server/db/errors";
 import {
   type FreezeProposalsType,
   type freezeProposalsTable,
-  freezeProposalsTypeSchema,
+  FreezeProposalsTypeEnum,
 } from "@/.server/db/schema";
 import {
   councilFreezeNonces,
@@ -67,7 +67,7 @@ export async function action({ request }: ActionFunctionArgs) {
     {
       validUntil: z.coerce.date().min(new Date()),
       threshold: z.coerce.number().min(1).max(9).nullable(),
-      type: freezeProposalsTypeSchema,
+      type: FreezeProposalsTypeEnum,
     },
     [
       {

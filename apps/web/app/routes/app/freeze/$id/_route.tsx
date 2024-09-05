@@ -7,7 +7,7 @@ import {
   councilSoftFreezeThreshold,
   councilUnfreezeThreshold,
 } from "@/.server/service/contracts";
-import { validateAndSaveFreezeSignature } from "@/.server/service/signatures";
+import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import { type SignAction, signActionEnum } from "@/common/sign-action";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
@@ -17,7 +17,7 @@ import VotingStatusIndicator from "@/components/voting-status-indicator";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
-import { badRequest, notFound } from "@/utils/http";
+import { notFound } from "@/utils/http";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, useLoaderData } from "@remix-run/react";
@@ -81,7 +81,6 @@ export async function action({ request }: ActionFunctionArgs) {
   const parsed = parseFormData(await request.formData(), {
     signature: hexSchema,
     proposalId: z.coerce.number(),
-    action: signActionEnum,
   });
 
   if (!parsed.success) {
@@ -90,17 +89,12 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const body = parsed.data;
 
-  const proposal = await getFreezeProposalById(body.proposalId);
-  if (!proposal) {
-    throw badRequest("Proposal not found");
-  }
+  await SIGNATURE_FACTORIES.freeze(
+    body.proposalId,
+    user.address,
+    body.signature
+  )
 
-  await validateAndSaveFreezeSignature({
-    action: body.action,
-    proposal,
-    signature: body.signature,
-    signer: user.address as Hex,
-  });
   return json({ ok: true });
 }
 
