@@ -65,28 +65,57 @@ export default function Index() {
             </p>
             <div className="mt-10">
               {!account.isConnected ? (
-                <ConnectButton
-                  loading={
-                    fetcher.state === "submitting" ||
-                    (navigation.state === "loading" &&
-                      navigation.location.pathname === $path("/app"))
-                  }
-                />
+                <ConnectButton />
               ) : (
                 <div className="flex space-x-4">
                   <Link to={$path("/app/proposals")}>
-                    <Button>Standard Upgrades</Button>
+                    <Button
+                      loading={
+                        navigation.state === "loading" &&
+                        navigation.location.pathname === $path("/app/proposals")
+                      }
+                      className="w-[200px]"
+                    >
+                      Standard Upgrades
+                    </Button>
                   </Link>
                   {showButtons && (
                     <>
                       <Link to={$path("/app/emergency")}>
-                        <Button variant="destructive">Emergency Upgrades</Button>
+                        <Button
+                          loading={
+                            navigation.state === "loading" &&
+                            navigation.location.pathname === $path("/app/emergency")
+                          }
+                          className="w-[200px]"
+                          variant="destructive"
+                        >
+                          Emergency Upgrades
+                        </Button>
                       </Link>
                       <Link to={$path("/app/freeze")}>
-                        <Button variant="secondary">Freeze Requests</Button>
+                        <Button
+                          loading={
+                            navigation.state === "loading" &&
+                            navigation.location.pathname === $path("/app/freeze")
+                          }
+                          className="w-[200px]"
+                          variant="secondary"
+                        >
+                          Freeze Requests
+                        </Button>
                       </Link>
                       <Link to={$path("/app/l2-cancellations")}>
-                        <Button variant="secondary">L2 Proposals Veto</Button>
+                        <Button
+                          loading={
+                            navigation.state === "loading" &&
+                            navigation.location.pathname === $path("/app/l2-cancellations")
+                          }
+                          className="w-[200px]"
+                          variant="secondary"
+                        >
+                          L2 Proposals Veto
+                        </Button>
                       </Link>
                     </>
                   )}
