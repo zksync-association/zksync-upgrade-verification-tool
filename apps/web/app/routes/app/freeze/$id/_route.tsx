@@ -181,14 +181,14 @@ export default function Freeze() {
                 <span>Valid Until:</span>
                 <div className="flex w-1/2 flex-col break-words text-right">
                   <span>{proposalValidUntil.toLocaleString()}</span>
-                  <span>({dateToUnixTimestamp(proposalValidUntil)})</span>
+                  <span data-testId="valid-until-timestamp">({dateToUnixTimestamp(proposalValidUntil)})</span>
                 </div>
               </div>
               <div className="flex justify-between">
                 <span>Proposed On:</span>
                 <div className="flex w-1/2 flex-col break-words text-right">
                   <span>{new Date(proposal.proposedOn).toLocaleString()}</span>
-                  <span>({dateToUnixTimestamp(new Date(proposal.proposedOn))})</span>
+                  <span data-testId="proposed-on-timestamp">({dateToUnixTimestamp(new Date(proposal.proposedOn))})</span>
                 </div>
               </div>
               {proposal.transactionHash && (
