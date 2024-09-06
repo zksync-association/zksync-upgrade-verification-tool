@@ -1,6 +1,4 @@
 import { Button } from "@/components/ui/button";
-import type { action } from "@/routes/app/proposals/$id/_route";
-import { useFetcher } from "@remix-run/react";
 import { useEffect } from "react";
 import { toast } from "react-hot-toast";
 import type { Hex } from "viem";
