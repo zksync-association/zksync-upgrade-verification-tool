@@ -26,7 +26,6 @@ import { CircleCheckBig, CircleX } from "lucide-react";
 import { hexSchema } from "@repo/common/schemas";
 import { hexToBigInt, isAddressEqual } from "viem";
 import { z } from "zod";
-import SignButton from "./sign-button";
 import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
 import { SignCancellationButton } from "@/routes/app/l2-cancellations/$id/sign-cancellation-button";
 
