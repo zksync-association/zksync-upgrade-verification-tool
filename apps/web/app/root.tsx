@@ -10,11 +10,13 @@ import {
   deserialize as deserializeWagmiCookie,
   parseCookie as parseWagmiCookie,
 } from "wagmi";
+import { Cookies, CookiesProvider } from "react-cookie";
 
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
-import AccountRevalidatorProvider from "@/components/providers/account-revalidator-provider";
 import ConnectRedirectProvider from "@/components/providers/connect-redirect-provider";
+import AccountWatcherProvider from "./components/providers/account-watcher-provider";
+import RoleRevalidatorProvider from "./components/providers/role-revalidator-provider";
 
 export const links: LinksFunction = () => [
   {
@@ -27,12 +29,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Get wagmi cookie for SSR
   const cookies = request.headers.get("Cookie");
   const wagmiCookie = cookies ? parseWagmiCookie(cookies, "wagmi.store") : undefined;
-  return json({ env: clientEnv, wagmiCookie });
+  return json({ env: clientEnv, wagmiCookie, cookies });
 }
 
 export default function App() {
   const nonce = useNonce();
-  const { env, wagmiCookie } = useLoaderData<typeof loader>();
+  const { env, wagmiCookie, cookies } = useLoaderData<typeof loader>();
 
   const walletProviderInitialState = wagmiCookie
     ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
@@ -40,19 +42,23 @@ export default function App() {
 
   return (
     <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
-      <WalletProvider
-        initialState={walletProviderInitialState}
-        projectId={env.WALLET_CONNECT_PROJECT_ID}
-        network={env.ETH_NETWORK}
-      >
-        <AccountRevalidatorProvider>
-          <ConnectRedirectProvider>
-            <div className="flex min-h-screen flex-col px-10 py-10 lg:px-40">
-              <Outlet />
-            </div>
-          </ConnectRedirectProvider>
-        </AccountRevalidatorProvider>
-      </WalletProvider>
+      <CookiesProvider cookies={new Cookies(cookies)}>
+        <WalletProvider
+          initialState={walletProviderInitialState}
+          projectId={env.WALLET_CONNECT_PROJECT_ID}
+          network={env.ETH_NETWORK}
+        >
+          <AccountWatcherProvider>
+            <RoleRevalidatorProvider>
+              <ConnectRedirectProvider>
+                <div className="flex min-h-screen flex-col px-10 py-10 lg:px-40">
+                  <Outlet />
+                </div>
+              </ConnectRedirectProvider>
+            </RoleRevalidatorProvider>
+          </AccountWatcherProvider>
+        </WalletProvider>
+      </CookiesProvider>
     </Document>
   );
 }

@@ -22,7 +22,6 @@ import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
-import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
@@ -38,9 +37,11 @@ import { $path } from "remix-routes";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
 import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
+import { requireUserFromRequest } from "@/utils/auth-headers";
+import useUser from "@/components/hooks/use-user";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
-  const user = requireUserFromHeader(request);
+  const user = requireUserFromRequest(request);
 
   const { id } = extractFromParams(remixParams, z.object({ id: hexSchema }), notFound());
 
@@ -117,14 +118,13 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   };
 
   return defer({
-    user,
     proposalId: proposal.externalId as Hex,
     asyncData: getAsyncData(),
   });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = requireUserFromHeader(request);
+  const user = requireUserFromRequest(request);
   const data = await getFormDataOrThrow(request, {
     signature: hexSchema,
     proposalId: hexSchema,
@@ -145,7 +145,8 @@ const NECESSARY_GUARDIAN_SIGNATURES = 5;
 const NECESSARY_LEGAL_VETO_SIGNATURES = 2;
 
 export default function Proposals() {
-  const { user, asyncData, proposalId } = useLoaderData<typeof loader>();
+  const { asyncData, proposalId } = useLoaderData<typeof loader>();
+  const user = useUser();
 
   return (
     <div className="flex flex-1 flex-col">

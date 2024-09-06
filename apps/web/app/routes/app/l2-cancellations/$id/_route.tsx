@@ -16,7 +16,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CallsRawData } from "@/components/upgrade-raw-data";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
 import ExecL2VetoForm from "@/routes/app/l2-cancellations/$id/exec-l2-veto-form";
-import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { badRequest, notFound } from "@/utils/http";
 import { env } from "@config/env.server";
@@ -28,10 +27,10 @@ import { hexToBigInt, isAddressEqual } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
 import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
+import { requireUserFromRequest } from "@/utils/auth-headers";
+import useUser from "@/components/hooks/use-user";
 
-export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
-  const user = requireUserFromHeader(request);
-
+export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const { id } = extractFromParams(remixParams, z.object({ id: hexSchema }), notFound());
 
   const proposal = await getAndUpdateL2CancellationByExternalId(id);
@@ -45,7 +44,6 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   const necessarySignatures = 5; //FIXME: centralize this information or pull from contract
 
   return json({
-    user,
     proposal,
     signatures,
     calls,
@@ -58,7 +56,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = requireUserFromHeader(request);
+  const user = requireUserFromRequest(request);
   const data = await getFormDataOrThrow(request, {
     signature: hexSchema,
     proposalId: z.coerce.number(),
@@ -79,7 +77,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function L2Cancellation() {
   const {
-    user,
     proposal,
     calls,
     signatures,
@@ -88,6 +85,7 @@ export default function L2Cancellation() {
     ethNetwork,
     currentNonce,
   } = useLoaderData<typeof loader>();
+  const user = useUser();
 
   let proposalType: string;
   switch (proposal.type) {
