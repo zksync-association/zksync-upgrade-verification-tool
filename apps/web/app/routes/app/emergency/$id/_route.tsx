@@ -9,7 +9,6 @@ import {
 } from "@/.server/service/authorized-users";
 import { broadcastSuccess } from "@/.server/service/emergency-proposals";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
-import { emergencyUpgradeActionForRole } from "@/common/sign-action";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import { StatusIndicator } from "@/components/status-indicator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +30,7 @@ import { hexSchema } from "@repo/common/schemas";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
+import { emergencyUpgradeActionForRole } from "@/common/user-role-schema";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
@@ -180,6 +180,7 @@ export default function EmergencyUpgradeDetails() {
                 }}
                 disabled={haveAlreadySigned}
                 postAction={$path("/app/emergency/:id", { id: proposal.externalId })}
+                intent={"approve"}
               >
                 Approve
               </SignButton>

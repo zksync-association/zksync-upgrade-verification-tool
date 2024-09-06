@@ -1,4 +1,3 @@
-import type { FreezeProposalsType } from "@/.server/db/schema";
 import { DateTimePicker } from "@/components/date-time-picker";
 import {
   AlertDialog,
@@ -14,6 +13,7 @@ import { Form, useActionData, useNavigation, useRevalidator } from "@remix-run/r
 import { add } from "date-fns";
 import { useState } from "react";
 import type { action } from "./_route";
+import type { FreezeProposalsType } from "@/common/freeze-proposal-type";
 
 export function CreateFreezeProposalModal({
   type,

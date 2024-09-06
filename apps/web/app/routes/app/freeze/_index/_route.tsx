@@ -1,9 +1,8 @@
 import { createFreezeProposal, getAllFreezeProposals } from "@/.server/db/dto/freeze-proposals";
 import { isValidationError } from "@/.server/db/errors";
 import {
-  type FreezeProposalsType,
   type freezeProposalsTable,
-  FreezeProposalsTypeEnum,
+
 } from "@/.server/db/schema";
 import {
   councilFreezeNonces,
@@ -27,6 +26,7 @@ import { $path } from "remix-routes";
 import type { Jsonify } from "type-fest";
 import { z } from "zod";
 import { parseFormData } from "@/utils/read-from-request";
+import { type FreezeProposalsType, FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
 
 export async function loader() {
   const proposals = await getAllFreezeProposals();

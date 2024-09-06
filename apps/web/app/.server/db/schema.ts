@@ -2,19 +2,9 @@ import { bytea } from "@/.server/db/custom-types";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { signActionEnum } from "@/common/sign-action";
 import { relations, sql } from "drizzle-orm";
-import {
-  bigint,
-  check,
-  index,
-  integer,
-  json,
-  pgTable,
-  serial,
-  text,
-  timestamp,
-  unique,
-} from "drizzle-orm/pg-core";
+import { bigint, check, index, integer, json, pgTable, serial, text, timestamp, unique, } from "drizzle-orm/pg-core";
 import { z } from "zod";
+import { FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
 
 export const proposalsTable = pgTable(
   "proposals",
@@ -113,15 +103,6 @@ export const signaturesTable = pgTable(
     ),
   })
 );
-
-export const FreezeProposalsTypeEnum = z.enum([
-  "SOFT_FREEZE",
-  "HARD_FREEZE",
-  "UNFREEZE",
-  "SET_SOFT_FREEZE_THRESHOLD",
-]);
-
-export type FreezeProposalsType = z.infer<typeof FreezeProposalsTypeEnum>;
 
 export const freezeProposalsTable = pgTable(
   "freeze_proposals",

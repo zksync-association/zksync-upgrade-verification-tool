@@ -1,13 +1,6 @@
 import { db } from "@/.server/db";
-import {
-  getEmergencyProposalByExternalId,
-  updateEmergencyProposal,
-} from "@/.server/db/dto/emergency-proposals";
-import {
-  createOrIgnoreSignature,
-  getSignaturesByEmergencyProposalId,
-} from "@/.server/db/dto/signatures";
-import { type FreezeProposalsType, FreezeProposalsTypeEnum } from "@/.server/db/schema";
+import { getEmergencyProposalByExternalId, updateEmergencyProposal, } from "@/.server/db/dto/emergency-proposals";
+import { createOrIgnoreSignature, getSignaturesByEmergencyProposalId, } from "@/.server/db/dto/signatures";
 import {
   councilAddress,
   councilMembers,
@@ -20,20 +13,21 @@ import {
 import { getFreezeProposalSignatureArgs } from "@/common/freeze-proposal";
 import { getL2CancellationSignatureArgs } from "@/common/l2-cancellations";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
-import {
-  emergencyUpgradeActionForRole,
-  signActionEnum,
-  standardUpgradeActionForRole,
-} from "@/common/sign-action";
+import { signActionEnum } from "@/common/sign-action";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
 import { type Hex, hexToBigInt } from "viem";
 import { assertSignatureIsValid } from "@/.server/service/verify-signature";
-import { type UserRole, UserRoleEnum } from "@/common/user-role-schema";
+import {
+  emergencyUpgradeActionForRole, standardUpgradeActionForRole,
+  UserRoleEnum
+} from "@/common/user-role-schema";
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getFreezeProposalById } from "@/.server/db/dto/freeze-proposals";
 import { getL2CancellationById } from "@/.server/db/dto/l2-cancellations";
+import { type FreezeProposalsType, FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
+import { multisigContractForRole, regularUpgradeContractNameByRole } from "@/.server/user-role-data";
 
 async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
   const guardians = await guardianMembers();
@@ -51,21 +45,6 @@ async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promi
     councilSignatures.length >= SEC_COUNCIL_THRESHOLD &&
     foundationSignature !== null
   );
-}
-
-async function targetContractForRole(role: UserRole): Promise<Hex> {
-  switch (role) {
-    case "guardian":
-      return await guardiansAddress();
-    case "visitor":
-      throw new Error("Visitors cannot sign");
-    case "securityCouncil":
-      return await councilAddress();
-    case "zkFoundation":
-      return zkFoundationAddress();
-    default:
-      throw new Error("Unknown role");
-  }
 }
 
 async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
@@ -95,7 +74,7 @@ async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
 
   const action = emergencyUpgradeActionForRole(role);
 
-  const targetContract = await targetContractForRole(role);
+  const targetContract = await multisigContractForRole(role);
   await assertSignatureIsValid({
     signer,
     signature,
@@ -132,28 +111,6 @@ async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
   });
 }
 
-function regularUpgradeContractNameByRole(role: UserRole): string {
-  switch (role) {
-    case "securityCouncil":
-      return "SecurityCouncil";
-    case "guardian":
-      return "Guardians";
-    default:
-      throw new Error(`${role} cannot sign regular upgrades`);
-  }
-}
-
-async function regularUpgradeTargetAddressByRole(role: UserRole): Promise<Hex> {
-  switch (role) {
-    case "securityCouncil":
-      return councilAddress();
-    case "guardian":
-      return guardiansAddress();
-    default:
-      throw new Error(`${role} cannot sign regular upgrades`);
-  }
-}
-
 async function regularUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
   const proposal = await getProposalByExternalId(externalId);
   if (!proposal) {
@@ -171,7 +128,7 @@ async function regularUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
     },
   ];
 
-  const contractAddress = await regularUpgradeTargetAddressByRole(role);
+  const contractAddress = await multisigContractForRole(role);
 
   await assertSignatureIsValid({
     signer,

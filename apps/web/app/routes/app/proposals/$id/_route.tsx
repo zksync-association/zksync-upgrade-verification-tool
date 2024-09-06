@@ -37,6 +37,7 @@ import { $path } from "remix-routes";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
 import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
+import { standardUpgradeActionForRole } from "@/common/user-role-schema";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -305,7 +306,7 @@ export default function Proposals() {
                           <SignButton
                             proposalId={proposalId}
                             contractData={{
-                              actionName: "ApproveUpgradeGuardians",
+                              actionName: standardUpgradeActionForRole(user.role),
                               address: addresses.guardians,
                               name: "Guardians",
                             }}
@@ -320,7 +321,7 @@ export default function Proposals() {
                           <SignButton
                             proposalId={proposalId}
                             contractData={{
-                              actionName: "ApproveUpgradeSecurityCouncil",
+                              actionName: standardUpgradeActionForRole(user.role),
                               address: addresses.council,
                               name: "SecurityCouncil",
                             }}

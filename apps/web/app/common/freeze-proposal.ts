@@ -2,6 +2,8 @@ import type { freezeProposalsTable } from "@/.server/db/schema";
 import { dateToUnixTimestamp } from "@/utils/date";
 import type { InferSelectModel } from "drizzle-orm";
 
+
+
 export function getFreezeProposalSignatureArgs(
   proposal: InferSelectModel<typeof freezeProposalsTable>
 ) {
