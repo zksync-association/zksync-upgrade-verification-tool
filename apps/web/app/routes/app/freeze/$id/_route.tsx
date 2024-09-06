@@ -26,9 +26,10 @@ import { CircleCheckBig } from "lucide-react";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
 import ContractWriteButton from "./contract-write-button";
-import SignButton from "./sign-button";
 import { extractFromParams, parseFormData } from "@/utils/read-from-request";
 import { formError } from "@/utils/action-errors";
+import { freezeActionFromType } from "@/common/freeze-proposal-type";
+import { SignFreezeButton } from "@/routes/app/freeze/$id/write-transaction/sign-freeze-button";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -104,29 +105,24 @@ export default function Freeze() {
     securityCouncilAddress,
     ethNetwork,
   } = useLoaderData<typeof loader>();
-
+  
   let proposalType: string;
-  let action: SignAction;
   let functionName: Parameters<typeof ContractWriteButton>[0]["functionName"];
   switch (proposal.type) {
     case "SOFT_FREEZE":
       proposalType = "Soft Freeze";
-      action = "SoftFreeze";
       functionName = "softFreeze";
       break;
     case "HARD_FREEZE":
       proposalType = "Hard Freeze";
-      action = "HardFreeze";
       functionName = "hardFreeze";
       break;
     case "SET_SOFT_FREEZE_THRESHOLD":
       proposalType = "Set Soft Freeze Threshold";
-      action = "SetSoftFreezeThreshold";
       functionName = "setSoftFreezeThreshold";
       break;
     case "UNFREEZE":
       proposalType = "Unfreeze";
-      action = "Unfreeze";
       functionName = "unfreeze";
       break;
   }
@@ -223,22 +219,15 @@ export default function Freeze() {
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
             {user.role === "securityCouncil" && (
-              <SignButton
-                proposal={{
-                  ...proposal,
-                  externalId: BigInt(proposal.externalId),
-                  proposedOn: new Date(proposal.proposedOn),
-                  validUntil: new Date(proposal.validUntil),
-                }}
-                contractData={{
-                  actionName: action,
-                  address: securityCouncilAddress,
-                  name: "SecurityCouncil",
-                }}
+              <SignFreezeButton
+                softFreezeThreshold={proposal.softFreezeThreshold}
+                validUntil={proposalValidUntil}
+                contractAddress={securityCouncilAddress}
+                nonce={proposal.externalId}
+                freezeType={proposal.type}
+                proposalId={proposal.id}
                 disabled={signDisabled}
-              >
-                Approve
-              </SignButton>
+              />
             )}
           </CardContent>
         </Card>

@@ -5,7 +5,6 @@ import { buildSignatureMessage, ethTypesForFreezeKind } from "@/common/freeze-pr
 export function getFreezeProposalSignatureArgs(
   proposal: InferSelectModel<typeof freezeProposalsTable>
 ) {
-
   const message = buildSignatureMessage(proposal);
   const types = ethTypesForFreezeKind(proposal.type);
 

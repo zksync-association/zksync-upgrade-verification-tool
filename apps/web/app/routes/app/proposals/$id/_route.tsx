@@ -298,7 +298,6 @@ export default function Proposals() {
                             contractAddress={addresses.guardians}
                             disabled={!signLegalVetoEnabled}
                           />
-
                         )}
                         <ApproveSignButton
                           proposalId={proposalId}

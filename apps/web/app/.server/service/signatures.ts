@@ -26,7 +26,7 @@ import { type BasicSignature, classifySignatures } from "@/utils/signatures";
 import { type Hex, hexToBigInt } from "viem";
 import {
   assertSignatureIsValidMultisig,
-  assertValidSignatureZkFoundation
+  assertValidSignatureZkFoundation,
 } from "@/.server/service/verify-signature-multisig";
 import {
   emergencyUpgradeActionForRole,
@@ -37,7 +37,7 @@ import {
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getFreezeProposalById } from "@/.server/db/dto/freeze-proposals";
 import { getL2CancellationById } from "@/.server/db/dto/l2-cancellations";
-import { type FreezeProposalsType, FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
+import { freezeActionFromType } from "@/common/freeze-proposal-type";
 import { multisigContractForRole } from "@/.server/user-role-data";
 
 async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
@@ -101,7 +101,7 @@ async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
       message,
       types,
       contractName
-    )
+    );
   } else {
     await assertSignatureIsValidMultisig({
       signer,
@@ -114,7 +114,6 @@ async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
       targetContract: await multisigContractForRole(role),
     });
   }
-
 
   await db.transaction(async (sqltx) => {
     const dto = {
@@ -224,21 +223,6 @@ async function extendVetoPeriod(externalId: Hex, signer: Hex, signature: Hex) {
   };
 
   await createOrIgnoreSignature(dto);
-}
-
-function freezeActionFromType(type: FreezeProposalsType) {
-  switch (type) {
-    case FreezeProposalsTypeEnum.enum.SOFT_FREEZE:
-      return signActionEnum.enum.SoftFreeze;
-    case FreezeProposalsTypeEnum.enum.HARD_FREEZE:
-      return signActionEnum.enum.HardFreeze;
-    case FreezeProposalsTypeEnum.enum.SET_SOFT_FREEZE_THRESHOLD:
-      return signActionEnum.enum.SetSoftFreezeThreshold;
-    case FreezeProposalsTypeEnum.enum.UNFREEZE:
-      return signActionEnum.enum.Unfreeze;
-    default:
-      throw new Error(`Unknown freeze type: ${type}`);
-  }
 }
 
 async function freeze(freezeId: number, signer: Hex, signature: Hex) {

@@ -71,9 +71,9 @@ export async function assertValidSignatureZkFoundation(
     });
 
     if (!isValid) {
-      throw badRequest("Invalid signature")
+      throw badRequest("Invalid signature");
     }
-    return
+    return;
   }
 
   const IERC1271Abi: AbiFunction = {
@@ -87,12 +87,15 @@ export async function assertValidSignatureZkFoundation(
     stateMutability: "view",
   };
 
-  const isValid = await l1Rpc.contractRead(foundationAddress, "isValidSignature", [IERC1271Abi], z.any(), [
-    digest,
-    signature,
-  ]);
+  const isValid = await l1Rpc.contractRead(
+    foundationAddress,
+    "isValidSignature",
+    [IERC1271Abi],
+    z.any(),
+    [digest, signature]
+  );
   if (!isValid) {
-    throw badRequest("Invalid signature")
+    throw badRequest("Invalid signature");
   }
 }
 
