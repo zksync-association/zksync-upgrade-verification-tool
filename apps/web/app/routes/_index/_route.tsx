@@ -17,7 +17,7 @@ export default function Index() {
 
   return (
     <>
-      {<Navbar />}
+      <Navbar />
       <div className="relative mt-6 flex max-h-[700px] flex-1">
         <div className="cta-bg -z-10 pointer-events-none w-full" />
         <main className="flex flex-1 flex-col items-center justify-center">
