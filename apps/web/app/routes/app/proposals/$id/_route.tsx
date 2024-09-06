@@ -19,7 +19,6 @@ import FieldChangesTable from "@/routes/app/proposals/$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-changes-table";
 import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
-import SignButton from "@/routes/app/proposals/$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
@@ -33,11 +32,12 @@ import { defer, json } from "@remix-run/node";
 import { Await, useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
 import { Suspense } from "react";
-import { $path } from "remix-routes";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
 import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
-import { standardUpgradeActionForRole } from "@/common/user-role-schema";
+import { ApproveSignButton } from "@/routes/app/proposals/$id/approve-sign-button";
+import { multisigContractForRole } from "@/.server/user-role-data";
+import { ExtendVetoButton } from "@/routes/app/proposals/$id/extend-veto-button";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -101,7 +101,12 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         fieldChanges: checkReport.fieldChanges,
         fieldStorageChanges: storageChangeReport,
       },
-      addresses: { guardians, council, upgradeHandler },
+      addresses: {
+        guardians,
+        council,
+        upgradeHandler,
+        signAddress: await multisigContractForRole(user.role),
+      },
       userSignedProposal: signatures
         .filter((s) =>
           user.role === "guardian"
@@ -288,50 +293,19 @@ export default function Proposals() {
                       </CardHeader>
                       <CardContent className="flex flex-col space-y-3">
                         {user.role === "guardian" && (
-                          <SignButton
+                          <ExtendVetoButton
                             proposalId={proposalId}
-                            contractData={{
-                              actionName: "ExtendLegalVetoPeriod",
-                              address: addresses.guardians,
-                              name: "Guardians",
-                            }}
+                            contractAddress={addresses.guardians}
                             disabled={!signLegalVetoEnabled}
-                            postAction={$path("/app/proposals/:id", { id: proposalId })}
-                            intent={"extendVeto"}
-                          >
-                            Approve extend veto period
-                          </SignButton>
+                          />
+
                         )}
-                        {user.role === "guardian" && (
-                          <SignButton
-                            proposalId={proposalId}
-                            contractData={{
-                              actionName: standardUpgradeActionForRole(user.role),
-                              address: addresses.guardians,
-                              name: "Guardians",
-                            }}
-                            disabled={!signProposalEnabled}
-                            postAction={$path("/app/proposals/:id", { id: proposalId })}
-                            intent={"approve"}
-                          >
-                            Approve proposal
-                          </SignButton>
-                        )}
-                        {user.role === "securityCouncil" && (
-                          <SignButton
-                            proposalId={proposalId}
-                            contractData={{
-                              actionName: standardUpgradeActionForRole(user.role),
-                              address: addresses.council,
-                              name: "SecurityCouncil",
-                            }}
-                            disabled={!signProposalEnabled}
-                            postAction={$path("/app/proposals/:id", { id: proposalId })}
-                            intent={"approve"}
-                          >
-                            Approve proposal
-                          </SignButton>
-                        )}
+                        <ApproveSignButton
+                          proposalId={proposalId}
+                          role={user.role}
+                          contractAddress={addresses.signAddress}
+                          disabled={!signProposalEnabled}
+                        />
                       </CardContent>
                     </Card>
                     <Card className="pb-10">

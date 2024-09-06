@@ -1,6 +1,12 @@
 import { db } from "@/.server/db";
-import { getEmergencyProposalByExternalId, updateEmergencyProposal, } from "@/.server/db/dto/emergency-proposals";
-import { createOrIgnoreSignature, getSignaturesByEmergencyProposalId, } from "@/.server/db/dto/signatures";
+import {
+  getEmergencyProposalByExternalId,
+  updateEmergencyProposal,
+} from "@/.server/db/dto/emergency-proposals";
+import {
+  createOrIgnoreSignature,
+  getSignaturesByEmergencyProposalId,
+} from "@/.server/db/dto/signatures";
 import {
   councilAddress,
   councilMembers,
@@ -18,16 +24,21 @@ import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emer
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
 import { type Hex, hexToBigInt } from "viem";
-import { assertSignatureIsValid } from "@/.server/service/verify-signature";
 import {
-  emergencyUpgradeActionForRole, standardUpgradeActionForRole,
-  UserRoleEnum
+  assertSignatureIsValidMultisig,
+  assertValidSignatureZkFoundation
+} from "@/.server/service/verify-signature-multisig";
+import {
+  emergencyUpgradeActionForRole,
+  regularUpgradeContractNameByRole,
+  standardUpgradeActionForRole,
+  UserRoleEnum,
 } from "@/common/user-role-schema";
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getFreezeProposalById } from "@/.server/db/dto/freeze-proposals";
 import { getL2CancellationById } from "@/.server/db/dto/l2-cancellations";
 import { type FreezeProposalsType, FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
-import { multisigContractForRole, regularUpgradeContractNameByRole } from "@/.server/user-role-data";
+import { multisigContractForRole } from "@/.server/user-role-data";
 
 async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
   const guardians = await guardianMembers();
@@ -74,19 +85,36 @@ async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
 
   const action = emergencyUpgradeActionForRole(role);
 
-  const targetContract = await multisigContractForRole(role);
-  await assertSignatureIsValid({
-    signer,
-    signature,
-    verifierAddr: await emergencyBoardAddress(),
-    action,
-    message: {
-      id: proposal.externalId,
-    },
-    types,
-    contractName: "EmergencyUpgradeBoard",
-    targetContract,
-  });
+  const message = {
+    id: proposal.externalId,
+  };
+
+  const contractName = "EmergencyUpgradeBoard";
+  const verifierAddr = await emergencyBoardAddress();
+
+  if (role === UserRoleEnum.enum.zkFoundation) {
+    await assertValidSignatureZkFoundation(
+      signer,
+      signature,
+      verifierAddr,
+      action,
+      message,
+      types,
+      contractName
+    )
+  } else {
+    await assertSignatureIsValidMultisig({
+      signer,
+      signature,
+      verifierAddr: verifierAddr,
+      action,
+      message: message,
+      types,
+      contractName: contractName,
+      targetContract: await multisigContractForRole(role),
+    });
+  }
+
 
   await db.transaction(async (sqltx) => {
     const dto = {
@@ -130,7 +158,7 @@ async function regularUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
 
   const contractAddress = await multisigContractForRole(role);
 
-  await assertSignatureIsValid({
+  await assertSignatureIsValidMultisig({
     signer,
     signature,
     verifierAddr: contractAddress,
@@ -175,7 +203,7 @@ async function extendVetoPeriod(externalId: Hex, signer: Hex, signature: Hex) {
   ];
 
   const action = signActionEnum.enum.ExtendLegalVetoPeriod;
-  await assertSignatureIsValid({
+  await assertSignatureIsValidMultisig({
     signer,
     signature,
     verifierAddr: contractAddress,
@@ -229,7 +257,7 @@ async function freeze(freezeId: number, signer: Hex, signature: Hex) {
 
   const { message, types } = getFreezeProposalSignatureArgs(freeze);
 
-  await assertSignatureIsValid({
+  await assertSignatureIsValidMultisig({
     signer,
     signature,
     verifierAddr: await councilAddress(),
@@ -274,7 +302,7 @@ async function l2Cancellation(vetoId: number, signer: Hex, signature: Hex) {
 
   const contractAddress = await guardiansAddress();
 
-  await assertSignatureIsValid({
+  await assertSignatureIsValidMultisig({
     signer,
     signature,
     verifierAddr: contractAddress,

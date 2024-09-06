@@ -1,9 +1,6 @@
 import { createFreezeProposal, getAllFreezeProposals } from "@/.server/db/dto/freeze-proposals";
 import { isValidationError } from "@/.server/db/errors";
-import {
-  type freezeProposalsTable,
-
-} from "@/.server/db/schema";
+import type { freezeProposalsTable } from "@/.server/db/schema";
 import {
   councilFreezeNonces,
   councilHardFreezeNonce,

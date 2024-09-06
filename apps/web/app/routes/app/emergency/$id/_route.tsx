@@ -15,7 +15,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UpgradeRawData } from "@/components/upgrade-raw-data";
 import { ExecuteEmergencyUpgradeButton } from "@/routes/app/emergency/$id/execute-emergency-upgrade-button";
-import SignButton from "@/routes/app/proposals/$id/sign-button";
 import { requireUserFromHeader } from "@/utils/auth-headers";
 import {
   GUARDIANS_COUNCIL_THRESHOLD,
@@ -27,10 +26,9 @@ import { badRequest, notFound } from "@/utils/http";
 import { type ActionFunctionArgs, json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
-import { $path } from "remix-routes";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
-import { emergencyUpgradeActionForRole } from "@/common/user-role-schema";
+import { EmergencySignButton } from "@/routes/app/emergency/$id/emergency-sign-button";
 
 export async function loader(args: LoaderFunctionArgs) {
   const user = requireUserFromHeader(args.request);
@@ -171,19 +169,12 @@ export default function EmergencyUpgradeDetails() {
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
             {user.role !== "visitor" && (
-              <SignButton
+              <EmergencySignButton
                 proposalId={proposal.externalId}
-                contractData={{
-                  actionName: emergencyUpgradeActionForRole(user.role),
-                  address: addresses.emergencyBoard,
-                  name: "EmergencyUpgradeBoard",
-                }}
+                contractAddress={addresses.emergencyBoard}
+                role={user.role}
                 disabled={haveAlreadySigned}
-                postAction={$path("/app/emergency/:id", { id: proposal.externalId })}
-                intent={"approve"}
-              >
-                Approve
-              </SignButton>
+              />
             )}
             {user.role === "visitor" && <p>No signing actions</p>}
           </CardContent>

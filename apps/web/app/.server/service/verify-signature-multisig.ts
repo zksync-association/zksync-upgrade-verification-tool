@@ -35,7 +35,7 @@ function createTypedDigest({
   });
 }
 
-export async function isValidSignatureZkFoundation(
+export async function assertValidSignatureZkFoundation(
   foundationAddress: Hex,
   signature: Hex,
   verifierAddr: Hex,
@@ -43,7 +43,7 @@ export async function isValidSignatureZkFoundation(
   message: Record<string, string>,
   types: { name: string; type: string }[],
   contractName: string
-): Promise<boolean> {
+): Promise<void> {
   const digest = createTypedDigest({
     verifierAddr,
     action,
@@ -54,7 +54,7 @@ export async function isValidSignatureZkFoundation(
   const code = await l1Rpc.getByteCode(foundationAddress);
 
   if (code === undefined) {
-    return verifyTypedData({
+    const isValid = await verifyTypedData({
       domain: {
         name: contractName,
         version: "1",
@@ -69,6 +69,11 @@ export async function isValidSignatureZkFoundation(
       signature,
       address: foundationAddress,
     });
+
+    if (!isValid) {
+      throw badRequest("Invalid signature")
+    }
+    return
   }
 
   const IERC1271Abi: AbiFunction = {
@@ -82,10 +87,13 @@ export async function isValidSignatureZkFoundation(
     stateMutability: "view",
   };
 
-  return await l1Rpc.contractRead(foundationAddress, "isValidSignature", [IERC1271Abi], z.any(), [
+  const isValid = await l1Rpc.contractRead(foundationAddress, "isValidSignature", [IERC1271Abi], z.any(), [
     digest,
     signature,
   ]);
+  if (!isValid) {
+    throw badRequest("Invalid signature")
+  }
 }
 
 type VerifySignatureArgs = {
@@ -99,7 +107,7 @@ type VerifySignatureArgs = {
   targetContract: Hex;
 };
 
-export async function verifySignature({
+export async function verifySignatureMultisig({
   signer,
   signature,
   verifierAddr,
@@ -130,8 +138,8 @@ export async function verifySignature({
   }
 }
 
-export async function assertSignatureIsValid(args: VerifySignatureArgs): Promise<void> {
-  const isValid = await verifySignature(args);
+export async function assertSignatureIsValidMultisig(args: VerifySignatureArgs): Promise<void> {
+  const isValid = await verifySignatureMultisig(args);
   if (!isValid) {
     throw badRequest("Invalid signature");
   }

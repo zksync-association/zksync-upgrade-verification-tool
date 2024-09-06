@@ -2,7 +2,18 @@ import { bytea } from "@/.server/db/custom-types";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { signActionEnum } from "@/common/sign-action";
 import { relations, sql } from "drizzle-orm";
-import { bigint, check, index, integer, json, pgTable, serial, text, timestamp, unique, } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  check,
+  index,
+  integer,
+  json,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
 
