@@ -8,7 +8,6 @@ import {
   councilUnfreezeThreshold,
 } from "@/.server/service/contracts";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
-import type { SignAction } from "@/common/sign-action";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
 import TxStatus from "@/components/tx-status";
@@ -105,7 +104,7 @@ export default function Freeze() {
     securityCouncilAddress,
     ethNetwork,
   } = useLoaderData<typeof loader>();
-  
+
   let proposalType: string;
   let functionName: Parameters<typeof ContractWriteButton>[0]["functionName"];
   switch (proposal.type) {
