@@ -29,16 +29,16 @@ export function SignCancellationButton({
   l2GasPerPubdataByteLimit,
   txMintValue,
   refundRecipient,
-  disabled
+  disabled,
 }: SignCancellationButtonProps) {
-  const fetcher = useFetcher<typeof action>()
+  const fetcher = useFetcher<typeof action>();
 
-  const submitSignature = useCallback((signature: Hex) => {
-    fetcher.submit(
-      { signature, proposalId },
-      { method: "POST" }
-    );
-  }, [fetcher])
+  const submitSignature = useCallback(
+    (signature: Hex) => {
+      fetcher.submit({ signature, proposalId }, { method: "POST" });
+    },
+    [fetcher, proposalId]
+  );
 
   const onSignatureCreatedStatus = fetcher.state === "idle" ? "iddle" : "loading";
 
@@ -51,7 +51,7 @@ export function SignCancellationButton({
   const { message, types } = getL2CancellationSignatureArgs({
     proposal: {
       externalId,
-      nonce
+      nonce,
     },
     l2GovernorAddress,
     l2GasLimit: hexToBigInt(l2GasLimit),
@@ -60,19 +60,19 @@ export function SignCancellationButton({
     refundRecipient,
   });
 
-  const actionName = signActionEnum.enum.CancelL2GovernorProposal
+  const actionName = signActionEnum.enum.CancelL2GovernorProposal;
 
   return (
     <BasicSignButton
       contractData={{
         name: "Guardians",
-        address: contractAddress
+        address: contractAddress,
       }}
       onSignatureCreated={submitSignature}
       onSignatureCreatedStatus={onSignatureCreatedStatus}
       onSignatureCreatedResult={onSignatureCreatedResult}
       types={{
-        [actionName]: types
+        [actionName]: types,
       }}
       message={message}
       primaryType={actionName}
@@ -80,5 +80,5 @@ export function SignCancellationButton({
     >
       Approve
     </BasicSignButton>
-  )
+  );
 }
