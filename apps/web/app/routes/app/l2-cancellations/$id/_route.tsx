@@ -28,6 +28,7 @@ import { hexToBigInt, isAddressEqual } from "viem";
 import { z } from "zod";
 import SignButton from "./sign-button";
 import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
+import { SignCancellationButton } from "@/routes/app/l2-cancellations/$id/sign-cancellation-button";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromHeader(request);
@@ -212,26 +213,18 @@ export default function L2Cancellation() {
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
             {user.role === "guardian" && (
-              <SignButton
-                proposal={{
-                  id: proposal.id,
-                  externalId: proposal.externalId,
-                  nonce: proposal.nonce,
-                }}
-                contractData={{
-                  actionName: "CancelL2GovernorProposal",
-                  address: guardiansAddress,
-                  name: "Guardians",
-                }}
+              <SignCancellationButton
+                contractAddress={guardiansAddress}
+                proposalId={proposal.id}
+                nonce={proposal.nonce}
+                externalId={proposal.externalId}
                 l2GasLimit={proposal.txRequestGasLimit}
                 l2GasPerPubdataByteLimit={proposal.txRequestL2GasPerPubdataByteLimit}
                 l2GovernorAddress={proposal.txRequestTo}
                 refundRecipient={proposal.txRequestRefundRecipient}
                 txMintValue={proposal.txRequestTxMintValue}
                 disabled={signDisabled}
-              >
-                Approve
-              </SignButton>
+              />
             )}
           </CardContent>
         </Card>

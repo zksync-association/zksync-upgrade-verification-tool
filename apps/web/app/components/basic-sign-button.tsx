@@ -24,7 +24,7 @@ type SignButtonProps = {
   onSignatureCreatedStatus: "iddle" | "loading";
   onSignatureCreatedResult: "none" | "success" | "error";
   types: TypedMessgeTypes;
-  message: Record<string, string>;
+  message: Record<string, string | number | bigint>;
   primaryType: string;
 };
 
