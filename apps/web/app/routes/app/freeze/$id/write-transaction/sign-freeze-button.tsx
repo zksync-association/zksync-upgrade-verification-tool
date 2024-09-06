@@ -32,9 +32,12 @@ export function SignFreezeButton({
   const fetcher = useFetcher<typeof action>();
 
   const actionName = freezeActionFromType(freezeType);
-  const saveSignature = useCallback((signature: Hex) => {
-    fetcher.submit({ signature, proposalId, action: actionName }, { method: "POST" });
-  }, []);
+  const saveSignature = useCallback(
+    (signature: Hex) => {
+      fetcher.submit({ signature, proposalId, action: actionName }, { method: "POST" });
+    },
+    [fetcher, proposalId, actionName]
+  );
   const types = ethTypesForFreezeKind(freezeType);
   const message = buildSignatureMessage({
     type: freezeType,

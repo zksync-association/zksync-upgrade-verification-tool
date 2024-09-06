@@ -41,7 +41,7 @@ const FREEZE_TYPE_DATA: Record<FreezeProposalsType, any> = {
       nonce: fp.externalId,
       validUntil,
     }),
-    freezeAction: signActionEnum.enum.SoftFreeze
+    freezeAction: signActionEnum.enum.SoftFreeze,
   },
   [FreezeProposalsTypeEnum.enum.HARD_FREEZE]: {
     signTypes: noThreshold,
@@ -49,7 +49,7 @@ const FREEZE_TYPE_DATA: Record<FreezeProposalsType, any> = {
       nonce: fp.externalId,
       validUntil,
     }),
-    freezeAction: signActionEnum.enum.HardFreeze
+    freezeAction: signActionEnum.enum.HardFreeze,
   },
   [FreezeProposalsTypeEnum.enum.UNFREEZE]: {
     signTypes: noThreshold,
@@ -57,7 +57,7 @@ const FREEZE_TYPE_DATA: Record<FreezeProposalsType, any> = {
       nonce: fp.externalId,
       validUntil,
     }),
-    freezeAction: signActionEnum.enum.Unfreeze
+    freezeAction: signActionEnum.enum.Unfreeze,
   },
   [FreezeProposalsTypeEnum.enum.SET_SOFT_FREEZE_THRESHOLD]: {
     signTypes: withThreshold,
@@ -66,7 +66,7 @@ const FREEZE_TYPE_DATA: Record<FreezeProposalsType, any> = {
       validUntil,
       threshold: fp.softFreezeThreshold,
     }),
-    freezeAction: signActionEnum.enum.SetSoftFreezeThreshold
+    freezeAction: signActionEnum.enum.SetSoftFreezeThreshold,
   },
 };
 
@@ -87,5 +87,5 @@ export function buildSignatureMessage(proposal: FreezeProposal) {
 }
 
 export function freezeActionFromType(type: FreezeProposalsType): SignAction {
-  return FREEZE_TYPE_DATA[type].freezeAction
+  return FREEZE_TYPE_DATA[type].freezeAction;
 }

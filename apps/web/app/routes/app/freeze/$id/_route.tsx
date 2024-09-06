@@ -27,7 +27,6 @@ import { z } from "zod";
 import ContractWriteButton from "./contract-write-button";
 import { extractFromParams, parseFormData } from "@/utils/read-from-request";
 import { formError } from "@/utils/action-errors";
-import { freezeActionFromType } from "@/common/freeze-proposal-type";
 import { SignFreezeButton } from "@/routes/app/freeze/$id/write-transaction/sign-freeze-button";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
