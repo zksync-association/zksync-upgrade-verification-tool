@@ -1,4 +1,4 @@
-import BasicSignButton from "@/components/basic-sign-button";
+import BasicSignButton, { fetcherToStatuses } from "@/components/basic-sign-button";
 import type { Hex } from "viem";
 import { emergencyUpgradeActionForRole, type UserRole } from "@/common/user-role-schema";
 import { useCallback } from "react";
@@ -30,13 +30,7 @@ export function EmergencySignButton({
     [fetcher, proposalId]
   );
 
-  const onSignatureCreatedStatus = fetcher.state === "idle" ? "iddle" : "loading";
-
-  const onSignatureCreatedResult = fetcher.data?.ok
-    ? "success"
-    : fetcher.state === "idle"
-      ? "none"
-      : "error";
+  const [onSignatureCreatedStatus, onSignatureCreatedResult] = fetcherToStatuses(fetcher);
 
   return (
     <BasicSignButton

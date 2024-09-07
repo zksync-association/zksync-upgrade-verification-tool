@@ -1,4 +1,4 @@
-import BasicSignButton from "@/components/basic-sign-button";
+import BasicSignButton, { fetcherToStatuses } from "@/components/basic-sign-button";
 import type { Hex } from "viem";
 import { useCallback } from "react";
 import {
@@ -46,13 +46,7 @@ export function SignFreezeButton({
     validUntil,
   });
 
-  const onSignatureCreatedStatus = fetcher.state === "idle" ? "iddle" : "loading";
-
-  const onSignatureCreatedResult = fetcher.data?.ok
-    ? "success"
-    : fetcher.state === "idle"
-      ? "none"
-      : "error";
+  const [onSignatureCreatedStatus, onSignatureCreatedResult] = fetcherToStatuses(fetcher);
 
   return (
     <BasicSignButton

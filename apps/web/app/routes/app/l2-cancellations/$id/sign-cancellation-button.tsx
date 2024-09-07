@@ -1,4 +1,4 @@
-import BasicSignButton from "@/components/basic-sign-button";
+import BasicSignButton, { fetcherToStatuses } from "@/components/basic-sign-button";
 import { type Hex, hexToBigInt } from "viem";
 import { useCallback } from "react";
 import { useFetcher } from "@remix-run/react";
@@ -40,13 +40,7 @@ export function SignCancellationButton({
     [fetcher, proposalId]
   );
 
-  const onSignatureCreatedStatus = fetcher.state === "idle" ? "iddle" : "loading";
-
-  const onSignatureCreatedResult = fetcher.data?.ok
-    ? "success"
-    : fetcher.state === "idle"
-      ? "none"
-      : "error";
+  const [onSignatureCreatedStatus, onSignatureCreatedResult] = fetcherToStatuses(fetcher);
 
   const { message, types } = getL2CancellationSignatureArgs({
     proposal: {

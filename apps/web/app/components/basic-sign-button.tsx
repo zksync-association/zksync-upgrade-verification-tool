@@ -3,6 +3,9 @@ import { useEffect } from "react";
 import { toast } from "react-hot-toast";
 import type { Hex } from "viem";
 import { useChains, useSignTypedData } from "wagmi";
+import { z } from "zod";
+import { json, type useFetcher } from "@remix-run/react";
+import type { JsonifyObject } from "type-fest/source/jsonify";
 
 type ContractData = {
   name: string;
@@ -16,17 +19,35 @@ type EthType = {
 
 type TypedMessgeTypes = Record<string, EthType[]>;
 
+const LoadingStatusEnum = z.enum(["idle", "loading"])
+type LoadingStatus = z.infer<typeof LoadingStatusEnum>
+const ResultStatusEnum = z.enum(["none", "success", "error"])
+type ResultStatus = z.infer<typeof ResultStatusEnum>
+
 type SignButtonProps = {
   contractData: ContractData;
   children?: React.ReactNode;
   disabled?: boolean;
   onSignatureCreated: (signature: Hex) => void;
-  onSignatureCreatedStatus: "iddle" | "loading";
-  onSignatureCreatedResult: "none" | "success" | "error";
+  onSignatureCreatedStatus: LoadingStatus;
+  onSignatureCreatedResult: ResultStatus;
   types: TypedMessgeTypes;
   message: Record<string, string | number | bigint>;
   primaryType: string;
 };
+
+type OkBoolAction = () => Omit<Response, "json"> & { json(): Promise<{ ok: boolean }> }
+type OkBoolFetcher = ReturnType<typeof useFetcher<OkBoolAction>>;
+
+export function fetcherToStatuses(fetcher: OkBoolFetcher): [LoadingStatus, ResultStatus] {
+  const fetcherStatus = fetcher.state === "idle" ? "idle" : "loading";
+  const resultStatus = fetcher.data === undefined
+    ? "none"
+    : fetcher.data.ok
+      ? "success"
+      : "error"
+  return [fetcherStatus, resultStatus]
+}
 
 export default function BasicSignButton({
   children,
@@ -39,7 +60,7 @@ export default function BasicSignButton({
   message,
   primaryType,
 }: SignButtonProps) {
-  const { signTypedData, isPending, isSuccess } = useSignTypedData();
+  const {signTypedData, isPending, isSuccess} = useSignTypedData();
   const [chain] = useChains();
 
   const loading = isPending || onSignatureCreatedStatus === "loading";
@@ -47,12 +68,12 @@ export default function BasicSignButton({
 
   useEffect(() => {
     if (success) {
-      toast.success("Signed successfully", { id: "sign_button" });
+      toast.success("Signed successfully", {id: "sign_button"});
     }
   }, [success]);
 
   function onClick() {
-    toast.loading("Signing...", { id: "sign_button" });
+    toast.loading("Signing...", {id: "sign_button"});
     signTypedData(
       {
         domain: {
@@ -71,7 +92,7 @@ export default function BasicSignButton({
         },
         onError(e) {
           console.error(e);
-          toast.error("Failed to sign", { id: "sign_button" });
+          toast.error("Failed to sign", {id: "sign_button"});
         },
       }
     );
