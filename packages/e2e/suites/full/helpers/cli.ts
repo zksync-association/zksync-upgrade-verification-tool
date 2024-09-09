@@ -46,16 +46,25 @@ export function spawnBackground(
 }
 
 export async function killProcessByPort(port: number) {
-  const pid = await getPidFromPort(port);
-  if (pid) {
-    process.kill(pid);
+  const pids = await getPidFromPort(port);
+  if (!pids) {
+    return;
+  }
+
+  for (const p of pids) {
+    process.kill(p);
   }
 }
 
 export async function getPidFromPort(port: number) {
   try {
     const process = await exec(`lsof -t -i :${port}`);
-    return Number(process.stdout.trim());
+    const output = process.stdout.trim();
+
+    // Output can be a list of pids
+    const pids = output.split("\n");
+
+    return pids.map(Number);
   } catch {
     return null;
   }
