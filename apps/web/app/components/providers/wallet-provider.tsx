@@ -5,15 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
 import { type State, WagmiProvider, cookieStorage, createStorage } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
-import { structuralSharing } from "wagmi/query";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      structuralSharing,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
 const NETWORKS = {
   mainnet: mainnet,
