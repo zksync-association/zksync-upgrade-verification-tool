@@ -5,12 +5,12 @@ import { Button } from "./ui/button";
 import ConnectButton from "./connect-button";
 import { useAccount } from "wagmi";
 import { Link, useFetcher } from "@remix-run/react";
-import useUser from "./hooks/use-user";
+import useOptionalUser from "./hooks/use-optional-user";
 import { ROLE_REVALIDATOR_PROVIDER_FETCHER_KEY } from "./providers/role-revalidator-provider";
 
 export default function Navbar() {
   const account = useAccount();
-  const { role } = useUser({ required: false });
+  const user = useOptionalUser();
   const fetcher = useFetcher({ key: ROLE_REVALIDATOR_PROVIDER_FETCHER_KEY });
 
   return (
@@ -26,14 +26,14 @@ export default function Navbar() {
           {account.isConnected && (
             <Button
               className="w-[200px] disabled:opacity-100"
-              loading={role === undefined || fetcher.state !== "idle"}
+              loading={user === null || fetcher.state !== "idle"}
               disabled
               data-testid="user-role"
             >
-              {role === "guardian" && "Guardian"}
-              {role === "securityCouncil" && "Security Council"}
-              {role === "visitor" && "Visitor"}
-              {role === "zkFoundation" && "ZkSync Foundation"}
+              {user?.role === "guardian" && "Guardian"}
+              {user?.role === "securityCouncil" && "Security Council"}
+              {user?.role === "visitor" && "Visitor"}
+              {user?.role === "zkFoundation" && "ZkSync Foundation"}
             </Button>
           )}
           {account.isConnected && <ConnectButton />}
