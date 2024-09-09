@@ -11,16 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { requireUserFromHeader } from "@/utils/auth-headers";
 import { PlusIcon } from "@radix-ui/react-icons";
-import type { LoaderFunctionArgs } from "@remix-run/node";
 import { Link, json, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { $path } from "remix-routes";
 
-export async function loader(args: LoaderFunctionArgs) {
+export async function loader() {
   const emergencyProposals = await getAllEmergencyProposals();
-  const user = requireUserFromHeader(args.request);
   return json({
     activeEmergencyProposals: emergencyProposals.filter(
       ({ status }) => status === "ACTIVE" || status === "READY"
@@ -29,7 +26,6 @@ export async function loader(args: LoaderFunctionArgs) {
       ({ status }) => status === "CLOSED" || status === "BROADCAST"
     ),
     emergencyBoardAddress: await emergencyBoardAddress(),
-    currentUser: user.address,
   });
 }
 

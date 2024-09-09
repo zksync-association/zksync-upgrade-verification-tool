@@ -8,7 +8,7 @@ import { StepsWizard, WizardStep } from "@/components/steps-wizard";
 import { NewEmergencyProposalStep1, type Step1 } from "@/routes/app/emergency/new/step1";
 import { NewEmergencyProposalStep2 } from "@/routes/app/emergency/new/step2";
 import { Step3 } from "@/routes/app/emergency/new/step3";
-import { requireUserFromHeader } from "@/utils/auth-headers";
+import { requireUserFromRequest } from "@/utils/auth-headers";
 import { badRequest } from "@/utils/http";
 import { type ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
@@ -22,7 +22,7 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = requireUserFromHeader(request);
+  const user = requireUserFromRequest(request);
   const body = z
     .object({
       intent: z.enum(["validate", "save"]),

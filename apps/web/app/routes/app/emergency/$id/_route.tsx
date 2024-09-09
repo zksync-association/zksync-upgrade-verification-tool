@@ -18,7 +18,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UpgradeRawData } from "@/components/upgrade-raw-data";
 import { ExecuteEmergencyUpgradeButton } from "@/routes/app/emergency/$id/execute-emergency-upgrade-button";
 import SignButton from "@/routes/app/proposals/$id/sign-button";
-import { requireUserFromHeader } from "@/utils/auth-headers";
 import {
   GUARDIANS_COUNCIL_THRESHOLD,
   SEC_COUNCIL_THRESHOLD,
@@ -32,9 +31,10 @@ import { hexSchema } from "@repo/common/schemas";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
+import { requireUserFromRequest } from "@/utils/auth-headers";
+import useUser from "@/components/hooks/use-user";
 
 export async function loader(args: LoaderFunctionArgs) {
-  const user = requireUserFromHeader(args.request);
   const { id: proposalId } = extractFromParams(
     args.params,
     z.object({ id: hexSchema }),
@@ -66,7 +66,6 @@ export async function loader(args: LoaderFunctionArgs) {
       emergencyBoard: boardAddress,
       zkFoundation: await zkFoundationAddress(),
     },
-    user,
     signatures,
     allGuardians: await guardianMembers(),
     allSecurityCouncil: await councilMembers(),
@@ -84,7 +83,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const proposalId = extract(formData, "proposalId", hexSchema);
 
   if (intent === intentParser.enum.newSignature) {
-    const user = requireUserFromHeader(request);
+    const user = requireUserFromRequest(request);
     const signature = extract(formData, "signature", hexSchema);
     const actionName = extract(formData, "actionName", signActionSchema);
 
@@ -113,8 +112,9 @@ function actionForRole(role: UserRole): SignAction {
 }
 
 export default function EmergencyUpgradeDetails() {
-  const { calls, user, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
+  const { calls, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
     useLoaderData<typeof loader>();
+  const user = useUser();
 
   const haveAlreadySigned = signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
   const gatheredScSignatures = signatures.filter((sig) => {
