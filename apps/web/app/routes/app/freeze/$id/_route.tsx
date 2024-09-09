@@ -13,7 +13,6 @@ import TxLink from "@/components/tx-link";
 import TxStatus from "@/components/tx-status";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
-import { requireUserFromHeader } from "@/utils/auth-headers";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
 import { notFound } from "@/utils/http";
@@ -28,10 +27,10 @@ import ContractWriteButton from "./contract-write-button";
 import { extractFromParams, parseFormData } from "@/utils/read-from-request";
 import { formError } from "@/utils/action-errors";
 import { SignFreezeButton } from "@/routes/app/freeze/$id/write-transaction/sign-freeze-button";
+import { requireUserFromRequest } from "@/utils/auth-headers";
+import useUser from "@/components/hooks/use-user";
 
-export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
-  const user = requireUserFromHeader(request);
-
+export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const { id } = extractFromParams(remixParams, z.object({ id: z.coerce.number() }), notFound());
 
   const proposal = await getFreezeProposalById(id);
@@ -69,14 +68,13 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     currentSoftFreezeThreshold,
     signatures,
     necessarySignatures,
-    user,
     securityCouncilAddress: await councilAddress(),
     ethNetwork: env.ETH_NETWORK,
   });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = requireUserFromHeader(request);
+  const user = requireUserFromRequest(request);
   const parsed = parseFormData(await request.formData(), {
     signature: hexSchema,
     proposalId: z.coerce.number(),
@@ -99,10 +97,10 @@ export default function Freeze() {
     currentSoftFreezeThreshold,
     signatures,
     necessarySignatures,
-    user,
     securityCouncilAddress,
     ethNetwork,
   } = useLoaderData<typeof loader>();
+  const user = useUser();
 
   let proposalType: string;
   let functionName: Parameters<typeof ContractWriteButton>[0]["functionName"];

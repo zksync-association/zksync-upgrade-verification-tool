@@ -95,7 +95,6 @@ export async function getFormDataOrThrow<T extends ObjectSchema>(
 ): Promise<ParsedObject<T>> {
   const formData = await request.formData();
   const res = parseFormData(formData, schema);
-  console.log(res.errors);
   if (!res.success) {
     throw error(res.errors);
   }

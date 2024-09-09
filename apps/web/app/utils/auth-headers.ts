@@ -1,27 +1,25 @@
-import { type UserRole, UserRoleEnum } from "@/common/user-role-schema";
 import { unauthorized } from "@/utils/http";
-import { addressSchema } from "@repo/common/schemas";
-import { USER_ADDRESS_HEADER, USER_ROLE_HEADER } from "@server/middlewares/auth";
-import type { Hex } from "viem";
+import { readAuthSession } from "@server/utils/auth-session";
+import { readUserRoleCookie } from "@server/utils/user-role-cookie";
 
-export function getUserFromHeader(request: Request) {
-  // Address should never fail as it's set by Express middleware
-  const address = request.headers.get(USER_ADDRESS_HEADER);
-  const parsedAddress = addressSchema.parse(address);
+export function requireUserFromRequest(request: Request) {
+  const cookies = request.headers.get("Cookie") ?? "";
 
-  const role = request.headers.get(USER_ROLE_HEADER);
-  const parsedRole = UserRoleEnum.optional().safeParse(role);
+  const { address } = readAuthSession(cookies);
+  const role = readUserRoleCookie(cookies);
 
-  return { address: parsedAddress, role: parsedRole.data ?? null };
-}
-
-export function requireUserFromHeader(request: Request): { address: Hex; role: UserRole } {
-  const { address, role } = getUserFromHeader(request);
-
-  const parsedRole = UserRoleEnum.safeParse(role);
-  if (!parsedRole.success) {
+  if (!address || !role) {
     throw unauthorized();
   }
 
-  return { address, role: parsedRole.data };
+  return { address, role: role.role };
+}
+
+export function getUserFromRequest(request: Request) {
+  const cookies = request.headers.get("Cookie") ?? "";
+
+  const { address } = readAuthSession(cookies);
+  const role = readUserRoleCookie(cookies);
+
+  return { address, role: role?.role };
 }

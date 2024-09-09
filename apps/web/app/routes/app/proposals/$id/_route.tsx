@@ -20,7 +20,6 @@ import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-c
 import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
-import { requireUserFromHeader } from "@/utils/auth-headers";
 import { displayBytes32 } from "@/utils/bytes32";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
@@ -36,11 +35,13 @@ import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
 import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
 import { ApproveSignButton } from "@/routes/app/proposals/$id/approve-sign-button";
-import { multisigContractForRole } from "@/.server/user-role-data";
 import { ExtendVetoButton } from "@/routes/app/proposals/$id/extend-veto-button";
+import { requireUserFromRequest } from "@/utils/auth-headers";
+import useUser from "@/components/hooks/use-user";
+import { chooseByRole } from "@/common/user-role-schema";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
-  const user = requireUserFromHeader(request);
+  const user = requireUserFromRequest(request);
 
   const { id } = extractFromParams(remixParams, z.object({ id: hexSchema }), notFound());
 
@@ -105,7 +106,6 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         guardians,
         council,
         upgradeHandler,
-        signAddress: await multisigContractForRole(user.role),
       },
       userSignedProposal: signatures
         .filter((s) =>
@@ -122,14 +122,13 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   };
 
   return defer({
-    user,
     proposalId: proposal.externalId as Hex,
     asyncData: getAsyncData(),
   });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = requireUserFromHeader(request);
+  const user = requireUserFromRequest(request);
   const data = await getFormDataOrThrow(request, {
     signature: hexSchema,
     proposalId: hexSchema,
@@ -152,7 +151,8 @@ const NECESSARY_GUARDIAN_SIGNATURES = 5;
 const NECESSARY_LEGAL_VETO_SIGNATURES = 2;
 
 export default function Proposals() {
-  const { user, asyncData, proposalId } = useLoaderData<typeof loader>();
+  const { asyncData, proposalId } = useLoaderData<typeof loader>();
+  const user = useUser();
 
   return (
     <div className="flex flex-1 flex-col">
@@ -205,6 +205,15 @@ export default function Proposals() {
                 proposal.status === PROPOSAL_STATES.Ready &&
                 (isAddressEqual(proposal.executor as Hex, user.address as Hex) ||
                   isAddressEqual(proposal.executor as Hex, zeroAddress));
+
+              const signAddress = chooseByRole(
+                user.role,
+                () => addresses.guardians,
+                () => addresses.council,
+                () => {
+                  throw new Error(`Role "${user.role}" cannot sign`);
+                }
+              );
 
               return (
                 <>
@@ -286,9 +295,10 @@ export default function Proposals() {
                     <Card className="pb-10">
                       <CardHeader>
                         <CardTitle>
-                          {user.role === "visitor" && "No role actions"}
                           {user.role === "guardian" && "Guardian Actions"}
                           {user.role === "securityCouncil" && "Security Council Actions"}
+                          {user.role === "visitor" && "No role actions"}
+                          {user.role === "zkFoundation" && "No role actions"}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-col space-y-3">
@@ -299,12 +309,15 @@ export default function Proposals() {
                             disabled={!signLegalVetoEnabled}
                           />
                         )}
-                        <ApproveSignButton
-                          proposalId={proposalId}
-                          role={user.role}
-                          contractAddress={addresses.signAddress}
-                          disabled={!signProposalEnabled}
-                        />
+
+                        {(user.role === "guardian" || user.role === "securityCouncil") && (
+                          <ApproveSignButton
+                            proposalId={proposalId}
+                            role={user.role}
+                            contractAddress={signAddress()}
+                            disabled={!signProposalEnabled}
+                          />
+                        )}
                       </CardContent>
                     </Card>
                     <Card className="pb-10">

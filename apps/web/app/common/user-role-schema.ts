@@ -53,3 +53,19 @@ export function regularUpgradeContractNameByRole(role: UserRole): string {
 
   return name;
 }
+
+export function chooseByRole<T>(
+  role: UserRole,
+  guardianOption: T,
+  councilOption: T,
+  defaultOption: T
+): T {
+  switch (role) {
+    case "guardian":
+      return guardianOption;
+    case "securityCouncil":
+      return councilOption;
+    default:
+      return defaultOption;
+  }
+}
