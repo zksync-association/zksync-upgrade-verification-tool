@@ -15,7 +15,6 @@ import { Cookies, CookiesProvider } from "react-cookie";
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
 import ConnectRedirectProvider from "@/components/providers/connect-redirect-provider";
-import AccountWatcherProvider from "./components/providers/account-watcher-provider";
 import RoleRevalidatorProvider from "./components/providers/role-revalidator-provider";
 
 export const links: LinksFunction = () => [
@@ -48,15 +47,13 @@ export default function App() {
           projectId={env.WALLET_CONNECT_PROJECT_ID}
           network={env.ETH_NETWORK}
         >
-          <AccountWatcherProvider>
-            <RoleRevalidatorProvider>
-              <ConnectRedirectProvider>
-                <div className="flex min-h-screen flex-col px-10 py-10 lg:px-40">
-                  <Outlet />
-                </div>
-              </ConnectRedirectProvider>
-            </RoleRevalidatorProvider>
-          </AccountWatcherProvider>
+          <RoleRevalidatorProvider>
+            <ConnectRedirectProvider>
+              <div className="flex min-h-screen flex-col px-10 py-10 lg:px-40">
+                <Outlet />
+              </div>
+            </ConnectRedirectProvider>
+          </RoleRevalidatorProvider>
         </WalletProvider>
       </CookiesProvider>
     </Document>
