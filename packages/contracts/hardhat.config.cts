@@ -52,7 +52,7 @@ const config: HardhatUserConfig = {
     },
     local: {
       chainId: 11155111,
-      url: "http://localhost:8545",
+      url: process.env.L1_RPC_URL || "http://localhost:8545",
       allowUnlimitedContractSize: true,
     },
     hardhat: {
