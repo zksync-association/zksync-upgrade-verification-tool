@@ -34,7 +34,7 @@ function compareExtractedTextWithDate(extractedText: string | null, expectedDate
   expect(number).toBeGreaterThan(expectedNumber - 10)
 }
 
-test.only("sec council logs in, go to freeze, clicks on create soft freeze and creates with default values", async ({page, switcher}) => {
+test("sec council logs in, go to freeze, clicks on create soft freeze and creates with default values", async ({page, switcher}) => {
   await switcher.council(1, page);
 
   await page.getByText("Freeze Requests").click();
@@ -56,4 +56,57 @@ test.only("sec council logs in, go to freeze, clicks on create soft freeze and c
   const proposedOnText = await page.getByTestId("proposed-on-timestamp").textContent()
   compareExtractedTextWithDate(validUntilText, oneWeekFromNow);
   compareExtractedTextWithDate(proposedOnText, now);
+})
+
+test.only("after create soft freeze a second one cannot be created", async ({page, switcher}) => {
+  await switcher.council(1, page);
+
+  await page.getByText("Freeze Requests").click();
+  await page.waitForLoadState("networkidle");
+
+  await page.getByTestId("soft-create-btn").click()
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Pending proposal already exists.")).toBeVisible();
+})
+
+test.only("guardians cannot sign a soft freeze", async ({page, switcher}) => {
+  await switcher.guardian(1, page);
+
+  await page.getByText("Freeze Requests").click();
+  await page.waitForLoadState("networkidle");
+
+  await page.getByText("Proposal 0").click();
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByText("No role actions")).toBeVisible();
+  const approveButtons = await page.getByRole("button", { name: "Approbe" }).all();
+  expect(approveButtons).toHaveLength(0);
+})
+
+test.only("zk foundation cannot sign a soft freeze", async ({page, switcher}) => {
+  await switcher.zkFoundation(page);
+
+  await page.getByText("Freeze Requests").click();
+  await page.waitForLoadState("networkidle");
+
+  await page.getByText("Proposal 0").click();
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByText("No role actions")).toBeVisible();
+  const approveButtons = await page.getByRole("button", { name: "Approbe" }).all();
+  expect(approveButtons).toHaveLength(0);
+})
+
+test.only("visitor cannot sign a soft freeze", async ({page, switcher}) => {
+  await switcher.visitor(page);
+
+  await page.getByText("Freeze Requests").click();
+  await page.waitForLoadState("networkidle");
+
+  await page.getByText("Proposal 0").click();
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByText("No role actions")).toBeVisible();
+  const approveButtons = await page.getByRole("button", { name: "Approbe" }).all();
+  expect(approveButtons).toHaveLength(0);
 })
