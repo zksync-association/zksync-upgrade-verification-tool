@@ -7,9 +7,6 @@ import { createUserRoleCookie } from "@server/utils/user-role-cookie";
 import { $path } from "remix-routes";
 
 export async function action({ request }: ActionFunctionArgs) {
-  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-  await sleep(5000); //FIXME remove
-
   const user = getUserFromRequest(request);
   if (!user.address) {
     throw badRequest("User not connected");
