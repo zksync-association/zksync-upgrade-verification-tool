@@ -79,7 +79,7 @@ test.only("guardians cannot sign a soft freeze", async ({page, switcher}) => {
   await page.waitForLoadState("networkidle");
 
   await expect(page.getByText("No role actions")).toBeVisible();
-  const approveButtons = await page.getByRole("button", { name: "Approbe" }).all();
+  const approveButtons = await page.getByRole("button", { name: "Approve" }).all();
   expect(approveButtons).toHaveLength(0);
 })
 
@@ -93,7 +93,7 @@ test.only("zk foundation cannot sign a soft freeze", async ({page, switcher}) =>
   await page.waitForLoadState("networkidle");
 
   await expect(page.getByText("No role actions")).toBeVisible();
-  const approveButtons = await page.getByRole("button", { name: "Approbe" }).all();
+  const approveButtons = await page.getByRole("button", { name: "Approve" }).all();
   expect(approveButtons).toHaveLength(0);
 })
 
@@ -107,6 +107,30 @@ test.only("visitor cannot sign a soft freeze", async ({page, switcher}) => {
   await page.waitForLoadState("networkidle");
 
   await expect(page.getByText("No role actions")).toBeVisible();
-  const approveButtons = await page.getByRole("button", { name: "Approbe" }).all();
+  const approveButtons = await page.getByRole("button", { name: "Approve" }).all();
   expect(approveButtons).toHaveLength(0);
+})
+
+test.only("security council member can sign a soft freeze", async ({page, switcher, wallet}) => {
+  await switcher.council(1, page);
+
+  await page.getByText("Freeze Requests").click();
+  await page.waitForLoadState("networkidle");
+
+  await page.getByText("Proposal 0").click();
+  await page.waitForLoadState("networkidle");
+
+
+  const initialApprovals = await page.getByTestId("signature-count").textContent();
+  if (!initialApprovals) {
+    throw new Error("No Security Council Approvals found for initialApprovals");
+  }
+  const initialCount = Number.parseInt(initialApprovals.split("/")[0] ?? "");
+
+  const approveButton = page.getByRole("button", { name: "Approve" });
+  await approveButton.click();
+  await wallet.sign();
+
+  await expect(page.getByTestId("signature-count")).toHaveText(`${initialCount + 1}/3`);
+  await expect(approveButton).toBeDisabled();
 })

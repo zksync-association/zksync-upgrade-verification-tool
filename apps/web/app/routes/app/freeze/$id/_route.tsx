@@ -219,6 +219,7 @@ export default function Freeze() {
                 label="Approvals"
                 signatures={signatures.length}
                 necessarySignatures={necessarySignatures}
+                testId={"signature-count"}
               />
             )}
           </CardContent>
