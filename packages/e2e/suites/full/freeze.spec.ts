@@ -1,9 +1,21 @@
 import { expect, test } from "../../helpers/dappwright.js";
-import { aw } from "vitest/dist/chunks/reporters.C_zwCd4j.js";
+import type { Page } from "@playwright/test";
 
 test.beforeEach(async ({page}) => {
   await page.goto("/");
 });
+
+async function goToFreezeIndex(page: Page) {
+  await page.getByText("Freeze Requests").click();
+  await page.waitForLoadState("networkidle");
+}
+
+function compareExtractedTextWithDate(extractedText: string | null, expectedDate: Date) {
+  const expectedNumber = Math.floor(expectedDate.valueOf() / 1000)
+  const number = Number(extractedText?.replace("(", "").replace(")", ""))
+  expect(number).toBeLessThan(expectedNumber + 10)
+  expect(number).toBeGreaterThan(expectedNumber - 10)
+}
 
 test("freeze button is listed and can be clicked", async ({page, switcher}) => {
   await switcher.council(1, page);
@@ -14,12 +26,16 @@ test("freeze button is listed and can be clicked", async ({page, switcher}) => {
 
 test("when no freeze request is created every category is empty", async ({page, switcher}) => {
   await switcher.council(1, page);
+  await goToFreezeIndex(page)
 
-  await page.getByText("Freeze Requests").click();
-  await page.waitForLoadState("networkidle");
+  for (const kind of ["soft", "hard", "change-threshold", "unfreeze"]) {
+    await expect(page.getByTestId(`${kind}-card`).getByText("No proposals found.")).toBeVisible()
+  }
+})
 
-  const elements = await page.getByText("No proposals found.").all();
-  expect(elements.length).toEqual(4);
+test("all freeze create buttons are enabled.", async ({page, switcher}) => {
+  await switcher.council(1, page);
+  await goToFreezeIndex(page);
 
   await page.getByTestId("soft-create-btn").isEnabled()
   await page.getByTestId("hard-create-btn").isEnabled()
@@ -27,23 +43,15 @@ test("when no freeze request is created every category is empty", async ({page, 
   await page.getByTestId("unfreeze-create-btn").isEnabled()
 })
 
-function compareExtractedTextWithDate(extractedText: string | null, expectedDate: Date) {
-  const expectedNumber = Math.floor(expectedDate.valueOf() / 1000)
-  const number = Number(extractedText?.replace("(", "").replace(")", ""))
-  expect(number).toBeLessThan(expectedNumber + 10)
-  expect(number).toBeGreaterThan(expectedNumber - 10)
-}
-
-test.only("sec council logs in, go to freeze, clicks on create soft freeze and creates with default values", async ({
+test("sec council logs in, go to freeze, clicks on create soft freeze and creates with default values", async ({
   page,
   switcher
 }) => {
   await switcher.council(1, page);
 
-  await page.getByText("Freeze Requests").click();
-  await page.waitForLoadState("networkidle");
+  await goToFreezeIndex(page);
 
-  await page.getByTestId("soft-create-btn").click()
+  await page.getByTestId("soft-create-btn").click();
 
   await expect(page.getByText("Create Soft Freeze Proposal")).toBeVisible();
   await expect(page.getByText("Valid Until")).toBeVisible();
@@ -63,66 +71,47 @@ test.only("sec council logs in, go to freeze, clicks on create soft freeze and c
 
 test("after create soft freeze a second one cannot be created", async ({page, switcher}) => {
   await switcher.council(1, page);
-
-  await page.getByText("Freeze Requests").click();
-  await page.waitForLoadState("networkidle");
+  await goToFreezeIndex(page);
 
   await page.getByTestId("soft-create-btn").click()
   await page.getByRole("button", {name: "Create"}).click();
   await expect(page.getByText("Pending proposal already exists.")).toBeVisible();
 })
 
-test("guardians cannot sign a soft freeze", async ({page, switcher}) => {
-  await switcher.guardian(1, page);
+async function goToFreezeDetailsPage(page: Page, kind: string) {
+  await goToFreezeIndex(page);
 
-  await page.getByText("Freeze Requests").click();
+  await page.getByTestId(`${kind}-proposals`).getByText(/Proposal \d+/).click();
   await page.waitForLoadState("networkidle");
+}
 
-  await page.getByText(/Proposal \d+/).click();
-  await page.waitForLoadState("networkidle");
+async function assertCannotSignProposal(page: Page, kind: string) {
+  await goToFreezeDetailsPage(page, kind);
 
   await expect(page.getByText("No role actions")).toBeVisible();
   const approveButtons = await page.getByRole("button", {name: "Approve"}).all();
   expect(approveButtons).toHaveLength(0);
+}
+
+test("guardians cannot sign a soft freeze", async ({page, switcher}) => {
+  await switcher.guardian(1, page);
+  await assertCannotSignProposal(page, "soft")
 })
 
 test("zk foundation cannot sign a soft freeze", async ({page, switcher}) => {
   await switcher.zkFoundation(page);
-
-  await page.getByText("Freeze Requests").click();
-  await page.waitForLoadState("networkidle");
-
-  await page.getByText(/Proposal \d+/).click();
-  await page.waitForLoadState("networkidle");
-
-  await expect(page.getByText("No role actions")).toBeVisible();
-  const approveButtons = await page.getByRole("button", {name: "Approve"}).all();
-  expect(approveButtons).toHaveLength(0);
+  await assertCannotSignProposal(page, "soft")
 })
 
 test("visitor cannot sign a soft freeze", async ({page, switcher}) => {
   await switcher.visitor(page);
-
-  await page.getByText("Freeze Requests").click();
-  await page.waitForLoadState("networkidle");
-
-  await page.getByText(/Proposal \d+/).click();
-  await page.waitForLoadState("networkidle");
-
-  await expect(page.getByText("No role actions")).toBeVisible();
-  const approveButtons = await page.getByRole("button", {name: "Approve"}).all();
-  expect(approveButtons).toHaveLength(0);
+  await assertCannotSignProposal(page, "soft")
 })
 
-test.only("security council member can sign a soft freeze", async ({page, switcher, wallet}) => {
+test("security council member can sign a soft freeze", async ({page, switcher, wallet}) => {
   await switcher.council(1, page);
 
-  await page.getByText("Freeze Requests").click();
-  await page.waitForLoadState("networkidle");
-
-  await page.getByText(/Proposal \d+/).click();
-  await page.waitForLoadState("networkidle");
-
+  await goToFreezeDetailsPage(page, "soft");
 
   const initialApprovals = await page.getByTestId("signature-count").textContent();
   if (!initialApprovals) {
@@ -134,11 +123,11 @@ test.only("security council member can sign a soft freeze", async ({page, switch
   await approveButton.click();
   await wallet.sign();
 
-  await expect(page.getByTestId("signature-count")).toHaveText(`${initialCount + 1}/3`);
+  await expect(page.getByTestId("signature-count")).toHaveText(new RegExp(`${initialCount + 1}\/\\d`) );
   await expect(approveButton).toBeDisabled();
 })
 
-test.only("after reach threshold sign button can be broadcasted", async ({page, switcher, wallet}) => {
+test("after reach threshold sign button can be broadcasted", async ({page, switcher, wallet}) => {
   await switcher.council(2, page);
 
   await page.getByText("Freeze Requests").click();

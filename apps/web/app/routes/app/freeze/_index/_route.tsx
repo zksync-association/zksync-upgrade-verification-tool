@@ -178,7 +178,7 @@ function ProposalCard({
   testNamespace: string;
 }) {
   return (
-    <Card className={cn("pb-10", className)}>
+    <Card className={cn("pb-10", className)} data-testId={`${testNamespace}-card`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{title}</CardTitle>
@@ -188,7 +188,7 @@ function ProposalCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col space-y-4">
+        <div className="flex flex-col space-y-4" data-testId={`${testNamespace}-proposals`}>
           {proposals.map((proposal) => {
             const validUntil = new Date(proposal.validUntil).toLocaleString();
 
