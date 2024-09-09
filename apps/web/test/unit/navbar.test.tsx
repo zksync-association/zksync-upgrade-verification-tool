@@ -5,7 +5,7 @@ import "@testing-library/jest-dom";
 import { useFetcher, useRouteLoaderData } from "@remix-run/react";
 import { useAccount } from "wagmi";
 import "@testing-library/jest-dom";
-import useUser from "@/components/hooks/use-user";
+import useOptionalUser from "@/components/hooks/use-optional-user";
 
 vi.mock("remix-routes", () => ({
   $path: () => "/",
@@ -28,13 +28,13 @@ vi.mock("@/components/connect-button", () => ({
   default: () => <button>Mocked Connect Button</button>,
 }));
 
-vi.mock("@/components/hooks/use-user", () => ({
+vi.mock("@/components/hooks/use-optional-user", () => ({
   default: vi.fn(),
 }));
 
 const mockedUseRouteLoaderData = vi.mocked(useRouteLoaderData);
 const mockedUseAccount = vi.mocked(useAccount);
-const mockedUseUser = vi.mocked(useUser);
+const mockedUseUser = vi.mocked(useOptionalUser);
 const mockedUseFetcher = vi.mocked(useFetcher);
 
 describe("Navbar", () => {
