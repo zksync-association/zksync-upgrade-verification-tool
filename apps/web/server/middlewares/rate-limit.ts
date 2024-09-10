@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import expressRateLimit from "express-rate-limit";
 
-import { env } from "../../config/env.server";
+import { env } from "@config/env.server";
 
 // When running tests or running in development, we want to effectively disable
 // rate limiting because playwright tests are very fast and we don't want to
@@ -30,7 +30,7 @@ const strongestRateLimit = expressRateLimit({
 const strongRateLimit = expressRateLimit({
   ...rateLimitDefault,
   windowMs: 60 * 1000,
-  limit: 100 * maxMultiple
+  limit: 100 * maxMultiple,
 });
 
 const generalRateLimit = expressRateLimit(rateLimitDefault);

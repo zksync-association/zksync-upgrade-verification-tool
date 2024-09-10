@@ -169,7 +169,7 @@ function ProposalCard({
   proposals,
   onAddProposal,
   className,
-  testNamespace
+  testNamespace,
 }: {
   title: string;
   proposals: Jsonify<InferSelectModel<typeof freezeProposalsTable>>[];
@@ -182,7 +182,12 @@ function ProposalCard({
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{title}</CardTitle>
-          <Button variant="secondary" size="icon" onClick={onAddProposal} data-testId={`${testNamespace}-create-btn`}>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={onAddProposal}
+            data-testId={`${testNamespace}-create-btn`}
+          >
             <PlusIcon className="h-4 w-4" />
           </Button>
         </div>
