@@ -9,7 +9,7 @@ import { env } from "../../config/env.server";
 const maxMultiple =
   env.NODE_ENV !== "production" // || process.env.PLAYWRIGHT_TEST_BASE_URL
     ? 10_000
-    : 1;
+    : 100;
 
 const rateLimitDefault = {
   windowMs: 60 * 1000,
@@ -30,7 +30,7 @@ const strongestRateLimit = expressRateLimit({
 const strongRateLimit = expressRateLimit({
   ...rateLimitDefault,
   windowMs: 60 * 1000,
-  max: 100 * maxMultiple,
+  limit: 100 * maxMultiple
 });
 
 const generalRateLimit = expressRateLimit(rateLimitDefault);
