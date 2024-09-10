@@ -140,13 +140,13 @@ jobs:
         run: pnpm test:e2e:env:down
       - name: App logs
         if: always()
-        run: cat suites/full/scripts/logs/app.log
+        run: cat ./packages/e2e/suites/full/scripts/logs/app.log
       - name: Main node logs
         if: always()
-        run: cat suites/full/scripts/logs/main-hardhat-node.log
+        run: cat ./packages/e2e/suites/full/scripts/logs/main-hardhat-node.log
       - name: Backup node logs
         if: always()
-        run: cat suites/full/scripts/logs/backup-hardhat-node.log
+        run: cat ./packages/e2e/suites/full/scripts/logs/backup-hardhat-node.log
 
   compile-contracts:
     runs-on: ubuntu-latest
