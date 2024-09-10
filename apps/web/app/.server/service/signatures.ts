@@ -8,153 +8,37 @@ import {
   getSignaturesByEmergencyProposalId,
 } from "@/.server/db/dto/signatures";
 import {
-  type freezeProposalsTable,
-  type l2CancellationsTable,
-  signaturesTable,
-} from "@/.server/db/schema";
-import {
   councilAddress,
   councilMembers,
   emergencyBoardAddress,
+  getUserAuthRole,
   guardianMembers,
   guardiansAddress,
   zkFoundationAddress,
 } from "@/.server/service/authorized-users";
-import { l1Rpc } from "@/.server/service/clients";
-import { guardiansAbi } from "@/.server/service/contract-abis";
 import { getFreezeProposalSignatureArgs } from "@/common/freeze-proposal";
 import { getL2CancellationSignatureArgs } from "@/common/l2-cancellations";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
-import { type SignAction, signActionSchema } from "@/common/sign-action";
+import { signActionEnum } from "@/common/sign-action";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";
 import { type BasicSignature, classifySignatures } from "@/utils/signatures";
-import { env } from "@config/env.server";
-import { type InferSelectModel, and, asc, eq } from "drizzle-orm";
-import { type AbiFunction, type Hex, hashTypedData, hexToBigInt, verifyTypedData } from "viem";
-import { mainnet, sepolia } from "wagmi/chains";
-import { z } from "zod";
-
-function createTypedDigest({
-  verifierAddr,
-  action,
-  contractName,
-  types,
-  message,
-}: {
-  verifierAddr: Hex;
-  action: SignAction;
-  contractName: string;
-  types: { name: string; type: string }[];
-  message: { [_key: string]: any };
-}) {
-  return hashTypedData({
-    domain: {
-      name: contractName,
-      version: "1",
-      chainId: env.ETH_NETWORK === "mainnet" ? mainnet.id : sepolia.id,
-      verifyingContract: verifierAddr,
-    },
-    primaryType: action,
-    message,
-    types: {
-      [action]: types,
-    },
-  });
-}
-
-async function isValidSignatureZkFoundation(
-  foundationAddress: Hex,
-  signature: Hex,
-  verifierAddr: Hex,
-  action: SignAction,
-  message: Record<string, string>,
-  types: { name: string; type: string }[],
-  contractName: string
-): Promise<boolean> {
-  const digest = createTypedDigest({
-    verifierAddr,
-    action,
-    message,
-    types,
-    contractName,
-  });
-  const code = await l1Rpc.getByteCode(foundationAddress);
-
-  if (code === undefined) {
-    return verifyTypedData({
-      domain: {
-        name: contractName,
-        version: "1",
-        chainId: env.ETH_NETWORK === "mainnet" ? mainnet.id : sepolia.id,
-        verifyingContract: verifierAddr,
-      },
-      primaryType: action,
-      message,
-      types: {
-        [action]: types,
-      },
-      signature,
-      address: foundationAddress,
-    });
-  }
-
-  const IERC1271Abi: AbiFunction = {
-    name: "isValidSignature",
-    inputs: [
-      { name: "hash", type: "bytes32" },
-      { name: "signature", type: "bytes" },
-    ],
-    outputs: [{ name: "magicValue", type: "bytes4" }],
-    type: "function",
-    stateMutability: "view",
-  };
-
-  return await l1Rpc.contractRead(foundationAddress, "isValidSignature", [IERC1271Abi], z.any(), [
-    digest,
-    signature,
-  ]);
-}
-
-async function verifySignature({
-  signer,
-  signature,
-  verifierAddr,
-  action,
-  contractName,
-  types,
-  message,
-  targetContract,
-}: {
-  signer: Hex;
-  signature: Hex;
-  verifierAddr: Hex;
-  action: SignAction;
-  contractName: string;
-  types: { name: string; type: string }[];
-  message: { [_key: string]: any };
-  targetContract: Hex;
-}) {
-  const digest = createTypedDigest({
-    verifierAddr,
-    action,
-    message,
-    types,
-    contractName,
-  });
-
-  try {
-    await l1Rpc.contractRead(targetContract, "checkSignatures", guardiansAbi.raw, z.any(), [
-      digest,
-      [signer],
-      [signature],
-      1,
-    ]);
-    return true;
-  } catch {
-    return false;
-  }
-}
+import { type Hex, hexToBigInt } from "viem";
+import {
+  assertSignatureIsValidMultisig,
+  assertValidSignatureZkFoundation,
+} from "@/.server/service/verify-signature-multisig";
+import {
+  emergencyUpgradeActionForRole,
+  regularUpgradeContractNameByRole,
+  standardUpgradeActionForRole,
+  UserRoleEnum,
+} from "@/common/user-role-schema";
+import { getProposalByExternalId } from "@/.server/db/dto/proposals";
+import { getFreezeProposalById } from "@/.server/db/dto/freeze-proposals";
+import { getL2CancellationById } from "@/.server/db/dto/l2-cancellations";
+import { freezeActionFromType } from "@/common/freeze-proposal-type";
+import { multisigContractForRole } from "@/.server/user-role-data";
 
 async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
   const guardians = await guardianMembers();
@@ -174,99 +58,75 @@ async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promi
   );
 }
 
-export async function saveEmergencySignature(
-  signature: Hex,
-  signer: Hex,
-  action: SignAction,
-  emergencyProposalId: Hex
-) {
-  switch (action) {
-    case "ExecuteEmergencyUpgradeGuardians": {
-      const isValid = await verifySignature({
-        signer,
-        signature,
-        verifierAddr: await emergencyBoardAddress(),
-        action,
-        message: {
-          id: emergencyProposalId,
-        },
-        types: [
-          {
-            name: "id",
-            type: "bytes32",
-          },
-        ],
-        contractName: "EmergencyUpgradeBoard",
-        targetContract: await guardiansAddress(),
-      });
-      if (!isValid) {
-        throw badRequest("Invalid signature provided");
-      }
-      break;
-    }
-    case "ExecuteEmergencyUpgradeSecurityCouncil": {
-      const isValid = await verifySignature({
-        signer,
-        signature,
-        verifierAddr: await emergencyBoardAddress(),
-        action,
-        message: {
-          id: emergencyProposalId,
-        },
-        types: [
-          {
-            name: "id",
-            type: "bytes32",
-          },
-        ],
-        contractName: "EmergencyUpgradeBoard",
-        targetContract: await councilAddress(),
-      });
-      if (!isValid) {
-        throw badRequest("Invalid signature provided");
-      }
-      break;
-    }
-    case "ExecuteEmergencyUpgradeZKFoundation": {
-      const isValid = await isValidSignatureZkFoundation(
-        await zkFoundationAddress(),
-        signature,
-        await emergencyBoardAddress(),
-        signActionSchema.enum.ExecuteEmergencyUpgradeZKFoundation,
-        { id: emergencyProposalId },
-        [{ name: "id", type: "bytes32" }],
-        "EmergencyUpgradeBoard"
-      );
-      if (!isValid) {
-        throw badRequest("Invalid signature provided");
-      }
-      break;
-    }
-    default:
-      throw badRequest(`Unknown signature action: ${action}`);
+async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
+  const proposal = await getEmergencyProposalByExternalId(externalId);
+
+  if (!proposal) {
+    throw notFound();
+  }
+
+  if (
+    proposal.status === emergencyProposalStatusSchema.enum.CLOSED ||
+    proposal.status === emergencyProposalStatusSchema.enum.BROADCAST
+  ) {
+    throw badRequest(
+      `Emergency proposal ${proposal.externalId} is on status ${proposal.status} which does not support new signatures.`
+    );
+  }
+
+  const role = await getUserAuthRole(signer);
+
+  const types = [
+    {
+      name: "id",
+      type: "bytes32",
+    },
+  ];
+
+  const action = emergencyUpgradeActionForRole(role);
+
+  const message = {
+    id: proposal.externalId,
+  };
+
+  const contractName = "EmergencyUpgradeBoard";
+  const verifierAddr = await emergencyBoardAddress();
+
+  if (role === UserRoleEnum.enum.zkFoundation) {
+    await assertValidSignatureZkFoundation(
+      signer,
+      signature,
+      verifierAddr,
+      action,
+      message,
+      types,
+      contractName
+    );
+  } else {
+    await assertSignatureIsValidMultisig({
+      signer,
+      signature,
+      verifierAddr: verifierAddr,
+      action,
+      message: message,
+      types,
+      contractName: contractName,
+      targetContract: await multisigContractForRole(role),
+    });
   }
 
   await db.transaction(async (sqltx) => {
-    const proposal = await getEmergencyProposalByExternalId(emergencyProposalId, { tx: sqltx });
-
-    if (!proposal) {
-      throw notFound();
-    }
-
-    if (proposal.status !== emergencyProposalStatusSchema.enum.ACTIVE) {
-      throw badRequest("Proposal is not accepting more signatures");
-    }
-
     const dto = {
       action,
       signature,
-      emergencyProposal: emergencyProposalId,
+      emergencyProposal: proposal.externalId,
       signer,
     };
 
-    const oldSignatures = await getSignaturesByEmergencyProposalId(emergencyProposalId, {
+    const oldSignatures = await getSignaturesByEmergencyProposalId(proposal.externalId, {
       tx: sqltx,
     });
+
     const allSignatures = [...oldSignatures, dto];
 
     if (await shouldMarkProposalAsReady(allSignatures)) {
@@ -278,198 +138,177 @@ export async function saveEmergencySignature(
   });
 }
 
-export async function validateAndSaveProposalSignature(
-  signature: Hex,
-  signer: Hex,
-  action: SignAction,
-  proposalId: Hex
-) {
-  let validSignature: boolean;
-  if (action === "ExtendLegalVetoPeriod" || action === "ApproveUpgradeGuardians") {
-    const guardians = await guardianMembers();
-    if (!guardians.includes(signer)) {
-      throw badRequest(
-        `Signer is not a guardian. Only guardians can execute this action: ${action}`
-      );
-    }
-
-    const addr = await guardiansAddress();
-    validSignature = await verifySignature({
-      signer,
-      signature,
-      verifierAddr: addr,
-      action,
-      message: {
-        id: proposalId,
-      },
-      types: [
-        {
-          name: "id",
-          type: "bytes32",
-        },
-      ],
-      contractName: "Guardians",
-      targetContract: addr,
-    });
-  } else {
-    const members = await councilMembers();
-    if (!members.includes(signer)) {
-      throw badRequest(
-        `Signer is not a security council member. Only the security council can execute this action: ${action}`
-      );
-    }
-
-    const addr = await councilAddress();
-    validSignature = await verifySignature({
-      signer,
-      signature,
-      verifierAddr: addr,
-      action,
-      message: {
-        id: proposalId,
-      },
-      types: [
-        {
-          name: "id",
-          type: "bytes32",
-        },
-      ],
-      contractName: "SecurityCouncil",
-      targetContract: addr,
-    });
+async function regularUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
+  const proposal = await getProposalByExternalId(externalId);
+  if (!proposal) {
+    throw notFound();
   }
 
-  if (!validSignature) {
-    throw badRequest("Invalid signature");
-  }
+  const role = await getUserAuthRole(signer);
+
+  const action = standardUpgradeActionForRole(role);
+
+  const types = [
+    {
+      name: "id",
+      type: "bytes32",
+    },
+  ];
+
+  const contractAddress = await multisigContractForRole(role);
+
+  await assertSignatureIsValidMultisig({
+    signer,
+    signature,
+    verifierAddr: contractAddress,
+    action,
+    message: {
+      id: proposal.externalId,
+    },
+    types,
+    contractName: regularUpgradeContractNameByRole(role),
+    targetContract: contractAddress,
+  });
 
   const dto = {
     action,
     signature,
-    proposal: proposalId,
+    proposal: proposal.externalId,
     signer,
   };
 
   await createOrIgnoreSignature(dto);
 }
 
-export async function validateAndSaveFreezeSignature({
-  signature,
-  signer,
-  action,
-  proposal,
-}: {
-  signature: Hex;
-  signer: Hex;
-  action: SignAction;
-  proposal: InferSelectModel<typeof freezeProposalsTable>;
-}) {
-  if (
-    action !== "SoftFreeze" &&
-    action !== "HardFreeze" &&
-    action !== "Unfreeze" &&
-    action !== "SetSoftFreezeThreshold"
-  ) {
-    throw badRequest("Invalid action");
+async function extendVetoPeriod(externalId: Hex, signer: Hex, signature: Hex) {
+  const proposal = await getProposalByExternalId(externalId);
+  if (!proposal) {
+    throw notFound();
   }
 
-  const securityCouncilMembers = await councilMembers();
-  if (!securityCouncilMembers.includes(signer)) {
-    throw badRequest(
-      `Signer is not part of the security council. Only security council members can execute this action: ${action}`
-    );
+  const role = await getUserAuthRole(signer);
+
+  if (role !== UserRoleEnum.enum.guardian) {
+    throw badRequest("Only guardians can extend legal veto period");
   }
 
-  const { message, types } = getFreezeProposalSignatureArgs(proposal);
+  const contractAddress = await guardiansAddress();
 
-  const addr = await councilAddress();
-  const validSignature = await verifySignature({
+  const types = [
+    {
+      name: "id",
+      type: "bytes32",
+    },
+  ];
+
+  const action = signActionEnum.enum.ExtendLegalVetoPeriod;
+  await assertSignatureIsValidMultisig({
     signer,
     signature,
-    verifierAddr: addr,
+    verifierAddr: contractAddress,
+    action,
+    message: {
+      id: proposal.externalId,
+    },
+    types,
+    contractName: regularUpgradeContractNameByRole(role),
+    targetContract: contractAddress,
+  });
+
+  const dto = {
+    action,
+    signature,
+    proposal: proposal.externalId,
+    signer,
+  };
+
+  await createOrIgnoreSignature(dto);
+}
+
+async function freeze(freezeId: number, signer: Hex, signature: Hex) {
+  const freeze = await getFreezeProposalById(freezeId);
+  if (!freeze) {
+    throw notFound();
+  }
+
+  const role = await getUserAuthRole(signer);
+
+  if (role !== UserRoleEnum.enum.securityCouncil) {
+    throw badRequest("only security council members can freeze contract");
+  }
+
+  const action = freezeActionFromType(freeze.type);
+
+  const { message, types } = getFreezeProposalSignatureArgs(freeze);
+
+  await assertSignatureIsValidMultisig({
+    signer,
+    signature,
+    verifierAddr: await councilAddress(),
     action,
     message,
     types,
     contractName: "SecurityCouncil",
-    targetContract: addr,
+    targetContract: await councilAddress(),
   });
-
-  if (!validSignature) {
-    throw badRequest("Invalid signature");
-  }
 
   await createOrIgnoreSignature({
     action,
     signature,
     signer,
-    freezeProposal: proposal.id,
+    freezeProposal: freeze.id,
   });
 }
 
-export async function validateAndSaveL2CancellationSignature({
-  signature,
-  signer,
-  proposal,
-}: {
-  signature: Hex;
-  signer: Hex;
-  proposal: InferSelectModel<typeof l2CancellationsTable>;
-}) {
-  const enabledMembers = await guardianMembers();
-  if (!enabledMembers.includes(signer)) {
-    throw badRequest(
-      "Signer is not part of the guardians. Only guardian members can execute this action."
-    );
+async function l2Cancellation(vetoId: number, signer: Hex, signature: Hex) {
+  const cancellation = await getL2CancellationById(vetoId);
+  if (!cancellation) {
+    throw notFound();
+  }
+
+  const role = await getUserAuthRole(signer);
+
+  if (role !== UserRoleEnum.enum.guardian) {
+    throw badRequest("only guardians can extend legal veto period");
   }
 
   const { message, types } = getL2CancellationSignatureArgs({
     proposal: {
-      externalId: proposal.externalId,
-      nonce: proposal.nonce,
+      externalId: cancellation.externalId,
+      nonce: cancellation.nonce,
     },
-    l2GasLimit: hexToBigInt(proposal.txRequestGasLimit),
-    l2GasPerPubdataByteLimit: hexToBigInt(proposal.txRequestL2GasPerPubdataByteLimit),
-    txMintValue: hexToBigInt(proposal.txRequestTxMintValue),
-    refundRecipient: proposal.txRequestRefundRecipient,
-    l2GovernorAddress: proposal.txRequestTo,
+    l2GasLimit: hexToBigInt(cancellation.txRequestGasLimit),
+    l2GasPerPubdataByteLimit: hexToBigInt(cancellation.txRequestL2GasPerPubdataByteLimit),
+    txMintValue: hexToBigInt(cancellation.txRequestTxMintValue),
+    refundRecipient: cancellation.txRequestRefundRecipient,
+    l2GovernorAddress: cancellation.txRequestTo,
   });
 
-  const addr = await guardiansAddress();
-  const validSignature = await verifySignature({
+  const contractAddress = await guardiansAddress();
+
+  await assertSignatureIsValidMultisig({
     signer,
     signature,
-    verifierAddr: addr,
+    verifierAddr: contractAddress,
     action: "CancelL2GovernorProposal",
     message,
     types,
     contractName: "Guardians",
-    targetContract: addr,
+    targetContract: contractAddress,
   });
-
-  if (!validSignature) {
-    throw badRequest("Invalid signature");
-  }
 
   await createOrIgnoreSignature({
     action: "CancelL2GovernorProposal",
     signature,
     signer,
-    l2GovernorProposal: proposal.id,
+    l2GovernorProposal: cancellation.id,
   });
 }
 
-export async function buildExtendVetoArgs(proposalId: Hex): Promise<null | any[]> {
-  const records = await db.query.signaturesTable.findMany({
-    where: and(
-      eq(signaturesTable.proposal, proposalId),
-      eq(signaturesTable.action, "ExtendLegalVetoPeriod")
-    ),
-    orderBy: asc(signaturesTable.signer),
-  });
-
-  if (records.length < 2) {
-    return null;
-  }
-
-  return [proposalId, records.map((r) => r.signer), records.map((r) => r.signature)];
-}
+export const SIGNATURE_FACTORIES = {
+  emergencyUpgrade,
+  regularUpgrade,
+  extendVetoPeriod,
+  freeze,
+  l2Cancellation,
+} as const;

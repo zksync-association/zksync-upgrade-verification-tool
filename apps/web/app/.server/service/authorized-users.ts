@@ -5,7 +5,7 @@ import {
   scAbi,
   upgradeHandlerAbi,
 } from "@/.server/service/contract-abis";
-import { type UserRole, UserRoleSchema } from "@/common/user-role-schema";
+import { type UserRole, UserRoleEnum } from "@/common/user-role-schema";
 import { env } from "@config/env.server";
 import { hexSchema } from "@repo/common/schemas";
 import { type Hex, isAddressEqual } from "viem";
@@ -66,15 +66,15 @@ export async function getUserAuthRole(address: Hex): Promise<UserRole> {
   const [guardianAddresses, scAddresses] = await Promise.all([guardianMembers(), councilMembers()]);
 
   if (guardianAddresses.includes(address)) {
-    return UserRoleSchema.enum.guardian;
+    return UserRoleEnum.enum.guardian;
   }
 
   if (scAddresses.includes(address)) {
-    return UserRoleSchema.enum.securityCouncil;
+    return UserRoleEnum.enum.securityCouncil;
   }
   if (isAddressEqual(address, await zkFoundationAddress())) {
-    return UserRoleSchema.enum.zkFoundation;
+    return UserRoleEnum.enum.zkFoundation;
   }
 
-  return UserRoleSchema.enum.visitor;
+  return UserRoleEnum.enum.visitor;
 }

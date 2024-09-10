@@ -1,10 +1,10 @@
-import { UserRoleSchema } from "@/common/user-role-schema";
+import { UserRoleEnum } from "@/common/user-role-schema";
 import { z } from "zod";
 
 export const USER_ROLE_COOKIE_NAME = "user-role";
 
 export const UserRoleCookieSchema = z.object({
-  role: UserRoleSchema,
+  role: UserRoleEnum,
   revalidate: z.boolean(),
 });
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const signActionSchema = z.enum([
+export const signActionEnum = z.enum([
   "ExtendLegalVetoPeriod",
   "ApproveUpgradeGuardians",
   "ApproveUpgradeSecurityCouncil",
@@ -14,4 +14,4 @@ export const signActionSchema = z.enum([
   "CancelL2GovernorProposal",
 ]);
 
-export type SignAction = z.infer<typeof signActionSchema>;
+export type SignAction = z.infer<typeof signActionEnum>;
