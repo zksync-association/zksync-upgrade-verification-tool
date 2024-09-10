@@ -141,7 +141,7 @@ jobs:
       - run: pnpm install
       - run: cp .env.example .env
       - run: pnpm env:up
-      - run: pnpm deploy:setup
+      - run: env L1_RPC_URL="http://localhost:8545" pnpm deploy:setup:remote
       - run: pnpm test:local
       - name: Stop local environment
         if: always()
