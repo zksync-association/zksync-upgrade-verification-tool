@@ -5,7 +5,7 @@ export default defineConfig({
   testDir: "./suites/full",
   testMatch: /.*\.(spec|test)\.ts$/,
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: "http://localhost:4000",
     viewport: { width: 1366, height: 768 },
   },
   timeout: 60000, // 60 seconds

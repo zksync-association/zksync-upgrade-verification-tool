@@ -8,6 +8,7 @@ import {
   GUARDIAN_INDEXES,
   type GUARDIANS_SIZE,
 } from "@repo/contracts/helpers/constants";
+import { TestApp } from "../suites/full/helpers/test-app.js";
 
 export { expect } from "@playwright/test";
 
@@ -77,7 +78,6 @@ export const test = baseTest.extend<{
       const { browserContext } = await dappwright.launch("", {
         wallet: "metamask",
         version: MetaMaskWallet.recommendedVersion,
-        headless: false,
       });
       const wallet = await dappwright.getWallet("metamask", browserContext);
 
@@ -92,10 +92,12 @@ export const test = baseTest.extend<{
           "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
       });
 
+      const testApp = new TestApp();
+
       try {
         await wallet.addNetwork({
           networkName: "Hardhat",
-          rpc: "http://localhost:8545",
+          rpc: testApp.mainNodeUrl,
           chainId: 11155111,
           symbol: "SepoliaETH",
         });
@@ -116,7 +118,7 @@ export const test = baseTest.extend<{
 
       // Navigate to the page and connect the wallet
       const newPage = await browserContext.newPage();
-      await newPage.goto("http://localhost:3000");
+      await newPage.goto("/");
       await newPage.getByText("Connect Wallet").click();
       await newPage.getByText("Metamask").click();
       await wallet.approve();
