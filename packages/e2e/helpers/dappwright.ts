@@ -78,6 +78,7 @@ export const test = baseTest.extend<{
       const { browserContext } = await dappwright.launch("", {
         wallet: "metamask",
         version: MetaMaskWallet.recommendedVersion,
+        headless: false
       });
       const wallet = await dappwright.getWallet("metamask", browserContext);
 

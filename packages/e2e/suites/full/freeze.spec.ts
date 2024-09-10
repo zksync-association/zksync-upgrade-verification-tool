@@ -2,12 +2,18 @@ import { expect, type IntRange, type RoleSwitcher, test } from "../../helpers/da
 import type { Page } from "@playwright/test";
 import type { Dappwright as Wallet } from "@tenkeylabs/dappwright";
 import type { COUNCIL_SIZE } from "@repo/contracts/helpers/constants";
+import { TestApp } from "./helpers/test-app.js";
+
+const testApp = new TestApp();
 
 test.beforeEach(async ({ page }) => {
+  await testApp.reset();
   await page.goto("/");
 });
 
+
 async function goToFreezeIndex(page: Page) {
+  await page.goto("/")
   await page.getByText("Freeze Requests").click();
   await page.waitForLoadState("networkidle");
 }
@@ -118,6 +124,12 @@ test("all freeze create buttons are enabled.", async ({ page, switcher }) => {
 
 // soft freeze
 
+async function createFreeze(page: Page, kind: string) {
+  await goToFreezeIndex(page);
+  await page.getByTestId(`${kind}-create-btn`).click();
+  await page.getByRole("button", { name: "Create" }).click();
+}
+
 test("sec council logs in, go to freeze, clicks on create soft freeze and creates with default values", async ({
   page,
   switcher,
@@ -146,15 +158,16 @@ test("sec council logs in, go to freeze, clicks on create soft freeze and create
 
 test("after create soft freeze a second one cannot be created", async ({ page, switcher }) => {
   await switcher.council(1, page);
-  await goToFreezeIndex(page);
+  await createFreeze(page, "soft")
 
   await page.getByTestId("soft-create-btn").click();
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByText("Pending proposal already exists.")).toBeVisible();
 });
 
-test("guardians cannot sign a soft freeze", async ({ page, switcher }) => {
+test.only("guardians cannot sign a soft freeze", async ({ page, switcher }) => {
   await switcher.guardian(1, page);
+  await createFreeze(page, "soft")
   await assertCannotSignProposal(page, "soft");
 });
 

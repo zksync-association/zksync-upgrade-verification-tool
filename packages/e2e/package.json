@@ -15,7 +15,7 @@
     "test:cli": "vitest run --config ./vitest.cli.config.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:fast": "TEST_FAST_MODE=true pnpm test:e2e",
+    "test:e2e:fast": "env TEST_FAST_MODE=true pnpm test:e2e",
     "test:e2e:env:up": "tsx suites/full/scripts/env-up.ts",
     "test:e2e:env:down": "tsx suites/full/scripts/env-down.ts"
   },
