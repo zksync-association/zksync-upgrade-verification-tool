@@ -107,6 +107,43 @@ jobs:
           pnpm test:u  # unit tests
           pnpm test:s  # server tests
 
+  webapp-e2e-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: webapp
+        ports:
+          - 5432:5432
+    defaults:
+      run:
+        working-directory: ./packages/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - run: pnpm install
+      - run: pnpm playwright install --with-deps chromium
+      - run: pnpm test:e2e:env:up
+      - run: pnpm test:e2e
+      - if: always()
+        run: pnpm test:e2e:env:down
+      - name: App logs
+        if: always()
+        run: cat suites/full/scripts/logs/app.log
+      - name: Main node logs
+        if: always()
+        run: cat suites/full/scripts/logs/main-hardhat-node.log
+      - name: Backup node logs
+        if: always()
+        run: cat suites/full/scripts/logs/backup-hardhat-node.log
+
   compile-contracts:
     runs-on: ubuntu-latest
     steps:
@@ -145,8 +182,7 @@ jobs:
       - run: pnpm test:local
       - name: Stop local environment
         if: always()
-        run:
-          cat .hardhat.log && pnpm env:down
+        run: cat .hardhat.log && pnpm env:down
 
   docker-build:
     runs-on: ubuntu-latest
