@@ -14,7 +14,10 @@
     "fullenv:down": "docker compose -f fullstack-compose.yml down --volumes --remove-orphans",
     "test:cli": "vitest run --config ./vitest.cli.config.ts",
     "test:e2e": "playwright test",
-    "test:e2e:fast": "TEST_FAST_MODE pnpm test:e2e"
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:fast": "TEST_FAST_MODE=true pnpm test:e2e",
+    "test:e2e:env:up": "tsx suites/full/scripts/env-up.ts",
+    "test:e2e:env:down": "tsx suites/full/scripts/env-down.ts"
   },
   "devDependencies": {
     "@faker-js/faker": "^8.4.1",
@@ -25,8 +28,13 @@
     "@types/mocha": "^10.0.7",
     "@types/node": "^22.5.1",
     "dotenv": "^16.4.5",
+    "drizzle-orm": "=0.33.0",
     "hardhat": "^2.22.6",
+    "ora": "^8.0.1",
+    "postgres": "=3.4.4",
     "tempy": "^3.1.0",
+    "tsx": "^4.19.0",
+    "viem": "^2.21.3",
     "vitest": "^2.0.5"
   },
   "engines": {
