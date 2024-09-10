@@ -59,8 +59,10 @@ jobs:
           cd apps/web
           ./scripts/init_db.sh
           docker ps -a
-          sleep 10
-          pnpm db:migrate
+      - name: Start hardhat
+        run: |
+          cd packages/contracts
+          pnpm env:up
       - name: Start WebApp
         run: |
           cd apps/web
