@@ -27,7 +27,8 @@ export class TestApp {
   readonly mainNodePort = 8561;
   readonly mainNodeUrl = `http://localhost:${this.mainNodePort}`;
 
-  readonly walletMnemonic = "draw drastic exercise toilet stove bone grit clutch any stand phone ten"
+  readonly walletMnemonic =
+    "draw drastic exercise toilet stove bone grit clutch any stand phone ten";
 
   private latestBackupNodeBlock: number | null = null;
 
