@@ -133,7 +133,7 @@ jobs:
           node-version: 22
           cache: "pnpm"
       - run: pnpm install
-      - run: pnpm playwright install --with-deps chromium
+      - run: pnpm playwright install --with-deps
       - run: pnpm test:e2e:env:up
       - run: pnpm test:e2e
       - if: always()
