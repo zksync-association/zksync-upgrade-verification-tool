@@ -123,6 +123,10 @@ jobs:
     defaults:
       run:
         working-directory: ./packages/e2e
+    env:
+      UPGRADE_HANDLER_ADDRESS: "0xab3ab5d67ed26ac1935dd790f4f013d222ba5073"
+      ZK_GOV_OPS_GOVERNOR_ADDRESS: "0xb0d4a25cecf5b05279c7ce62db5b26de1dfc3690"
+      ZK_TOKEN_GOVERNOR_ADDRESS: "0x68c3633a5d1125f7aed0c2c549fa2d0f643f73e8"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -136,6 +140,12 @@ jobs:
       - run: pnpm playwright install --with-deps
       - run: pnpm test:e2e:env:up
       - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
       - if: always()
         run: pnpm test:e2e:env:down
       - name: App logs
