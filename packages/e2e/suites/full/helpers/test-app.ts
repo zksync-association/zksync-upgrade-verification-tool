@@ -10,7 +10,7 @@ import ora from "ora";
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 const ROOT_DIR = path.join(__dirname, "../../../../..");
-const LOGS_DIR = path.join(__dirname, "logs");
+const LOGS_DIR = path.join(process.cwd(), "logs");
 
 export class TestApp {
   readonly webDir = path.join(ROOT_DIR, "apps/web");
