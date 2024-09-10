@@ -91,7 +91,6 @@ async function broadcastAndCheckFreeze(page: Page, wallet: Wallet) {
     expect(txid).toMatch(/^0x[0-9a-fA-F]+$/);
     await page.goBack();
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(10 * 1000);
     await expect(page.getByText("Transaction Hash:")).toBeVisible();
 }
 
@@ -198,7 +197,7 @@ test("security council member can sign a soft freeze", async ({page, switcher, w
     await expect(approveButton).toBeDisabled();
 });
 
-test.only("Soft freeze, after reach threshold sign button can be broadcasted. After broadcast txid is displayed", async ({
+test("Soft freeze, after reach threshold sign button can be broadcasted. After broadcast txid is displayed", async ({
     page,
     switcher,
     wallet,
@@ -238,6 +237,7 @@ test("try to create hard freeze displays right data", async ({page, switcher}) =
 
 test("after create hard freeze a second one cannot be created", async ({page, switcher}) => {
     await switcher.council(1, page);
+    await createFreeze(page, "hard");
     await goToFreezeIndex(page);
 
     await page.getByTestId("hard-create-btn").click();
@@ -280,5 +280,76 @@ test("Hard freeze, after reach threshold sign button can be broadcasted. After b
 }) => {
     await createFreeze(page, "hard");
     await applyApprovals(page, "hard", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    await broadcastAndCheckFreeze(page, wallet);
+});
+
+test("create unfreeze proposal shows right data", async ({
+    page,
+    switcher,
+}) => {
+    await switcher.council(1, page);
+
+    await goToFreezeIndex(page);
+
+    await page.getByTestId("unfreeze-create-btn").click();
+
+    await expect(page.getByText("Create Unfreeze Proposal")).toBeVisible();
+    await expect(page.getByText("Valid Until")).toBeVisible();
+    await expect(page.getByRole("button", {name: "Create"})).toBeEnabled();
+
+    await page.getByRole("button", {name: "Create"}).click();
+
+    await page.waitForURL("**/app/freeze/*");
+
+    const now = new Date();
+    const oneWeekFromNow = new Date(Date.now() + 1000 * 3600 * 24 * 7);
+    const validUntilText = await page.getByTestId("valid-until-timestamp").textContent();
+    const proposedOnText = await page.getByTestId("proposed-on-timestamp").textContent();
+    compareExtractedTextWithDate(validUntilText, oneWeekFromNow);
+    compareExtractedTextWithDate(proposedOnText, now);
+});
+
+test("guardians cannot sign an unfreeze proposal", async ({page, switcher}) => {
+    await switcher.guardian(1, page);
+    await assertCannotSignProposal(page, "unfreeze");
+});
+
+test("zk foundation cannot sign an unfreeze proposal", async ({page, switcher}) => {
+    await switcher.zkFoundation(page);
+    await assertCannotSignProposal(page, "unfreeze");
+});
+
+test("visitor cannot sign an unfreeze proposal", async ({page, switcher}) => {
+    await switcher.visitor(page);
+    await assertCannotSignProposal(page, "unfreeze");
+});
+
+test("security council member can sign an unfreeze proposal", async ({page, switcher, wallet}) => {
+    await switcher.council(1, page);
+    await createFreeze(page, "unfreeze");
+    await goToFreezeDetailsPage(page, "unfreeze");
+
+    const approveButton = page.getByRole("button", {name: "Approve"});
+    await withVoteIncrease(page, async () => {
+        await approveButton.click();
+        await wallet.sign();
+    });
+
+    await expect(approveButton).toBeDisabled();
+});
+
+test("unfreeze, after reach threshold sign button can be broadcasted. After broadcast txid is displayed", async ({
+    page,
+    switcher,
+    wallet,
+}) => {
+    await createFreeze(page, "soft");
+    await applyApprovals(page, "soft", switcher, wallet, [1, 2, 3]);
+
+    await page.getByRole("button", {name: "Execute freeze"}).click();
+    await wallet.confirmTransaction();
+
+    await createFreeze(page, "unfreeze");
+    await applyApprovals(page, "unfreeze", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
     await broadcastAndCheckFreeze(page, wallet);
 });
