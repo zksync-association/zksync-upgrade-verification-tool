@@ -21,6 +21,7 @@ export class TestApp {
   readonly testDatabaseName = "webapp_e2e_tests";
 
   readonly appPort = 4000;
+  readonly appUrl = `http://localhost:${this.appPort}`;
   readonly backupNodePort = 8560;
   readonly backupNodeUrl = `http://localhost:${this.backupNodePort}`;
   readonly mainNodePort = 8561;
@@ -80,6 +81,11 @@ export class TestApp {
   async reset() {
     await this.cleanupDb();
     await this.resetMainNode();
+  }
+
+  async resetApp({ env }: { env: Record<string, string> }) {
+    await killProcessByPort(this.appPort);
+    await this.startApp({ env });
   }
 
   async cleanupDb() {
@@ -162,17 +168,20 @@ export class TestApp {
     return node;
   }
 
-  private async startApp() {
-    return spawnBackground("pnpm start", {
+  private async startApp({ env }: { env?: Record<string, string> } = {}) {
+    spawnBackground("pnpm start", {
       cwd: this.webDir,
       env: {
         ...process.env,
         SERVER_PORT: this.appPort.toString(),
         L1_RPC_URL: this.mainNodeUrl,
         L2_RPC_URL: this.mainNodeUrl,
+        ALLOW_PRIVATE_ACTIONS: "true",
+        ...env,
       },
       outputFile: this.logPaths.app,
     });
+    await this.waitForApp();
   }
 
   private async getLatestBackupNodeBlock() {
@@ -231,5 +240,20 @@ export class TestApp {
       return hexToNumber(data.result as Hex);
     }
     throw new Error("Unexpected response format");
+  }
+
+  private async waitForApp(maxRetries = 30, retryInterval = 1000) {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const response = await fetch(this.appUrl);
+        if (response.ok) {
+          return; // App is up and running
+        }
+      } catch {
+        // App not ready yet, will retry
+      }
+      await new Promise((resolve) => setTimeout(resolve, retryInterval));
+    }
+    throw new Error(`App on ${this.appUrl} did not become ready in time`);
   }
 }

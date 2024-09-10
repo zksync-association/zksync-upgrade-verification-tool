@@ -1,4 +1,4 @@
-import { test, expect } from "../../helpers/dappwright.js";
+import { test, expect } from "./helpers/dappwright.js";
 import { TestApp } from "./helpers/test-app.js";
 
 const testApp = new TestApp();
