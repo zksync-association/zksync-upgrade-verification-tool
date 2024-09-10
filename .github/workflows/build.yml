@@ -11,8 +11,8 @@ env:
   LOG_LEVEL: debug
   ETH_NETWORK: "mainnet"
   DATABASE_URL: postgresql://user:password@localhost:5432/webapp
-  L1_RPC_URL: ${{ secrets.TENDERLY_RPC_URL }}
-  L2_RPC_URL: ${{ secrets.TENDERLY_RPC_URL }} # set to the same as l1 because it's good enough for this test.
+  L1_RPC_URL: "http://localhost:8545" # ${{ secrets.TENDERLY_RPC_URL }}
+  L2_RPC_URL: "http://localhost:8545" # set to the same as l1 because it's good enough for this test.
   WALLET_CONNECT_PROJECT_ID: 00000000000000000000000000000000
   UPGRADE_HANDLER_ADDRESS: "0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9" # set to sepolia zkSync diamond just because it exists
   ZK_GOV_OPS_GOVERNOR_ADDRESS: "0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9" # set to sepolia zkSync diamond just because it exists
@@ -59,8 +59,10 @@ jobs:
           cd apps/web
           ./scripts/init_db.sh
           docker ps -a
-          sleep 10
-          pnpm db:migrate
+      - name: Start hardhat
+        run: |
+          cd packages/contracts
+          pnpm env:up
       - name: Start WebApp
         run: |
           cd apps/web
@@ -179,7 +181,7 @@ jobs:
       - run: pnpm install
       - run: cp .env.example .env
       - run: pnpm env:up
-      - run: pnpm deploy:setup
+      - run: env L1_RPC_URL="http://localhost:8545" pnpm deploy:setup:remote
       - run: pnpm test:local
       - name: Stop local environment
         if: always()

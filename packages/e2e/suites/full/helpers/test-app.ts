@@ -175,6 +175,7 @@ export class TestApp {
       cwd: this.webDir,
       env: {
         ...process.env,
+        DATABASE_URL: this.testDatabaseUrl,
         SERVER_PORT: this.appPort.toString(),
         L1_RPC_URL: this.mainNodeUrl,
         L2_RPC_URL: this.mainNodeUrl,
