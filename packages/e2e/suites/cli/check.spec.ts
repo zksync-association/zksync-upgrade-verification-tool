@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import "dotenv/config";
-import { execAsync, expectToFailAsync } from "../../helpers/util.js";
+import { execAsync, expectToFailAsync } from "./helpers/util.js";
 
 describe("validate check", () => {
   describe("test-mini-upgrade", () => {
