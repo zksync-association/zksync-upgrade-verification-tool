@@ -143,10 +143,10 @@ jobs:
         run: cat ./logs/app.log
       - name: Main node logs
         if: always()
-        run: cat ./logs/main-hardhat-node.log
+        run: cat ./logs/main-node.log
       - name: Backup node logs
         if: always()
-        run: cat ./logs/backup-hardhat-node.log
+        run: cat ./logs/backup-node.log
 
   compile-contracts:
     runs-on: ubuntu-latest

@@ -181,6 +181,7 @@ export class TestApp {
         L1_RPC_URL: this.mainNodeUrl,
         L2_RPC_URL: this.mainNodeUrl,
         ALLOW_PRIVATE_ACTIONS: "true",
+        NODE_ENV: "production",
         ...env,
       },
       outputFile: this.logPaths.app,
