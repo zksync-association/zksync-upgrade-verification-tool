@@ -7,7 +7,7 @@ test.beforeEach(async () => {
   await testApp.reset();
 });
 
-test.only("TC100 - Login as visitor", async ({ switcher, page }) => {
+test("TC100 - Login as visitor", async ({ switcher, page }) => {
   await switcher.visitor(page);
   await expect(page.getByTestId("user-role")).toHaveText("Visitor");
 });
