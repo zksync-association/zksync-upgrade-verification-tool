@@ -27,6 +27,8 @@ export class TestApp {
   readonly mainNodePort = 8561;
   readonly mainNodeUrl = `http://localhost:${this.mainNodePort}`;
 
+  readonly walletMnemonic = "draw drastic exercise toilet stove bone grit clutch any stand phone ten"
+
   private latestBackupNodeBlock: number | null = null;
 
   db: PostgresJsDatabase;
@@ -148,7 +150,7 @@ export class TestApp {
     await this.waitForHardhatNode(this.backupNodeUrl);
     await exec("pnpm deploy:setup", {
       cwd: this.contractsDir,
-      env: { ...process.env, L1_RPC_URL: this.backupNodeUrl },
+      env: { ...process.env, L1_RPC_URL: this.backupNodeUrl, MNEMONIC: this.walletMnemonic },
     });
     return node;
   }

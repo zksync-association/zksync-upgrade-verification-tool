@@ -70,6 +70,8 @@ export const test = baseTest.extend<{
   // biome-ignore lint/correctness/noEmptyPattern: <explanation>
   context: async ({}, use) => {
     if (!sharedBrowserContext) {
+      const testApp = new TestApp();
+
       // Launch context with extension
 
       // `dappwright.launch` is used to be able to modify the
@@ -88,12 +90,8 @@ export const test = baseTest.extend<{
       wallet.page.waitForTimeout = async (_ms: number) => {};
 
       await wallet.setup({
-        seed:
-          process.env.MNEMONIC ||
-          "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
+        seed: testApp.walletMnemonic,
       });
-
-      const testApp = new TestApp();
 
       try {
         await wallet.addNetwork({
