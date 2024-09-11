@@ -4,8 +4,7 @@ import { councilAddress, guardiansAddress } from "@/.server/service/authorized-u
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
-import { validateAndSaveProposalSignature } from "@/.server/service/signatures";
-import { signActionSchema } from "@/common/sign-action";
+import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
 import TxStatus from "@/components/tx-status";
@@ -20,7 +19,6 @@ import FieldChangesTable from "@/routes/app/proposals/$id/field-changes-table";
 import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-changes-table";
 import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
-import SignButton from "@/routes/app/proposals/$id/sign-button";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { displayBytes32 } from "@/utils/bytes32";
 import { compareHexValues } from "@/utils/compare-hex-values";
@@ -33,12 +31,14 @@ import { defer, json } from "@remix-run/node";
 import { Await, useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
 import { Suspense } from "react";
-import { $path } from "remix-routes";
 import { type Hex, isAddressEqual, zeroAddress } from "viem";
 import { z } from "zod";
 import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
+import { ApproveSignButton } from "@/routes/app/proposals/$id/approve-sign-button";
+import { ExtendVetoButton } from "@/routes/app/proposals/$id/extend-veto-button";
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
+import { chooseByRole } from "@/common/user-role-schema";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromRequest(request);
@@ -102,7 +102,11 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         fieldChanges: checkReport.fieldChanges,
         fieldStorageChanges: storageChangeReport,
       },
-      addresses: { guardians, council, upgradeHandler },
+      addresses: {
+        guardians,
+        council,
+        upgradeHandler,
+      },
       userSignedProposal: signatures
         .filter((s) =>
           user.role === "guardian"
@@ -128,15 +132,17 @@ export async function action({ request }: ActionFunctionArgs) {
   const data = await getFormDataOrThrow(request, {
     signature: hexSchema,
     proposalId: hexSchema,
-    actionName: signActionSchema,
+    intent: z.enum(["approve", "extendVeto"], { message: "Unknown intent" }),
   });
 
-  await validateAndSaveProposalSignature(
-    data.signature,
-    user.address as Hex,
-    data.actionName,
-    data.proposalId
-  );
+  if (data.intent === "approve") {
+    await SIGNATURE_FACTORIES.regularUpgrade(data.proposalId, user.address, data.signature);
+  }
+
+  if (data.intent === "extendVeto") {
+    await SIGNATURE_FACTORIES.extendVetoPeriod(data.proposalId, user.address, data.signature);
+  }
+
   return json({ ok: true });
 }
 
@@ -199,6 +205,15 @@ export default function Proposals() {
                 proposal.status === PROPOSAL_STATES.Ready &&
                 (isAddressEqual(proposal.executor as Hex, user.address as Hex) ||
                   isAddressEqual(proposal.executor as Hex, zeroAddress));
+
+              const signAddress = chooseByRole(
+                user.role,
+                () => addresses.guardians,
+                () => addresses.council,
+                () => {
+                  throw new Error(`Role "${user.role}" cannot sign`);
+                }
+              );
 
               return (
                 <>
@@ -280,53 +295,28 @@ export default function Proposals() {
                     <Card className="pb-10">
                       <CardHeader>
                         <CardTitle>
-                          {user.role === "visitor" && "No role actions"}
                           {user.role === "guardian" && "Guardian Actions"}
                           {user.role === "securityCouncil" && "Security Council Actions"}
+                          {user.role === "visitor" && "No role actions"}
+                          {user.role === "zkFoundation" && "No role actions"}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-col space-y-3">
                         {user.role === "guardian" && (
-                          <SignButton
+                          <ExtendVetoButton
                             proposalId={proposalId}
-                            contractData={{
-                              actionName: "ExtendLegalVetoPeriod",
-                              address: addresses.guardians,
-                              name: "Guardians",
-                            }}
+                            contractAddress={addresses.guardians}
                             disabled={!signLegalVetoEnabled}
-                            postAction={$path("/app/proposals/:id", { id: proposalId })}
-                          >
-                            Approve extend veto period
-                          </SignButton>
+                          />
                         )}
-                        {user.role === "guardian" && (
-                          <SignButton
+
+                        {(user.role === "guardian" || user.role === "securityCouncil") && (
+                          <ApproveSignButton
                             proposalId={proposalId}
-                            contractData={{
-                              actionName: "ApproveUpgradeGuardians",
-                              address: addresses.guardians,
-                              name: "Guardians",
-                            }}
+                            role={user.role}
+                            contractAddress={signAddress()}
                             disabled={!signProposalEnabled}
-                            postAction={$path("/app/proposals/:id", { id: proposalId })}
-                          >
-                            Approve proposal
-                          </SignButton>
-                        )}
-                        {user.role === "securityCouncil" && (
-                          <SignButton
-                            proposalId={proposalId}
-                            contractData={{
-                              actionName: "ApproveUpgradeSecurityCouncil",
-                              address: addresses.council,
-                              name: "SecurityCouncil",
-                            }}
-                            disabled={!signProposalEnabled}
-                            postAction={$path("/app/proposals/:id", { id: proposalId })}
-                          >
-                            Approve proposal
-                          </SignButton>
+                          />
                         )}
                       </CardContent>
                     </Card>

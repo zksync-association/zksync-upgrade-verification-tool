@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { execAsync, expectToFailAsync } from "../../helpers/util.js";
+import { execAsync, expectToFailAsync } from "./helpers/util.js";
 import pkg from "../../../../apps/cli/package.json";
 
 describe("CLI Output Test Suite", () => {

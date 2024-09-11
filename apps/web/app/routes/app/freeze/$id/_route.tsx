@@ -7,8 +7,7 @@ import {
   councilSoftFreezeThreshold,
   councilUnfreezeThreshold,
 } from "@/.server/service/contracts";
-import { validateAndSaveFreezeSignature } from "@/.server/service/signatures";
-import { type SignAction, signActionSchema } from "@/common/sign-action";
+import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
 import TxStatus from "@/components/tx-status";
@@ -16,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
-import { badRequest, notFound } from "@/utils/http";
+import { notFound } from "@/utils/http";
 import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, useLoaderData } from "@remix-run/react";
@@ -25,9 +24,9 @@ import { CircleCheckBig } from "lucide-react";
 import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
 import ContractWriteButton from "./contract-write-button";
-import SignButton from "./sign-button";
 import { extractFromParams, parseFormData } from "@/utils/read-from-request";
 import { formError } from "@/utils/action-errors";
+import { SignFreezeButton } from "@/routes/app/freeze/$id/write-transaction/sign-freeze-button";
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
 
@@ -79,7 +78,6 @@ export async function action({ request }: ActionFunctionArgs) {
   const parsed = parseFormData(await request.formData(), {
     signature: hexSchema,
     proposalId: z.coerce.number(),
-    action: signActionSchema,
   });
 
   if (!parsed.success) {
@@ -88,17 +86,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const body = parsed.data;
 
-  const proposal = await getFreezeProposalById(body.proposalId);
-  if (!proposal) {
-    throw badRequest("Proposal not found");
-  }
+  await SIGNATURE_FACTORIES.freeze(body.proposalId, user.address, body.signature);
 
-  await validateAndSaveFreezeSignature({
-    action: body.action,
-    proposal,
-    signature: body.signature,
-    signer: user.address as Hex,
-  });
   return json({ ok: true });
 }
 
@@ -114,27 +103,22 @@ export default function Freeze() {
   const user = useUser();
 
   let proposalType: string;
-  let action: SignAction;
   let functionName: Parameters<typeof ContractWriteButton>[0]["functionName"];
   switch (proposal.type) {
     case "SOFT_FREEZE":
       proposalType = "Soft Freeze";
-      action = "SoftFreeze";
       functionName = "softFreeze";
       break;
     case "HARD_FREEZE":
       proposalType = "Hard Freeze";
-      action = "HardFreeze";
       functionName = "hardFreeze";
       break;
     case "SET_SOFT_FREEZE_THRESHOLD":
       proposalType = "Set Soft Freeze Threshold";
-      action = "SetSoftFreezeThreshold";
       functionName = "setSoftFreezeThreshold";
       break;
     case "UNFREEZE":
       proposalType = "Unfreeze";
-      action = "Unfreeze";
       functionName = "unfreeze";
       break;
   }
@@ -236,22 +220,15 @@ export default function Freeze() {
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
             {user.role === "securityCouncil" && (
-              <SignButton
-                proposal={{
-                  ...proposal,
-                  externalId: BigInt(proposal.externalId),
-                  proposedOn: new Date(proposal.proposedOn),
-                  validUntil: new Date(proposal.validUntil),
-                }}
-                contractData={{
-                  actionName: action,
-                  address: securityCouncilAddress,
-                  name: "SecurityCouncil",
-                }}
+              <SignFreezeButton
+                softFreezeThreshold={proposal.softFreezeThreshold}
+                validUntil={proposalValidUntil}
+                contractAddress={securityCouncilAddress}
+                nonce={proposal.externalId}
+                freezeType={proposal.type}
+                proposalId={proposal.id}
                 disabled={signDisabled}
-              >
-                Approve
-              </SignButton>
+              />
             )}
           </CardContent>
         </Card>

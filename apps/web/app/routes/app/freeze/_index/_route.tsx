@@ -1,10 +1,6 @@
 import { createFreezeProposal, getAllFreezeProposals } from "@/.server/db/dto/freeze-proposals";
 import { isValidationError } from "@/.server/db/errors";
-import {
-  type FreezeProposalsType,
-  type freezeProposalsTable,
-  freezeProposalsTypeSchema,
-} from "@/.server/db/schema";
+import type { freezeProposalsTable } from "@/.server/db/schema";
 import {
   councilFreezeNonces,
   councilHardFreezeNonce,
@@ -27,6 +23,7 @@ import { $path } from "remix-routes";
 import type { Jsonify } from "type-fest";
 import { z } from "zod";
 import { parseFormData } from "@/utils/read-from-request";
+import { type FreezeProposalsType, FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
 
 export async function loader() {
   const proposals = await getAllFreezeProposals();
@@ -67,7 +64,7 @@ export async function action({ request }: ActionFunctionArgs) {
     {
       validUntil: z.coerce.date().min(new Date()),
       threshold: z.coerce.number().min(1).max(9).nullable(),
-      type: freezeProposalsTypeSchema,
+      type: FreezeProposalsTypeEnum,
     },
     [
       {

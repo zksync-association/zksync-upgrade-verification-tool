@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { execAsync } from "../../helpers/util.js";
+import { execAsync } from "./helpers/util.js";
 
 describe("storage-diff", () => {
   it("shows the correct data", async () => {

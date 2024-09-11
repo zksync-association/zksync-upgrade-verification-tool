@@ -1,6 +1,6 @@
 import { bytea } from "@/.server/db/custom-types";
 import { emergencyProposalStatusSchema } from "@/common/proposal-status";
-import { signActionSchema } from "@/common/sign-action";
+import { signActionEnum } from "@/common/sign-action";
 import { relations, sql } from "drizzle-orm";
 import {
   bigint,
@@ -15,6 +15,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
+import { FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
 
 export const proposalsTable = pgTable(
   "proposals",
@@ -94,7 +95,7 @@ export const signaturesTable = pgTable(
     signer: bytea("signer").notNull(),
     signature: bytea("signature").notNull(),
     action: text("action", {
-      enum: signActionSchema.options,
+      enum: signActionEnum.options,
     }).notNull(),
   },
   ({ proposal, signer, action, emergencyProposal, freezeProposal, l2GovernorProposal }) => ({
@@ -114,20 +115,11 @@ export const signaturesTable = pgTable(
   })
 );
 
-export const freezeProposalsTypeSchema = z.enum([
-  "SOFT_FREEZE",
-  "HARD_FREEZE",
-  "UNFREEZE",
-  "SET_SOFT_FREEZE_THRESHOLD",
-]);
-
-export type FreezeProposalsType = z.infer<typeof freezeProposalsTypeSchema>;
-
 export const freezeProposalsTable = pgTable(
   "freeze_proposals",
   {
     id: serial("id").primaryKey(),
-    type: text("type", { enum: freezeProposalsTypeSchema.options }).notNull(),
+    type: text("type", { enum: FreezeProposalsTypeEnum.options }).notNull(),
     externalId: bigint("external_id", { mode: "bigint" }).notNull(),
     validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
     proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
@@ -139,8 +131,8 @@ export const freezeProposalsTable = pgTable(
     proposalCheck: check(
       "soft_freeze_threshold",
       sql`(
-        (type = ${freezeProposalsTypeSchema.Values.SET_SOFT_FREEZE_THRESHOLD} AND soft_freeze_threshold IS NOT NULL) OR
-        (type != ${freezeProposalsTypeSchema.Values.SET_SOFT_FREEZE_THRESHOLD} AND soft_freeze_threshold IS NULL)
+        (type = ${FreezeProposalsTypeEnum.Values.SET_SOFT_FREEZE_THRESHOLD} AND soft_freeze_threshold IS NOT NULL) OR
+        (type != ${FreezeProposalsTypeEnum.Values.SET_SOFT_FREEZE_THRESHOLD} AND soft_freeze_threshold IS NULL)
       )`
     ),
   })

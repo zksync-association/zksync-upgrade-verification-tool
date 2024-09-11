@@ -11,9 +11,9 @@ env:
   LOG_LEVEL: debug
   ETH_NETWORK: "mainnet"
   DATABASE_URL: postgresql://user:password@localhost:5432/webapp
-  L1_RPC_URL: ${{ secrets.TENDERLY_RPC_URL }}
-  L2_RPC_URL: ${{ secrets.TENDERLY_RPC_URL }} # set to the same as l1 because it's good enough for this test.
-  WALLET_CONNECT_PROJECT_ID: 00000000000000000000000000000000
+  L1_RPC_URL: "http://localhost:8545" # ${{ secrets.TENDERLY_RPC_URL }}
+  L2_RPC_URL: "http://localhost:8545" # set to the same as l1 because it's good enough for this test.
+  WALLET_CONNECT_PROJECT_ID: ${{ secrets.WALLET_CONNECT_PROJECT_ID }}
   UPGRADE_HANDLER_ADDRESS: "0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9" # set to sepolia zkSync diamond just because it exists
   ZK_GOV_OPS_GOVERNOR_ADDRESS: "0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9" # set to sepolia zkSync diamond just because it exists
   ZK_TOKEN_GOVERNOR_ADDRESS: "0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9" # set to sepolia zkSync diamond just because it exists
@@ -59,8 +59,10 @@ jobs:
           cd apps/web
           ./scripts/init_db.sh
           docker ps -a
-          sleep 10
-          pnpm db:migrate
+      - name: Start hardhat
+        run: |
+          cd packages/contracts
+          pnpm env:up
       - name: Start WebApp
         run: |
           cd apps/web
@@ -107,6 +109,55 @@ jobs:
           pnpm test:u  # unit tests
           pnpm test:s  # server tests
 
+  # webapp-e2e-test:
+  #   runs-on: ubuntu-latest
+  #   services:
+  #     postgres:
+  #       image: postgres:16
+  #       env:
+  #         POSTGRES_USER: user
+  #         POSTGRES_PASSWORD: password
+  #         POSTGRES_DB: webapp
+  #       ports:
+  #         - 5432:5432
+  #   defaults:
+  #     run:
+  #       working-directory: ./packages/e2e
+  #   env:
+  #     UPGRADE_HANDLER_ADDRESS: "0xab3ab5d67ed26ac1935dd790f4f013d222ba5073"
+  #     ZK_GOV_OPS_GOVERNOR_ADDRESS: "0xb0d4a25cecf5b05279c7ce62db5b26de1dfc3690"
+  #     ZK_TOKEN_GOVERNOR_ADDRESS: "0x68c3633a5d1125f7aed0c2c549fa2d0f643f73e8"
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: recursive
+  #     - uses: pnpm/action-setup@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 22
+  #         cache: "pnpm"
+  #     - run: pnpm install
+  #     - run: pnpm playwright install --with-deps
+  #     - run: pnpm test:e2e:env:up
+  #     - run: pnpm test:e2e
+  #     - uses: actions/upload-artifact@v4
+  #       if: ${{ !cancelled() }}
+  #       with:
+  #         name: playwright-report
+  #         path: packages/e2e/playwright-report/
+  #         retention-days: 30
+  #     - if: always()
+  #       run: pnpm test:e2e:env:down
+  #     - name: App logs
+  #       if: always()
+  #       run: cat ./logs/app.log
+  #     - name: Main node logs
+  #       if: always()
+  #       run: cat ./logs/main-node.log
+  #     - name: Backup node logs
+  #       if: always()
+  #       run: cat ./logs/backup-node.log
+
   compile-contracts:
     runs-on: ubuntu-latest
     steps:
@@ -141,12 +192,11 @@ jobs:
       - run: pnpm install
       - run: cp .env.example .env
       - run: pnpm env:up
-      - run: pnpm deploy:setup
+      - run: env L1_RPC_URL="http://localhost:8545" pnpm deploy:setup:remote
       - run: pnpm test:local
       - name: Stop local environment
         if: always()
-        run:
-          cat .hardhat.log && pnpm env:down
+        run: cat .hardhat.log && pnpm env:down
 
   docker-build:
     runs-on: ubuntu-latest

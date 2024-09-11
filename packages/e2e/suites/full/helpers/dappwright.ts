@@ -8,7 +8,7 @@ import {
   GUARDIAN_INDEXES,
   type GUARDIANS_SIZE,
 } from "@repo/contracts/helpers/constants";
-import { TestApp } from "../suites/full/helpers/test-app.js";
+import { TestApp } from "./test-app.js";
 
 export { expect } from "@playwright/test";
 
@@ -70,6 +70,8 @@ export const test = baseTest.extend<{
   // biome-ignore lint/correctness/noEmptyPattern: <explanation>
   context: async ({}, use) => {
     if (!sharedBrowserContext) {
+      const testApp = new TestApp();
+
       // Launch context with extension
 
       // `dappwright.launch` is used to be able to modify the
@@ -78,7 +80,7 @@ export const test = baseTest.extend<{
       const { browserContext } = await dappwright.launch("", {
         wallet: "metamask",
         version: MetaMaskWallet.recommendedVersion,
-        headless: false
+        headless: process.env.HEADLESS ? process.env.HEADLESS === "true" : true,
       });
       const wallet = await dappwright.getWallet("metamask", browserContext);
 
@@ -88,12 +90,8 @@ export const test = baseTest.extend<{
       wallet.page.waitForTimeout = async (_ms: number) => {};
 
       await wallet.setup({
-        seed:
-          process.env.MNEMONIC ||
-          "draw drastic exercise toilet stove bone grit clutch any stand phone ten",
+        seed: testApp.walletMnemonic,
       });
-
-      const testApp = new TestApp();
 
       try {
         await wallet.addNetwork({
@@ -118,12 +116,16 @@ export const test = baseTest.extend<{
       await switcher.council(1);
 
       // Navigate to the page and connect the wallet
-      const newPage = await browserContext.newPage();
-      await newPage.goto("/");
-      await newPage.getByText("Connect Wallet").click();
-      await newPage.getByText("Metamask").click();
+      const page = browserContext.pages()[0];
+      if (!page) {
+        throw new Error("No page found");
+      }
+
+      await page.bringToFront();
+      await page.goto("/");
+      await page.getByText("Connect Wallet").click();
+      await page.getByText("Metamask").click();
       await wallet.approve();
-      await newPage.close();
 
       // Cache context
       sharedBrowserContext = browserContext;
@@ -132,6 +134,15 @@ export const test = baseTest.extend<{
       wallet.page.waitForTimeout = originalWaitForTimeout;
     }
     await use(sharedBrowserContext);
+  },
+
+  page: async ({ context }, use) => {
+    const page = context.pages()[0];
+    if (!page) {
+      throw new Error("No page found");
+    }
+    await page.goto("/");
+    await use(page);
   },
 
   wallet: async ({ context }, use) => {

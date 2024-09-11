@@ -7,7 +7,7 @@ import {
   getL2GovernorAddress,
   getL2VetoNonce,
 } from "@/.server/service/l2-cancellations";
-import { validateAndSaveL2CancellationSignature } from "@/.server/service/signatures";
+import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
 import TxStatus from "@/components/tx-status";
@@ -25,8 +25,8 @@ import { CircleCheckBig, CircleX } from "lucide-react";
 import { hexSchema } from "@repo/common/schemas";
 import { hexToBigInt, isAddressEqual } from "viem";
 import { z } from "zod";
-import SignButton from "./sign-button";
 import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
+import { SignCancellationButton } from "@/routes/app/l2-cancellations/$id/sign-cancellation-button";
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
 
@@ -67,11 +67,8 @@ export async function action({ request }: ActionFunctionArgs) {
     throw badRequest("Proposal not found");
   }
 
-  await validateAndSaveL2CancellationSignature({
-    proposal,
-    signature: data.signature,
-    signer: user.address,
-  });
+  await SIGNATURE_FACTORIES.l2Cancellation(data.proposalId, user.address, data.signature);
+
   return json({ ok: true });
 }
 
@@ -213,26 +210,18 @@ export default function L2Cancellation() {
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
             {user.role === "guardian" && (
-              <SignButton
-                proposal={{
-                  id: proposal.id,
-                  externalId: proposal.externalId,
-                  nonce: proposal.nonce,
-                }}
-                contractData={{
-                  actionName: "CancelL2GovernorProposal",
-                  address: guardiansAddress,
-                  name: "Guardians",
-                }}
+              <SignCancellationButton
+                contractAddress={guardiansAddress}
+                proposalId={proposal.id}
+                nonce={proposal.nonce}
+                externalId={proposal.externalId}
                 l2GasLimit={proposal.txRequestGasLimit}
                 l2GasPerPubdataByteLimit={proposal.txRequestL2GasPerPubdataByteLimit}
                 l2GovernorAddress={proposal.txRequestTo}
                 refundRecipient={proposal.txRequestRefundRecipient}
                 txMintValue={proposal.txRequestTxMintValue}
                 disabled={signDisabled}
-              >
-                Approve
-              </SignButton>
+              />
             )}
           </CardContent>
         </Card>
