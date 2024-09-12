@@ -48,8 +48,8 @@ export class TestApp {
   async up() {
     const spinner = ora().start();
 
-    spinner.start("Building app");
-    await this.buildApp();
+    // spinner.start("Building app");
+    // await this.buildApp();
 
     spinner.start("Setting up database");
     await this.setupDb();
@@ -104,6 +104,7 @@ export class TestApp {
   }
 
   async resetMainNode() {
+    const mainBefore = await this.getLatestBlock(this.mainNodeUrl);
     const response = await fetch(this.mainNodeUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -124,6 +125,9 @@ export class TestApp {
     if (!response.ok) {
       throw new Error("Failed to reset main node");
     }
+    await this.waitForHardhatNode(this.mainNodeUrl);
+    const mainAfter = await this.getLatestBlock(this.mainNodeUrl);
+    await this.mineBlocks(this.mainNodeUrl, mainBefore - mainAfter);
   }
 
   private async buildApp() {
@@ -182,6 +186,9 @@ export class TestApp {
         L2_RPC_URL: this.mainNodeUrl,
         ALLOW_PRIVATE_ACTIONS: "true",
         NODE_ENV: "production",
+        UPGRADE_HANDLER_ADDRESS: "0xab3ab5d67ed26ac1935dd790f4f013d222ba5073",
+        ZK_GOV_OPS_GOVERNOR_ADDRESS: "0xb0d4a25cecf5b05279c7ce62db5b26de1dfc3690",
+        ZK_TOKEN_GOVERNOR_ADDRESS: "0x68c3633a5d1125f7aed0c2c549fa2d0f643f73e8",
         ...env,
       },
       outputFile: this.logPaths.app,
@@ -245,6 +252,23 @@ export class TestApp {
       return hexToNumber(data.result as Hex);
     }
     throw new Error("Unexpected response format");
+  }
+
+  private async mineBlocks(url: string, howManyBlocks: number) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "hardhat_mine",
+        params: [howManyBlocks, 0],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to mineBlocks");
+    }
   }
 
   private async waitForApp(maxRetries = 30, retryInterval = 1000) {

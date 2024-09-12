@@ -62,6 +62,8 @@ export class RoleSwitcher {
   }
 }
 
+let testApp: TestApp;
+
 export const test = baseTest.extend<{
   context: BrowserContext;
   wallet: Dappwright;
@@ -70,7 +72,7 @@ export const test = baseTest.extend<{
   // biome-ignore lint/correctness/noEmptyPattern: <explanation>
   context: async ({}, use) => {
     if (!sharedBrowserContext) {
-      const testApp = new TestApp();
+      testApp = new TestApp();
 
       // Launch context with extension
 
@@ -147,6 +149,19 @@ export const test = baseTest.extend<{
 
   wallet: async ({ context }, use) => {
     const metamask = await dappwright.getWallet("metamask", context);
+    // const original = metamask.confirmTransaction
+    // metamask.confirmTransaction = async () => {
+    //   await original.bind(metamask)();
+    //   await metamask.page.bringToFront();
+    //   await metamask.page.getByTestId('account-options-menu-button').click();
+    //   await metamask.page.getByTestId('global-menu-settings').click();
+    //   await metamask.page.getByText("Advanced").click();
+    //   await metamask.page.getByText("Clear activity tab data").click();
+    //   await metamask.page.getByRole("button", { name: "Clear", exact: true }).click();
+    //   await metamask.page.locator(".app-header__logo-container").click();
+    //   await page.bringToFront();
+    // }
+
     await use(metamask);
   },
 

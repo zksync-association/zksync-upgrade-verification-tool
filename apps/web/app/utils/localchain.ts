@@ -5,7 +5,7 @@ export const localchain = defineChain({
   name: "Sepolia",
   rpcUrls: {
     default: {
-      http: ["http://localhost:8545"],
+      http: ["http://localhost:8561"],
     },
   },
   nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 },

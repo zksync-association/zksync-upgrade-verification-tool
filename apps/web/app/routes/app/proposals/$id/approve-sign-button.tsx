@@ -58,6 +58,7 @@ export function ApproveSignButton({
           },
         ],
       }}
+      testId={"approve-button"}
     >
       Approve upgrade
     </BasicSignButton>
