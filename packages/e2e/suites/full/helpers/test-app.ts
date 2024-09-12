@@ -48,8 +48,8 @@ export class TestApp {
   async up() {
     const spinner = ora().start();
 
-    // spinner.start("Building app");
-    // await this.buildApp();
+    spinner.start("Building app");
+    await this.buildApp();
 
     spinner.start("Setting up database");
     await this.setupDb();
