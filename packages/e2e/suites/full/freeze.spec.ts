@@ -401,6 +401,14 @@ test("guardians cannot sign a change-threshold proposal", async ({ page, switche
   await cannotSignChangeThreshold(page);
 });
 
+test("change threshold cannot be created with no threshold", async ({ page, switcher }) => {
+  await switcher.guardian(1, page);
+  await goToFreezeIndex(page);
+  await page.getByTestId("change-threshold-create-btn").click();
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByText("Number must be greater than or equal to 1")).toBeVisible();
+});
+
 test("zk foundation cannot sign a change-threshold proposal", async ({ page, switcher }) => {
   await switcher.zkFoundation(page);
   await cannotSignChangeThreshold(page);
