@@ -12,10 +12,21 @@ import { z } from "zod";
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 
 export async function getProposals() {
+  // First, we will update the status of all stored active proposals
   const storedProposals = await getStoredProposals();
   const activeStoredProposals = storedProposals.filter((p) => p.status === "ACTIVE");
-  const inactiveStoredProposals = storedProposals.filter((p) => p.status === "INACTIVE");
+  for (const proposal of activeStoredProposals) {
+    const status = await getProposalState(proposal.externalId);
+    const parsedStatus = isProposalActive(status) ? "ACTIVE" : "INACTIVE";
+    if (proposal.status !== parsedStatus) {
+      await updateProposal({
+        id: proposal.id,
+        status: parsedStatus,
+      });
+    }
+  }
 
+  // Then, we will fetch the logs and save new proposals
   const latestBlock = await l1Rpc.getLatestBlock();
   const currentBlock = latestBlock.number;
 
@@ -32,27 +43,12 @@ export async function getProposals() {
       throw new Error("Invalid log");
     }
 
-    // If the proposal is already stored and inactive,
-    // we don't need to update the status.
-    if (inactiveStoredProposals.some((p) => p.externalId === id)) {
+    // If proposal is already stored, we skip it
+    if (storedProposals.some((p) => p.externalId === id)) {
       continue;
     }
 
-    // At this point, we must fetch the status to determine if the proposal is active or inactive
     const status = await getProposalState(id);
-
-    // If the proposal is already stored, we need to update the status, but not fetch the data.
-    // Note we only look on active proposals, as inactive ones have already been handled.
-    const activeProposal = activeStoredProposals.find((p) => p.externalId === id);
-    const activeProposalStatus = isProposalActive(status) ? "ACTIVE" : "INACTIVE";
-    if (activeProposal) {
-      if (activeProposalStatus !== activeProposal.status) {
-        await updateProposal({ id: activeProposal.id, status: activeProposalStatus });
-      }
-      continue;
-    }
-
-    // If we reach here, the proposal is not stored yet.
     const proposal = decodeEventLog({
       abi: PROTOCOL_UPGRADE_HANDLER_RAW_ABI,
       eventName: "UpgradeStarted",
