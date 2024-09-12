@@ -96,34 +96,6 @@ async function createChangeThreshold(page: Page, newThreshold = 2) {
   await page.getByRole("button", { name: "Create" }).click();
 }
 
-// General tests
-
-test("freeze button is listed and can be clicked", async ({ page, switcher }) => {
-  await switcher.council(1, page);
-  const freezeButton = page.getByText("Freeze Requests");
-  await expect(freezeButton).toBeVisible();
-  await expect(freezeButton).toBeEnabled();
-});
-
-test("when no freeze request is created every category is empty", async ({ page, switcher }) => {
-  await switcher.council(1, page);
-  await goToFreezeIndex(page);
-
-  for (const kind of ["soft", "hard", "change-threshold", "unfreeze"]) {
-    await expect(page.getByTestId(`${kind}-card`).getByText("No proposals found.")).toBeVisible();
-  }
-});
-
-test("all freeze create buttons are enabled.", async ({ page, switcher }) => {
-  await switcher.council(1, page);
-  await goToFreezeIndex(page);
-
-  await page.getByTestId("soft-create-btn").isEnabled();
-  await page.getByTestId("hard-create-btn").isEnabled();
-  await page.getByTestId("change-threshold-create-btn").isEnabled();
-  await page.getByTestId("unfreeze-create-btn").isEnabled();
-});
-
 async function createFreeze(page: Page, kind: string) {
   await goToFreezeIndex(page);
   await page.getByTestId(`${kind}-create-btn`).click();
@@ -139,9 +111,40 @@ async function approveFreeze(page: Page, wallet: Wallet) {
   await wallet.sign();
 }
 
+// General tests
+
+test("TC300: Navigate to freeze index button is enabled", async ({ page, switcher }) => {
+  await switcher.council(1, page);
+  const freezeButton = page.getByText("Freeze Requests");
+  await expect(freezeButton).toBeVisible();
+  await expect(freezeButton).toBeEnabled();
+});
+
+test("TC 301: Navigate to index page shows list of empty freezes", async ({ page, switcher }) => {
+  await switcher.council(1, page);
+  await goToFreezeIndex(page);
+
+  for (const kind of ["soft", "hard", "change-threshold", "unfreeze"]) {
+    await expect(page.getByTestId(`${kind}-card`).getByText("No proposals found.")).toBeVisible();
+  }
+});
+
+test("TC302: Navigate to freeze index. Shows all create buttons enabled", async ({
+  page,
+  switcher,
+}) => {
+  await switcher.council(1, page);
+  await goToFreezeIndex(page);
+
+  await page.getByTestId("soft-create-btn").isEnabled();
+  await page.getByTestId("hard-create-btn").isEnabled();
+  await page.getByTestId("change-threshold-create-btn").isEnabled();
+  await page.getByTestId("unfreeze-create-btn").isEnabled();
+});
+
 // soft freeze
 
-test("sec council logs in, go to freeze, clicks on create soft freeze and creates with default values", async ({
+test("TC303, TC304: click on create soft freeze button displays correct form.", async ({
   page,
   switcher,
 }) => {
@@ -167,7 +170,10 @@ test("sec council logs in, go to freeze, clicks on create soft freeze and create
   compareExtractedTextWithDate(proposedOnText, now);
 });
 
-test("after create soft freeze a second one cannot be created", async ({ page, switcher }) => {
+test("TC305: Create second soft when there is an active one, fails with proper message", async ({
+  page,
+  switcher,
+}) => {
   await switcher.council(1, page);
   await createFreeze(page, "soft");
 
@@ -178,23 +184,36 @@ test("after create soft freeze a second one cannot be created", async ({ page, s
   await expect(page.getByText("Pending proposal already exists.")).toBeVisible();
 });
 
-test("guardians cannot sign a soft freeze", async ({ page, switcher }) => {
+test("TC313: Attempt to approve soft freeze by guardian, sign button is not displayed", async ({
+  page,
+  switcher,
+}) => {
   await switcher.guardian(1, page);
   await createFreeze(page, "soft");
   await assertCannotSignProposal(page, "soft");
 });
 
-test("zk foundation cannot sign a soft freeze", async ({ page, switcher }) => {
+test("TC314: Attempt to approve soft freeze by zk foundation, sign button is not displayed", async ({
+  page,
+  switcher,
+}) => {
   await switcher.zkFoundation(page);
   await assertCannotSignProposal(page, "soft");
 });
 
-test("visitor cannot sign a soft freeze", async ({ page, switcher }) => {
+test("TC315: Attempt to approve soft freeze by visitor, sign button is not displayed", async ({
+  page,
+  switcher,
+}) => {
   await switcher.visitor(page);
   await assertCannotSignProposal(page, "soft");
 });
 
-test("security council member can sign a soft freeze", async ({ page, switcher, wallet }) => {
+test("TC312: Approve soft freeze by security council member. Signature can be done, signature count increase by one.", async ({
+  page,
+  switcher,
+  wallet,
+}) => {
   await switcher.council(1, page);
   await createFreeze(page, "soft");
   await goToFreezeDetailsPage(page, "soft");
@@ -206,7 +225,7 @@ test("security council member can sign a soft freeze", async ({ page, switcher, 
   await expect(page.getByRole("button", { name: "Approve" })).toBeDisabled();
 });
 
-test("Soft freeze, after reach threshold sign button can be broadcasted. After broadcast txid is displayed", async ({
+test("TC316, TC317: Fulfill signature threshold for soft freeze -> broadcast -> correct tx status shown", async ({
   page,
   switcher,
   wallet,
@@ -220,7 +239,7 @@ test.skip("broadcasted transaction exists in blockchain", () => {});
 
 // hard freeze
 
-test("try to create hard freeze displays right data", async ({ page, switcher }) => {
+test("TC306, TC307: create hard freeze popup is correct and works", async ({ page, switcher }) => {
   await switcher.council(1, page);
 
   await goToFreezeIndex(page);
@@ -243,7 +262,10 @@ test("try to create hard freeze displays right data", async ({ page, switcher })
   compareExtractedTextWithDate(proposedOnText, now);
 });
 
-test("after create hard freeze a second one cannot be created", async ({ page, switcher }) => {
+test("TC308: Create second hard freeze when there is an active one. Fails with proper message.", async ({
+  page,
+  switcher,
+}) => {
   await switcher.council(1, page);
   await createFreeze(page, "hard");
   await goToFreezeIndex(page);
@@ -371,7 +393,10 @@ async function cannotSignChangeThreshold(page: Page) {
   expect(approveButtons).toHaveLength(0);
 }
 
-test("create change threshold proposal shows right data", async ({ page, switcher }) => {
+test("TC309, TC311: create change threshold proposal shows right data and works", async ({
+  page,
+  switcher,
+}) => {
   await switcher.council(1, page);
 
   await goToFreezeIndex(page);
@@ -396,17 +421,20 @@ test("create change threshold proposal shows right data", async ({ page, switche
   compareExtractedTextWithDate(proposedOnText, now);
 });
 
-test("guardians cannot sign a change-threshold proposal", async ({ page, switcher }) => {
-  await switcher.guardian(1, page);
-  await cannotSignChangeThreshold(page);
-});
-
-test("change threshold cannot be created with no threshold", async ({ page, switcher }) => {
+test("TC310: Try to create a soft freeze threshold change with no threshold value -> Fails with proper error message", async ({
+  page,
+  switcher,
+}) => {
   await switcher.guardian(1, page);
   await goToFreezeIndex(page);
   await page.getByTestId("change-threshold-create-btn").click();
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByText("Number must be greater than or equal to 1")).toBeVisible();
+});
+
+test("guardians cannot sign a change-threshold proposal", async ({ page, switcher }) => {
+  await switcher.guardian(1, page);
+  await cannotSignChangeThreshold(page);
 });
 
 test("zk foundation cannot sign a change-threshold proposal", async ({ page, switcher }) => {
@@ -464,12 +492,11 @@ test("TC318: Create soft freeze → change threshold. New threshold is reflected
   await applyApprovals(page, "change-threshold", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   await broadcastAndCheckFreeze(page, wallet);
 
-
   await goToFreezeDetailsPage(page, "soft");
   const approvalCount = await page.getByTestId("signature-count").textContent();
   if (!approvalCount) {
-    throw new Error("approval count should be visible")
+    throw new Error("approval count should be visible");
   }
   const expectedAmount = approvalCount.split("/")[1];
-  expect(expectedAmount).toEqual("4")
-})
+  expect(expectedAmount).toEqual("4");
+});
