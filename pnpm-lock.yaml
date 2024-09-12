@@ -204,9 +204,6 @@ importers:
       get-port:
         specifier: '=7.1.0'
         version: 7.1.0
-      helmet:
-        specifier: '=7.1.0'
-        version: 7.1.0
       isbot:
         specifier: '=4.4.0'
         version: 4.4.0
@@ -5545,10 +5542,6 @@ packages:
 
   headers-polyfill@4.0.3:
     resolution: {integrity: sha512-IScLbePpkvO846sIwOtOTDjutRMWdXdJmXdMvk6gCBHxFO8d+QKOQedyZSxFTTFYRSmlgSTDtXqqq4pcenBXLQ==}
-
-  helmet@7.1.0:
-    resolution: {integrity: sha512-g+HZqgfbpXdCkme/Cd/mZkV0aV3BZZZSugecH03kl38m/Kmdx8jKjBikpDj2cr+Iynv4KpYEviojNdTJActJAg==}
-    engines: {node: '>=16.0.0'}
 
   help-me@5.0.0:
     resolution: {integrity: sha512-7xgomUX6ADmcYzFik0HzAxh/73YlKR9bmFzf51CZwR+b6YtzU2m0u49hQCqV6SvlqIqsaxovfwdvbnsw3b/zpg==}
@@ -14982,8 +14975,6 @@ snapshots:
   he@1.2.0: {}
 
   headers-polyfill@4.0.3: {}
-
-  helmet@7.1.0: {}
 
   help-me@5.0.0: {}
 

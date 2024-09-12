@@ -65,7 +65,6 @@
     "express": "=4.19.2",
     "express-rate-limit": "=7.3.1",
     "get-port": "=7.1.0",
-    "helmet": "=7.1.0",
     "isbot": "=4.4.0",
     "lucide-react": "=0.399.0",
     "pino": "=9.2.0",
