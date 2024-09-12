@@ -427,7 +427,6 @@ test("security council member can sign a change-threshold proposal", async ({
   await expect(approveButton(page)).toBeDisabled();
 });
 
-
 test("change threshold, after reach threshold sign button can be broadcasted. After broadcast txid is displayed", async ({
   page,
   switcher,
