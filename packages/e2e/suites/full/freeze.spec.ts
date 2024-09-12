@@ -89,10 +89,10 @@ async function broadcastAndCheckFreeze(page: Page, wallet: Wallet) {
   await expect(page.getByText("Transaction Hash:")).toBeVisible();
 }
 
-async function createChangeThreshold(page: Page) {
+async function createChangeThreshold(page: Page, newThreshold = 2) {
   await goToFreezeIndex(page);
   await page.getByTestId("change-threshold-create-btn").click();
-  await page.locator("[name='threshold']").fill("2");
+  await page.locator("[name='threshold']").fill(newThreshold.toString());
   await page.getByRole("button", { name: "Create" }).click();
 }
 
@@ -425,4 +425,22 @@ test("security council member can sign a change-threshold proposal", async ({
   });
 
   await expect(approveButton(page)).toBeDisabled();
+});
+
+
+test("change threshold, after reach threshold sign button can be broadcasted. After broadcast txid is displayed", async ({
+  page,
+  switcher,
+  wallet,
+}) => {
+  await switcher.council(1, page);
+  await createChangeThreshold(page, 1);
+  await goToFreezeDetailsPage(page, "change-threshold");
+
+  await applyApprovals(page, "change-threshold", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  await broadcastAndCheckFreeze(page, wallet);
+
+  await createFreeze(page, "soft");
+  await applyApprovals(page, "soft", switcher, wallet, [1]);
+  await broadcastAndCheckFreeze(page, wallet);
 });
