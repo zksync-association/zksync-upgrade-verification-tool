@@ -451,3 +451,25 @@ test("change threshold, after reach threshold sign button can be broadcasted. Af
   await applyApprovals(page, "soft", switcher, wallet, [1]);
   await broadcastAndCheckFreeze(page, wallet);
 });
+
+test("TC318: Create soft freeze → change threshold. New threshold is reflected in soft freeze details", async ({
+  page,
+  switcher,
+  wallet,
+}) => {
+  await switcher.council(1, page);
+  await createFreeze(page, "soft");
+
+  await createChangeThreshold(page, 4);
+  await applyApprovals(page, "change-threshold", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  await broadcastAndCheckFreeze(page, wallet);
+
+
+  await goToFreezeDetailsPage(page, "soft");
+  const approvalCount = await page.getByTestId("signature-count").textContent();
+  if (!approvalCount) {
+    throw new Error("approval count should be visible")
+  }
+  const expectedAmount = approvalCount.split("/")[1];
+  expect(expectedAmount).toEqual("4")
+})
