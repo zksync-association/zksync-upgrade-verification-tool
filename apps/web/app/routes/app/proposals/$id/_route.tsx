@@ -292,7 +292,7 @@ export default function Proposals() {
                         </div>
                       </CardContent>
                     </Card>
-                    <Card className="pb-10">
+                    <Card className="pb-10" data-testid="role-actions">
                       <CardHeader>
                         <CardTitle>
                           {user.role === "guardian" && "Guardian Actions"}
@@ -320,7 +320,7 @@ export default function Proposals() {
                         )}
                       </CardContent>
                     </Card>
-                    <Card className="pb-10">
+                    <Card className="pb-10" data-testid="proposal-actions">
                       <CardHeader>
                         <CardTitle>Proposal Actions</CardTitle>
                       </CardHeader>

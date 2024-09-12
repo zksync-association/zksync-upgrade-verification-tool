@@ -4,7 +4,7 @@ import path from "node:path";
 import postgres from "postgres";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
-import { type Hex, hexToNumber } from "viem";
+import { type Hex, hexToNumber, numberToHex } from "viem";
 import ora from "ora";
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
@@ -124,6 +124,19 @@ export class TestApp {
     if (!response.ok) {
       throw new Error("Failed to reset main node");
     }
+  }
+
+  async mineBlocksInMainNode(blocks: number) {
+    await fetch(this.mainNodeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "hardhat_mine",
+        params: [numberToHex(blocks)],
+      }),
+    });
   }
 
   private async buildApp() {
