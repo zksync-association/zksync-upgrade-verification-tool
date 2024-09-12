@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
 async function goToFreezeIndex(page: Page) {
   await page.goto("/");
   await page.getByText("Freeze Requests").click();
-  await page.waitForLoadState("networkidle");
+  await page.getByText("Soft Freeze Proposals", { exact: true }).isVisible();
 }
 
 function compareExtractedTextWithDate(extractedText: string | null, expectedDate: Date) {
@@ -31,7 +31,8 @@ async function goToFreezeDetailsPage(page: Page, kind: string) {
     .getByTestId(`${kind}-proposals`)
     .getByText(/Proposal \d+/)
     .click();
-  await page.waitForLoadState("networkidle");
+
+  await page.getByText("Proposal Details").isVisible();
 }
 
 async function assertCannotSignProposal(page: Page, kind: string) {
@@ -84,7 +85,7 @@ async function broadcastAndCheckFreeze(page: Page, wallet: Wallet) {
 
   expect(txid).toMatch(/^0x[0-9a-fA-F]+$/);
   await page.goBack();
-  await page.waitForLoadState("networkidle");
+  await page.getByText("Proposal Details").isVisible();
   await expect(page.getByText("Transaction Hash:")).toBeVisible();
 }
 
