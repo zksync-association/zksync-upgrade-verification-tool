@@ -96,7 +96,7 @@ export default function BasicSignButton({
   }
 
   return (
-    <Button loading={loading} disabled={disabled} onClick={onClick} data-testId={testId}>
+    <Button loading={loading} disabled={disabled} onClick={onClick} data-testid={testId}>
       {children}
     </Button>
   );

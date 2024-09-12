@@ -165,7 +165,7 @@ export default function Freeze() {
                 <span>Valid Until:</span>
                 <div className="flex w-1/2 flex-col break-words text-right">
                   <span>{proposalValidUntil.toLocaleString()}</span>
-                  <span data-testId="valid-until-timestamp">
+                  <span data-testid="valid-until-timestamp">
                     ({dateToUnixTimestamp(proposalValidUntil)})
                   </span>
                 </div>
@@ -174,7 +174,7 @@ export default function Freeze() {
                 <span>Proposed On:</span>
                 <div className="flex w-1/2 flex-col break-words text-right">
                   <span>{new Date(proposal.proposedOn).toLocaleString()}</span>
-                  <span data-testId="proposed-on-timestamp">
+                  <span data-testid="proposed-on-timestamp">
                     ({dateToUnixTimestamp(new Date(proposal.proposedOn))})
                   </span>
                 </div>
