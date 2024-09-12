@@ -1,4 +1,4 @@
-import type { EmergencyProposalStatus } from "@/common/proposal-status";
+import type { EmergencyProposalStatus } from "@/common/emergency-proposal-status";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { type Hex, isAddressEqual } from "viem";
 
