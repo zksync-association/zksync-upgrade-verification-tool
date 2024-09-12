@@ -2,7 +2,7 @@ import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
-import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
+import { getProposalData, getProposalState, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
@@ -57,7 +57,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     const [guardians, council, proposalStatus, signatures, proposalData] = await Promise.all([
       guardiansAddress(),
       councilAddress(),
-      getProposalStatus(id),
+      getProposalState(id),
       getSignaturesByExternalProposalId(id),
       getProposalData(id),
     ]);

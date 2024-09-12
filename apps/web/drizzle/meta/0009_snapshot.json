@@ -1,0 +1,618 @@
+{
+  "id": "157af4f8-2789-4391-b67b-2b933967ee99",
+  "prevId": "1451505d-e9d4-412b-97ae-d02c87d22e6d",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.emergency_proposal_calls": {
+      "name": "emergency_proposal_calls",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "proposal_id": {
+          "name": "proposal_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target": {
+          "name": "target",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "emergency_proposal_calls_proposal_id_emergency_proposals_id_fk": {
+          "name": "emergency_proposal_calls_proposal_id_emergency_proposals_id_fk",
+          "tableFrom": "emergency_proposal_calls",
+          "tableTo": "emergency_proposals",
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.emergency_proposals": {
+      "name": "emergency_proposals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "proposed_on": {
+          "name": "proposed_on",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "changed_on": {
+          "name": "changed_on",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_id": {
+          "name": "external_id",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "salt": {
+          "name": "salt",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proposer": {
+          "name": "proposer",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "storage_diff_report": {
+          "name": "storage_diff_report",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "check_report": {
+          "name": "check_report",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "emergency_external_id_idx": {
+          "name": "emergency_external_id_idx",
+          "columns": [
+            {
+              "expression": "external_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "emergency_proposals_external_id_unique": {
+          "name": "emergency_proposals_external_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "external_id"
+          ]
+        }
+      }
+    },
+    "public.freeze_proposals": {
+      "name": "freeze_proposals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_id": {
+          "name": "external_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_until": {
+          "name": "valid_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proposed_on": {
+          "name": "proposed_on",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "soft_freeze_threshold": {
+          "name": "soft_freeze_threshold",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "transaction_hash": {
+          "name": "transaction_hash",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "freeze_proposals_external_id_idx": {
+          "name": "freeze_proposals_external_id_idx",
+          "columns": [
+            {
+              "expression": "external_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.l2_cancellation_calls": {
+      "name": "l2_cancellation_calls",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "proposal_id": {
+          "name": "proposal_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target": {
+          "name": "target",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "l2_cancellation_calls_proposal_id_l2_governor_cancellations_id_fk": {
+          "name": "l2_cancellation_calls_proposal_id_l2_governor_cancellations_id_fk",
+          "tableFrom": "l2_cancellation_calls",
+          "tableTo": "l2_governor_cancellations",
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.l2_governor_cancellations": {
+      "name": "l2_governor_cancellations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "external_id": {
+          "name": "external_id",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proposer": {
+          "name": "proposer",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nonce": {
+          "name": "nonce",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tx_request_gas_limit": {
+          "name": "tx_request_gas_limit",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tx_request_l2_gas_per_pubdata_byte_limit": {
+          "name": "tx_request_l2_gas_per_pubdata_byte_limit",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tx_request_to": {
+          "name": "tx_request_to",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tx_request_refund_recipient": {
+          "name": "tx_request_refund_recipient",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tx_request_tx_mint_value": {
+          "name": "tx_request_tx_mint_value",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_hash": {
+          "name": "transaction_hash",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "l2_governor_cancellations_external_id_unique": {
+          "name": "l2_governor_cancellations_external_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "external_id"
+          ]
+        }
+      }
+    },
+    "public.proposals": {
+      "name": "proposals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "external_id": {
+          "name": "external_id",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calldata": {
+          "name": "calldata",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "check_report": {
+          "name": "check_report",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "storage_diff_report": {
+          "name": "storage_diff_report",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proposed_on": {
+          "name": "proposed_on",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "executor": {
+          "name": "executor",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_hash": {
+          "name": "transaction_hash",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "external_id_idx": {
+          "name": "external_id_idx",
+          "columns": [
+            {
+              "expression": "external_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "proposals_external_id_unique": {
+          "name": "proposals_external_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "external_id"
+          ]
+        }
+      }
+    },
+    "public.signatures": {
+      "name": "signatures",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "proposal_id": {
+          "name": "proposal_id",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emergency_proposal_id": {
+          "name": "emergency_proposal_id",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "freeze_proposal_id": {
+          "name": "freeze_proposal_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "l2_governor_proposal_id": {
+          "name": "l2_governor_proposal_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "signer": {
+          "name": "signer",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "signature": {
+          "name": "signature",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "signatures_proposal_id_proposals_external_id_fk": {
+          "name": "signatures_proposal_id_proposals_external_id_fk",
+          "tableFrom": "signatures",
+          "tableTo": "proposals",
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "external_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "signatures_emergency_proposal_id_emergency_proposals_external_id_fk": {
+          "name": "signatures_emergency_proposal_id_emergency_proposals_external_id_fk",
+          "tableFrom": "signatures",
+          "tableTo": "emergency_proposals",
+          "columnsFrom": [
+            "emergency_proposal_id"
+          ],
+          "columnsTo": [
+            "external_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "signatures_freeze_proposal_id_freeze_proposals_id_fk": {
+          "name": "signatures_freeze_proposal_id_freeze_proposals_id_fk",
+          "tableFrom": "signatures",
+          "tableTo": "freeze_proposals",
+          "columnsFrom": [
+            "freeze_proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "signatures_l2_governor_proposal_id_l2_governor_cancellations_id_fk": {
+          "name": "signatures_l2_governor_proposal_id_l2_governor_cancellations_id_fk",
+          "tableFrom": "signatures",
+          "tableTo": "l2_governor_cancellations",
+          "columnsFrom": [
+            "l2_governor_proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "signatures_proposal_id_signer_action_unique": {
+          "name": "signatures_proposal_id_signer_action_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "proposal_id",
+            "signer",
+            "action"
+          ]
+        },
+        "signatures_emergency_proposal_id_signer_action_unique": {
+          "name": "signatures_emergency_proposal_id_signer_action_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "emergency_proposal_id",
+            "signer",
+            "action"
+          ]
+        },
+        "signatures_freeze_proposal_id_signer_action_unique": {
+          "name": "signatures_freeze_proposal_id_signer_action_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "freeze_proposal_id",
+            "signer",
+            "action"
+          ]
+        },
+        "signatures_l2_governor_proposal_id_signer_action_unique": {
+          "name": "signatures_l2_governor_proposal_id_signer_action_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "l2_governor_proposal_id",
+            "signer",
+            "action"
+          ]
+        }
+      }
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

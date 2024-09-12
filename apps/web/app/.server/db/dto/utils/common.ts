@@ -1,5 +1,5 @@
 import { db } from "@/.server/db";
-import type { InferInsertModel } from "drizzle-orm";
+import type { InferInsertModel, SQL } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 
 export function getFirstOrThrow<T>(value: T[]): T {
@@ -21,3 +21,5 @@ export async function createOrIgnoreRecord<T extends PgTable>(
 ) {
   return (tx ?? db).insert(table).values(data).onConflictDoNothing().returning();
 }
+
+export type Filter<T extends PgTable> = (table: T["_"]["columns"]) => SQL;
