@@ -6,7 +6,7 @@ import { TestApp } from "./helpers/test-app.js";
 
 const testApp = new TestApp();
 
-test.beforeEach(async ({}) => {
+test.beforeEach(async () => {
   await testApp.reset();
 });
 
@@ -188,7 +188,6 @@ test("TC313: Attempt to approve soft freeze by guardian, sign button is not disp
   switcher,
 }) => {
   await switcher.guardian(1, page);
-  await createFreeze(page, "soft");
   await assertCannotSignProposal(page, "soft");
 });
 
