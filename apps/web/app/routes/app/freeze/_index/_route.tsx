@@ -175,7 +175,7 @@ function ProposalCard({
   testNamespace: string;
 }) {
   return (
-    <Card className={cn("pb-10", className)} data-testId={`${testNamespace}-card`}>
+    <Card className={cn("pb-10", className)} data-testid={`${testNamespace}-card`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{title}</CardTitle>
@@ -183,14 +183,14 @@ function ProposalCard({
             variant="secondary"
             size="icon"
             onClick={onAddProposal}
-            data-testId={`${testNamespace}-create-btn`}
+            data-testid={`${testNamespace}-create-btn`}
           >
             <PlusIcon className="h-4 w-4" />
           </Button>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col space-y-4" data-testId={`${testNamespace}-proposals`}>
+        <div className="flex flex-col space-y-4" data-testid={`${testNamespace}-proposals`}>
           {proposals.map((proposal) => {
             const validUntil = new Date(proposal.validUntil).toLocaleString();
 
