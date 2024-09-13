@@ -63,7 +63,7 @@ export function SignFreezeButton({
       message={message}
       primaryType={actionName}
       disabled={disabled}
-      testId={"approve-button"}
+      dataTestId={"approve-button"}
     >
       Approve
     </BasicSignButton>

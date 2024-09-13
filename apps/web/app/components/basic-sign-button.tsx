@@ -33,7 +33,7 @@ type SignButtonProps = {
   types: TypedMessgeTypes;
   message: Record<string, string | number | bigint>;
   primaryType: string;
-  testId: string;
+  dataTestId: string;
 };
 
 type OkBoolAction = () => Omit<Response, "json"> & { json(): Promise<{ ok: boolean }> };
@@ -55,7 +55,7 @@ export default function BasicSignButton({
   types,
   message,
   primaryType,
-  testId,
+  dataTestId,
 }: SignButtonProps) {
   const { signTypedData, isPending, isSuccess } = useSignTypedData();
   const [chain] = useChains();
@@ -96,7 +96,7 @@ export default function BasicSignButton({
   }
 
   return (
-    <Button loading={loading} disabled={disabled} onClick={onClick} data-testid={testId}>
+    <Button loading={loading} disabled={disabled} onClick={onClick} data-testid={dataTestId}>
       {children}
     </Button>
   );
