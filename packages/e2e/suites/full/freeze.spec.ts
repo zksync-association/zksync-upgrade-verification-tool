@@ -275,22 +275,35 @@ test("TC308: Create second hard freeze when there is an active one. Fails with p
   await expect(page.getByText("Pending proposal already exists.")).toBeVisible();
 });
 
-test("TC321: Attempt hard freeze approve by guardian -> Approve button disabled", async ({ page, switcher }) => {
+test("TC321: Attempt hard freeze approve by guardian -> Approve button disabled", async ({
+  page,
+  switcher,
+}) => {
   await switcher.guardian(1, page);
   await assertCannotSignProposal(page, "hard");
 });
 
-test("TC322: Attempt hard freeze approve by zk foundation -> Approve button disabled", async ({ page, switcher }) => {
+test("TC322: Attempt hard freeze approve by zk foundation -> Approve button disabled", async ({
+  page,
+  switcher,
+}) => {
   await switcher.zkFoundation(page);
   await assertCannotSignProposal(page, "hard");
 });
 
-test("TC323: Attempt hard freeze approve by visitor -> Approve button disabled", async ({ page, switcher }) => {
+test("TC323: Attempt hard freeze approve by visitor -> Approve button disabled", async ({
+  page,
+  switcher,
+}) => {
   await switcher.visitor(page);
   await assertCannotSignProposal(page, "hard");
 });
 
-test("TC320: Hard freeze approve by security council -> updates state properly", async ({ page, switcher, wallet }) => {
+test("TC320: Hard freeze approve by security council -> updates state properly", async ({
+  page,
+  switcher,
+  wallet,
+}) => {
   await switcher.council(1, page);
   await createFreeze(page, "hard");
   await goToFreezeDetailsPage(page, "hard");
@@ -313,7 +326,10 @@ test("TC324, TC325: Fulfill signature threshold for hard freeze -> broadcast -> 
 
 // Unfreeze
 
-test("TC338, TC339: click create unfreze -> right data -> creates correct unfreeze proposal", async ({ page, switcher }) => {
+test("TC338, TC339: click create unfreze -> right data -> creates correct unfreeze proposal", async ({
+  page,
+  switcher,
+}) => {
   await switcher.council(1, page);
 
   await goToFreezeIndex(page);
@@ -336,17 +352,26 @@ test("TC338, TC339: click create unfreze -> right data -> creates correct unfree
   compareExtractedTextWithDate(proposedOnText, now);
 });
 
-test("TC333: Attempt to approve unfreeze by guardian -> Sign button disabled", async ({ page, switcher }) => {
+test("TC333: Attempt to approve unfreeze by guardian -> Sign button disabled", async ({
+  page,
+  switcher,
+}) => {
   await switcher.guardian(1, page);
   await assertCannotSignProposal(page, "unfreeze");
 });
 
-test("TC334: Attempt to approve unfreeze by zk foundation -> Sign button disabled", async ({ page, switcher }) => {
+test("TC334: Attempt to approve unfreeze by zk foundation -> Sign button disabled", async ({
+  page,
+  switcher,
+}) => {
   await switcher.zkFoundation(page);
   await assertCannotSignProposal(page, "unfreeze");
 });
 
-test("TC335: Attempt to approve unfreeze by visitor -> Sign button disabled", async ({ page, switcher }) => {
+test("TC335: Attempt to approve unfreeze by visitor -> Sign button disabled", async ({
+  page,
+  switcher,
+}) => {
   await switcher.visitor(page);
   await assertCannotSignProposal(page, "unfreeze");
 });
@@ -432,17 +457,26 @@ test("TC310: Try to create a soft freeze threshold change with no threshold valu
   await expect(page.getByText("Number must be greater than or equal to 1")).toBeVisible();
 });
 
-test("TC327: Attempt to approve change threshold by guardian -> Approve button is not displayed", async ({ page, switcher }) => {
+test("TC327: Attempt to approve change threshold by guardian -> Approve button is not displayed", async ({
+  page,
+  switcher,
+}) => {
   await switcher.guardian(1, page);
   await cannotSignChangeThreshold(page);
 });
 
-test("TC328: Attempt to approve change threshold by zk foundation  -> Approve button is not displayed", async ({ page, switcher }) => {
+test("TC328: Attempt to approve change threshold by zk foundation  -> Approve button is not displayed", async ({
+  page,
+  switcher,
+}) => {
   await switcher.zkFoundation(page);
   await cannotSignChangeThreshold(page);
 });
 
-test("TC328: Attempt to approve change threshold by visitor -> Approve button is not displayed", async ({ page, switcher }) => {
+test("TC328: Attempt to approve change threshold by visitor -> Approve button is not displayed", async ({
+  page,
+  switcher,
+}) => {
   await switcher.visitor(page);
   await cannotSignChangeThreshold(page);
 });

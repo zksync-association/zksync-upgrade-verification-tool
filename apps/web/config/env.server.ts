@@ -39,6 +39,7 @@ export const clientEnv = {
   ETH_NETWORK: env.ETH_NETWORK,
   WALLET_CONNECT_PROJECT_ID: env.WALLET_CONNECT_PROJECT_ID,
   ALLOW_PRIVATE_ACTIONS: env.ALLOW_PRIVATE_ACTIONS,
+  LOCAL_CHAIN_PORT: env.ETH_NETWORK === "local" ? Number(new URL(env.L1_RPC_URL).port) : 0,
 };
 
 export type CLIENT_ENV = typeof clientEnv;
