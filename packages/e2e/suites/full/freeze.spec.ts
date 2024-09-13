@@ -6,9 +6,8 @@ import { TestApp } from "./helpers/test-app.js";
 
 const testApp = new TestApp();
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({}) => {
   await testApp.reset();
-  await page.goto("/");
 });
 
 async function goToFreezeIndex(page: Page) {
