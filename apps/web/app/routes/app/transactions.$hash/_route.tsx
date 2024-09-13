@@ -97,7 +97,7 @@ export default function Transactions() {
                 <TableBody>
                   <TableRow>
                     <TableCell>Transaction Hash</TableCell>
-                    <TableCell>{data.transactionHash}</TableCell>
+                    <TableCell data-testId={"transaction-hash"}>{data.transactionHash}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>Status</TableCell>

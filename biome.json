@@ -19,7 +19,8 @@
       "apps/web/drizzle",
       "e2e/contracts/zk-gov",
       "packages/contracts/src/zk-gov",
-      "packages/contracts/src/zk-gov-preprocessed"
+      "packages/contracts/src/zk-gov-preprocessed",
+      "packages/e2e/playwright-report"
     ]
   },
   "organizeImports": {

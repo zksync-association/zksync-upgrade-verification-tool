@@ -71,6 +71,7 @@ export function SignCancellationButton({
       message={message}
       primaryType={actionName}
       disabled={disabled}
+      dataTestId={"approve-button"}
     >
       Approve
     </BasicSignButton>

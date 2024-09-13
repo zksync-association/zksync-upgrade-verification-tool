@@ -49,6 +49,7 @@ export function ExtendVetoButton({
           },
         ],
       }}
+      dataTestId={"extend-veto-button"}
     >
       Extend legal veto period
     </BasicSignButton>
