@@ -1,7 +1,8 @@
 import { TestApp } from "./helpers/test-app.js";
-import { expect, test } from "./helpers/dappwright.js";
+import { expect, RoleSwitcher, test } from "./helpers/dappwright.js";
 import type { Page } from "@playwright/test";
 import type { Dappwright as Wallet } from "@tenkeylabs/dappwright";
+import { guardianRange, repeatFor } from "./helpers/utils.js";
 
 const testApp = new TestApp();
 
@@ -22,7 +23,6 @@ async function goToCreateCancellationPage(page: Page) {
 }
 
 async function goToCancellationDetail(page: Page) {
-  await createCancellation(page, 0);
   await goToCancellationsIndex(page);
   await page.getByText("View").click();
   await page.getByText("Proposal Details").waitFor();
@@ -208,4 +208,47 @@ test("TS412: Guardian goes to veto details page -> Approvals count increased in 
   })
 
   await expect(approveButton(page)).toBeDisabled();
+})
+
+async function createAndApproveCancellation(page: Page, switcher: RoleSwitcher, wallet: Wallet, index: number) {
+  await switcher.guardian(1, page);
+  await createCancellation(page, index);
+  await goToCancellationDetail(page);
+
+
+  await repeatFor(guardianRange(1, 5), async (n) => {
+    await switcher.guardian(n, page);
+    await approveButton(page).click();
+    await signWithScroll(wallet);
+  })
+}
+
+test("TS413: Approvals gathered -> Broadcast button enabled for every rol", async ({page, switcher, wallet}) => {
+  await createAndApproveCancellation(page, switcher, wallet, 0);
+
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("button", {name: "Execute Veto"})).toBeEnabled();
+
+  await switcher.council(1, page);
+  await goToCancellationDetail(page);
+  await expect(page.getByRole("button", {name: "Execute Veto"})).toBeEnabled();
+
+  await switcher.visitor(page);
+  await goToCancellationDetail(page);
+  await expect(page.getByRole("button", {name: "Execute Veto"})).toBeEnabled();
+
+  await switcher.zkFoundation(page);
+  await goToCancellationDetail(page);
+  await expect(page.getByRole("button", {name: "Execute Veto"})).toBeEnabled();
+})
+
+test("TS414: Broadcast tx -> Redirects to /transactions. Shows correct tx data. Transaction is created with right eth value.", async ({page, switcher, wallet}) => {
+  await createAndApproveCancellation(page, switcher, wallet, 0);
+
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", {name: "Execute Veto"}).click();
+  await wallet.confirmTransaction();
+  await page.waitForTimeout(10 * 1000);
+
+  await expect(page.getByText("Transaction successful")).toBeVisible();
 })
