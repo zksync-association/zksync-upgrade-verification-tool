@@ -61,6 +61,8 @@ async function withVoteIncrease(page: Page, fn: () => Promise<void>) {
   );
 }
 
+// This code is copied from: https://github.com/TenKeyLabs/dappwright/blob/main/src/wallets/metamask/actions/util.ts#L3
+// Thre eason is that we need to scroll before signed, and that's not included in the current version of dappright.
 async function performPopupAction (page: Page, action: (popup: Page) => Promise<void>): Promise<void> {
   const popup = await page.context().waitForEvent('page'); // Wait for the popup to show up
 
@@ -68,6 +70,8 @@ async function performPopupAction (page: Page, action: (popup: Page) => Promise<
   if (!popup.isClosed()) await popup.waitForEvent('close');
 }
 
+
+// Our message has scroll. That is not included in dappwrights logic. That's why it's re implemented here.
 async function signWithScroll(wallet: Wallet) {
   await performPopupAction(wallet.page, async (popup) => {
     await popup.bringToFront();
