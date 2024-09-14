@@ -33,7 +33,7 @@ export default function L2Proposals() {
           <div className="flex items-center justify-between">
             <CardTitle>Active L2 Veto Proposals</CardTitle>
             <Link to={$path("/app/l2-cancellations/new")}>
-              <Button data-testid="new-emergency-proposal" variant="secondary" size="icon">
+              <Button data-testid="new-cancellation-proposal" variant="secondary" size="icon">
                 <PlusIcon className="h-4 w-4" />
               </Button>
             </Link>
