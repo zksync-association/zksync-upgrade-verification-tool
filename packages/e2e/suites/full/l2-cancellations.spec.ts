@@ -252,21 +252,20 @@ test("TS414: Broadcast tx -> Redirects to /transactions. Shows correct tx data. 
   await page.waitForLoadState("networkidle");
   await page.getByRole("button", {name: "Execute Veto"}).click();
   await wallet.confirmTransaction();
-  await page.waitForTimeout(10 * 1000);
 
   await expect(page.getByText("Transaction successful")).toBeVisible();
 })
 
-test("TS415: Create govops proposal -> Creates with proper data.", async ({page, switcher, wallet}) => {
-  await createAndApproveCancellation(page, switcher, wallet, 0);
+test("TS415: Create govops proposal -> Creates with proper data.", async ({page}) => {
+  await createCancellation(page, 0);
   await goToCancellationDetail(page);
 
   await expect(page.getByText("GovOps Governor Proposal", { exact: true })).toBeVisible();
   await expect(page.getByText("Test GovOps proposal", { exact: true })).toBeVisible();
 })
 
-test("TS416: Create token proposal -> Creates with proper data.", async ({page, switcher, wallet}) => {
-  await createAndApproveCancellation(page, switcher, wallet, 1);
+test("TS416: Create token proposal -> Creates with proper data.", async ({page}) => {
+  await createCancellation(page, 1);
   await goToCancellationDetail(page);
 
   await expect(page.getByText("Token Governor Proposal", { exact: true })).toBeVisible();
