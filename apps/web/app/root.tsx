@@ -24,7 +24,7 @@ export const links: LinksFunction = () => [
   },
 ];
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export function loader({ request }: LoaderFunctionArgs) {
   // Get wagmi cookie for SSR
   const cookies = request.headers.get("Cookie");
   const wagmiCookie = cookies ? parseWagmiCookie(cookies, "wagmi.store") : undefined;
@@ -46,6 +46,7 @@ export default function App() {
           initialState={walletProviderInitialState}
           projectId={env.WALLET_CONNECT_PROJECT_ID}
           network={env.ETH_NETWORK}
+          chainPort={env.LOCAL_CHAIN_PORT}
         >
           <RoleRevalidatorProvider>
             <ConnectRedirectProvider>

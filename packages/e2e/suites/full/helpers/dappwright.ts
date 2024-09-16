@@ -17,7 +17,7 @@ type Enumerate<N extends number, Acc extends number[] = []> = Acc["length"] exte
   : Enumerate<N, [...Acc, Acc["length"]]>;
 
 /** IntRange is a type that represents a range of numbers from F to T inclusive */
-type IntRange<F extends number, T extends number> = Exclude<Enumerate<T>, Enumerate<F>> | T;
+export type IntRange<F extends number, T extends number> = Exclude<Enumerate<T>, Enumerate<F>> | T;
 
 let sharedBrowserContext: BrowserContext;
 
@@ -62,6 +62,8 @@ export class RoleSwitcher {
   }
 }
 
+let testApp: TestApp;
+
 export const test = baseTest.extend<{
   context: BrowserContext;
   wallet: Dappwright;
@@ -70,7 +72,7 @@ export const test = baseTest.extend<{
   // biome-ignore lint/correctness/noEmptyPattern: <explanation>
   context: async ({}, use) => {
     if (!sharedBrowserContext) {
-      const testApp = new TestApp();
+      testApp = new TestApp();
 
       // Launch context with extension
 

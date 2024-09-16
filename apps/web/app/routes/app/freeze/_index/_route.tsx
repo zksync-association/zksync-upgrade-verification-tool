@@ -136,21 +136,25 @@ export default function Index() {
         title="Soft Freeze Proposals"
         proposals={softFreezeProposals}
         onAddProposal={() => setModalType("SOFT_FREEZE")}
+        testNamespace={"soft"}
       />
       <ProposalCard
         title="Hard Freeze Proposals"
         proposals={hardFreezeProposals}
         onAddProposal={() => setModalType("HARD_FREEZE")}
+        testNamespace={"hard"}
       />
       <ProposalCard
         title="Set Soft Freeze Threshold Proposals"
         proposals={setSoftFreezeThresholdProposals}
         onAddProposal={() => setModalType("SET_SOFT_FREEZE_THRESHOLD")}
+        testNamespace={"change-threshold"}
       />
       <ProposalCard
         title="Unfreeze Proposals"
         proposals={unfreezeProposals}
         onAddProposal={() => setModalType("UNFREEZE")}
+        testNamespace={"unfreeze"}
       />
       <CreateFreezeProposalModal type={modalType} onClose={() => setModalType(null)} />
     </div>
@@ -162,24 +166,31 @@ function ProposalCard({
   proposals,
   onAddProposal,
   className,
+  testNamespace,
 }: {
   title: string;
   proposals: Jsonify<InferSelectModel<typeof freezeProposalsTable>>[];
   onAddProposal: () => void;
   className?: string;
+  testNamespace: string;
 }) {
   return (
-    <Card className={cn("pb-10", className)}>
+    <Card className={cn("pb-10", className)} data-testid={`${testNamespace}-card`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{title}</CardTitle>
-          <Button variant="secondary" size="icon" onClick={onAddProposal}>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={onAddProposal}
+            data-testid={`${testNamespace}-create-btn`}
+          >
             <PlusIcon className="h-4 w-4" />
           </Button>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col space-y-4">
+        <div className="flex flex-col space-y-4" data-testid={`${testNamespace}-proposals`}>
           {proposals.map((proposal) => {
             const validUntil = new Date(proposal.validUntil).toLocaleString();
 

@@ -54,6 +54,7 @@ export function EmergencySignButton({
         id: proposalId,
       }}
       disabled={disabled}
+      dataTestId={"approve-button"}
     >
       Approve emergency upgrade
     </BasicSignButton>

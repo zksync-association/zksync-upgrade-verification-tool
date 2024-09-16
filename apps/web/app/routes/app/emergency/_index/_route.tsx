@@ -105,7 +105,7 @@ export default function Index() {
           )}
         </CardContent>
       </Card>
-      <Card className="pb-10">
+      <Card className="pb-10" data-testid="inactive-proposals-card">
         <CardHeader>
           <CardTitle>Inactive Emergency Proposals</CardTitle>
         </CardHeader>

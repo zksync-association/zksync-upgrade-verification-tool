@@ -180,6 +180,7 @@ export default function L2Cancellation() {
                 label="Approvals"
                 signatures={signatures.length}
                 necessarySignatures={necessarySignatures}
+                testId={"approvals-count"}
               />
             )}
             {proposal.status === "DONE" && (

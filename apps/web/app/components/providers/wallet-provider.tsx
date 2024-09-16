@@ -1,16 +1,16 @@
 import Avatar from "@/components/connect-button/avatar";
 import { localchain } from "@/utils/localchain";
-import { RainbowKitProvider, darkTheme, getDefaultConfig } from "@rainbow-me/rainbowkit";
+import { darkTheme, getDefaultConfig, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
-import { type State, WagmiProvider, cookieStorage, createStorage } from "wagmi";
+import { cookieStorage, createStorage, type State, WagmiProvider } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
 
 const queryClient = new QueryClient();
 
 const NETWORKS = {
-  mainnet: mainnet,
-  sepolia: sepolia,
+  mainnet: (_n: number) => mainnet,
+  sepolia: (_n: number) => sepolia,
   local: localchain,
 };
 
@@ -19,23 +19,25 @@ export function WalletProvider({
   initialState,
   projectId,
   network: networkName,
+  chainPort,
 }: {
   children: ReactNode;
   initialState?: State;
   projectId: string;
   network: "mainnet" | "sepolia" | "local";
+  chainPort: number;
 }) {
   const config = useMemo(() => {
     return getDefaultConfig({
       appName: "zkSync Upgrade Verification Tool",
-      chains: [NETWORKS[networkName]],
+      chains: [NETWORKS[networkName](chainPort)],
       projectId,
       ssr: true,
       storage: createStorage({
         storage: cookieStorage,
       }),
     });
-  }, [projectId, networkName]);
+  }, [projectId, networkName, chainPort]);
 
   return (
     <WagmiProvider config={config} initialState={initialState}>
