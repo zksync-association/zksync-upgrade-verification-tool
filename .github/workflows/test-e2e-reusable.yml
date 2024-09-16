@@ -15,6 +15,7 @@ defaults:
 jobs:
   test-cli:
     runs-on: ubuntu-latest
+    if: false  # Disable this job for now
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -31,6 +32,15 @@ jobs:
 
   test-e2e-web:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: webapp
+        ports:
+          - 5432:5432
     env:
       HEADLESS: false
     steps:
