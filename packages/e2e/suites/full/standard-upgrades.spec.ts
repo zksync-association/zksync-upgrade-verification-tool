@@ -34,7 +34,7 @@ test("TC002 - Check list of active proposals is display with active proposals", 
 test("TC003 - Check list of active proposals is displayed without active proposals", async ({
   page,
 }) => {
-  await testApp.mineBlocksInMainNode(10_000_000);
+  await testApp.increaseBlockTimestamp({ days: 40 });
   await page.reload();
   const activeProposalsSection = page
     .getByRole("heading", { name: "Active Standard Proposals", exact: true })
@@ -49,7 +49,7 @@ test("TC003 - Check list of active proposals is displayed without active proposa
 test("TC004 - Check list of inactive proposals is displayed with inactive proposals", async ({
   page,
 }) => {
-  await testApp.mineBlocksInMainNode(10_000_000);
+  await testApp.increaseBlockTimestamp({ days: 40 });
   await page.reload();
   const inactiveProposalsSection = page
     .getByRole("heading", { name: "Inactive Standard Proposals" })
@@ -96,7 +96,7 @@ test("TC006 - Verify proposal details are correctly displayed on an active propo
 test("TC007 - Verify proposal details are correctly displayed on an inactive proposal", async ({
   page,
 }) => {
-  await testApp.mineBlocksInMainNode(10_000_000);
+  await testApp.increaseBlockTimestamp({ days: 40 });
   await page.reload();
   const inactiveProposalsSection = page
     .getByRole("heading", { name: "Inactive Standard Proposals" })
@@ -217,6 +217,10 @@ test("TC012 - Verify a security council approval can be executed", async ({
 test("TC013 - Verify a guardian approval can be executed", async ({ page, switcher, wallet }) => {
   await goToProposalDetails(page);
 
+  // First switch to guardian 1 and wait for 1 second to make sure guardian role is correctly switched
+  await switcher.guardian(1, page);
+  await page.waitForTimeout(1000);
+
   for (let i = 1; i <= 5; i++) {
     await switcher.guardian(i as IntRange<1, 8>, page);
     await page.getByRole("button", { name: "Approve Upgrade" }).click();
@@ -224,7 +228,7 @@ test("TC013 - Verify a guardian approval can be executed", async ({ page, switch
     await expect(page.getByTestId("guardian-signature-count")).toHaveText(`${i}/5`);
   }
 
-  await expect(page.getByText("LEGAL VETO PERIOD")).toBeVisible();
+  await expect(page.getByText("LEGAL VETO PERIOD (day 1 out of 3)", { exact: true })).toBeVisible();
   await testApp.increaseBlockTimestamp({ days: 4 });
   await page.reload();
   await expect(page.getByText("WAITING")).toBeVisible();
@@ -242,6 +246,10 @@ test("TC014 - Verify a legal veto extension can be executed", async ({
 }) => {
   await goToProposalDetails(page);
 
+  // First switch to guardian 1 and wait for 1 second to make sure guardian role is correctly switched
+  await switcher.guardian(1, page);
+  await page.waitForTimeout(1000);
+
   for (let i = 1; i <= 2; i++) {
     await switcher.guardian(i as IntRange<1, 8>, page);
     await page.getByRole("button", { name: "Extend legal veto period" }).click();
@@ -258,6 +266,10 @@ test("TC014 - Verify a legal veto extension can be executed", async ({
 test("TC015 - Verify a proposal can be executed by anyone", async ({ page, switcher, wallet }) => {
   await goToProposalDetails(page);
 
+  // First switch to guardian 1 and wait for 1 second to make sure guardian role is correctly switched
+  await switcher.guardian(1, page);
+  await page.waitForTimeout(1000);
+
   for (let i = 1; i <= 5; i++) {
     await switcher.guardian(i as IntRange<1, 8>, page);
     await page.getByRole("button", { name: "Approve Upgrade" }).click();
@@ -265,18 +277,21 @@ test("TC015 - Verify a proposal can be executed by anyone", async ({ page, switc
     await expect(page.getByTestId("guardian-signature-count")).toHaveText(`${i}/5`);
   }
 
-  await expect(page.getByText("LEGAL VETO PERIOD")).toBeVisible();
+  await expect(page.getByText("LEGAL VETO PERIOD (day 1 out of 3)", { exact: true })).toBeVisible();
   await testApp.increaseBlockTimestamp({ days: 4 });
   await page.reload();
   await expect(page.getByText("WAITING")).toBeVisible();
 
-  await page.getByText("Execute guardian approval").click();
+  await page.getByRole("button", { name: "Execute guardian approval" }).click();
   await wallet.confirmTransaction();
 
   await expect(page.getByText("Transaction successful")).toBeVisible();
 
   await page.goBack();
   await expect(page.getByText("Proposal Details")).toBeVisible();
+
+  await testApp.increaseBlockTimestamp({ days: 31 });
+  await page.reload();
 
   await switcher.visitor(page);
   await page.getByRole("button", { name: "Execute Upgrade" }).click();

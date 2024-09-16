@@ -102,6 +102,7 @@ export const test = baseTest.extend<{
           chainId: 11155111,
           symbol: "SepoliaETH",
         });
+        await wallet.switchNetwork("Hardhat");
       } catch {
         throw new Error("Please verify there's a node running at http://localhost:8545");
       }

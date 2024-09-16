@@ -143,6 +143,33 @@ export class TestApp {
     });
   }
 
+  async increaseBlockTimestamp({
+    days,
+    hours,
+    minutes,
+    seconds,
+  }: { days?: number; hours?: number; minutes?: number; seconds?: number }) {
+    const increaseBySeconds =
+      (days ?? 0) * 24 * 60 * 60 + (hours ?? 0) * 60 * 60 + (minutes ?? 0) * 60 + (seconds ?? 0);
+    if (increaseBySeconds === 0) {
+      throw new Error("Increase by seconds must be greater than 0");
+    }
+
+    // Increase time method works on the next block, so we need to mine one block
+    // after executing the method.
+    await fetch(this.mainNodeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "evm_increaseTime",
+        params: [increaseBySeconds],
+      }),
+    });
+    await this.mineBlocksInMainNode(1);
+  }
+
   private async buildApp() {
     await exec("pnpm build", { cwd: this.webDir });
   }
@@ -202,6 +229,8 @@ export class TestApp {
         UPGRADE_HANDLER_ADDRESS: "0xab3ab5d67ed26ac1935dd790f4f013d222ba5073",
         ZK_GOV_OPS_GOVERNOR_ADDRESS: "0xb0d4a25cecf5b05279c7ce62db5b26de1dfc3690",
         ZK_TOKEN_GOVERNOR_ADDRESS: "0x68c3633a5d1125f7aed0c2c549fa2d0f643f73e8",
+        ETH_NETWORK: "local",
+        LOCAL_CHAIN_PORT: this.mainNodePort.toString(),
         ...env,
       },
       outputFile: this.logPaths.app,
