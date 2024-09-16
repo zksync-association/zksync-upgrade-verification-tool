@@ -12,12 +12,13 @@
     "fullenv:up": "docker compose -f fullstack-compose.yml up -d",
     "fullenv:up:services": "pnpm fullenv:up -- hh-deploy migrate",
     "fullenv:down": "docker compose -f fullstack-compose.yml down --volumes --remove-orphans",
+    "test:e2e": "run-s test:cli test:web",
     "test:cli": "vitest run --config ./vitest.cli.config.ts",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:fast": "env TEST_FAST_MODE=true pnpm test:e2e",
-    "test:e2e:env:up": "tsx suites/full/scripts/env-up.ts",
-    "test:e2e:env:down": "tsx suites/full/scripts/env-down.ts"
+    "test:web": "playwright test",
+    "test:web:ui": "playwright test --ui",
+    "test:web:fast": "env TEST_FAST_MODE=true pnpm test:e2e",
+    "test:web:env:up": "tsx suites/full/scripts/env-up.ts",
+    "test:web:env:down": "tsx suites/full/scripts/env-down.ts"
   },
   "devDependencies": {
     "@faker-js/faker": "^8.4.1",
@@ -30,6 +31,7 @@
     "dotenv": "^16.4.5",
     "drizzle-orm": "=0.33.0",
     "hardhat": "^2.22.6",
+    "npm-run-all": "^4.1.5",
     "ora": "^8.0.1",
     "postgres": "=3.4.4",
     "tempy": "^3.1.0",

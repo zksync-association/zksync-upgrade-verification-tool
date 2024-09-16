@@ -2,6 +2,7 @@ import { expect } from "chai";
 import hre from "hardhat";
 import fs from "node:fs";
 import type { Address, PublicClient } from "viem";
+import { deploySetup } from "../helpers/deploy-setup.js";
 
 const availableAddresses = [
   "ProtocolUpgradeHandler",
@@ -32,6 +33,7 @@ describe("Deploy:All tests", () => {
   let addresses: Record<AvailableAddresses, `0x${string}`>;
 
   before(async () => {
+    await deploySetup();
     client = await hre.viem.getPublicClient();
     addresses = getDeployedAddresses();
     console.log("Deployed addresses:", addresses);
