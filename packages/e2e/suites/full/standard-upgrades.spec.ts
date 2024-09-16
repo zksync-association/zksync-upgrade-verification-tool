@@ -1,4 +1,5 @@
-import { test, expect } from "./helpers/dappwright.js";
+import type { Page } from "@playwright/test";
+import { test, expect, type IntRange } from "./helpers/dappwright.js";
 import { TestApp } from "./helpers/test-app.js";
 
 const testApp = new TestApp();
@@ -76,14 +77,7 @@ test("TC005 - Check list of inactive proposals is displayed without inactive pro
 test("TC006 - Verify proposal details are correctly displayed on an active proposal", async ({
   page,
 }) => {
-  const activeProposalsSection = page
-    .getByRole("heading", { name: "Active Standard Proposals", exact: true })
-    .locator("..")
-    .locator("..");
-  const proposalButton = activeProposalsSection.getByRole("button", {
-    name: /^0x[a-fA-F0-9]{64}$/,
-  });
-  await proposalButton.click();
+  await goToProposalDetails(page);
 
   await expect(page.getByText("Proposal Details")).toBeVisible();
   await expect(page.getByText("Current Version")).toBeVisible();
@@ -144,15 +138,7 @@ test("TC007 - Verify proposal details are correctly displayed on an inactive pro
 
 test("TC008 - Verify a guardian can only see guardian role actions", async ({ page, switcher }) => {
   await switcher.guardian(1, page);
-
-  const activeProposalsSection = page
-    .getByRole("heading", { name: "Active Standard Proposals" })
-    .locator("..")
-    .locator("..");
-  const proposalButton = activeProposalsSection.getByRole("button", {
-    name: /^0x[a-fA-F0-9]{64}$/,
-  });
-  await proposalButton.click();
+  await goToProposalDetails(page);
 
   const roleActions = page.getByTestId("role-actions");
   await expect(roleActions.getByText("Guardian Actions")).toBeVisible();
@@ -171,15 +157,7 @@ test("TC009 - Verify a council member can only see council role actions", async 
   switcher,
 }) => {
   await switcher.council(1, page);
-
-  const activeProposalsSection = page
-    .getByRole("heading", { name: "Active Standard Proposals" })
-    .locator("..")
-    .locator("..");
-  const proposalButton = activeProposalsSection.getByRole("button", {
-    name: /^0x[a-fA-F0-9]{64}$/,
-  });
-  await proposalButton.click();
+  await goToProposalDetails(page);
 
   const roleActions = page.getByTestId("role-actions");
   await expect(roleActions.getByText("Guardian Actions")).not.toBeVisible();
@@ -193,15 +171,7 @@ test("TC009 - Verify a council member can only see council role actions", async 
 
 test("TC010 - Verify a visitor can't see any role actions", async ({ page, switcher }) => {
   await switcher.visitor(page);
-
-  const activeProposalsSection = page
-    .getByRole("heading", { name: "Active Standard Proposals" })
-    .locator("..")
-    .locator("..");
-  const proposalButton = activeProposalsSection.getByRole("button", {
-    name: /^0x[a-fA-F0-9]{64}$/,
-  });
-  await proposalButton.click();
+  await goToProposalDetails(page);
 
   const roleActions = page.getByTestId("role-actions");
   await expect(roleActions.getByText("Guardian Actions")).not.toBeVisible();
@@ -211,7 +181,110 @@ test("TC010 - Verify a visitor can't see any role actions", async ({ page, switc
 
 test("TC011 - Verify a zkFoundation can't see any role actions", async ({ page, switcher }) => {
   await switcher.zkFoundation(page);
+  await goToProposalDetails(page);
 
+  const roleActions = page.getByTestId("role-actions");
+  await expect(roleActions.getByText("Guardian Actions")).not.toBeVisible();
+  await expect(roleActions.getByText("Security Council Actions")).not.toBeVisible();
+  await expect(roleActions.getByText("No role actions")).toBeVisible();
+});
+
+test("TC012 - Verify a security council approval can be executed", async ({
+  page,
+  switcher,
+  wallet,
+}) => {
+  await goToProposalDetails(page);
+
+  for (let i = 1; i <= 6; i++) {
+    await switcher.council(i as IntRange<1, 12>, page);
+    await page.getByRole("button", { name: "Approve Upgrade" }).click();
+    await wallet.sign();
+    await expect(page.getByTestId("council-signature-count")).toHaveText(`${i}/6`);
+  }
+
+  await expect(page.getByText("LEGAL VETO PERIOD")).toBeVisible();
+  await testApp.increaseBlockTimestamp({ days: 4 });
+  await page.reload();
+  await expect(page.getByText("WAITING")).toBeVisible();
+
+  await page.getByText("Execute security council approval").click();
+  await wallet.confirmTransaction();
+
+  await expect(page.getByText("Transaction successful")).toBeVisible();
+});
+
+test("TC013 - Verify a guardian approval can be executed", async ({ page, switcher, wallet }) => {
+  await goToProposalDetails(page);
+
+  for (let i = 1; i <= 5; i++) {
+    await switcher.guardian(i as IntRange<1, 8>, page);
+    await page.getByRole("button", { name: "Approve Upgrade" }).click();
+    await wallet.sign();
+    await expect(page.getByTestId("guardian-signature-count")).toHaveText(`${i}/5`);
+  }
+
+  await expect(page.getByText("LEGAL VETO PERIOD")).toBeVisible();
+  await testApp.increaseBlockTimestamp({ days: 4 });
+  await page.reload();
+  await expect(page.getByText("WAITING")).toBeVisible();
+
+  await page.getByText("Execute guardian approval").click();
+  await wallet.confirmTransaction();
+
+  await expect(page.getByText("Transaction successful")).toBeVisible();
+});
+
+test("TC014 - Verify a legal veto extension can be executed", async ({
+  page,
+  switcher,
+  wallet,
+}) => {
+  await goToProposalDetails(page);
+
+  for (let i = 1; i <= 2; i++) {
+    await switcher.guardian(i as IntRange<1, 8>, page);
+    await page.getByRole("button", { name: "Extend legal veto period" }).click();
+    await wallet.sign();
+    await expect(page.getByTestId("legal-veto-signature-count")).toHaveText(`${i}/2`);
+  }
+
+  await page.getByText("Execute legal veto extension").click();
+  await wallet.confirmTransaction();
+
+  await expect(page.getByText("Transaction successful")).toBeVisible();
+});
+
+test("TC015 - Verify a proposal can be executed by anyone", async ({ page, switcher, wallet }) => {
+  await goToProposalDetails(page);
+
+  for (let i = 1; i <= 5; i++) {
+    await switcher.guardian(i as IntRange<1, 8>, page);
+    await page.getByRole("button", { name: "Approve Upgrade" }).click();
+    await wallet.sign();
+    await expect(page.getByTestId("guardian-signature-count")).toHaveText(`${i}/5`);
+  }
+
+  await expect(page.getByText("LEGAL VETO PERIOD")).toBeVisible();
+  await testApp.increaseBlockTimestamp({ days: 4 });
+  await page.reload();
+  await expect(page.getByText("WAITING")).toBeVisible();
+
+  await page.getByText("Execute guardian approval").click();
+  await wallet.confirmTransaction();
+
+  await expect(page.getByText("Transaction successful")).toBeVisible();
+
+  await page.goBack();
+  await expect(page.getByText("Proposal Details")).toBeVisible();
+
+  await switcher.visitor(page);
+  await page.getByRole("button", { name: "Execute Upgrade" }).click();
+  await wallet.confirmTransaction();
+  await expect(page.getByText("Transaction successful")).toBeVisible();
+});
+
+async function goToProposalDetails(page: Page) {
   const activeProposalsSection = page
     .getByRole("heading", { name: "Active Standard Proposals" })
     .locator("..")
@@ -220,9 +293,5 @@ test("TC011 - Verify a zkFoundation can't see any role actions", async ({ page, 
     name: /^0x[a-fA-F0-9]{64}$/,
   });
   await proposalButton.click();
-
-  const roleActions = page.getByTestId("role-actions");
-  await expect(roleActions.getByText("Guardian Actions")).not.toBeVisible();
-  await expect(roleActions.getByText("Security Council Actions")).not.toBeVisible();
-  await expect(roleActions.getByText("No role actions")).toBeVisible();
-});
+  await expect(page.getByText("Proposal Details")).toBeVisible();
+}
