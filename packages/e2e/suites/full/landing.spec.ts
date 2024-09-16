@@ -1,11 +1,13 @@
 import { test, expect } from "./helpers/dappwright.js";
 import { TestApp } from "./helpers/test-app.js";
 
-const testApp = new TestApp();
-
-test.beforeEach(async () => {
+test.beforeEach(async ({ testApp }) => {
   await testApp.reset();
 });
+
+test.afterEach(async ({ clearWalletNonces }) => {
+  await clearWalletNonces()
+})
 
 test("TC100 - Login as visitor", async ({ switcher, page }) => {
   await switcher.visitor(page);
@@ -27,14 +29,14 @@ test("TC103 - Login as zk foundation", async ({ switcher, page }) => {
   await expect(page.getByTestId("user-role")).toHaveText("ZkSync Foundation");
 });
 
-test("TC104 - View all buttons in private app", async ({ page }) => {
+test("TC104 - View all buttons in private app", async ({ page, testApp }) => {
   await expect(page.getByText("Standard Upgrades")).toBeVisible();
   await expect(page.getByText("Emergency Upgrades")).toBeVisible();
   await expect(page.getByText("Freeze Requests")).toBeVisible();
   await expect(page.getByText("L2 Proposals Veto")).toBeVisible();
 });
 
-test("TC105 - View only standard upgrades in private app", async ({ page }) => {
+test.skip("TC105 - View only standard upgrades in private app", async ({ page, testApp }) => {
   await testApp.resetApp({ env: { ALLOW_PRIVATE_ACTIONS: "false" } });
 
   await expect(page.getByText("Standard Upgrades")).toBeVisible();

@@ -4,11 +4,13 @@ import type { Page } from "@playwright/test";
 import type { Dappwright as Wallet } from "@tenkeylabs/dappwright";
 import { guardianRange, repeatFor } from "./helpers/utils.js";
 
-const testApp = new TestApp();
-
-test.beforeEach(async () => {
+test.beforeEach(async ({ testApp }) => {
   await testApp.reset();
 });
+
+test.afterEach(async ({ clearWalletNonces }) => {
+  await clearWalletNonces()
+})
 
 async function goToCancellationsIndex(page: Page) {
   await page.goto("/");

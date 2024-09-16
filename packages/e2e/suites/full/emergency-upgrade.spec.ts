@@ -4,12 +4,13 @@ import type { Dappwright, Dappwright as Wallet } from "@tenkeylabs/dappwright";
 import { TestApp } from "./helpers/test-app.js";
 import { councilRange, guardianRange, repeatFor } from "./helpers/utils.js";
 
-const testApp = new TestApp();
-
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ testApp }) => {
   await testApp.reset();
-  await page.goto("/");
 });
+
+test.afterEach(async ({ clearWalletNonces }) => {
+  await clearWalletNonces()
+})
 
 async function goToEmergencyIndex(page: Page) {
   await page.goto("/");
@@ -96,16 +97,16 @@ test("TC202: Create a valid emergency proposal -> List it into active proposals"
 }) => {
   await createEmergencyProposal(page, "TC202");
   await goToEmergencyIndex(page);
-  await page.getByText("title").isVisible();
+  await page.getByText("title").waitFor();
   const rows = await page.locator("tbody tr").all();
   expect(rows.length).toBe(1);
   const row = rows[0];
   if (row === undefined) {
     throw new Error("Missing row with created upgraded.");
   }
-  await row.getByText("TC202").isVisible();
-  await row.getByText("ACTIVE").isVisible();
-  await row.getByText("View").isVisible();
+  await expect(row.getByText("TC202")).toBeVisible();
+  await expect(row.getByText("ACTIVE")).toBeVisible();
+  await expect(row.getByText("View")).toBeVisible();
 });
 
 test("TC203: Try to create emergency upgrade with invalid calldata -> Cannot be done. Shows error message.", async ({
