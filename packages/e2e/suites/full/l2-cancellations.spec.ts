@@ -88,7 +88,7 @@ test("TC400: Go to / page -> l2 veto button is enabled", async ({ page }) => {
   await expect(page.getByText("L2 Proposals Veto")).toBeEnabled();
 });
 
-test("TS401: Go to veto index page -> no vetos created.", async ({ page }) => {
+test("TC401: Go to veto index page -> no vetos created.", async ({ page }) => {
   await page.goto("/");
   await page.getByText("L2 Proposals Veto").click();
   await page.getByText("Active L2 Veto Proposals").isVisible();
@@ -98,7 +98,7 @@ test("TS401: Go to veto index page -> no vetos created.", async ({ page }) => {
   expect(texts.length).toBe(2);
 });
 
-test("TS402: Create a veto, missing no proposal selected -> Submit button is disabled.", async ({
+test("TC402: Create a veto, missing no proposal selected -> Submit button is disabled.", async ({
   page,
 }) => {
   await goToCreateCancellationPage(page);
@@ -106,7 +106,7 @@ test("TS402: Create a veto, missing no proposal selected -> Submit button is dis
   await expect(page.getByRole("button", { name: "Create Veto Proposal" })).toBeDisabled();
 });
 
-test("TS403: Create a veto, proposal selected, empty l2 gas limit -> Submit button is disabled.", async ({
+test("TC403: Create a veto, proposal selected, empty l2 gas limit -> Submit button is disabled.", async ({
   page,
 }) => {
   await goToCreateCancellationPage(page);
@@ -119,7 +119,7 @@ test("TS403: Create a veto, proposal selected, empty l2 gas limit -> Submit butt
   await expect(page.getByText("Cannot be zero")).toBeVisible();
 });
 
-test("TS404: Create a veto, proposal selected, empty l2 gas pubdata -> Submit button is disabled.", async ({
+test("TC404: Create a veto, proposal selected, empty l2 gas pubdata -> Submit button is disabled.", async ({
   page,
 }) => {
   await goToCreateCancellationPage(page);
@@ -132,7 +132,7 @@ test("TS404: Create a veto, proposal selected, empty l2 gas pubdata -> Submit bu
   await expect(page.getByText("Cannot be zero")).toBeVisible();
 });
 
-test("TS405: Create a veto, proposal selected, empty l2 gas pubdata -> Submit button is disabled.", async ({
+test("TC405: Create a veto, proposal selected, empty l2 gas pubdata -> Submit button is disabled.", async ({
   page,
 }) => {
   await goToCreateCancellationPage(page);
@@ -146,7 +146,7 @@ test("TS405: Create a veto, proposal selected, empty l2 gas pubdata -> Submit bu
   await expect(page.getByText("Not a valid hex")).toBeVisible();
 });
 
-test("TS406: Create a veto, proposal selected, empty transaction mint value -> Submit button is disabled.", async ({
+test("TC406: Create a veto, proposal selected, empty transaction mint value -> Submit button is disabled.", async ({
   page,
 }) => {
   await goToCreateCancellationPage(page);
@@ -159,7 +159,7 @@ test("TS406: Create a veto, proposal selected, empty transaction mint value -> S
   await expect(page.getByText("Cannot be zero")).toBeVisible();
 });
 
-test("TS407: Create a veto, proposal selected, empty nonce -> Submit button is enabled.", async ({
+test("TC407: Create a veto, proposal selected, empty nonce -> Submit button is enabled.", async ({
   page,
 }) => {
   await goToCreateCancellationPage(page);
@@ -170,7 +170,7 @@ test("TS407: Create a veto, proposal selected, empty nonce -> Submit button is e
   await expect(page.getByRole("button", { name: "Create Veto Proposal" })).toBeEnabled();
 });
 
-test("TS408: Create a veto with correct data -> Redirects to index page. new veto is listed. Click on new veto displays right data.", async ({
+test("TC408: Create a veto with correct data -> Redirects to index page. new veto is listed. Click on new veto displays right data.", async ({
   page,
 }) => {
   await createCancellation(page, 0);
@@ -189,7 +189,7 @@ function approveButton(page: Page) {
   return page.getByTestId("approve-button");
 }
 
-test("TS409: Zk foundation goes to veto details page -> Approve button is not rendered", async ({
+test("TC409: Zk foundation goes to veto details page -> Approve button is not rendered", async ({
   page,
   switcher,
 }) => {
@@ -201,7 +201,7 @@ test("TS409: Zk foundation goes to veto details page -> Approve button is not re
   await expect(approveButton(page)).not.toBeAttached();
 });
 
-test("TS410: visitor goes to veto details page -> Approve button is not rendered", async ({
+test("TC410: visitor goes to veto details page -> Approve button is not rendered", async ({
   page,
   switcher,
 }) => {
@@ -213,7 +213,7 @@ test("TS410: visitor goes to veto details page -> Approve button is not rendered
   await expect(approveButton(page)).not.toBeAttached();
 });
 
-test("TS411: council goes to veto details page -> Approve button is not rendered", async ({
+test("TC411: council goes to veto details page -> Approve button is not rendered", async ({
   page,
   switcher,
 }) => {
@@ -225,7 +225,7 @@ test("TS411: council goes to veto details page -> Approve button is not rendered
   await expect(approveButton(page)).not.toBeAttached();
 });
 
-test("TS412: Guardian goes to veto details page -> Approvals count increased in 1. Button disabled after approve.", async ({
+test("TC412: Guardian goes to veto details page -> Approvals count increased in 1. Button disabled after approve.", async ({
   page,
   switcher,
   wallet,
@@ -259,7 +259,7 @@ async function createAndApproveCancellation(
   });
 }
 
-test("TS413: Approvals gathered -> Broadcast button enabled for every rol", async ({
+test("TC413: Approvals gathered -> Broadcast button enabled for every rol", async ({
   page,
   switcher,
   wallet,
@@ -282,7 +282,7 @@ test("TS413: Approvals gathered -> Broadcast button enabled for every rol", asyn
   await expect(page.getByRole("button", { name: "Execute Veto" })).toBeEnabled();
 });
 
-test("TS414: Broadcast tx -> Redirects to /transactions. Shows correct tx data. Transaction is created with right eth value.", async ({
+test("TC414: Broadcast tx -> Redirects to /transactions. Shows correct tx data. Transaction is created with right eth value.", async ({
   page,
   switcher,
   wallet,
@@ -296,7 +296,7 @@ test("TS414: Broadcast tx -> Redirects to /transactions. Shows correct tx data. 
   await expect(page.getByText("Transaction successful")).toBeVisible();
 });
 
-test("TS415: Create govops proposal -> Creates with proper data.", async ({ page }) => {
+test("TC415: Create govops proposal -> Creates with proper data.", async ({ page }) => {
   await createCancellation(page, 0);
   await goToCancellationDetail(page);
 
@@ -304,7 +304,7 @@ test("TS415: Create govops proposal -> Creates with proper data.", async ({ page
   await expect(page.getByText("Test GovOps proposal", { exact: true })).toBeVisible();
 });
 
-test("TS416: Create token proposal -> Creates with proper data.", async ({ page }) => {
+test("TC416: Create token proposal -> Creates with proper data.", async ({ page }) => {
   await createCancellation(page, 1);
   await goToCancellationDetail(page);
 
