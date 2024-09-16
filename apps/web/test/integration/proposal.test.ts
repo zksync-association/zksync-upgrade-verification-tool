@@ -35,11 +35,13 @@ describe("Proposal DB", () => {
     expect(createdProposal.transactionHash.toLowerCase()).toEqual(transactionHash.toLowerCase());
   });
 
-  it("should ignore proposals with the same external id", async () => {
+  it("should fail with proposals with the same external id", async () => {
     const randomParams = await createRandomProposal();
-    await createProposal({
-      ...randomParams,
-    });
+    await expect(
+      createProposal({
+        ...randomParams,
+      })
+    ).rejects.toThrow();
 
     const proposals = await db
       .select()
