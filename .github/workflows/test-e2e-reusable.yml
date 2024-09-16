@@ -51,6 +51,7 @@ jobs:
           node-version: 20
           cache: "pnpm"
       - run: pnpm install
+      - run: cd ../contracts && pnpm build
       - run: pnpm test:web:env:up
       - run: xvfb-run pnpm playwright test
       - uses: actions/upload-artifact@v4
