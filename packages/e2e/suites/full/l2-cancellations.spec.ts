@@ -83,7 +83,7 @@ async function signWithScroll(wallet: Wallet) {
   });
 }
 
-test("TS400: Go to / page -> l2 veto button is enabled", async ({ page }) => {
+test("TC400: Go to / page -> l2 veto button is enabled", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("L2 Proposals Veto")).toBeEnabled();
 });
