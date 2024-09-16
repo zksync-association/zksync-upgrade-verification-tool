@@ -13,7 +13,6 @@
     "build": "tsx esbuild.ts",
     "watch": "tsx esbuild.ts --watch",
     "test": "vitest run",
-    "test:ci": "vitest run --coverage --coverage.reporter=lcov",
     "typecheck": "tsc --noEmit",
     "validate": "./bin/validate.js"
   },
