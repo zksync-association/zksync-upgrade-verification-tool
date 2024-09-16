@@ -51,4 +51,6 @@ jobs:
     needs: ["changed-files", "ci-for-lint", "ci-for-test", "ci-for-test-e2e"]
     if: ${{ needs.changed-files.outputs.app == 'true' }}
     uses: ./.github/workflows/docker-reusable.yml
-    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
