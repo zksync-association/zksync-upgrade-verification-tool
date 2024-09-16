@@ -24,6 +24,8 @@ jobs:
 
   test-e2e-web:
     runs-on: ubuntu-latest
+    env:
+      HEADLESS: false
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -33,7 +35,7 @@ jobs:
           cache: "pnpm"
       - run: pnpm install
       - run: pnpm test:web:env:up
-      - run: pnpm test:web
+      - run: xvfb-run pnpm playwright test
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
