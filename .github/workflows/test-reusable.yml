@@ -42,4 +42,6 @@ jobs:
           node-version: 20
           cache: "pnpm"
       - run: pnpm install
+      - run: |
+          cp packages/contracts/.env.example packages/contracts/.env
       - run: pnpm test
