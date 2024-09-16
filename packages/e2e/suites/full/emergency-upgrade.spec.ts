@@ -1,7 +1,8 @@
-import { expect, type IntRange, type RoleSwitcher, test } from "./helpers/dappwright.js";
+import { expect, type RoleSwitcher, test } from "./helpers/dappwright.js";
 import type { Page } from "@playwright/test";
 import type { Dappwright, Dappwright as Wallet } from "@tenkeylabs/dappwright";
 import { TestApp } from "./helpers/test-app.js";
+import { councilRange, guardianRange, repeatFor } from "./helpers/utils.js";
 
 const testApp = new TestApp();
 
@@ -15,28 +16,6 @@ async function goToEmergencyIndex(page: Page) {
   await page.getByText("Emergency Upgrades").click();
   await page.getByText("Active Emergency Proposals", { exact: true }).isVisible();
 }
-
-async function repeatFor<T>(numbers: T[], action: (n: T) => Promise<void>) {
-  for (const n of numbers) {
-    await action(n);
-  }
-}
-
-function genericRange<From extends number, To extends number>(
-  from: IntRange<From, To>,
-  to: IntRange<From, To>
-): IntRange<From, To>[] {
-  const res = [];
-  let last = from;
-  while (last <= to) {
-    res.push(last);
-    last = (last + 1) as IntRange<From, To>;
-  }
-  return res as IntRange<From, To>[];
-}
-
-const councilRange = genericRange<1, 12>;
-const guardianRange = genericRange<1, 8>;
 
 async function goToCreateEmergencyProposal(page: Page) {
   await goToEmergencyIndex(page);
