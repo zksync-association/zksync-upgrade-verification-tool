@@ -20,7 +20,11 @@ jobs:
           node-version: 20
           cache: "pnpm"
       - run: pnpm install
-      - run: pnpm test:cli
+      - run: cd ../../apps/cli && pnpm build
+      - run: cp .env.example .env
+      - env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        run: pnpm test:cli
 
   test-e2e-web:
     runs-on: ubuntu-latest

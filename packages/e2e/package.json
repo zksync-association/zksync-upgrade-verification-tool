@@ -18,7 +18,8 @@
     "test:web:ui": "playwright test --ui",
     "test:web:fast": "env TEST_FAST_MODE=true pnpm test:e2e",
     "test:web:env:up": "tsx suites/full/scripts/env-up.ts",
-    "test:web:env:down": "tsx suites/full/scripts/env-down.ts"
+    "test:web:env:down": "tsx suites/full/scripts/env-down.ts",
+    "validate": "../../apps/cli/bin/validate.js"
   },
   "devDependencies": {
     "@faker-js/faker": "^8.4.1",
