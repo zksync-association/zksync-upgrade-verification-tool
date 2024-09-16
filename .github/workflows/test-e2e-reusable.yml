@@ -1,6 +1,9 @@
 name: Workflow template for testing e2e jobs
 on:
   workflow_call:
+    secrets:
+      ETHERSCAN_API_KEY:
+        required: true
 
 env:
   FORCE_COLOR: 1

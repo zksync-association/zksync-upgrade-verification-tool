@@ -45,6 +45,7 @@ jobs:
     needs: ["changed-files", "ci-for-lint"]
     if: ${{ needs.changed-files.outputs.app == 'true' }}
     uses: ./.github/workflows/test-e2e-reusable.yml
+    secrets: inherit
 
   ci-for-docker:
     name: Docker
