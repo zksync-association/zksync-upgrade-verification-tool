@@ -1,11 +1,11 @@
 import { z, type ZodType } from "zod";
 import type { Hex } from "viem";
 import { addressSchema, contractEventSchema, type ContractEvent } from "@repo/common/schemas";
-import { ContractAbi } from "./contract-abi.js";
-import { ContractData } from "./contract-data.js";
-import { ContractNotVerified, ExternalApiError } from "./errors.js";
-import { getAbiSchema, sourceCodeResponseSchema, sourceCodeSchema } from "../schemas/etherscan.js";
-import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "./constants.js";
+import { ContractAbi } from "./contract-abi";
+import { ContractData } from "./contract-data";
+import { ContractNotVerified, ExternalApiError } from "./errors";
+import { getAbiSchema, sourceCodeResponseSchema, sourceCodeSchema } from "../schemas/etherscan";
+import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "./constants";
 
 export interface BlockExplorer {
   getAbi(rawAddress: string): Promise<ContractAbi>;

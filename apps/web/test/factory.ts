@@ -1,4 +1,4 @@
-import { createOrIgnoreProposal as createDbProposal } from "@/.server/db/dto/proposals";
+import { createProposal as createDbProposal } from "@/.server/db/dto/proposals";
 import type { emergencyProposalsTable, proposalsTable } from "@/.server/db/schema";
 import { faker } from "@faker-js/faker";
 import type { InferInsertModel } from "drizzle-orm";
@@ -6,14 +6,7 @@ import type { Hex } from "viem";
 
 export const createRandomProposal = async () => {
   const params = createRandomProposalParams();
-  await createDbProposal({
-    externalId: params.externalId,
-    calldata: params.calldata,
-    proposedOn: params.proposedOn,
-    executor: params.executor,
-    transactionHash: params.transactionHash,
-  });
-
+  await createDbProposal(params);
   return params;
 };
 
@@ -26,6 +19,7 @@ export const createRandomProposalParams = () => {
     proposedOn: faker.date.anytime(),
     executor: faker.string.hexadecimal({ length: 20 }) as `0x${string}`,
     transactionHash: faker.string.hexadecimal({ length: 32 }) as `0x${string}`,
+    status: "ACTIVE",
   } satisfies InferInsertModel<typeof proposalsTable>;
 };
 

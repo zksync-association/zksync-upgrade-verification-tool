@@ -18,7 +18,7 @@ import {
 } from "@/.server/service/authorized-users";
 import { getFreezeProposalSignatureArgs } from "@/common/freeze-proposal";
 import { getL2CancellationSignatureArgs } from "@/common/l2-cancellations";
-import { emergencyProposalStatusSchema } from "@/common/proposal-status";
+import { emergencyProposalStatusSchema } from "@/common/emergency-proposal-status";
 import { signActionEnum } from "@/common/sign-action";
 import { GUARDIANS_COUNCIL_THRESHOLD, SEC_COUNCIL_THRESHOLD } from "@/utils/emergency-proposals";
 import { badRequest, notFound } from "@/utils/http";

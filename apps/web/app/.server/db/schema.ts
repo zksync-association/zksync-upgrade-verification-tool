@@ -1,5 +1,4 @@
 import { bytea } from "@/.server/db/custom-types";
-import { emergencyProposalStatusSchema } from "@/common/proposal-status";
 import { signActionEnum } from "@/common/sign-action";
 import { relations, sql } from "drizzle-orm";
 import {
@@ -16,6 +15,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
+import { proposalStatusSchema } from "@/common/proposal-status";
+import { emergencyProposalStatusSchema } from "@/common/emergency-proposal-status";
 
 export const proposalsTable = pgTable(
   "proposals",
@@ -28,6 +29,7 @@ export const proposalsTable = pgTable(
     proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
     executor: bytea("executor").notNull(),
     transactionHash: bytea("transaction_hash").notNull(),
+    status: text("status", { enum: proposalStatusSchema.options }).notNull(),
   },
   (table) => ({
     externalIdIdx: index("external_id_idx").on(table.externalId),

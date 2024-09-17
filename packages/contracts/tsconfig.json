@@ -1,8 +1,7 @@
 {
   "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
-    "types": ["node"],
-    "verbatimModuleSyntax": false
+    "types": ["node"]
   },
   "include": ["**/*.ts", "**/*.cts", "**/*.mts", "hardhat.config.cjs"],
   "exclude": ["node_modules", "src"]

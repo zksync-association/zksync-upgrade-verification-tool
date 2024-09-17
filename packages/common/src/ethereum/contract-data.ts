@@ -1,6 +1,6 @@
 import path from "node:path";
 import fs from "node:fs/promises";
-import type { Sources } from "../schemas/etherscan.js";
+import type { Sources } from "../schemas/etherscan";
 
 export class ContractData {
   name: string;

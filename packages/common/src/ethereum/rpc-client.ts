@@ -17,8 +17,8 @@ import {
   memoryDiffParser,
   type CallTrace,
   type MemoryDiffRaw,
-} from "../schemas/index.js";
-import { L1_DEFAULT_URLS, L2_DEFAULT_URLS, type Network } from "./constants.js";
+} from "../schemas/index";
+import { L1_DEFAULT_URLS, L2_DEFAULT_URLS, type Network } from "./constants";
 
 export class RpcClient {
   private viemClient: PublicClient<HttpTransport>;

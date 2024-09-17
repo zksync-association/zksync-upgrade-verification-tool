@@ -1,4 +1,5 @@
 import { z } from "zod";
 
-export const emergencyProposalStatusSchema = z.enum(["ACTIVE", "READY", "BROADCAST", "CLOSED"]);
-export type EmergencyProposalStatus = z.infer<typeof emergencyProposalStatusSchema>;
+export const proposalStatusSchema = z.enum(["ACTIVE", "INACTIVE"]);
+
+export type ProposalStatus = z.infer<typeof proposalStatusSchema>;

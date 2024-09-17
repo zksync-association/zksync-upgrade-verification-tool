@@ -1,23 +1,18 @@
-import { type Proposal, getProposals } from "@/.server/service/proposals";
+import { getProposals } from "@/.server/service/proposals";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
-import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { Await, Link, defer, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { Suspense } from "react";
 import { $path } from "remix-routes";
 
-const isProposalActive = (p: Proposal) =>
-  p.state !== PROPOSAL_STATES.Expired && p.state !== PROPOSAL_STATES.Done;
-const isProposalInactive = (p: Proposal) => !isProposalActive(p);
-
 export function loader() {
   const getFilteredProposals = async () => {
     const proposals = await getProposals();
     return {
-      active: proposals.filter(isProposalActive),
-      inactive: proposals.filter(isProposalInactive),
+      active: proposals.filter((p) => p.status === "ACTIVE"),
+      inactive: proposals.filter((p) => p.status === "INACTIVE"),
     };
   };
   return defer({
@@ -49,13 +44,13 @@ export default function Index() {
                   <div className="flex flex-col space-y-4">
                     {activeProposals.map((proposal) => (
                       <Link
-                        key={proposal.id}
+                        key={proposal.externalId}
                         className="flex"
-                        to={$path("/app/proposals/:id", { id: proposal.id })}
+                        to={$path("/app/proposals/:id", { id: proposal.externalId })}
                       >
                         <Button className="flex flex-1 justify-between pr-4" variant="outline">
                           <span />
-                          <span>{proposal.id}</span>
+                          <span>{proposal.externalId}</span>
                           <ArrowRight />
                         </Button>
                       </Link>
@@ -76,13 +71,13 @@ export default function Index() {
                   <div className="flex flex-col space-y-4">
                     {inactiveProposals.map((proposal) => (
                       <Link
-                        key={proposal.id}
+                        key={proposal.externalId}
                         className="flex"
-                        to={$path("/app/proposals/:id", { id: proposal.id })}
+                        to={$path("/app/proposals/:id", { id: proposal.externalId })}
                       >
                         <Button className="flex flex-1 justify-between pr-4" variant="outline">
                           <span />
-                          <span>{proposal.id}</span>
+                          <span>{proposal.externalId}</span>
                           <ArrowRight />
                         </Button>
                       </Link>

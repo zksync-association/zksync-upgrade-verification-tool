@@ -4,9 +4,9 @@
   "compilerOptions": {
     "lib": ["es2022"],
     "target": "es2022",
-    "module": "NodeNext",
+    "module": "Preserve",
+    "noEmit": true,
     "moduleDetection": "force",
-    "outDir": "dist",
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,

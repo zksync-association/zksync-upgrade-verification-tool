@@ -3,7 +3,7 @@ import {
   createEmergencyProposal,
   getEmergencyProposalByExternalId,
 } from "@/.server/db/dto/emergency-proposals";
-import { createOrIgnoreProposal, getProposalByExternalId } from "@/.server/db/dto/proposals";
+import { createProposal, getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { proposalsTable } from "@/.server/db/schema";
 import { eq } from "drizzle-orm";
 import { expect } from "vitest";
@@ -35,11 +35,13 @@ describe("Proposal DB", () => {
     expect(createdProposal.transactionHash.toLowerCase()).toEqual(transactionHash.toLowerCase());
   });
 
-  it("should ignore proposals with the same external id", async () => {
+  it("should fail with proposals with the same external id", async () => {
     const randomParams = await createRandomProposal();
-    await createOrIgnoreProposal({
-      ...randomParams,
-    });
+    await expect(
+      createProposal({
+        ...randomParams,
+      })
+    ).rejects.toThrow();
 
     const proposals = await db
       .select()
@@ -59,7 +61,7 @@ describe("Proposal DB", () => {
 
   it("should throw an error when creating a proposal with invalid data", async () => {
     const invalidData = { ...createRandomProposalParams(), externalId: -2 };
-    await expect(createOrIgnoreProposal(invalidData as any)).rejects.toThrowError(
+    await expect(createProposal(invalidData as any)).rejects.toThrowError(
       "Expected string, received number"
     );
   });

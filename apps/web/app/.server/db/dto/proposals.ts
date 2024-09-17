@@ -1,20 +1,24 @@
 import { db } from "@/.server/db";
-import { createOrIgnoreRecord, getFirst, getFirstOrThrow } from "@/.server/db/dto/utils/common";
+import { getFirst, getFirstOrThrow, type Filter } from "@/.server/db/dto/utils/common";
 import { proposalsTable } from "@/.server/db/schema";
 import { type InferInsertModel, type InferSelectModel, eq } from "drizzle-orm";
 import type { Hex } from "viem";
 
-export async function createOrIgnoreProposal(
+export async function createProposal(
   data: InferInsertModel<typeof proposalsTable>,
   { tx }: { tx?: typeof db } = {}
 ) {
-  await createOrIgnoreRecord(proposalsTable, data, { tx });
+  await (tx ?? db).insert(proposalsTable).values(data).returning();
 }
 
 export async function getProposalByExternalId(externalId: Hex) {
   return getFirst(
     await db.select().from(proposalsTable).where(eq(proposalsTable.externalId, externalId))
   );
+}
+
+export async function getProposals({ filter }: { filter?: Filter<typeof proposalsTable> } = {}) {
+  return db.select().from(proposalsTable).where(filter);
 }
 
 export async function updateProposal(

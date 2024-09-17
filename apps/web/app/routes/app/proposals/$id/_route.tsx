@@ -2,7 +2,7 @@ import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
-import { getProposalData, getProposalStatus, nowInSeconds } from "@/.server/service/proposals";
+import { getProposalData, getProposalState, nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
@@ -57,7 +57,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     const [guardians, council, proposalStatus, signatures, proposalData] = await Promise.all([
       guardiansAddress(),
       councilAddress(),
-      getProposalStatus(id),
+      getProposalState(id),
       getSignaturesByExternalProposalId(id),
       getProposalData(id),
     ]);
@@ -277,22 +277,24 @@ export default function Proposals() {
                             label="Security Council Approvals"
                             signatures={proposal.signatures.approveUpgradeSecurityCouncil.length}
                             necessarySignatures={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
-                            testId={"council-signature-count"}
+                            testId="council-signature-count"
                           />
                           <VotingStatusIndicator
                             label="Guardian Approvals"
                             signatures={proposal.signatures.approveUpgradeGuardians.length}
                             necessarySignatures={NECESSARY_GUARDIAN_SIGNATURES}
+                            testId="guardian-signature-count"
                           />
                           <VotingStatusIndicator
                             label="Extend Legal Veto Approvals"
                             signatures={proposal.signatures.extendLegalVetoPeriod.length}
                             necessarySignatures={NECESSARY_LEGAL_VETO_SIGNATURES}
+                            testId="legal-veto-signature-count"
                           />
                         </div>
                       </CardContent>
                     </Card>
-                    <Card className="pb-10">
+                    <Card className="pb-10" data-testid="role-actions">
                       <CardHeader>
                         <CardTitle>
                           {user.role === "guardian" && "Guardian Actions"}
@@ -320,7 +322,7 @@ export default function Proposals() {
                         )}
                       </CardContent>
                     </Card>
-                    <Card className="pb-10">
+                    <Card className="pb-10" data-testid="proposal-actions">
                       <CardHeader>
                         <CardTitle>Proposal Actions</CardTitle>
                       </CardHeader>

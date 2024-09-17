@@ -71,3 +71,4 @@ vite.config.ts.*
 # Specific directories
 e2e/contracts/zk-gov-preprocessed/
 packages/contracts/src/zk-gov-preprocessed/
+packages/e2e/playwright-report/

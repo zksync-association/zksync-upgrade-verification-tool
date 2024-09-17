@@ -58,10 +58,6 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 11155111,
       allowUnlimitedContractSize: true,
-      mining: {
-        auto: true,
-        interval: 1000,
-      },
       forking: {
         enabled: !!process.env.FORK_URL,
         url: process.env.FORK_URL || "ENV_VAR_FORK_URL_MISSING",

@@ -9,7 +9,7 @@ import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import { l1Rpc } from "@/.server/service/clients";
 import type { Call } from "@/common/calls";
 import type { FullEmergencyProp } from "@/common/emergency-proposal-schema";
-import { emergencyProposalStatusSchema } from "@/common/proposal-status";
+import { emergencyProposalStatusSchema } from "@/common/emergency-proposal-status";
 import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { notFound } from "@/utils/http";
 import { env } from "@config/env.server";
