@@ -8,6 +8,7 @@ import { getProposals as getStoredProposals } from "@/.server/db/dto/proposals";
 import { l1Rpc } from "@/.server/service/clients";
 import { type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
 import { z } from "zod";
+import { bigIntMax } from "@/utils/bigint";
 
 const upgradeHandlerAddress = env.UPGRADE_HANDLER_ADDRESS;
 
@@ -32,7 +33,7 @@ export async function getProposals() {
 
   // Logs are calculated from the last 40 * 24 * 360 blocks,
   // as this is a conservative estimation of oldest block with a valid upgrade.
-  const from = hexToBigInt(currentBlock) - BigInt(40 * 24 * 360);
+  const from = bigIntMax(hexToBigInt(currentBlock) - BigInt(40 * 24 * 360), BigInt(0));
   const logs = await l1Rpc.getLogs(upgradeHandlerAddress, numberToHex(from), "latest", [
     upgradeHandlerAbi.eventIdFor("UpgradeStarted"),
   ]);
