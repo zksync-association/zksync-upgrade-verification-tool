@@ -230,8 +230,6 @@ test("TC316, TC317: Fulfill signature threshold for soft freeze -> broadcast -> 
   await broadcastAndCheckFreeze(page, wallet);
 });
 
-test.skip("broadcasted transaction exists in blockchain", () => {});
-
 // hard freeze
 
 test("TC306, TC307: create hard freeze popup is correct and works", async ({ page, switcher }) => {
