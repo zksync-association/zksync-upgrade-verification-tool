@@ -8,7 +8,7 @@ export const exec = util.promisify(execSync);
 export function spawnBackground(
   command: string,
   { cwd, env, outputFile }: { cwd?: string; env?: Record<string, string>; outputFile?: string } = {}
-): { pid: number | undefined; kill: () => void } {
+) {
   let fileStream: number | undefined;
 
   if (outputFile) {
@@ -37,35 +37,14 @@ export function spawnBackground(
 
   process.unref();
 
-  return {
-    pid: process.pid,
-    kill: () => {
-      process.kill();
-    },
-  };
+  const pid = process.pid;
+  if (!pid) {
+    throw new Error("Failed to start process");
+  }
+
+  return pid;
 }
 
-export async function killProcessByPort(port: number) {
-  const pids = await getPidFromPort(port);
-  if (!pids) {
-    return;
-  }
-
-  for (const p of pids) {
-    process.kill(p);
-  }
-}
-
-export async function getPidFromPort(port: number) {
-  try {
-    const process = await exec(`lsof -t -i :${port}`);
-    const output = process.stdout.trim();
-
-    // Output can be a list of pids
-    const pids = output.split("\n");
-
-    return pids.map(Number);
-  } catch {
-    return null;
-  }
+export async function killProcessByPid(pid: number) {
+  process.kill(pid);
 }
