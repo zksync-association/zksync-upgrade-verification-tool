@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SKIP_ENV_VALIDATION: true
-      DATABASE_URL: "DATABASE_URL=postgresql://user:password@localhost:5432/webapp"
+      DATABASE_URL: postgresql://user:password@localhost:5432/webapp
     steps:
       - uses: actions/checkout@v4
         with:
