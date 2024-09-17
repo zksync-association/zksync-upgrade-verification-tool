@@ -24,11 +24,17 @@ let sharedBrowserContext: BrowserContext;
 // Fast mode limits the number of accounts created to 1 per role
 const fastMode = process.env.TEST_FAST_MODE === "true";
 
+type ChangeAccountFn = () => Promise<void>;
+
 export class RoleSwitcher {
   private wallet: Dappwright;
+  private history: ChangeAccountFn[];
+  private current: ChangeAccountFn | null;
 
   constructor(wallet: Dappwright) {
     this.wallet = wallet;
+    this.history = [];
+    this.current = null;
   }
 
   async council(councilNumber: IntRange<1, typeof COUNCIL_SIZE>, page?: Page) {
@@ -36,6 +42,7 @@ export class RoleSwitcher {
       throw new Error("Fast mode does not support council numbers other than 1");
     }
     const index = COUNCIL_INDEXES[councilNumber - 1] as number;
+    this.current = async () => this.council(councilNumber);
     await this.switchToIndex(index, page);
   }
 
@@ -44,15 +51,31 @@ export class RoleSwitcher {
       throw new Error("Fast mode does not support guardian numbers other than 1");
     }
     const index = GUARDIAN_INDEXES[guardianNumber - 1] as number;
+    this.current = async () => this.guardian(guardianNumber);
     await this.switchToIndex(index, page);
   }
 
   async zkFoundation(page?: Page) {
+    this.current = async () => this.zkFoundation();
     await this.switchToIndex(DERIVATION_INDEXES.ZK_FOUNDATION, page);
   }
 
   async visitor(page?: Page) {
+    this.current = async () => this.visitor();
     await this.switchToIndex(DERIVATION_INDEXES.VISITOR, page);
+  }
+
+  pushToHistory(): void {
+    if (this.current === null) {
+      throw new Error("Cannot push to history if no account is set.");
+    }
+    this.history.push(this.current);
+  }
+
+  popHistory(): ChangeAccountFn[] {
+    const res = this.history;
+    this.history = [];
+    return res;
   }
 
   private async switchToIndex(index: number, page?: Page) {
@@ -62,18 +85,17 @@ export class RoleSwitcher {
   }
 }
 
-let testApp: TestApp;
+const testApp = new TestApp();
 
 export const test = baseTest.extend<{
   context: BrowserContext;
   wallet: Dappwright;
   switcher: RoleSwitcher;
+  testApp: TestApp;
 }>({
   // biome-ignore lint/correctness/noEmptyPattern: <explanation>
   context: async ({}, use) => {
     if (!sharedBrowserContext) {
-      testApp = new TestApp();
-
       // Launch context with extension
 
       // `dappwright.launch` is used to be able to modify the
@@ -135,6 +157,7 @@ export const test = baseTest.extend<{
       // Reset waitForTimeout method
       wallet.page.waitForTimeout = originalWaitForTimeout;
     }
+
     await use(sharedBrowserContext);
   },
 
@@ -152,7 +175,39 @@ export const test = baseTest.extend<{
     await use(metamask);
   },
 
-  switcher: async ({ wallet }, use) => {
-    await use(new RoleSwitcher(wallet));
+  switcher: async ({ wallet, page }, use) => {
+    const switcher = new RoleSwitcher(wallet);
+    const original = wallet.confirmTransaction;
+
+    // Each time there is a tx signature we save the address that produced the signature.
+    wallet.confirmTransaction = async () => {
+      switcher.pushToHistory();
+      await original.bind(wallet)();
+    };
+
+    await use(switcher);
+
+    // After each test we go through each address that has signed and
+    // Clear the tx nonce in metamask.
+    // This is because metamask doesn't automatically fix the nonce when it doesn't
+    // match with the network. Doing this forces metamask to refresh the nonce.
+    const history = switcher.popHistory();
+    for (const entry of history) {
+      await entry();
+
+      await wallet.page.bringToFront();
+      await wallet.page.getByTestId("account-options-menu-button").click();
+      await wallet.page.getByTestId("global-menu-settings").click();
+      await wallet.page.getByText("Advanced").click();
+      await wallet.page.getByText("Clear activity tab data").click();
+      await wallet.page.getByRole("button", { name: "Clear", exact: true }).click();
+      await wallet.page.locator(".app-header__logo-container").click();
+    }
+    await page.bringToFront();
+  },
+
+  // biome-ignore lint/correctness/noEmptyPattern: playwright fixtures require explicit empty pattern
+  testApp: async ({}, use) => {
+    await use(testApp);
   },
 });

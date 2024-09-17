@@ -1,12 +1,9 @@
-import { TestApp } from "./helpers/test-app.js";
 import { expect, type RoleSwitcher, test } from "./helpers/dappwright.js";
 import type { Page } from "@playwright/test";
 import type { Dappwright as Wallet } from "@tenkeylabs/dappwright";
 import { guardianRange, repeatFor } from "./helpers/utils.js";
 
-const testApp = new TestApp();
-
-test.beforeEach(async () => {
+test.beforeEach(async ({ testApp }) => {
   await testApp.reset();
 });
 
