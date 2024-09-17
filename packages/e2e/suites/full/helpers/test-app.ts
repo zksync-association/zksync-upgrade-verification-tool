@@ -6,6 +6,7 @@ import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { type Hex, hexToNumber, numberToHex } from "viem";
 import ora from "ora";
+import z from "zod";
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
@@ -283,17 +284,21 @@ export class TestApp {
     if (!response.ok) {
       throw new Error("Failed to get latest block");
     }
-
-    const data = await response.json();
-    if (
-      typeof data === "object" &&
-      data !== null &&
-      "result" in data &&
-      typeof data.result === "string"
-    ) {
-      return hexToNumber(data.result as Hex);
+    const responseData = await response.json();
+    const data = z
+      .object({
+        jsonrpc: z.string(),
+        id: z.number(),
+        result: z
+          .string()
+          .regex(/^0x[0-9a-fA-F]+$/)
+          .transform((hex) => hexToNumber(hex as Hex)),
+      })
+      .safeParse(responseData);
+    if (!data.success) {
+      throw new Error("Unexpected response format");
     }
-    throw new Error("Unexpected response format");
+    return data.data.result;
   }
 
   private async mineBlocks(url: string, howManyBlocks: number) {
