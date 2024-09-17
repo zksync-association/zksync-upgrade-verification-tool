@@ -205,6 +205,10 @@ export class TestApp {
     const latestBlock = await this.getLatestBlock(this.backupNodeUrl);
     this.latestBackupNodeBlock = latestBlock;
 
+    // Wait for the backup node latest block timestamp to be older,
+    // so that we don't face "current time must be after fork block" error.
+    await new Promise((resolve) => setTimeout(resolve, 20000));
+
     const node = spawnBackground(
       `pnpm hardhat node --port ${this.mainNodePort} --fork ${this.backupNodeUrl} --fork-block-number ${latestBlock}`,
       {
