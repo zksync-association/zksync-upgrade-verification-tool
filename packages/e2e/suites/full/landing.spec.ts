@@ -1,6 +1,6 @@
 import { test, expect } from "./helpers/dappwright.js";
 
-test.beforeEach(async ({ testApp}) => {
+test.beforeEach(async ({ testApp }) => {
   await testApp.reset();
 });
 

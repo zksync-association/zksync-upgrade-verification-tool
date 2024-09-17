@@ -26,7 +26,6 @@ const fastMode = process.env.TEST_FAST_MODE === "true";
 
 type ChangeAccountFn = () => Promise<void>;
 
-
 export class RoleSwitcher {
   private wallet: Dappwright;
   private history: ChangeAccountFn[];
@@ -35,7 +34,7 @@ export class RoleSwitcher {
   constructor(wallet: Dappwright) {
     this.wallet = wallet;
     this.history = [];
-    this.current = null
+    this.current = null;
   }
 
   async council(councilNumber: IntRange<1, typeof COUNCIL_SIZE>, page?: Page) {
@@ -68,14 +67,14 @@ export class RoleSwitcher {
 
   pushToHistory(): void {
     if (this.current === null) {
-      throw new Error("Cannot push to history if no account is set.")
+      throw new Error("Cannot push to history if no account is set.");
     }
-    this.history.push(this.current)
+    this.history.push(this.current);
   }
 
   popHistory(): ChangeAccountFn[] {
-    const res = this.history
-    this.history = []
+    const res = this.history;
+    this.history = [];
     return res;
   }
 
@@ -184,7 +183,7 @@ export const test = baseTest.extend<{
     wallet.confirmTransaction = async () => {
       switcher.pushToHistory();
       await original.bind(wallet)();
-    }
+    };
 
     await use(switcher);
 
@@ -192,22 +191,23 @@ export const test = baseTest.extend<{
     // Clear the tx nonce in metamask.
     // This is because metamask doesn't automatically fix the nonce when it doesn't
     // match with the network. Doing this forces metamask to refresh the nonce.
-    const history = switcher.popHistory()
+    const history = switcher.popHistory();
     for (const entry of history) {
-      await entry()
+      await entry();
 
       await wallet.page.bringToFront();
-      await wallet.page.getByTestId('account-options-menu-button').click();
-      await wallet.page.getByTestId('global-menu-settings').click();
+      await wallet.page.getByTestId("account-options-menu-button").click();
+      await wallet.page.getByTestId("global-menu-settings").click();
       await wallet.page.getByText("Advanced").click();
       await wallet.page.getByText("Clear activity tab data").click();
-      await wallet.page.getByRole("button", {name: "Clear", exact: true}).click();
+      await wallet.page.getByRole("button", { name: "Clear", exact: true }).click();
       await wallet.page.locator(".app-header__logo-container").click();
     }
-    await page.bringToFront()
+    await page.bringToFront();
   },
 
+  // biome-ignore lint/correctness/noEmptyPattern: playwright fixtures require explicit empty pattern
   testApp: async ({}, use) => {
-    await use(testApp)
-  }
+    await use(testApp);
+  },
 });
