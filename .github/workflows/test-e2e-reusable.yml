@@ -42,7 +42,9 @@ jobs:
         ports:
           - 5432:5432
     env:
+      ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
       HEADLESS: false
+      WALLET_CONNECT_PROJECT_ID: placeholder
     steps:
       - uses: actions/checkout@v4
         with:
