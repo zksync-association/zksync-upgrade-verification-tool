@@ -10,7 +10,7 @@ import {
 } from "viem";
 import fs from "node:fs/promises";
 import { mnemonicToAccount } from "viem/accounts";
-import { COUNCIL_INDEXES, GUARDIAN_INDEXES, DERIVATION_INDEXES } from "../helpers/constants.js";
+import { COUNCIL_INDEXES, GUARDIAN_INDEXES, DERIVATION_INDEXES } from "./constants.js";
 
 export async function deploySetup() {
   const walletClient = (await hre.viem.getWalletClients())[0];
