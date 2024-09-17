@@ -1,16 +1,11 @@
 import { expect, type RoleSwitcher, test } from "./helpers/dappwright.js";
 import type { Page } from "@playwright/test";
 import type { Dappwright, Dappwright as Wallet } from "@tenkeylabs/dappwright";
-import { TestApp } from "./helpers/test-app.js";
 import { councilRange, guardianRange, repeatFor } from "./helpers/utils.js";
 
 test.beforeEach(async ({ testApp }) => {
   await testApp.reset();
 });
-
-test.afterEach(async ({ clearWalletNonces }) => {
-  await clearWalletNonces()
-})
 
 async function goToEmergencyIndex(page: Page) {
   await page.goto("/");

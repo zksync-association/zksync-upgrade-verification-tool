@@ -26,6 +26,7 @@ const fastMode = process.env.TEST_FAST_MODE === "true";
 
 type ChangeAccountFn = () => Promise<void>;
 
+
 export class RoleSwitcher {
   private wallet: Dappwright;
   private history: ChangeAccountFn[];
@@ -92,7 +93,6 @@ export const test = baseTest.extend<{
   wallet: Dappwright;
   switcher: RoleSwitcher;
   testApp: TestApp;
-  clearWalletNonces: () => Promise<void>
 }>({
   // biome-ignore lint/correctness/noEmptyPattern: <explanation>
   context: async ({}, use) => {
@@ -158,7 +158,7 @@ export const test = baseTest.extend<{
       // Reset waitForTimeout method
       wallet.page.waitForTimeout = originalWaitForTimeout;
     }
-``
+
     await use(sharedBrowserContext);
   },
 
@@ -176,37 +176,38 @@ export const test = baseTest.extend<{
     await use(metamask);
   },
 
-  switcher: async ({ wallet }, use) => {
+  switcher: async ({ wallet, page }, use) => {
     const switcher = new RoleSwitcher(wallet);
-
     const original = wallet.confirmTransaction;
+
+    // Each time there is a tx signature we save the address that produced the signature.
     wallet.confirmTransaction = async () => {
       switcher.pushToHistory();
       await original.bind(wallet)();
     }
 
     await use(switcher);
+
+    // After each test we go through each address that has signed and
+    // Clear the tx nonce in metamask.
+    // This is because metamask doesn't automatically fix the nonce when it doesn't
+    // match with the network. Doing this forces metamask to refresh the nonce.
+    const history = switcher.popHistory()
+    for (const entry of history) {
+      await entry()
+
+      await wallet.page.bringToFront();
+      await wallet.page.getByTestId('account-options-menu-button').click();
+      await wallet.page.getByTestId('global-menu-settings').click();
+      await wallet.page.getByText("Advanced").click();
+      await wallet.page.getByText("Clear activity tab data").click();
+      await wallet.page.getByRole("button", {name: "Clear", exact: true}).click();
+      await wallet.page.locator(".app-header__logo-container").click();
+    }
+    await page.bringToFront()
   },
 
   testApp: async ({}, use) => {
     await use(testApp)
-  },
-
-  clearWalletNonces: async ({ wallet, switcher, page }, use) => {
-    await use(async () => {
-      const history = switcher.popHistory()
-      for (const entry of history) {
-        await entry()
-
-        await wallet.page.bringToFront();
-        await wallet.page.getByTestId('account-options-menu-button').click();
-        await wallet.page.getByTestId('global-menu-settings').click();
-        await wallet.page.getByText("Advanced").click();
-        await wallet.page.getByText("Clear activity tab data").click();
-        await wallet.page.getByRole("button", { name: "Clear", exact: true }).click();
-        await wallet.page.locator(".app-header__logo-container").click();
-      }
-      await page.bringToFront();
-    })
   }
 });

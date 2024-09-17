@@ -7,10 +7,6 @@ test.beforeEach(async ({ testApp }) => {
   await testApp.reset();
 });
 
-test.afterEach(async ({ clearWalletNonces }) => {
-  await clearWalletNonces()
-})
-
 async function goToFreezeIndex(page: Page) {
   await page.goto("/");
   await page.getByText("Freeze Requests").click();
