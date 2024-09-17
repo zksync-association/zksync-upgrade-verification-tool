@@ -55,6 +55,7 @@ jobs:
           node-version: 20
           cache: "pnpm"
       - run: pnpm install
+      - run: pnpm playwright install --with-deps chromium
       - run: cd ../contracts && pnpm build
       - run: pnpm test:web:env:up
       - run: xvfb-run pnpm playwright test
