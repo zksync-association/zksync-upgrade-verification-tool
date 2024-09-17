@@ -31,23 +31,15 @@ test("TC104 - View all buttons in private app", async ({ page }) => {
   await expect(page.getByText("L2 Proposals Veto")).toBeVisible();
 });
 
-test("TC105 - View only standard upgrades in private app", async ({ testApp, context }) => {
-  try {
-    await testApp.resetApp({ env: { ALLOW_PRIVATE_ACTIONS: "false" } });
-    // We use a new page here to ensure that we render everything using the new configuration of the app.
-    const page = await context.newPage();
-    await page.goto("/");
-    try {
-      await expect(page.getByText("Standard Upgrades")).toBeVisible();
-      await expect(page.getByText("Emergency Upgrades")).not.toBeVisible();
-      await expect(page.getByText("Freeze Requests")).not.toBeVisible();
-      await expect(page.getByText("L2 Proposals Veto")).not.toBeVisible();
-    } finally {
-      // Ensuring that this page is always closed, even if the test fails.
-      await page.close();
-    }
-  } finally {
-    // Ensuring that we get back the original configuration, even if the test fails.
-    await testApp.resetApp({ env: { ALLOW_PRIVATE_ACTIONS: "true" } });
-  }
+test("TC105 - View only standard upgrades in private app", async ({ testApp, page }) => {
+  await testApp.resetApp({ env: { ALLOW_PRIVATE_ACTIONS: "false" } });
+  await page.reload();
+
+  await expect(page.getByText("Standard Upgrades")).toBeVisible();
+  await expect(page.getByText("Emergency Upgrades")).not.toBeVisible();
+  await expect(page.getByText("Freeze Requests")).not.toBeVisible();
+  await expect(page.getByText("L2 Proposals Veto")).not.toBeVisible();
+
+  await testApp.resetApp({ env: { ALLOW_PRIVATE_ACTIONS: "true" } });
+  await page.reload();
 });
