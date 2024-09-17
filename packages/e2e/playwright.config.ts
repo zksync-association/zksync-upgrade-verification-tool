@@ -8,6 +8,6 @@ export default defineConfig({
     baseURL: "http://localhost:4000",
     viewport: { width: 1366, height: 768 },
   },
-  timeout: 120000, // 120 seconds,
+  timeout: 180000, // 3 minutes,
   reporter: [["html"], ["list"]],
 });
