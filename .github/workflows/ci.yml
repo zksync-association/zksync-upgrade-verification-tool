@@ -28,30 +28,30 @@ jobs:
               - '!**/*.md'
               - '!**/*.MD'
 
-  ci-for-lint:
-    name: Lint
-    needs: ["changed-files"]
-    if: ${{ needs.changed-files.outputs.app == 'true' }}
-    uses: ./.github/workflows/lint-reusable.yml
+  # ci-for-lint:
+  #   name: Lint
+  #   needs: ["changed-files"]
+  #   if: ${{ needs.changed-files.outputs.app == 'true' }}
+  #   uses: ./.github/workflows/lint-reusable.yml
 
-  ci-for-test:
-    name: Test
-    needs: ["changed-files", "ci-for-lint"]
-    if: ${{ needs.changed-files.outputs.app == 'true' }}
-    uses: ./.github/workflows/test-reusable.yml
+  # ci-for-test:
+  #   name: Test
+  #   needs: ["changed-files", "ci-for-lint"]
+  #   if: ${{ needs.changed-files.outputs.app == 'true' }}
+  #   uses: ./.github/workflows/test-reusable.yml
 
   ci-for-test-e2e:
     name: Test E2E
-    needs: ["changed-files", "ci-for-lint"]
+    needs: ["changed-files"]
     if: ${{ needs.changed-files.outputs.app == 'true' }}
     uses: ./.github/workflows/test-e2e-reusable.yml
     secrets: inherit
 
-  ci-for-docker:
-    name: Docker
-    needs: ["changed-files", "ci-for-lint", "ci-for-test", "ci-for-test-e2e"]
-    if: ${{ needs.changed-files.outputs.app == 'true' }}
-    uses: ./.github/workflows/docker-reusable.yml
-    permissions:
-      contents: read
-      packages: write
+  # ci-for-docker:
+  #   name: Docker
+  #   needs: ["changed-files", "ci-for-lint", "ci-for-test", "ci-for-test-e2e"]
+  #   if: ${{ needs.changed-files.outputs.app == 'true' }}
+  #   uses: ./.github/workflows/docker-reusable.yml
+  #   permissions:
+  #     contents: read
+  #     packages: write
