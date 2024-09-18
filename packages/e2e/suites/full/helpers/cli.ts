@@ -15,10 +15,6 @@ export function spawnBackground(
     const outputDir = path.dirname(outputFile);
     fs.mkdirSync(outputDir, { recursive: true });
 
-    if (fs.existsSync(outputFile)) {
-      fs.truncateSync(outputFile, 0);
-    }
-
     fileStream = fs.openSync(outputFile, "a");
   }
 
@@ -46,5 +42,19 @@ export function spawnBackground(
 }
 
 export async function killProcessByPid(pid: number) {
-  process.kill(pid);
+  // Kills the process and its children with "-pid"
+  process.kill(-pid, "SIGKILL");
+  await waitForProcessToExit(pid);
+}
+
+async function waitForProcessToExit(pid: number, maxIterations = 100) {
+  for (let i = 0; i < maxIterations; i++) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Process ${pid} did not exit after ${maxIterations} checks`);
 }

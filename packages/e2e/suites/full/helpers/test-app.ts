@@ -76,13 +76,13 @@ export class TestApp {
     const pids = await this.getPids();
 
     spinner.start("Stopping app");
-    killProcessByPid(pids.app);
+    await killProcessByPid(pids.app);
 
     spinner.start("Stopping backup node");
-    killProcessByPid(pids.backupNode);
+    await killProcessByPid(pids.backupNode);
 
     spinner.start("Stopping main node");
-    killProcessByPid(pids.mainNode);
+    await killProcessByPid(pids.mainNode);
 
     spinner.succeed("Test app stopped");
   }
@@ -94,7 +94,7 @@ export class TestApp {
 
   async resetApp({ env }: { env: Record<string, string> }) {
     const pids = await this.getPids();
-    killProcessByPid(pids.app);
+    await killProcessByPid(pids.app);
     const app = await this.startApp({ env });
     await this.savePids({ ...pids, app });
   }
