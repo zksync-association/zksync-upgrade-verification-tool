@@ -31,7 +31,7 @@ test("TC104 - View all buttons in private app", async ({ page }) => {
   await expect(page.getByText("L2 Proposals Veto")).toBeVisible();
 });
 
-test.only("TC105 - View only standard upgrades in private app", async ({ testApp, page }) => {
+test("TC105 - View only standard upgrades in private app", async ({ testApp, page }) => {
   try {
     await testApp.resetApp({ env: { ALLOW_PRIVATE_ACTIONS: "false" } });
     await page.reload();
