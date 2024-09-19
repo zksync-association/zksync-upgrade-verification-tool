@@ -2,7 +2,10 @@ import "@matterlabs/hardhat-zksync-node";
 import "@matterlabs/hardhat-zksync-deploy";
 import "@matterlabs/hardhat-zksync-solc";
 import { type HardhatUserConfig, subtask } from "hardhat/config.js";
-import { TASK_COMPILE_SOLIDITY, TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from "hardhat/builtin-tasks/task-names.js";
+import {
+  TASK_COMPILE_SOLIDITY,
+  TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS,
+} from "hardhat/builtin-tasks/task-names.js";
 import path from "node:path";
 import { glob } from "glob";
 import { execSync } from "node:child_process";
@@ -42,10 +45,10 @@ const config: HardhatUserConfig = {
     local: {
       url: process.env.L2_RPC_URL || "http://localhost:8011",
       ethNetwork: "http://localhost:8545",
-      zksync: true
+      zksync: true,
     },
     hardhat: {
-      zksync: true
+      zksync: true,
     },
   },
 };
