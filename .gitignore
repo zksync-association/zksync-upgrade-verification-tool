@@ -49,8 +49,11 @@ node_modules/
 # Build outputs
 .cache
 artifacts/
+artifacts-zk/
 build/
 cache/
+cache-zk/
+deployments-zk/
 dist/
 out/
 server-build/
