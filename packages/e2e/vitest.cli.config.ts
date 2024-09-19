@@ -8,7 +8,7 @@ export default defineConfig({
     sequence: {
       concurrent: false,
     },
-    globalSetup: "./testDelays.ts",
+    setupFiles: ["dotenv/config", "./testDelays.ts"],
     include: ["suites/cli/*.{test,spec}.{ts,tsx}"],
   },
 });

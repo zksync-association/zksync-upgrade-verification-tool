@@ -1,9 +1,6 @@
-name: Docker CI for WebApp
-
+name: Workflow template for docker jobs
 on:
-  pull_request:
-  push:
-    branches: ["main"]
+  workflow_call:
 
 permissions:
   contents: read

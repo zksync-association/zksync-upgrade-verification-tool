@@ -19,23 +19,33 @@ elif [[ "$(docker ps -aq -f status=exited -f name=$CONTAINER_NAME)" ]]; then
     CONTAINER_EXISTS_STOPPED=true
 fi
 
-# Check if --reset flag is provided
+# Check flags
 RESET_FLAG=false
+DOWN_FLAG=false
 for arg in "$@"
 do
     if [ "$arg" == "--reset" ]
     then
         RESET_FLAG=true
+    elif [ "$arg" == "--down" ]
+    then
+        DOWN_FLAG=true
     fi
 done
 
 # If --reset flag is set, stop and remove the container if it exists
-if [ "$RESET_FLAG" = true ] && ( $CONTAINER_RUNNING || $CONTAINER_EXISTS_STOPPED )
+if [ "$RESET_FLAG" = true ] || [ "$DOWN_FLAG" = true ] && ( $CONTAINER_RUNNING || $CONTAINER_EXISTS_STOPPED )
 then
     docker stop $CONTAINER_NAME
     docker rm $CONTAINER_NAME
     CONTAINER_RUNNING=false
     CONTAINER_EXISTS_STOPPED=false
+fi
+
+# If --down flag is set, exit
+if [ "$DOWN_FLAG" = true ]
+then
+    exit 0
 fi
 
 # Handle container status

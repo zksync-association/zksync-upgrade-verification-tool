@@ -12,19 +12,12 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "pnpm tsx ./scripts/migrate.ts",
-    "db:wait": "sleep 2",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:up": "docker compose up -d db",
-    "db:down": "docker compose down db",
+    "test": "run-s test:*",
     "test:s": "vitest run --config ./vitest.server.config.ts",
     "test:u": "vitest run --config ./vitest.unit.config.ts",
-    "pretest:i": "pnpm run db:up &&  pnpm run db:wait && pnpm db:migrate",
-    "test:i": "vitest run --config ./vitest.integration.config.ts",
-    "posttest:i": "pnpm run db:down",
-    "pretest:i:ui": "pnpm run db:up &&  pnpm run db:wait && pnpm db:migrate",
-    "test:i:ui": "vitest run --config ./vitest.integration.config.ts --ui --api 9588",
-    "posttest:i:ui": "pnpm run db:down"
+    "test:i": "vitest run --config ./vitest.integration.config.ts"
   },
   "dependencies": {
     "@headlessui/react": "=2.1.2",

@@ -1,16 +1,19 @@
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { exec, killProcessByPort, spawnBackground } from "./cli.js";
+import { exec, killProcessByPid, spawnBackground } from "./cli.js";
 import path from "node:path";
 import postgres from "postgres";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { type Hex, hexToNumber, numberToHex } from "viem";
 import ora from "ora";
+import z from "zod";
+import fs from "node:fs/promises";
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 const ROOT_DIR = path.join(__dirname, "../../../../..");
 const LOGS_DIR = path.join(process.cwd(), "logs");
+const PIDS_FILE = path.join(LOGS_DIR, "pids.json");
 
 export class TestApp {
   readonly webDir = path.join(ROOT_DIR, "apps/web");
@@ -55,28 +58,31 @@ export class TestApp {
     await this.setupDb();
 
     spinner.start("Starting backup node");
-    await this.startBackupNode();
+    const backupNode = await this.startBackupNode();
 
     spinner.start("Starting main node");
-    await this.startMainHardhatNode();
+    const mainNode = await this.startMainHardhatNode();
 
     spinner.start("Starting app");
-    await this.startApp();
+    const app = await this.startApp();
+
+    await this.savePids({ backupNode, mainNode, app });
 
     spinner.succeed("Test app started");
   }
 
   async down() {
     const spinner = ora().start();
+    const pids = await this.getPids();
 
     spinner.start("Stopping app");
-    await killProcessByPort(this.appPort);
+    await killProcessByPid(pids.app);
 
     spinner.start("Stopping backup node");
-    await killProcessByPort(this.backupNodePort);
+    await killProcessByPid(pids.backupNode);
 
     spinner.start("Stopping main node");
-    await killProcessByPort(this.mainNodePort);
+    await killProcessByPid(pids.mainNode);
 
     spinner.succeed("Test app stopped");
   }
@@ -87,8 +93,10 @@ export class TestApp {
   }
 
   async resetApp({ env }: { env: Record<string, string> }) {
-    await killProcessByPort(this.appPort);
-    await this.startApp({ env });
+    const pids = await this.getPids();
+    await killProcessByPid(pids.app);
+    const app = await this.startApp({ env });
+    await this.savePids({ ...pids, app });
   }
 
   async cleanupDb() {
@@ -188,7 +196,7 @@ export class TestApp {
   }
 
   private async startBackupNode() {
-    const node = spawnBackground(`pnpm hardhat node --port ${this.backupNodePort}`, {
+    const pid = spawnBackground(`pnpm hardhat node --port ${this.backupNodePort}`, {
       cwd: this.contractsDir,
       outputFile: this.logPaths.backupNode,
     });
@@ -197,14 +205,18 @@ export class TestApp {
       cwd: this.contractsDir,
       env: { ...process.env, L1_RPC_URL: this.backupNodeUrl, MNEMONIC: this.walletMnemonic },
     });
-    return node;
+    return pid;
   }
 
   private async startMainHardhatNode() {
     const latestBlock = await this.getLatestBlock(this.backupNodeUrl);
     this.latestBackupNodeBlock = latestBlock;
 
-    const node = spawnBackground(
+    // Wait for the backup node latest block timestamp to be older,
+    // so that we don't face "current time must be after fork block" error.
+    await new Promise((resolve) => setTimeout(resolve, 20000));
+
+    const pid = spawnBackground(
       `pnpm hardhat node --port ${this.mainNodePort} --fork ${this.backupNodeUrl} --fork-block-number ${latestBlock}`,
       {
         cwd: this.contractsDir,
@@ -212,11 +224,11 @@ export class TestApp {
       }
     );
     await this.waitForHardhatNode(this.mainNodeUrl);
-    return node;
+    return pid;
   }
 
   private async startApp({ env }: { env?: Record<string, string> } = {}) {
-    spawnBackground("pnpm start", {
+    const pid = spawnBackground("pnpm start", {
       cwd: this.webDir,
       env: {
         ...process.env,
@@ -236,6 +248,7 @@ export class TestApp {
       outputFile: this.logPaths.app,
     });
     await this.waitForApp();
+    return pid;
   }
 
   private async getLatestBackupNodeBlock() {
@@ -283,17 +296,21 @@ export class TestApp {
     if (!response.ok) {
       throw new Error("Failed to get latest block");
     }
-
-    const data = await response.json();
-    if (
-      typeof data === "object" &&
-      data !== null &&
-      "result" in data &&
-      typeof data.result === "string"
-    ) {
-      return hexToNumber(data.result as Hex);
+    const responseData = await response.json();
+    const data = z
+      .object({
+        jsonrpc: z.string(),
+        id: z.number(),
+        result: z
+          .string()
+          .regex(/^0x[0-9a-fA-F]+$/)
+          .transform((hex) => hexToNumber(hex as Hex)),
+      })
+      .safeParse(responseData);
+    if (!data.success) {
+      throw new Error("Unexpected response format");
     }
-    throw new Error("Unexpected response format");
+    return data.data.result;
   }
 
   private async mineBlocks(url: string, howManyBlocks: number) {
@@ -326,5 +343,28 @@ export class TestApp {
       await new Promise((resolve) => setTimeout(resolve, retryInterval));
     }
     throw new Error(`App on ${this.appUrl} did not become ready in time`);
+  }
+
+  private async savePids({
+    app,
+    backupNode,
+    mainNode,
+  }: {
+    app: number;
+    backupNode: number;
+    mainNode: number;
+  }) {
+    return fs.writeFile(PIDS_FILE, JSON.stringify({ app, backupNode, mainNode }, null, 2));
+  }
+
+  private async getPids() {
+    const pids = JSON.parse(await fs.readFile(PIDS_FILE, "utf-8"));
+    return z
+      .object({
+        app: z.number(),
+        backupNode: z.number(),
+        mainNode: z.number(),
+      })
+      .parse(pids);
   }
 }

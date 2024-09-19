@@ -13,5 +13,6 @@
       "dependsOn": ["web#build"]
     },
     "test": {}
-  }
+  },
+  "globalPassThroughEnv": ["DATABASE_URL", "SKIP_ENV_VALIDATION"]
 }
