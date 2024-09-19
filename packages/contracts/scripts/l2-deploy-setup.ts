@@ -43,6 +43,59 @@ async function main() {
     .send(keccak256(Buffer.from("TIMELOCK_ADMIN_ROLE")), zeroAddress);
   await Promise.all([grant1.wait(), grant2.wait(), grant3.wait(), grant4.wait()]);
 
+  // Token Governor
+  const tokenGovArtifact = await deployer.loadArtifact("ZkTokenGovernor");
+  const tokenGovContract = await deployer.deploy(tokenGovArtifact, [
+    {
+      name: "ZkTokenGovernor",
+      token: await tokenContract.getAddress(),
+      timelock: zeroAddress,
+      initialVotingDelay: 0,
+      initialVotingPeriod: 100000,
+      initialProposalThreshold: 0,
+      initialQuorum: 0,
+      initialVoteExtension: 0,
+      vetoGuardian: zeroAddress,
+      proposeGuardian: zeroAddress,
+      isProposeGuarded: false,
+    }
+  ]);
+  // Create a dummy token governor proposal. This is used to have realistic data in the webapp.
+  const tokenGovProposalTx = await tokenGovContract.getFunction("propose").send(
+    [zeroAddress],
+    [0n],
+    ["0x"],
+    "Test Token proposal",
+  );
+  await tokenGovProposalTx.wait();
+
+  // Deploy gov ops governor contract.
+  const govOpsGovArtifact = await deployer.loadArtifact("ZkGovOpsGovernor");
+  const govOpsGovContract = await deployer.deploy(govOpsGovArtifact, [
+    {
+      name: "ZkGovOpsGovernor",
+      token: await tokenContract.getAddress(),
+      timelock: zeroAddress,
+      initialVotingDelay: 0,
+      initialVotingPeriod: 100000,
+      initialProposalThreshold: 0,
+      initialQuorum: 0,
+      initialVoteExtension: 0,
+      vetoGuardian: zeroAddress,
+      proposeGuardian: zeroAddress,
+      isProposeGuarded: false,
+    }
+  ]);
+  // Create a dummy token gov ops proposal. This is used to have realistic data in the webapp.
+  const govopsProposalTx =  await govOpsGovContract.getFunction("propose").send(
+    [zeroAddress, zeroAddress],
+    [0n, 0n],
+    ["0x", "0x"],
+    "Test GovOps proposal",
+  );
+  await govopsProposalTx.wait();
+
+
   // Protocol Governor
   const protocolGovArtifact = await deployer.loadArtifact("ZkProtocolGovernor");
   const protocolGovContract = await deployer.deploy(protocolGovArtifact, [
