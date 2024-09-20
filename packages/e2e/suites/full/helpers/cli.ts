@@ -8,16 +8,12 @@ export const exec = util.promisify(execSync);
 export function spawnBackground(
   command: string,
   { cwd, env, outputFile }: { cwd?: string; env?: Record<string, string>; outputFile?: string } = {}
-): { pid: number | undefined; kill: () => void } {
+) {
   let fileStream: number | undefined;
 
   if (outputFile) {
     const outputDir = path.dirname(outputFile);
     fs.mkdirSync(outputDir, { recursive: true });
-
-    if (fs.existsSync(outputFile)) {
-      fs.truncateSync(outputFile, 0);
-    }
 
     fileStream = fs.openSync(outputFile, "a");
   }
@@ -37,35 +33,28 @@ export function spawnBackground(
 
   process.unref();
 
-  return {
-    pid: process.pid,
-    kill: () => {
-      process.kill();
-    },
-  };
+  const pid = process.pid;
+  if (!pid) {
+    throw new Error("Failed to start process");
+  }
+
+  return pid;
 }
 
-export async function killProcessByPort(port: number) {
-  const pids = await getPidFromPort(port);
-  if (!pids) {
-    return;
-  }
-
-  for (const p of pids) {
-    process.kill(p);
-  }
+export async function killProcessByPid(pid: number) {
+  // Kills the process and its children with "-pid"
+  process.kill(-pid, "SIGKILL");
+  await waitForProcessToExit(pid);
 }
 
-export async function getPidFromPort(port: number) {
-  try {
-    const process = await exec(`lsof -t -i :${port}`);
-    const output = process.stdout.trim();
-
-    // Output can be a list of pids
-    const pids = output.split("\n");
-
-    return pids.map(Number);
-  } catch {
-    return null;
+async function waitForProcessToExit(pid: number, maxIterations = 100) {
+  for (let i = 0; i < maxIterations; i++) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
+  throw new Error(`Process ${pid} did not exit after ${maxIterations} checks`);
 }

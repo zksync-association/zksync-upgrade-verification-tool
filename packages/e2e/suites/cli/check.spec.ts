@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import "dotenv/config";
 import { execAsync, expectToFailAsync } from "./helpers/util.js";
 
 describe("validate check", () => {

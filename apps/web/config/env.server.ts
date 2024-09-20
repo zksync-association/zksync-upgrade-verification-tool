@@ -28,9 +28,9 @@ export const env = createEnv({
     ZK_TOKEN_GOVERNOR_ADDRESS: addressSchema,
     ALLOW_PRIVATE_ACTIONS: boolFromStrSchema,
   },
-  // eslint-disable-next-line n/no-process-env
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,
+  skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
 });
 
 export const clientEnv = {
