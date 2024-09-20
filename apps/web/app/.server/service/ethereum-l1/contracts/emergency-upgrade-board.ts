@@ -1,7 +1,7 @@
 import { getContract, type Address } from "viem";
 import { l1Rpc } from "../client";
-import { emergencyUpgradeBoardAddress } from "./protocol-upgrade-handler";
 import { emergencyUpgradeBoardAbi } from "@/utils/contract-abis";
+import { emergencyUpgradeBoardAddress } from "./protocol-upgrade-handler";
 
 const emergencyUpgradeBoard = (address: Address) =>
   getContract({
@@ -10,13 +10,11 @@ const emergencyUpgradeBoard = (address: Address) =>
     client: l1Rpc,
   });
 
-export async function withEmergencyUpgradeBoardAddress<T>(
-  fn: (emergencyUpgradeBoardAddress: Address) => Promise<T>
-) {
-  const emergencyUpgradeBoardAddr = await emergencyUpgradeBoardAddress();
-  return fn(emergencyUpgradeBoardAddr);
+export async function zkFoundationAddress(emergencyUpgradeBoardAddress?: Address) {
+  const address = await emergencyUpgradeBoardAddressOrDefault(emergencyUpgradeBoardAddress);
+  return emergencyUpgradeBoard(address).read.ZK_FOUNDATION_SAFE();
 }
 
-export async function zkFoundationAddress(emergencyUpgradeBoardAddress: Address) {
-  return emergencyUpgradeBoard(emergencyUpgradeBoardAddress).read.ZK_FOUNDATION_SAFE();
+async function emergencyUpgradeBoardAddressOrDefault(address?: Address) {
+  return address ?? (await emergencyUpgradeBoardAddress());
 }
