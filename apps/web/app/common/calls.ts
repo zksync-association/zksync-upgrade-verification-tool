@@ -10,11 +10,13 @@ export const callSchema = z.object({
 
 export type Call = z.infer<typeof callSchema>;
 
-export const formCallSchema = z.object({
+export const formCallSchemaWithoutObject = {
   target: addressSchema,
   data: hexSchema,
   value: z.coerce
     .number()
     .transform((n) => n.toString())
     .transform((str) => numberToHex(parseEther(str))),
-});
+};
+
+export const formCallSchema = z.object(formCallSchemaWithoutObject);

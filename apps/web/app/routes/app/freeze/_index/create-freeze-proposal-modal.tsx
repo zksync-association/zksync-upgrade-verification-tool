@@ -1,26 +1,30 @@
 import { DateTimePicker } from "@/components/date-time-picker";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Cross2Icon, Share2Icon } from "@radix-ui/react-icons";
-import { Form, useActionData, useNavigation, useRevalidator } from "@remix-run/react";
+import { Share2Icon } from "@radix-ui/react-icons";
+import { useActionData, useNavigation, useRevalidator } from "@remix-run/react";
 import { add } from "date-fns";
 import { useState } from "react";
 import type { action } from "./_route";
 import type { FreezeProposalsType } from "@/common/freeze-proposal-type";
+import { Form, FormInput, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { PlusIcon } from "lucide-react";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 export function CreateFreezeProposalModal({
   type,
-  onClose,
+  testNamespace,
 }: {
   type: FreezeProposalsType | null;
-  onClose: () => void;
+  testNamespace: string;
 }) {
   const actionResult = useActionData<typeof action>();
   const [date, setDate] = useState<Date>(add(new Date(), { days: 7 }));
@@ -46,55 +50,57 @@ export function CreateFreezeProposalModal({
       break;
   }
 
-  const handleClose = () => {
+  const handleOpenChange = () => {
     if (actionResult !== null && actionResult !== undefined) {
       revalidator.revalidate();
     }
-    onClose();
   };
 
   return (
-    <AlertDialog open={type !== null}>
-      <AlertDialogContent>
-        <AlertDialogHeader className="flex flex-row items-center justify-between">
-          <AlertDialogTitle className="mb-4 flex w-full items-center justify-between">
+    <Dialog onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button variant="secondary" size="icon" data-testid={`${testNamespace}-create-btn`}>
+          <PlusIcon className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <DialogTitle className="mb-4 flex w-full items-center justify-between">
             {title}
-            <Button variant="ghost" size="icon" onClick={handleClose} className="h-8 w-8 p-0">
-              <Cross2Icon className="h-4 w-4" />
-            </Button>
-          </AlertDialogTitle>
-        </AlertDialogHeader>
-        <Form method="post">
-          <div className="flex flex-col space-y-6">
-            <div className="flex flex-col space-y-4">
-              <Label>Valid Until</Label>
-              <DateTimePicker
-                date={date}
-                setDate={setDate}
-                timeFormat="12H"
-                dayPicker={{
-                  disabled: { before: new Date() },
-                }}
-              />
-              <Input name="validUntil" type="hidden" value={date?.toISOString()} />
-              {actionResult?.error_type === "form_error" && actionResult.errors.validUntil && (
-                <p className="text-red-500 text-sm">{actionResult.errors.validUntil}</p>
+          </DialogTitle>
+          <DialogDescription>
+            <VisuallyHidden>{title}</VisuallyHidden>
+          </DialogDescription>
+        </DialogHeader>
+        <Form method="POST">
+          <FormItem name="validUntil" className="space-y-4">
+            <FormLabel>Valid Until</FormLabel>
+            <DateTimePicker
+              date={date}
+              setDate={setDate}
+              timeFormat="12H"
+              dayPicker={{
+                disabled: { before: new Date() },
+              }}
+            />
+            <FormInput type="hidden" value={date?.toISOString()} />
+            {actionResult?.error_type === "form_error" && actionResult.errors.validUntil && (
+              <p className="text-red-500 text-sm">{actionResult.errors.validUntil}</p>
+            )}
+          </FormItem>
+          {type === "SET_SOFT_FREEZE_THRESHOLD" && (
+            <FormItem name="threshold">
+              <FormLabel>Threshold</FormLabel>
+              <FormInput type="number" min={1} max={9} />
+              {actionResult?.error_type === "form_error" && actionResult.errors.threshold && (
+                <FormMessage>{actionResult.errors.threshold}</FormMessage>
               )}
-            </div>
-            {type === "SET_SOFT_FREEZE_THRESHOLD" && (
-              <div className="flex flex-col space-y-4">
-                <Label>Threshold</Label>
-                <Input name="threshold" type="number" min={1} max={9} />
-                {actionResult?.error_type === "form_error" && actionResult.errors.threshold && (
-                  <p className="text-red-500 text-sm">{actionResult.errors.threshold}</p>
-                )}
-              </div>
-            )}
+            </FormItem>
+          )}
 
-            {actionResult?.error_type === "general_error" && (
-              <p className="text-red-500 text-sm">{actionResult.error}</p>
-            )}
-          </div>
+          {actionResult?.error_type === "general_error" && (
+            <p className="text-red-500 text-sm">{actionResult.error}</p>
+          )}
 
           <Input name="type" type="hidden" value={type ?? undefined} />
 
@@ -105,7 +111,7 @@ export function CreateFreezeProposalModal({
             </Button>
           </div>
         </Form>
-      </AlertDialogContent>
-    </AlertDialog>
+      </DialogContent>
+    </Dialog>
   );
 }
