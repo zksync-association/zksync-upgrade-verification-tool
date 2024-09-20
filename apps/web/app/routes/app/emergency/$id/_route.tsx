@@ -26,14 +26,8 @@ import useUser from "@/components/hooks/use-user";
 import { EmergencySignButton } from "@/routes/app/emergency/$id/emergency-sign-button";
 import { emergencyUpgradeBoardAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 import { zkFoundationAddress } from "@/.server/service/ethereum-l1/contracts/emergency-upgrade-board";
-import {
-  guardianMembers,
-  withGuardiansAddress,
-} from "@/.server/service/ethereum-l1/contracts/guardians";
-import {
-  securityCouncilMembers,
-  withSecurityCouncilAddress,
-} from "@/.server/service/ethereum-l1/contracts/security-council";
+import { guardianMembers } from "@/.server/service/ethereum-l1/contracts/guardians";
+import { securityCouncilMembers } from "@/.server/service/ethereum-l1/contracts/security-council";
 
 export async function loader(args: LoaderFunctionArgs) {
   const { id: proposalId } = extractFromParams(
@@ -50,8 +44,8 @@ export async function loader(args: LoaderFunctionArgs) {
   const emergencyBoard = await emergencyUpgradeBoardAddress();
   const [zkFoundation, allGuardians, allSecurityCouncil, calls, signatures] = await Promise.all([
     zkFoundationAddress(emergencyBoard),
-    withGuardiansAddress(guardianMembers),
-    withSecurityCouncilAddress(securityCouncilMembers),
+    guardianMembers(),
+    securityCouncilMembers(),
     getEmergencyProposalCallsByProposalId(proposal.id),
     getSignaturesByEmergencyProposalId(proposal.externalId),
   ]);

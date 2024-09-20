@@ -33,7 +33,7 @@ import {
   updateL2Cancellation,
 } from "../db/dto/l2-cancellations";
 import { l2Rpc } from "./ethereum-l2/client";
-import { getGuardiansL2VetoNonce, withGuardiansAddress } from "./ethereum-l1/contracts/guardians";
+import { getGuardiansL2VetoNonce } from "./ethereum-l1/contracts/guardians";
 import { zkGovOpsGovernorAbi } from "@/utils/contract-abis";
 
 const eventSchema = z.object({
@@ -193,7 +193,7 @@ export async function getActiveL2Proposals() {
 }
 
 export async function getL2VetoNonce(): Promise<number> {
-  const bigIntNonce = await withGuardiansAddress(getGuardiansL2VetoNonce);
+  const bigIntNonce = await getGuardiansL2VetoNonce();
   return Number(bigIntNonce);
 }
 

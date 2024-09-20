@@ -1,8 +1,8 @@
 import { getContract, type Address, type Hex } from "viem";
 
 import { l1Rpc } from "../client";
-import { guardiansAddress } from "./protocol-upgrade-handler";
 import { guardiansAbi } from "@/utils/contract-abis";
+import { guardiansAddress } from "./protocol-upgrade-handler";
 
 const guardians = (address: Address) =>
   getContract({
@@ -13,16 +13,9 @@ const guardians = (address: Address) =>
 
 const GUARDIAN_MEMBERS_COUNT = 8;
 
-export async function withGuardiansAddress<T, A extends unknown[]>(
-  fn: (guardiansAddress: Address, ...args: A) => Promise<T>,
-  ...args: A
-) {
-  const guardiansAddr = await guardiansAddress();
-  return fn(guardiansAddr, ...args);
-}
-
-export async function guardianMembers(guardiansAddress: Address): Promise<Address[]> {
-  const contract = guardians(guardiansAddress);
+export async function guardianMembers(guardiansAddress?: Address): Promise<Address[]> {
+  const address = await guardianAddressOrDefault(guardiansAddress);
+  const contract = guardians(address);
 
   const memberPromises = Array.from({ length: GUARDIAN_MEMBERS_COUNT }, (_, i) =>
     contract.read.members([BigInt(i)])
@@ -31,20 +24,26 @@ export async function guardianMembers(guardiansAddress: Address): Promise<Addres
   return Promise.all(memberPromises);
 }
 
-export async function getGuardiansL2VetoNonce(guardiansAddress: Address) {
-  const contract = guardians(guardiansAddress);
+export async function getGuardiansL2VetoNonce(guardiansAddress?: Address) {
+  const address = await guardianAddressOrDefault(guardiansAddress);
+  const contract = guardians(address);
   return contract.read.nonce();
 }
 
 export async function checkSignatures(
-  guardiansAddress: Address,
   {
     digest,
     signer,
     signatures,
     threshold,
-  }: { digest: Hex; signer: Hex[]; signatures: Hex[]; threshold: bigint }
+  }: { digest: Hex; signer: Hex[]; signatures: Hex[]; threshold: bigint },
+  guardiansAddress?: Address
 ) {
-  const contract = guardians(guardiansAddress);
+  const address = await guardianAddressOrDefault(guardiansAddress);
+  const contract = guardians(address);
   return contract.read.checkSignatures([digest, signer, signatures, threshold]);
+}
+
+async function guardianAddressOrDefault(address?: Address) {
+  return address ?? (await guardiansAddress());
 }

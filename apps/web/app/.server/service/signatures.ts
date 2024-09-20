@@ -31,15 +31,9 @@ import { getFreezeProposalById } from "@/.server/db/dto/freeze-proposals";
 import { getL2CancellationById } from "@/.server/db/dto/l2-cancellations";
 import { freezeActionFromType } from "@/common/freeze-proposal-type";
 import { multisigContractForRole } from "@/.server/user-role-data";
-import { guardianMembers, withGuardiansAddress } from "./ethereum-l1/contracts/guardians";
-import {
-  securityCouncilMembers,
-  withSecurityCouncilAddress,
-} from "./ethereum-l1/contracts/security-council";
-import {
-  withEmergencyUpgradeBoardAddress,
-  zkFoundationAddress,
-} from "./ethereum-l1/contracts/emergency-upgrade-board";
+import { guardianMembers } from "./ethereum-l1/contracts/guardians";
+import { securityCouncilMembers } from "./ethereum-l1/contracts/security-council";
+import { zkFoundationAddress } from "./ethereum-l1/contracts/emergency-upgrade-board";
 import {
   emergencyUpgradeBoardAddress,
   guardiansAddress,
@@ -48,9 +42,9 @@ import {
 
 async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
   const [guardians, council, foundation] = await Promise.all([
-    withGuardiansAddress(guardianMembers),
-    withSecurityCouncilAddress(securityCouncilMembers),
-    withEmergencyUpgradeBoardAddress(zkFoundationAddress),
+    guardianMembers(),
+    securityCouncilMembers(),
+    zkFoundationAddress(),
   ]);
 
   const {
