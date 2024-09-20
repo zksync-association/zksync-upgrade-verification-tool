@@ -1,25 +1,32 @@
 import hre from "hardhat";
-import "@matterlabs/hardhat-zksync-deploy";
 import { keccak256, zeroAddress } from "viem";
+import { type Contract, type Wallet } from "zksync-ethers"
+import type { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 
-async function main() {
-  // hre.deployer.zksync = true
-  const deployer = hre.deployer;
-  const zkWallet = await deployer.getWallet();
+type SimpleDeployer = {
+  loadArtifact: (name: string) => Promise<ZkSyncArtifact>,
+  deploy: (artifact: ZkSyncArtifact, args: any[]) => Promise<Contract>;
+}
 
-  console.log(await zkWallet.address);
-
+async function deployAndPrepareZkToken(deployer: SimpleDeployer, zkWallet: Wallet): Promise<Contract> {
   const tokenArtifact = await deployer.loadArtifact("ZkTokenV1");
-  const tokenContract = await deployer.deploy(tokenArtifact, []);
+  const tokenContract: Contract = await deployer.deploy(tokenArtifact, []);
   await tokenContract.waitForDeployment();
+
   // Initialize token contract
   const initializeZkTokenTx = await tokenContract
     .getFunction("initialize")
     .send(zkWallet.address, zkWallet.address, 1000000000n);
+
+  // Delegate votes to deployer address
   await initializeZkTokenTx.wait();
   const delegateVotesTx = await tokenContract.getFunction("delegate").send(zkWallet.address);
   await delegateVotesTx.wait();
+  return tokenContract;
+}
 
+
+async function deployTimelockContract(deployer: SimpleDeployer, zkWallet: Wallet) {
   const timeLockArtifact = await deployer.loadArtifact("TimelockController");
   const timeLockContract = await deployer.deploy(timeLockArtifact, [
     0,
@@ -42,8 +49,10 @@ async function main() {
     .getFunction("grantRole")
     .send(keccak256(Buffer.from("TIMELOCK_ADMIN_ROLE")), zeroAddress);
   await Promise.all([grant1.wait(), grant2.wait(), grant3.wait(), grant4.wait()]);
+  return timeLockContract;
+}
 
-  // Token Governor
+async function deployTokenGovernor(deployer: SimpleDeployer, tokenContract: Contract): Promise<Contract> {
   const tokenGovArtifact = await deployer.loadArtifact("ZkTokenGovernor");
   const tokenGovContract = await deployer.deploy(tokenGovArtifact, [
     {
@@ -68,8 +77,10 @@ async function main() {
     "Test Token proposal",
   );
   await tokenGovProposalTx.wait();
+  return tokenGovContract
+}
 
-  // Deploy gov ops governor contract.
+async function deployGovOpsGovernor(deployer: SimpleDeployer, tokenContract: Contract) {
   const govOpsGovArtifact = await deployer.loadArtifact("ZkGovOpsGovernor");
   const govOpsGovContract = await deployer.deploy(govOpsGovArtifact, [
     {
@@ -87,16 +98,17 @@ async function main() {
     }
   ]);
   // Create a dummy token gov ops proposal. This is used to have realistic data in the webapp.
-  const govopsProposalTx =  await govOpsGovContract.getFunction("propose").send(
+  const govopsProposalTx = await govOpsGovContract.getFunction("propose").send(
     [zeroAddress, zeroAddress],
     [0n, 0n],
     ["0x", "0x"],
     "Test GovOps proposal",
   );
   await govopsProposalTx.wait();
+  return govOpsGovContract
+}
 
-
-  // Protocol Governor
+async function deployAndPrepareProtocolGovernor(deployer: SimpleDeployer, tokenContract: Contract, timeLockContract: Contract): Promise<Contract> {
   const protocolGovArtifact = await deployer.loadArtifact("ZkProtocolGovernor");
   const protocolGovContract = await deployer.deploy(protocolGovArtifact, [
     "ZkGovOpsGovernor",
@@ -131,6 +143,27 @@ async function main() {
   await protocolGovContract
     .getFunction("execute")
     .send(propAddresses, propValues, propCallDatas, keccak256(Buffer.from(description)));
+
+  return protocolGovContract
+}
+
+async function main() {
+  // Deployer is an object provided by zksync to deploy contracts:
+  // https://docs.zksync.io/build/tooling/hardhat/plugins/hardhat-zksync-deploy#environment-extensions
+  const deployer = hre.deployer;
+  const zkWallet = await deployer.getWallet();
+
+  const tokenContract = await deployAndPrepareZkToken(deployer, zkWallet);
+  const timeLockContract = await deployTimelockContract(deployer, zkWallet);
+  const tokenGovContract = await deployTokenGovernor(deployer, tokenContract);
+  const govOpsGovernorContract = await deployGovOpsGovernor(deployer, tokenContract);
+  const protocolGovContract = await deployAndPrepareProtocolGovernor(deployer, tokenContract, timeLockContract);
+
+  console.log(`ZkToken: ${await tokenContract.getAddress()}`)
+  console.log(`TimeLock: ${await timeLockContract.getAddress()}`)
+  console.log(`TokenGovernor: ${await tokenGovContract.getAddress()}`)
+  console.log(`GovOpsGovernor: ${await govOpsGovernorContract.getAddress()}`)
+  console.log(`ProtocolGovernor: ${await protocolGovContract.getAddress()}`)
 }
 
 main()
