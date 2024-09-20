@@ -1,5 +1,5 @@
 import { getAllEmergencyProposals } from "@/.server/db/dto/emergency-proposals";
-import { emergencyBoardAddress } from "@/.server/service/authorized-users";
+import { emergencyUpgradeBoardAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 import type { EmergencyProposalStatus } from "@/common/emergency-proposal-status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,10 @@ import { ArrowRight } from "lucide-react";
 import { $path } from "remix-routes";
 
 export async function loader() {
-  const emergencyProposals = await getAllEmergencyProposals();
+  const [emergencyProposals, emergencyBoardAddress] = await Promise.all([
+    getAllEmergencyProposals(),
+    emergencyUpgradeBoardAddress(),
+  ]);
   return json({
     activeEmergencyProposals: emergencyProposals.filter(
       ({ status }) => status === "ACTIVE" || status === "READY"
@@ -25,7 +28,7 @@ export async function loader() {
     inactiveEmergencyProposals: emergencyProposals.filter(
       ({ status }) => status === "CLOSED" || status === "BROADCAST"
     ),
-    emergencyBoardAddress: await emergencyBoardAddress(),
+    emergencyBoardAddress,
   });
 }
 

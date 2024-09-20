@@ -1,8 +1,8 @@
-import { emergencyBoardAddress } from "@/.server/service/authorized-users";
 import {
   saveEmergencyProposal,
   validateEmergencyProposalCalls,
 } from "@/.server/service/emergency-proposals";
+import { emergencyUpgradeBoardAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 import { type Call, callSchema } from "@/common/calls";
 import { StepsWizard, WizardStep } from "@/components/steps-wizard";
 import { NewEmergencyProposalStep1, type Step1 } from "@/routes/app/emergency/new/step1";
@@ -18,7 +18,7 @@ import { $path } from "remix-routes";
 import { z } from "zod";
 
 export async function loader() {
-  return json({ emergencyBoardAddress: await emergencyBoardAddress() });
+  return json({ emergencyBoardAddress: await emergencyUpgradeBoardAddress() });
 }
 
 export async function action({ request }: ActionFunctionArgs) {

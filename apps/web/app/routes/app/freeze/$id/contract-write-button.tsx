@@ -1,7 +1,7 @@
 import type { freezeProposalsTable, signaturesTable } from "@/.server/db/schema";
 import { Button } from "@/components/ui/button";
+import { securityCouncilAbi } from "@/utils/contract-abis";
 import { dateToUnixTimestamp } from "@/utils/date";
-import { ALL_ABIS } from "@/utils/raw-abis";
 import { useFetcher } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
 import type React from "react";
@@ -17,7 +17,7 @@ type BroadcastTxButtonProps = {
   disabled?: boolean;
   children?: React.ReactNode;
   validUntil: Date;
-  functionName: ContractFunctionName<typeof ALL_ABIS.council, "nonpayable">;
+  functionName: ContractFunctionName<typeof securityCouncilAbi, "nonpayable">;
   proposalId: InferSelectModel<typeof freezeProposalsTable>["id"];
   softFreezeThreshold: number | null;
 };
@@ -59,7 +59,7 @@ export default function ContractWriteButton({
         account: address,
         address: target,
         functionName,
-        abi: ALL_ABIS.council,
+        abi: securityCouncilAbi,
         args:
           functionName === "setSoftFreezeThreshold"
             ? [args.softFreezeThreshold, args.validUntil, args.signers, args.signatures]

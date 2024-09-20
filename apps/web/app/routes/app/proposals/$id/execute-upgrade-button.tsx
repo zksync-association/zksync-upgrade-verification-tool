@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ALL_ABIS } from "@/utils/raw-abis";
+import { upgradeHandlerAbi } from "@/utils/contract-abis";
 import { useNavigate } from "@remix-run/react";
 import type React from "react";
 import { toast } from "react-hot-toast";
@@ -30,7 +30,7 @@ export default function ExecuteUpgradeButton({
     toast.loading("Broadcasting transaction...", { id: "broadcasting-tx" });
 
     const abiItem = getAbiItem({
-      abi: ALL_ABIS.handler,
+      abi: upgradeHandlerAbi,
       name: "execute",
     });
 
@@ -41,7 +41,7 @@ export default function ExecuteUpgradeButton({
         account: address,
         address: target,
         functionName: "execute",
-        abi: ALL_ABIS.handler,
+        abi: upgradeHandlerAbi,
         args: [upgradeProposal],
         dataSuffix: proposalCalldata,
       },

@@ -4,18 +4,24 @@ import {
   l2CancellationTypeEnum,
   type l2CancellationsTable,
 } from "@/.server/db/schema";
-import { guardiansAddress } from "@/.server/service/contracts";
 import { bigIntMax } from "@/utils/bigint";
 import { badRequest, notFound } from "@/utils/http";
 import {
   type L2_CANCELLATION_STATES,
   isValidCancellationState,
 } from "@/utils/l2-cancellation-states";
-import { ALL_ABIS, ZK_GOV_OPS_GOVERNOR_ABI } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 import type { InferSelectModel } from "drizzle-orm";
 import { hexSchema } from "@repo/common/schemas";
-import { type Address, type Hex, decodeEventLog, hexToBigInt, numberToHex } from "viem";
+import {
+  type Address,
+  type Hex,
+  decodeEventLog,
+  getAbiItem,
+  hexToBigInt,
+  numberToHex,
+  toEventSelector,
+} from "viem";
 import { z } from "zod";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
@@ -26,8 +32,9 @@ import {
   getL2Cancellations,
   updateL2Cancellation,
 } from "../db/dto/l2-cancellations";
-import { l1Rpc, l2Rpc } from "./clients";
-import { zkGovOpsGovernorAbi } from "./contract-abis";
+import { l2Rpc } from "./ethereum-l2/client";
+import { getGuardiansL2VetoNonce, withGuardiansAddress } from "./ethereum-l1/contracts/guardians";
+import { zkGovOpsGovernorAbi } from "@/utils/contract-abis";
 
 const eventSchema = z.object({
   eventName: z.string(),
@@ -52,18 +59,23 @@ function blocksInADay() {
 }
 
 async function getL2ProposalState(address: Hex, proposalId: Hex): Promise<L2_CANCELLATION_STATES> {
-  return l2Rpc.contractRead(address, "state", ZK_GOV_OPS_GOVERNOR_ABI, z.number(), [proposalId]);
+  return l2Rpc.contractRead(address, "state", zkGovOpsGovernorAbi, z.number(), [proposalId]);
 }
 
 async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigint) {
   const proposalCreatedLogsPromise = l2Rpc
     .getLogs(getL2GovernorAddress(type), numberToHex(from), "latest", [
-      zkGovOpsGovernorAbi.eventIdFor("ProposalCreated"),
+      toEventSelector(
+        getAbiItem({
+          abi: zkGovOpsGovernorAbi,
+          name: "ProposalCreated",
+        })
+      ),
     ])
     .then((logs) =>
       logs.map((log) =>
         decodeEventLog({
-          abi: ZK_GOV_OPS_GOVERNOR_ABI,
+          abi: zkGovOpsGovernorAbi,
           eventName: "ProposalCreated",
           data: log.data,
           topics: log.topics as any,
@@ -78,12 +90,17 @@ async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigi
     );
   const proposalCanceledPromise = l2Rpc
     .getLogs(getL2GovernorAddress(type), numberToHex(from), "latest", [
-      zkGovOpsGovernorAbi.eventIdFor("ProposalCanceled"),
+      toEventSelector(
+        getAbiItem({
+          abi: zkGovOpsGovernorAbi,
+          name: "ProposalCanceled",
+        })
+      ),
     ])
     .then((logs) =>
       logs.map((log) =>
         decodeEventLog({
-          abi: ZK_GOV_OPS_GOVERNOR_ABI,
+          abi: zkGovOpsGovernorAbi,
           eventName: "ProposalCanceled",
           data: log.data,
           topics: log.topics as any,
@@ -102,12 +119,17 @@ async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigi
 
   const proposalExecutedPromise = l2Rpc
     .getLogs(getL2GovernorAddress(type), numberToHex(from), "latest", [
-      zkGovOpsGovernorAbi.eventIdFor("ProposalExecuted"),
+      toEventSelector(
+        getAbiItem({
+          abi: zkGovOpsGovernorAbi,
+          name: "ProposalExecuted",
+        })
+      ),
     ])
     .then((logs) =>
       logs.map((log) =>
         decodeEventLog({
-          abi: ZK_GOV_OPS_GOVERNOR_ABI,
+          abi: zkGovOpsGovernorAbi,
           eventName: "ProposalExecuted",
           data: log.data,
           topics: log.topics as any,
@@ -171,12 +193,7 @@ export async function getActiveL2Proposals() {
 }
 
 export async function getL2VetoNonce(): Promise<number> {
-  const bigIntNonce = await l1Rpc.contractRead(
-    await guardiansAddress(),
-    "nonce",
-    ALL_ABIS.guardians,
-    z.bigint()
-  );
+  const bigIntNonce = await withGuardiansAddress(getGuardiansL2VetoNonce);
   return Number(bigIntNonce);
 }
 

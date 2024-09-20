@@ -7,15 +7,7 @@ import {
   createOrIgnoreSignature,
   getSignaturesByEmergencyProposalId,
 } from "@/.server/db/dto/signatures";
-import {
-  councilAddress,
-  councilMembers,
-  emergencyBoardAddress,
-  getUserAuthRole,
-  guardianMembers,
-  guardiansAddress,
-  zkFoundationAddress,
-} from "@/.server/service/authorized-users";
+import { getUserAuthRole } from "@/.server/service/authorized-users";
 import { getFreezeProposalSignatureArgs } from "@/common/freeze-proposal";
 import { getL2CancellationSignatureArgs } from "@/common/l2-cancellations";
 import { emergencyProposalStatusSchema } from "@/common/emergency-proposal-status";
@@ -39,11 +31,27 @@ import { getFreezeProposalById } from "@/.server/db/dto/freeze-proposals";
 import { getL2CancellationById } from "@/.server/db/dto/l2-cancellations";
 import { freezeActionFromType } from "@/common/freeze-proposal-type";
 import { multisigContractForRole } from "@/.server/user-role-data";
+import { guardianMembers, withGuardiansAddress } from "./ethereum-l1/contracts/guardians";
+import {
+  securityCouncilMembers,
+  withSecurityCouncilAddress,
+} from "./ethereum-l1/contracts/security-council";
+import {
+  withEmergencyUpgradeBoardAddress,
+  zkFoundationAddress,
+} from "./ethereum-l1/contracts/emergency-upgrade-board";
+import {
+  emergencyUpgradeBoardAddress,
+  guardiansAddress,
+  securityCouncilAddress,
+} from "./ethereum-l1/contracts/protocol-upgrade-handler";
 
 async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
-  const guardians = await guardianMembers();
-  const council = await councilMembers();
-  const foundation = await zkFoundationAddress();
+  const [guardians, council, foundation] = await Promise.all([
+    withGuardiansAddress(guardianMembers),
+    withSecurityCouncilAddress(securityCouncilMembers),
+    withEmergencyUpgradeBoardAddress(zkFoundationAddress),
+  ]);
 
   const {
     guardians: guardianSignatures,
@@ -60,7 +68,6 @@ async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promi
 
 async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
   const proposal = await getEmergencyProposalByExternalId(externalId);
-
   if (!proposal) {
     throw notFound();
   }
@@ -75,7 +82,11 @@ async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
   }
 
   const role = await getUserAuthRole(signer);
+  const action = emergencyUpgradeActionForRole(role);
 
+  const message = {
+    id: proposal.externalId,
+  };
   const types = [
     {
       name: "id",
@@ -83,14 +94,8 @@ async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
     },
   ];
 
-  const action = emergencyUpgradeActionForRole(role);
-
-  const message = {
-    id: proposal.externalId,
-  };
-
   const contractName = "EmergencyUpgradeBoard";
-  const verifierAddr = await emergencyBoardAddress();
+  const verifierAddr = await emergencyUpgradeBoardAddress();
 
   if (role === UserRoleEnum.enum.zkFoundation) {
     await assertValidSignatureZkFoundation(
@@ -106,11 +111,11 @@ async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
     await assertSignatureIsValidMultisig({
       signer,
       signature,
-      verifierAddr: verifierAddr,
+      verifierAddr,
       action,
-      message: message,
+      message,
       types,
-      contractName: contractName,
+      contractName,
       targetContract: await multisigContractForRole(role),
     });
   }
@@ -241,15 +246,17 @@ async function freeze(freezeId: number, signer: Hex, signature: Hex) {
 
   const { message, types } = getFreezeProposalSignatureArgs(freeze);
 
+  const contractAddress = await securityCouncilAddress();
+
   await assertSignatureIsValidMultisig({
     signer,
     signature,
-    verifierAddr: await councilAddress(),
+    verifierAddr: contractAddress,
     action,
     message,
     types,
     contractName: "SecurityCouncil",
-    targetContract: await councilAddress(),
+    targetContract: contractAddress,
   });
 
   await createOrIgnoreSignature({

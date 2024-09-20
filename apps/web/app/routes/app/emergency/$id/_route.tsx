@@ -1,12 +1,6 @@
 import { getEmergencyProposalCallsByProposalId } from "@/.server/db/dto/emergency-proposal-calls";
 import { getEmergencyProposalByExternalId } from "@/.server/db/dto/emergency-proposals";
 import { getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures";
-import {
-  councilMembers,
-  emergencyBoardAddress,
-  guardianMembers,
-  zkFoundationAddress,
-} from "@/.server/service/authorized-users";
 import { broadcastSuccess } from "@/.server/service/emergency-proposals";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
@@ -30,6 +24,16 @@ import { z } from "zod";
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
 import { EmergencySignButton } from "@/routes/app/emergency/$id/emergency-sign-button";
+import { emergencyUpgradeBoardAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
+import { zkFoundationAddress } from "@/.server/service/ethereum-l1/contracts/emergency-upgrade-board";
+import {
+  guardianMembers,
+  withGuardiansAddress,
+} from "@/.server/service/ethereum-l1/contracts/guardians";
+import {
+  securityCouncilMembers,
+  withSecurityCouncilAddress,
+} from "@/.server/service/ethereum-l1/contracts/security-council";
 
 export async function loader(args: LoaderFunctionArgs) {
   const { id: proposalId } = extractFromParams(
@@ -38,20 +42,22 @@ export async function loader(args: LoaderFunctionArgs) {
     notFound()
   );
 
-  const boardAddress = await emergencyBoardAddress();
-
   const proposal = await getEmergencyProposalByExternalId(proposalId);
-
   if (proposal === undefined) {
     throw notFound();
   }
 
-  const calls = await getEmergencyProposalCallsByProposalId(proposal.id);
-
-  const signatures = await getSignaturesByEmergencyProposalId(proposal.externalId);
+  const emergencyBoard = await emergencyUpgradeBoardAddress();
+  const [zkFoundation, allGuardians, allSecurityCouncil, calls, signatures] = await Promise.all([
+    zkFoundationAddress(emergencyBoard),
+    withGuardiansAddress(guardianMembers),
+    withSecurityCouncilAddress(securityCouncilMembers),
+    getEmergencyProposalCallsByProposalId(proposal.id),
+    getSignaturesByEmergencyProposalId(proposal.externalId),
+  ]);
 
   return json({
-    calls: calls,
+    calls,
     proposal: {
       title: proposal?.title,
       externalId: proposal.externalId,
@@ -60,12 +66,12 @@ export async function loader(args: LoaderFunctionArgs) {
       status: proposal.status,
     },
     addresses: {
-      emergencyBoard: boardAddress,
-      zkFoundation: await zkFoundationAddress(),
+      emergencyBoard,
+      zkFoundation,
     },
     signatures,
-    allGuardians: await guardianMembers(),
-    allSecurityCouncil: await councilMembers(),
+    allGuardians,
+    allSecurityCouncil,
   });
 }
 

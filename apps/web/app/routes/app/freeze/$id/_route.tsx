@@ -1,12 +1,5 @@
 import { getFreezeProposalById } from "@/.server/db/dto/freeze-proposals";
 import { getSignaturesByFreezeProposalId } from "@/.server/db/dto/signatures";
-import {
-  councilAddress,
-  councilHardFreezeThreshold,
-  councilSetSoftFreezeThresholdThreshold,
-  councilSoftFreezeThreshold,
-  councilUnfreezeThreshold,
-} from "@/.server/service/contracts";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
@@ -29,6 +22,13 @@ import { formError } from "@/utils/action-errors";
 import { SignFreezeButton } from "@/routes/app/freeze/$id/write-transaction/sign-freeze-button";
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
+import {
+  securityCouncilHardFreezeThreshold,
+  securityCouncilSoftFreezeConservativeThreshold,
+  securityCouncilSoftFreezeThreshold,
+  securityCouncilUnfreezeThreshold,
+} from "@/.server/service/ethereum-l1/contracts/security-council";
+import { securityCouncilAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 
 export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const { id } = extractFromParams(remixParams, z.object({ id: z.coerce.number() }), notFound());
@@ -42,24 +42,28 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
     compareHexValues(a.signer, b.signer)
   );
 
+  const securityCouncil = await securityCouncilAddress();
+
   let currentSoftFreezeThreshold: bigint | undefined;
   if (proposal.type === "SET_SOFT_FREEZE_THRESHOLD") {
-    currentSoftFreezeThreshold = await councilSoftFreezeThreshold();
+    currentSoftFreezeThreshold = await securityCouncilSoftFreezeThreshold(securityCouncil);
   }
 
   let necessarySignatures: number;
   switch (proposal.type) {
     case "SOFT_FREEZE":
-      necessarySignatures = Number(await councilSoftFreezeThreshold());
+      necessarySignatures = Number(await securityCouncilSoftFreezeThreshold(securityCouncil));
       break;
     case "HARD_FREEZE":
-      necessarySignatures = Number(await councilHardFreezeThreshold());
+      necessarySignatures = Number(await securityCouncilHardFreezeThreshold(securityCouncil));
       break;
     case "SET_SOFT_FREEZE_THRESHOLD":
-      necessarySignatures = Number(await councilSetSoftFreezeThresholdThreshold());
+      necessarySignatures = Number(
+        await securityCouncilSoftFreezeConservativeThreshold(securityCouncil)
+      );
       break;
     case "UNFREEZE":
-      necessarySignatures = Number(await councilUnfreezeThreshold());
+      necessarySignatures = Number(await securityCouncilUnfreezeThreshold(securityCouncil));
       break;
   }
 
@@ -68,7 +72,7 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
     currentSoftFreezeThreshold,
     signatures,
     necessarySignatures,
-    securityCouncilAddress: await councilAddress(),
+    securityCouncilAddress: securityCouncil,
     ethNetwork: env.ETH_NETWORK,
   });
 }
