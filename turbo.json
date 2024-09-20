@@ -10,7 +10,7 @@
       "dependsOn": ["@repo/contracts#build"]
     },
     "web#typecheck": {
-      "dependsOn": ["web#build"]
+      "dependsOn": ["web#build", "@repo/contracts#build"]
     },
     "test": {}
   },
