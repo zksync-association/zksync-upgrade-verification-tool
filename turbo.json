@@ -13,7 +13,7 @@
       "cache": false
     },
     "web#typecheck": {
-      "dependsOn": ["@repo/contracts#build"]
+      "dependsOn": ["@repo/contracts#build", "web#build"]
     },
     "test": {}
   },
