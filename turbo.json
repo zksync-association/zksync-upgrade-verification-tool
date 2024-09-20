@@ -9,8 +9,11 @@
     "@repo/contracts#typecheck": {
       "dependsOn": ["@repo/contracts#build"]
     },
+    "@repo/contracts#build": {
+      "cache": false
+    },
     "web#typecheck": {
-      "dependsOn": ["web#build", "@repo/contracts#build"]
+      "dependsOn": ["@repo/contracts#build"]
     },
     "test": {}
   },
