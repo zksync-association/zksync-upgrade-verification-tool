@@ -1,8 +1,7 @@
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
-import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
-import { getProposalData, getProposalState, nowInSeconds } from "@/.server/service/proposals";
+import { nowInSeconds } from "@/.server/service/proposals";
 import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
@@ -39,6 +38,12 @@ import { ExtendVetoButton } from "@/routes/app/proposals/$id/extend-veto-button"
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
 import { chooseByRole } from "@/common/user-role-schema";
+import {
+  getUpgradeState,
+  getUpgradeStatus,
+  guardiansAddress,
+  securityCouncilAddress,
+} from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromRequest(request);
@@ -56,10 +61,10 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
     const storageChangeReport = await getStorageChangeReport(id);
     const [guardians, council, proposalStatus, signatures, proposalData] = await Promise.all([
       guardiansAddress(),
-      councilAddress(),
-      getProposalState(id),
+      securityCouncilAddress(),
+      getUpgradeState(id),
       getSignaturesByExternalProposalId(id),
-      getProposalData(id),
+      getUpgradeStatus(id),
     ]);
     const upgradeHandler = env.UPGRADE_HANDLER_ADDRESS;
 
@@ -74,7 +79,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
           proposalStatus,
           proposalData.creationTimestamp,
           proposalData.guardiansExtendedLegalVeto,
-          await nowInSeconds(),
+          Number(await nowInSeconds()),
           env.ETH_NETWORK
         ),
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,

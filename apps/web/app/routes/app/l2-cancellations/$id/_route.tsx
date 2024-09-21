@@ -1,7 +1,6 @@
 import { getl2CancellationCallsByProposalId } from "@/.server/db/dto/l2-cancellation-calls";
 import { getL2CancellationById } from "@/.server/db/dto/l2-cancellations";
 import { getSignaturesByL2CancellationId } from "@/.server/db/dto/signatures";
-import { guardiansAddress } from "@/.server/service/contracts";
 import {
   getAndUpdateL2CancellationByExternalId,
   getL2GovernorAddress,
@@ -29,6 +28,7 @@ import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request
 import { SignCancellationButton } from "@/routes/app/l2-cancellations/$id/sign-cancellation-button";
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
+import { guardiansAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 
 export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const { id } = extractFromParams(remixParams, z.object({ id: hexSchema }), notFound());

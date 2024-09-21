@@ -1,5 +1,5 @@
 import { addressSchema } from "@repo/common/schemas";
-import { padHex } from "viem";
+import { padHex, type Hex } from "viem";
 import { z } from "zod";
 
 export const fullEmergencyPropSchema = z.object({
@@ -10,7 +10,8 @@ export const fullEmergencyPropSchema = z.object({
     .refine((value) => value.length === 66, {
       message: "Salt must be a 32-byte hex string (64 characters)",
     })
-    .default(padHex("0x0")),
+    .default(padHex("0x0"))
+    .transform((value) => value as Hex),
   proposer: addressSchema,
 });
 

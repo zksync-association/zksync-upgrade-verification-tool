@@ -1,6 +1,6 @@
 import type { signaturesTable } from "@/.server/db/schema";
 import { Button } from "@/components/ui/button";
-import { ALL_ABIS } from "@/utils/raw-abis";
+import { guardiansAbi, securityCouncilAbi } from "@/utils/contract-abis";
 import { useNavigate } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
 import type React from "react";
@@ -11,15 +11,12 @@ import { useAccount, useWriteContract } from "wagmi";
 
 type BroadcastTxButtonProps = {
   target: Hex;
-  functionName: ContractFunctionName<
-    typeof ALL_ABIS.council | typeof ALL_ABIS.guardians,
-    "nonpayable"
-  >;
+  functionName: ContractFunctionName<typeof securityCouncilAbi | typeof guardiansAbi, "nonpayable">;
   signatures: InferSelectModel<typeof signaturesTable>[];
   threshold: number;
   proposalId: Hex;
   disabled?: boolean;
-  abiName: keyof Pick<typeof ALL_ABIS, "guardians" | "council">;
+  abiName: "guardians" | "council";
   children?: React.ReactNode;
 };
 
@@ -52,7 +49,7 @@ export default function ContractWriteButton({
         account: address,
         address: target,
         functionName,
-        abi: ALL_ABIS[abiName],
+        abi: abiName === "guardians" ? guardiansAbi : securityCouncilAbi,
         args: [proposalId, signatures.map((s) => s.signer), signatures.map((s) => s.signature)],
       },
       {

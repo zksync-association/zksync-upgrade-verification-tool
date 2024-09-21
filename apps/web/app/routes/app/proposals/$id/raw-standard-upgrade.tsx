@@ -1,10 +1,10 @@
 import { UpgradeRawData } from "@/components/upgrade-raw-data";
-import { ALL_ABIS } from "@/utils/raw-abis";
+import { upgradeHandlerAbi } from "@/utils/contract-abis";
 import { type Hex, decodeAbiParameters, getAbiItem, numberToHex } from "viem";
 
 export function RawStandardUpgrade(props: { encoded: Hex }) {
   const abiItem = getAbiItem({
-    abi: ALL_ABIS.handler,
+    abi: upgradeHandlerAbi,
     name: "execute",
   });
 
