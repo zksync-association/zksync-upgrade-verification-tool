@@ -1,30 +1,64 @@
 services:
-  hh-node:
+  l1-node:
     platform: linux/amd64
     image: upgrade-checker:local
-    command:  sh -c "cd .. && cd .. && cd packages && cd contracts && pnpm hardhat node"
+    working_dir: /app/packages/contracts
+    command: sh -c "pnpm run node"
     ports:
       - "8545:8545"
     env_file:
       - .env
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'hardhat node' || exit 1"]
+      test: ["CMD-SHELL", "node", "ping-network.js", "http://localhost:8545"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+
+  l2-node:
+    platform: linux/amd64
+    image: upgrade-checker:local
+    working_dir: /app/packages/contracts
+    command: sh -c "pnpm run node-l2"
+    ports:
+      - "8011:8011"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "node", "ping-network.js", "http://localhost:8011"]
       interval: 1s
       timeout: 5s
       retries: 5
       start_period: 2s
 
-  hh-deploy:
+  l1-deploy:
     platform: linux/amd64
     image: upgrade-checker:local
-    command: sh -c "cd .. && cd .. && cd packages && cd contracts && pnpm deploy:setup:remote"
+    working_dir: /app/packages/contracts
+    command: sh -c "pnpm deploy:setup:remote"
     env_file:
       - .env
     environment:
-      L1_RPC_URL: http://hh-node:8545
+      L1_RPC_URL: http://l1-node:8545
     depends_on:
-      hh-node:
+      l1-node:
         condition: service_healthy
+
+  l2-deploy:
+    platform: linux/amd64
+    image: upgrade-checker:local
+    working_dir: /app/packages/contracts
+    command: sh -c "pnpm deploy:setup:l2"
+    env_file:
+      - .env
+    environment:
+      L1_RPC_URL: http://l1-node:8545
+      L2_RPC_URL: http://l2-node:8011
+#    depends_on:
+#      l1-node:
+#        condition: service_healthy
+#      l2-node:
+#        condition: service_healthy
 
   db:
     image: postgres:14
@@ -58,13 +92,15 @@ services:
       - ../../apps/web/.env
     environment:
       DATABASE_URL: postgresql://user:password@db:5432/webapp
-      L1_RPC_URL: http://hh-node:8545
-      L2_RPC_URL: http://hh-node:8545
+      L1_RPC_URL: http://l1-node:8545
+      L2_RPC_URL: http://l1-node:8545
       NODE_ENV: production
     ports:
       - "3000:3000"
     depends_on:
-      hh-deploy:
+      l1-deploy:
+        condition: service_completed_successfully
+      l2-deploy:
         condition: service_completed_successfully
       db:
         condition: service_healthy

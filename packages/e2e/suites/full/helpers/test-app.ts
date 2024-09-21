@@ -29,6 +29,8 @@ export class TestApp {
   readonly backupNodeUrl = `http://localhost:${this.backupNodePort}`;
   readonly mainNodePort = 8561;
   readonly mainNodeUrl = `http://localhost:${this.mainNodePort}`;
+  readonly l2NodePort = 8570;
+  readonly l2NodeUrl = `http://localhost:${this.l2NodePort}`;
 
   readonly walletMnemonic =
     "draw drastic exercise toilet stove bone grit clutch any stand phone ten";
@@ -41,6 +43,7 @@ export class TestApp {
     app: path.join(LOGS_DIR, "app.log"),
     backupNode: path.join(LOGS_DIR, "backup-node.log"),
     mainNode: path.join(LOGS_DIR, "main-node.log"),
+    l2Node: path.join(LOGS_DIR, "l2-node.log"),
   };
 
   constructor() {
@@ -51,22 +54,25 @@ export class TestApp {
   async up() {
     const spinner = ora().start();
 
-    spinner.start("Building app");
-    await this.buildApp();
+    // spinner.start("Building app");
+    // await this.buildApp();
 
-    spinner.start("Setting up database");
-    await this.setupDb();
+    // spinner.start("Setting up database");
+    // await this.setupDb();
+    //
+    // spinner.start("Starting backup node");
+    // const backupNode = await this.startBackupNode();
+    //
+    // spinner.start("Starting main node");
+    // const mainNode = await this.startMainHardhatNode();
+    //
+    spinner.start("Starting l2 node");
+    const l2Node = await this.startL2Node();
 
-    spinner.start("Starting backup node");
-    const backupNode = await this.startBackupNode();
+    // spinner.start("Starting app");
+    // const app = await this.startApp();
 
-    spinner.start("Starting main node");
-    const mainNode = await this.startMainHardhatNode();
-
-    spinner.start("Starting app");
-    const app = await this.startApp();
-
-    await this.savePids({ backupNode, mainNode, app });
+    // await this.savePids({ backupNode, mainNode, app, l2Node });
 
     spinner.succeed("Test app started");
   }
@@ -227,6 +233,30 @@ export class TestApp {
     return pid;
   }
 
+  private async startL2Node() {
+    const pid = spawnBackground(
+      `pnpm hardhat --config hardhat-l2.config.cts node-zksync --port ${this.l2NodePort}`,
+      {
+        cwd: this.contractsDir,
+        env: {
+          L1_RPC_URL: this.mainNodeUrl,
+          L2_RPC_URL: this.l2NodeUrl
+        },
+        outputFile: this.logPaths.l2Node,
+      }
+    );
+    await this.waitForHardhatNode(this.l2NodeUrl);
+    const res = await exec("pnpm deploy:setup:l2", {
+      cwd: this.contractsDir,
+      env: {
+        ...process.env,
+        L1_RPC_URL: this.backupNodeUrl,
+        L2_RPC_RL: this.l2NodeUrl,
+      },
+    });
+    return pid;
+  }
+
   private async startApp({ env }: { env?: Record<string, string> } = {}) {
     const pid = spawnBackground("pnpm start", {
       cwd: this.webDir,
@@ -349,12 +379,14 @@ export class TestApp {
     app,
     backupNode,
     mainNode,
+    l2Node
   }: {
     app: number;
     backupNode: number;
     mainNode: number;
+    l2Node: number;
   }) {
-    return fs.writeFile(PIDS_FILE, JSON.stringify({ app, backupNode, mainNode }, null, 2));
+    return fs.writeFile(PIDS_FILE, JSON.stringify({ app, backupNode, mainNode, l2Node }, null, 2));
   }
 
   private async getPids() {
@@ -364,6 +396,7 @@ export class TestApp {
         app: z.number(),
         backupNode: z.number(),
         mainNode: z.number(),
+        l2Node: z.number()
       })
       .parse(pids);
   }

@@ -44,7 +44,7 @@ const config: HardhatUserConfig = {
   networks: {
     local: {
       url: process.env.L2_RPC_URL || "http://localhost:8011",
-      ethNetwork: "http://localhost:8545",
+      ethNetwork: process.env.L1_RPC_URL || "http://localhost:8545",
       zksync: true,
     },
     hardhat: {
