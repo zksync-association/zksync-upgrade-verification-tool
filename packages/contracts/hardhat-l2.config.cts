@@ -37,10 +37,7 @@ const config: HardhatUserConfig = {
   solidity: "0.8.24",
   zksolc: { version: "latest" },
   paths: {
-    sources: "src",
-    cache: "cache",
-    artifacts: "artifacts",
-    tests: "tests",
+    sources: "src"
   },
   networks: {
     local: {

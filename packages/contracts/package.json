@@ -5,14 +5,18 @@
   "type": "module",
   "exports": {
     "./helpers/*": "./helpers/*.ts",
-    "./artifacts/ProtocolUpgradeHandler/*": "./artifacts/src/zk-gov-preprocessed/l1-contracts/src/ProtocolUpgradeHandler.sol/*",
-    "./artifacts/EmergencyUpgradeBoard/*": "./artifacts/src/zk-gov-preprocessed/l1-contracts/src/EmergencyUpgradeBoard.sol/*",
-    "./artifacts/Guardians/*": "./artifacts/src/zk-gov-preprocessed/l1-contracts/src/Guardians.sol/*",
-    "./artifacts/SecurityCouncil/*": "./artifacts/src/zk-gov-preprocessed/l1-contracts/src/SecurityCouncil.sol/*",
-    "./artifacts/ZkGovOpsGovernor/*": "./artifacts/src/zk-gov-preprocessed/l2-contracts/src/ZkGovOpsGovernor.sol/*"
+    "./artifacts/ProtocolUpgradeHandler/*": "./artifacts/src/zk-gov/l1-contracts/src/ProtocolUpgradeHandler.sol/*",
+    "./artifacts/EmergencyUpgradeBoard/*": "./artifacts/src/zk-gov/l1-contracts/src/EmergencyUpgradeBoard.sol/*",
+    "./artifacts/Guardians/*": "./artifacts/src/zk-gov/l1-contracts/src/Guardians.sol/*",
+    "./artifacts/SecurityCouncil/*": "./artifacts/src/zk-gov/l1-contracts/src/SecurityCouncil.sol/*",
+    "./artifacts/ZkGovOpsGovernor/*": "./artifacts/src/zk-gov-preprocessed/l2-contracts/src/ZkGovOpsGovernor.sol/*",
+    "./artifacts/ZkTokenGovernor/*": "./artifacts/src/zk-gov-preprocessed/l2-contracts/src/ZkTokenGovernor.sol/*",
+    "./artifacts/ZkProtocolGovernor/*": "./artifacts/src/zk-gov-preprocessed/l2-contracts/src/ZkProtocolGovernor.sol/*"
   },
   "scripts": {
-    "build": "hardhat compile",
+    "build:l1": "hardhat compile",
+    "build:l2": "pnpm hardhat compile --config hardhat-l2.config.cts",
+    "build": "run-p build:l1 build:l2",
     "preprocess:zk-gov": "NODE_OPTIONS='--experimental-loader ts-node/esm/transpile-only --no-warnings=ExperimentalWarning' node scripts/preprocess-zk-gov.ts",
     "typecheck": "tsc --noEmit",
     "node": "hardhat node",
@@ -42,6 +46,7 @@
     "dotenv": "^16.4.5",
     "glob": "^11.0.0",
     "hardhat": "^2.22.6",
+    "npm-run-all": "^4.1.5",
     "ora": "^8.0.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4",
