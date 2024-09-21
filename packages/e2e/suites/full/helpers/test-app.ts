@@ -246,7 +246,7 @@ export class TestApp {
       }
     );
     await this.waitForHardhatNode(this.l2NodeUrl);
-    const res = await exec("pnpm deploy:setup:l2", {
+    await exec("pnpm deploy:setup:l2", {
       cwd: this.contractsDir,
       env: {
         ...process.env,
