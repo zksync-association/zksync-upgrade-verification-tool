@@ -374,6 +374,9 @@ importers:
       '@matterlabs/hardhat-zksync-deploy':
         specifier: ^1.5.0
         version: 1.5.0(ethers@6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10))(hardhat@2.22.9(bufferutil@4.0.8)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10))(zksync-ethers@6.12.1(ethers@6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10)))
+      '@matterlabs/hardhat-zksync-ethers':
+        specifier: ^1.2.1
+        version: 1.2.1(bufferutil@4.0.8)(ethers@6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10))(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10)(zksync-ethers@6.12.1(ethers@6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10)))
       '@matterlabs/hardhat-zksync-node':
         specifier: ^1.1.1
         version: 1.1.1(hardhat@2.22.9(bufferutil@4.0.8)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10))
@@ -413,9 +416,6 @@ importers:
       dotenv:
         specifier: ^16.4.5
         version: 16.4.5
-      ethers:
-        specifier: ^6.13.2
-        version: 6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10)
       glob:
         specifier: ^11.0.0
         version: 11.0.0
@@ -2235,6 +2235,12 @@ packages:
       hardhat: ^2.22.5
       zksync-ethers: ^6.8.0
 
+  '@matterlabs/hardhat-zksync-ethers@1.2.1':
+    resolution: {integrity: sha512-J/ZpGx2Ig9AUxsKbE4IqpQ6hetqO7RPRFaSrdIcEWzurSYWb40Ih/HkQD03f5cSAjzhQEKaNlyVofefqLGkdZg==}
+    peerDependencies:
+      ethers: ^6.12.2
+      zksync-ethers: ^6.11.2
+
   '@matterlabs/hardhat-zksync-node@1.1.1':
     resolution: {integrity: sha512-cDN4PbntNRAu9CRCwWY1qNxA7Nsr5lLGC2MT80p/h7/FR9AT4USUgnRCeYsgNOKwa6c9mRNwD/CxJhgreYrUbA==}
     peerDependencies:
@@ -2466,6 +2472,12 @@ packages:
     peerDependenciesMeta:
       c-kzg:
         optional: true
+
+  '@nomicfoundation/hardhat-ethers@3.0.8':
+    resolution: {integrity: sha512-zhOZ4hdRORls31DTOqg+GmEZM0ujly8GGIuRY7t7szEk2zW/arY1qDug/py8AEktT00v5K+b6RvbVog+va51IA==}
+    peerDependencies:
+      ethers: ^6.1.0
+      hardhat: ^2.0.0
 
   '@nomicfoundation/hardhat-viem@2.0.3':
     resolution: {integrity: sha512-y2eYaHtpshiGrhU2L5My4zYrj/vxxRdCIqbTsg9YP7AjKWhJGvKPkVRYaPTosW68nYlNtkns/+Eb25aXACHd9Q==}
@@ -10886,6 +10898,25 @@ snapshots:
       - encoding
       - supports-color
 
+  '@matterlabs/hardhat-zksync-ethers@1.2.1(bufferutil@4.0.8)(ethers@6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10))(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10)(zksync-ethers@6.12.1(ethers@6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10)))':
+    dependencies:
+      '@matterlabs/hardhat-zksync-deploy': 1.5.0(ethers@6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10))(hardhat@2.22.9(bufferutil@4.0.8)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10))(zksync-ethers@6.12.1(ethers@6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10)))
+      '@matterlabs/hardhat-zksync-solc': 1.2.4(hardhat@2.22.9(bufferutil@4.0.8)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10))
+      '@nomicfoundation/hardhat-ethers': 3.0.8(ethers@6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10))(hardhat@2.22.9(bufferutil@4.0.8)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10))
+      chai: 4.5.0
+      chalk: 4.1.2
+      ethers: 6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10)
+      hardhat: 2.22.9(bufferutil@4.0.8)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10)
+      zksync-ethers: 6.12.1(ethers@6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10))
+    transitivePeerDependencies:
+      - bufferutil
+      - c-kzg
+      - encoding
+      - supports-color
+      - ts-node
+      - typescript
+      - utf-8-validate
+
   '@matterlabs/hardhat-zksync-node@1.1.1(hardhat@2.22.9(bufferutil@4.0.8)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10))':
     dependencies:
       '@matterlabs/hardhat-zksync-solc': 1.2.4(hardhat@2.22.9(bufferutil@4.0.8)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10))
@@ -11251,6 +11282,15 @@ snapshots:
     dependencies:
       '@nomicfoundation/ethereumjs-rlp': 5.0.4
       ethereum-cryptography: 0.1.3
+
+  '@nomicfoundation/hardhat-ethers@3.0.8(ethers@6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10))(hardhat@2.22.9(bufferutil@4.0.8)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10))':
+    dependencies:
+      debug: 4.3.6(supports-color@8.1.1)
+      ethers: 6.13.2(bufferutil@4.0.8)(utf-8-validate@5.0.10)
+      hardhat: 2.22.9(bufferutil@4.0.8)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10)
+      lodash.isequal: 4.5.0
+    transitivePeerDependencies:
+      - supports-color
 
   '@nomicfoundation/hardhat-viem@2.0.3(hardhat@2.22.9(bufferutil@4.0.8)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10))(typescript@5.5.4)(viem@2.17.5(bufferutil@4.0.8)(typescript@5.5.4)(utf-8-validate@5.0.10)(zod@3.23.8))(zod@3.23.8)':
     dependencies:

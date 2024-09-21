@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^1.5.0",
+    "@matterlabs/hardhat-zksync-ethers": "^1.2.1",
     "@matterlabs/hardhat-zksync-node": "^1.1.1",
     "@matterlabs/hardhat-zksync-solc": "^1.2.4",
     "@nomicfoundation/hardhat-viem": "2.0.3",
@@ -40,7 +41,6 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4",
     "viem": "2.17.5",
-    "zksync-ethers": "^6.12.1",
-    "ethers": "^6.13.2"
+    "zksync-ethers": "^6.12.1"
   }
 }

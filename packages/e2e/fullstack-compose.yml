@@ -54,11 +54,11 @@ services:
     environment:
       L1_RPC_URL: http://l1-node:8545
       L2_RPC_URL: http://l2-node:8011
-#    depends_on:
-#      l1-node:
-#        condition: service_healthy
-#      l2-node:
-#        condition: service_healthy
+    depends_on:
+      l1-node:
+        condition: service_healthy
+      l2-node:
+        condition: service_healthy
 
   db:
     image: postgres:14

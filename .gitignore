@@ -66,6 +66,7 @@ vite.config.ts.*
 # Hardhat
 **/.hardhat*
 **/addresses.txt
+**/addresses-l2.txt
 **/test-results/
 
 # Turborepo

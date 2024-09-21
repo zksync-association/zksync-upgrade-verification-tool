@@ -11,7 +11,6 @@ export function spawnBackground(
 ) {
   let fileStream: number | undefined;
 
-  console.log(outputFile)
   if (outputFile) {
     const outputDir = path.dirname(outputFile);
     fs.mkdirSync(outputDir, { recursive: true });

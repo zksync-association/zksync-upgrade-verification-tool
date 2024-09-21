@@ -54,25 +54,25 @@ export class TestApp {
   async up() {
     const spinner = ora().start();
 
-    // spinner.start("Building app");
-    // await this.buildApp();
+    spinner.start("Building app");
+    await this.buildApp();
 
-    // spinner.start("Setting up database");
-    // await this.setupDb();
-    //
-    // spinner.start("Starting backup node");
-    // const backupNode = await this.startBackupNode();
-    //
-    // spinner.start("Starting main node");
-    // const mainNode = await this.startMainHardhatNode();
-    //
+    spinner.start("Setting up database");
+    await this.setupDb();
+
+    spinner.start("Starting backup node");
+    const backupNode = await this.startBackupNode();
+
+    spinner.start("Starting main node");
+    const mainNode = await this.startMainHardhatNode();
+
     spinner.start("Starting l2 node");
     const l2Node = await this.startL2Node();
 
-    // spinner.start("Starting app");
-    // const app = await this.startApp();
+    spinner.start("Starting app");
+    const app = await this.startApp();
 
-    // await this.savePids({ backupNode, mainNode, app, l2Node });
+    await this.savePids({ backupNode, mainNode, app, l2Node });
 
     spinner.succeed("Test app started");
   }
@@ -240,7 +240,7 @@ export class TestApp {
         cwd: this.contractsDir,
         env: {
           L1_RPC_URL: this.mainNodeUrl,
-          L2_RPC_URL: this.l2NodeUrl
+          L2_RPC_URL: this.l2NodeUrl,
         },
         outputFile: this.logPaths.l2Node,
       }
@@ -379,7 +379,7 @@ export class TestApp {
     app,
     backupNode,
     mainNode,
-    l2Node
+    l2Node,
   }: {
     app: number;
     backupNode: number;
@@ -396,7 +396,7 @@ export class TestApp {
         app: z.number(),
         backupNode: z.number(),
         mainNode: z.number(),
-        l2Node: z.number()
+        l2Node: z.number(),
       })
       .parse(pids);
   }
