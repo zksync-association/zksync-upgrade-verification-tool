@@ -82,13 +82,24 @@ export class TestApp {
     const pids = await this.getPids();
 
     spinner.start("Stopping app");
-    await killProcessByPid(pids.app);
+    await killProcessByPid(pids.app).catch(() =>
+      console.log(`error stopping app, pid=${pids.app}`)
+    );
 
     spinner.start("Stopping backup node");
-    await killProcessByPid(pids.backupNode);
+    await killProcessByPid(pids.backupNode).catch(() =>
+      console.log(`error stopping backup node, pid=${pids.backupNode}`)
+    );
 
     spinner.start("Stopping main node");
-    await killProcessByPid(pids.mainNode);
+    await killProcessByPid(pids.mainNode).catch(() =>
+      console.log(`error stopping main node, pid=${pids.mainNode}`)
+    );
+
+    spinner.start("Stopping l2 node");
+    await killProcessByPid(pids.l2Node).catch(() =>
+      console.log(`error stopping l2 node, pid=${pids.l2Node}`)
+    );
 
     spinner.succeed("Test app stopped");
   }
@@ -251,7 +262,7 @@ export class TestApp {
       env: {
         ...process.env,
         L1_RPC_URL: this.backupNodeUrl,
-        L2_RPC_RL: this.l2NodeUrl,
+        L2_RPC_URL: this.l2NodeUrl,
       },
     });
     return pid;
@@ -265,12 +276,12 @@ export class TestApp {
         DATABASE_URL: this.testDatabaseUrl,
         SERVER_PORT: this.appPort.toString(),
         L1_RPC_URL: this.mainNodeUrl,
-        L2_RPC_URL: this.mainNodeUrl,
+        L2_RPC_URL: this.l2NodeUrl,
         ALLOW_PRIVATE_ACTIONS: "true",
         NODE_ENV: "production",
         UPGRADE_HANDLER_ADDRESS: "0xab3ab5d67ed26ac1935dd790f4f013d222ba5073",
-        ZK_GOV_OPS_GOVERNOR_ADDRESS: "0xb0d4a25cecf5b05279c7ce62db5b26de1dfc3690",
-        ZK_TOKEN_GOVERNOR_ADDRESS: "0x68c3633a5d1125f7aed0c2c549fa2d0f643f73e8",
+        ZK_GOV_OPS_GOVERNOR_ADDRESS: "0x1011959EE8299b0e9900036D27Ca7EfF0C54DFF6",
+        ZK_TOKEN_GOVERNOR_ADDRESS: "0x775f1fbfc46720025ACC2FFE652e578de642e6a2",
         ETH_NETWORK: "local",
         LOCAL_CHAIN_PORT: this.mainNodePort.toString(),
         ...env,

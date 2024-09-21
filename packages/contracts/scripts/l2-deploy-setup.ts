@@ -1,5 +1,5 @@
 import hre from "hardhat";
-import { keccak256, zeroAddress } from "viem";
+import { type Address, type Hex, keccak256, zeroAddress } from "viem";
 import { type Contract, Provider, type Wallet } from "zksync-ethers";
 import type { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
@@ -66,57 +66,76 @@ async function deployTimelockContract(deployer: SimpleDeployer, zkWallet: Wallet
   return timeLockContract;
 }
 
+type ProposalData = {
+  addresses: Address[];
+  values: bigint[];
+  datas: Hex[];
+};
+
+async function deployGovernor(
+  deployer: SimpleDeployer,
+  tokenContract: Contract,
+  contractName: string,
+  proposal: ProposalData
+) {
+  const artifact = await deployer.loadArtifact(contractName);
+  const deployedContract = await deployer.deploy(artifact, [
+    {
+      name: contractName,
+      token: await tokenContract.getAddress(),
+      timelock: zeroAddress,
+      initialVotingDelay: 0,
+      initialVotingPeriod: 1000000000,
+      initialProposalThreshold: 0,
+      initialQuorum: 0,
+      initialVoteExtension: 0,
+      vetoGuardian: zeroAddress,
+      proposeGuardian: zeroAddress,
+      isProposeGuarded: false,
+    },
+  ]);
+
+  // Create a dummy token governor proposal. This is used to have realistic data in the webapp.
+  const proposalName = `Test ${contractName} proposal`;
+  const proposeTx = await deployedContract
+    .getFunction("propose")
+    .send(proposal.addresses, proposal.values, proposal.datas, proposalName);
+  await proposeTx.wait();
+
+  const proposalId = await deployedContract
+    .getFunction("hashProposal")
+    .staticCall(
+      proposal.addresses,
+      proposal.values,
+      proposal.datas,
+      keccak256(Buffer.from(proposalName))
+    );
+
+  await deployedContract.getFunction("castVote").send(proposalId, 1n);
+
+  const state = await deployedContract.getFunction("state").staticCall(proposalId);
+  console.log(state);
+
+  return deployedContract;
+}
+
 async function deployTokenGovernor(
   deployer: SimpleDeployer,
   tokenContract: Contract
 ): Promise<Contract> {
-  const tokenGovArtifact = await deployer.loadArtifact("ZkTokenGovernor");
-  const tokenGovContract = await deployer.deploy(tokenGovArtifact, [
-    {
-      name: "ZkTokenGovernor",
-      token: await tokenContract.getAddress(),
-      timelock: zeroAddress,
-      initialVotingDelay: 0,
-      initialVotingPeriod: 100000,
-      initialProposalThreshold: 0,
-      initialQuorum: 0,
-      initialVoteExtension: 0,
-      vetoGuardian: zeroAddress,
-      proposeGuardian: zeroAddress,
-      isProposeGuarded: false,
-    },
-  ]);
-  // Create a dummy token governor proposal. This is used to have realistic data in the webapp.
-  const tokenGovProposalTx = await tokenGovContract
-    .getFunction("propose")
-    .send([zeroAddress], [0n], ["0x"], "Test Token proposal");
-  await tokenGovProposalTx.wait();
-  return tokenGovContract;
+  return deployGovernor(deployer, tokenContract, "ZkTokenGovernor", {
+    addresses: [zeroAddress],
+    values: [0n],
+    datas: ["0x"],
+  });
 }
 
 async function deployGovOpsGovernor(deployer: SimpleDeployer, tokenContract: Contract) {
-  const govOpsGovArtifact = await deployer.loadArtifact("ZkGovOpsGovernor");
-  const govOpsGovContract = await deployer.deploy(govOpsGovArtifact, [
-    {
-      name: "ZkGovOpsGovernor",
-      token: await tokenContract.getAddress(),
-      timelock: zeroAddress,
-      initialVotingDelay: 0,
-      initialVotingPeriod: 100000,
-      initialProposalThreshold: 0,
-      initialQuorum: 0,
-      initialVoteExtension: 0,
-      vetoGuardian: zeroAddress,
-      proposeGuardian: zeroAddress,
-      isProposeGuarded: false,
-    },
-  ]);
-  // Create a dummy token gov ops proposal. This is used to have realistic data in the webapp.
-  const govopsProposalTx = await govOpsGovContract
-    .getFunction("propose")
-    .send([zeroAddress, zeroAddress], [0n, 0n], ["0x", "0x"], "Test GovOps proposal");
-  await govopsProposalTx.wait();
-  return govOpsGovContract;
+  return deployGovernor(deployer, tokenContract, "ZkGovOpsGovernor", {
+    addresses: [zeroAddress, zeroAddress],
+    values: [0n, 0n],
+    datas: ["0x", "0x"],
+  });
 }
 
 async function deployAndPrepareProtocolGovernor(
@@ -182,7 +201,6 @@ async function main() {
   );
 
   const text = [
-    `ZkToken: ${await tokenContract.getAddress()}`,
     `ZkToken: ${await tokenContract.getAddress()}`,
     `TimeLock: ${await timeLockContract.getAddress()}`,
     `TokenGovernor: ${await tokenGovContract.getAddress()}`,
