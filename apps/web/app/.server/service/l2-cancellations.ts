@@ -1,28 +1,16 @@
 import {
-  type L2CancellationType,
-  l2CancellationStatusEnum,
-  l2CancellationTypeEnum,
   type l2CancellationsTable,
+  l2CancellationStatusEnum,
+  type L2CancellationType,
+  l2CancellationTypeEnum,
 } from "@/.server/db/schema";
 import { bigIntMax } from "@/utils/bigint";
 import { badRequest, notFound } from "@/utils/http";
-import {
-  type L2_CANCELLATION_STATES,
-  isValidCancellationState,
-} from "@/utils/l2-cancellation-states";
+import { isValidCancellationState, } from "@/utils/l2-cancellation-states";
 import { env } from "@config/env.server";
 import type { InferSelectModel } from "drizzle-orm";
 import { hexSchema } from "@repo/common/schemas";
-import {
-  type Address,
-  type Hex,
-  decodeEventLog,
-  getAbiItem,
-  hexToBigInt,
-  numberToHex,
-  toEventSelector,
-} from "viem";
-import { z } from "zod";
+import { type Address, type Hex, } from "viem";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
 import {
@@ -32,24 +20,9 @@ import {
   getL2Cancellations,
   updateL2Cancellation,
 } from "../db/dto/l2-cancellations";
-import { l2Rpc } from "./ethereum-l2/client";
+import { getLatestBlock } from "./ethereum-l2/client";
 import { getGuardiansL2VetoNonce } from "./ethereum-l1/contracts/guardians";
-import { zkGovOpsGovernorAbi } from "@/utils/contract-abis";
-
-const eventSchema = z.object({
-  eventName: z.string(),
-  args: z.object({
-    proposalId: z.bigint().transform((bn) => numberToHex(bn)),
-    proposer: hexSchema,
-    targets: z.array(hexSchema),
-    values: z.array(z.bigint().transform((bn) => numberToHex(bn))),
-    signatures: z.array(z.string()),
-    calldatas: z.array(hexSchema),
-    voteStart: z.bigint().transform((bn) => numberToHex(bn)),
-    voteEnd: z.bigint().transform((bn) => numberToHex(bn)),
-    description: z.string(),
-  }),
-});
+import { getL2ProposalState, lookForActiveProposals } from "@/.server/service/ethereum-l2/contracts/governors";
 
 function blocksInADay() {
   if (env.ETH_NETWORK === "mainnet" || env.ETH_NETWORK === "local") {
@@ -58,105 +31,9 @@ function blocksInADay() {
   return 24 * (3600 / 20); // 20 seconds per block.
 }
 
-async function getL2ProposalState(address: Hex, proposalId: Hex): Promise<L2_CANCELLATION_STATES> {
-  return l2Rpc.contractRead(address, "state", zkGovOpsGovernorAbi, z.number(), [proposalId]);
-}
-
 async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigint) {
-  const proposalCreatedLogsPromise = l2Rpc
-    .getLogs(getL2GovernorAddress(type), numberToHex(from), "latest", [
-      toEventSelector(
-        getAbiItem({
-          abi: zkGovOpsGovernorAbi,
-          name: "ProposalCreated",
-        })
-      ),
-    ])
-    .then((logs) =>
-      logs.map((log) =>
-        decodeEventLog({
-          abi: zkGovOpsGovernorAbi,
-          eventName: "ProposalCreated",
-          data: log.data,
-          topics: log.topics as any,
-        })
-      )
-    )
-    .then((events) =>
-      events
-        .map((event) => eventSchema.parse(event))
-        .map((parsedEvent) => parsedEvent.args)
-        .map((event) => ({ ...event, type }))
-    );
-  const proposalCanceledPromise = l2Rpc
-    .getLogs(getL2GovernorAddress(type), numberToHex(from), "latest", [
-      toEventSelector(
-        getAbiItem({
-          abi: zkGovOpsGovernorAbi,
-          name: "ProposalCanceled",
-        })
-      ),
-    ])
-    .then((logs) =>
-      logs.map((log) =>
-        decodeEventLog({
-          abi: zkGovOpsGovernorAbi,
-          eventName: "ProposalCanceled",
-          data: log.data,
-          topics: log.topics as any,
-        })
-      )
-    )
-    .then((events) =>
-      events.reduce(
-        (obj, event) => {
-          obj[numberToHex(event.args.proposalId)] = true;
-          return obj;
-        },
-        {} as Record<string, boolean>
-      )
-    );
-
-  const proposalExecutedPromise = l2Rpc
-    .getLogs(getL2GovernorAddress(type), numberToHex(from), "latest", [
-      toEventSelector(
-        getAbiItem({
-          abi: zkGovOpsGovernorAbi,
-          name: "ProposalExecuted",
-        })
-      ),
-    ])
-    .then((logs) =>
-      logs.map((log) =>
-        decodeEventLog({
-          abi: zkGovOpsGovernorAbi,
-          eventName: "ProposalExecuted",
-          data: log.data,
-          topics: log.topics as any,
-        })
-      )
-    )
-    .then((events) =>
-      events.reduce(
-        (obj, event) => {
-          obj[numberToHex(event.args.proposalId)] = true;
-          return obj;
-        },
-        {} as Record<string, boolean>
-      )
-    );
-
-  const [proposalCreatedLogs, proposalCanceled, proposalExecuted] = await Promise.all([
-    proposalCreatedLogsPromise,
-    proposalCanceledPromise,
-    proposalExecutedPromise,
-  ]);
-
-  const activeProposals = proposalCreatedLogs.filter(
-    (proposal) =>
-      proposalCanceled[proposal.proposalId] !== true &&
-      proposalExecuted[proposal.proposalId] !== true
-  );
+  const activeProposals = await lookForActiveProposals(getL2GovernorAddress(type), from)
+    .then(proposals => proposals.map(p => ({ ...p, type }))  )
 
   const states = await Promise.all(
     activeProposals.map((p) => getL2ProposalState(getL2GovernorAddress(p.type), p.proposalId))
@@ -166,9 +43,7 @@ async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigi
 }
 
 export async function getActiveL2Proposals() {
-  const latestBlock = await l2Rpc.getLatestBlock();
-  const currentBlock = hexToBigInt(latestBlock.number);
-
+  const latestBlock = await getLatestBlock();
   // Proposal lifetime is:
   // - 7 days vote delay period
   // - 7 days voting period
@@ -180,7 +55,7 @@ export async function getActiveL2Proposals() {
   // const maxProposalLifetimeInBlocks = BigInt((21 + 7) * 24 * 3600); // conservative estimation of oldest block with a valid proposal
   const maxProposalLifetimeInBlocks = BigInt((21 + 3) * blocksInADay());
 
-  const from = bigIntMax(currentBlock - maxProposalLifetimeInBlocks, 1n);
+  const from = bigIntMax(latestBlock.number - maxProposalLifetimeInBlocks, 1n);
   const govOpsProposals = await fetchProposalsFromL2Governor(
     l2CancellationTypeEnum.enum.ZK_GOV_OPS_GOVERNOR,
     from
