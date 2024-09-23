@@ -29,13 +29,16 @@ export async function queryLogs<A extends Abi, N extends ContractEventName<A>>(
     args: args1
   }).then(logs =>
     logs.map((log) => {
-      const parsed = decodeEventLog({
+      const decoded = decodeEventLog({
         abi,
         eventName,
         data: log.data,
         topics: log.topics,
       });
-      return { parsed, raw: log}
+      return {
+        ...decoded,
+        transactionHash: log.transactionHash
+      }
     })
   );
 }

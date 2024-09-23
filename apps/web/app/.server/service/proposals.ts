@@ -152,16 +152,16 @@ export async function searchNotStartedProposals() {
 
   // Now we need to check if these events have not been already started in l1
   const filtered = []
-  for (const { parsed, raw } of executedInL2) {
-    const stateInL1 = await getUpgradeState(numberToHex(parsed.args.proposalId));
+  for (const { args, transactionHash } of executedInL2) {
+    const stateInL1 = await getUpgradeState(numberToHex(args.proposalId));
     if (stateInL1 === PROPOSAL_STATES.None) {
-      if (!raw.transactionHash) {
+      if (!transactionHash) {
         throw new Error("transactionHash should be present")
       }
 
       filtered.push({
-        proposalId: numberToHex(parsed.args.proposalId),
-        txHash: raw.transactionHash
+        proposalId: numberToHex(args.proposalId),
+        txHash: transactionHash
       });
     }
   }

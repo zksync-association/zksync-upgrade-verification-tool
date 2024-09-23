@@ -33,12 +33,12 @@ const canceledSchema = z.object({
 export async function lookForActiveProposals(address: Address, fromBlock: bigint): Promise<ProposalCreatedEvent[]> {
   const createdPromise = await queryLogs(zkGovOpsGovernorAbi, address, "ProposalCreated", fromBlock)
     .then(logs => logs
-      .map((event) => createdSchema.parse(event.parsed.args))
+      .map((log) => createdSchema.parse(log.args))
     )
 
   const cancelledPromise = await queryLogs(zkGovOpsGovernorAbi, address, "ProposalCanceled", fromBlock)
     .then(logs => logs
-      .map(logs => canceledSchema.parse(logs.parsed))
+      .map(log => canceledSchema.parse(log.args))
       .reduce((acc, curr): Set<Hex> => {
         acc.add(curr.proposalId)
         return acc
@@ -47,7 +47,7 @@ export async function lookForActiveProposals(address: Address, fromBlock: bigint
 
   const executedPromise = await queryLogs(zkGovOpsGovernorAbi, address, "ProposalExecuted", fromBlock)
     .then(logs => logs
-      .map(logs => canceledSchema.parse(logs.parsed))
+      .map(log => canceledSchema.parse(log.args))
       .reduce((acc, curr): Set<Hex> => {
         acc.add(curr.proposalId)
         return acc
