@@ -1,17 +1,9 @@
 import { l2Rpc } from "@/.server/service/ethereum-l2/client";
-import {
-  type AbiItemName,
-  type Address,
-  type ContractEventName,
-  decodeEventLog,
-  getAbiItem,
-  getContract, type Hex, hexToBigInt,
-  numberToHex
-} from "viem";
+import { type Address, getContract, type Hex, hexToBigInt, numberToHex } from "viem";
 import { zkGovOpsGovernorAbi } from "@/utils/contract-abis";
 import { z } from "zod";
 import { hexSchema } from "@repo/common/schemas";
-
+import { queryLogs } from "@/.server/service/server-utils";
 
 const governor = (address: Address) =>
   getContract({
@@ -20,7 +12,7 @@ const governor = (address: Address) =>
     client: l2Rpc,
   });
 
-const createdSchema = z.object({
+export const createdSchema = z.object({
   proposalId: z.bigint().transform((bn) => numberToHex(bn)),
   proposer: hexSchema,
   targets: z.array(hexSchema),
@@ -38,48 +30,24 @@ const canceledSchema = z.object({
 })
 
 
-function queryEvents(
-  address: Address,
-  eventName: ContractEventName<typeof zkGovOpsGovernorAbi>,
-  fromBlock: bigint
-) {
-  const asAbiItemName = eventName as AbiItemName<typeof zkGovOpsGovernorAbi>;
-  return l2Rpc.getLogs({
-    address: address,
-    event: getAbiItem({
-      abi: zkGovOpsGovernorAbi,
-      name: asAbiItemName
-    }),
-    fromBlock,
-    toBlock: "latest"
-  }).then((logs) =>
-    logs.map((log) => decodeEventLog({
-      abi: zkGovOpsGovernorAbi,
-      eventName: eventName,
-      data: log.data,
-      topics: log.topics,
-    }))
-  );
-}
-
 export async function lookForActiveProposals(address: Address, fromBlock: bigint): Promise<ProposalCreatedEvent[]> {
-  const createdPromise = await queryEvents(address, "ProposalCreated", fromBlock)
+  const createdPromise = await queryLogs(zkGovOpsGovernorAbi, address, "ProposalCreated", fromBlock)
     .then(logs => logs
-      .map((event) => createdSchema.parse(event.args))
+      .map((event) => createdSchema.parse(event.parsed.args))
     )
 
-  const cancelledPromise = await queryEvents(address, "ProposalCanceled", fromBlock)
+  const cancelledPromise = await queryLogs(zkGovOpsGovernorAbi, address, "ProposalCanceled", fromBlock)
     .then(logs => logs
-      .map(logs => canceledSchema.parse(logs))
+      .map(logs => canceledSchema.parse(logs.parsed))
       .reduce((acc, curr): Set<Hex> => {
         acc.add(curr.proposalId)
         return acc
       }, new Set<Hex>())
     )
 
-  const executedPromise = await queryEvents(address, "ProposalExecuted", fromBlock)
+  const executedPromise = await queryLogs(zkGovOpsGovernorAbi, address, "ProposalExecuted", fromBlock)
     .then(logs => logs
-      .map(logs => canceledSchema.parse(logs))
+      .map(logs => canceledSchema.parse(logs.parsed))
       .reduce((acc, curr): Set<Hex> => {
         acc.add(curr.proposalId)
         return acc

@@ -26,6 +26,7 @@ export const env = createEnv({
     SKIP_REPORTS: z.coerce.boolean().default(false),
     ZK_GOV_OPS_GOVERNOR_ADDRESS: addressSchema,
     ZK_TOKEN_GOVERNOR_ADDRESS: addressSchema,
+    ZK_PROTOCOL_GOVERNOR_ADDRESS: addressSchema,
     ALLOW_PRIVATE_ACTIONS: boolFromStrSchema,
   },
   runtimeEnv: process.env,

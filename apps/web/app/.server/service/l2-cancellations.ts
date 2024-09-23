@@ -23,13 +23,7 @@ import {
 import { getLatestBlock } from "./ethereum-l2/client";
 import { getGuardiansL2VetoNonce } from "./ethereum-l1/contracts/guardians";
 import { getL2ProposalState, lookForActiveProposals } from "@/.server/service/ethereum-l2/contracts/governors";
-
-function blocksInADay() {
-  if (env.ETH_NETWORK === "mainnet" || env.ETH_NETWORK === "local") {
-    return 24 * 3600; // 24 hours, 1 block per second
-  }
-  return 24 * (3600 / 20); // 20 seconds per block.
-}
+import { blocksInADay } from "@/.server/service/server-utils";
 
 async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigint) {
   const activeProposals = await lookForActiveProposals(getL2GovernorAddress(type), from)

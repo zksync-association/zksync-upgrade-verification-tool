@@ -8,6 +8,8 @@ import securityCouncilArtifact from "@repo/contracts/artifacts/SecurityCouncil/S
 import type { SecurityCouncil$Type } from "@repo/contracts/artifacts/SecurityCouncil/SecurityCouncil.d.ts";
 import zkGovOpsGovernorArtifact from "@repo/contracts/artifacts/ZkGovOpsGovernor/ZkGovOpsGovernor.json";
 import type { ZkGovOpsGovernor$Type } from "@repo/contracts/artifacts/ZkGovOpsGovernor/ZkGovOpsGovernor.d.ts";
+import zkProtocolGovernorArtifact from "@repo/contracts/artifacts/ZkProtocolGovernor/ZkProtocolGovernor.json";
+import type { ZkProtocolGovernor$Type } from "@repo/contracts/artifacts/ZkProtocolGovernor/ZkProtocolGovernor.d.ts";
 
 export const emergencyUpgradeBoardAbi =
   emergencyUpgradeBoardArtifact.abi as EmergencyUpgradeBoard$Type["abi"];
@@ -19,3 +21,5 @@ export const upgradeHandlerAbi = upgradeHandlerArtifact.abi as ProtocolUpgradeHa
 export const securityCouncilAbi = securityCouncilArtifact.abi as SecurityCouncil$Type["abi"];
 
 export const zkGovOpsGovernorAbi = zkGovOpsGovernorArtifact.abi as ZkGovOpsGovernor$Type["abi"];
+
+export const zkProtocolGovernorAbi = zkProtocolGovernorArtifact.abi as ZkProtocolGovernor$Type["abi"];

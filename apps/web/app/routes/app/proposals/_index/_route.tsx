@@ -6,6 +6,7 @@ import { Await, Link, defer, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { Suspense } from "react";
 import { $path } from "remix-routes";
+import { PlusIcon } from "@radix-ui/react-icons";
 
 export function loader() {
   const getFilteredProposals = async () => {
@@ -38,7 +39,14 @@ export default function Index() {
             <>
               <Card className="pb-10">
                 <CardHeader>
-                  <CardTitle>Active Standard Proposals</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Active Standard Proposals</CardTitle>
+                    <a href={$path("/app/proposals/new")}>
+                      <Button data-testid="start-regular-ugprade" variant="secondary" size="icon">
+                        <PlusIcon className="h-4 w-4"/>
+                      </Button>
+                    </a>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col space-y-4">
