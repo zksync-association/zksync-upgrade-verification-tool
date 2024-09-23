@@ -98,7 +98,6 @@ async function extractProposalData(txHash: Hex, proposalId: Hex) {
   const l1MessageEventId = "0x3a36e47291f4201faf137fab081d92295bce2d53be2c6ca68ba82c7faa9ce241";
   const bodyLog = receipt.logs.find(l => l.topics[0] === l1MessageEventId)
   if (!bodyLog) {
-    // TODO: replace with better error
     return {
       proposalId,
       ok: false,
@@ -108,7 +107,6 @@ async function extractProposalData(txHash: Hex, proposalId: Hex) {
   }
 
   if (!logProof) {
-    // TODO: replace with better error
     return {
       proposalId,
       ok: false,
