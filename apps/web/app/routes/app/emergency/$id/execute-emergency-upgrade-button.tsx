@@ -1,7 +1,7 @@
 import type { Call } from "@/common/calls";
 import { emergencyProposalStatusSchema } from "@/common/emergency-proposal-status";
 import { Button } from "@/components/ui/button";
-import { ALL_ABIS } from "@/utils/raw-abis";
+import { emergencyUpgradeBoardAbi } from "@/utils/contract-abis";
 import { type BasicProposal, type BasicSignature, classifySignatures } from "@/utils/signatures";
 import { useFetcher, useNavigate } from "@remix-run/react";
 import type React from "react";
@@ -61,7 +61,7 @@ export function ExecuteEmergencyUpgradeButton({
     toast.loading("Broadcasting transaction...", { id: "exec-emergency-upgrade" });
     writeContract(
       {
-        abi: ALL_ABIS.emergencyBoard,
+        abi: emergencyUpgradeBoardAbi,
         functionName: "executeEmergencyUpgrade",
         args: [
           calls.map((c) => ({ ...c, value: hexToBigInt(c.value) })),

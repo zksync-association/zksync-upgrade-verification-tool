@@ -1,13 +1,6 @@
 import { createFreezeProposal, getAllFreezeProposals } from "@/.server/db/dto/freeze-proposals";
 import { isValidationError } from "@/.server/db/errors";
 import type { freezeProposalsTable } from "@/.server/db/schema";
-import {
-  councilFreezeNonces,
-  councilHardFreezeNonce,
-  councilSoftFreezeNonce,
-  councilSoftFreezeThresholdSettingNonce,
-  councilUnfreezeNonce,
-} from "@/.server/service/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +17,13 @@ import type { Jsonify } from "type-fest";
 import { z } from "zod";
 import { parseFormData } from "@/utils/read-from-request";
 import { type FreezeProposalsType, FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
+import { securityCouncilAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
+import {
+  securityCouncilHardFreezeNonce,
+  securityCouncilSoftFreezeNonce,
+  securityCouncilSoftFreezeThresholdSettingNonce,
+  securityCouncilUnfreezeNonce,
+} from "@/.server/service/ethereum-l1/contracts/security-council";
 
 export async function loader() {
   const proposals = await getAllFreezeProposals();
@@ -33,8 +33,15 @@ export async function loader() {
   const validProposals = proposals.filter((p) => new Date(p.validUntil) > now);
 
   // Filter proposals already executed or ignored
-  const { softFreezeNonce, hardFreezeNonce, softFreezeThresholdSettingNonce, unfreezeNonce } =
-    await councilFreezeNonces();
+  const securityCouncil = await securityCouncilAddress();
+  const [softFreezeNonce, hardFreezeNonce, softFreezeThresholdSettingNonce, unfreezeNonce] =
+    await Promise.all([
+      securityCouncilSoftFreezeNonce(securityCouncil),
+      securityCouncilHardFreezeNonce(securityCouncil),
+      securityCouncilSoftFreezeThresholdSettingNonce(securityCouncil),
+      securityCouncilUnfreezeNonce(securityCouncil),
+    ]);
+
   const validAndActiveProposals = validProposals.filter((p) => {
     switch (p.type) {
       case "SOFT_FREEZE":
@@ -84,21 +91,23 @@ export async function action({ request }: ActionFunctionArgs) {
     return json(formError(parsed.errors));
   }
 
+  const securityCouncil = await securityCouncilAddress();
+
   const data = parsed.data;
 
   let nonce: bigint;
   switch (data.type) {
     case "SOFT_FREEZE":
-      nonce = await councilSoftFreezeNonce();
+      nonce = await securityCouncilSoftFreezeNonce(securityCouncil);
       break;
     case "HARD_FREEZE":
-      nonce = await councilHardFreezeNonce();
+      nonce = await securityCouncilHardFreezeNonce(securityCouncil);
       break;
     case "SET_SOFT_FREEZE_THRESHOLD":
-      nonce = await councilSoftFreezeThresholdSettingNonce();
+      nonce = await securityCouncilSoftFreezeThresholdSettingNonce(securityCouncil);
       break;
     case "UNFREEZE":
-      nonce = await councilUnfreezeNonce();
+      nonce = await securityCouncilUnfreezeNonce(securityCouncil);
       break;
   }
 

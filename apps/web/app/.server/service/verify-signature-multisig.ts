@@ -1,11 +1,11 @@
 import { type AbiFunction, hashTypedData, type Hex, verifyTypedData } from "viem";
 import type { SignAction } from "@/common/sign-action";
-import { l1Rpc } from "@/.server/service/clients";
 import { env } from "@config/env.server";
 import { mainnet, sepolia } from "wagmi/chains";
-import { z } from "zod";
-import { guardiansAbi } from "@/.server/service/contract-abis";
 import { badRequest } from "@/utils/http";
+import { l1Rpc } from "./ethereum-l1/client";
+import guardiansArtifact from "@repo/contracts/artifacts/Guardians/Guardians.json";
+import type { Guardians$Type } from "@repo/contracts/artifacts/Guardians/Guardians.d.ts";
 
 function createTypedDigest({
   verifierAddr,
@@ -51,7 +51,7 @@ export async function assertValidSignatureZkFoundation(
     types,
     contractName,
   });
-  const code = await l1Rpc.getByteCode(foundationAddress);
+  const code = await l1Rpc.getCode({ address: foundationAddress });
 
   if (code === undefined) {
     const isValid = await verifyTypedData({
@@ -76,7 +76,7 @@ export async function assertValidSignatureZkFoundation(
     return;
   }
 
-  const IERC1271Abi: AbiFunction = {
+  const IERC1271Abi = {
     name: "isValidSignature",
     inputs: [
       { name: "hash", type: "bytes32" },
@@ -85,15 +85,14 @@ export async function assertValidSignatureZkFoundation(
     outputs: [{ name: "magicValue", type: "bytes4" }],
     type: "function",
     stateMutability: "view",
-  };
+  } satisfies AbiFunction;
 
-  const isValid = await l1Rpc.contractRead(
-    foundationAddress,
-    "isValidSignature",
-    [IERC1271Abi],
-    z.any(),
-    [digest, signature]
-  );
+  const isValid = await l1Rpc.readContract({
+    abi: [IERC1271Abi],
+    address: foundationAddress,
+    functionName: "isValidSignature",
+    args: [digest, signature],
+  });
   if (!isValid) {
     throw badRequest("Invalid signature");
   }
@@ -128,13 +127,15 @@ export async function verifySignatureMultisig({
     contractName,
   });
 
+  const guardiansAbi = guardiansArtifact.abi as Guardians$Type["abi"];
+
   try {
-    await l1Rpc.contractRead(targetContract, "checkSignatures", guardiansAbi.raw, z.any(), [
-      digest,
-      [signer],
-      [signature],
-      1,
-    ]);
+    await l1Rpc.readContract({
+      address: targetContract,
+      abi: guardiansAbi,
+      functionName: "checkSignatures",
+      args: [digest, [signer], [signature], 1n],
+    });
     return true;
   } catch {
     return false;

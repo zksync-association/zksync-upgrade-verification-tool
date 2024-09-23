@@ -159,6 +159,9 @@ importers:
       '@repo/common':
         specifier: workspace:*
         version: link:../../packages/common
+      '@repo/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@repo/ethereum-reports':
         specifier: workspace:*
         version: link:../../packages/ethereum-reports

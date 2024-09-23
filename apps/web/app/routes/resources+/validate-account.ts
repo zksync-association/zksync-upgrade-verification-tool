@@ -1,5 +1,5 @@
 import { getUserAuthRole } from "@/.server/service/authorized-users";
-import { checkConnection } from "@/.server/service/clients";
+import { checkConnection } from "@/.server/service/ethereum-l1/client";
 import { getUserFromRequest } from "@/utils/auth-headers";
 import { badRequest } from "@/utils/http";
 import { type ActionFunctionArgs, json, redirect } from "@remix-run/node";

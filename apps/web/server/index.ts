@@ -8,7 +8,6 @@ import express, { type RequestHandler, type Request, type Response } from "expre
 import getPort, { portNumbers } from "get-port";
 
 import { testDbConnection } from "@/.server/db";
-import { validateHandlerAddress } from "@/.server/service/clients";
 import { env } from "@config/env.server";
 import { auth } from "@server/middlewares/auth";
 import { cspNonce } from "@server/middlewares/csp-nonce";
@@ -18,6 +17,7 @@ import { logger } from "./middlewares/logger";
 import { rateLimit } from "./middlewares/rate-limit";
 import { removeTrailingSlash } from "./middlewares/remove-trailing-slash";
 import { requireHttps } from "./middlewares/require-https";
+import { validateHandlerAddress } from "@/.server/service/ethereum-l1/client";
 
 installGlobals();
 patchBigintToJSON();

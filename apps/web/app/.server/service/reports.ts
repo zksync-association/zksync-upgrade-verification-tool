@@ -1,6 +1,4 @@
 import { getProposalByExternalId, updateProposal } from "@/.server/db/dto/proposals";
-import { l1Explorer, l1Rpc, l2Explorer } from "@/.server/service/clients";
-import { ALL_ABIS } from "@/utils/raw-abis";
 import { env } from "@config/env.server";
 import { defaultLogger } from "@config/log.server";
 import { type BlockExplorerClient, DIAMOND_ADDRS, type Network } from "@repo/common/ethereum";
@@ -18,6 +16,9 @@ import { StorageChanges } from "@repo/ethereum-reports/storage/storage-changes";
 import { ZkSyncEraDiff } from "@repo/ethereum-reports/zk-sync-era-diff";
 import { ZksyncEraState } from "@repo/ethereum-reports/zksync-era-state";
 import { type Hex, decodeAbiParameters, getAbiItem, hexToBytes } from "viem";
+import { l1Explorer, legacyL1Rpc } from "./ethereum-l1/client-legacy";
+import { l2Explorer } from "./ethereum-l2/client";
+import { upgradeHandlerAbi } from "@/utils/contract-abis";
 
 const network = env.ETH_NETWORK === "local" ? "sepolia" : env.ETH_NETWORK;
 
@@ -27,10 +28,10 @@ async function calculateBeforeAndAfter(
   l2Explorer: BlockExplorerClient,
   calldata: Hex
 ) {
-  const current = await ZksyncEraState.fromBlockchain(network, l1Explorer, l1Rpc);
+  const current = await ZksyncEraState.fromBlockchain(network, l1Explorer, legacyL1Rpc);
 
   const abiItem = getAbiItem({
-    abi: ALL_ABIS.handler,
+    abi: upgradeHandlerAbi,
     name: "execute",
   });
 
@@ -48,7 +49,7 @@ async function calculateBeforeAndAfter(
     Buffer.from(hexToBytes(call.data)),
     network,
     l1Explorer,
-    l1Rpc,
+    legacyL1Rpc,
     l2Explorer
   );
   return { current, proposed, sysAddresses };
@@ -87,7 +88,7 @@ async function calculateStorageChangeReport(
   const diamondAddress = DIAMOND_ADDRS[network];
 
   const abiItem = getAbiItem({
-    abi: ALL_ABIS.handler,
+    abi: upgradeHandlerAbi,
     name: "execute",
   });
   const [upgradeProposal] = decodeAbiParameters([abiItem.inputs[0]], calldata);
@@ -95,7 +96,7 @@ async function calculateStorageChangeReport(
   if (call === undefined) {
     return [];
   }
-  const rawMap = await l1Rpc.debugCallTraceStorage(
+  const rawMap = await legacyL1Rpc.debugCallTraceStorage(
     upgradeProposal.executor,
     call.target,
     call.data
@@ -108,7 +109,7 @@ async function calculateStorageChangeReport(
   const selectors: Hex[] = [];
   const facetAddrs: Hex[] = [];
 
-  const pre = new RpcStorageSnapshot(l1Rpc, diamondAddress);
+  const pre = new RpcStorageSnapshot(legacyL1Rpc, diamondAddress);
   const storageDelta = new RecordStorageSnapshot(contractChanges.storage.unwrapOr({}));
   const post = pre.apply(storageDelta);
 

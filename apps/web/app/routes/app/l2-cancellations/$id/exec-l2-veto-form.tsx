@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { compareHexValues } from "@/utils/compare-hex-values";
-import { ALL_ABIS } from "@/utils/raw-abis";
+import { guardiansAbi } from "@/utils/contract-abis";
 import type { BasicSignature } from "@/utils/signatures";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFetcher } from "@remix-run/react";
@@ -99,7 +99,7 @@ export default function ExecL2VetoForm({
         account: address,
         address: guardiansAddress,
         functionName: "cancelL2GovernorProposal",
-        abi: ALL_ABIS.guardians,
+        abi: guardiansAbi,
         args: [l2Proposal, txRequest, signers, signatureValues],
         value: parseEther(value),
       },

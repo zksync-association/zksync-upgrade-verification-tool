@@ -5,15 +5,15 @@ import {
   getEmergencyProposalByExternalId,
   updateEmergencyProposal,
 } from "@/.server/db/dto/emergency-proposals";
-import { emergencyBoardAddress } from "@/.server/service/authorized-users";
-import { l1Rpc } from "@/.server/service/clients";
 import type { Call } from "@/common/calls";
 import type { FullEmergencyProp } from "@/common/emergency-proposal-schema";
 import { emergencyProposalStatusSchema } from "@/common/emergency-proposal-status";
 import { calculateUpgradeProposalHash } from "@/utils/emergency-proposals";
 import { notFound } from "@/utils/http";
-import { env } from "@config/env.server";
 import { type Hex, hexToBigInt } from "viem";
+import { l1Rpc } from "./ethereum-l1/client";
+import { emergencyUpgradeBoardAddress } from "./ethereum-l1/contracts/protocol-upgrade-handler";
+import { env } from "@config/env.server";
 
 export async function broadcastSuccess(propsalId: Hex) {
   const proposal = await getEmergencyProposalByExternalId(propsalId);
@@ -40,12 +40,12 @@ export async function validateEmergencyProposalCalls(calls: Call[]): Promise<Cal
 
 export async function validateCall(call: Call): Promise<CallValidation> {
   try {
-    await l1Rpc.contractReadRaw(
-      call.target,
-      call.data,
-      env.UPGRADE_HANDLER_ADDRESS,
-      hexToBigInt(call.value)
-    );
+    await l1Rpc.call({
+      to: call.target,
+      data: call.data,
+      value: hexToBigInt(call.value),
+      account: env.UPGRADE_HANDLER_ADDRESS,
+    });
     return { call, isValid: true };
   } catch {
     return { call, isValid: false };
@@ -55,8 +55,8 @@ export async function validateCall(call: Call): Promise<CallValidation> {
 export const saveEmergencyProposal = async (data: FullEmergencyProp, calls: Call[]) => {
   const externalId = calculateUpgradeProposalHash(
     calls,
-    data.salt as Hex,
-    await emergencyBoardAddress()
+    data.salt,
+    await emergencyUpgradeBoardAddress()
   );
 
   const currentDate = new Date();

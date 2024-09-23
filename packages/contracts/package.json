@@ -4,7 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./helpers/*": "./helpers/*.ts"
+    "./helpers/*": "./helpers/*.ts",
+    "./artifacts/ProtocolUpgradeHandler/*": "./artifacts/src/zk-gov-preprocessed/l1-contracts/src/ProtocolUpgradeHandler.sol/*",
+    "./artifacts/EmergencyUpgradeBoard/*": "./artifacts/src/zk-gov-preprocessed/l1-contracts/src/EmergencyUpgradeBoard.sol/*",
+    "./artifacts/Guardians/*": "./artifacts/src/zk-gov-preprocessed/l1-contracts/src/Guardians.sol/*",
+    "./artifacts/SecurityCouncil/*": "./artifacts/src/zk-gov-preprocessed/l1-contracts/src/SecurityCouncil.sol/*",
+    "./artifacts/ZkGovOpsGovernor/*": "./artifacts/src/zk-gov-preprocessed/l2-contracts/src/ZkGovOpsGovernor.sol/*"
   },
   "scripts": {
     "build": "hardhat compile",

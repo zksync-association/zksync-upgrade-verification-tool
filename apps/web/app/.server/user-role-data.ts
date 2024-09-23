@@ -1,13 +1,16 @@
-import { councilAddress, guardiansAddress } from "@/.server/service/authorized-users";
 import type { Hex } from "viem";
 import { type UserRole, UserRoleEnum } from "@/common/user-role-schema";
+import {
+  guardiansAddress,
+  securityCouncilAddress,
+} from "./service/ethereum-l1/contracts/protocol-upgrade-handler";
 
 const USER_ROLE_DATA = {
   [UserRoleEnum.enum.guardian]: {
     multisigContractForRole: guardiansAddress,
   },
   [UserRoleEnum.enum.securityCouncil]: {
-    multisigContractForRole: councilAddress,
+    multisigContractForRole: securityCouncilAddress,
   },
   [UserRoleEnum.enum.zkFoundation]: {
     multisigContractForRole: () => {
