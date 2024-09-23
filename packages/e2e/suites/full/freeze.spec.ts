@@ -150,7 +150,7 @@ test("TC303, TC304: click on create soft freeze button displays correct form.", 
 
   await page.getByTestId("soft-create-btn").click();
 
-  await expect(page.getByText("Create Soft Freeze Proposal")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create Soft Freeze Proposal" })).toBeVisible();
   await expect(page.getByText("Valid Until")).toBeVisible();
   await expect(page.getByRole("button", { name: "Create" })).toBeEnabled();
 
@@ -239,7 +239,7 @@ test("TC306, TC307: create hard freeze popup is correct and works", async ({ pag
 
   await page.getByTestId("hard-create-btn").click();
 
-  await expect(page.getByText("Create Hard Freeze Proposal")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create Hard Freeze Proposal" })).toBeVisible();
   await expect(page.getByText("Valid Until")).toBeVisible();
   await expect(page.getByRole("button", { name: "Create" })).toBeEnabled();
 
@@ -329,7 +329,7 @@ test("TC338, TC339: click create unfreze -> right data -> creates correct unfree
 
   await page.getByTestId("unfreeze-create-btn").click();
 
-  await expect(page.getByText("Create Unfreeze Proposal")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create Unfreeze Proposal" })).toBeVisible();
   await expect(page.getByText("Valid Until")).toBeVisible();
   await expect(page.getByRole("button", { name: "Create" })).toBeEnabled();
 

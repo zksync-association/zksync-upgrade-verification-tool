@@ -17,12 +17,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getFormDataOrThrow } from "@/utils/read-from-request";
+import { formError } from "@/utils/action-errors";
+import { zodStringToBigIntPipe, zodStringToNumberPipe } from "@/utils/form-number-schema";
+import { getFormData } from "@/utils/read-from-request";
 import { type ActionFunctionArgs, defer, redirect } from "@remix-run/node";
-import { Await, useLoaderData, useNavigation } from "@remix-run/react";
+import { Await, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { Form } from "@remix-run/react";
 import { addressSchema, hexSchema } from "@repo/common/schemas";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { $path } from "remix-routes";
 import { numberToHex } from "viem";
 import { useAccount } from "wagmi";
@@ -40,15 +42,44 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  const data = await getFormData(request, {
+    proposalId: hexSchema,
+    l2GasLimit: zodStringToBigIntPipe(
+      z
+        .bigint({
+          message: "L2 gas limit is required",
+        })
+        .min(1n, "L2 gas limit must be greater than 0")
+    ),
+    l2GasPerPubdataByteLimit: zodStringToBigIntPipe(
+      z
+        .bigint({
+          message: "L2 gas per pubdata byte limit is required",
+        })
+        .min(1n, "L2 gas per pubdata byte limit must be greater than 0")
+    ),
+    refundRecipient: addressSchema,
+    txMintValue: zodStringToBigIntPipe(
+      z
+        .bigint({
+          message: "Transaction mint value is required",
+        })
+        .min(0n, "Transaction mint value must be greater than 0")
+    ),
+    nonce: zodStringToNumberPipe(
+      z
+        .number({
+          message: "Nonce is required",
+        })
+        .min(0)
+    ),
+  });
+  if (!data.success) {
+    return formError(data.errors);
+  }
+
   const { proposalId, l2GasLimit, l2GasPerPubdataByteLimit, refundRecipient, txMintValue, nonce } =
-    await getFormDataOrThrow(request, {
-      proposalId: hexSchema,
-      l2GasLimit: z.coerce.bigint(),
-      l2GasPerPubdataByteLimit: z.coerce.bigint(),
-      refundRecipient: addressSchema,
-      txMintValue: z.coerce.bigint(),
-      nonce: z.coerce.number(),
-    });
+    data.data;
 
   await createVetoProposalFor(
     proposalId,
@@ -65,6 +96,8 @@ export default function NewL2GovernorVeto() {
   const { activeL2Proposals, currentNonce, suggestedNonce } = useLoaderData<typeof loader>();
   const { address } = useAccount();
   const navigation = useNavigation();
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const actionData = useActionData<typeof action>();
 
   const formDefaultValues = {
     nonce: suggestedNonce,
@@ -108,7 +141,12 @@ export default function NewL2GovernorVeto() {
                           <TableCell>{row.type}</TableCell>
                           <TableCell>{row.description}</TableCell>
                           <TableCell>
-                            <Input type={"radio"} name="proposalId" value={row.proposalId} />
+                            <Input
+                              type={"radio"}
+                              name="proposalId"
+                              value={row.proposalId}
+                              onChange={() => setSelectedProposalId(row.proposalId)}
+                            />
                           </TableCell>
                         </TableRow>
                       ))}
@@ -132,6 +170,7 @@ export default function NewL2GovernorVeto() {
                   <FormDescription>
                     The maximum gas limit for executing this transaction on L2.
                   </FormDescription>
+                  <FormMessage>{actionData?.errors?.l2GasLimit}</FormMessage>
                 </FormItem>
 
                 <FormItem name="l2GasPerPubdataByteLimit">
@@ -144,7 +183,7 @@ export default function NewL2GovernorVeto() {
                   <FormDescription>
                     Limits the amount of gas per byte of public data on L2.
                   </FormDescription>
-                  <FormMessage />
+                  <FormMessage>{actionData?.errors?.l2GasPerPubdataByteLimit}</FormMessage>
                 </FormItem>
 
                 <FormItem name="refundRecipient">
@@ -153,7 +192,7 @@ export default function NewL2GovernorVeto() {
                   <FormDescription>
                     The L2 address to which any refunds should be sent.
                   </FormDescription>
-                  <FormMessage />
+                  <FormMessage>{actionData?.errors?.refundRecipient}</FormMessage>
                 </FormItem>
 
                 <FormItem name="txMintValue">
@@ -162,7 +201,7 @@ export default function NewL2GovernorVeto() {
                   <FormDescription>
                     The ether minted on L2 in this L1 {"->"} L2 transaction.
                   </FormDescription>
-                  <FormMessage />
+                  <FormMessage>{actionData?.errors?.txMintValue}</FormMessage>
                 </FormItem>
 
                 <FormItem name="nonce">
@@ -175,12 +214,16 @@ export default function NewL2GovernorVeto() {
                   <FormDescription>
                     The ether minted on L2 in this L1 {"->"} L2 transaction.
                   </FormDescription>
-                  <FormMessage />
+                  <FormMessage>{actionData?.errors?.nonce}</FormMessage>
                 </FormItem>
               </CardContent>
             </Card>
 
-            <Button loading={navigation.state !== "idle"} type="submit">
+            <Button
+              loading={navigation.state !== "idle"}
+              type="submit"
+              disabled={!selectedProposalId}
+            >
               Create Veto Proposal
             </Button>
           </Form>
