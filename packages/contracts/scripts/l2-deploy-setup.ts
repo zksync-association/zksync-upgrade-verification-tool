@@ -112,10 +112,6 @@ async function deployGovernor(
     );
 
   await deployedContract.getFunction("castVote").send(proposalId, 1n);
-
-  const state = await deployedContract.getFunction("state").staticCall(proposalId);
-  console.log(state);
-
   return deployedContract;
 }
 
