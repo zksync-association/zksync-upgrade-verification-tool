@@ -18,6 +18,8 @@ import { parseFormData } from "@/utils/read-from-request";
 import { hexSchema } from "@repo/common/schemas";
 import { badRequest } from "@/utils/http";
 import { $path } from "remix-routes";
+import { hexToBigInt } from "viem";
+import { displayBytes32 } from "@/utils/common-tables";
 
 export async function loader() {
   const proposals = await searchNotStartedProposals();
@@ -48,7 +50,8 @@ export default function startProposal() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Id</TableHead>
+            <TableHead>Tally id</TableHead>
+            <TableHead>L1 id</TableHead>
             <TableHead>Error</TableHead>
             <TableHead />
           </TableRow>
@@ -56,7 +59,10 @@ export default function startProposal() {
         <TableBody>
           {proposals.map((proposal) => (
             <TableRow key={proposal.l2ProposalId}>
-              <TableCell>{proposal.l2ProposalId}</TableCell>
+              <TableCell>{hexToBigInt(proposal.l2ProposalId).toString(10)}</TableCell>
+              <TableCell>
+                {proposal.l1ProposalId ? displayBytes32(proposal.l1ProposalId) : "-"}
+              </TableCell>
               <TableCell>{proposal.error ?? "-"}</TableCell>
               {proposal.ok && (
                 <TableCell>

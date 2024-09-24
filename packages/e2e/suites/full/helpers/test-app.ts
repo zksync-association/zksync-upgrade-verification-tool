@@ -280,8 +280,11 @@ export class TestApp {
         ALLOW_PRIVATE_ACTIONS: "true",
         NODE_ENV: "production",
         UPGRADE_HANDLER_ADDRESS: "0xab3ab5d67ed26ac1935dd790f4f013d222ba5073",
-        ZK_GOV_OPS_GOVERNOR_ADDRESS: "0x1011959EE8299b0e9900036D27Ca7EfF0C54DFF6",
-        ZK_TOKEN_GOVERNOR_ADDRESS: "0x775f1fbfc46720025ACC2FFE652e578de642e6a2",
+        ZK_GOV_OPS_GOVERNOR_ADDRESS: "0xaAF5f437fB0524492886fbA64D703df15BF619AE",
+        ZK_TOKEN_GOVERNOR_ADDRESS: "0x99E12239CBf8112fBB3f7Fd473d0558031abcbb5",
+        ZK_PROTOCOL_GOVERNOR_ADDRESS: "0x775f1fbfc46720025ACC2FFE652e578de642e6a2",
+        WALLET_CONNECT_PROJECT_ID: "test",
+        ETHERSCAN_API_KEY: "test",
         ETH_NETWORK: "local",
         LOCAL_CHAIN_PORT: this.mainNodePort.toString(),
         ...env,
@@ -371,7 +374,7 @@ export class TestApp {
     }
   }
 
-  private async waitForApp(maxRetries = 30, retryInterval = 1000) {
+  private async waitForApp(maxRetries = 10, retryInterval = 1000) {
     for (let i = 0; i < maxRetries; i++) {
       try {
         const response = await fetch(this.appUrl);

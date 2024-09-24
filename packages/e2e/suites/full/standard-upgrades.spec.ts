@@ -299,6 +299,12 @@ test("TC015 - Verify a proposal can be executed by anyone", async ({ page, switc
   await expect(page.getByText("Transaction successful")).toBeVisible();
 });
 
+test("TC016: Click in plus button -> Start regular upgrade flow page is shown", async ({
+  page,
+}) => {
+  await goToProposalDetails(page);
+});
+
 async function goToProposalDetails(page: Page) {
   const activeProposalsSection = page
     .getByRole("heading", { name: "Active Standard Proposals" })

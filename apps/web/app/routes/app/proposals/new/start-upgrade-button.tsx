@@ -17,8 +17,7 @@ export function StartUpgradeButton(props: StartUpgradeButtonProps) {
   const { writeContract, status } = useWriteContract();
   const fetcher = useFetcher();
 
-
-  const loading = status === "pending"
+  const loading = status === "pending";
 
   const onClick = useCallback(() => {
     if (props.data === null) {
@@ -62,7 +61,9 @@ export function StartUpgradeButton(props: StartUpgradeButtonProps) {
           fetcher.submit({ txHash }, { method: "POST" });
         },
         onError: (e) => {
-          toast.error("There was an error broadcasting the transaction.", { id: "start-regular-upgrade" });
+          toast.error("There was an error broadcasting the transaction.", {
+            id: "start-regular-upgrade",
+          });
           console.error(e);
         },
       }

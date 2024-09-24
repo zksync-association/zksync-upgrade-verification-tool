@@ -6,11 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  displayAddress,
-  displayBytes32,
-  displayEmpty,
-} from "@/routes/app/proposals/$id/common-tables";
+import { displayAddress, displayBytes32, displayEmpty } from "@/utils/common-tables";
 import { cn } from "@/utils/cn";
 import type { ExtractedValue } from "@repo/ethereum-reports/reports/obj-storage-visitor";
 import type { FieldStorageChange } from "@repo/ethereum-reports/reports/object-storage-change-report";

@@ -8,7 +8,7 @@
     "build:remix": "remix vite:build",
     "build:server": "tsx esbuild.ts",
     "dev": "NODE_ENV=development FORCE_COLOR=true tsx watch --clear-screen=false --ignore \".cache/**\" --ignore \"app/**\" --ignore \"vite.config.ts.timestamp-*\" --ignore \"build/**\" --ignore \"node_modules/**\" -r dotenv/config --inspect ./server/index.ts | pino-pretty",
-    "start": "node -r dotenv/config ./server-build/index.js",
+    "start": "node ./server-build/index.js",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "pnpm tsx ./scripts/migrate.ts",
