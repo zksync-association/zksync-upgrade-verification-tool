@@ -1,8 +1,4 @@
-import {
-  createProposal,
-  getProposals as getStoredProposals,
-  updateProposal,
-} from "@/.server/db/dto/proposals";
+import { createProposal, getProposals as getStoredProposals, updateProposal, } from "@/.server/db/dto/proposals";
 import { isProposalActive, PROPOSAL_STATES } from "@/utils/proposal-states";
 import { bigIntMax } from "@/utils/bigint";
 import { l1Rpc } from "./ethereum-l1/client";
@@ -17,6 +13,7 @@ import { env } from "@config/env.server";
 import { encodeAbiParameters, type Hex, keccak256, numberToHex, padHex, zeroAddress } from "viem";
 import { queryLogs } from "@/.server/service/server-utils";
 import { upgradeStructAbi } from "@/utils/emergency-proposals";
+import type { StartUpgradeData } from "@/common/types";
 
 export async function getProposals() {
   // First, we will update the status of all stored active proposals
@@ -82,13 +79,7 @@ export type ProposalDataResponse = {
 } & (
   | {
       ok: true;
-      data: {
-        l2BatchNumber: Hex;
-        l2MessageIndex: Hex;
-        l2TxNumberInBatch: Hex;
-        proof: Hex[];
-        proposal: Hex;
-      };
+      data: StartUpgradeData;
       error: null;
     }
   | {
@@ -101,15 +92,19 @@ export type ProposalDataResponse = {
 async function extractProposalData(txHash: Hex, proposalId: Hex): Promise<ProposalDataResponse> {
   if (env.ETH_NETWORK === "local") {
     const data = {
-      l2BatchNumber: 0,
-      l2MessageIndex: 0,
-      l2TxNumberInBatch: 0,
+      l2BatchNumber: numberToHex(0),
+      l2MessageIndex: numberToHex(0),
+      l2TxNumberInBatch: numberToHex(0),
       proof: [txHash],
       proposal: encodeAbiParameters(
         [upgradeStructAbi],
         [
           {
-            calls: [],
+            calls: [{
+              target: zeroAddress,
+              value: 0n,
+              data: "0x"
+            }],
             executor: zeroAddress,
             salt: padHex("0x0"),
           },
