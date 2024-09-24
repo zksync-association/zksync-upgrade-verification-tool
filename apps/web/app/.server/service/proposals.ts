@@ -1,4 +1,8 @@
-import { createProposal, getProposals as getStoredProposals, updateProposal } from "@/.server/db/dto/proposals";
+import {
+  createProposal,
+  getProposals as getStoredProposals,
+  updateProposal,
+} from "@/.server/db/dto/proposals";
 import { isProposalActive, PROPOSAL_STATES } from "@/utils/proposal-states";
 import { bigIntMax } from "@/utils/bigint";
 import { l1Rpc } from "./ethereum-l1/client";
@@ -30,7 +34,7 @@ export async function getProposals() {
   }
 
   // Then, we will fetch the logs and save new proposals
-  const latestBlock = await l1Rpc.getBlock({blockTag: "latest"});
+  const latestBlock = await l1Rpc.getBlock({ blockTag: "latest" });
   const currentBlock = latestBlock.number;
 
   // Logs are calculated from the last 40 * 24 * 360 blocks,
@@ -69,41 +73,69 @@ export async function getProposals() {
 }
 
 export async function nowInSeconds() {
-  const block = await l1Rpc.getBlock({blockTag: "latest"});
+  const block = await l1Rpc.getBlock({ blockTag: "latest" });
   return block.timestamp;
 }
 
-async function extractProposalData(txHash: Hex, proposalId: Hex) {
+export type ProposalDataResponse = {
+  proposalId: Hex;
+} & (
+  | {
+      ok: true;
+      data: {
+        l2BatchNumber: Hex;
+        l2MessageIndex: Hex;
+        l2TxNumberInBatch: Hex;
+        proof: Hex[];
+        proposal: Hex;
+      };
+      error: null;
+    }
+  | {
+      ok: false;
+      error: string;
+      data: null;
+    }
+);
+
+async function extractProposalData(txHash: Hex, proposalId: Hex): Promise<ProposalDataResponse> {
   if (env.ETH_NETWORK === "local") {
-    return {
+    const data = {
       l2BatchNumber: 0,
       l2MessageIndex: 0,
       l2TxNumberInBatch: 0,
       proof: [txHash],
       proposal: encodeAbiParameters(
         [upgradeStructAbi],
-        [{
-          calls: [],
-          executor: zeroAddress,
-          salt: padHex("0x0")
-        }]
+        [
+          {
+            calls: [],
+            executor: zeroAddress,
+            salt: padHex("0x0"),
+          },
+        ]
       ),
-      proposalId: txHash
-    }
+    };
+    return {
+      proposalId,
+      data,
+      ok: true,
+      error: null,
+    };
   }
 
-  const receipt = await l2Rpc.getTransactionReceipt({hash: txHash});
+  const receipt = await l2Rpc.getTransactionReceipt({ hash: txHash });
   const logProof = await fetchLogProof(txHash, 0);
 
   const l1MessageEventId = "0x3a36e47291f4201faf137fab081d92295bce2d53be2c6ca68ba82c7faa9ce241";
-  const bodyLog = receipt.logs.find(l => l.topics[0] === l1MessageEventId)
+  const bodyLog = receipt.logs.find((l) => l.topics[0] === l1MessageEventId);
   if (!bodyLog) {
     return {
       proposalId,
       ok: false,
       error: `No message sent to l1 found for tx ${txHash}`,
-      data: null
-    }
+      data: null,
+    };
   }
 
   if (!logProof) {
@@ -111,17 +143,35 @@ async function extractProposalData(txHash: Hex, proposalId: Hex) {
       proposalId,
       ok: false,
       error: `log proof was not found for tx ${txHash}`,
-      data: null
-    }
+      data: null,
+    };
   }
 
   if (proposalId !== keccak256(bodyLog.data)) {
     return {
       proposalId,
       ok: false,
-      error: `proposalId does not match`,
-      data: null
-    }
+      error: "proposalId does not match",
+      data: null,
+    };
+  }
+
+  if (!receipt.l1BatchNumber) {
+    return {
+      proposalId,
+      ok: false,
+      error: "missing batch number",
+      data: null,
+    };
+  }
+
+  if (!receipt.l1BatchTxIndex) {
+    return {
+      proposalId,
+      ok: false,
+      error: "missing batch tx index",
+      data: null,
+    };
   }
 
   return {
@@ -129,13 +179,13 @@ async function extractProposalData(txHash: Hex, proposalId: Hex) {
     ok: true,
     error: null,
     data: {
-      l2BatchNumber: receipt.l1BatchNumber,
-      l2MessageIndex: logProof.id,
-      l2TxNumberInBatch: receipt.l1BatchTxIndex,
+      l2BatchNumber: numberToHex(receipt.l1BatchNumber),
+      l2MessageIndex: numberToHex(logProof.id),
+      l2TxNumberInBatch: numberToHex(receipt.l1BatchTxIndex),
       proof: logProof.proof,
       proposal: bodyLog.data,
-    }
-  }
+    },
+  };
 }
 
 export async function searchNotStartedProposals() {
@@ -146,25 +196,27 @@ export async function searchNotStartedProposals() {
     env.ZK_PROTOCOL_GOVERNOR_ADDRESS,
     "ProposalExecuted",
     0n
-  )
+  );
 
   // Now we need to check if these events have not been already started in l1
-  const filtered = []
+  const filtered = [];
   for (const { args, transactionHash } of executedInL2) {
     const stateInL1 = await getUpgradeState(numberToHex(args.proposalId));
     if (stateInL1 === PROPOSAL_STATES.None) {
       if (!transactionHash) {
-        throw new Error("transactionHash should be present")
+        throw new Error("transactionHash should be present");
       }
 
       filtered.push({
         proposalId: numberToHex(args.proposalId),
-        txHash: transactionHash
+        txHash: transactionHash,
       });
     }
   }
 
-  return await Promise.all(filtered.map(async ({txHash, proposalId}) => {
-    return extractProposalData(txHash, proposalId);
-  }))
+  return await Promise.all(
+    filtered.map(async ({ txHash, proposalId }) => {
+      return extractProposalData(txHash, proposalId);
+    })
+  );
 }
