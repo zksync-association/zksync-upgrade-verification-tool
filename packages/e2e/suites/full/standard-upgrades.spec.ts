@@ -24,7 +24,9 @@ test("TC002 - Check list of active proposals is display with active proposals", 
   const activeProposalsSection = page
     .getByRole("heading", { name: "Active Standard Proposals" })
     .locator("..")
+    .locator("..")
     .locator("..");
+
   const proposalButton = activeProposalsSection.getByRole("button", {
     name: /^0x[a-fA-F0-9]{64}$/,
   });
@@ -39,8 +41,9 @@ test("TC003 - Check list of active proposals is displayed without active proposa
   const activeProposalsSection = page
     .getByRole("heading", { name: "Active Standard Proposals", exact: true })
     .locator("..")
+    .locator("..")
     .locator("..");
-  await expect(activeProposalsSection.getByRole("button")).toHaveCount(0);
+  await expect(activeProposalsSection.getByRole("button")).not.toBeAttached();
   await expect(
     activeProposalsSection.getByText("No active standard proposals found.")
   ).toBeVisible();
@@ -54,6 +57,7 @@ test("TC004 - Check list of inactive proposals is displayed with inactive propos
   const inactiveProposalsSection = page
     .getByRole("heading", { name: "Inactive Standard Proposals" })
     .locator("..")
+    .locator("..")
     .locator("..");
   const proposalButton = inactiveProposalsSection.getByRole("button", {
     name: /^0x[a-fA-F0-9]{64}$/,
@@ -66,6 +70,7 @@ test("TC005 - Check list of inactive proposals is displayed without inactive pro
 }) => {
   const inactiveProposalsSection = page
     .getByRole("heading", { name: "Inactive Standard Proposals" })
+    .locator("..")
     .locator("..")
     .locator("..");
   await expect(inactiveProposalsSection.getByRole("button")).toHaveCount(0);
@@ -100,6 +105,7 @@ test("TC007 - Verify proposal details are correctly displayed on an inactive pro
   await page.reload();
   const inactiveProposalsSection = page
     .getByRole("heading", { name: "Inactive Standard Proposals" })
+    .locator("..")
     .locator("..")
     .locator("..");
   const proposalButton = inactiveProposalsSection.getByRole("button", {
@@ -339,6 +345,7 @@ async function goToStartProposal(page: Page) {
 async function goToProposalDetails(page: Page) {
   const activeProposalsSection = page
     .getByRole("heading", { name: "Active Standard Proposals" })
+    .locator("..")
     .locator("..")
     .locator("..");
   const proposalButton = activeProposalsSection.getByRole("button", {
