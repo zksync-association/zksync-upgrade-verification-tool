@@ -28,6 +28,8 @@ import { emergencyUpgradeBoardAddress } from "@/.server/service/ethereum-l1/cont
 import { zkFoundationAddress } from "@/.server/service/ethereum-l1/contracts/emergency-upgrade-board";
 import { guardianMembers } from "@/.server/service/ethereum-l1/contracts/guardians";
 import { securityCouncilMembers } from "@/.server/service/ethereum-l1/contracts/security-council";
+import ZkAdminArchiveProposal from "@/components/zk-admin-archive-proposal";
+import ProposalArchivedCard from "@/components/proposal-archived-card";
 
 export async function loader(args: LoaderFunctionArgs) {
   const { id: proposalId } = extractFromParams(
@@ -53,11 +55,15 @@ export async function loader(args: LoaderFunctionArgs) {
   return json({
     calls,
     proposal: {
+      id: proposal.id,
       title: proposal?.title,
       externalId: proposal.externalId,
       proposedOn: proposal.proposedOn,
       salt: proposal.salt,
       status: proposal.status,
+      archivedOn: proposal.archivedOn,
+      archivedReason: proposal.archivedReason,
+      archivedBy: proposal.archivedBy,
     },
     addresses: {
       emergencyBoard,
@@ -108,6 +114,9 @@ export default function EmergencyUpgradeDetails() {
   const gatheredZkFoundationSignatures = signatures.filter((s) =>
     isAddressEqual(s.signer, addresses.zkFoundation)
   ).length;
+
+  const proposalArchived = proposal.archivedOn !== null;
+
   return (
     <div className="flex min-h-screen flex-col">
       <HeaderWithBackButton>Proposal {proposal.externalId}</HeaderWithBackButton>
@@ -136,11 +145,19 @@ export default function EmergencyUpgradeDetails() {
                   <span>{new Date(proposal.proposedOn).toLocaleTimeString()}</span>
                 </div>
               </div>
+              {proposalArchived && (
+                <ProposalArchivedCard
+                  archivedOn={new Date(proposal.archivedOn ?? 0)}
+                  archivedReason={proposal.archivedReason ?? ""}
+                  archivedBy={proposal.archivedBy ?? ""}
+                />
+              )}
             </div>
           </CardContent>
         </Card>
         <Card className="pb-10">
           <CardHeader className="pt-7">
+            <p className="text-red-500">{proposalArchived ? "Archived" : "\u00A0"}</p>
             <CardTitle>Proposal Status</CardTitle>
           </CardHeader>
           <CardContent>
@@ -168,15 +185,22 @@ export default function EmergencyUpgradeDetails() {
             <CardTitle>Signatures</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
-            {user.role !== "visitor" && (
+            {user.role !== "visitor" && user.role !== "zkAdmin" && (
               <EmergencySignButton
                 proposalId={proposal.externalId}
                 contractAddress={addresses.emergencyBoard}
                 role={user.role}
-                disabled={haveAlreadySigned}
+                disabled={haveAlreadySigned || proposalArchived}
               />
             )}
             {user.role === "visitor" && <p>No signing actions</p>}
+            {user.role === "zkAdmin" && (
+              <ZkAdminArchiveProposal
+                proposalId={BigInt(proposal.id)}
+                proposalType="ArchiveEmergencyProposal"
+                disabled={proposal.archivedOn !== null}
+              />
+            )}
           </CardContent>
         </Card>
         <Card className="pb-10">
@@ -192,6 +216,7 @@ export default function EmergencyUpgradeDetails() {
               zkFoundationAddress={addresses.zkFoundation}
               proposal={proposal}
               calls={calls}
+              disabled={proposalArchived}
             >
               Execute upgrade
             </ExecuteEmergencyUpgradeButton>

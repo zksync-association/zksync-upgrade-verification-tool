@@ -39,13 +39,14 @@ export async function getFreezeProposalById(
 }
 
 export async function updateFreezeProposal(
-  id: InferSelectModel<typeof freezeProposalsTable>["id"],
-  data: Partial<InferInsertModel<typeof freezeProposalsTable>>
+  data: Partial<InferInsertModel<typeof freezeProposalsTable>> & {
+    id: InferSelectModel<typeof freezeProposalsTable>["id"];
+  }
 ) {
   return db
     .update(freezeProposalsTable)
     .set(data)
-    .where(eq(freezeProposalsTable.id, id))
+    .where(eq(freezeProposalsTable.id, data.id))
     .returning()
     .then(getFirstOrThrow);
 }

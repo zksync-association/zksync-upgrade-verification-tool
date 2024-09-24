@@ -32,6 +32,7 @@ export default function Navbar() {
               {user.role === "securityCouncil" && "Security Council"}
               {user.role === "visitor" && "Visitor"}
               {user.role === "zkFoundation" && "ZkSync Foundation"}
+              {user.role === "zkAdmin" && "ZkAdmin"}
             </Button>
           )}
           {user !== null && <ConnectButton />}

@@ -305,7 +305,8 @@ export default function Proposals() {
                           {user.role === "guardian" && "Guardian Actions"}
                           {user.role === "securityCouncil" && "Security Council Actions"}
                           {user.role === "visitor" && "No role actions"}
-                          {user.role === "zkFoundation" && "No role actions"}
+                          {(user.role === "zkFoundation" || user.role === "zkAdmin") &&
+                            "No role actions"}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-col space-y-3">

@@ -71,6 +71,13 @@
       "when": 1726081824635,
       "tag": "0009_skinny_liz_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1727120082087,
+      "tag": "0010_aromatic_red_skull",
+      "breakpoints": true
     }
   ]
 }

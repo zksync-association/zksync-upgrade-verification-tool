@@ -17,14 +17,18 @@ import { $path } from "remix-routes";
 
 export async function loader() {
   const proposals = await getUpdatedL2Cancellations();
-  return json({ proposals });
+
+  const isActive = (p: (typeof proposals)[number]) => p.status === "ACTIVE" && !p.archivedOn;
+  const isInactive = (p: (typeof proposals)[number]) => !isActive(p);
+
+  return json({
+    activeProposals: proposals.filter(isActive),
+    inactiveProposals: proposals.filter(isInactive),
+  });
 }
 
 export default function L2Proposals() {
-  const { proposals } = useLoaderData<typeof loader>();
-
-  const activeProposals = proposals.filter((p) => p.status === "ACTIVE");
-  const inactiveProposals = proposals.filter((p) => p.status !== "ACTIVE");
+  const { activeProposals, inactiveProposals } = useLoaderData<typeof loader>();
 
   return (
     <div className="space-y-4">
@@ -81,6 +85,7 @@ export default function L2Proposals() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Description</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="w-20" />
                 </TableRow>
               </TableHeader>
@@ -89,6 +94,9 @@ export default function L2Proposals() {
                   inactiveProposals.map((proposal) => (
                     <TableRow key={proposal.id}>
                       <TableCell>{proposal.description}</TableCell>
+                      <TableCell>
+                        {proposal.archivedOn !== null ? "Archived" : "Inactive"}
+                      </TableCell>
                       <TableCell>
                         <Link to={$path("/app/l2-cancellations/:id", { id: proposal.externalId })}>
                           <Button variant="outline" size="sm">
