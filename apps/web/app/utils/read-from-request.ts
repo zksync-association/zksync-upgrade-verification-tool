@@ -88,13 +88,21 @@ export type WithFormData = {
   formData: () => Promise<FormData>;
 };
 
+export async function getFormData<T extends ObjectSchema>(
+  request: WithFormData,
+  schema: T
+): Promise<ParseFromDataRes<T>> {
+  const formData = await request.formData();
+  const res = parseFormData(formData, schema);
+  return res;
+}
+
 export async function getFormDataOrThrow<T extends ObjectSchema>(
   request: WithFormData,
   schema: T,
   error = (_e: ParsedObjectError<T>) => badRequest("Error parsing body")
 ): Promise<ParsedObject<T>> {
-  const formData = await request.formData();
-  const res = parseFormData(formData, schema);
+  const res = await getFormData(request, schema);
   if (!res.success) {
     throw error(res.errors);
   }

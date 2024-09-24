@@ -10,8 +10,7 @@ import { cn } from "@/utils/cn";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { Link, json, redirect, useLoaderData } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
-import { ArrowRight, PlusIcon } from "lucide-react";
-import { useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { $path } from "remix-routes";
 import type { Jsonify } from "type-fest";
 import { z } from "zod";
@@ -137,35 +136,32 @@ export default function Index() {
     setSoftFreezeThresholdProposals,
     unfreezeProposals,
   } = useLoaderData<typeof loader>();
-  const [modalType, setModalType] = useState<FreezeProposalsType | null>(null);
-
   return (
     <div className="space-y-4">
       <ProposalCard
         title="Soft Freeze Proposals"
         proposals={softFreezeProposals}
-        onAddProposal={() => setModalType("SOFT_FREEZE")}
-        testNamespace={"soft"}
+        type="SOFT_FREEZE"
+        testNamespace="soft"
       />
       <ProposalCard
         title="Hard Freeze Proposals"
         proposals={hardFreezeProposals}
-        onAddProposal={() => setModalType("HARD_FREEZE")}
-        testNamespace={"hard"}
+        type="HARD_FREEZE"
+        testNamespace="hard"
       />
       <ProposalCard
         title="Set Soft Freeze Threshold Proposals"
         proposals={setSoftFreezeThresholdProposals}
-        onAddProposal={() => setModalType("SET_SOFT_FREEZE_THRESHOLD")}
-        testNamespace={"change-threshold"}
+        type="SET_SOFT_FREEZE_THRESHOLD"
+        testNamespace="change-threshold"
       />
       <ProposalCard
         title="Unfreeze Proposals"
         proposals={unfreezeProposals}
-        onAddProposal={() => setModalType("UNFREEZE")}
-        testNamespace={"unfreeze"}
+        type="UNFREEZE"
+        testNamespace="unfreeze"
       />
-      <CreateFreezeProposalModal type={modalType} onClose={() => setModalType(null)} />
     </div>
   );
 }
@@ -173,13 +169,13 @@ export default function Index() {
 function ProposalCard({
   title,
   proposals,
-  onAddProposal,
+  type,
   className,
   testNamespace,
 }: {
   title: string;
   proposals: Jsonify<InferSelectModel<typeof freezeProposalsTable>>[];
-  onAddProposal: () => void;
+  type: FreezeProposalsType;
   className?: string;
   testNamespace: string;
 }) {
@@ -188,14 +184,7 @@ function ProposalCard({
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{title}</CardTitle>
-          <Button
-            variant="secondary"
-            size="icon"
-            onClick={onAddProposal}
-            data-testid={`${testNamespace}-create-btn`}
-          >
-            <PlusIcon className="h-4 w-4" />
-          </Button>
+          <CreateFreezeProposalModal type={type} testNamespace={testNamespace} />
         </div>
       </CardHeader>
       <CardContent>

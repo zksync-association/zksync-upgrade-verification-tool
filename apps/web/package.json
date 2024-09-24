@@ -21,7 +21,6 @@
   },
   "dependencies": {
     "@headlessui/react": "=2.1.2",
-    "@hookform/resolvers": "=3.9.0",
     "@radix-ui/react-accordion": "=1.2.0",
     "@radix-ui/react-alert-dialog": "=1.1.1",
     "@radix-ui/react-aspect-ratio": "=1.1.0",
@@ -37,6 +36,7 @@
     "@radix-ui/react-separator": "=1.1.0",
     "@radix-ui/react-slot": "=1.1.0",
     "@radix-ui/react-tabs": "=1.1.0",
+    "@radix-ui/react-visually-hidden": "^1.1.0",
     "@rainbow-me/rainbowkit": "=2.1.5",
     "@remix-run/express": "=2.10.2",
     "@remix-run/node": "=2.10.2",
@@ -68,7 +68,6 @@
     "react-cookie": "=7.2.0",
     "react-day-picker": "=8.10.1",
     "react-dom": "=18.2.0",
-    "react-hook-form": "=7.52.1",
     "react-hot-toast": "=2.4.1",
     "tailwind-merge": "=2.4.0",
     "tailwindcss-animate": "=1.0.7",
