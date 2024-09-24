@@ -6,11 +6,11 @@ import {
 } from "@/.server/db/schema";
 import { bigIntMax } from "@/utils/bigint";
 import { badRequest, notFound } from "@/utils/http";
-import { isValidCancellationState, } from "@/utils/l2-cancellation-states";
+import { isValidCancellationState } from "@/utils/l2-cancellation-states";
 import { env } from "@config/env.server";
 import type { InferSelectModel } from "drizzle-orm";
 import { hexSchema } from "@repo/common/schemas";
-import { type Address, type Hex, } from "viem";
+import type { Address, Hex } from "viem";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
 import {
@@ -22,12 +22,16 @@ import {
 } from "../db/dto/l2-cancellations";
 import { getLatestBlock } from "./ethereum-l2/client";
 import { getGuardiansL2VetoNonce } from "./ethereum-l1/contracts/guardians";
-import { getL2ProposalState, lookForActiveProposals } from "@/.server/service/ethereum-l2/contracts/governors";
+import {
+  getL2ProposalState,
+  lookForActiveProposals,
+} from "@/.server/service/ethereum-l2/contracts/governors";
 import { blocksInADay } from "@/.server/service/server-utils";
 
 async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigint) {
-  const activeProposals = await lookForActiveProposals(getL2GovernorAddress(type), from)
-    .then(proposals => proposals.map(p => ({ ...p, type }))  )
+  const activeProposals = await lookForActiveProposals(getL2GovernorAddress(type), from).then(
+    (proposals) => proposals.map((p) => ({ ...p, type }))
+  );
 
   const states = await Promise.all(
     activeProposals.map((p) => getL2ProposalState(getL2GovernorAddress(p.type), p.proposalId))

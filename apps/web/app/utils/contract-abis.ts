@@ -22,4 +22,5 @@ export const securityCouncilAbi = securityCouncilArtifact.abi as SecurityCouncil
 
 export const zkGovOpsGovernorAbi = zkGovOpsGovernorArtifact.abi as ZkGovOpsGovernor$Type["abi"];
 
-export const zkProtocolGovernorAbi = zkProtocolGovernorArtifact.abi as ZkProtocolGovernor$Type["abi"];
+export const zkProtocolGovernorAbi =
+  zkProtocolGovernorArtifact.abi as ZkProtocolGovernor$Type["abi"];

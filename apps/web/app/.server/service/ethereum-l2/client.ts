@@ -7,16 +7,15 @@ import { getLogProof } from "viem/zksync";
 const network = env.ETH_NETWORK === "local" ? "sepolia" : env.ETH_NETWORK;
 
 export type MessageProof = {
-  id: number
-  proof: Hex[]
-  root: Hex
-}
+  id: number;
+  proof: Hex[];
+  root: Hex;
+};
 
 export const l2Rpc = createPublicClient({
   transport: http(env.L2_RPC_URL),
-  chain: zksync
-})
-
+  chain: zksync,
+});
 
 /**
  * This function is implemented like this because `zks_getL2ToL1LogProof` is not implemented
@@ -33,22 +32,22 @@ export const l2Rpc = createPublicClient({
 export async function fetchLogProof(txHash: Hex, index: number): Promise<MessageProof | null> {
   if (env.ETH_NETWORK === "local") {
     try {
-      await l2Rpc.getTransactionReceipt({ hash: txHash })
+      await l2Rpc.getTransactionReceipt({ hash: txHash });
       return {
         proof: [txHash],
         root: txHash,
         id: 0,
-      }
+      };
     } catch (_e) {
-      return null
+      return null;
     }
   } else {
-    return getLogProof(l2Rpc, { txHash, index })
+    return getLogProof(l2Rpc, { txHash, index });
   }
 }
 
 export async function getLatestBlock() {
-  return l2Rpc.getBlock({blockTag: "latest"})
+  return l2Rpc.getBlock({ blockTag: "latest" });
 }
 
 export const l2Explorer = BlockExplorerClient.forL2(network);

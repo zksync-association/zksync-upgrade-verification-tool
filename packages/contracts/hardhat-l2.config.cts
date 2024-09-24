@@ -37,7 +37,7 @@ const config: HardhatUserConfig = {
   solidity: "0.8.24",
   zksolc: { version: "latest" },
   paths: {
-    sources: "src"
+    sources: "src",
   },
   networks: {
     local: {

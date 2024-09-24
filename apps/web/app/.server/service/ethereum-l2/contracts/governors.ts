@@ -26,41 +26,59 @@ export const createdSchema = z.object({
 type ProposalCreatedEvent = z.infer<typeof createdSchema>;
 
 const canceledSchema = z.object({
-  proposalId: z.bigint().transform((bn) => numberToHex(bn))
-})
+  proposalId: z.bigint().transform((bn) => numberToHex(bn)),
+});
 
+export async function lookForActiveProposals(
+  address: Address,
+  fromBlock: bigint
+): Promise<ProposalCreatedEvent[]> {
+  const createdPromise = await queryLogs(
+    zkGovOpsGovernorAbi,
+    address,
+    "ProposalCreated",
+    fromBlock
+  ).then((logs) => logs.map((log) => createdSchema.parse(log.args)));
 
-export async function lookForActiveProposals(address: Address, fromBlock: bigint): Promise<ProposalCreatedEvent[]> {
-  const createdPromise = await queryLogs(zkGovOpsGovernorAbi, address, "ProposalCreated", fromBlock)
-    .then(logs => logs
-      .map((log) => createdSchema.parse(log.args))
-    )
-
-  const cancelledPromise = await queryLogs(zkGovOpsGovernorAbi, address, "ProposalCanceled", fromBlock)
-    .then(logs => logs
-      .map(log => canceledSchema.parse(log.args))
+  const cancelledPromise = await queryLogs(
+    zkGovOpsGovernorAbi,
+    address,
+    "ProposalCanceled",
+    fromBlock
+  ).then((logs) =>
+    logs
+      .map((log) => canceledSchema.parse(log.args))
       .reduce((acc, curr): Set<Hex> => {
-        acc.add(curr.proposalId)
-        return acc
+        acc.add(curr.proposalId);
+        return acc;
       }, new Set<Hex>())
-    )
+  );
 
-  const executedPromise = await queryLogs(zkGovOpsGovernorAbi, address, "ProposalExecuted", fromBlock)
-    .then(logs => logs
-      .map(log => canceledSchema.parse(log.args))
+  const executedPromise = await queryLogs(
+    zkGovOpsGovernorAbi,
+    address,
+    "ProposalExecuted",
+    fromBlock
+  ).then((logs) =>
+    logs
+      .map((log) => canceledSchema.parse(log.args))
       .reduce((acc, curr): Set<Hex> => {
-        acc.add(curr.proposalId)
-        return acc
+        acc.add(curr.proposalId);
+        return acc;
       }, new Set<Hex>())
-    )
+  );
 
-  const [created, canceledSet, executedSet] = await Promise.all([createdPromise, cancelledPromise, executedPromise]);
+  const [created, canceledSet, executedSet] = await Promise.all([
+    createdPromise,
+    cancelledPromise,
+    executedPromise,
+  ]);
 
   return created.filter(
-    creation => !canceledSet.has(creation.proposalId) && !executedSet.has(creation.proposalId)
+    (creation) => !canceledSet.has(creation.proposalId) && !executedSet.has(creation.proposalId)
   );
 }
 
 export async function getL2ProposalState(address: Hex, proposalId: Hex): Promise<number> {
-  return await governor(address).read.state([hexToBigInt(proposalId)])
+  return await governor(address).read.state([hexToBigInt(proposalId)]);
 }

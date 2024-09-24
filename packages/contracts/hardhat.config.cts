@@ -11,7 +11,6 @@ import { writeFile } from "node:fs/promises";
 
 Dotenv.config();
 
-
 // We don't need to do this for any of the l1 operations. But we are compiling l1 contracts
 // with l1 compiler to obtain the types and obtain type safety in the webapp.
 subtask(TASK_COMPILE_SOLIDITY).setAction(async (_, { config }, runSuper) => {
@@ -41,12 +40,12 @@ subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, hre) => {
   // None of the tasks related to l1 use this contracts. We are just compiling them with regular
   // l1 hardhat to get the types.
   const l2Contracts = path.join(
-      hre.config.paths.sources,
-      "zk-gov-preprocessed",
-      "l2-contracts",
-      "src",
-      "**",
-      "*.sol"
+    hre.config.paths.sources,
+    "zk-gov-preprocessed",
+    "l2-contracts",
+    "src",
+    "**",
+    "*.sol"
   );
   const devContracts = path.join(hre.config.paths.sources, "local-contracts", "**", "*.sol");
   return glob.sync([l1Contracts, l2Contracts, devContracts]);

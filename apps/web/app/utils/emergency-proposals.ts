@@ -30,9 +30,7 @@ export const calculateUpgradeProposalHash = (calls: Call[], salt: Hex, executorA
     executor: executorAddress,
     salt,
   };
-  const upgradeProposalAbi: AbiParameter[] = [
-    upgradeStructAbi,
-  ];
+  const upgradeProposalAbi: AbiParameter[] = [upgradeStructAbi];
 
   const encodedProposal = encodeAbiParameters(upgradeProposalAbi, [upgradeProposal]);
   return keccak256(encodedProposal);

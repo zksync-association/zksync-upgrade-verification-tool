@@ -5,7 +5,7 @@ import {
   type BlockTag,
   type ContractEventName,
   decodeEventLog,
-  getAbiItem
+  getAbiItem,
 } from "viem";
 import { l2Rpc } from "@/.server/service/ethereum-l2/client";
 import { env } from "@config/env.server";
@@ -18,29 +18,31 @@ export async function queryLogs<A extends Abi, N extends ContractEventName<A>>(
   toBlock: bigint | BlockTag = "latest"
 ) {
   const args1 = {};
-  return l2Rpc.getLogs({
-    address: address,
-    event: getAbiItem({
-      abi,
-      name: eventName
-    } as any) as AbiEvent,
-    fromBlock: fromBlock,
-    toBlock: toBlock,
-    args: args1
-  }).then(logs =>
-    logs.map((log) => {
-      const decoded = decodeEventLog({
+  return l2Rpc
+    .getLogs({
+      address: address,
+      event: getAbiItem({
         abi,
-        eventName,
-        data: log.data,
-        topics: log.topics,
-      });
-      return {
-        ...decoded,
-        transactionHash: log.transactionHash
-      }
+        name: eventName,
+      } as any) as AbiEvent,
+      fromBlock: fromBlock,
+      toBlock: toBlock,
+      args: args1,
     })
-  );
+    .then((logs) =>
+      logs.map((log) => {
+        const decoded = decodeEventLog({
+          abi,
+          eventName,
+          data: log.data,
+          topics: log.topics,
+        });
+        return {
+          ...decoded,
+          transactionHash: log.transactionHash,
+        };
+      })
+    );
 }
 
 export function blocksInADay() {
