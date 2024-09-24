@@ -299,11 +299,42 @@ test("TC015 - Verify a proposal can be executed by anyone", async ({ page, switc
   await expect(page.getByText("Transaction successful")).toBeVisible();
 });
 
-test("TC016: Click in plus button -> Start regular upgrade flow page is shown", async ({
+test("TC016: Click in plus button -> Start regular upgrade flow page is shown. Upgrades ready in l2 are displayed", async ({
   page,
 }) => {
-  await goToProposalDetails(page);
+  await goToStartProposal(page);
+
+  await expect(page.getByRole("button", { name: "Start" })).toBeDisabled();
+  await expect(page.getByText("68693134686067409446318095868434117916042803819816398115405085560523995847566")).toBeVisible();
+  await expect(page.getByText("0xe08b76f3")).toBeVisible();
 });
+
+test("TC017: Start new regular upgrade page -> Upgrade can be started. Redirects to tx page. -> New upgrade is displayed in index page", async ({
+  page,
+  wallet
+}) => {
+  await goToStartProposal(page);
+
+  await page.getByText("68693134686067409446318095868434117916042803819816398115405085560523995847566")
+    .locator("..")
+    .locator('[name="proposal"]').click();
+
+  await page.getByRole("button", { name: "Start" }).click();
+  await wallet.confirmTransaction();
+
+  await page.getByText("Transaction successful").waitFor();
+
+  await page.goto("/app/proposals");
+  await page.getByText("Active Standard Proposals", {exact: true}).waitFor();
+
+  const buttons = await page.getByText(/^0x[a-fA-F0-9]{64}$/).all()
+  expect(buttons.length).toBe(2);
+});
+
+async function goToStartProposal(page: Page) {
+  await page.getByTestId("start-regular-ugprade").click();
+  await page.getByText("Start regular upgrade flow").waitFor();
+}
 
 async function goToProposalDetails(page: Page) {
   const activeProposalsSection = page
