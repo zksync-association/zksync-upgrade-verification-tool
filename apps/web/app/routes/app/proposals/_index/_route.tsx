@@ -42,7 +42,7 @@ export default function Index() {
                   <div className="flex items-center justify-between">
                     <CardTitle>Active Standard Proposals</CardTitle>
                     <a href={$path("/app/proposals/new")}>
-                      <Button data-testid="start-regular-ugprade" variant="secondary" size="icon">
+                      <Button data-testid="start-regular-upgrade" variant="secondary" size="icon">
                         <PlusIcon className="h-4 w-4" />
                       </Button>
                     </a>

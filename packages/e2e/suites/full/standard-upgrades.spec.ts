@@ -324,7 +324,7 @@ test("TC017: Start new regular upgrade page -> Upgrade can be started. Redirects
   await goToStartProposal(page);
 
   await page
-    .getByText("68693134686067409446318095868434117916042803819816398115405085560523995847566")
+    .getByText(/0x[a-fA-F0-9]{8}...[a-fA-F0-9]{10}/)
     .locator("..")
     .locator('[name="proposal"]')
     .click();
@@ -342,7 +342,7 @@ test("TC017: Start new regular upgrade page -> Upgrade can be started. Redirects
 });
 
 async function goToStartProposal(page: Page) {
-  await page.getByTestId("start-regular-ugprade").click();
+  await page.getByTestId("start-regular-upgrade").click();
   await page.getByText("Start regular upgrade flow").waitFor();
 }
 
