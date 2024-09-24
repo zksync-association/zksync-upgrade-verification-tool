@@ -103,7 +103,7 @@ test("TC402: Create a veto, missing no proposal selected -> Submit button is dis
   await expect(page.getByRole("button", { name: "Create Veto Proposal" })).toBeDisabled();
 });
 
-test("TC403: Create a veto, proposal selected, empty l2 gas limit -> Submit button is disabled.", async ({
+test("TC403: Create a veto, proposal selected, empty l2 gas limit -> Submit errors.", async ({
   page,
 }) => {
   await goToCreateCancellationPage(page);
@@ -112,8 +112,8 @@ test("TC403: Create a veto, proposal selected, empty l2 gas limit -> Submit butt
   await input.clear();
   await input.blur();
 
-  await expect(page.getByRole("button", { name: "Create Veto Proposal" })).toBeDisabled();
-  await expect(page.getByText("Cannot be zero")).toBeVisible();
+  await page.getByRole("button", { name: "Create Veto Proposal" }).click();
+  await expect(page.getByText("L2 gas limit is required")).toBeVisible();
 });
 
 test("TC404: Create a veto, proposal selected, empty l2 gas pubdata -> Submit button is disabled.", async ({
@@ -125,8 +125,8 @@ test("TC404: Create a veto, proposal selected, empty l2 gas pubdata -> Submit bu
   await input.clear();
   await input.blur();
 
-  await expect(page.getByRole("button", { name: "Create Veto Proposal" })).toBeDisabled();
-  await expect(page.getByText("Cannot be zero")).toBeVisible();
+  await page.getByRole("button", { name: "Create Veto Proposal" }).click();
+  await expect(page.getByText("L2 gas per pubdata byte limit is required")).toBeVisible();
 });
 
 test("TC405: Create a veto, proposal selected, empty l2 gas pubdata -> Submit button is disabled.", async ({
@@ -137,9 +137,8 @@ test("TC405: Create a veto, proposal selected, empty l2 gas pubdata -> Submit bu
   const refundRecipientInput = page.locator('[name="refundRecipient"]');
   await refundRecipientInput.clear();
   await refundRecipientInput.blur();
-  await page.locator('[name="txMintValue"]').click();
 
-  await expect(page.getByRole("button", { name: "Create Veto Proposal" })).toBeDisabled();
+  await page.getByRole("button", { name: "Create Veto Proposal" }).click();
   await expect(page.getByText("Not a valid hex")).toBeVisible();
 });
 
@@ -152,8 +151,8 @@ test("TC406: Create a veto, proposal selected, empty transaction mint value -> S
   await input.clear();
   await input.blur();
 
-  await expect(page.getByRole("button", { name: "Create Veto Proposal" })).toBeDisabled();
-  await expect(page.getByText("Cannot be zero")).toBeVisible();
+  await page.getByRole("button", { name: "Create Veto Proposal" }).click();
+  await expect(page.getByText("Transaction mint value is required")).toBeVisible();
 });
 
 test("TC407: Create a veto, proposal selected, empty nonce -> Submit button is enabled.", async ({
@@ -163,8 +162,8 @@ test("TC407: Create a veto, proposal selected, empty nonce -> Submit button is e
   await selectL2Proposal(page, 0);
   await page.locator('[name="nonce"]').clear();
 
-  // This is a weird case. This is being interpreted as zero because input is of type number.
-  await expect(page.getByRole("button", { name: "Create Veto Proposal" })).toBeEnabled();
+  await page.getByRole("button", { name: "Create Veto Proposal" }).click();
+  await expect(page.getByText("Nonce is required")).toBeVisible();
 });
 
 test("TC408: Create a veto with correct data -> Redirects to index page. new veto is listed. Click on new veto displays right data.", async ({

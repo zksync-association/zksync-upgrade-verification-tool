@@ -2,34 +2,23 @@ import type { Call } from "@/common/calls";
 import { Button } from "@/components/ui/button";
 import {
   Form,
-  FormControl,
   FormDescription,
-  FormField,
+  FormInput,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { guardiansAbi } from "@/utils/contract-abis";
 import type { BasicSignature } from "@/utils/signatures";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useFetcher } from "@remix-run/react";
 import type React from "react";
-import { useForm } from "react-hook-form";
+import { useState } from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
 import { type Hex, hexToBigInt, parseEther } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
 import { z } from "zod";
-
-const submitSchema = z.object({
-  value: z
-    .string()
-    .refine((str) => /^\d+\.?\d*$/.test(str), { message: "Should be a numeric value" }),
-});
-
-type SubmitType = z.infer<typeof submitSchema>;
 
 type BroadcastTxButtonProps = {
   guardiansAddress: Hex;
@@ -64,10 +53,22 @@ export default function ExecL2VetoForm({
   const { address } = useAccount();
   const { isPending, writeContract } = useWriteContract();
   const fetcher = useFetcher();
+  const [valueError, setValueError] = useState<string | null>(null);
 
   const thresholdReached = signatures.length >= threshold;
 
-  const onSubmit = async ({ value }: SubmitType) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const formData = new FormData(e.currentTarget);
+    const value = z.coerce.number().min(0).safeParse(formData.get("value"));
+    if (!value.success) {
+      setValueError("Invalid value");
+      return;
+    }
+
+    setValueError(null);
+
     if (!thresholdReached) {
       console.error("Not enough signatures", signatures.length, threshold);
       return;
@@ -101,7 +102,7 @@ export default function ExecL2VetoForm({
         functionName: "cancelL2GovernorProposal",
         abi: guardiansAbi,
         args: [l2Proposal, txRequest, signers, signatureValues],
-        value: parseEther(value),
+        value: parseEther(value.data.toString()),
       },
       {
         onSuccess: (hash) => {
@@ -126,40 +127,23 @@ export default function ExecL2VetoForm({
     );
   };
 
-  const form = useForm<SubmitType>({
-    resolver: zodResolver(submitSchema),
-    defaultValues: {
-      value: "0.001",
-    },
-    mode: "onTouched",
-  });
-
   return (
-    <div>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <FormField
-            control={form.control}
-            name="value"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Value (Eth)</FormLabel>
-                <FormControl>
-                  <Input placeholder="ETH" {...field} />
-                </FormControl>
-                <FormDescription>Value of ether to send in the tx</FormDescription>
-                <FormMessage data-testid="title-error" />
-              </FormItem>
-            )}
-          />
-          <Button
-            disabled={!form.formState.isValid || disabled || !thresholdReached}
-            loading={isPending}
-          >
-            {children}
-          </Button>
-        </form>
-      </Form>
-    </div>
+    <Form onSubmit={handleSubmit}>
+      <FormItem name="value">
+        <FormLabel>Value (Eth)</FormLabel>
+        <FormInput
+          placeholder="ETH"
+          defaultValue={0.001}
+          type="number"
+          min={0}
+          step={0.000000001}
+        />
+        <FormDescription>Value of ether to send in the tx</FormDescription>
+        <FormMessage data-testid="title-error"> {valueError}</FormMessage>
+      </FormItem>
+      <Button disabled={disabled || !thresholdReached} loading={isPending}>
+        {children}
+      </Button>
+    </Form>
   );
 }
