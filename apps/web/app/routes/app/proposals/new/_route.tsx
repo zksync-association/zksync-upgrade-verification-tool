@@ -1,19 +1,38 @@
-import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { type ActionFunctionArgs, json } from "@remix-run/node";
+import { redirect, useLoaderData } from "@remix-run/react";
 import { searchNotStartedProposals } from "@/.server/service/proposals";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { StartUpgradeButton } from "@/routes/app/proposals/new/start-upgrade-button";
 import { useState } from "react";
 import type { StartUpgradeData } from "@/common/types";
 import { env } from "@config/env.server";
+import { parseFormData } from "@/utils/read-from-request";
+import { hexSchema } from "@repo/common/schemas";
+import { badRequest } from "@/utils/http";
+import { $path } from "remix-routes";
 
 export async function loader() {
   const proposals = await searchNotStartedProposals();
   return json({
     proposals,
-    target: env.UPGRADE_HANDLER_ADDRESS
+    target: env.UPGRADE_HANDLER_ADDRESS,
   });
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  const parsed = parseFormData(await request.formData(), { txHash: hexSchema });
+  if (!parsed.success) {
+    throw badRequest("Failed to parse body");
+  }
+  return redirect($path("/app/transactions/:hash", { hash: parsed.data.txHash }));
 }
 
 export default function startProposal() {
@@ -22,36 +41,39 @@ export default function startProposal() {
 
   return (
     <div>
-      <h2 className="font-semibold text-2xl leading-none tracking-tight">Start regular upgrade flow</h2>
+      <h2 className="font-semibold text-2xl leading-none tracking-tight">
+        Start regular upgrade flow
+      </h2>
 
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Id</TableHead>
             <TableHead>Error</TableHead>
-            <TableHead/>
+            <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {proposals.map(proposal => (
+          {proposals.map((proposal) => (
             <TableRow key={proposal.l2ProposalId}>
               <TableCell>{proposal.l2ProposalId}</TableCell>
               <TableCell>{proposal.error ?? "-"}</TableCell>
               {proposal.ok && (
                 <TableCell>
-                  <Input type={"radio"} name={"proposal"} value={proposal.l2ProposalId} onClick={() => setUpgradeData(proposal.data)}/>
+                  <Input
+                    type={"radio"}
+                    name={"proposal"}
+                    value={proposal.l2ProposalId}
+                    onClick={() => setUpgradeData(proposal.data)}
+                  />
                 </TableCell>
               )}
-              {!proposal.ok && (
-                <TableCell>
-                </TableCell>
-              )}
-
+              {!proposal.ok && <TableCell />}
             </TableRow>
           ))}
         </TableBody>
       </Table>
-      <StartUpgradeButton target={target} data={upgradeData}/>
+      <StartUpgradeButton target={target} data={upgradeData} />
     </div>
   );
 }

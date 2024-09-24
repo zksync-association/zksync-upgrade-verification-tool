@@ -14,7 +14,7 @@ import {
 import { fetchLogProof, l2Rpc } from "@/.server/service/ethereum-l2/client";
 import { zkProtocolGovernorAbi } from "@/utils/contract-abis";
 import { env } from "@config/env.server";
-import { decodeAbiParameters, encodeAbiParameters, type Hex, keccak256, numberToHex, padHex, zeroAddress } from "viem";
+import { decodeAbiParameters, type Hex, keccak256, numberToHex } from "viem";
 import { queryLogs } from "@/.server/service/server-utils";
 import type { StartUpgradeData } from "@/common/types";
 
@@ -34,7 +34,7 @@ export async function getProposals() {
   }
 
   // Then, we will fetch the logs and save new proposals
-  const latestBlock = await l1Rpc.getBlock({blockTag: "latest"});
+  const latestBlock = await l1Rpc.getBlock({ blockTag: "latest" });
   const currentBlock = latestBlock.number;
 
   // Logs are calculated from the last 40 * 24 * 360 blocks,
@@ -73,7 +73,7 @@ export async function getProposals() {
 }
 
 export async function nowInSeconds() {
-  const block = await l1Rpc.getBlock({blockTag: "latest"});
+  const block = await l1Rpc.getBlock({ blockTag: "latest" });
   return block.timestamp;
 }
 
@@ -81,22 +81,22 @@ export type ProposalDataResponse = {
   l2ProposalId: Hex;
 } & (
   | {
-  ok: true;
-  data: StartUpgradeData;
-  l1ProposalId: Hex;
-  error: null;
-}
+      ok: true;
+      data: StartUpgradeData;
+      l1ProposalId: Hex;
+      error: null;
+    }
   | {
-  ok: false;
-  error: string;
-  data: null;
-  l1ProposalId: null;
-}
-  );
+      ok: false;
+      error: string;
+      data: null;
+      l1ProposalId: null;
+    }
+);
 
 async function extractProposalData(txHash: Hex, l2ProposalId: Hex): Promise<ProposalDataResponse> {
-  console.log("txHash", txHash)
-  const receipt = await l2Rpc.getTransactionReceipt({hash: txHash});
+  console.log("txHash", txHash);
+  const receipt = await l2Rpc.getTransactionReceipt({ hash: txHash });
   const logProof = await fetchLogProof(txHash, 0);
 
   const l1MessageEventId = "0x3a36e47291f4201faf137fab081d92295bce2d53be2c6ca68ba82c7faa9ce241";
@@ -132,13 +132,10 @@ async function extractProposalData(txHash: Hex, l2ProposalId: Hex): Promise<Prop
   }
 
   if (receipt.l1BatchTxIndex === null) {
-    console.warn(`Missing l1BatchTxIndex for tx ${txHash}`)
+    console.warn(`Missing l1BatchTxIndex for tx ${txHash}`);
   }
 
-  const [body] = decodeAbiParameters(
-    [{name: "_", type: "bytes"}],
-    bodyLog.data
-  )
+  const [body] = decodeAbiParameters([{ name: "_", type: "bytes" }], bodyLog.data);
 
   return {
     l2ProposalId: l2ProposalId,
@@ -167,7 +164,7 @@ export async function searchNotStartedProposals() {
 
   // Now we need to check if these events have not been already started in l1
   const filtered = [];
-  for (const {args, transactionHash} of executedInL2) {
+  for (const { args, transactionHash } of executedInL2) {
     if (!transactionHash) {
       throw new Error("transactionHash should be present");
     }
@@ -175,8 +172,8 @@ export async function searchNotStartedProposals() {
     const data = await extractProposalData(transactionHash, numberToHex(args.proposalId));
 
     if (!data.ok) {
-      filtered.push(data)
-      continue
+      filtered.push(data);
+      continue;
     }
 
     const stateInL1 = await getUpgradeState(data.l1ProposalId);

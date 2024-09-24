@@ -3,7 +3,7 @@ import path from "node:path";
 import { MalformedUpgrade } from "@repo/common/ethereum";
 import { FileSystem } from "../src/lib/file-system.js";
 import { UpgradeImporter } from "../src/lib/importer.js";
-import { decodeAbiParameters, isAddressEqual } from "viem";
+import { isAddressEqual } from "viem";
 
 class TestFS extends FileSystem {
   private registered: Map<string, string>;
