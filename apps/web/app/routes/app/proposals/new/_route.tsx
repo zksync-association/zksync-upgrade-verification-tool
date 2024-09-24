@@ -34,12 +34,12 @@ export default function startProposal() {
         </TableHeader>
         <TableBody>
           {proposals.map(proposal => (
-            <TableRow key={proposal.proposalId}>
-              <TableCell>{proposal.proposalId}</TableCell>
+            <TableRow key={proposal.l2ProposalId}>
+              <TableCell>{proposal.l2ProposalId}</TableCell>
               <TableCell>{proposal.error ?? "-"}</TableCell>
               {proposal.ok && (
                 <TableCell>
-                  <Input type={"radio"} name={"proposal"} value={proposal.proposalId} onClick={() => setUpgradeData(proposal.data)}/>
+                  <Input type={"radio"} name={"proposal"} value={proposal.l2ProposalId} onClick={() => setUpgradeData(proposal.data)}/>
                 </TableCell>
               )}
               {!proposal.ok && (

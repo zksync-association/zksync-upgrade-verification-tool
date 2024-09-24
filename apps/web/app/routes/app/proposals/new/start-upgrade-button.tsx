@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useCallback } from "react";
 import { useAccount, useWriteContract } from "wagmi";
-import { type Address, decodeAbiParameters, getAbiItem, type Hex, hexToBigInt, hexToNumber } from "viem";
+import { type Address, decodeAbiParameters, getAbiItem, hexToBigInt, hexToNumber } from "viem";
 import { upgradeHandlerAbi } from "@/utils/contract-abis";
 import type { StartUpgradeData } from "@/common/types";
 
@@ -42,7 +42,7 @@ export function StartUpgradeButton(props : StartUpgradeButtonProps) {
       args: [
         hexToBigInt(l2BatchNumber),
         hexToBigInt(l2MessageIndex),
-        hexToNumber(l2TxNumberInBatch),
+        l2TxNumberInBatch ? hexToNumber(l2TxNumberInBatch) : 0,
         proof,
         proposal
       ]
