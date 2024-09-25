@@ -1,5 +1,5 @@
 import { type Address, type Hex, hexToBigInt } from "viem";
-import { readFileSync } from "fs";
+import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { addressSchema, hexSchema } from "@repo/common/schemas";
 
