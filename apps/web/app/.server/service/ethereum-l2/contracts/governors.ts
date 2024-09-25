@@ -10,35 +10,18 @@ const governor = (address: Address) =>
     client: l2Rpc,
   });
 
-export async function lookForActiveProposals(
-  address: Address,
-  fromBlock: bigint
-) {
-  const createdPromise = queryLogs(
-    zkGovOpsGovernorAbi,
-    address,
-    "ProposalCreated",
-    fromBlock
-  ).then((logs) => logs.map((log) => log.args));
+export async function lookForActiveProposals(address: Address, fromBlock: bigint) {
+  const createdPromise = queryLogs(zkGovOpsGovernorAbi, address, "ProposalCreated", fromBlock).then(
+    (logs) => logs.map((log) => log.args)
+  );
 
-  const cancelledPromise = queryLogs(
-    zkGovOpsGovernorAbi,
-    address,
-    "ProposalCanceled",
-    fromBlock
-  ).then((logs) =>
-    logs
-      .map((log) => log.args.proposalId)
-  ).then(proposalIds => new Set(proposalIds));
+  const cancelledPromise = queryLogs(zkGovOpsGovernorAbi, address, "ProposalCanceled", fromBlock)
+    .then((logs) => logs.map((log) => log.args.proposalId))
+    .then((proposalIds) => new Set(proposalIds));
 
-  const executedPromise = queryLogs(
-    zkGovOpsGovernorAbi,
-    address,
-    "ProposalExecuted",
-    fromBlock
-  ).then((logs) =>
-    logs.map((log) => log.args.proposalId)
-  ).then(proposalIds => new Set(proposalIds));
+  const executedPromise = queryLogs(zkGovOpsGovernorAbi, address, "ProposalExecuted", fromBlock)
+    .then((logs) => logs.map((log) => log.args.proposalId))
+    .then((proposalIds) => new Set(proposalIds));
 
   const [created, canceledSet, executedSet] = await Promise.all([
     createdPromise,
@@ -46,17 +29,19 @@ export async function lookForActiveProposals(
     executedPromise,
   ]);
 
-  return created.filter(
-    (creation) => !canceledSet.has(creation.proposalId) && !executedSet.has(creation.proposalId)
-  ).map(raw => {
-    return {
-      ...raw,
-      proposalId: numberToHex(raw.proposalId),
-      values: raw.values.map(v => numberToHex(v)),
-      voteStart: numberToHex(raw.voteStart),
-      voteEnd: numberToHex(raw.voteEnd)
-    }
-  });
+  return created
+    .filter(
+      (creation) => !canceledSet.has(creation.proposalId) && !executedSet.has(creation.proposalId)
+    )
+    .map((raw) => {
+      return {
+        ...raw,
+        proposalId: numberToHex(raw.proposalId),
+        values: raw.values.map((v) => numberToHex(v)),
+        voteStart: numberToHex(raw.voteStart),
+        voteEnd: numberToHex(raw.voteEnd),
+      };
+    });
 }
 
 export async function getL2ProposalState(address: Hex, proposalId: Hex): Promise<number> {

@@ -10,7 +10,7 @@ import { isValidCancellationState } from "@/utils/l2-cancellation-states";
 import { env } from "@config/env.server";
 import type { InferSelectModel } from "drizzle-orm";
 import { hexSchema } from "@repo/common/schemas";
-import { type Address, type Hex, numberToHex } from "viem";
+import type { Address, Hex } from "viem";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
 import {

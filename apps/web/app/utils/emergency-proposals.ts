@@ -1,11 +1,5 @@
 import type { Call } from "@/common/calls";
-import { type AbiParameter, type Hex, encodeAbiParameters, keccak256 } from "viem";
-
-type UpgradeProposal = {
-  calls: Call[];
-  executor: Hex;
-  salt: Hex;
-};
+import { type Hex, encodeAbiParameters, keccak256, hexToBigInt } from "viem";
 
 export const upgradeStructAbi = {
   type: "tuple",
@@ -25,14 +19,13 @@ export const upgradeStructAbi = {
 } as const;
 
 export const calculateUpgradeProposalHash = (calls: Call[], salt: Hex, executorAddress: Hex) => {
-  const upgradeProposal: UpgradeProposal = {
-    calls,
+  const upgradeProposal = {
+    calls: calls.map((c) => ({ ...c, value: hexToBigInt(c.value) })),
     executor: executorAddress,
     salt,
   };
-  const upgradeProposalAbi: AbiParameter[] = [upgradeStructAbi];
 
-  const encodedProposal = encodeAbiParameters(upgradeProposalAbi, [upgradeProposal]);
+  const encodedProposal = encodeAbiParameters([upgradeStructAbi], [upgradeProposal]);
   return keccak256(encodedProposal);
 };
 
