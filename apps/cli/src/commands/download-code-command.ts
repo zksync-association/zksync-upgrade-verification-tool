@@ -1,9 +1,4 @@
-import {
-  ContractData,
-  ADDRESS_ZERO,
-  OPEN_ZEP_PROXY_IMPL_SLOT,
-  MalformedUpgrade,
-} from "@repo/common/ethereum";
+import { ContractData, ADDRESS_ZERO, OPEN_ZEP_PROXY_IMPL_SLOT } from "@repo/common/ethereum";
 import type { GitContractsRepo } from "@repo/ethereum-reports/git-contracts-repo";
 import { ZkSyncEraDiff, hexAreEq } from "@repo/ethereum-reports/zk-sync-era-diff";
 import { type HexEraPropName, ZksyncEraState } from "@repo/ethereum-reports/zksync-era-state";
@@ -104,8 +99,8 @@ export const downloadCodeCommand = async (
   targetDir: string,
   _l1Filter: string[]
 ) => {
-  const file = UpgradeFile.fromFile(upgradeDirectory)
-  const dataHex = file.calls[0]?.data
+  const file = UpgradeFile.fromFile(upgradeDirectory);
+  const dataHex = file.calls[0]?.data;
 
   const current = await withSpinner(
     async () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
@@ -114,7 +109,7 @@ export const downloadCodeCommand = async (
   );
 
   if (!dataHex) {
-    throw new Error("Missing calldata")
+    throw new Error("Missing calldata");
   }
 
   const repo = await withSpinner(

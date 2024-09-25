@@ -32,11 +32,7 @@ async function getMemoryPath(
     .unwrapOrElse(() => {
       return env
         .rpcL1()
-        .debugCallTraceStorage(
-          "0x0b622a2061eaccae1c664ebc3e868b8438e03f61",
-          address,
-          callData
-        );
+        .debugCallTraceStorage("0x0b622a2061eaccae1c664ebc3e868b8438e03f61", address, callData);
     });
 }
 
@@ -45,11 +41,11 @@ export async function storageChangeCommand(
   dir: string,
   preCalculatedPath: Option<string>
 ): Promise<void> {
-  const file = UpgradeFile.fromFile(dir)
-  const dataHex = file.calls[0]?.data
+  const file = UpgradeFile.fromFile(dir);
+  const dataHex = file.calls[0]?.data;
 
   if (!dataHex) {
-    throw new Error("Missing calldata")
+    throw new Error("Missing calldata");
   }
 
   const diamondAddress = DIAMOND_ADDRS[env.network];

@@ -4,21 +4,22 @@ import { z } from "zod";
 import { addressSchema, hexSchema } from "@repo/common/schemas";
 
 const schema = z.object({
-  calls: z.array(z.object({
-    value: hexSchema.transform(hex => hexToBigInt(hex)),
-    data: hexSchema,
-    target: addressSchema
-  })),
+  calls: z.array(
+    z.object({
+      value: hexSchema.transform((hex) => hexToBigInt(hex)),
+      data: hexSchema,
+      target: addressSchema,
+    })
+  ),
   executor: addressSchema,
-  salt: hexSchema
-})
-
+  salt: hexSchema,
+});
 
 type RawCall = {
   value: bigint;
   data: Hex;
   target: Address;
-}
+};
 
 export class UpgradeFile {
   calls: RawCall[];
@@ -32,9 +33,9 @@ export class UpgradeFile {
   }
 
   static fromFile(path: string) {
-    const buff = readFileSync(path)
+    const buff = readFileSync(path);
     const obj = JSON.parse(buff.toString());
-    const parsed = schema.parse(obj)
-    return new this(parsed.calls, parsed.executor, parsed.salt);
+    const parsed = schema.parse(obj);
+    return new UpgradeFile(parsed.calls, parsed.executor, parsed.salt);
   }
 }

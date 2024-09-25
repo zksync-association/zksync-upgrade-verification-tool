@@ -5,7 +5,7 @@ import {
   downloadCodeCommand,
   storageChangeCommand,
   storageSnapshotCommand,
-} from "../commands/index.js";
+} from "../commands";
 import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
 import { Option } from "nochoices";
@@ -64,7 +64,7 @@ export function buildCli(
       alias: "f",
       type: "string",
       describe: "File with raw upgrade",
-      demandOption: true
+      demandOption: true,
     })
     .middleware((yargs) => {
       env.withNetwork(NetworkSchema.parse(yargs.network));
@@ -85,11 +85,10 @@ export function buildCli(
       "storage-diff",
       "Executes the upgrade transaction in debug mode to analyze the changes in contract storage",
       (yargs) =>
-        yargs
-          .option("precalculated", {
-            type: "string",
-            demandOption: false,
-          }),
+        yargs.option("precalculated", {
+          type: "string",
+          demandOption: false,
+        }),
       async (yargs) => {
         return storageDiffCbk(env, yargs.file, Option.fromNullable(yargs.precalculated));
       }

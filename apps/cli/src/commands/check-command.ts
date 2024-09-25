@@ -8,8 +8,8 @@ import { StringCheckReport } from "@repo/ethereum-reports/reports/string-check-r
 import { UpgradeFile } from "../lib/upgrade-file";
 
 export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
-  const file = UpgradeFile.fromFile(upgradeFilePath)
-  const dataHex = file.calls[0]?.data
+  const file = UpgradeFile.fromFile(upgradeFilePath);
+  const dataHex = file.calls[0]?.data;
 
   const current = await withSpinner(
     async () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
@@ -28,7 +28,7 @@ export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
   );
 
   if (!dataHex) {
-    throw new Error("Missing calldata")
+    throw new Error("Missing calldata");
   }
 
   const stateManagerAddress = current

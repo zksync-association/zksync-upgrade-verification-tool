@@ -89,7 +89,13 @@ describe("cli", () => {
         called = true;
       };
       const cli = buildCli(
-        ["storage-diff", "-f", "someDir", "--ethscankey=fakeKey", "--precalculated=path/to/data.json"],
+        [
+          "storage-diff",
+          "-f",
+          "someDir",
+          "--ethscankey=fakeKey",
+          "--precalculated=path/to/data.json",
+        ],
         fail,
         fail,
         fakeStorageDiff,
