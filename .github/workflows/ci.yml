@@ -74,7 +74,7 @@ jobs:
 
   ci-for-docker:
     name: Docker
-    needs: ["changed-files", "ci-for-lint", "ci-for-test", "ci-for-test-e2e"]
+    needs: ["changed-files", "ci-for-lint", "ci-for-test", "ci-for-test-e2e-cli", "ci-for-test-e2e-web"]
     if: ${{ needs.changed-files.outputs.app == 'true' }}
     uses: ./.github/workflows/docker-reusable.yml
     permissions:
