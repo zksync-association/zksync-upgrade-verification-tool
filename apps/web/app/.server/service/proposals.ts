@@ -17,6 +17,7 @@ import { env } from "@config/env.server";
 import { decodeAbiParameters, type Hex, keccak256, numberToHex } from "viem";
 import { queryLogs } from "@/.server/service/server-utils";
 import type { StartUpgradeData } from "@/common/types";
+import { defaultLogger } from "@config/log.server";
 
 export async function getProposals() {
   // First, we will update the status of all stored active proposals
@@ -132,7 +133,7 @@ async function extractProposalData(txHash: Hex, l2ProposalId: Hex): Promise<Prop
   }
 
   if (receipt.l1BatchTxIndex === null) {
-    console.warn(`Missing l1BatchTxIndex for tx ${txHash}`);
+    defaultLogger.warn(`Missing l1BatchTxIndex for tx ${txHash}`);
   }
 
   const [body] = decodeAbiParameters([{ name: "_", type: "bytes" }], bodyLog.data);
