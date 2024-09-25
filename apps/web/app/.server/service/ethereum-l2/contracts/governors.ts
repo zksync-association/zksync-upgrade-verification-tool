@@ -29,11 +29,7 @@ export async function lookForActiveProposals(
   ).then((logs) =>
     logs
       .map((log) => log.args.proposalId)
-      .reduce((acc, curr): Set<bigint> => {
-        acc.add(curr);
-        return acc;
-      }, new Set<bigint>())
-  );
+  ).then(proposalIds => new Set(proposalIds));
 
   const executedPromise = queryLogs(
     zkGovOpsGovernorAbi,
@@ -41,13 +37,8 @@ export async function lookForActiveProposals(
     "ProposalExecuted",
     fromBlock
   ).then((logs) =>
-    logs
-      .map((log) => log.args.proposalId)
-      .reduce((acc, curr): Set<bigint> => {
-        acc.add(curr);
-        return acc;
-      }, new Set<bigint>())
-  );
+    logs.map((log) => log.args.proposalId)
+  ).then(proposalIds => new Set(proposalIds));
 
   const [created, canceledSet, executedSet] = await Promise.all([
     createdPromise,
