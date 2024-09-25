@@ -3,21 +3,18 @@ import { hexToBytes } from "viem";
 import { withSpinner } from "../lib/with-spinner.js";
 import { ZksyncEraState } from "@repo/ethereum-reports/zksync-era-state";
 import { ZkSyncEraDiff } from "@repo/ethereum-reports/zk-sync-era-diff";
-import { DIAMOND_ADDRS, MalformedUpgrade } from "@repo/common/ethereum";
+import { DIAMOND_ADDRS } from "@repo/common/ethereum";
 import { StringCheckReport } from "@repo/ethereum-reports/reports/string-check-report";
+import { UpgradeFile } from "../lib/upgrade-file";
 
-export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
+export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
+  const file = UpgradeFile.fromFile(upgradeFilePath)
+  const dataHex = file.calls[0]?.data
+
   const current = await withSpinner(
     async () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
     "Gathering current zksync state",
     env
-  );
-
-  const importer = env.importer();
-  const upgrade = await importer.readFromFiles(upgradeDirectory, env.network);
-
-  const data = upgrade.upgradeCalldataHex.expect(
-    new MalformedUpgrade("Missing calldata for governor operations")
   );
 
   const repo = await withSpinner(
@@ -30,6 +27,10 @@ export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
     env
   );
 
+  if (!dataHex) {
+    throw new Error("Missing calldata")
+  }
+
   const stateManagerAddress = current
     .hexAttrValue("stateTransitionManagerAddress")
     .expect(new Error("Should be present"));
@@ -39,7 +40,7 @@ export async function checkCommand(env: EnvBuilder, upgradeDirectory: string) {
       ZksyncEraState.fromCalldata(
         stateManagerAddress,
         DIAMOND_ADDRS[env.network],
-        Buffer.from(hexToBytes(data)),
+        Buffer.from(hexToBytes(dataHex)),
         env.network,
         env.l1Client(),
         env.rpcL1(),

@@ -60,6 +60,12 @@ export function buildCli(
       describe: "Use colored output",
       default: false,
     })
+    .option("file", {
+      alias: "f",
+      type: "string",
+      describe: "File with raw upgrade",
+      demandOption: true
+    })
     .middleware((yargs) => {
       env.withNetwork(NetworkSchema.parse(yargs.network));
       env.withL1RpcUrl(yargs.l1RpcUrl);
@@ -68,16 +74,11 @@ export function buildCli(
       env.withColored(!yargs.noColor);
     })
     .command(
-      "check <upgradeDirectory>",
+      "check",
       "get current state of contracts",
-      (yargs) =>
-        yargs.positional("upgradeDirectory", {
-          describe: "FolderName of the upgrade to check",
-          type: "string",
-          demandOption: true,
-        }),
+      (yargs) => yargs,
       async (yargs) => {
-        await checkCbk(env, yargs.upgradeDirectory);
+        await checkCbk(env, yargs.file);
       }
     )
     .command(
