@@ -3,16 +3,23 @@ import { execAsync, expectToFailAsync } from "./helpers/util.js";
 import pkg from "../../../../apps/cli/package.json";
 
 describe("CLI Output Test Suite", () => {
-  it("should error on invalid option", async () => {
+  it("errors on invalid option", async () => {
     const { stdout } = await expectToFailAsync(() =>
-      execAsync("pnpm validate check reference/test-upgrade-mini --badOption defect")
+      execAsync("pnpm validate check -f some/file --badOption defect")
     );
     expect(stdout).to.contain("Unknown argument: badOption");
   });
 
+  it("errors on missing update file option", async () => {
+    const { stdout } = await expectToFailAsync(() =>
+      execAsync("pnpm validate check")
+    );
+    expect(stdout).to.contain("Missing required argument: file");
+  });
+
   it("should error on invalid command", async () => {
-    const { stdout } = await expectToFailAsync(() => execAsync("pnpm validate defect"));
-    expect(stdout).to.contain("Unknown argument: defect");
+    const { stdout } = await expectToFailAsync(() => execAsync("pnpm validate -f some/file unknownCommand"));
+    expect(stdout).to.contain("Unknown argument: unknownCommand");
   });
 
   it("should error on missing command", async () => {
@@ -34,7 +41,7 @@ describe("CLI Output Test Suite", () => {
 
   it("errors if non supported network", async () => {
     const { stdout } = await expectToFailAsync(() =>
-      execAsync("pnpm validate check reference/test-upgrade-mini -n unknown-network")
+      execAsync("pnpm validate -f some/file check -n unknown-network")
     );
     expect(stdout).to.contain(
       'Argument: network, Given: "unknown-network", Choices: "mainnet", "sepolia"\n'
