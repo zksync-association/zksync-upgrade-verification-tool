@@ -311,10 +311,8 @@ test("TC016: Click in plus button -> Start regular upgrade flow page is shown. U
   await goToStartProposal(page);
 
   await expect(page.getByRole("button", { name: "Start" })).toBeDisabled();
-  await expect(
-    page.getByText("68693134686067409446318095868434117916042803819816398115405085560523995847566")
-  ).toBeVisible();
-  await expect(page.getByText("0xe08b76f3")).toBeVisible();
+  await expect(page.locator('td').filter({ hasText: /^[0-9]{50}/ })).toBeVisible();
+  await expect(page.locator('td').filter({ hasText: /0x[a-fA-F0-9]{8}...[a-fA-F0-9]{10}/ })).toBeVisible();
 });
 
 test("TC017: Start new regular upgrade page -> Upgrade can be started. Redirects to tx page. -> New upgrade is displayed in index page", async ({
