@@ -11,6 +11,7 @@ import type { EnvBuilder } from "../lib/env-builder.js";
 import { withSpinner } from "../lib/with-spinner.js";
 import path from "node:path";
 import { hexToBigInt, hexToBytes } from "viem";
+import { UpgradeFile } from "../lib/upgrade-file";
 
 async function downloadAllCode(
   diff: ZkSyncEraDiff,
@@ -103,18 +104,18 @@ export const downloadCodeCommand = async (
   targetDir: string,
   _l1Filter: string[]
 ) => {
+  const file = UpgradeFile.fromFile(upgradeDirectory)
+  const dataHex = file.calls[0]?.data
+
   const current = await withSpinner(
     async () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
     "Gathering current zksync state",
     env
   );
 
-  const importer = env.importer();
-  const upgrade = await importer.readFromFiles(upgradeDirectory, env.network);
-
-  const data = upgrade.upgradeCalldataHex.expect(
-    new MalformedUpgrade("Missing calldata for governor operations")
-  );
+  if (!dataHex) {
+    throw new Error("Missing calldata")
+  }
 
   const repo = await withSpinner(
     async () => {
@@ -131,7 +132,7 @@ export const downloadCodeCommand = async (
       ZksyncEraState.fromCalldata(
         "0x",
         "0x",
-        Buffer.from(hexToBytes(data)),
+        Buffer.from(hexToBytes(dataHex)),
         env.network,
         env.l1Client(),
         env.rpcL1(),

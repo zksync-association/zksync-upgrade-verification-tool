@@ -1,5 +1,4 @@
 import { FileSystem } from "./file-system.js";
-import { UpgradeImporter } from "./importer.js";
 import { Terminal } from "./terminal.js";
 import { GitContractsRepo } from "@repo/ethereum-reports/git-contracts-repo";
 import { BlockExplorerClient, NET_VERSIONS, RpcClient, type Network } from "@repo/common/ethereum";
@@ -94,10 +93,6 @@ export class EnvBuilder {
 
   fs(): FileSystem {
     return new FileSystem();
-  }
-
-  importer(): UpgradeImporter {
-    return new UpgradeImporter(this.fs());
   }
 
   async contractsRepo(): Promise<GitContractsRepo> {

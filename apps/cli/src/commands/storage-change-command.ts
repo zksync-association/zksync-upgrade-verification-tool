@@ -13,14 +13,13 @@ import { RecordStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/r
 import { RpcStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/rpc-storage-snapshot";
 import { StorageChanges } from "@repo/ethereum-reports/storage/storage-changes";
 import { MAIN_CONTRACT_FIELDS } from "@repo/ethereum-reports/storage/storage-props";
-import type { UpgradeChanges } from "@repo/ethereum-reports/upgrade-changes";
-import { UpgradeImporter } from "../lib/importer.js";
+import { UpgradeFile } from "../lib/upgrade-file";
 
 async function getMemoryPath(
   preCalculatedPath: Option<string>,
   env: EnvBuilder,
   address: Hex,
-  changes: UpgradeChanges
+  callData: Hex
 ): Promise<MemoryDiffRaw> {
   return preCalculatedPath
     .map((path) =>
@@ -36,7 +35,7 @@ async function getMemoryPath(
         .debugCallTraceStorage(
           "0x0b622a2061eaccae1c664ebc3e868b8438e03f61",
           address,
-          changes.upgradeCalldataHex.expect(new Error("Missing upgrade calldata"))
+          callData
         );
     });
 }
@@ -46,14 +45,18 @@ export async function storageChangeCommand(
   dir: string,
   preCalculatedPath: Option<string>
 ): Promise<void> {
+  const file = UpgradeFile.fromFile(dir)
+  const dataHex = file.calls[0]?.data
+
+  if (!dataHex) {
+    throw new Error("Missing calldata")
+  }
+
   const diamondAddress = DIAMOND_ADDRS[env.network];
 
   const rawMap = await withSpinner(
     async () => {
-      const importer = new UpgradeImporter(env.fs());
-      const changes = await importer.readFromFiles(dir, env.network);
-
-      return getMemoryPath(preCalculatedPath, env, diamondAddress, changes);
+      return getMemoryPath(preCalculatedPath, env, diamondAddress, dataHex);
     },
     "Calculating storage changes",
     env
