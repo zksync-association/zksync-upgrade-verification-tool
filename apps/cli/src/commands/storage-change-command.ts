@@ -38,11 +38,12 @@ async function getMemoryPath(
 
 export async function storageChangeCommand(
   env: EnvBuilder,
-  dir: string,
+  upgradeFilePath: string,
   preCalculatedPath: Option<string>
 ): Promise<void> {
-  const file = UpgradeFile.fromFile(dir);
-  const dataHex = file.calls[0]?.data;
+  const dataHex = UpgradeFile.fromFile(upgradeFilePath)
+    .firstCallData()
+    .expect(new Error("Missing calldata"));
 
   if (!dataHex) {
     throw new Error("Missing calldata");

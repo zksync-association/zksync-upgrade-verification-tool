@@ -2,6 +2,7 @@ import { type Address, type Hex, hexToBigInt } from "viem";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { addressSchema, hexSchema } from "@repo/common/schemas";
+import { Option } from "nochoices";
 
 const schema = z.object({
   calls: z.array(
@@ -30,6 +31,10 @@ export class UpgradeFile {
     this.calls = calls;
     this.executor = executor;
     this.salt = salt;
+  }
+
+  firstCallData(): Option<Hex> {
+    return Option.fromNullable(this.calls[0]).map((call) => call.data);
   }
 
   static fromFile(path: string) {
