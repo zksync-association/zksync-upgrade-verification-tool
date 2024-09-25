@@ -124,53 +124,6 @@ export async function deploySetup() {
   addressesContent += `Counter: ${counterAddress}\n`;
   addressesContent += `EmergencyUpgradeBoard: ${emergencyBoardAddress}\n`;
 
-  // Deploy L2 contracts
-  const zkToken = await hre.viem.deployContract("ZkTokenV1");
-  await zkToken.write.initialize([handlerAddress, handlerAddress, 1000000000n]);
-
-  const zkGovOpsGovernor = await hre.viem.deployContract("ZkGovOpsGovernor", [
-    {
-      name: "ZkGovOpsGovernor",
-      token: zkToken.address,
-      timelock: zeroAddress,
-      initialVotingDelay: 0,
-      initialVotingPeriod: 100000,
-      initialProposalThreshold: 0,
-      initialQuorum: 0,
-      initialVoteExtension: 0,
-      vetoGuardian: zeroAddress,
-    },
-  ]);
-  console.log("ZkGovOpsGovernor deployed to:", zkGovOpsGovernor.address);
-
-  const zkTokenGovernor = await hre.viem.deployContract("ZkTokenGovernor", [
-    {
-      name: "ZkTokenGovernor",
-      token: zkToken.address,
-      timelock: zeroAddress,
-      initialVotingDelay: 0,
-      initialVotingPeriod: 100000,
-      initialProposalThreshold: 0,
-      initialQuorum: 0,
-      initialVoteExtension: 0,
-      vetoGuardian: zeroAddress,
-      proposeGuardian: zeroAddress,
-      isProposeGuarded: false,
-    },
-  ]);
-  console.log("ZkTokenGovernor deployed to:", zkTokenGovernor.address);
-
-  await zkGovOpsGovernor.write.propose([[zeroAddress], [0n], ["0x"], "Test GovOps proposal"]);
-  await zkTokenGovernor.write.propose([
-    [zeroAddress, zeroAddress],
-    [0n, 0n],
-    ["0x", "0x"],
-    "Test Token proposal",
-  ]);
-
-  addressesContent += `ZkGovOpsGovernor: ${zkGovOpsGovernor.address}\n`;
-  addressesContent += `ZkTokenGovernor: ${zkTokenGovernor.address}\n`;
-
   const calldata = encodeFunctionData({
     abi: counterAbi,
     functionName: "setNumber",

@@ -171,14 +171,14 @@ test("TC408: Create a veto with correct data -> Redirects to index page. new vet
 }) => {
   await createCancellation(page, 0);
 
-  await expect(page.getByText("Test GovOps proposal")).toBeVisible();
+  await expect(page.getByText("Test ZkGovOpsGovernor proposal")).toBeVisible();
   const goToDetail = page.getByText("View");
   await expect(goToDetail).toBeVisible();
   await goToDetail.click();
   await page.getByText("Proposal Details").waitFor();
 
   await expect(page.getByText("GovOps Governor Proposal")).toBeVisible();
-  await expect(page.getByText("Test GovOps proposal")).toBeVisible();
+  await expect(page.getByText("Test ZkGovOpsGovernor proposal")).toBeVisible();
 });
 
 function approveButton(page: Page) {
@@ -297,7 +297,7 @@ test("TC415: Create govops proposal -> Creates with proper data.", async ({ page
   await goToCancellationDetail(page);
 
   await expect(page.getByText("GovOps Governor Proposal", { exact: true })).toBeVisible();
-  await expect(page.getByText("Test GovOps proposal", { exact: true })).toBeVisible();
+  await expect(page.getByText("Test ZkGovOpsGovernor proposal", { exact: true })).toBeVisible();
 });
 
 test("TC416: Create token proposal -> Creates with proper data.", async ({ page }) => {
@@ -305,5 +305,5 @@ test("TC416: Create token proposal -> Creates with proper data.", async ({ page 
   await goToCancellationDetail(page);
 
   await expect(page.getByText("Token Governor Proposal", { exact: true })).toBeVisible();
-  await expect(page.getByText("Test Token proposal", { exact: true })).toBeVisible();
+  await expect(page.getByText("Test ZkTokenGovernor proposal", { exact: true })).toBeVisible();
 });

@@ -6,11 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  displayAddress,
-  displayBytes32,
-  displayEmpty,
-} from "@/routes/app/proposals/$id/common-tables";
+import { displayAddress, displayBytes32, displayEmpty } from "@/utils/common-tables";
 import { cn } from "@/utils/cn";
 import type { ContractFieldChange } from "@repo/ethereum-reports/reports/object-check-report";
 

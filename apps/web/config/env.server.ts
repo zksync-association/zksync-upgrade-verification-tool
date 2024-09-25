@@ -2,6 +2,7 @@ import { EthNetworkEnum } from "@/common/eth-network-enum";
 import { addressSchema } from "@repo/common/schemas";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
+import "dotenv/config";
 
 export const NodeEnvEnum = z.enum(["development", "test", "production"]);
 
@@ -26,6 +27,7 @@ export const env = createEnv({
     SKIP_REPORTS: z.coerce.boolean().default(false),
     ZK_GOV_OPS_GOVERNOR_ADDRESS: addressSchema,
     ZK_TOKEN_GOVERNOR_ADDRESS: addressSchema,
+    ZK_PROTOCOL_GOVERNOR_ADDRESS: addressSchema,
     ALLOW_PRIVATE_ACTIONS: boolFromStrSchema,
   },
   runtimeEnv: process.env,

@@ -29,6 +29,8 @@ export class TestApp {
   readonly backupNodeUrl = `http://localhost:${this.backupNodePort}`;
   readonly mainNodePort = 8561;
   readonly mainNodeUrl = `http://localhost:${this.mainNodePort}`;
+  readonly l2NodePort = 8570;
+  readonly l2NodeUrl = `http://localhost:${this.l2NodePort}`;
 
   readonly walletMnemonic =
     "draw drastic exercise toilet stove bone grit clutch any stand phone ten";
@@ -41,6 +43,7 @@ export class TestApp {
     app: path.join(LOGS_DIR, "app.log"),
     backupNode: path.join(LOGS_DIR, "backup-node.log"),
     mainNode: path.join(LOGS_DIR, "main-node.log"),
+    l2Node: path.join(LOGS_DIR, "l2-node.log"),
   };
 
   constructor() {
@@ -63,10 +66,13 @@ export class TestApp {
     spinner.start("Starting main node");
     const mainNode = await this.startMainHardhatNode();
 
+    spinner.start("Starting l2 node");
+    const l2Node = await this.startL2Node();
+
     spinner.start("Starting app");
     const app = await this.startApp();
 
-    await this.savePids({ backupNode, mainNode, app });
+    await this.savePids({ backupNode, mainNode, app, l2Node });
 
     spinner.succeed("Test app started");
   }
@@ -76,13 +82,24 @@ export class TestApp {
     const pids = await this.getPids();
 
     spinner.start("Stopping app");
-    await killProcessByPid(pids.app);
+    await killProcessByPid(pids.app).catch(() =>
+      console.log(`error stopping app, pid=${pids.app}`)
+    );
 
     spinner.start("Stopping backup node");
-    await killProcessByPid(pids.backupNode);
+    await killProcessByPid(pids.backupNode).catch(() =>
+      console.log(`error stopping backup node, pid=${pids.backupNode}`)
+    );
 
     spinner.start("Stopping main node");
-    await killProcessByPid(pids.mainNode);
+    await killProcessByPid(pids.mainNode).catch(() =>
+      console.log(`error stopping main node, pid=${pids.mainNode}`)
+    );
+
+    spinner.start("Stopping l2 node");
+    await killProcessByPid(pids.l2Node).catch(() =>
+      console.log(`error stopping l2 node, pid=${pids.l2Node}`)
+    );
 
     spinner.succeed("Test app stopped");
   }
@@ -227,6 +244,30 @@ export class TestApp {
     return pid;
   }
 
+  private async startL2Node() {
+    const pid = spawnBackground(
+      `pnpm hardhat --config hardhat-l2.config.cts node-zksync --port ${this.l2NodePort}`,
+      {
+        cwd: this.contractsDir,
+        env: {
+          L1_RPC_URL: this.mainNodeUrl,
+          L2_RPC_URL: this.l2NodeUrl,
+        },
+        outputFile: this.logPaths.l2Node,
+      }
+    );
+    await this.waitForHardhatNode(this.l2NodeUrl);
+    await exec("pnpm deploy:setup:l2", {
+      cwd: this.contractsDir,
+      env: {
+        ...process.env,
+        L1_RPC_URL: this.backupNodeUrl,
+        L2_RPC_URL: this.l2NodeUrl,
+      },
+    });
+    return pid;
+  }
+
   private async startApp({ env }: { env?: Record<string, string> } = {}) {
     const pid = spawnBackground("pnpm start", {
       cwd: this.webDir,
@@ -235,12 +276,15 @@ export class TestApp {
         DATABASE_URL: this.testDatabaseUrl,
         SERVER_PORT: this.appPort.toString(),
         L1_RPC_URL: this.mainNodeUrl,
-        L2_RPC_URL: this.mainNodeUrl,
+        L2_RPC_URL: this.l2NodeUrl,
         ALLOW_PRIVATE_ACTIONS: "true",
         NODE_ENV: "production",
         UPGRADE_HANDLER_ADDRESS: "0xab3ab5d67ed26ac1935dd790f4f013d222ba5073",
-        ZK_GOV_OPS_GOVERNOR_ADDRESS: "0xb0d4a25cecf5b05279c7ce62db5b26de1dfc3690",
-        ZK_TOKEN_GOVERNOR_ADDRESS: "0x68c3633a5d1125f7aed0c2c549fa2d0f643f73e8",
+        ZK_GOV_OPS_GOVERNOR_ADDRESS: "0xaAF5f437fB0524492886fbA64D703df15BF619AE",
+        ZK_TOKEN_GOVERNOR_ADDRESS: "0x99E12239CBf8112fBB3f7Fd473d0558031abcbb5",
+        ZK_PROTOCOL_GOVERNOR_ADDRESS: "0x23b13d016E973C9915c6252271fF06cCA2098885",
+        WALLET_CONNECT_PROJECT_ID: "test",
+        ETHERSCAN_API_KEY: "test",
         ETH_NETWORK: "local",
         LOCAL_CHAIN_PORT: this.mainNodePort.toString(),
         ...env,
@@ -330,7 +374,7 @@ export class TestApp {
     }
   }
 
-  private async waitForApp(maxRetries = 30, retryInterval = 1000) {
+  private async waitForApp(maxRetries = 10, retryInterval = 1000) {
     for (let i = 0; i < maxRetries; i++) {
       try {
         const response = await fetch(this.appUrl);
@@ -349,12 +393,14 @@ export class TestApp {
     app,
     backupNode,
     mainNode,
+    l2Node,
   }: {
     app: number;
     backupNode: number;
     mainNode: number;
+    l2Node: number;
   }) {
-    return fs.writeFile(PIDS_FILE, JSON.stringify({ app, backupNode, mainNode }, null, 2));
+    return fs.writeFile(PIDS_FILE, JSON.stringify({ app, backupNode, mainNode, l2Node }, null, 2));
   }
 
   private async getPids() {
@@ -364,6 +410,7 @@ export class TestApp {
         app: z.number(),
         backupNode: z.number(),
         mainNode: z.number(),
+        l2Node: z.number(),
       })
       .parse(pids);
   }

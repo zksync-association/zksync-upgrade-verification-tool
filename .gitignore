@@ -49,8 +49,11 @@ node_modules/
 # Build outputs
 .cache
 artifacts/
+artifacts-zk/
 build/
 cache/
+cache-zk/
+deployments-zk/
 dist/
 out/
 server-build/
@@ -63,6 +66,7 @@ vite.config.ts.*
 # Hardhat
 **/.hardhat*
 **/addresses.txt
+**/addresses-l2.txt
 **/test-results/
 
 # Turborepo

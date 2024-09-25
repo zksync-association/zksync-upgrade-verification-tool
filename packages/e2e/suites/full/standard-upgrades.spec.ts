@@ -24,7 +24,9 @@ test("TC002 - Check list of active proposals is display with active proposals", 
   const activeProposalsSection = page
     .getByRole("heading", { name: "Active Standard Proposals" })
     .locator("..")
+    .locator("..")
     .locator("..");
+
   const proposalButton = activeProposalsSection.getByRole("button", {
     name: /^0x[a-fA-F0-9]{64}$/,
   });
@@ -39,8 +41,9 @@ test("TC003 - Check list of active proposals is displayed without active proposa
   const activeProposalsSection = page
     .getByRole("heading", { name: "Active Standard Proposals", exact: true })
     .locator("..")
+    .locator("..")
     .locator("..");
-  await expect(activeProposalsSection.getByRole("button")).toHaveCount(0);
+  await expect(activeProposalsSection.getByRole("button")).not.toBeAttached();
   await expect(
     activeProposalsSection.getByText("No active standard proposals found.")
   ).toBeVisible();
@@ -54,6 +57,7 @@ test("TC004 - Check list of inactive proposals is displayed with inactive propos
   const inactiveProposalsSection = page
     .getByRole("heading", { name: "Inactive Standard Proposals" })
     .locator("..")
+    .locator("..")
     .locator("..");
   const proposalButton = inactiveProposalsSection.getByRole("button", {
     name: /^0x[a-fA-F0-9]{64}$/,
@@ -66,6 +70,7 @@ test("TC005 - Check list of inactive proposals is displayed without inactive pro
 }) => {
   const inactiveProposalsSection = page
     .getByRole("heading", { name: "Inactive Standard Proposals" })
+    .locator("..")
     .locator("..")
     .locator("..");
   await expect(inactiveProposalsSection.getByRole("button")).toHaveCount(0);
@@ -100,6 +105,7 @@ test("TC007 - Verify proposal details are correctly displayed on an inactive pro
   await page.reload();
   const inactiveProposalsSection = page
     .getByRole("heading", { name: "Inactive Standard Proposals" })
+    .locator("..")
     .locator("..")
     .locator("..");
   const proposalButton = inactiveProposalsSection.getByRole("button", {
@@ -299,9 +305,59 @@ test("TC015 - Verify a proposal can be executed by anyone", async ({ page, switc
   await expect(page.getByText("Transaction successful")).toBeVisible();
 });
 
+test("TC016: Click in plus button -> Start regular upgrade flow page is shown. Upgrades ready in l2 are displayed", async ({
+  page,
+}) => {
+  await goToStartProposal(page);
+
+  await expect(page.getByRole("button", { name: "Start" })).toBeDisabled();
+  await expect(page.locator("td").filter({ hasText: /^[0-9]{50}/ })).toBeVisible();
+  await expect(
+    page.locator("td").filter({ hasText: /0x[a-fA-F0-9]{8}...[a-fA-F0-9]{10}/ })
+  ).toBeVisible();
+});
+
+test("TC017: Start new regular upgrade page -> Upgrade can be started. Redirects to tx page. -> New upgrade is displayed in index page", async ({
+  page,
+  wallet,
+}) => {
+  await goToStartProposal(page);
+
+  await page
+    .getByText(/0x[a-fA-F0-9]{8}...[a-fA-F0-9]{10}/)
+    .locator("..")
+    .locator('[name="proposal"]')
+    .click();
+
+  await page.getByRole("button", { name: "Start" }).click();
+  await wallet.confirmTransaction();
+
+  await page.getByText("Transaction successful").waitFor();
+
+  await page.goto("/app/proposals");
+  await page.getByText("Active Standard Proposals", { exact: true }).waitFor();
+
+  const activeProposalsSection = page
+    .getByRole("heading", { name: "Active Standard Proposals" })
+    .locator("..")
+    .locator("..")
+    .locator("..");
+
+  await activeProposalsSection.getByText(/0x/).first().waitFor();
+
+  const buttons = await activeProposalsSection.getByRole("button", { name: /^0x/ }).all();
+
+  expect(buttons.length).toBe(2);
+});
+
+async function goToStartProposal(page: Page) {
+  await page.getByTestId("start-regular-upgrade").click();
+  await page.getByText("Start regular upgrade flow").waitFor();
+}
 async function goToProposalDetails(page: Page) {
   const activeProposalsSection = page
     .getByRole("heading", { name: "Active Standard Proposals" })
+    .locator("..")
     .locator("..")
     .locator("..");
   const proposalButton = activeProposalsSection.getByRole("button", {

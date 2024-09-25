@@ -1,39 +1,31 @@
 import type { Call } from "@/common/calls";
-import { type AbiParameter, type Hex, encodeAbiParameters, keccak256 } from "viem";
+import { type Hex, encodeAbiParameters, keccak256, hexToBigInt } from "viem";
 
-type UpgradeProposal = {
-  calls: Call[];
-  executor: Hex;
-  salt: Hex;
-};
+export const upgradeStructAbi = {
+  type: "tuple",
+  components: [
+    {
+      type: "tuple[]",
+      components: [
+        { type: "address", name: "target" },
+        { type: "uint256", name: "value" },
+        { type: "bytes", name: "data" },
+      ],
+      name: "calls",
+    },
+    { type: "address", name: "executor" },
+    { type: "bytes32", name: "salt" },
+  ],
+} as const;
 
 export const calculateUpgradeProposalHash = (calls: Call[], salt: Hex, executorAddress: Hex) => {
-  const upgradeProposal: UpgradeProposal = {
-    calls,
+  const upgradeProposal = {
+    calls: calls.map((c) => ({ ...c, value: hexToBigInt(c.value) })),
     executor: executorAddress,
     salt,
   };
 
-  const upgradeProposalAbi: AbiParameter[] = [
-    {
-      type: "tuple",
-      components: [
-        {
-          type: "tuple[]",
-          components: [
-            { type: "address", name: "target" },
-            { type: "uint256", name: "value" },
-            { type: "bytes", name: "data" },
-          ],
-          name: "calls",
-        },
-        { type: "address", name: "executor" },
-        { type: "bytes32", name: "salt" },
-      ],
-    },
-  ];
-
-  const encodedProposal = encodeAbiParameters(upgradeProposalAbi, [upgradeProposal]);
+  const encodedProposal = encodeAbiParameters([upgradeStructAbi], [upgradeProposal]);
   return keccak256(encodedProposal);
 };
 

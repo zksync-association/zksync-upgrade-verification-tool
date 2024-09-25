@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { displayBytes32 } from "@/routes/app/proposals/$id/common-tables";
+import { displayBytes32 } from "@/utils/common-tables";
 import { getTransactionUrl } from "@/utils/etherscan";
 import { capitalizeFirstLetter } from "@/utils/string";
 
