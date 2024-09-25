@@ -337,7 +337,14 @@ test("TC017: Start new regular upgrade page -> Upgrade can be started. Redirects
   await page.goto("/app/proposals");
   await page.getByText("Active Standard Proposals", { exact: true }).waitFor();
 
-  const buttons = await page.getByText(/^0x[a-fA-F0-9]{64}$/).all();
+  const activeProposalsSection = page
+    .getByRole("heading", { name: "Active Standard Proposals" })
+    .locator("..")
+    .locator("..")
+    .locator("..");
+
+  const buttons = await activeProposalsSection.getByRole("button", { name: /^0x/ }).all();
+
   expect(buttons.length).toBe(2);
 });
 
@@ -345,7 +352,6 @@ async function goToStartProposal(page: Page) {
   await page.getByTestId("start-regular-upgrade").click();
   await page.getByText("Start regular upgrade flow").waitFor();
 }
-
 async function goToProposalDetails(page: Page) {
   const activeProposalsSection = page
     .getByRole("heading", { name: "Active Standard Proposals" })
