@@ -343,6 +343,8 @@ test("TC017: Start new regular upgrade page -> Upgrade can be started. Redirects
     .locator("..")
     .locator("..");
 
+  await activeProposalsSection.getByText(/0x/).first().waitFor();
+
   const buttons = await activeProposalsSection.getByRole("button", { name: /^0x/ }).all();
 
   expect(buttons.length).toBe(2);
