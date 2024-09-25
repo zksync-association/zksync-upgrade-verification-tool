@@ -1,8 +1,6 @@
 import { l2Rpc } from "@/.server/service/ethereum-l2/client";
 import { type Address, getContract, type Hex, hexToBigInt, numberToHex } from "viem";
 import { zkGovOpsGovernorAbi } from "@/utils/contract-abis";
-import { z } from "zod";
-import { hexSchema } from "@repo/common/schemas";
 import { queryLogs } from "@/.server/service/server-utils";
 
 const governor = (address: Address) =>
@@ -12,60 +10,43 @@ const governor = (address: Address) =>
     client: l2Rpc,
   });
 
-export const createdSchema = z.object({
-  proposalId: z.bigint().transform((bn) => numberToHex(bn)),
-  proposer: hexSchema,
-  targets: z.array(hexSchema),
-  values: z.array(z.bigint().transform((bn) => numberToHex(bn))),
-  signatures: z.array(z.string()),
-  calldatas: z.array(hexSchema),
-  voteStart: z.bigint().transform((bn) => numberToHex(bn)),
-  voteEnd: z.bigint().transform((bn) => numberToHex(bn)),
-  description: z.string(),
-});
-type ProposalCreatedEvent = z.infer<typeof createdSchema>;
-
-const canceledSchema = z.object({
-  proposalId: z.bigint().transform((bn) => numberToHex(bn)),
-});
-
 export async function lookForActiveProposals(
   address: Address,
   fromBlock: bigint
-): Promise<ProposalCreatedEvent[]> {
-  const createdPromise = await queryLogs(
+) {
+  const createdPromise = queryLogs(
     zkGovOpsGovernorAbi,
     address,
     "ProposalCreated",
     fromBlock
-  ).then((logs) => logs.map((log) => createdSchema.parse(log.args)));
+  ).then((logs) => logs.map((log) => log.args));
 
-  const cancelledPromise = await queryLogs(
+  const cancelledPromise = queryLogs(
     zkGovOpsGovernorAbi,
     address,
     "ProposalCanceled",
     fromBlock
   ).then((logs) =>
     logs
-      .map((log) => canceledSchema.parse(log.args))
-      .reduce((acc, curr): Set<Hex> => {
-        acc.add(curr.proposalId);
+      .map((log) => log.args.proposalId)
+      .reduce((acc, curr): Set<bigint> => {
+        acc.add(curr);
         return acc;
-      }, new Set<Hex>())
+      }, new Set<bigint>())
   );
 
-  const executedPromise = await queryLogs(
+  const executedPromise = queryLogs(
     zkGovOpsGovernorAbi,
     address,
     "ProposalExecuted",
     fromBlock
   ).then((logs) =>
     logs
-      .map((log) => canceledSchema.parse(log.args))
-      .reduce((acc, curr): Set<Hex> => {
-        acc.add(curr.proposalId);
+      .map((log) => log.args.proposalId)
+      .reduce((acc, curr): Set<bigint> => {
+        acc.add(curr);
         return acc;
-      }, new Set<Hex>())
+      }, new Set<bigint>())
   );
 
   const [created, canceledSet, executedSet] = await Promise.all([
@@ -76,7 +57,15 @@ export async function lookForActiveProposals(
 
   return created.filter(
     (creation) => !canceledSet.has(creation.proposalId) && !executedSet.has(creation.proposalId)
-  );
+  ).map(raw => {
+    return {
+      ...raw,
+      proposalId: numberToHex(raw.proposalId),
+      values: raw.values.map(v => numberToHex(v)),
+      voteStart: numberToHex(raw.voteStart),
+      voteEnd: numberToHex(raw.voteEnd)
+    }
+  });
 }
 
 export async function getL2ProposalState(address: Hex, proposalId: Hex): Promise<number> {
