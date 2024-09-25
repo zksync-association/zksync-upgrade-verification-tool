@@ -82,21 +82,16 @@ export function buildCli(
       }
     )
     .command(
-      "storage-diff <upgradeDir>",
+      "storage-diff",
       "Executes the upgrade transaction in debug mode to analyze the changes in contract storage",
       (yargs) =>
         yargs
-          .positional("upgradeDir", {
-            describe: "FolderName of the upgrade to check",
-            type: "string",
-            demandOption: true,
-          })
           .option("precalculated", {
             type: "string",
             demandOption: false,
           }),
       async (yargs) => {
-        return storageDiffCbk(env, yargs.upgradeDir, Option.fromNullable(yargs.precalculated));
+        return storageDiffCbk(env, yargs.file, Option.fromNullable(yargs.precalculated));
       }
     )
     .command(
@@ -108,15 +103,10 @@ export function buildCli(
       }
     )
     .command(
-      "download-code <upgradeDir> <targetSourceCodeDir>",
+      "download-code <targetSourceCodeDir>",
       "Download source code diff",
       (yargs) =>
         yargs
-          .positional("upgradeDir", {
-            describe: "FolderName of the upgrade to check",
-            type: "string",
-            demandOption: true,
-          })
           .positional("targetSourceCodeDir", {
             describe: "Directory to save the downloaded source code",
             type: "string",
@@ -156,7 +146,7 @@ export function buildCli(
             .map((sc) => `sc:${sc}`)
         );
 
-        await downloadCodeCbk(env, yargs.upgradeDir, yargs.targetSourceCodeDir, filter);
+        await downloadCodeCbk(env, yargs.file, yargs.targetSourceCodeDir, filter);
       }
     )
     .demandCommand(1, "Please specify a command")

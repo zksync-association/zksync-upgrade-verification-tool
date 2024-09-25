@@ -10,13 +10,13 @@ describe("cli", () => {
   describe("check", () => {
     it("sends right arguments", async () => {
       let called = false;
-      const fakeCheck = async (env: EnvBuilder, upgradeDirectory: string): Promise<void> => {
-        expect(upgradeDirectory).to.equal("someDir");
+      const fakeCheck = async (env: EnvBuilder, filePath: string): Promise<void> => {
+        expect(filePath).to.equal("pathToJsonFile");
         expect(env.etherscanApiKey).to.eql("fakeKey");
         called = true;
       };
       const cli = buildCli(
-        ["check", "someDir", "--ethscankey=fakeKey"],
+        ["check", "--file=pathToJsonFile", "--ethscankey=fakeKey"],
         fakeCheck,
         fail,
         fail,
@@ -43,7 +43,7 @@ describe("cli", () => {
         called = true;
       };
       const cli = buildCli(
-        ["download-code", "someDir", "targetDir", "--ethscankey=fakeKey"],
+        ["download-code", "-f", "someDir", "targetDir", "--ethscankey=fakeKey"],
         fail,
         fakeDownload,
         fail,
@@ -67,7 +67,7 @@ describe("cli", () => {
         called = true;
       };
       const cli = buildCli(
-        ["storage-diff", "someDir", "--ethscankey=fakeKey"],
+        ["storage-diff", "-f", "someDir", "--ethscankey=fakeKey"],
         fail,
         fail,
         fakeStorageDiff,
@@ -89,7 +89,7 @@ describe("cli", () => {
         called = true;
       };
       const cli = buildCli(
-        ["storage-diff", "someDir", "--ethscankey=fakeKey", "--precalculated=path/to/data.json"],
+        ["storage-diff", "-f", "someDir", "--ethscankey=fakeKey", "--precalculated=path/to/data.json"],
         fail,
         fail,
         fakeStorageDiff,
