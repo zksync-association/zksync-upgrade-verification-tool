@@ -11,14 +11,14 @@ describe("CLI Output Test Suite", () => {
   });
 
   it("errors on missing update file option", async () => {
-    const { stdout } = await expectToFailAsync(() =>
-      execAsync("pnpm validate check")
-    );
+    const { stdout } = await expectToFailAsync(() => execAsync("pnpm validate check"));
     expect(stdout).to.contain("Missing required argument: file");
   });
 
   it("should error on invalid command", async () => {
-    const { stdout } = await expectToFailAsync(() => execAsync("pnpm validate -f some/file unknownCommand"));
+    const { stdout } = await expectToFailAsync(() =>
+      execAsync("pnpm validate -f some/file unknownCommand")
+    );
     expect(stdout).to.contain("Unknown argument: unknownCommand");
   });
 

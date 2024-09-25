@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
-import { execAsync } from "./helpers/util.js";
+import { describe } from "vitest";
 
 describe.skip("storage-diff", () => {});

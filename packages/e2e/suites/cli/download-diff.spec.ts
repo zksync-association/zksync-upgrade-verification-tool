@@ -1,6 +1,3 @@
-import { describe, expect, it } from "vitest";
-import { createTempDir, execAsync, expectToFailAsync } from "./helpers/util.js";
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
+import { describe } from "vitest";
 
 describe.skip("validate download-diff", () => {});
