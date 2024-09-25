@@ -1,0 +1,30 @@
+name: Workflow template for testing e2e jobs
+on:
+  workflow_call:
+    secrets:
+      ETHERSCAN_API_KEY:
+        required: true
+
+env:
+  FORCE_COLOR: 1
+
+defaults:
+  run:
+    working-directory: ./packages/e2e
+
+jobs:
+  test-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+      - run: pnpm install
+      - run: cd ../../apps/cli && pnpm build
+      - run: cp .env.example .env
+      - env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        run: pnpm test:cli

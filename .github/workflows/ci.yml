@@ -29,7 +29,23 @@ jobs:
               - '**/*'
               - '!**/*.md'
               - '!**/*.MD'
-
+            
+            webapp:
+              - 'apps/web/**/*'
+              - 'packages/common/**/*'
+              - 'packages/contracts/**/*'
+              - 'packages/e2e/**/*'
+              - '!packages/e2e/suits/cli/**/*'
+              - '!**/*.md'
+              - '!**/*.MD'
+            
+            cli:
+              - 'apps/cli/**/*'
+              - 'packages/common/**/*'
+              - 'packages/e2e/**/*'
+              - '!packages/e2e/suits/full/**/*'
+              - '!**/*.md'
+              - '!**/*.MD'
   ci-for-lint:
     name: Lint
     needs: ["changed-files"]
@@ -42,11 +58,18 @@ jobs:
     if: ${{ needs.changed-files.outputs.app == 'true' }}
     uses: ./.github/workflows/test-reusable.yml
 
-  ci-for-test-e2e:
+  ci-for-test-e2e-cli:
     name: Test E2E
     needs: ["changed-files", "ci-for-lint"]
-    if: ${{ needs.changed-files.outputs.app == 'true' }}
-    uses: ./.github/workflows/test-e2e-reusable.yml
+    if: ${{ needs.changed-files.outputs.cli == 'true' }}
+    uses: ./.github/workflows/test-e2e-cli-reusable.yml
+    secrets: inherit
+
+  ci-for-test-e2e-web:
+    name: Test E2E
+    needs: [ "changed-files", "ci-for-lint" ]
+    if: ${{ needs.changed-files.outputs.webapp == 'true' }}
+    uses: ./.github/workflows/test-e2e-web-reusable.yml
     secrets: inherit
 
   ci-for-docker:
