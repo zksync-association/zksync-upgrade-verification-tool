@@ -2,7 +2,7 @@ import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { env } from "@config/env.server";
-import { Link, useLoaderData } from "@remix-run/react";
+import { Link, useLoaderData, useNavigation } from "@remix-run/react";
 import { $path } from "remix-routes";
 import { useAccount } from "wagmi";
 
@@ -14,6 +14,7 @@ export function loader() {
 export default function Index() {
   const account = useAccount();
   const { showButtons } = useLoaderData<typeof loader>();
+  const navigation = useNavigation();
 
   return (
     <>
