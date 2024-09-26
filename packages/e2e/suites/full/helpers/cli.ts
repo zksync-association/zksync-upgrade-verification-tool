@@ -35,7 +35,6 @@ export function spawnBackground(
 
   const pid = proc.pid;
   if (!pid) {
-    console.log(proc.exitCode);
     throw new Error("Failed to start process");
   }
 

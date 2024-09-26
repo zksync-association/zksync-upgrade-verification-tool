@@ -195,6 +195,9 @@ importers:
       date-fns:
         specifier: '=3.6.0'
         version: 3.6.0
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.4.5
       drizzle-orm:
         specifier: '=0.33.0'
         version: 0.33.0(@types/react@18.3.5)(postgres@3.4.4)(react@18.2.0)
@@ -295,9 +298,6 @@ importers:
       autoprefixer:
         specifier: ^10.4.19
         version: 10.4.20(postcss@8.4.41)
-      dotenv:
-        specifier: ^16.4.5
-        version: 16.4.5
       drizzle-kit:
         specifier: ^0.24.0
         version: 0.24.2
