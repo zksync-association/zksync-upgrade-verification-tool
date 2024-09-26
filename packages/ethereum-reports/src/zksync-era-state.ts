@@ -2,7 +2,7 @@ import { bytesToBigInt, bytesToHex, bytesToNumber, type Hex, numberToBytes } fro
 import type { FacetData } from "./upgrade-changes.js";
 import { Option } from "nochoices";
 import { Diamond } from "./diamond.js";
-import { RpcStorageSnapshot } from "./storage/snapshot/index.js";
+import { RpcStorageSnapshot } from "./storage/snapshot";
 import { StringStorageVisitor } from "./reports/string-storage-visitor.js";
 import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props.js";
 import {
@@ -11,7 +11,7 @@ import {
   type SystemContractProvider,
 } from "./system-contract-providers.js";
 import { z } from "zod";
-import { RecordStorageSnapshot } from "./storage/snapshot/index.js";
+import { RecordStorageSnapshot } from "./storage/snapshot";
 import {
   AddressExtractor,
   BigNumberExtractor,
@@ -20,7 +20,7 @@ import {
   ListOfAddressesExtractor,
 } from "./reports/extractors.js";
 import type { ContractField } from "./storage/contractField.js";
-import type { StorageSnapshot } from "./storage/snapshot/index.js";
+import type { StorageSnapshot } from "./storage/snapshot";
 import type { StorageVisitor } from "./reports/storage-visitor.js";
 import {
   BlockExplorerClient,

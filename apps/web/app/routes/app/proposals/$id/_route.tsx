@@ -157,13 +157,7 @@ export default function Proposals() {
           }
         >
           <Await resolve={asyncData}>
-            {({
-              addresses,
-              proposal,
-              userSignedLegalVeto,
-              userSignedProposal,
-              ethNetwork,
-            }) => {
+            {({ addresses, proposal, userSignedLegalVeto, userSignedProposal, ethNetwork }) => {
               const securityCouncilSignaturesReached =
                 proposal.signatures.approveUpgradeSecurityCouncil.length >=
                 NECESSARY_SECURITY_COUNCIL_SIGNATURES;
