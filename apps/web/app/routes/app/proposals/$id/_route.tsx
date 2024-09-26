@@ -2,7 +2,6 @@ import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 import { nowInSeconds } from "@/.server/service/proposals";
-import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
@@ -13,12 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
 import ContractWriteButton from "@/routes/app/proposals/$id/contract-write-button";
 import ExecuteUpgradeButton from "@/routes/app/proposals/$id/execute-upgrade-button";
-import FacetChangesTable from "@/routes/app/proposals/$id/facet-changes-table";
-import FieldChangesTable from "@/routes/app/proposals/$id/field-changes-table";
-import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-changes-table";
 import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
-import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { displayBytes32 } from "@/utils/common-tables";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
@@ -57,8 +52,6 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   }
 
   const getAsyncData = async () => {
-    const checkReport = await getCheckReport(id);
-    const storageChangeReport = await getStorageChangeReport(id);
     const [guardians, council, proposalStatus, signatures, proposalData] = await Promise.all([
       guardiansAddress(),
       securityCouncilAddress(),
@@ -70,8 +63,6 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
     return {
       proposal: {
-        currentVersion: checkReport.metadata.currentVersion,
-        proposedVersion: checkReport.metadata.proposedVersion,
         proposedOn: proposal.proposedOn,
         executor: proposal.executor,
         status: proposalStatus,
@@ -100,12 +91,6 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
             .sort((a, b) => compareHexValues(a.signer, b.signer)),
         },
         transactionHash: proposal.transactionHash,
-      },
-      reports: {
-        facetChanges: checkReport.facetChanges,
-        systemContractChanges: checkReport.systemContractChanges,
-        fieldChanges: checkReport.fieldChanges,
-        fieldStorageChanges: storageChangeReport,
       },
       addresses: {
         guardians,
@@ -175,7 +160,6 @@ export default function Proposals() {
             {({
               addresses,
               proposal,
-              reports,
               userSignedLegalVeto,
               userSignedProposal,
               ethNetwork,
@@ -229,18 +213,6 @@ export default function Proposals() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-6">
-                          <div className="flex justify-between">
-                            <span>Current Version:</span>
-                            <span className="w-1/2 break-words text-right">
-                              {proposal.currentVersion}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Proposed Version:</span>
-                            <span className="w-1/2 break-words text-right">
-                              {proposal.proposedVersion}
-                            </span>
-                          </div>
                           <div className="flex justify-between">
                             <span>Proposal ID:</span>
                             <span className="w-1/2 justify-end break-words">{proposalId}</span>
@@ -381,57 +353,8 @@ export default function Proposals() {
                     <h2 className="font-bold text-3xl">Upgrade Analysis</h2>
                     <Tabs className="mt-4 flex" defaultValue="facet-changes">
                       <TabsList className="mt-12 mr-6">
-                        <TabsTrigger value="facet-changes">Facet Changes</TabsTrigger>
-                        <TabsTrigger value="system-contract-changes">
-                          System Contract Changes
-                        </TabsTrigger>
-                        <TabsTrigger value="field-changes">Field Changes</TabsTrigger>
-                        <TabsTrigger value="field-storage-changes">
-                          Field Storage Changes
-                        </TabsTrigger>
                         <TabsTrigger value="raw-data">Raw Data</TabsTrigger>
                       </TabsList>
-                      <TabsContent value="facet-changes" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>Facet Changes</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <FacetChangesTable data={reports.facetChanges} />
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                      <TabsContent value="system-contract-changes" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>System Contract Changes</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <SystemContractChangesTable data={reports.systemContractChanges} />
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                      <TabsContent value="field-changes" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>Field Changes</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <FieldChangesTable data={reports.fieldChanges} />
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                      <TabsContent value="field-storage-changes" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>Field Storage Changes</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <FieldStorageChangesTable data={reports.fieldStorageChanges} />{" "}
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-
                       <TabsContent value="raw-data" className="w-full">
                         <Card className="pb-8">
                           <CardHeader>

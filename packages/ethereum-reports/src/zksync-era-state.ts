@@ -60,7 +60,6 @@ export const BYTES32_ZKSYNC_FIELDS = [
 ] as const;
 
 export const HEX_ZKSYNC_FIELDS = [...ADDR_ZKSYNC_FIELDS, ...BYTES32_ZKSYNC_FIELDS] as const;
-
 export type HexEraPropName = (typeof HEX_ZKSYNC_FIELDS)[number];
 
 export const NUMERIC_ZKSYNC_FIELDS = [
