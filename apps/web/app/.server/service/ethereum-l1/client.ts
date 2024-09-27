@@ -1,5 +1,6 @@
 import { env } from "@config/env.server";
 import { createPublicClient, http } from "viem";
+import { defaultLogger } from "@config/log.server";
 
 export const l1Rpc = createPublicClient({
   transport: http(env.L1_RPC_URL),
@@ -26,10 +27,10 @@ export const checkConnection = async () => {
     const data: any = await response.json();
     return "result" in data;
   } catch (error) {
-    console.error("Error checking connection to :", env.L1_RPC_URL);
+    defaultLogger.error("Error checking connection to :", env.L1_RPC_URL);
     if (error instanceof Error) {
-      console.error(error.message);
-      console.error(error.cause);
+      defaultLogger.error(error.message);
+      defaultLogger.error(error.cause);
     }
     return false;
   }
