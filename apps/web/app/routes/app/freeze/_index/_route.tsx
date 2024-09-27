@@ -137,8 +137,18 @@ export default function Index() {
   const { activeProposals, inactiveProposals } = useLoaderData<typeof loader>();
   return (
     <div className="space-y-4">
-      <ProposalCard title="Active Proposals" proposals={activeProposals} type="active" />
-      <ProposalCard title="Inactive Proposals" proposals={inactiveProposals} type="inactive" />
+      <ProposalCard
+        title="Active Proposals"
+        proposals={activeProposals}
+        type="active"
+        data-testid="active-proposals-card"
+      />
+      <ProposalCard
+        title="Inactive Proposals"
+        proposals={inactiveProposals}
+        type="inactive"
+        data-testid="inactive-proposals-card"
+      />
     </div>
   );
 }
@@ -148,14 +158,16 @@ function ProposalCard({
   proposals,
   className,
   type,
+  ...props
 }: {
   title: string;
   proposals: Jsonify<InferSelectModel<typeof freezeProposalsTable>>[];
   className?: string;
   type: "active" | "inactive";
+  "data-testid": string;
 }) {
   return (
-    <Card className={cn("pb-10", className)}>
+    <Card className={cn("pb-10", className)} data-testid={props["data-testid"]}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{title}</CardTitle>

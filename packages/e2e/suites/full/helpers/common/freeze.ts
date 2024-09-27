@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 export async function goToFreezeIndex(page: Page) {
   await page.goto("/");
   await page.getByText("Freeze Requests").click();
-  await page.getByText("Soft Freeze Proposals", { exact: true }).isVisible();
+  await page.getByText("Active Proposals", { exact: true }).isVisible();
 }
 
 export async function createFreeze(
@@ -22,6 +22,20 @@ export async function createFreeze(
 ) {
   await goToFreezeIndex(page);
   await page.getByTestId("create-freeze-btn").click();
+  await selectFreezeType(page, kind);
+
+  if (kind === "SET_SOFT_FREEZE_THRESHOLD") {
+    if (!threshold) throw new Error("Threshold is required for SET_SOFT_FREEZE_THRESHOLD");
+    await page.getByLabel("Threshold").fill(threshold.toString());
+  }
+
+  await page.getByRole("button", { name: "Create" }).click();
+}
+
+export async function selectFreezeType(
+  page: Page,
+  kind: "SOFT_FREEZE" | "HARD_FREEZE" | "UNFREEZE" | "SET_SOFT_FREEZE_THRESHOLD"
+) {
   await page.getByRole("combobox").click();
 
   let label: string;
@@ -40,11 +54,4 @@ export async function createFreeze(
       break;
   }
   await page.getByLabel(label, { exact: true }).click();
-
-  if (kind === "SET_SOFT_FREEZE_THRESHOLD") {
-    if (!threshold) throw new Error("Threshold is required for SET_SOFT_FREEZE_THRESHOLD");
-    await page.getByLabel("Threshold").fill(threshold.toString());
-  }
-
-  await page.getByRole("button", { name: "Create" }).click();
 }

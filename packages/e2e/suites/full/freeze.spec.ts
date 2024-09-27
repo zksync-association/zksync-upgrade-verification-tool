@@ -2,7 +2,7 @@ import { expect, type IntRange, type RoleSwitcher, test } from "./helpers/dappwr
 import type { Page } from "@playwright/test";
 import type { Dappwright as Wallet } from "@tenkeylabs/dappwright";
 import type { COUNCIL_SIZE } from "@repo/contracts/helpers/constants";
-import { createFreeze, goToFreezeIndex } from "./helpers/common/freeze.js";
+import { createFreeze, goToFreezeIndex, selectFreezeType } from "./helpers/common/freeze.js";
 
 test.beforeEach(async ({ testApp }) => {
   await testApp.reset();
@@ -15,14 +15,18 @@ function compareExtractedTextWithDate(extractedText: string | null, expectedDate
   expect(number).toBeGreaterThan(expectedNumber - 10);
 }
 
-async function goToFreezeDetailsPage(page: Page, kind: string) {
+async function goToFreezeDetailsPage(
+  page: Page,
+  kind: "SOFT_FREEZE" | "HARD_FREEZE" | "UNFREEZE" | "SET_SOFT_FREEZE_THRESHOLD"
+) {
   await goToFreezeIndex(page);
-
-  await page
-    .getByTestId(`${kind}-proposals`)
-    .getByText(/Proposal \d+/)
-    .click();
-
+  const label = {
+    SOFT_FREEZE: "Soft Freeze",
+    HARD_FREEZE: "Hard Freeze",
+    SET_SOFT_FREEZE_THRESHOLD: "Set Soft Freeze Threshold",
+    UNFREEZE: "Unfreeze",
+  }[kind];
+  await page.getByText(new RegExp(`^${label} - Proposal \\d+$`)).click();
   await page.getByText("Proposal Details").isVisible();
 }
 
@@ -54,7 +58,7 @@ async function withVoteIncrease(page: Page, fn: () => Promise<void>) {
 
 async function applyApprovals(
   page: Page,
-  kind: string,
+  kind: "SOFT_FREEZE" | "HARD_FREEZE" | "UNFREEZE" | "SET_SOFT_FREEZE_THRESHOLD",
   switcher: RoleSwitcher,
   wallet: Wallet,
   councilIndexes: IntRange<1, typeof COUNCIL_SIZE>[]
@@ -83,13 +87,6 @@ async function broadcastAndCheckFreeze(page: Page, wallet: Wallet) {
   await expect(page.getByText("Transaction Hash:")).toBeVisible();
 }
 
-async function createChangeThreshold(page: Page, newThreshold = 2) {
-  await goToFreezeIndex(page);
-  await page.getByTestId("change-threshold-create-btn").click();
-  await page.locator("[name='threshold']").fill(newThreshold.toString());
-  await page.getByRole("button", { name: "Create" }).click();
-}
-
 function approveButton(page: Page) {
   return page.getByTestId("approve-button");
 }
@@ -97,6 +94,15 @@ function approveButton(page: Page) {
 async function approveFreeze(page: Page, wallet: Wallet) {
   await approveButton(page).click();
   await wallet.sign();
+}
+
+async function openCreateProposal(page: Page) {
+  await page.getByTestId("create-freeze-btn").click();
+  await expect(page.getByRole("heading", { name: "Create Proposal" })).toBeVisible();
+  await expect(page.getByText("Proposal Type", { exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox")).toBeEnabled();
+  await expect(page.getByText("Valid Until")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create" })).toBeEnabled();
 }
 
 // General tests
@@ -108,26 +114,21 @@ test("TC300: Navigate to freeze index button is enabled", async ({ page, switche
   await expect(freezeButton).toBeEnabled();
 });
 
-test("TC 301: Navigate to index page shows list of empty freezes", async ({ page, switcher }) => {
+test("TC301: Navigate to index page shows list of empty freezes", async ({ page, switcher }) => {
   await switcher.council(1, page);
   await goToFreezeIndex(page);
-
-  for (const kind of ["SOFT_FREEZE", "HARD_FREEZE", "change-threshold", "UNFREEZE"]) {
-    await expect(page.getByTestId(`${kind}-card`).getByText("No proposals found.")).toBeVisible();
-  }
+  await expect(
+    page.getByTestId("active-proposals-card").getByText("No proposals found.")
+  ).toBeVisible();
+  await expect(
+    page.getByTestId("inactive-proposals-card").getByText("No proposals found.")
+  ).toBeVisible();
 });
 
-test("TC302: Navigate to freeze index. Shows all create buttons enabled", async ({
-  page,
-  switcher,
-}) => {
+test("TC302: Navigate to freeze index. Shows create button", async ({ page, switcher }) => {
   await switcher.council(1, page);
   await goToFreezeIndex(page);
-
-  await page.getByTestId("soft-create-btn").isEnabled();
-  await page.getByTestId("hard-create-btn").isEnabled();
-  await page.getByTestId("change-threshold-create-btn").isEnabled();
-  await page.getByTestId("unfreeze-create-btn").isEnabled();
+  await page.getByTestId("create-freeze-btn").isEnabled();
 });
 
 // soft freeze
@@ -137,16 +138,7 @@ test("TC303, TC304: click on create soft freeze button displays correct form.", 
   switcher,
 }) => {
   await switcher.council(1, page);
-
-  await goToFreezeIndex(page);
-
-  await page.getByTestId("soft-create-btn").click();
-
-  await expect(page.getByRole("heading", { name: "Create Soft Freeze Proposal" })).toBeVisible();
-  await expect(page.getByText("Valid Until")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create" })).toBeEnabled();
-
-  await page.getByRole("button", { name: "Create" }).click();
+  await createFreeze(page, "SOFT_FREEZE");
 
   await page.waitForURL("**/app/freeze/*");
 
@@ -164,11 +156,7 @@ test("TC305: Create second soft when there is an active one, fails with proper m
 }) => {
   await switcher.council(1, page);
   await createFreeze(page, "SOFT_FREEZE");
-
-  await goToFreezeIndex(page);
-
-  await page.getByTestId("soft-create-btn").click();
-  await page.getByRole("button", { name: "Create" }).click();
+  await createFreeze(page, "SOFT_FREEZE");
   await expect(page.getByText("Pending proposal already exists.")).toBeVisible();
 });
 
@@ -226,16 +214,7 @@ test("TC316, TC317: Fulfill signature threshold for soft freeze -> broadcast -> 
 
 test("TC306, TC307: create hard freeze popup is correct and works", async ({ page, switcher }) => {
   await switcher.council(1, page);
-
-  await goToFreezeIndex(page);
-
-  await page.getByTestId("hard-create-btn").click();
-
-  await expect(page.getByRole("heading", { name: "Create Hard Freeze Proposal" })).toBeVisible();
-  await expect(page.getByText("Valid Until")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create" })).toBeEnabled();
-
-  await page.getByRole("button", { name: "Create" }).click();
+  await createFreeze(page, "HARD_FREEZE");
 
   await page.waitForURL("**/app/freeze/*");
 
@@ -253,10 +232,7 @@ test("TC308: Create second hard freeze when there is an active one. Fails with p
 }) => {
   await switcher.council(1, page);
   await createFreeze(page, "HARD_FREEZE");
-  await goToFreezeIndex(page);
-
-  await page.getByTestId("hard-create-btn").click();
-  await page.getByRole("button", { name: "Create" }).click();
+  await createFreeze(page, "HARD_FREEZE");
   await expect(page.getByText("Pending proposal already exists.")).toBeVisible();
 });
 
@@ -316,16 +292,7 @@ test("TC338, TC339: click create unfreze -> right data -> creates correct unfree
   switcher,
 }) => {
   await switcher.council(1, page);
-
-  await goToFreezeIndex(page);
-
-  await page.getByTestId("unfreeze-create-btn").click();
-
-  await expect(page.getByRole("heading", { name: "Create Unfreeze Proposal" })).toBeVisible();
-  await expect(page.getByText("Valid Until")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create" })).toBeEnabled();
-
-  await page.getByRole("button", { name: "Create" }).click();
+  await createFreeze(page, "UNFREEZE");
 
   await page.waitForURL("**/app/freeze/*");
 
@@ -395,9 +362,7 @@ test("TC336, TC337: Freeze -> Gather unfreeze signatures -> Exec unfreeze tx -> 
 // change threshold
 
 async function cannotSignChangeThreshold(page: Page) {
-  await createChangeThreshold(page);
-
-  await goToFreezeDetailsPage(page, "change-threshold");
+  await createFreeze(page, "SET_SOFT_FREEZE_THRESHOLD", 2);
   await expect(page.getByText("No role actions")).toBeVisible();
   const approveButtons = await page.getByRole("button", { name: "Approve" }).all();
   expect(approveButtons).toHaveLength(0);
@@ -409,18 +374,8 @@ test("TC309, TC311: create change threshold proposal shows right data and works"
 }) => {
   await switcher.council(1, page);
 
-  await goToFreezeIndex(page);
+  await createFreeze(page, "SET_SOFT_FREEZE_THRESHOLD", 2);
 
-  await page.getByTestId("change-threshold-create-btn").click();
-
-  await expect(page.getByText("Set Soft Freeze Threshold Proposals")).toBeVisible();
-  await expect(page.getByText("Valid Until")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create" })).toBeEnabled();
-  const thresholdInput = page.locator("[name='threshold']");
-  await expect(thresholdInput).toBeEnabled();
-  await thresholdInput.fill("2");
-
-  await page.getByRole("button", { name: "Create" }).click();
   await page.waitForURL("**/app/freeze/*");
 
   const now = new Date();
@@ -437,7 +392,8 @@ test("TC310: Try to create a soft freeze threshold change with no threshold valu
 }) => {
   await switcher.guardian(1, page);
   await goToFreezeIndex(page);
-  await page.getByTestId("change-threshold-create-btn").click();
+  await openCreateProposal(page);
+  await selectFreezeType(page, "SET_SOFT_FREEZE_THRESHOLD");
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByText("Number must be greater than or equal to 1")).toBeVisible();
 });
@@ -472,8 +428,7 @@ test("TC326: Approve change threshold by security council -> updates state", asy
   wallet,
 }) => {
   await switcher.council(1, page);
-  await createChangeThreshold(page);
-  await goToFreezeDetailsPage(page, "change-threshold");
+  await createFreeze(page, "SET_SOFT_FREEZE_THRESHOLD", 2);
 
   await withVoteIncrease(page, async () => {
     await approveFreeze(page, wallet);
@@ -488,10 +443,16 @@ test("TC330, TC331: Gather signatures for change signatures -> Exec tx -> Right 
   wallet,
 }) => {
   await switcher.council(1, page);
-  await createChangeThreshold(page, 1);
-  await goToFreezeDetailsPage(page, "change-threshold");
+  await createFreeze(page, "SET_SOFT_FREEZE_THRESHOLD", 1);
+  await goToFreezeDetailsPage(page, "SET_SOFT_FREEZE_THRESHOLD");
 
-  await applyApprovals(page, "change-threshold", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  await applyApprovals(
+    page,
+    "SET_SOFT_FREEZE_THRESHOLD",
+    switcher,
+    wallet,
+    [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  );
   await broadcastAndCheckFreeze(page, wallet);
 
   await createFreeze(page, "SOFT_FREEZE");
@@ -507,8 +468,14 @@ test("TC318: Create soft freeze → change threshold. New threshold is reflected
   await switcher.council(1, page);
   await createFreeze(page, "SOFT_FREEZE");
 
-  await createChangeThreshold(page, 4);
-  await applyApprovals(page, "change-threshold", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  await createFreeze(page, "SET_SOFT_FREEZE_THRESHOLD", 4);
+  await applyApprovals(
+    page,
+    "SET_SOFT_FREEZE_THRESHOLD",
+    switcher,
+    wallet,
+    [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  );
   await broadcastAndCheckFreeze(page, wallet);
 
   await goToFreezeDetailsPage(page, "SOFT_FREEZE");
