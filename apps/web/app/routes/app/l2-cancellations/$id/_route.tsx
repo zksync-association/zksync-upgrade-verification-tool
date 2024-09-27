@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CallsRawData } from "@/components/upgrade-raw-data";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
 import ExecL2VetoForm from "@/routes/app/l2-cancellations/$id/exec-l2-veto-form";
-import { displayBytes32 } from "@/utils/bytes32";
+import { displayBytes32 } from "@/utils/common-tables";
 import { badRequest, notFound } from "@/utils/http";
 import { env } from "@config/env.server";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";

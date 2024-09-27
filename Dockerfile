@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 LABEL org.opencontainers.image.source=https://github.com/zksync-association/zksync-upgrade-verification-tool
 
@@ -6,9 +6,6 @@ LABEL org.opencontainers.image.source=https://github.com/zksync-association/zksy
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN npm i -g pnpm
-
-# install git (needed to compile system contracts)
-RUN apk add git
 
 # Setup working dir
 RUN mkdir /app

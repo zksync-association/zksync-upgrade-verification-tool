@@ -24,16 +24,16 @@ export function spawnBackground(
     throw new Error("Command is required");
   }
 
-  const process: ChildProcess = spawn(cmd, cmdArgs, {
+  const proc: ChildProcess = spawn(cmd, cmdArgs, {
     cwd,
     stdio: stdio as any,
     detached: true,
-    env,
+    env: { ...process.env, ...env },
   });
 
-  process.unref();
+  proc.unref();
 
-  const pid = process.pid;
+  const pid = proc.pid;
   if (!pid) {
     throw new Error("Failed to start process");
   }

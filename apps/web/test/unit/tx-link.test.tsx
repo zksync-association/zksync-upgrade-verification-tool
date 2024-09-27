@@ -27,7 +27,7 @@ describe("TxLink", () => {
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noreferrer");
 
-    const displayedTx = screen.getByText("0x12345678...90abcdef");
+    const displayedTx = screen.getByText("0x12345678...7890abcdef");
     expect(displayedTx).toBeInTheDocument();
 
     const icon = screen.getByTestId("square-arrow-out-up-right-icon");

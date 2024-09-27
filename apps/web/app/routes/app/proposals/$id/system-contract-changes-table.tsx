@@ -6,11 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  displayAddress,
-  displayBytes32,
-  displayEmpty,
-} from "@/routes/app/proposals/$id/common-tables";
+import { displayAddress, displayBytes32, displayEmpty } from "@/utils/common-tables";
 import type { SystemContractUpgrade } from "@repo/ethereum-reports/reports/object-check-report";
 
 export default function SystemContractChangesTable({

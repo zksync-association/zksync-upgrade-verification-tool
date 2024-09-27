@@ -19,7 +19,7 @@ import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-c
 import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
 import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
-import { displayBytes32 } from "@/utils/bytes32";
+import { displayBytes32 } from "@/utils/common-tables";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
 import { notFound } from "@/utils/http";
