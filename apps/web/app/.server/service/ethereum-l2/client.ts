@@ -1,10 +1,7 @@
 import { env } from "@config/env.server";
-import { BlockExplorerClient } from "@repo/common/ethereum";
 import { createPublicClient, type Hex, http } from "viem";
 import { zksync } from "viem/chains";
 import { getLogProof } from "viem/zksync";
-
-const network = env.ETH_NETWORK === "local" ? "sepolia" : env.ETH_NETWORK;
 
 export type MessageProof = {
   id: number;
@@ -50,5 +47,3 @@ export async function fetchLogProof(txHash: Hex, index: number): Promise<Message
 export async function getLatestBlock() {
   return l2Rpc.getBlock({ blockTag: "latest" });
 }
-
-export const l2Explorer = BlockExplorerClient.forL2(network);
