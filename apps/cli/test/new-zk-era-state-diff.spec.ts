@@ -10,11 +10,13 @@ import {
   type L2ContractData,
   type NumberEraPropNames,
   type ZkEraStateData,
-} from "@repo/ethereum-reports/zksync-era-state";
-import { MissingRequiredProp, BlockExplorerClient, RpcClient } from "@repo/common/ethereum";
-import { SystemContractList } from "@repo/ethereum-reports/system-contract-providers";
-import type { FacetData } from "@repo/ethereum-reports/upgrade-changes";
-import { ZkSyncEraDiff } from "@repo/ethereum-reports/zk-sync-era-diff";
+} from "../src/reports/zksync-era-state";
+import { BlockExplorerClient } from "../src/etherscan/block-explorer-client";
+import { RpcClient } from "@repo/common/ethereum"
+import { MissingRequiredProp } from "../src/lib/errors"
+import { SystemContractList } from "../src/reports/system-contract-providers";
+import type { FacetData } from "../src/reports/upgrade-changes";
+import { ZkSyncEraDiff } from "../src/reports/zk-sync-era-diff";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): ZkSyncEraDiff {

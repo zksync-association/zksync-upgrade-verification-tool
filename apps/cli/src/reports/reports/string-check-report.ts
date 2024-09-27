@@ -4,7 +4,7 @@ import CliTable from "cli-table3";
 import { HEX_ZKSYNC_FIELDS, NUMERIC_ZKSYNC_FIELDS } from "../zksync-era-state.js";
 import type { Hex } from "viem";
 import chalk from "chalk";
-import type { BlockExplorer } from "@repo/common/ethereum";
+import type { BlockExplorer } from "../../etherscan/block-explorer-client";
 
 export interface CheckReportOptions {
   shortOutput: boolean;

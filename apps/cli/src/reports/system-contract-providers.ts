@@ -2,7 +2,9 @@ import type { Hex } from "viem";
 import type { L2ContractData } from "./zksync-era-state.js";
 import { utils } from "zksync-ethers";
 import { Option } from "nochoices";
-import type { RpcClient, BlockExplorerClient, ContractData } from "@repo/common/ethereum";
+import type { RpcClient, ContractData } from "@repo/common/ethereum";
+import type { BlockExplorerClient } from "../etherscan/block-explorer-client";
+
 
 export interface SystemContractProvider {
   dataFor(addr: Hex): Promise<Option<L2ContractData>>;

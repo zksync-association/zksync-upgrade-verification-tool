@@ -1,4 +1,4 @@
-import type { StorageSnapshot } from "../storage/snapshot/index.js";
+import type { StorageSnapshot } from "../storage/snapshot";
 import type { ContractField } from "../storage/contractField.js";
 import { StringStorageVisitor } from "./string-storage-visitor.js";
 

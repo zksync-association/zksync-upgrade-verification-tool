@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { bytesToHex, hexToBigInt, hexToBytes, keccak256, numberToHex } from "viem";
-import { SnapshotReport } from "@repo/ethereum-reports/reports/storage-snapshot-report";
-import { ContractField } from "@repo/ethereum-reports/storage/contractField";
-import { MappingType } from "@repo/ethereum-reports/storage/mapping-type";
-import { RecordStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/record-storage-snapshot";
-import { AddressType } from "@repo/ethereum-reports/storage/types/address-type";
-import { ArrayType } from "@repo/ethereum-reports/storage/types/array-type";
-import { BigNumberType } from "@repo/ethereum-reports/storage/types/big-number-type";
-import { BlobType } from "@repo/ethereum-reports/storage/types/blob-type";
-import { StructType } from "@repo/ethereum-reports/storage/types/struct-type";
+import { RecordStorageSnapshot } from "../src/reports/storage/snapshot";
+import { ContractField } from "../src/reports/storage/contractField";
+import { SnapshotReport } from "../src/reports/reports/storage-snapshot-report";
+import { BigNumberType } from "../src/reports/storage/types/big-number-type";
+import { BlobType } from "../src/reports/storage/types/blob-type";
+import { AddressType } from "../src/reports/storage/types/address-type";
+import { ArrayType } from "../src/reports/storage/types/array-type";
+import { StructType } from "../src/reports/storage/types/struct-type";
+import { MappingType } from "../src/reports/storage/mapping-type";
 
 describe("SnapshotReport", () => {
   it("can return a number prop ", async () => {
@@ -140,7 +140,8 @@ value:
       "0x0000000000000000000000000000000000000000000000000000000000000002":
         "0x000000000000000000000000000000000000000000000000000000000000000c",
     });
-    const props = [
+    let props: ContractField[];
+    props = [
       new ContractField(
         "prop1",
         0n,

@@ -1,7 +1,8 @@
 import { FileSystem } from "./file-system.js";
 import { Terminal } from "./terminal.js";
-import { GitContractsRepo } from "@repo/ethereum-reports/git-contracts-repo";
-import { BlockExplorerClient, NET_VERSIONS, RpcClient, type Network } from "@repo/common/ethereum";
+import { GitContractsRepo } from "../reports/git-contracts-repo";
+import { NET_VERSIONS, RpcClient, type Network } from "@repo/common/ethereum";
+import { BlockExplorerClient } from "../etherscan/block-explorer-client";
 
 export class EnvBuilder {
   private _etherscanApiKey?: string;

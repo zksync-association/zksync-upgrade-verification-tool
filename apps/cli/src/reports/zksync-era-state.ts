@@ -23,12 +23,10 @@ import type { ContractField } from "./storage/contractField.js";
 import type { StorageSnapshot } from "./storage/snapshot";
 import type { StorageVisitor } from "./reports/storage-visitor.js";
 import {
-  BlockExplorerClient,
   DIAMOND_ADDRS,
   MissingRequiredProp,
   RpcClient,
   UPGRADE_FN_SELECTOR,
-  type BlockExplorer,
   type Network,
 } from "@repo/common/ethereum";
 import {
@@ -37,6 +35,10 @@ import {
   upgradeCallDataSchema,
   type CallTrace,
 } from "@repo/common/schemas";
+import {
+  BlockExplorerClient,
+  type BlockExplorer,
+} from "../etherscan/block-explorer-client";
 
 export type L2ContractData = {
   address: Hex;

@@ -6,7 +6,7 @@ import {
 } from "../zksync-era-state.js";
 import type { Hex } from "viem";
 import type { Option } from "nochoices";
-import type { BlockExplorer } from "@repo/common/ethereum";
+import type { BlockExplorer } from "../../etherscan/block-explorer-client";
 
 export type SystemContractUpgrade = {
   name: string;
