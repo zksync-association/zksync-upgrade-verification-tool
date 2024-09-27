@@ -24,7 +24,6 @@ import type { StorageSnapshot } from "./storage/snapshot";
 import type { StorageVisitor } from "./reports/storage-visitor.js";
 import {
   DIAMOND_ADDRS,
-  MissingRequiredProp,
   RpcClient,
   UPGRADE_FN_SELECTOR,
   type Network,
@@ -36,6 +35,7 @@ import {
   type CallTrace,
 } from "@repo/common/schemas";
 import { BlockExplorerClient, type BlockExplorer } from "../etherscan/block-explorer-client";
+import { MissingRequiredProp } from "../lib/errors";
 
 export type L2ContractData = {
   address: Hex;

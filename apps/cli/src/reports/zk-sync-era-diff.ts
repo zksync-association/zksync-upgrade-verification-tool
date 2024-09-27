@@ -2,8 +2,8 @@ import type { Hex } from "viem";
 import type { ZksyncEraState, HexEraPropName, NumberEraPropNames } from "./zksync-era-state.js";
 import { Option } from "nochoices";
 import type { FacetData } from "./upgrade-changes.js";
-import { MissingRequiredProp } from "@repo/common/ethereum";
 import { SystemContractChange } from "./system-contract-change.js";
+import { MissingRequiredProp } from "../lib/errors";
 
 export type FacetDataDiff = {
   name: string;
