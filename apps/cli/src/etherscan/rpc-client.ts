@@ -11,14 +11,48 @@ import {
 import { type TypeOf, z, type ZodType } from "zod";
 import type { PublicClient, HttpTransport } from "viem";
 import { getStorageAt } from "viem/actions";
-import {
-  callTracerSchema,
-  contractEventSchema,
-  memoryDiffParser,
-  type CallTrace,
-  type MemoryDiffRaw,
-} from "../schemas/index";
-import { L1_DEFAULT_URLS, L2_DEFAULT_URLS, type Network } from "./constants";
+import { L1_DEFAULT_URLS, L2_DEFAULT_URLS, type Network } from "@repo/common/ethereum";
+import { hexSchema, zodOptional } from "@repo/common/schemas";
+
+const stateParser = z.record(
+  z.string(),
+  z.object({
+    nonce: zodOptional(z.number()),
+    storage: zodOptional(z.record(z.string(), hexSchema)),
+  })
+);
+
+export const memoryDiffParser = z.object({
+  result: z.object({
+    post: stateParser,
+    pre: stateParser,
+  }),
+});
+
+
+export const contractEventSchema = z.object({
+  address: hexSchema,
+  topics: z.array(hexSchema),
+  data: hexSchema,
+  transactionHash: hexSchema,
+  blockNumber: hexSchema,
+});
+
+const baseCallTracerSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  input: z.string(),
+});
+export type CallTrace = z.infer<typeof baseCallTracerSchema> & {
+  calls?: CallTrace[];
+};
+
+
+export const callTracerSchema: z.ZodType<CallTrace> = baseCallTracerSchema.extend({
+  calls: z.lazy(() => callTracerSchema.array().optional()),
+});
+
+export type MemoryDiffRaw = z.infer<typeof memoryDiffParser>;
 
 export class RpcClient {
   private viemClient: PublicClient<HttpTransport>;

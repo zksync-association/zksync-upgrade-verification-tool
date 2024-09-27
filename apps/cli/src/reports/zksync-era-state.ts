@@ -24,18 +24,68 @@ import type { StorageSnapshot } from "./storage/snapshot";
 import type { StorageVisitor } from "./reports/storage-visitor.js";
 import {
   DIAMOND_ADDRS,
-  RpcClient,
   UPGRADE_FN_SELECTOR,
   type Network,
 } from "@repo/common/ethereum";
 import {
   hexSchema,
-  l2UpgradeSchema,
-  upgradeCallDataSchema,
-  type CallTrace,
 } from "@repo/common/schemas";
 import { BlockExplorerClient, type BlockExplorer } from "../etherscan/block-explorer-client";
 import { MissingRequiredProp } from "../lib/errors";
+import { RpcClient } from "../etherscan/rpc-client";
+
+const baseCallTracerSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  input: z.string(),
+});
+
+export type CallTrace = z.infer<typeof baseCallTracerSchema> & {
+  calls?: CallTrace[];
+};
+
+export const callTracerSchema: z.ZodType<CallTrace> = baseCallTracerSchema.extend({
+  calls: z.lazy(() => callTracerSchema.array().optional()),
+});
+
+export const l2UpgradeSchema = z.object({
+  functionName: z.string(),
+  args: z.tuple([
+    z.array(
+      z.object({
+        bytecodeHash: hexSchema,
+        newAddress: hexSchema,
+        callConstructor: z.boolean(),
+        value: z.bigint(),
+        input: z.string(),
+      })
+    ),
+  ]),
+});
+
+
+export const upgradeCallDataSchema = z.object({
+  functionName: z.string(),
+  args: z.tuple([
+    z.object({
+      l2ProtocolUpgradeTx: z.object({
+        to: z.bigint(),
+        from: z.bigint(),
+        data: hexSchema,
+      }),
+      factoryDeps: z.array(z.any()),
+      bootloaderHash: hexSchema,
+      defaultAccountHash: hexSchema,
+      verifier: hexSchema,
+      verifierParams: z.any(),
+      l1ContractsUpgradeCalldata: z.string(),
+      postUpgradeCalldata: hexSchema,
+      upgradeTimestamp: z.bigint(),
+      newProtocolVersion: z.bigint(),
+    }),
+  ]),
+});
+
 
 export type L2ContractData = {
   address: Hex;

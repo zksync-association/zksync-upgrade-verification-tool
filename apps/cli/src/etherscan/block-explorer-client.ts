@@ -1,6 +1,6 @@
 import { z, type ZodType } from "zod";
 import type { Hex } from "viem";
-import { addressSchema, contractEventSchema, type ContractEvent } from "@repo/common/schemas";
+import { addressSchema, hexSchema } from "@repo/common/schemas";
 import { ContractAbi } from "./contract-abi";
 import { ContractData } from "./contract-data";
 import { ContractNotVerified, ExternalApiError } from "../lib/errors";
@@ -9,6 +9,16 @@ import {
   ETHERSCAN_ENDPOINTS,
   type Network,
 } from "@repo/common/ethereum";
+
+export const contractEventSchema = z.object({
+  address: hexSchema,
+  topics: z.array(hexSchema),
+  data: hexSchema,
+  transactionHash: hexSchema,
+  blockNumber: hexSchema,
+});
+
+export type ContractEvent = z.infer<typeof contractEventSchema>;
 
 const sourcesParser = z.record(z.string(), z.object({ content: z.string() }));
 export const sourceCodeSchema = z.object({

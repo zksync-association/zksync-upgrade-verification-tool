@@ -3,13 +3,13 @@ import type { Hex } from "viem";
 import { Option } from "nochoices";
 import { withSpinner } from "../lib/with-spinner.js";
 import { DIAMOND_ADDRS } from "@repo/common/ethereum";
-import { type MemoryDiffRaw, memoryDiffParser } from "@repo/common/schemas";
 import { UpgradeFile } from "../lib/upgrade-file";
 import { RecordStorageSnapshot, RpcStorageSnapshot } from "../reports/storage/snapshot";
 import { MAIN_CONTRACT_FIELDS } from "../reports/storage/storage-props";
 import { FacetsToSelectorsVisitor, ListOfAddressesExtractor } from "../reports/reports/extractors";
 import { StorageChanges } from "../reports/storage/storage-changes";
 import { StringStorageChangeReport } from "../reports/reports/string-storage-change-report";
+import { type MemoryDiffRaw, memoryDiffParser } from "../etherscan/rpc-client"
 
 async function getMemoryPath(
   preCalculatedPath: Option<string>,
