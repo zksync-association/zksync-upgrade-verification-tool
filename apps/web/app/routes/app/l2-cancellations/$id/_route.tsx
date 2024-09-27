@@ -116,7 +116,7 @@ export default function L2Cancellation() {
       <HeaderWithBackButton>Proposal {displayBytes32(proposal.externalId)}</HeaderWithBackButton>
 
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card className="pb-10">
+        <Card className="pb-10" data-testid="proposal-details-card">
           <CardHeader>
             <CardTitle>Proposal Details</CardTitle>
           </CardHeader>
@@ -220,7 +220,7 @@ export default function L2Cancellation() {
             )}
           </CardContent>
         </Card>
-        <Card className="pb-10">
+        <Card className="pb-10" data-testid="role-actions-card">
           <CardHeader>
             <CardTitle>
               {user.role === "guardian"
@@ -254,7 +254,7 @@ export default function L2Cancellation() {
             )}
           </CardContent>
         </Card>
-        <Card className="pb-10">
+        <Card className="pb-10" data-testid="execute-actions-card">
           <CardHeader>
             <CardTitle>Execute Actions</CardTitle>
           </CardHeader>

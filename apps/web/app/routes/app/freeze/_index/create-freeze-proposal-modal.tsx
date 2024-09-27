@@ -42,7 +42,7 @@ export function CreateFreezeProposalModal() {
   return (
     <Dialog onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="secondary" size="icon">
+        <Button variant="secondary" size="icon" data-testid="create-freeze-btn">
           <PlusIcon className="h-4 w-4" />
         </Button>
       </DialogTrigger>

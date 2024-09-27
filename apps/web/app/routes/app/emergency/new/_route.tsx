@@ -41,7 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const allValid = validations.every((v) => v.isValid);
   if (allValid && body.data.intent === "save") {
-    await saveEmergencyProposal(
+    const proposal = await saveEmergencyProposal(
       {
         salt: body.data.salt,
         title: body.data.title,
@@ -49,7 +49,7 @@ export async function action({ request }: ActionFunctionArgs) {
       },
       calls
     );
-    return redirect($path("/app/emergency"));
+    return redirect($path("/app/emergency/:id", { id: proposal.externalId }));
   }
 
   return json({ ok: allValid, validations });

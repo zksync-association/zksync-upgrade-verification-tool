@@ -2,16 +2,11 @@ import { expect, type IntRange, type RoleSwitcher, test } from "./helpers/dappwr
 import type { Page } from "@playwright/test";
 import type { Dappwright as Wallet } from "@tenkeylabs/dappwright";
 import type { COUNCIL_SIZE } from "@repo/contracts/helpers/constants";
+import { createFreeze, goToFreezeIndex } from "./helpers/common/freeze.js";
 
 test.beforeEach(async ({ testApp }) => {
   await testApp.reset();
 });
-
-async function goToFreezeIndex(page: Page) {
-  await page.goto("/");
-  await page.getByText("Freeze Requests").click();
-  await page.getByText("Soft Freeze Proposals", { exact: true }).isVisible();
-}
 
 function compareExtractedTextWithDate(extractedText: string | null, expectedDate: Date) {
   const expectedNumber = Math.floor(expectedDate.valueOf() / 1000);
@@ -31,7 +26,10 @@ async function goToFreezeDetailsPage(page: Page, kind: string) {
   await page.getByText("Proposal Details").isVisible();
 }
 
-async function assertCannotSignProposal(page: Page, kind: string) {
+async function assertCannotSignProposal(
+  page: Page,
+  kind: "SOFT_FREEZE" | "HARD_FREEZE" | "UNFREEZE"
+) {
   await createFreeze(page, kind);
   await goToFreezeDetailsPage(page, kind);
 
@@ -92,12 +90,6 @@ async function createChangeThreshold(page: Page, newThreshold = 2) {
   await page.getByRole("button", { name: "Create" }).click();
 }
 
-async function createFreeze(page: Page, kind: string) {
-  await goToFreezeIndex(page);
-  await page.getByTestId(`${kind}-create-btn`).click();
-  await page.getByRole("button", { name: "Create" }).click();
-}
-
 function approveButton(page: Page) {
   return page.getByTestId("approve-button");
 }
@@ -120,7 +112,7 @@ test("TC 301: Navigate to index page shows list of empty freezes", async ({ page
   await switcher.council(1, page);
   await goToFreezeIndex(page);
 
-  for (const kind of ["soft", "hard", "change-threshold", "unfreeze"]) {
+  for (const kind of ["SOFT_FREEZE", "HARD_FREEZE", "change-threshold", "UNFREEZE"]) {
     await expect(page.getByTestId(`${kind}-card`).getByText("No proposals found.")).toBeVisible();
   }
 });
@@ -171,7 +163,7 @@ test("TC305: Create second soft when there is an active one, fails with proper m
   switcher,
 }) => {
   await switcher.council(1, page);
-  await createFreeze(page, "soft");
+  await createFreeze(page, "SOFT_FREEZE");
 
   await goToFreezeIndex(page);
 
@@ -185,7 +177,7 @@ test("TC313: Attempt to approve soft freeze by guardian, sign button is not disp
   switcher,
 }) => {
   await switcher.guardian(1, page);
-  await assertCannotSignProposal(page, "soft");
+  await assertCannotSignProposal(page, "SOFT_FREEZE");
 });
 
 test("TC314: Attempt to approve soft freeze by zk foundation, sign button is not displayed", async ({
@@ -193,7 +185,7 @@ test("TC314: Attempt to approve soft freeze by zk foundation, sign button is not
   switcher,
 }) => {
   await switcher.zkFoundation(page);
-  await assertCannotSignProposal(page, "soft");
+  await assertCannotSignProposal(page, "SOFT_FREEZE");
 });
 
 test("TC315: Attempt to approve soft freeze by visitor, sign button is not displayed", async ({
@@ -201,7 +193,7 @@ test("TC315: Attempt to approve soft freeze by visitor, sign button is not displ
   switcher,
 }) => {
   await switcher.visitor(page);
-  await assertCannotSignProposal(page, "soft");
+  await assertCannotSignProposal(page, "SOFT_FREEZE");
 });
 
 test("TC312: Approve soft freeze by security council member. Signature can be done, signature count increase by one.", async ({
@@ -210,8 +202,8 @@ test("TC312: Approve soft freeze by security council member. Signature can be do
   wallet,
 }) => {
   await switcher.council(1, page);
-  await createFreeze(page, "soft");
-  await goToFreezeDetailsPage(page, "soft");
+  await createFreeze(page, "SOFT_FREEZE");
+  await goToFreezeDetailsPage(page, "SOFT_FREEZE");
 
   await withVoteIncrease(page, async () => {
     await approveFreeze(page, wallet);
@@ -225,8 +217,8 @@ test("TC316, TC317: Fulfill signature threshold for soft freeze -> broadcast -> 
   switcher,
   wallet,
 }) => {
-  await createFreeze(page, "soft");
-  await applyApprovals(page, "soft", switcher, wallet, [1, 2, 3]);
+  await createFreeze(page, "SOFT_FREEZE");
+  await applyApprovals(page, "SOFT_FREEZE", switcher, wallet, [1, 2, 3]);
   await broadcastAndCheckFreeze(page, wallet);
 });
 
@@ -260,7 +252,7 @@ test("TC308: Create second hard freeze when there is an active one. Fails with p
   switcher,
 }) => {
   await switcher.council(1, page);
-  await createFreeze(page, "hard");
+  await createFreeze(page, "HARD_FREEZE");
   await goToFreezeIndex(page);
 
   await page.getByTestId("hard-create-btn").click();
@@ -273,7 +265,7 @@ test("TC321: Attempt hard freeze approve by guardian -> Approve button disabled"
   switcher,
 }) => {
   await switcher.guardian(1, page);
-  await assertCannotSignProposal(page, "hard");
+  await assertCannotSignProposal(page, "HARD_FREEZE");
 });
 
 test("TC322: Attempt hard freeze approve by zk foundation -> Approve button disabled", async ({
@@ -281,7 +273,7 @@ test("TC322: Attempt hard freeze approve by zk foundation -> Approve button disa
   switcher,
 }) => {
   await switcher.zkFoundation(page);
-  await assertCannotSignProposal(page, "hard");
+  await assertCannotSignProposal(page, "HARD_FREEZE");
 });
 
 test("TC323: Attempt hard freeze approve by visitor -> Approve button disabled", async ({
@@ -289,7 +281,7 @@ test("TC323: Attempt hard freeze approve by visitor -> Approve button disabled",
   switcher,
 }) => {
   await switcher.visitor(page);
-  await assertCannotSignProposal(page, "hard");
+  await assertCannotSignProposal(page, "HARD_FREEZE");
 });
 
 test("TC320: Hard freeze approve by security council -> updates state properly", async ({
@@ -298,8 +290,8 @@ test("TC320: Hard freeze approve by security council -> updates state properly",
   wallet,
 }) => {
   await switcher.council(1, page);
-  await createFreeze(page, "hard");
-  await goToFreezeDetailsPage(page, "hard");
+  await createFreeze(page, "HARD_FREEZE");
+  await goToFreezeDetailsPage(page, "HARD_FREEZE");
 
   await withVoteIncrease(page, async () => {
     await approveFreeze(page, wallet);
@@ -312,8 +304,8 @@ test("TC324, TC325: Fulfill signature threshold for hard freeze -> broadcast -> 
   switcher,
   wallet,
 }) => {
-  await createFreeze(page, "hard");
-  await applyApprovals(page, "hard", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  await createFreeze(page, "HARD_FREEZE");
+  await applyApprovals(page, "HARD_FREEZE", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   await broadcastAndCheckFreeze(page, wallet);
 });
 
@@ -350,7 +342,7 @@ test("TC333: Attempt to approve unfreeze by guardian -> Sign button disabled", a
   switcher,
 }) => {
   await switcher.guardian(1, page);
-  await assertCannotSignProposal(page, "unfreeze");
+  await assertCannotSignProposal(page, "UNFREEZE");
 });
 
 test("TC334: Attempt to approve unfreeze by zk foundation -> Sign button disabled", async ({
@@ -358,7 +350,7 @@ test("TC334: Attempt to approve unfreeze by zk foundation -> Sign button disable
   switcher,
 }) => {
   await switcher.zkFoundation(page);
-  await assertCannotSignProposal(page, "unfreeze");
+  await assertCannotSignProposal(page, "UNFREEZE");
 });
 
 test("TC335: Attempt to approve unfreeze by visitor -> Sign button disabled", async ({
@@ -366,7 +358,7 @@ test("TC335: Attempt to approve unfreeze by visitor -> Sign button disabled", as
   switcher,
 }) => {
   await switcher.visitor(page);
-  await assertCannotSignProposal(page, "unfreeze");
+  await assertCannotSignProposal(page, "UNFREEZE");
 });
 
 test("TC332: Approve change unfreeze by security council -> Updates state", async ({
@@ -375,8 +367,8 @@ test("TC332: Approve change unfreeze by security council -> Updates state", asyn
   wallet,
 }) => {
   await switcher.council(1, page);
-  await createFreeze(page, "unfreeze");
-  await goToFreezeDetailsPage(page, "unfreeze");
+  await createFreeze(page, "UNFREEZE");
+  await goToFreezeDetailsPage(page, "UNFREEZE");
 
   await withVoteIncrease(page, async () => {
     await approveFreeze(page, wallet);
@@ -390,13 +382,13 @@ test("TC336, TC337: Freeze -> Gather unfreeze signatures -> Exec unfreeze tx -> 
   switcher,
   wallet,
 }) => {
-  await createFreeze(page, "soft");
-  await applyApprovals(page, "soft", switcher, wallet, [1, 2, 3]);
+  await createFreeze(page, "SOFT_FREEZE");
+  await applyApprovals(page, "SOFT_FREEZE", switcher, wallet, [1, 2, 3]);
   await page.getByRole("button", { name: "Execute freeze" }).click();
   await wallet.confirmTransaction();
 
-  await createFreeze(page, "unfreeze");
-  await applyApprovals(page, "unfreeze", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  await createFreeze(page, "UNFREEZE");
+  await applyApprovals(page, "UNFREEZE", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   await broadcastAndCheckFreeze(page, wallet);
 });
 
@@ -502,8 +494,8 @@ test("TC330, TC331: Gather signatures for change signatures -> Exec tx -> Right 
   await applyApprovals(page, "change-threshold", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   await broadcastAndCheckFreeze(page, wallet);
 
-  await createFreeze(page, "soft");
-  await applyApprovals(page, "soft", switcher, wallet, [1]);
+  await createFreeze(page, "SOFT_FREEZE");
+  await applyApprovals(page, "SOFT_FREEZE", switcher, wallet, [1]);
   await broadcastAndCheckFreeze(page, wallet);
 });
 
@@ -513,13 +505,13 @@ test("TC318: Create soft freeze → change threshold. New threshold is reflected
   wallet,
 }) => {
   await switcher.council(1, page);
-  await createFreeze(page, "soft");
+  await createFreeze(page, "SOFT_FREEZE");
 
   await createChangeThreshold(page, 4);
   await applyApprovals(page, "change-threshold", switcher, wallet, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   await broadcastAndCheckFreeze(page, wallet);
 
-  await goToFreezeDetailsPage(page, "soft");
+  await goToFreezeDetailsPage(page, "SOFT_FREEZE");
   const approvalCount = await page.getByTestId("signature-count").textContent();
   if (!approvalCount) {
     throw new Error("approval count should be visible");

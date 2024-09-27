@@ -223,7 +223,7 @@ export default function Proposals() {
               return (
                 <>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <Card className="pb-10">
+                    <Card className="pb-10" data-testid="proposal-details-card">
                       <CardHeader>
                         <CardTitle>Proposal Details</CardTitle>
                       </CardHeader>

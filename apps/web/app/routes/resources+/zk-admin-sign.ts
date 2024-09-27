@@ -7,9 +7,16 @@ import { getFormDataOrThrow } from "@/utils/read-from-request";
 import { env } from "@config/env.server";
 import { json, type ActionFunctionArgs } from "@remix-run/node";
 import { addressSchema, hexSchema } from "@repo/common/schemas";
-import { isAddressEqual } from "viem";
+import { isAddressEqual, type Address } from "viem";
 import { mainnet, sepolia } from "viem/chains";
 import { z } from "zod";
+
+import { defaultLogger } from "@config/log.server";
+import { $path } from "remix-routes";
+
+const logger = defaultLogger.child({
+  module: $path("/resources/zk-admin-sign"),
+});
 
 export const zkAdminSignActionSchema = z.enum([
   "ArchiveEmergencyProposal",
@@ -27,11 +34,13 @@ export const zkAdminTypedData = ({
   proposalType,
   archivedReason,
   archivedOn,
+  archivedBy,
 }: {
   proposalId: bigint;
   proposalType: ZkAdminSignAction;
   archivedReason: string;
   archivedOn: string;
+  archivedBy: Address;
 }) => {
   const internalTypes = [
     {
@@ -50,6 +59,10 @@ export const zkAdminTypedData = ({
       name: "archivedOn",
       type: "string",
     },
+    {
+      name: "archivedBy",
+      type: "address",
+    },
   ] as const;
   const types = { [proposalType]: internalTypes } as {
     [key in ZkAdminSignAction]: typeof internalTypes;
@@ -62,6 +75,7 @@ export const zkAdminTypedData = ({
       proposalType,
       archivedReason,
       archivedOn,
+      archivedBy,
     },
   };
   return data;
@@ -78,6 +92,7 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 
   if (!isAddressEqual(data.archivedBy, env.ZK_ADMIN_ADDRESS)) {
+    logger.error({ archivedBy: data.archivedBy }, "Address is not zk admin");
     throw unauthorized();
   }
 
@@ -95,9 +110,11 @@ export async function action({ request }: ActionFunctionArgs) {
       proposalType: data.proposalType,
       archivedReason: data.archivedReason,
       archivedOn: data.archivedOn,
+      archivedBy: data.archivedBy,
     }),
   });
   if (!isValid) {
+    logger.error("Signature is not valid");
     throw unauthorized();
   }
 

@@ -14,6 +14,8 @@ import { Dialog, DialogHeader, DialogTitle, DialogTrigger, DialogContent } from 
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
+const TOAST_ID = "archive_button";
+
 export default function ZkAdminArchiveProposal({
   proposalId,
   proposalType,
@@ -32,12 +34,13 @@ export default function ZkAdminArchiveProposal({
 
   const loading = isPending || fetcher.state === "loading";
   const success = isSuccess && fetcher.data?.ok;
+  const buttonDisabled = disabled || archivedReason === "";
 
   const archivedOn = new Date().toISOString();
 
   useEffect(() => {
     if (success) {
-      toast.success("Signed successfully", { id: "sign_button" });
+      toast.success("Archived successfully", { id: TOAST_ID });
       setOpen(false);
     }
   }, [success]);
@@ -47,7 +50,7 @@ export default function ZkAdminArchiveProposal({
       return;
     }
 
-    toast.loading("Signing...", { id: "sign_button" });
+    toast.loading("Archiving...", { id: TOAST_ID });
     signTypedData(
       {
         domain: {
@@ -60,6 +63,7 @@ export default function ZkAdminArchiveProposal({
           proposalType,
           archivedReason,
           archivedOn,
+          archivedBy: user.address,
         }),
       },
       {
@@ -81,7 +85,7 @@ export default function ZkAdminArchiveProposal({
         },
         onError(e) {
           console.error(e);
-          toast.error("Failed to sign", { id: "sign_button" });
+          toast.error("Failed to archive", { id: TOAST_ID });
         },
       }
     );
@@ -98,14 +102,18 @@ export default function ZkAdminArchiveProposal({
         <DialogHeader>
           <DialogTitle>Archive Proposal</DialogTitle>
         </DialogHeader>
-        <Label>Reason for archiving</Label>
-        <Input value={archivedReason} onChange={(e) => setArchivedReason(e.target.value)} />
+        <Label htmlFor="archivedReason">Reason for archiving</Label>
+        <Input
+          id="archivedReason"
+          value={archivedReason}
+          onChange={(e) => setArchivedReason(e.target.value)}
+        />
         <div className="flex justify-end">
           <Button
             className="my-4 w-40"
             onClick={onClick}
             loading={loading}
-            disabled={archivedReason === "" || disabled}
+            disabled={buttonDisabled}
           >
             Archive
           </Button>
