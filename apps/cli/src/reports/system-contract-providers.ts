@@ -5,7 +5,6 @@ import { Option } from "nochoices";
 import type { RpcClient, ContractData } from "@repo/common/ethereum";
 import type { BlockExplorerClient } from "../etherscan/block-explorer-client";
 
-
 export interface SystemContractProvider {
   dataFor(addr: Hex): Promise<Option<L2ContractData>>;
 }

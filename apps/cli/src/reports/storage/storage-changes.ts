@@ -1,7 +1,7 @@
 import { Option } from "nochoices";
 import type { Hex } from "viem";
 import type { ContractField } from "./contractField.js";
-import type { StorageSnapshot } from "./snapshot/index.js";
+import type { StorageSnapshot } from "./snapshot";
 import { PropertyChange } from "./property-change.js";
 import { mainDiamondFields } from "./storage-props.js";
 

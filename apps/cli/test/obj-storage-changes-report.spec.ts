@@ -12,7 +12,6 @@ import { ArrayType } from "../src/reports/storage/types/array-type";
 import { FixedArrayType } from "../src/reports/storage/types/fixed-array-type";
 import { StructType } from "../src/reports/storage/types/struct-type";
 
-
 describe("MemoryMapReport", () => {
   describe("For simple memory diff", () => {
     const boolSlot = BigInt(0xf);

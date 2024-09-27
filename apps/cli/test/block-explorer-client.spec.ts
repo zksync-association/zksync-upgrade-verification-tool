@@ -1,5 +1,5 @@
 import { BlockExplorerClient } from "../src/etherscan/block-explorer-client";
-import { ExternalApiError } from "../src/lib/errors"
+import { ExternalApiError } from "../src/lib/errors";
 import { beforeEach, describe, expect, it } from "vitest";
 
 describe("BlockExplorerClient", () => {

@@ -35,10 +35,7 @@ import {
   upgradeCallDataSchema,
   type CallTrace,
 } from "@repo/common/schemas";
-import {
-  BlockExplorerClient,
-  type BlockExplorer,
-} from "../etherscan/block-explorer-client";
+import { BlockExplorerClient, type BlockExplorer } from "../etherscan/block-explorer-client";
 
 export type L2ContractData = {
   address: Hex;

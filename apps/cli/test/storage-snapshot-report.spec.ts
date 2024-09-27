@@ -140,8 +140,8 @@ value:
       "0x0000000000000000000000000000000000000000000000000000000000000002":
         "0x000000000000000000000000000000000000000000000000000000000000000c",
     });
-    let props: ContractField[];
-    props = [
+
+    const props: ContractField[] = [
       new ContractField(
         "prop1",
         0n,

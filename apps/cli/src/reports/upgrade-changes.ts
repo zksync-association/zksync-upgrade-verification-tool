@@ -1,10 +1,10 @@
 import { VerifierContract } from "./verifier.js";
 import type { Hex } from "viem";
 import { Option } from "nochoices";
-import type { UpgradeManifest } from "./schema/manifest.js";
-import type { TransactionsJson } from "./schema/transactions.js";
-import type { FacetsJson } from "./schema/facets.js";
-import type { L2UpgradeJson } from "./schema/l2Upgrade.js";
+import type { UpgradeManifest } from "./schema";
+import type { TransactionsJson } from "./schema";
+import type { FacetsJson } from "./schema";
+import type { L2UpgradeJson } from "./schema";
 
 export type FacetData = {
   name: string;

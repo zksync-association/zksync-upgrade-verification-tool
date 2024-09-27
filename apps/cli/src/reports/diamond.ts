@@ -1,8 +1,5 @@
 import { type Abi, bytesToHex, type Hex, hexToBytes, toFunctionSelector } from "viem";
-import type {
-  ContractData,
-  RpcClient,
-} from "@repo/common/ethereum";
+import type { ContractData, RpcClient } from "@repo/common/ethereum";
 import type { ZodType } from "zod";
 import { facetsResponseSchema } from "./schema/new-facets.js";
 import type { FacetData } from "./upgrade-changes.js";

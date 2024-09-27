@@ -1,4 +1,4 @@
-import {type BlockExplorer} from "../src/etherscan/block-explorer-client"
+import type { BlockExplorer } from "../src/etherscan/block-explorer-client";
 import type { ContractsRepo } from "../src/reports/git-contracts-repo";
 import { SystemContractList } from "../src/reports/system-contract-providers";
 import { ZkSyncEraDiff } from "../src/reports/zk-sync-era-diff";

@@ -2,7 +2,6 @@ import type { BlockExplorer } from "../../src/etherscan/block-explorer-client";
 import type { ContractAbi } from "../../src/etherscan/contract-abi";
 import type { ContractData } from "../../src/etherscan/contract-data";
 
-
 export class TestBlockExplorer implements BlockExplorer {
   abis: Map<string, ContractAbi>;
 

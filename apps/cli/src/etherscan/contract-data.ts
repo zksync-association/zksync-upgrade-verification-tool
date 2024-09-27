@@ -2,7 +2,6 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { z } from "zod";
 
-
 const sourcesSchema = z.record(z.string(), z.object({ content: z.string() }));
 export type Sources = z.infer<typeof sourcesSchema>;
 

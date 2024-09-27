@@ -4,7 +4,11 @@ import { addressSchema, contractEventSchema, type ContractEvent } from "@repo/co
 import { ContractAbi } from "./contract-abi";
 import { ContractData } from "./contract-data";
 import { ContractNotVerified, ExternalApiError } from "../lib/errors";
-import { ERA_BLOCK_EXPLORER_ENDPOINTS, ETHERSCAN_ENDPOINTS, type Network } from "@repo/common/ethereum";
+import {
+  ERA_BLOCK_EXPLORER_ENDPOINTS,
+  ETHERSCAN_ENDPOINTS,
+  type Network,
+} from "@repo/common/ethereum";
 
 const sourcesParser = z.record(z.string(), z.object({ content: z.string() }));
 export const sourceCodeSchema = z.object({
@@ -19,7 +23,6 @@ export const getAbiSchema = z.object({
   message: z.enum(["OK", "NOTOK"]),
   result: z.string(),
 });
-
 
 export const etherscanSourceCodeSchema = z.object({
   SourceCode: z.string(),
@@ -42,7 +45,6 @@ export const sourceCodeResponseSchema = z.object({
   message: z.enum(["OK", "NOTOK"]),
   result: z.array(etherscanSourceCodeSchema),
 });
-
 
 export interface BlockExplorer {
   getAbi(rawAddress: string): Promise<ContractAbi>;

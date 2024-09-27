@@ -2,7 +2,7 @@ import type { MemoryDataType } from "./data-type.js";
 import type { Option } from "nochoices";
 import { bytesToBigInt } from "viem";
 
-import type { StorageSnapshot } from "../snapshot/index.js";
+import type { StorageSnapshot } from "../snapshot";
 import { BigNumberValue } from "../values/big-number-value.js";
 import type { StorageValue } from "../values/storage-value.js";
 

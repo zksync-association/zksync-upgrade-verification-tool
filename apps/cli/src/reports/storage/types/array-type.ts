@@ -1,5 +1,5 @@
 import type { MemoryDataType } from "./data-type.js";
-import type { StorageSnapshot } from "../snapshot/index.js";
+import type { StorageSnapshot } from "../snapshot";
 import { Option } from "nochoices";
 import { bytesToBigint } from "viem/utils";
 import { hexToBigInt, keccak256, numberToBytes } from "viem";

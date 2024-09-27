@@ -1,5 +1,5 @@
 import type { MemoryDataType } from "./data-type.js";
-import type { StorageSnapshot } from "../snapshot/index.js";
+import type { StorageSnapshot } from "../snapshot";
 import type { Option } from "nochoices";
 import type { StorageValue } from "../values/storage-value.js";
 import { BooleanValue } from "../values/boolean-value.js";
