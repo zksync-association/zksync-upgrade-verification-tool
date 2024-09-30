@@ -32,7 +32,7 @@ export const l2Rpc = createPublicClient({
 export async function fetchLogProof(txHash: Hex, index: number): Promise<MessageProof | null> {
   if (env.ETH_NETWORK === "local") {
     try {
-      // In development, we just check that the tx exists. If tx does not exist this raise an error.
+      // In development, we just check that the tx exists. If tx does not exist this raises an error.
       await l2Rpc.getTransactionReceipt({ hash: txHash });
       return {
         proof: [txHash],
