@@ -3,7 +3,7 @@
 # Function to delete node_modules directories
 delete_node_modules() {
     local dir="$1"
-    find "$dir" -maxdepth 1 -type d -name "node_modules" -print -exec rm -rf {} +
+    find "$dir" -maxdepth 1 -type d -name "node_modules" -print -exec rm -rf '{}' +
 }
 
 # Function to delete other specified directories
