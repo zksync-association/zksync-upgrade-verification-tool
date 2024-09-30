@@ -15,7 +15,7 @@ delete_other_directories() {
         -name "dist" -o \
         -name "build" -o \
         -name "server-build" \
-    \) -print -exec rm -rf {} +
+    \) -print -exec rm -rf '{}' +
 }
 
 # Get the root directory of the repository
