@@ -2,7 +2,8 @@ import fs from "node:fs/promises";
 import type { Stats } from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { NotADir } from "@repo/common/ethereum";
+import { NotADir } from "../lib/errors";
+
 
 export async function directoryExists(path: string): Promise<boolean> {
   let targetDirStat: Stats;

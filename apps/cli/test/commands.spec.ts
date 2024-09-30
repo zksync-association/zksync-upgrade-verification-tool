@@ -10,8 +10,8 @@ import {
   MalformedUpgrade,
   MissingNetwork,
   NotADir,
-  NotAnUpgradeDir,
-} from "@repo/common/ethereum";
+  NotAnUpgradeDir
+} from "../src/lib/errors";
 
 const doNothing = () => {};
 
