@@ -1,4 +1,4 @@
-import type { BlockExplorer } from "../src/etherscan/block-explorer-client";
+import type { BlockExplorer } from "../src/ethereum/block-explorer-client";
 import type { ContractsRepo } from "../src/reports/git-contracts-repo";
 import { SystemContractList } from "../src/reports/system-contract-providers";
 import { ZkSyncEraDiff } from "../src/reports/zk-sync-era-diff";
@@ -16,7 +16,7 @@ import { TestBlockExplorer } from "./utilities/test-block-explorer.js";
 import { TestContractRepo } from "./utilities/test-contract-repo.js";
 import { type CheckReportObj, ObjectCheckReport } from "../src/reports/reports/object-check-report";
 import { StringCheckReport } from "../src/reports/reports/string-check-report";
-import { ContractAbi } from "../src/etherscan/contract-abi";
+import { ContractAbi } from "../src/ethereum/contract-abi";
 
 interface Ctx {
   abi1: ContractAbi;

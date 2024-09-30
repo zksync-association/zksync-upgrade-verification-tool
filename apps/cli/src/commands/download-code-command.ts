@@ -7,7 +7,7 @@ import { withSpinner } from "../lib/with-spinner.js";
 import path from "node:path";
 import { hexToBigInt, hexToBytes } from "viem";
 import { UpgradeFile } from "../lib/upgrade-file";
-import { ContractData } from "../etherscan/contract-data";
+import { ContractData } from "../ethereum/contract-data";
 
 async function downloadAllCode(
   diff: ZkSyncEraDiff,

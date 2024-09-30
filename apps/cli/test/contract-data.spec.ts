@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ContractData } from "../src/etherscan/contract-data";
+import { ContractData } from "../src/ethereum/contract-data";
 
 describe("ContractData", () => {
   it("can remap keys", async () => {

@@ -11,12 +11,12 @@ import {
   type NumberEraPropNames,
   type ZkEraStateData,
 } from "../src/reports/zksync-era-state";
-import { BlockExplorerClient } from "../src/etherscan/block-explorer-client";
+import { BlockExplorerClient } from "../src/ethereum/block-explorer-client";
 import { MissingRequiredProp } from "../src/lib/errors";
 import { SystemContractList } from "../src/reports/system-contract-providers";
 import type { FacetData } from "../src/reports/upgrade-changes";
 import { ZkSyncEraDiff } from "../src/reports/zk-sync-era-diff";
-import { RpcClient } from "../src/etherscan/rpc-client";
+import { RpcClient } from "../src/ethereum/rpc-client";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): ZkSyncEraDiff {

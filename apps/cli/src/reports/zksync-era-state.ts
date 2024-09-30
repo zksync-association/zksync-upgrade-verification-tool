@@ -24,9 +24,9 @@ import type { StorageSnapshot } from "./storage/snapshot";
 import type { StorageVisitor } from "./reports/storage-visitor.js";
 import { DIAMOND_ADDRS, UPGRADE_FN_SELECTOR, type Network } from "@repo/common/ethereum";
 import { hexSchema } from "@repo/common/schemas";
-import { BlockExplorerClient, type BlockExplorer } from "../etherscan/block-explorer-client";
+import { BlockExplorerClient, type BlockExplorer } from "../ethereum/block-explorer-client";
 import { MissingRequiredProp } from "../lib/errors";
-import { RpcClient } from "../etherscan/rpc-client";
+import { RpcClient } from "../ethereum/rpc-client";
 
 const baseCallTracerSchema = z.object({
   from: z.string(),

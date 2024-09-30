@@ -8,7 +8,7 @@ import { compiledArtifactParser } from "./schema/compiled.js";
 import { utils } from "zksync-ethers";
 import { type SystemContractHashes, systemContractHashesParser } from "./schema/github-schemas.js";
 import { Option } from "nochoices";
-import type { Sources } from "../etherscan/contract-data";
+import type { Sources } from "../ethereum/contract-data";
 
 const execPromise = promisify(exec);
 

@@ -31,7 +31,7 @@ export function buildCli(
       }
     }, true)
     .option("ethscankey", {
-      describe: "Api key for etherscan",
+      describe: "Api key for ethereum",
       type: "string",
       demandOption:
         "Please provide a valid Etherscan api key. You can set ETHERSCAN_API_KEY env var or use the option --ethscankey",

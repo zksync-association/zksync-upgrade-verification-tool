@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import fs from "node:fs/promises";
 import { GitContractsRepo } from "../src/reports/git-contracts-repo";
-import { ContractData } from "../src/etherscan/contract-data";
+import { ContractData } from "../src/ethereum/contract-data";
 
 const MIT_CONTENT = `MIT License
 

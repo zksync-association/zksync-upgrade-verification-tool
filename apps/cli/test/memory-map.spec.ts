@@ -14,7 +14,7 @@ import { StructType } from "../src/reports/storage/types/struct-type";
 import { AddressType } from "../src/reports/storage/types/address-type";
 import { BigNumberType } from "../src/reports/storage/types/big-number-type";
 import { BooleanType } from "../src/reports/storage/types/boolean-type";
-import { memoryDiffParser } from "../src/etherscan/rpc-client";
+import { memoryDiffParser } from "../src/ethereum/rpc-client";
 
 class TestReport implements StorageVisitor<string> {
   beforeData: Option<string>;

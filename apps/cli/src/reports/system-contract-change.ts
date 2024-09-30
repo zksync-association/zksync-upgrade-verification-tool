@@ -2,8 +2,8 @@ import type { Hex } from "viem";
 import type { GitContractsRepo } from "./git-contracts-repo.js";
 import type { Option } from "nochoices";
 import { ContractNotVerified } from "@repo/common/ethereum";
-import type { BlockExplorer } from "../etherscan/block-explorer-client";
-import { ContractData } from "../etherscan/contract-data";
+import type { BlockExplorer } from "../ethereum/block-explorer-client";
+import { ContractData } from "../ethereum/contract-data";
 
 export class SystemContractChange {
   address: Hex;

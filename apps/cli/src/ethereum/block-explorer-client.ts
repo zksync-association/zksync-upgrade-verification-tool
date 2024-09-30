@@ -84,7 +84,7 @@ export class BlockExplorerClient implements BlockExplorer {
     parser: T
   ): Promise<z.infer<typeof parser>> {
     // TODO: Make an option to avoid this
-    // This is to trottle the amount of request made to etherscan, because free plans
+    // This is to trottle the amount of request made to ethereum, because free plans
     // rate limits the calls to 5 per second.
     if (this.callCount % 5 === 4) {
       await new Promise((resolve) => setTimeout(resolve, 1000));

@@ -1,6 +1,6 @@
-import type { BlockExplorer } from "../../src/etherscan/block-explorer-client";
-import type { ContractAbi } from "../../src/etherscan/contract-abi";
-import type { ContractData } from "../../src/etherscan/contract-data";
+import type { BlockExplorer } from "../../src/ethereum/block-explorer-client";
+import type { ContractAbi } from "../../src/ethereum/contract-abi";
+import type { ContractData } from "../../src/ethereum/contract-data";
 
 export class TestBlockExplorer implements BlockExplorer {
   abis: Map<string, ContractAbi>;
