@@ -2,7 +2,7 @@ import type { StorageSnapshot } from "./storage-snapshot.js";
 import { Option } from "nochoices";
 import { type Hex, hexToBytes } from "viem";
 import { CompoundStorageSnapshot } from "./compound-storage-snapshot.js";
-import type { RpcClient } from "@repo/common/ethereum";
+import type { RpcClient } from "../../../ethereum/rpc-client";
 
 export class RpcStorageSnapshot implements StorageSnapshot {
   private rpc: RpcClient;

@@ -4,7 +4,6 @@ import path from "node:path";
 import os from "node:os";
 import { NotADir } from "../lib/errors";
 
-
 export async function directoryExists(path: string): Promise<boolean> {
   let targetDirStat: Stats;
   try {

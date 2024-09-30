@@ -10,7 +10,7 @@ import {
   MalformedUpgrade,
   MissingNetwork,
   NotADir,
-  NotAnUpgradeDir
+  NotAnUpgradeDir,
 } from "../src/lib/errors";
 
 const doNothing = () => {};
