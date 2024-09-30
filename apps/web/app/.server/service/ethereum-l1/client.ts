@@ -42,10 +42,10 @@ export const validateHandlerAddress = async () => {
     });
     if (!exists) {
       throw new Error(
-        `Upgrade handler contract not found at ${env.UPGRADE_HANDLER_ADDRESS} on L1 Network "${process.env.ETH_NETWORK}"`
+        `Upgrade handler contract not found at ${env.UPGRADE_HANDLER_ADDRESS} on L1 Network "${env.ETH_NETWORK}"`
       );
     }
     return;
   }
-  throw new Error(`Connection to L1 "${process.env.ETH_NETWORK}" network failed`);
+  throw new Error(`Connection to L1 "${env.ETH_NETWORK}" network failed`);
 };
