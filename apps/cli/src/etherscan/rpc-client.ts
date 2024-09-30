@@ -12,13 +12,13 @@ import { type TypeOf, z, type ZodType } from "zod";
 import type { PublicClient, HttpTransport } from "viem";
 import { getStorageAt } from "viem/actions";
 import { L1_DEFAULT_URLS, L2_DEFAULT_URLS, type Network } from "@repo/common/ethereum";
-import { hexSchema, zodOptional } from "@repo/common/schemas";
+import { hexSchema, optionSchema } from "@repo/common/schemas";
 
 const stateParser = z.record(
   z.string(),
   z.object({
-    nonce: zodOptional(z.number()),
-    storage: zodOptional(z.record(z.string(), hexSchema)),
+    nonce: optionSchema(z.number()),
+    storage: optionSchema(z.record(z.string(), hexSchema)),
   })
 );
 
