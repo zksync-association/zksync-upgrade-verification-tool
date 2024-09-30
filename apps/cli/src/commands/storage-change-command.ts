@@ -9,7 +9,7 @@ import { MAIN_CONTRACT_FIELDS } from "../reports/storage/storage-props";
 import { FacetsToSelectorsVisitor, ListOfAddressesExtractor } from "../reports/reports/extractors";
 import { StorageChanges } from "../reports/storage/storage-changes";
 import { StringStorageChangeReport } from "../reports/reports/string-storage-change-report";
-import { type MemoryDiffRaw, memoryDiffParser } from "../etherscan/rpc-client"
+import { type MemoryDiffRaw, memoryDiffParser } from "../etherscan/rpc-client";
 
 async function getMemoryPath(
   preCalculatedPath: Option<string>,

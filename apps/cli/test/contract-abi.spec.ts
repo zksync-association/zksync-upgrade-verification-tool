@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Abi } from "viem";
-import { ContractAbi } from "@repo/common/ethereum";
+import { ContractAbi } from "../src/etherscan/contract-abi";
 
 describe("ContractAbi", () => {
   const rawAbi: Abi = [

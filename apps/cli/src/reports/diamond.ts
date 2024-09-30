@@ -1,10 +1,11 @@
 import { type Abi, bytesToHex, type Hex, hexToBytes, toFunctionSelector } from "viem";
-import type { ContractData, RpcClient } from "@repo/common/ethereum";
 import type { ZodType } from "zod";
 import { facetsResponseSchema } from "./schema/new-facets.js";
 import type { FacetData } from "./upgrade-changes.js";
 import type { BlockExplorer, BlockExplorerClient } from "../etherscan/block-explorer-client";
 import type { ContractAbi } from "../etherscan/contract-abi";
+import type { ContractData } from "../etherscan/contract-data";
+import type { RpcClient } from "../etherscan/rpc-client";
 
 const DIAMOND_FUNCTIONS = {
   facets: "facets",

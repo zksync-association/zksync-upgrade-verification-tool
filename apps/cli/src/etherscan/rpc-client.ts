@@ -29,7 +29,6 @@ export const memoryDiffParser = z.object({
   }),
 });
 
-
 export const contractEventSchema = z.object({
   address: hexSchema,
   topics: z.array(hexSchema),
@@ -46,7 +45,6 @@ const baseCallTracerSchema = z.object({
 export type CallTrace = z.infer<typeof baseCallTracerSchema> & {
   calls?: CallTrace[];
 };
-
 
 export const callTracerSchema: z.ZodType<CallTrace> = baseCallTracerSchema.extend({
   calls: z.lazy(() => callTracerSchema.array().optional()),

@@ -1,4 +1,4 @@
-import { ContractData, ADDRESS_ZERO, OPEN_ZEP_PROXY_IMPL_SLOT } from "@repo/common/ethereum";
+import { ADDRESS_ZERO, OPEN_ZEP_PROXY_IMPL_SLOT } from "@repo/common/ethereum";
 import type { GitContractsRepo } from "../reports/git-contracts-repo";
 import { ZkSyncEraDiff, hexAreEq } from "../reports/zk-sync-era-diff";
 import { type HexEraPropName, ZksyncEraState } from "../reports/zksync-era-state";
@@ -7,6 +7,7 @@ import { withSpinner } from "../lib/with-spinner.js";
 import path from "node:path";
 import { hexToBigInt, hexToBytes } from "viem";
 import { UpgradeFile } from "../lib/upgrade-file";
+import { ContractData } from "../etherscan/contract-data";
 
 async function downloadAllCode(
   diff: ZkSyncEraDiff,

@@ -22,14 +22,8 @@ import {
 import type { ContractField } from "./storage/contractField.js";
 import type { StorageSnapshot } from "./storage/snapshot";
 import type { StorageVisitor } from "./reports/storage-visitor.js";
-import {
-  DIAMOND_ADDRS,
-  UPGRADE_FN_SELECTOR,
-  type Network,
-} from "@repo/common/ethereum";
-import {
-  hexSchema,
-} from "@repo/common/schemas";
+import { DIAMOND_ADDRS, UPGRADE_FN_SELECTOR, type Network } from "@repo/common/ethereum";
+import { hexSchema } from "@repo/common/schemas";
 import { BlockExplorerClient, type BlockExplorer } from "../etherscan/block-explorer-client";
 import { MissingRequiredProp } from "../lib/errors";
 import { RpcClient } from "../etherscan/rpc-client";
@@ -63,7 +57,6 @@ export const l2UpgradeSchema = z.object({
   ]),
 });
 
-
 export const upgradeCallDataSchema = z.object({
   functionName: z.string(),
   args: z.tuple([
@@ -85,7 +78,6 @@ export const upgradeCallDataSchema = z.object({
     }),
   ]),
 });
-
 
 export type L2ContractData = {
   address: Hex;
