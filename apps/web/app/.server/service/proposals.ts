@@ -14,7 +14,7 @@ import {
 import { fetchLogProof, l2Rpc } from "@/.server/service/ethereum-l2/client";
 import { zkProtocolGovernorAbi } from "@/utils/contract-abis";
 import { env } from "@config/env.server";
-import { decodeAbiParameters, type Hex, keccak256, numberToHex } from "viem";
+import { decodeAbiParameters, type Hex, keccak256, numberToHex, toEventSelector } from "viem";
 import { queryLogs } from "@/.server/service/server-utils";
 import type { StartUpgradeData } from "@/common/types";
 import { defaultLogger } from "@config/log.server";
@@ -95,12 +95,44 @@ export type ProposalDataResponse = {
     }
 );
 
+export async function searchNotStartedProposals() {
+  // First we look for proposals that have already been executed
+  // in l2.
+  const executedInL2 = await queryLogs(
+    zkProtocolGovernorAbi,
+    env.ZK_PROTOCOL_GOVERNOR_ADDRESS,
+    "ProposalExecuted",
+    0n
+  );
+
+  // Now we need to check if these events have not been already started in l1
+  const filtered = [];
+  for (const { args, transactionHash } of executedInL2) {
+    if (!transactionHash) {
+      throw new Error("transactionHash should be present");
+    }
+
+    const data = await extractProposalData(transactionHash, numberToHex(args.proposalId));
+
+    if (!data.ok) {
+      filtered.push(data);
+      continue;
+    }
+
+    const stateInL1 = await getUpgradeState(data.l1ProposalId);
+    if (stateInL1 === PROPOSAL_STATES.None) {
+      filtered.push(data);
+    }
+  }
+
+  return filtered;
+}
+
 async function extractProposalData(txHash: Hex, l2ProposalId: Hex): Promise<ProposalDataResponse> {
-  console.log("txHash", txHash);
   const receipt = await l2Rpc.getTransactionReceipt({ hash: txHash });
   const logProof = await fetchLogProof(txHash, 0);
 
-  const l1MessageEventId = "0x3a36e47291f4201faf137fab081d92295bce2d53be2c6ca68ba82c7faa9ce241";
+  const l1MessageEventId = toEventSelector("L1MessageSent(address,bytes32,bytes)");
   const bodyLog = receipt.logs.find((l) => l.topics[0] === l1MessageEventId);
   if (!bodyLog) {
     return {
@@ -151,37 +183,4 @@ async function extractProposalData(txHash: Hex, l2ProposalId: Hex): Promise<Prop
       proposal: body,
     },
   };
-}
-
-export async function searchNotStartedProposals() {
-  // First we look for proposals that have already been executed
-  // in l2.
-  const executedInL2 = await queryLogs(
-    zkProtocolGovernorAbi,
-    env.ZK_PROTOCOL_GOVERNOR_ADDRESS,
-    "ProposalExecuted",
-    0n
-  );
-
-  // Now we need to check if these events have not been already started in l1
-  const filtered = [];
-  for (const { args, transactionHash } of executedInL2) {
-    if (!transactionHash) {
-      throw new Error("transactionHash should be present");
-    }
-
-    const data = await extractProposalData(transactionHash, numberToHex(args.proposalId));
-
-    if (!data.ok) {
-      filtered.push(data);
-      continue;
-    }
-
-    const stateInL1 = await getUpgradeState(data.l1ProposalId);
-    if (stateInL1 === PROPOSAL_STATES.None) {
-      filtered.push(data);
-    }
-  }
-
-  return filtered;
 }
