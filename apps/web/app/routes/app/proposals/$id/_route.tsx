@@ -345,7 +345,7 @@ export default function Proposals() {
                   </div>
                   <div className="pt-4">
                     <h2 className="font-bold text-3xl">Upgrade Analysis</h2>
-                    <Tabs className="mt-4 flex" defaultValue="facet-changes">
+                    <Tabs className="mt-4 flex" defaultValue="raw-data">
                       <TabsList className="mt-12 mr-6">
                         <TabsTrigger value="raw-data">Raw Data</TabsTrigger>
                       </TabsList>
