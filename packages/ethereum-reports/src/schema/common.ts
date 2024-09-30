@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { addressSchema, hexSchema } from "@repo/common/schemas";
 
-export const numericString = z.string().regex(/^[0-9]*$/, "Invalid number");
+export const numericString = z.string().regex(/^[0-9]+$/, "Invalid number");
 
 export const transactionSchema = z.object({
   txType: z.number(),
