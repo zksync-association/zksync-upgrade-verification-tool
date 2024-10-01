@@ -1,24 +1,22 @@
-import { ContractAbi, type BlockExplorer } from "@repo/common/ethereum";
-import type { ContractsRepo } from "@repo/ethereum-reports/git-contracts-repo";
-import {
-  type CheckReportObj,
-  ObjectCheckReport,
-} from "@repo/ethereum-reports/reports/object-check-report";
-import { StringCheckReport } from "@repo/ethereum-reports/reports/string-check-report";
-import { SystemContractList } from "@repo/ethereum-reports/system-contract-providers";
-import { ZkSyncEraDiff } from "@repo/ethereum-reports/zk-sync-era-diff";
+import type { BlockExplorer } from "../src/ethereum/block-explorer-client";
+import type { ContractsRepo } from "../src/reports/git-contracts-repo";
+import { SystemContractList } from "../src/reports/system-contract-providers";
+import { ZkSyncEraDiff } from "../src/reports/zk-sync-era-diff";
 import {
   type L2ContractData,
   type ZkEraStateData,
   ZksyncEraState,
   HEX_ZKSYNC_FIELDS,
   NUMERIC_ZKSYNC_FIELDS,
-} from "@repo/ethereum-reports/zksync-era-state";
+} from "../src/reports/zksync-era-state";
 import { Option } from "nochoices";
 import { type Hex, hexToBigInt } from "viem";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TestBlockExplorer } from "./utilities/test-block-explorer.js";
 import { TestContractRepo } from "./utilities/test-contract-repo.js";
+import { type CheckReportObj, ObjectCheckReport } from "../src/reports/reports/object-check-report";
+import { StringCheckReport } from "../src/reports/reports/string-check-report";
+import { ContractAbi } from "../src/ethereum/contract-abi";
 
 interface Ctx {
   abi1: ContractAbi;

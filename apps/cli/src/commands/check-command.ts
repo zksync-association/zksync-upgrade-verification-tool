@@ -1,11 +1,11 @@
 import type { EnvBuilder } from "../lib/env-builder.js";
 import { hexToBytes } from "viem";
 import { withSpinner } from "../lib/with-spinner.js";
-import { ZksyncEraState } from "@repo/ethereum-reports/zksync-era-state";
-import { ZkSyncEraDiff } from "@repo/ethereum-reports/zk-sync-era-diff";
+import { ZksyncEraState } from "../reports/zksync-era-state";
+import { ZkSyncEraDiff } from "../reports/zk-sync-era-diff";
 import { DIAMOND_ADDRS } from "@repo/common/ethereum";
-import { StringCheckReport } from "@repo/ethereum-reports/reports/string-check-report";
 import { UpgradeFile } from "../lib/upgrade-file";
+import { StringCheckReport } from "../reports/reports/string-check-report";
 
 export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
   const dataHex = UpgradeFile.fromFile(upgradeFilePath)

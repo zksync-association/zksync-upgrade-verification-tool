@@ -11,6 +11,7 @@ import { EnvBuilder } from "./env-builder.js";
 import { Option } from "nochoices";
 import { failHandler } from "../commands/fail-handler.js";
 import { NetworkSchema } from "@repo/common/ethereum";
+import pkg from "../../package.json";
 
 export function buildCli(
   args: string[],
@@ -22,6 +23,7 @@ export function buildCli(
   const env = new EnvBuilder();
   const argParser = yargs(args)
     .scriptName("validate")
+    .version(pkg.version)
     .middleware((yargs) => {
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
@@ -31,7 +33,7 @@ export function buildCli(
       }
     }, true)
     .option("ethscankey", {
-      describe: "Api key for etherscan",
+      describe: "Api key for ethereum",
       type: "string",
       demandOption:
         "Please provide a valid Etherscan api key. You can set ETHERSCAN_API_KEY env var or use the option --ethscankey",

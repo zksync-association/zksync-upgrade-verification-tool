@@ -1,4 +1,4 @@
-import { BlockExplorerClient } from "@repo/common/ethereum";
+import { EthereumConfig } from "@config/ethereum.server";
 import {
   createPublicClient,
   type Hex,
@@ -13,7 +13,6 @@ import {
 } from "viem";
 import { zksync } from "viem/chains";
 import { getLogProof } from "viem/zksync";
-import { EthereumConfig } from "@config/ethereum.server";
 
 export type MessageProof = {
   id: number;
@@ -94,5 +93,3 @@ export async function queryL2Logs<A extends Abi, N extends ContractEventName<A>>
 export async function getLatestL2Block() {
   return l2Rpc.getBlock({ blockTag: "latest" });
 }
-
-export const l2Explorer = BlockExplorerClient.forL2(EthereumConfig.legacyClientNetwork);
