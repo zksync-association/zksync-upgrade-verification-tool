@@ -21,13 +21,14 @@ export async function loader() {
     getAllEmergencyProposals(),
     emergencyUpgradeBoardAddress(),
   ]);
+
+  const isActive = (proposal: (typeof emergencyProposals)[number]) =>
+    (proposal.status === "ACTIVE" || proposal.status === "READY") && proposal.archivedOn === null;
+  const isInactive = (proposal: (typeof emergencyProposals)[number]) => !isActive(proposal);
+
   return json({
-    activeEmergencyProposals: emergencyProposals.filter(
-      ({ status }) => status === "ACTIVE" || status === "READY"
-    ),
-    inactiveEmergencyProposals: emergencyProposals.filter(
-      ({ status }) => status === "CLOSED" || status === "BROADCAST"
-    ),
+    activeEmergencyProposals: emergencyProposals.filter(isActive),
+    inactiveEmergencyProposals: emergencyProposals.filter(isInactive),
     emergencyBoardAddress,
   });
 }
@@ -41,11 +42,11 @@ export default function Index() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Active Emergency Proposals</CardTitle>
-            <a href={$path("/app/emergency/new")}>
+            <Link to={$path("/app/emergency/new")}>
               <Button data-testid="new-emergency-proposal" variant="secondary" size="icon">
                 <PlusIcon className="h-4 w-4" />
               </Button>
-            </a>
+            </Link>
           </div>
         </CardHeader>
         <CardContent>
@@ -151,9 +152,9 @@ export default function Index() {
                       </TableCell>
                       <TableCell>
                         <span
-                          className={`rounded-full px-2 py-1 text-xs ${getStatusColor(ep.status)}`}
+                          className={`rounded-full px-2 py-1 text-xs ${getStatusColor(ep.status, ep.archivedOn !== null)}`}
                         >
-                          {ep.status}
+                          {ep.archivedOn === null ? ep.status : "Archived"}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -176,7 +177,11 @@ export default function Index() {
   );
 }
 
-const getStatusColor = (status: EmergencyProposalStatus) => {
+const getStatusColor = (status: EmergencyProposalStatus, archived?: boolean) => {
+  if (archived) {
+    return "bg-red-100 text-red-800";
+  }
+
   switch (status) {
     case "ACTIVE":
       return "bg-green-100 text-green-800";

@@ -46,3 +46,8 @@ test("TC105 - View only standard upgrades in private app", async ({ testApp, pag
     await page.reload();
   }
 });
+
+test("TC106 - Login as zk admin", async ({ switcher, page }) => {
+  await switcher.zkAdmin(page);
+  await expect(page.getByTestId("user-role")).toHaveText("ZkAdmin");
+});

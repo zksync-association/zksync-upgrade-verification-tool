@@ -29,6 +29,8 @@ import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
 import { guardiansAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 import { EthereumConfig } from "@config/ethereum.server";
+import ZkAdminArchiveProposal from "@/components/zk-admin-archive-proposal";
+import ProposalArchivedCard from "@/components/proposal-archived-card";
 
 export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const { id } = extractFromParams(remixParams, z.object({ id: hexSchema }), notFound());
@@ -98,18 +100,25 @@ export default function L2Cancellation() {
 
   const isExactNonce = proposal.nonce === currentNonce;
 
+  const proposalArchived = proposal.archivedOn !== null;
+
   const signDisabled =
-    user.role !== "guardian" || signatures.some((s) => isAddressEqual(s.signer, user.address));
+    user.role !== "guardian" ||
+    signatures.some((s) => isAddressEqual(s.signer, user.address)) ||
+    proposalArchived;
 
   const execDisabled =
-    signatures.length < necessarySignatures || proposal.transactionHash !== null || !isExactNonce;
+    signatures.length < necessarySignatures ||
+    proposal.transactionHash !== null ||
+    !isExactNonce ||
+    proposalArchived;
 
   return (
     <div className="flex flex-1 flex-col">
       <HeaderWithBackButton>Proposal {displayBytes32(proposal.externalId)}</HeaderWithBackButton>
 
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card className="pb-10">
+        <Card className="pb-10" data-testid="proposal-details-card">
           <CardHeader>
             <CardTitle>Proposal Details</CardTitle>
           </CardHeader>
@@ -168,11 +177,19 @@ export default function L2Cancellation() {
                   </div>
                 </div>
               )}
+              {proposalArchived && (
+                <ProposalArchivedCard
+                  archivedBy={proposal.archivedBy ?? ""}
+                  archivedOn={new Date(proposal.archivedOn ?? 0)}
+                  archivedReason={proposal.archivedReason ?? ""}
+                />
+              )}
             </div>
           </CardContent>
         </Card>
         <Card className="pb-10">
-          <CardHeader>
+          <CardHeader className="pt-7">
+            <p className="text-red-500">{proposalArchived ? "Archived" : "\u00A0"}</p>
             <CardTitle>Veto Status</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1">
@@ -205,10 +222,14 @@ export default function L2Cancellation() {
             )}
           </CardContent>
         </Card>
-        <Card className="pb-10">
+        <Card className="pb-10" data-testid="role-actions-card">
           <CardHeader>
             <CardTitle>
-              {user.role === "guardian" ? "Guardian Actions" : "No role actions"}
+              {user.role === "guardian"
+                ? "Guardian Actions"
+                : user.role === "zkAdmin"
+                  ? "Zk Admin Actions"
+                  : "No role actions"}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
@@ -226,9 +247,16 @@ export default function L2Cancellation() {
                 disabled={signDisabled}
               />
             )}
+            {user.role === "zkAdmin" && (
+              <ZkAdminArchiveProposal
+                proposalId={BigInt(proposal.id)}
+                proposalType="ArchiveL2CancellationProposal"
+                disabled={proposalArchived}
+              />
+            )}
           </CardContent>
         </Card>
-        <Card className="pb-10">
+        <Card className="pb-10" data-testid="execute-actions-card">
           <CardHeader>
             <CardTitle>Execute Actions</CardTitle>
           </CardHeader>

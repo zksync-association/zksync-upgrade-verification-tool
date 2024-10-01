@@ -21,9 +21,6 @@ export type IntRange<F extends number, T extends number> = Exclude<Enumerate<T>,
 
 let sharedBrowserContext: BrowserContext;
 
-// Fast mode limits the number of accounts created to 1 per role
-const fastMode = process.env.TEST_FAST_MODE === "true";
-
 type ChangeAccountFn = () => Promise<void>;
 
 export class RoleSwitcher {
@@ -38,18 +35,12 @@ export class RoleSwitcher {
   }
 
   async council(councilNumber: IntRange<1, typeof COUNCIL_SIZE>, page?: Page) {
-    if (fastMode && councilNumber !== 1) {
-      throw new Error("Fast mode does not support council numbers other than 1");
-    }
     const index = COUNCIL_INDEXES[councilNumber - 1] as number;
     this.current = async () => this.council(councilNumber);
     await this.switchToIndex(index, page);
   }
 
   async guardian(guardianNumber: IntRange<1, typeof GUARDIANS_SIZE>, page?: Page) {
-    if (fastMode && guardianNumber !== 1) {
-      throw new Error("Fast mode does not support guardian numbers other than 1");
-    }
     const index = GUARDIAN_INDEXES[guardianNumber - 1] as number;
     this.current = async () => this.guardian(guardianNumber);
     await this.switchToIndex(index, page);
@@ -63,6 +54,11 @@ export class RoleSwitcher {
   async visitor(page?: Page) {
     this.current = async () => this.visitor();
     await this.switchToIndex(DERIVATION_INDEXES.VISITOR, page);
+  }
+
+  async zkAdmin(page?: Page) {
+    this.current = async () => this.zkAdmin();
+    await this.switchToIndex(DERIVATION_INDEXES.ZK_ADMIN, page);
   }
 
   pushToHistory(): void {
@@ -129,10 +125,7 @@ export const test = baseTest.extend<{
         throw new Error("Please verify there's a node running at http://localhost:8545");
       }
 
-      for (const i of Object.values(DERIVATION_INDEXES)) {
-        if (fastMode && i === DERIVATION_INDEXES.COUNCIL_2) {
-          break;
-        }
+      for (const _ of Object.values(DERIVATION_INDEXES)) {
         await wallet.createAccount();
       }
 
@@ -173,6 +166,7 @@ export const test = baseTest.extend<{
 
   wallet: async ({ context }, use) => {
     const metamask = await dappwright.getWallet("metamask", context);
+    patchWalletSign(metamask);
     await use(metamask);
   },
 
@@ -212,3 +206,38 @@ export const test = baseTest.extend<{
     await use(testApp);
   },
 });
+
+function patchWalletSign(wallet: Dappwright) {
+  wallet.sign = () => signWithScroll(wallet);
+}
+
+// This code is copied from: https://github.com/TenKeyLabs/dappwright/blob/main/src/wallets/metamask/actions/util.ts#L3
+// The reason is that we need to scroll before signed, and that's not included in the current version of dappright.
+async function performPopupAction(
+  page: Page,
+  action: (popup: Page) => Promise<void>
+): Promise<void> {
+  const popup = await page.context().waitForEvent("page"); // Wait for the popup to show up
+
+  await action(popup);
+  if (!popup.isClosed()) await popup.waitForEvent("close");
+}
+
+// Our message has scroll. That is not included in dappwrights logic. That's why it's re implemented here.
+async function signWithScroll(wallet: Dappwright) {
+  await performPopupAction(wallet.page, async (popup) => {
+    await popup.bringToFront();
+    await popup.reload();
+
+    // We must wait until the signature request is visible
+    await popup.getByText("Signature Request").waitFor({ state: "visible" });
+
+    // If the scroll button is visible, we click it, otherwise we sign directly
+    const scrollButton = popup.getByTestId("signature-request-scroll-button");
+    if (await scrollButton.isVisible({ timeout: 500 })) {
+      await scrollButton.click();
+    }
+
+    await popup.getByRole("button", { name: "Sign" }).click();
+  });
+}

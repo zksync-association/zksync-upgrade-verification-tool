@@ -38,13 +38,14 @@ export async function getL2CancellationByExternalId(
 }
 
 export async function updateL2Cancellation(
-  id: InferSelectModel<typeof l2CancellationsTable>["id"],
-  data: Partial<InferInsertModel<typeof l2CancellationsTable>>
+  data: Partial<InferInsertModel<typeof l2CancellationsTable>> & {
+    id: InferSelectModel<typeof l2CancellationsTable>["id"];
+  }
 ) {
   return db
     .update(l2CancellationsTable)
     .set(data)
-    .where(eq(l2CancellationsTable.id, id))
+    .where(eq(l2CancellationsTable.id, data.id))
     .returning()
     .then(getFirstOrThrow);
 }

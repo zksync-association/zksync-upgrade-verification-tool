@@ -35,6 +35,8 @@ export class TestApp {
   readonly walletMnemonic =
     "draw drastic exercise toilet stove bone grit clutch any stand phone ten";
 
+  readonly zkAdminAddress = "0x01EbB569710c39B2dF45ec0dD17127b2b0f9D992";
+
   private latestBackupNodeBlock: number | null = null;
 
   db: PostgresJsDatabase;
@@ -287,6 +289,7 @@ export class TestApp {
         ETHERSCAN_API_KEY: "test",
         ETH_NETWORK: "local",
         LOCAL_CHAIN_PORT: this.mainNodePort.toString(),
+        ZK_ADMIN_ADDRESS: this.zkAdminAddress,
         ...env,
       },
       outputFile: this.logPaths.app,

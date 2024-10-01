@@ -203,7 +203,7 @@ export default function Proposals() {
               return (
                 <>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <Card className="pb-10">
+                    <Card className="pb-10" data-testid="proposal-details-card">
                       <CardHeader>
                         <CardTitle>Proposal Details</CardTitle>
                       </CardHeader>
@@ -273,7 +273,8 @@ export default function Proposals() {
                           {user.role === "guardian" && "Guardian Actions"}
                           {user.role === "securityCouncil" && "Security Council Actions"}
                           {user.role === "visitor" && "No role actions"}
-                          {user.role === "zkFoundation" && "No role actions"}
+                          {(user.role === "zkFoundation" || user.role === "zkAdmin") &&
+                            "No role actions"}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-col space-y-3">

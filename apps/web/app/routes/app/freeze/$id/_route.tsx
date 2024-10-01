@@ -29,6 +29,9 @@ import {
 } from "@/.server/service/ethereum-l1/contracts/security-council";
 import { securityCouncilAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 import { EthereumConfig } from "@config/ethereum.server";
+import ProposalArchivedCard from "@/components/proposal-archived-card";
+import ZkAdminArchiveProposal from "@/components/zk-admin-archive-proposal";
+import type { ZkAdminSignAction } from "@/routes/resources+/zk-admin-sign";
 
 export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const { id } = extractFromParams(remixParams, z.object({ id: z.coerce.number() }), notFound());
@@ -110,42 +113,49 @@ export default function Freeze() {
 
   let proposalType: string;
   let functionName: Parameters<typeof ContractWriteButton>[0]["functionName"];
+  let zkAdminSignAction: ZkAdminSignAction;
   switch (proposal.type) {
     case "SOFT_FREEZE":
       proposalType = "Soft Freeze";
       functionName = "softFreeze";
+      zkAdminSignAction = "ArchiveSoftFreezeProposal";
       break;
     case "HARD_FREEZE":
       proposalType = "Hard Freeze";
       functionName = "hardFreeze";
+      zkAdminSignAction = "ArchiveHardFreezeProposal";
       break;
     case "SET_SOFT_FREEZE_THRESHOLD":
       proposalType = "Set Soft Freeze Threshold";
       functionName = "setSoftFreezeThreshold";
+      zkAdminSignAction = "ArchiveSetSoftFreezeThresholdProposal";
       break;
     case "UNFREEZE":
       proposalType = "Unfreeze";
       functionName = "unfreeze";
+      zkAdminSignAction = "ArchiveUnfreezeProposal";
       break;
   }
 
   const proposalValidUntil = new Date(proposal.validUntil);
+  const proposalArchived = proposal.archivedOn !== null;
 
   const signDisabled =
     user.role !== "securityCouncil" ||
-    signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
+    signatures.some((s) => isAddressEqual(s.signer, user.address as Hex)) ||
+    proposalArchived;
 
   const executeFreezeEnabled =
-    signatures.length >= necessarySignatures && !proposal.transactionHash;
+    signatures.length >= necessarySignatures && !proposal.transactionHash && !proposalArchived;
 
   return (
     <div className="flex flex-1 flex-col">
       <HeaderWithBackButton>
-        {proposalType} Proposal {proposal.externalId}
+        {proposalType} - Proposal {proposal.externalId}
       </HeaderWithBackButton>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card className="pb-10">
+        <Card className="pb-10" data-testid="proposal-details-card">
           <CardHeader>
             <CardTitle>Proposal Details</CardTitle>
           </CardHeader>
@@ -194,11 +204,19 @@ export default function Freeze() {
                   </div>
                 </div>
               )}
+              {proposalArchived && (
+                <ProposalArchivedCard
+                  archivedOn={new Date(proposal.archivedOn ?? 0)}
+                  archivedReason={proposal.archivedReason ?? ""}
+                  archivedBy={proposal.archivedBy ?? ""}
+                />
+              )}
             </div>
           </CardContent>
         </Card>
         <Card className="flex flex-col pb-10">
-          <CardHeader>
+          <CardHeader className="pt-7">
+            <p className="text-red-500">{proposalArchived ? "Archived" : "\u00A0"}</p>
             <CardTitle>Proposal Status</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1">
@@ -218,10 +236,14 @@ export default function Freeze() {
             )}
           </CardContent>
         </Card>
-        <Card className="pb-10">
+        <Card className="pb-10" data-testid="role-actions-card">
           <CardHeader>
             <CardTitle>
-              {user.role === "securityCouncil" ? "Security Council Actions" : "No role actions"}
+              {user.role === "securityCouncil"
+                ? "Security Council Actions"
+                : user.role === "zkAdmin"
+                  ? "Zk Admin Actions"
+                  : "No role actions"}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col space-y-3">
@@ -236,9 +258,16 @@ export default function Freeze() {
                 disabled={signDisabled}
               />
             )}
+            {user.role === "zkAdmin" && (
+              <ZkAdminArchiveProposal
+                proposalId={BigInt(proposal.id)}
+                proposalType={zkAdminSignAction}
+                disabled={proposalArchived}
+              />
+            )}
           </CardContent>
         </Card>
-        <Card className="pb-10">
+        <Card className="pb-10" data-testid="execute-actions-card">
           <CardHeader>
             <CardTitle>Execute Actions</CardTitle>
           </CardHeader>

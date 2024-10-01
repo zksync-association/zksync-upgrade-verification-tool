@@ -43,7 +43,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const allValid = validations.every((v) => v.isValid);
   if (allValid && body.data.intent === "save") {
     try {
-      await saveEmergencyProposal(
+      const proposal = await saveEmergencyProposal(
         {
           salt: body.data.salt,
           title: body.data.title,
@@ -51,13 +51,13 @@ export async function action({ request }: ActionFunctionArgs) {
         },
         calls
       );
+      return redirect($path("/app/emergency/:id", { id: proposal.externalId }));
     } catch (err) {
       if (isUniqueConstraintError(err)) {
         throw badRequest("Proposal with these params already exists.");
       }
       throw err;
     }
-    return redirect($path("/app/emergency"));
   }
 
   return json({ ok: allValid, validations });

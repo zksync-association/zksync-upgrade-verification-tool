@@ -51,6 +51,10 @@ export const emergencyProposalsTable = pgTable(
     proposer: bytea("proposer").notNull(),
     storageDiffReport: json("storage_diff_report"),
     checkReport: json("check_report"),
+    archivedOn: timestamp("archived_on", { withTimezone: true }),
+    archivedReason: text("archived_reason"),
+    archivedBy: bytea("archived_by"),
+    archivedSignature: bytea("archived_signature"),
   },
   (table) => ({
     externalIdIdx: index("emergency_external_id_idx").on(table.externalId),
@@ -127,6 +131,10 @@ export const freezeProposalsTable = pgTable(
     proposedOn: timestamp("proposed_on", { withTimezone: true }).notNull(),
     softFreezeThreshold: bigint("soft_freeze_threshold", { mode: "number" }),
     transactionHash: bytea("transaction_hash"),
+    archivedOn: timestamp("archived_on", { withTimezone: true }),
+    archivedReason: text("archived_reason"),
+    archivedBy: bytea("archived_by"),
+    archivedSignature: bytea("archived_signature"),
   },
   ({ externalId }) => ({
     externalIdIdx: index("freeze_proposals_external_id_idx").on(externalId),
@@ -165,6 +173,10 @@ export const l2CancellationsTable = pgTable("l2_governor_cancellations", {
   txRequestRefundRecipient: bytea("tx_request_refund_recipient").notNull(),
   txRequestTxMintValue: bytea("tx_request_tx_mint_value").notNull(),
   transactionHash: bytea("transaction_hash"),
+  archivedOn: timestamp("archived_on", { withTimezone: true }),
+  archivedReason: text("archived_reason"),
+  archivedBy: bytea("archived_by"),
+  archivedSignature: bytea("archived_signature"),
 });
 
 export const l2CancellationsTableRelations = relations(l2CancellationsTable, ({ many }) => {

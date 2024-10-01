@@ -25,6 +25,14 @@ const USER_ROLE_DATA = {
       throw new Error("Visitors cannot sign regular upgrades");
     },
   },
+  [UserRoleEnum.enum.zkAdmin]: {
+    multisigContractForRole: () => {
+      throw new Error("zkAdmin cannot sign");
+    },
+    regularUpgradeContractNameByRole: () => {
+      throw new Error("zkAdmin cannot sign regular upgrades");
+    },
+  },
 };
 
 export async function multisigContractForRole(role: UserRole): Promise<Hex> {
