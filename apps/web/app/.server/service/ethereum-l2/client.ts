@@ -1,10 +1,19 @@
-import { env } from "@config/env.server";
 import { BlockExplorerClient } from "@repo/common/ethereum";
-import { createPublicClient, type Hex, http } from "viem";
+import {
+  createPublicClient,
+  type Hex,
+  http,
+  type Abi,
+  type AbiEvent,
+  type Address,
+  type BlockTag,
+  type ContractEventName,
+  decodeEventLog,
+  getAbiItem,
+} from "viem";
 import { zksync } from "viem/chains";
 import { getLogProof } from "viem/zksync";
-
-const network = env.ETH_NETWORK === "local" ? "sepolia" : env.ETH_NETWORK;
+import { EthereumConfig } from "@config/ethereum.server";
 
 export type MessageProof = {
   id: number;
@@ -13,7 +22,7 @@ export type MessageProof = {
 };
 
 export const l2Rpc = createPublicClient({
-  transport: http(env.L2_RPC_URL),
+  transport: http(EthereumConfig.l2.rpcUrl),
   chain: zksync,
 });
 
@@ -29,26 +38,61 @@ export const l2Rpc = createPublicClient({
  * @param txHash
  * @param index
  */
-export async function fetchLogProof(txHash: Hex, index: number): Promise<MessageProof | null> {
-  if (env.ETH_NETWORK === "local") {
-    try {
-      // In development, we just check that the tx exists. If tx does not exist this raise an error.
-      await l2Rpc.getTransactionReceipt({ hash: txHash });
-      return {
-        proof: [txHash],
-        root: txHash,
-        id: 0,
-      };
-    } catch (_e) {
-      return null;
-    }
-  } else {
+export async function fetchL2LogProof(txHash: Hex, index: number): Promise<MessageProof | null> {
+  if (EthereumConfig.supportsLogProof) {
     return getLogProof(l2Rpc, { txHash, index });
+  }
+
+  // In development, we just check that the tx exists. If tx does not exist this raises an error.
+  try {
+    await l2Rpc.getTransactionReceipt({ hash: txHash });
+    return {
+      proof: [txHash],
+      root: txHash,
+      id: 0,
+    };
+  } catch (_e) {
+    return null;
   }
 }
 
-export async function getLatestBlock() {
+export async function queryL2Logs<A extends Abi, N extends ContractEventName<A>>(
+  abi: A,
+  address: Address,
+  eventName: N,
+  fromBlock: bigint,
+  toBlock: bigint | BlockTag = "latest"
+) {
+  const args1 = {};
+  return l2Rpc
+    .getLogs({
+      address: address,
+      event: getAbiItem({
+        abi,
+        name: eventName,
+      } as any) as AbiEvent,
+      fromBlock: fromBlock,
+      toBlock: toBlock,
+      args: args1,
+    })
+    .then((logs) =>
+      logs.map((log) => {
+        const decoded = decodeEventLog({
+          abi,
+          eventName,
+          data: log.data,
+          topics: log.topics,
+        });
+        return {
+          ...decoded,
+          transactionHash: log.transactionHash,
+        };
+      })
+    );
+}
+
+export async function getLatestL2Block() {
   return l2Rpc.getBlock({ blockTag: "latest" });
 }
 
-export const l2Explorer = BlockExplorerClient.forL2(network);
+export const l2Explorer = BlockExplorerClient.forL2(EthereumConfig.legacyClientNetwork);

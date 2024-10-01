@@ -37,7 +37,7 @@ export default function Index() {
         <Await resolve={proposals}>
           {({ active: activeProposals, inactive: inactiveProposals }) => (
             <>
-              <Card className="pb-10">
+              <Card className="pb-10" data-testid="active-proposals-card">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Active Standard Proposals</CardTitle>
@@ -71,7 +71,7 @@ export default function Index() {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="pb-10">
+              <Card className="pb-10" data-testid="inactive-proposals-card">
                 <CardHeader>
                   <CardTitle>Inactive Standard Proposals</CardTitle>
                 </CardHeader>

@@ -11,13 +11,13 @@ import {
   getUpgradeState,
   getUpgradeStatus,
 } from "./ethereum-l1/contracts/protocol-upgrade-handler";
-import { fetchLogProof, l2Rpc } from "@/.server/service/ethereum-l2/client";
+import { fetchL2LogProof, l2Rpc, queryL2Logs } from "@/.server/service/ethereum-l2/client";
 import { zkProtocolGovernorAbi } from "@/utils/contract-abis";
 import { env } from "@config/env.server";
-import { decodeAbiParameters, type Hex, keccak256, numberToHex } from "viem";
-import { queryLogs } from "@/.server/service/server-utils";
+import { decodeAbiParameters, type Hex, keccak256, numberToHex, toEventSelector } from "viem";
 import type { StartUpgradeData } from "@/common/types";
 import { defaultLogger } from "@config/log.server";
+import { EthereumConfig } from "@config/ethereum.server";
 
 export async function getProposals() {
   // First, we will update the status of all stored active proposals
@@ -38,9 +38,10 @@ export async function getProposals() {
   const latestBlock = await l1Rpc.getBlock({ blockTag: "latest" });
   const currentBlock = latestBlock.number;
 
-  // Logs are calculated from the last 40 * 24 * 360 blocks,
+  // Logs are calculated from the last 40 days,
   // as this is a conservative estimation of oldest block with a valid upgrade.
-  const from = bigIntMax(currentBlock - BigInt(40 * 24 * 360), BigInt(0));
+  const blocksInADay = Math.floor((24 * 60 * 60) / EthereumConfig.l1.blockTime);
+  const from = bigIntMax(currentBlock - BigInt(40 * blocksInADay), BigInt(0));
   const logs = await getUpgradeStartedEvents({
     fromBlock: from,
     toBlock: "latest",
@@ -58,12 +59,15 @@ export async function getProposals() {
       continue;
     }
 
-    const [status, proposalData] = await Promise.all([getUpgradeState(id), getUpgradeStatus(id)]);
+    const [status, proposedOn] = await Promise.all([
+      getUpgradeState(id),
+      getUpgradeStatus(id).then((s) => new Date(s.creationTimestamp * 1000)),
+    ]);
 
     await createProposal({
       externalId: id,
       calldata: log.data,
-      proposedOn: new Date(proposalData.creationTimestamp * 1000),
+      proposedOn,
       executor: log.args._proposal.executor,
       transactionHash: log.transactionHash,
       status: isProposalActive(status) ? "ACTIVE" : "INACTIVE",
@@ -71,11 +75,6 @@ export async function getProposals() {
   }
 
   return getStoredProposals();
-}
-
-export async function nowInSeconds() {
-  const block = await l1Rpc.getBlock({ blockTag: "latest" });
-  return block.timestamp;
 }
 
 export type ProposalDataResponse = {
@@ -95,12 +94,44 @@ export type ProposalDataResponse = {
     }
 );
 
-async function extractProposalData(txHash: Hex, l2ProposalId: Hex): Promise<ProposalDataResponse> {
-  console.log("txHash", txHash);
-  const receipt = await l2Rpc.getTransactionReceipt({ hash: txHash });
-  const logProof = await fetchLogProof(txHash, 0);
+export async function searchNotStartedProposals() {
+  // First we look for proposals that have already been executed
+  // in l2.
+  const executedInL2 = await queryL2Logs(
+    zkProtocolGovernorAbi,
+    env.ZK_PROTOCOL_GOVERNOR_ADDRESS,
+    "ProposalExecuted",
+    0n
+  );
 
-  const l1MessageEventId = "0x3a36e47291f4201faf137fab081d92295bce2d53be2c6ca68ba82c7faa9ce241";
+  // Now we need to check if these events have not been already started in l1
+  const filtered = [];
+  for (const { args, transactionHash } of executedInL2) {
+    if (!transactionHash) {
+      throw new Error("transactionHash should be present");
+    }
+
+    const data = await extractProposalData(transactionHash, numberToHex(args.proposalId));
+
+    if (!data.ok) {
+      filtered.push(data);
+      continue;
+    }
+
+    const stateInL1 = await getUpgradeState(data.l1ProposalId);
+    if (stateInL1 === PROPOSAL_STATES.None) {
+      filtered.push(data);
+    }
+  }
+
+  return filtered;
+}
+
+async function extractProposalData(txHash: Hex, l2ProposalId: Hex): Promise<ProposalDataResponse> {
+  const receipt = await l2Rpc.getTransactionReceipt({ hash: txHash });
+  const logProof = await fetchL2LogProof(txHash, 0);
+
+  const l1MessageEventId = toEventSelector("L1MessageSent(address,bytes32,bytes)");
   const bodyLog = receipt.logs.find((l) => l.topics[0] === l1MessageEventId);
   if (!bodyLog) {
     return {
@@ -151,37 +182,4 @@ async function extractProposalData(txHash: Hex, l2ProposalId: Hex): Promise<Prop
       proposal: body,
     },
   };
-}
-
-export async function searchNotStartedProposals() {
-  // First we look for proposals that have already been executed
-  // in l2.
-  const executedInL2 = await queryLogs(
-    zkProtocolGovernorAbi,
-    env.ZK_PROTOCOL_GOVERNOR_ADDRESS,
-    "ProposalExecuted",
-    0n
-  );
-
-  // Now we need to check if these events have not been already started in l1
-  const filtered = [];
-  for (const { args, transactionHash } of executedInL2) {
-    if (!transactionHash) {
-      throw new Error("transactionHash should be present");
-    }
-
-    const data = await extractProposalData(transactionHash, numberToHex(args.proposalId));
-
-    if (!data.ok) {
-      filtered.push(data);
-      continue;
-    }
-
-    const stateInL1 = await getUpgradeState(data.l1ProposalId);
-    if (stateInL1 === PROPOSAL_STATES.None) {
-      filtered.push(data);
-    }
-  }
-
-  return filtered;
 }

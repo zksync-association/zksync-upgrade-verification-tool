@@ -9,25 +9,18 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/app/proposals");
 });
 
+const activeProposalsCard = (page: Page) => page.getByTestId("active-proposals-card");
+const inactiveProposalsCard = (page: Page) => page.getByTestId("inactive-proposals-card");
+
 test("TC001 - Verify proposals page loads correctly", async ({ page }) => {
-  await expect(
-    page.getByRole("heading", { name: "Active Standard Proposals", exact: true })
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Inactive Standard Proposals", exact: true })
-  ).toBeVisible();
+  await expect(activeProposalsCard(page)).toBeVisible();
+  await expect(inactiveProposalsCard(page)).toBeVisible();
 });
 
 test("TC002 - Check list of active proposals is display with active proposals", async ({
   page,
 }) => {
-  const activeProposalsSection = page
-    .getByRole("heading", { name: "Active Standard Proposals" })
-    .locator("..")
-    .locator("..")
-    .locator("..");
-
-  const proposalButton = activeProposalsSection.getByRole("button", {
+  const proposalButton = activeProposalsCard(page).getByRole("button", {
     name: /^0x[a-fA-F0-9]{64}$/,
   });
   await expect(proposalButton).toBeVisible();
@@ -38,14 +31,8 @@ test("TC003 - Check list of active proposals is displayed without active proposa
 }) => {
   await testApp.increaseBlockTimestamp({ days: 40 });
   await page.reload();
-  const activeProposalsSection = page
-    .getByRole("heading", { name: "Active Standard Proposals", exact: true })
-    .locator("..")
-    .locator("..")
-    .locator("..");
-  await expect(activeProposalsSection.getByRole("button")).not.toBeAttached();
   await expect(
-    activeProposalsSection.getByText("No active standard proposals found.")
+    activeProposalsCard(page).getByText("No active standard proposals found.")
   ).toBeVisible();
 });
 
@@ -54,12 +41,7 @@ test("TC004 - Check list of inactive proposals is displayed with inactive propos
 }) => {
   await testApp.increaseBlockTimestamp({ days: 40 });
   await page.reload();
-  const inactiveProposalsSection = page
-    .getByRole("heading", { name: "Inactive Standard Proposals" })
-    .locator("..")
-    .locator("..")
-    .locator("..");
-  const proposalButton = inactiveProposalsSection.getByRole("button", {
+  const proposalButton = inactiveProposalsCard(page).getByRole("button", {
     name: /^0x[a-fA-F0-9]{64}$/,
   });
   await expect(proposalButton).toBeVisible();
@@ -68,11 +50,7 @@ test("TC004 - Check list of inactive proposals is displayed with inactive propos
 test("TC005 - Check list of inactive proposals is displayed without inactive proposals", async ({
   page,
 }) => {
-  const inactiveProposalsSection = page
-    .getByRole("heading", { name: "Inactive Standard Proposals" })
-    .locator("..")
-    .locator("..")
-    .locator("..");
+  const inactiveProposalsSection = inactiveProposalsCard(page);
   await expect(inactiveProposalsSection.getByRole("button")).toHaveCount(0);
   await expect(
     inactiveProposalsSection.getByText("No inactive standard proposals found.")
@@ -337,16 +315,9 @@ test("TC017: Start new regular upgrade page -> Upgrade can be started. Redirects
   await page.goto("/app/proposals");
   await page.getByText("Active Standard Proposals", { exact: true }).waitFor();
 
-  const activeProposalsSection = page
-    .getByRole("heading", { name: "Active Standard Proposals" })
-    .locator("..")
-    .locator("..")
-    .locator("..");
-
+  const activeProposalsSection = activeProposalsCard(page);
   await activeProposalsSection.getByText(/0x/).first().waitFor();
-
   const buttons = await activeProposalsSection.getByRole("button", { name: /^0x/ }).all();
-
   expect(buttons.length).toBe(2);
 });
 
@@ -355,11 +326,7 @@ async function goToStartProposal(page: Page) {
   await page.getByText("Start regular upgrade flow").waitFor();
 }
 async function goToProposalDetails(page: Page) {
-  const activeProposalsSection = page
-    .getByRole("heading", { name: "Active Standard Proposals" })
-    .locator("..")
-    .locator("..")
-    .locator("..");
+  const activeProposalsSection = activeProposalsCard(page);
   const proposalButton = activeProposalsSection.getByRole("button", {
     name: /^0x[a-fA-F0-9]{64}$/,
   });

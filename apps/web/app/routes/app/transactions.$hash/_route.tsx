@@ -10,11 +10,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { displayBytes32 } from "@/utils/common-tables";
-import { getTransactionUrl } from "@/utils/etherscan";
 import { capitalizeFirstLetter } from "@/utils/string";
 
 import { notFound } from "@/utils/http";
-import { env } from "@config/env.server";
 import { type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
@@ -23,11 +21,11 @@ import { formatEther, formatGwei } from "viem";
 import { useWaitForTransactionReceipt } from "wagmi";
 import { z } from "zod";
 import { extractFromParams } from "@/utils/read-from-request";
+import { EthereumConfig } from "@config/ethereum.server";
 
 export function loader(args: LoaderFunctionArgs) {
   const { hash } = extractFromParams(args.params, z.object({ hash: hexSchema }), notFound());
-
-  const txUrl = getTransactionUrl(hash, env.ETH_NETWORK);
+  const txUrl = EthereumConfig.getTransactionUrl(hash);
   return json({ txUrl, hash });
 }
 

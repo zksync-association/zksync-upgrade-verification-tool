@@ -1,11 +1,10 @@
 import { type AbiFunction, hashTypedData, type Hex, verifyTypedData } from "viem";
 import type { SignAction } from "@/common/sign-action";
-import { env } from "@config/env.server";
-import { mainnet, sepolia } from "wagmi/chains";
 import { badRequest } from "@/utils/http";
 import { l1Rpc } from "./ethereum-l1/client";
 import guardiansArtifact from "@repo/contracts/artifacts/Guardians/Guardians.json";
 import type { Guardians$Type } from "@repo/contracts/artifacts/Guardians/Guardians.d.ts";
+import { EthereumConfig } from "@config/ethereum.server";
 
 function createTypedDigest({
   verifierAddr,
@@ -24,7 +23,7 @@ function createTypedDigest({
     domain: {
       name: contractName,
       version: "1",
-      chainId: env.ETH_NETWORK === "mainnet" ? mainnet.id : sepolia.id,
+      chainId: EthereumConfig.l1.chainId,
       verifyingContract: verifierAddr,
     },
     primaryType: action,
@@ -58,7 +57,7 @@ export async function assertValidSignatureZkFoundation(
       domain: {
         name: contractName,
         version: "1",
-        chainId: env.ETH_NETWORK === "mainnet" ? mainnet.id : sepolia.id,
+        chainId: EthereumConfig.l1.chainId,
         verifyingContract: verifierAddr,
       },
       primaryType: action,

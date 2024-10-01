@@ -1,5 +1,5 @@
-import type { EthNetwork } from "@/common/eth-network-enum";
 import { PROPOSAL_STATES, type StatusTime } from "@/utils/proposal-states";
+import { EthereumConfig } from "@config/ethereum.server";
 
 export function daysInSeconds(days: number): number {
   return days * 24 * 3600;
@@ -20,15 +20,14 @@ export function calculateStatusPendingDays(
   status: PROPOSAL_STATES,
   creationTimestamp: number,
   guardiansExtendedLegalVeto: boolean,
-  nowInSeconds: number,
-  network: EthNetwork
+  latestBlockTimestamp: number
 ): StatusTime | null {
-  const baseVetoPeriodDays = network === "sepolia" ? 0 : 3;
-
   if (status === PROPOSAL_STATES.LegalVetoPeriod) {
-    const delta = nowInSeconds - creationTimestamp;
+    const delta = latestBlockTimestamp - creationTimestamp;
     const currentDay = Math.ceil(delta / daysInSeconds(1));
-    const totalDays = guardiansExtendedLegalVeto ? 7 : baseVetoPeriodDays;
+    const totalDays = guardiansExtendedLegalVeto
+      ? 7
+      : EthereumConfig.standardProposalVetoPeriodDays;
 
     return {
       totalDays: totalDays,
@@ -37,11 +36,11 @@ export function calculateStatusPendingDays(
   }
 
   if (status === PROPOSAL_STATES.Waiting) {
-    const baseVetoPeriodDuration = daysInSeconds(baseVetoPeriodDays);
+    const baseVetoPeriodDuration = daysInSeconds(EthereumConfig.standardProposalVetoPeriodDays);
     const vetoPeriodDuration = guardiansExtendedLegalVeto
       ? SEVEN_DAYS_SECONDS
       : baseVetoPeriodDuration;
-    const delta = nowInSeconds - (creationTimestamp + vetoPeriodDuration);
+    const delta = latestBlockTimestamp - (creationTimestamp + vetoPeriodDuration);
     const currentDay = Math.ceil(delta / daysInSeconds(1));
 
     return {
