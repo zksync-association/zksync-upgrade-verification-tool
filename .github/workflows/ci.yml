@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  changed-files:
+    runs-on: ubuntu-latest
+    name: Get changed files
+    outputs:
+      app: ${{ steps.changed-files.outputs.app_any_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+        with:
+          files_yaml: |
+            app:
+              - '**/*'
+              - '!**/*.md'
+              - '!**/*.MD'
+
+  ci-for-lint:
+    name: Lint
+    needs: ["changed-files"]
+    if: ${{ needs.changed-files.outputs.app == 'true' }}
+    uses: ./.github/workflows/lint-reusable.yml
+
+  ci-for-test:
+    name: Test
+    needs: ["changed-files", "ci-for-lint"]
+    if: ${{ needs.changed-files.outputs.app == 'true' }}
+    uses: ./.github/workflows/test-reusable.yml
+
+  ci-for-test-e2e:
+    name: Test E2E
+    needs: ["changed-files", "ci-for-lint", "ci-for-test"]
+    if: ${{ needs.changed-files.outputs.app == 'true' }}
+    uses: ./.github/workflows/test-e2e-reusable.yml
+    secrets: inherit
+
+  ci-for-docker:
+    name: Docker
+    needs: ["changed-files", "ci-for-lint", "ci-for-test", "ci-for-test-e2e"]
+    if: ${{ needs.changed-files.outputs.app == 'true' }}
+    uses: ./.github/workflows/docker-reusable.yml
+    permissions:
+      contents: read
+      packages: write

@@ -1,0 +1,22 @@
+{
+  "extends": "@repo/typescript-config/remix.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./app/*"],
+      "@config/*": ["./config/*"],
+      "@server/*": ["./server/*"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "**/.server/**/*.ts",
+    "**/.server/**/*.tsx",
+    "**/.client/**/*.ts",
+    "**/.client/**/*.tsx",
+    "**/*.js",
+    "**/*.mjs",
+    "**/*.cjs"
+  ],
+  "exclude": ["build", "node_modules", "server-build"]
+}

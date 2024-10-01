@@ -16,16 +16,11 @@
       "*.md"
     ],
     "ignore": [
-      "./dist/*",
-      "./node_modules/*",
-      "package.json",
-      "**/__snapshots__/*",
-      "**/coverage/*",
-      "**/artifacts",
-      "**/zk-gov",
-      "**/zk-gov-preprocessed",
-      "**/contracts",
-      "**/cache"
+      "apps/web/drizzle",
+      "e2e/contracts/zk-gov",
+      "packages/contracts/src/zk-gov",
+      "packages/contracts/src/zk-gov-preprocessed",
+      "packages/e2e/playwright-report"
     ]
   },
   "organizeImports": {
@@ -55,9 +50,21 @@
         "noExplicitAny": "off",
         "noAsyncPromiseExecutor": "off"
       },
-      "a11y":{
+      "a11y": {
         "useValidAriaRole": "off"
+      },
+      "nursery": {
+        "useSortedClasses": {
+          "fix": "safe",
+          "level": "info",
+          "options": {}
+        }
       }
     }
+  },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
   }
 }

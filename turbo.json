@@ -1,0 +1,21 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "build/**", "server-build/**"]
+    },
+    "typecheck": {},
+    "@repo/contracts#typecheck": {
+      "dependsOn": ["@repo/contracts#build"]
+    },
+    "@repo/contracts#build": {
+      "cache": false
+    },
+    "web#typecheck": {
+      "dependsOn": ["@repo/contracts#build", "web#build"]
+    },
+    "test": {}
+  },
+  "globalPassThroughEnv": ["DATABASE_URL", "SKIP_ENV_VALIDATION"]
+}
