@@ -1,7 +1,10 @@
 import Navbar from "@/components/navbar";
-import { Outlet } from "@remix-run/react";
+import { Outlet, useLocation } from "@remix-run/react";
+import { $path } from "remix-routes";
 
 export default function App() {
+  const location = useLocation();
+
   return (
     <>
       <Navbar />
@@ -13,11 +16,26 @@ export default function App() {
         />
         <div className="w-full text-center">
           <h1 className="pt-20 pb-14 font-bold text-3xl md:text-5xl">
-            Upgrade Analysis & Approval Tool
+            {getTitle(location.pathname)}
           </h1>
         </div>
         <Outlet />
       </div>
     </>
   );
+}
+
+function getTitle(path: string) {
+  if (path.startsWith($path("/app/emergency"))) {
+    return "Emergency Upgrades";
+  }
+  if (path.startsWith($path("/app/freeze"))) {
+    return "Freeze Requests";
+  }
+  if (path.startsWith($path("/app/l2-cancellations"))) {
+    return "Governor Veto Proposals";
+  }
+  if (path.startsWith($path("/app/proposals"))) {
+    return "Standard Upgrade Proposals";
+  }
 }
