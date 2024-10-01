@@ -14,6 +14,7 @@ let EthereumConfig: {
     readonly rpcUrl: string;
     readonly blockTime: number;
   };
+  // Necessary to support legacy clients, shared with CLI.
   readonly legacyClientNetwork: Network;
   readonly etherscanBaseUrl: string;
   readonly getTransactionUrl: (transactionHash: Hex) => string;
