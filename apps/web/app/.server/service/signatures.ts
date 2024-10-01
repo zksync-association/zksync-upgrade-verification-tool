@@ -40,7 +40,9 @@ import {
   securityCouncilAddress,
 } from "./ethereum-l1/contracts/protocol-upgrade-handler";
 
-async function shouldMarkProposalAsReady(allSignatures: BasicSignature[]): Promise<boolean> {
+async function shouldMarkEmergencyProposalAsReady(
+  allSignatures: BasicSignature[]
+): Promise<boolean> {
   const [guardians, council, foundation] = await Promise.all([
     guardianMembers(),
     securityCouncilMembers(),
@@ -128,7 +130,7 @@ async function emergencyUpgrade(externalId: Hex, signer: Hex, signature: Hex) {
 
     const allSignatures = [...oldSignatures, dto];
 
-    if (await shouldMarkProposalAsReady(allSignatures)) {
+    if (await shouldMarkEmergencyProposalAsReady(allSignatures)) {
       proposal.status = emergencyProposalStatusSchema.enum.READY;
       await updateEmergencyProposal(proposal);
     }

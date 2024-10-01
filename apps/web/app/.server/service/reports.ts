@@ -19,8 +19,7 @@ import { type Hex, decodeAbiParameters, getAbiItem, hexToBytes } from "viem";
 import { l1Explorer, legacyL1Rpc } from "./ethereum-l1/client-legacy";
 import { l2Explorer } from "./ethereum-l2/client";
 import { upgradeHandlerAbi } from "@/utils/contract-abis";
-
-const network = env.ETH_NETWORK === "local" ? "sepolia" : env.ETH_NETWORK;
+import { EthereumConfig } from "@config/ethereum.server";
 
 async function calculateBeforeAndAfter(
   network: Network,
@@ -67,7 +66,7 @@ const emptyCheckReport = {
 
 async function calculateCheckReport(_reportId: Hex, calldata: Hex): Promise<CheckReportObj> {
   const { current, proposed, sysAddresses } = await calculateBeforeAndAfter(
-    network,
+    EthereumConfig.legacyClientNetwork,
     l1Explorer,
     l2Explorer,
     calldata
@@ -85,7 +84,7 @@ async function calculateStorageChangeReport(
     return [];
   }
 
-  const diamondAddress = DIAMOND_ADDRS[network];
+  const diamondAddress = DIAMOND_ADDRS[EthereumConfig.legacyClientNetwork];
 
   const abiItem = getAbiItem({
     abi: upgradeHandlerAbi,

@@ -11,13 +11,13 @@ import {
   getUpgradeState,
   getUpgradeStatus,
 } from "./ethereum-l1/contracts/protocol-upgrade-handler";
-import { fetchLogProof, l2Rpc } from "@/.server/service/ethereum-l2/client";
+import { fetchL2LogProof, l2Rpc, queryL2Logs } from "@/.server/service/ethereum-l2/client";
 import { zkProtocolGovernorAbi } from "@/utils/contract-abis";
 import { env } from "@config/env.server";
 import { decodeAbiParameters, type Hex, keccak256, numberToHex, toEventSelector } from "viem";
-import { queryLogs } from "@/.server/service/server-utils";
 import type { StartUpgradeData } from "@/common/types";
 import { defaultLogger } from "@config/log.server";
+import { EthereumConfig } from "@config/ethereum.server";
 
 export async function getProposals() {
   // First, we will update the status of all stored active proposals
@@ -38,9 +38,10 @@ export async function getProposals() {
   const latestBlock = await l1Rpc.getBlock({ blockTag: "latest" });
   const currentBlock = latestBlock.number;
 
-  // Logs are calculated from the last 40 * 24 * 360 blocks,
+  // Logs are calculated from the last 40 days,
   // as this is a conservative estimation of oldest block with a valid upgrade.
-  const from = bigIntMax(currentBlock - BigInt(40 * 24 * 360), BigInt(0));
+  const blocksInADay = Math.floor((24 * 60 * 60) / EthereumConfig.l1.blockTime);
+  const from = bigIntMax(currentBlock - BigInt(40 * blocksInADay), BigInt(0));
   const logs = await getUpgradeStartedEvents({
     fromBlock: from,
     toBlock: "latest",
@@ -76,11 +77,6 @@ export async function getProposals() {
   return getStoredProposals();
 }
 
-export async function nowInSeconds() {
-  const block = await l1Rpc.getBlock({ blockTag: "latest" });
-  return block.timestamp;
-}
-
 export type ProposalDataResponse = {
   l2ProposalId: Hex;
 } & (
@@ -101,7 +97,7 @@ export type ProposalDataResponse = {
 export async function searchNotStartedProposals() {
   // First we look for proposals that have already been executed
   // in l2.
-  const executedInL2 = await queryLogs(
+  const executedInL2 = await queryL2Logs(
     zkProtocolGovernorAbi,
     env.ZK_PROTOCOL_GOVERNOR_ADDRESS,
     "ProposalExecuted",
@@ -133,7 +129,7 @@ export async function searchNotStartedProposals() {
 
 async function extractProposalData(txHash: Hex, l2ProposalId: Hex): Promise<ProposalDataResponse> {
   const receipt = await l2Rpc.getTransactionReceipt({ hash: txHash });
-  const logProof = await fetchLogProof(txHash, 0);
+  const logProof = await fetchL2LogProof(txHash, 0);
 
   const l1MessageEventId = toEventSelector("L1MessageSent(address,bytes32,bytes)");
   const bodyLog = receipt.logs.find((l) => l.topics[0] === l1MessageEventId);
