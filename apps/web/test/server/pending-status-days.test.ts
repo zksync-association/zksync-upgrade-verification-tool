@@ -3,20 +3,10 @@ import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { EthereumConfig } from "@config/ethereum.server";
 import { describe, expect, it } from "vitest";
 
-vi.mock("@config/ethereum.server", async () => {
-  const actual = await vi.importActual("@config/ethereum.server");
-  return {
-    ...actual,
-    standardProposalVetoPeriodDays: 3,
-  };
-});
-
-const mockedEthereumConfig = vi.mocked(EthereumConfig);
-
 describe("calculateStatusPendingDays", () => {
   beforeEach(() => {
     // @ts-expect-error
-    mockedEthereumConfig.standardProposalVetoPeriodDays = 3;
+    EthereumConfig.standardProposalVetoPeriodDays = 3;
   });
 
   afterEach(() => {
@@ -121,7 +111,7 @@ describe("calculateStatusPendingDays", () => {
   describe("Waiting", () => {
     it("returns right data for sepolia", () => {
       // @ts-expect-error
-      mockedEthereumConfig.standardProposalVetoPeriodDays = 0;
+      EthereumConfig.standardProposalVetoPeriodDays = 0;
       const creationTime = nowInSeconds;
       const now = creationTime + 1;
       const res = calculateStatusPendingDays(PROPOSAL_STATES.Waiting, creationTime, false, now);
