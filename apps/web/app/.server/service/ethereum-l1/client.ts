@@ -1,14 +1,15 @@
-import { env } from "@config/env.server";
 import { createPublicClient, http } from "viem";
+import { EthereumConfig } from "@config/ethereum.server";
 import { defaultLogger } from "@config/log.server";
+import { env } from "@config/env.server";
 
 export const l1Rpc = createPublicClient({
-  transport: http(env.L1_RPC_URL),
+  transport: http(EthereumConfig.l1.rpcUrl),
 });
 
 export const checkConnection = async () => {
   try {
-    const response = await fetch(env.L1_RPC_URL, {
+    const response = await fetch(EthereumConfig.l1.rpcUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -27,7 +28,7 @@ export const checkConnection = async () => {
     const data: any = await response.json();
     return "result" in data;
   } catch (error) {
-    defaultLogger.error("Error checking connection to :", env.L1_RPC_URL);
+    defaultLogger.error("Error checking connection to :", EthereumConfig.l1.rpcUrl);
     if (error instanceof Error) {
       defaultLogger.error(error.message);
       defaultLogger.error(error.cause);
@@ -43,10 +44,15 @@ export const validateHandlerAddress = async () => {
     });
     if (!exists) {
       throw new Error(
-        `Upgrade handler contract not found at ${env.UPGRADE_HANDLER_ADDRESS} on L1 Network "${process.env.ETH_NETWORK}"`
+        `Upgrade handler contract not found at ${env.UPGRADE_HANDLER_ADDRESS} on L1 Network "${EthereumConfig.network}"`
       );
     }
     return;
   }
-  throw new Error(`Connection to L1 "${process.env.ETH_NETWORK}" network failed`);
+  throw new Error(`Connection to L1 "${EthereumConfig.network}" network failed`);
 };
+
+export async function getLatestL1BlockTimestamp() {
+  const block = await l1Rpc.getBlock({ blockTag: "latest" });
+  return block.timestamp;
+}

@@ -1,5 +1,4 @@
 import TxLink from "@/components/tx-link";
-import { getTransactionUrl } from "@/utils/etherscan";
 import { render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import "@testing-library/jest-dom";
@@ -15,12 +14,8 @@ vi.mock("@/routes/app/proposals/$id/common-tables", () => ({
 describe("TxLink", () => {
   const mockTxid = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
-  beforeEach(() => {
-    vi.mocked(getTransactionUrl).mockReturnValue("https://example.com/tx/mock");
-  });
-
   it("renders the transaction link correctly", () => {
-    render(<TxLink hash={mockTxid} network={"mainnet"} />);
+    render(<TxLink hash={mockTxid} url="https://example.com/tx/mock" />);
 
     const link = screen.getByRole("link");
     expect(link).toHaveAttribute("href", "https://example.com/tx/mock");
@@ -34,10 +29,5 @@ describe("TxLink", () => {
     expect(icon).toBeInTheDocument();
     expect(icon).toHaveAttribute("width", "12");
     expect(icon).toHaveAttribute("height", "12");
-  });
-
-  it("calls getTransactionUrl with the correct txid", () => {
-    render(<TxLink hash={mockTxid} network={"mainnet"} />);
-    expect(getTransactionUrl).toHaveBeenCalledWith(mockTxid, "mainnet");
   });
 });

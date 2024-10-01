@@ -1,7 +1,7 @@
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
-import { nowInSeconds } from "@/.server/service/proposals";
+import { getLatestL1BlockTimestamp } from "@/.server/service/ethereum-l1/client";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
@@ -39,6 +39,7 @@ import {
   guardiansAddress,
   securityCouncilAddress,
 } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
+import { EthereumConfig } from "@config/ethereum.server";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromRequest(request);
@@ -70,8 +71,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
           proposalStatus,
           proposalData.creationTimestamp,
           proposalData.guardiansExtendedLegalVeto,
-          Number(await nowInSeconds()),
-          env.ETH_NETWORK
+          Number(await getLatestL1BlockTimestamp())
         ),
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         approvedByGuardians: proposalData.guardiansApproval,
@@ -107,13 +107,15 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       userSignedLegalVeto: signatures
         .filter((s) => s.action === "ExtendLegalVetoPeriod")
         .some((s) => isAddressEqual(s.signer as Hex, user.address as Hex)),
-      ethNetwork: env.ETH_NETWORK,
     };
   };
 
   return defer({
     proposalId: proposal.externalId as Hex,
     asyncData: getAsyncData(),
+    transactionUrl: proposal.transactionHash
+      ? EthereumConfig.getTransactionUrl(proposal.transactionHash)
+      : "",
   });
 }
 
@@ -141,7 +143,7 @@ const NECESSARY_GUARDIAN_SIGNATURES = 5;
 const NECESSARY_LEGAL_VETO_SIGNATURES = 2;
 
 export default function Proposals() {
-  const { asyncData, proposalId } = useLoaderData<typeof loader>();
+  const { asyncData, proposalId, transactionUrl } = useLoaderData<typeof loader>();
   const user = useUser();
 
   return (
@@ -157,7 +159,7 @@ export default function Proposals() {
           }
         >
           <Await resolve={asyncData}>
-            {({ addresses, proposal, userSignedLegalVeto, userSignedProposal, ethNetwork }) => {
+            {({ addresses, proposal, userSignedLegalVeto, userSignedProposal }) => {
               const securityCouncilSignaturesReached =
                 proposal.signatures.approveUpgradeSecurityCouncil.length >=
                 NECESSARY_SECURITY_COUNCIL_SIGNATURES;
@@ -230,7 +232,7 @@ export default function Proposals() {
                           <div className="flex justify-between">
                             <span>Transaction hash:</span>
                             <div className="flex flex-1 flex-col items-end space-y-1">
-                              <TxLink hash={proposal.transactionHash} network={ethNetwork} />
+                              <TxLink hash={proposal.transactionHash} url={transactionUrl} />
                               <TxStatus hash={proposal.transactionHash} />
                             </div>
                           </div>

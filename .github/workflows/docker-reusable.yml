@@ -31,10 +31,6 @@ jobs:
         id: vars
         run: echo "SHORT_SHA=$(git rev-parse --short $GITHUB_SHA)" >> $GITHUB_ENV
 
-      - name: Get current Unix time
-        id: unix_time
-        run: echo "UNIX_TIME=$(date +%s)" >> $GITHUB_ENV
-
       - name: Build Docker image
         id: build
         uses: docker/build-push-action@v6
@@ -43,4 +39,4 @@ jobs:
           push: ${{ github.ref == 'refs/heads/main' }}
           tags: |
             ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ env.SHORT_SHA }}-${{ env.UNIX_TIME }}
+            ghcr.io/${{ github.repository }}:${{ env.SHORT_SHA }}

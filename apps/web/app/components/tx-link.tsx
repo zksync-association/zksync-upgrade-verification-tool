@@ -1,16 +1,11 @@
 import { displayBytes32 } from "@/utils/common-tables";
-import { getTransactionUrl } from "@/utils/etherscan";
 import { SquareArrowOutUpRight } from "lucide-react";
 import type { Hex } from "viem";
 
-import type { EthNetwork } from "@/common/eth-network-enum";
-
-type TxLinkProps = { hash: Hex; network: EthNetwork };
-
-export default function TxLink({ hash, network }: TxLinkProps) {
+export default function TxLink({ hash, url }: { hash: Hex; url: string }) {
   return (
     <a
-      href={getTransactionUrl(hash, network)}
+      href={url}
       className="flex items-center justify-end break-words underline"
       target="_blank"
       rel="noreferrer"

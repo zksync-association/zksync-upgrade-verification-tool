@@ -1,17 +1,23 @@
+import type { EthNetwork } from "@/common/eth-network-enum";
 import Avatar from "@/components/connect-button/avatar";
-import { localchain } from "@/utils/localchain";
 import { darkTheme, getDefaultConfig, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
 import { cookieStorage, createStorage, type State, WagmiProvider } from "wagmi";
-import { mainnet, sepolia } from "wagmi/chains";
+import { localhost, mainnet, sepolia } from "wagmi/chains";
 
 const queryClient = new QueryClient();
 
-const NETWORKS = {
-  mainnet: (_n: number) => mainnet,
-  sepolia: (_n: number) => sepolia,
-  local: localchain,
+const Networks = {
+  mainnet: () => mainnet,
+  sepolia: () => sepolia,
+  local: (port: number) => ({
+    ...localhost,
+    id: 11155111,
+    rpcUrls: {
+      default: { http: [`http://127.0.0.1:${port}`] },
+    },
+  }),
 };
 
 export function WalletProvider({
@@ -24,13 +30,13 @@ export function WalletProvider({
   children: ReactNode;
   initialState?: State;
   projectId: string;
-  network: "mainnet" | "sepolia" | "local";
+  network: EthNetwork;
   chainPort: number;
 }) {
   const config = useMemo(() => {
     return getDefaultConfig({
       appName: "zkSync Upgrade Verification Tool",
-      chains: [NETWORKS[networkName](chainPort)],
+      chains: [Networks[networkName](chainPort)],
       projectId,
       ssr: true,
       storage: createStorage({

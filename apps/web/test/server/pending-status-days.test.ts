@@ -2,19 +2,27 @@ import { calculateStatusPendingDays, daysInSeconds } from "@/.server/service/pro
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { describe, expect, it } from "vitest";
 
+const EthereumConfig = vi.hoisted(() => ({
+  standardProposalVetoPeriodDays: 3,
+}));
+
+vi.mock("@config/ethereum.server", () => ({
+  EthereumConfig,
+}));
+
 describe("calculateStatusPendingDays", () => {
+  beforeEach(() => {
+    // Set to default mainnet value
+    EthereumConfig.standardProposalVetoPeriodDays = 3;
+  });
+
   const nowInSeconds = Math.ceil(new Date().valueOf() / 1000);
+
   it("returns null for DONE state", () => {
     const creationTime = nowInSeconds;
     const now = creationTime + daysInSeconds(40);
 
-    const res = calculateStatusPendingDays(
-      PROPOSAL_STATES.Done,
-      creationTime,
-      false,
-      now,
-      "mainnet"
-    );
+    const res = calculateStatusPendingDays(PROPOSAL_STATES.Done, creationTime, false, now);
 
     expect(res).toBe(null);
   });
@@ -23,13 +31,7 @@ describe("calculateStatusPendingDays", () => {
     const creationTime = nowInSeconds;
     const now = creationTime + daysInSeconds(40);
 
-    const res = calculateStatusPendingDays(
-      PROPOSAL_STATES.Expired,
-      creationTime,
-      false,
-      now,
-      "mainnet"
-    );
+    const res = calculateStatusPendingDays(PROPOSAL_STATES.Expired, creationTime, false, now);
 
     expect(res).toBe(null);
   });
@@ -38,13 +40,7 @@ describe("calculateStatusPendingDays", () => {
     const creationTime = nowInSeconds;
     const now = creationTime + daysInSeconds(40);
 
-    const res = calculateStatusPendingDays(
-      PROPOSAL_STATES.Ready,
-      creationTime,
-      false,
-      now,
-      "mainnet"
-    );
+    const res = calculateStatusPendingDays(PROPOSAL_STATES.Ready, creationTime, false, now);
 
     expect(res).toBe(null);
   });
@@ -53,13 +49,7 @@ describe("calculateStatusPendingDays", () => {
     const creationTime = nowInSeconds;
     const now = creationTime + daysInSeconds(40);
 
-    const res = calculateStatusPendingDays(
-      PROPOSAL_STATES.None,
-      creationTime,
-      false,
-      now,
-      "mainnet"
-    );
+    const res = calculateStatusPendingDays(PROPOSAL_STATES.None, creationTime, false, now);
 
     expect(res).toBe(null);
   });
@@ -73,8 +63,7 @@ describe("calculateStatusPendingDays", () => {
         PROPOSAL_STATES.LegalVetoPeriod,
         creationTime,
         false,
-        now,
-        "mainnet"
+        now
       );
 
       expect(res?.totalDays).toBe(3);
@@ -88,8 +77,7 @@ describe("calculateStatusPendingDays", () => {
         PROPOSAL_STATES.LegalVetoPeriod,
         creationTime,
         true,
-        now,
-        "mainnet"
+        now
       );
 
       expect(res?.totalDays).toBe(7);
@@ -103,8 +91,7 @@ describe("calculateStatusPendingDays", () => {
         PROPOSAL_STATES.LegalVetoPeriod,
         creationTime,
         true,
-        now,
-        "mainnet"
+        now
       );
 
       expect(res?.currentDay).toBe(1);
@@ -118,8 +105,7 @@ describe("calculateStatusPendingDays", () => {
         PROPOSAL_STATES.LegalVetoPeriod,
         creationTime,
         true,
-        now,
-        "mainnet"
+        now
       );
 
       expect(res?.currentDay).toBe(2);
@@ -128,15 +114,12 @@ describe("calculateStatusPendingDays", () => {
 
   describe("Waiting", () => {
     it("returns right data for sepolia", () => {
+      EthereumConfig.standardProposalVetoPeriodDays = 0;
       const creationTime = nowInSeconds;
       const now = creationTime + 1;
-      const res = calculateStatusPendingDays(
-        PROPOSAL_STATES.Waiting,
-        creationTime,
-        false,
-        now,
-        "sepolia"
-      );
+      const res = calculateStatusPendingDays(PROPOSAL_STATES.Waiting, creationTime, false, now);
+
+      // Restore the original value after the test
 
       expect(res?.totalDays).toBe(30);
       expect(res?.currentDay).toBe(1);
@@ -146,13 +129,7 @@ describe("calculateStatusPendingDays", () => {
       const creationTime = nowInSeconds;
       const now = creationTime + daysInSeconds(1) + 1;
 
-      const res = calculateStatusPendingDays(
-        PROPOSAL_STATES.Waiting,
-        creationTime,
-        false,
-        now,
-        "mainnet"
-      );
+      const res = calculateStatusPendingDays(PROPOSAL_STATES.Waiting, creationTime, false, now);
 
       expect(res?.totalDays).toBe(30);
     });
@@ -161,13 +138,7 @@ describe("calculateStatusPendingDays", () => {
       const creationTime = nowInSeconds;
       const now = creationTime + daysInSeconds(3) + daysInSeconds(7) - 1;
 
-      const res = calculateStatusPendingDays(
-        PROPOSAL_STATES.Waiting,
-        creationTime,
-        false,
-        now,
-        "mainnet"
-      );
+      const res = calculateStatusPendingDays(PROPOSAL_STATES.Waiting, creationTime, false, now);
 
       expect(res?.currentDay).toBe(7);
     });
@@ -176,13 +147,7 @@ describe("calculateStatusPendingDays", () => {
       const creationTime = nowInSeconds;
       const now = creationTime + daysInSeconds(7) + daysInSeconds(10) - 1;
 
-      const res = calculateStatusPendingDays(
-        PROPOSAL_STATES.Waiting,
-        creationTime,
-        true,
-        now,
-        "mainnet"
-      );
+      const res = calculateStatusPendingDays(PROPOSAL_STATES.Waiting, creationTime, true, now);
 
       expect(res?.currentDay).toBe(10);
     });
@@ -197,8 +162,7 @@ describe("calculateStatusPendingDays", () => {
         PROPOSAL_STATES.ExecutionPending,
         creationTime,
         true,
-        now,
-        "mainnet"
+        now
       );
 
       expect(res?.currentDay).toBe(1);
