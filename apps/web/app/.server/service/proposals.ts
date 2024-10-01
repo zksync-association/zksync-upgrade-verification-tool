@@ -58,12 +58,15 @@ export async function getProposals() {
       continue;
     }
 
-    const [status, proposalData] = await Promise.all([getUpgradeState(id), getUpgradeStatus(id)]);
+    const [status, proposedOn] = await Promise.all([
+      getUpgradeState(id),
+      getUpgradeStatus(id).then((s) => new Date(s.creationTimestamp * 1000)),
+    ]);
 
     await createProposal({
       externalId: id,
       calldata: log.data,
-      proposedOn: new Date(proposalData.creationTimestamp * 1000),
+      proposedOn,
       executor: log.args._proposal.executor,
       transactionHash: log.transactionHash,
       status: isProposalActive(status) ? "ACTIVE" : "INACTIVE",
