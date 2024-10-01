@@ -17,7 +17,6 @@ import VotingStatusIndicator from "@/components/voting-status-indicator";
 import ExecL2VetoForm from "@/routes/app/l2-cancellations/$id/exec-l2-veto-form";
 import { displayBytes32 } from "@/utils/common-tables";
 import { badRequest, notFound } from "@/utils/http";
-import { env } from "@config/env.server";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { CircleCheckBig, CircleX } from "lucide-react";
@@ -29,6 +28,7 @@ import { SignCancellationButton } from "@/routes/app/l2-cancellations/$id/sign-c
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
 import { guardiansAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
+import { EthereumConfig } from "@config/ethereum.server";
 import ZkAdminArchiveProposal from "@/components/zk-admin-archive-proposal";
 import ProposalArchivedCard from "@/components/proposal-archived-card";
 
@@ -52,7 +52,9 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
     necessarySignatures,
     guardiansAddress: guardiansAddr,
     l2GovernorAddress: l2GovernorAddr,
-    ethNetwork: env.ETH_NETWORK,
+    transactionUrl: proposal.transactionHash
+      ? EthereumConfig.getTransactionUrl(proposal.transactionHash)
+      : "",
     currentNonce: await getL2VetoNonce(),
   });
 }
@@ -81,7 +83,7 @@ export default function L2Cancellation() {
     signatures,
     necessarySignatures,
     guardiansAddress,
-    ethNetwork,
+    transactionUrl,
     currentNonce,
   } = useLoaderData<typeof loader>();
   const user = useUser();
@@ -170,7 +172,7 @@ export default function L2Cancellation() {
                 <div className="flex justify-between">
                   <span>Transaction Hash:</span>
                   <div className="flex flex-1 flex-col items-end space-y-1">
-                    <TxLink hash={proposal.transactionHash} network={ethNetwork} />
+                    <TxLink hash={proposal.transactionHash} url={transactionUrl} />
                     <TxStatus hash={proposal.transactionHash} />
                   </div>
                 </div>

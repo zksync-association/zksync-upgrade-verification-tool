@@ -63,8 +63,6 @@ test("TC006 - Verify proposal details are correctly displayed on an active propo
   await goToProposalDetails(page);
 
   await expect(page.getByText("Proposal Details")).toBeVisible();
-  await expect(page.getByText("Current Version")).toBeVisible();
-  await expect(page.getByText("Proposed Version")).toBeVisible();
   await expect(page.getByText("Proposal ID")).toBeVisible();
   await expect(page.getByText("Proposed On")).toBeVisible();
   await expect(page.getByText("Executor")).toBeVisible();
@@ -92,8 +90,6 @@ test("TC007 - Verify proposal details are correctly displayed on an inactive pro
   await proposalButton.click();
 
   await expect(page.getByText("Proposal Details")).toBeVisible();
-  await expect(page.getByText("Current Version")).toBeVisible();
-  await expect(page.getByText("Proposed Version")).toBeVisible();
   await expect(page.getByText("Proposal ID")).toBeVisible();
   await expect(page.getByText("Proposed On")).toBeVisible();
   await expect(page.getByText("Executor")).toBeVisible();

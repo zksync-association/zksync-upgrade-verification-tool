@@ -1,8 +1,9 @@
 import { FileSystem } from "./file-system.js";
-import { UpgradeImporter } from "./importer.js";
 import { Terminal } from "./terminal.js";
-import { GitContractsRepo } from "@repo/ethereum-reports/git-contracts-repo";
-import { BlockExplorerClient, NET_VERSIONS, RpcClient, type Network } from "@repo/common/ethereum";
+import { GitContractsRepo } from "../reports/git-contracts-repo";
+import { NET_VERSIONS, type Network } from "@repo/common/ethereum";
+import { BlockExplorerClient } from "../ethereum/block-explorer-client";
+import { RpcClient } from "../ethereum/rpc-client";
 
 export class EnvBuilder {
   private _etherscanApiKey?: string;
@@ -50,7 +51,7 @@ export class EnvBuilder {
 
   get etherscanApiKey(): string {
     if (!this._etherscanApiKey) {
-      throw new Error("Missing etherscan key");
+      throw new Error("Missing ethereum key");
     }
     return this._etherscanApiKey;
   }
@@ -94,10 +95,6 @@ export class EnvBuilder {
 
   fs(): FileSystem {
     return new FileSystem();
-  }
-
-  importer(): UpgradeImporter {
-    return new UpgradeImporter(this.fs());
   }
 
   async contractsRepo(): Promise<GitContractsRepo> {

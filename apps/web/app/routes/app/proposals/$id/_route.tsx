@@ -1,8 +1,7 @@
 import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
-import { nowInSeconds } from "@/.server/service/proposals";
-import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
+import { getLatestL1BlockTimestamp } from "@/.server/service/ethereum-l1/client";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
@@ -13,12 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
 import ContractWriteButton from "@/routes/app/proposals/$id/contract-write-button";
 import ExecuteUpgradeButton from "@/routes/app/proposals/$id/execute-upgrade-button";
-import FacetChangesTable from "@/routes/app/proposals/$id/facet-changes-table";
-import FieldChangesTable from "@/routes/app/proposals/$id/field-changes-table";
-import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-changes-table";
 import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
-import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { displayBytes32 } from "@/utils/common-tables";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
@@ -44,6 +39,7 @@ import {
   guardiansAddress,
   securityCouncilAddress,
 } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
+import { EthereumConfig } from "@config/ethereum.server";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromRequest(request);
@@ -57,8 +53,6 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   }
 
   const getAsyncData = async () => {
-    const checkReport = await getCheckReport(id);
-    const storageChangeReport = await getStorageChangeReport(id);
     const [guardians, council, proposalStatus, signatures, proposalData] = await Promise.all([
       guardiansAddress(),
       securityCouncilAddress(),
@@ -70,8 +64,6 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
     return {
       proposal: {
-        currentVersion: checkReport.metadata.currentVersion,
-        proposedVersion: checkReport.metadata.proposedVersion,
         proposedOn: proposal.proposedOn,
         executor: proposal.executor,
         status: proposalStatus,
@@ -79,8 +71,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
           proposalStatus,
           proposalData.creationTimestamp,
           proposalData.guardiansExtendedLegalVeto,
-          Number(await nowInSeconds()),
-          env.ETH_NETWORK
+          Number(await getLatestL1BlockTimestamp())
         ),
         extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
         approvedByGuardians: proposalData.guardiansApproval,
@@ -101,12 +92,6 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
         },
         transactionHash: proposal.transactionHash,
       },
-      reports: {
-        facetChanges: checkReport.facetChanges,
-        systemContractChanges: checkReport.systemContractChanges,
-        fieldChanges: checkReport.fieldChanges,
-        fieldStorageChanges: storageChangeReport,
-      },
       addresses: {
         guardians,
         council,
@@ -122,13 +107,15 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
       userSignedLegalVeto: signatures
         .filter((s) => s.action === "ExtendLegalVetoPeriod")
         .some((s) => isAddressEqual(s.signer as Hex, user.address as Hex)),
-      ethNetwork: env.ETH_NETWORK,
     };
   };
 
   return defer({
     proposalId: proposal.externalId as Hex,
     asyncData: getAsyncData(),
+    transactionUrl: proposal.transactionHash
+      ? EthereumConfig.getTransactionUrl(proposal.transactionHash)
+      : "",
   });
 }
 
@@ -156,7 +143,7 @@ const NECESSARY_GUARDIAN_SIGNATURES = 5;
 const NECESSARY_LEGAL_VETO_SIGNATURES = 2;
 
 export default function Proposals() {
-  const { asyncData, proposalId } = useLoaderData<typeof loader>();
+  const { asyncData, proposalId, transactionUrl } = useLoaderData<typeof loader>();
   const user = useUser();
 
   return (
@@ -172,14 +159,7 @@ export default function Proposals() {
           }
         >
           <Await resolve={asyncData}>
-            {({
-              addresses,
-              proposal,
-              reports,
-              userSignedLegalVeto,
-              userSignedProposal,
-              ethNetwork,
-            }) => {
+            {({ addresses, proposal, userSignedLegalVeto, userSignedProposal }) => {
               const securityCouncilSignaturesReached =
                 proposal.signatures.approveUpgradeSecurityCouncil.length >=
                 NECESSARY_SECURITY_COUNCIL_SIGNATURES;
@@ -230,18 +210,6 @@ export default function Proposals() {
                       <CardContent>
                         <div className="space-y-6">
                           <div className="flex justify-between">
-                            <span>Current Version:</span>
-                            <span className="w-1/2 break-words text-right">
-                              {proposal.currentVersion}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Proposed Version:</span>
-                            <span className="w-1/2 break-words text-right">
-                              {proposal.proposedVersion}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
                             <span>Proposal ID:</span>
                             <span className="w-1/2 justify-end break-words">{proposalId}</span>
                           </div>
@@ -264,7 +232,7 @@ export default function Proposals() {
                           <div className="flex justify-between">
                             <span>Transaction hash:</span>
                             <div className="flex flex-1 flex-col items-end space-y-1">
-                              <TxLink hash={proposal.transactionHash} network={ethNetwork} />
+                              <TxLink hash={proposal.transactionHash} url={transactionUrl} />
                               <TxStatus hash={proposal.transactionHash} />
                             </div>
                           </div>
@@ -380,59 +348,10 @@ export default function Proposals() {
                   </div>
                   <div className="pt-4">
                     <h2 className="font-bold text-3xl">Upgrade Analysis</h2>
-                    <Tabs className="mt-4 flex" defaultValue="facet-changes">
+                    <Tabs className="mt-4 flex" defaultValue="raw-data">
                       <TabsList className="mt-12 mr-6">
-                        <TabsTrigger value="facet-changes">Facet Changes</TabsTrigger>
-                        <TabsTrigger value="system-contract-changes">
-                          System Contract Changes
-                        </TabsTrigger>
-                        <TabsTrigger value="field-changes">Field Changes</TabsTrigger>
-                        <TabsTrigger value="field-storage-changes">
-                          Field Storage Changes
-                        </TabsTrigger>
                         <TabsTrigger value="raw-data">Raw Data</TabsTrigger>
                       </TabsList>
-                      <TabsContent value="facet-changes" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>Facet Changes</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <FacetChangesTable data={reports.facetChanges} />
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                      <TabsContent value="system-contract-changes" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>System Contract Changes</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <SystemContractChangesTable data={reports.systemContractChanges} />
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                      <TabsContent value="field-changes" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>Field Changes</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <FieldChangesTable data={reports.fieldChanges} />
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                      <TabsContent value="field-storage-changes" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>Field Storage Changes</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <FieldStorageChangesTable data={reports.fieldStorageChanges} />{" "}
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-
                       <TabsContent value="raw-data" className="w-full">
                         <Card className="pb-8">
                           <CardHeader>

@@ -1,16 +1,13 @@
-import {
-  ContractData,
-  ADDRESS_ZERO,
-  OPEN_ZEP_PROXY_IMPL_SLOT,
-  MalformedUpgrade,
-} from "@repo/common/ethereum";
-import type { GitContractsRepo } from "@repo/ethereum-reports/git-contracts-repo";
-import { ZkSyncEraDiff, hexAreEq } from "@repo/ethereum-reports/zk-sync-era-diff";
-import { type HexEraPropName, ZksyncEraState } from "@repo/ethereum-reports/zksync-era-state";
+import { ADDRESS_ZERO, OPEN_ZEP_PROXY_IMPL_SLOT } from "@repo/common/ethereum";
+import type { GitContractsRepo } from "../reports/git-contracts-repo";
+import { ZkSyncEraDiff, hexAreEq } from "../reports/zk-sync-era-diff";
+import { type HexEraPropName, ZksyncEraState } from "../reports/zksync-era-state";
 import type { EnvBuilder } from "../lib/env-builder.js";
 import { withSpinner } from "../lib/with-spinner.js";
 import path from "node:path";
 import { hexToBigInt, hexToBytes } from "viem";
+import { UpgradeFile } from "../lib/upgrade-file";
+import { ContractData } from "../ethereum/contract-data";
 
 async function downloadAllCode(
   diff: ZkSyncEraDiff,
@@ -103,18 +100,18 @@ export const downloadCodeCommand = async (
   targetDir: string,
   _l1Filter: string[]
 ) => {
+  const file = UpgradeFile.fromFile(upgradeDirectory);
+  const dataHex = file.calls[0]?.data;
+
   const current = await withSpinner(
     async () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
     "Gathering current zksync state",
     env
   );
 
-  const importer = env.importer();
-  const upgrade = await importer.readFromFiles(upgradeDirectory, env.network);
-
-  const data = upgrade.upgradeCalldataHex.expect(
-    new MalformedUpgrade("Missing calldata for governor operations")
-  );
+  if (!dataHex) {
+    throw new Error("Missing calldata");
+  }
 
   const repo = await withSpinner(
     async () => {
@@ -131,7 +128,7 @@ export const downloadCodeCommand = async (
       ZksyncEraState.fromCalldata(
         "0x",
         "0x",
-        Buffer.from(hexToBytes(data)),
+        Buffer.from(hexToBytes(dataHex)),
         env.network,
         env.l1Client(),
         env.rpcL1(),

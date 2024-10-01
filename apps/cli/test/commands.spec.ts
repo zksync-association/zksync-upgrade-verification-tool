@@ -11,7 +11,7 @@ import {
   MissingNetwork,
   NotADir,
   NotAnUpgradeDir,
-} from "@repo/common/ethereum";
+} from "../src/lib/errors";
 
 const doNothing = () => {};
 

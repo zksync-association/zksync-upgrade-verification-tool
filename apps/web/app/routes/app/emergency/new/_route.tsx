@@ -1,3 +1,4 @@
+import { isUniqueConstraintError } from "@/.server/db/errors";
 import {
   saveEmergencyProposal,
   validateEmergencyProposalCalls,
@@ -41,15 +42,22 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const allValid = validations.every((v) => v.isValid);
   if (allValid && body.data.intent === "save") {
-    const proposal = await saveEmergencyProposal(
-      {
-        salt: body.data.salt,
-        title: body.data.title,
-        proposer: user.address,
-      },
-      calls
-    );
-    return redirect($path("/app/emergency/:id", { id: proposal.externalId }));
+    try {
+      const proposal = await saveEmergencyProposal(
+        {
+          salt: body.data.salt,
+          title: body.data.title,
+          proposer: user.address,
+        },
+        calls
+      );
+      return redirect($path("/app/emergency/:id", { id: proposal.externalId }));
+    } catch (err) {
+      if (isUniqueConstraintError(err)) {
+        throw badRequest("Proposal with these params already exists.");
+      }
+      throw err;
+    }
   }
 
   return json({ ok: allValid, validations });

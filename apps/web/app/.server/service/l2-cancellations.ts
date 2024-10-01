@@ -20,13 +20,13 @@ import {
   getL2Cancellations,
   updateL2Cancellation,
 } from "../db/dto/l2-cancellations";
-import { getLatestBlock } from "./ethereum-l2/client";
+import { getLatestL2Block } from "./ethereum-l2/client";
 import { getGuardiansL2VetoNonce } from "./ethereum-l1/contracts/guardians";
 import {
   getL2ProposalState,
   lookForActiveProposals,
 } from "@/.server/service/ethereum-l2/contracts/governors";
-import { blocksInADay } from "@/.server/service/server-utils";
+import { EthereumConfig } from "@config/ethereum.server";
 
 async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigint) {
   const activeProposals = await lookForActiveProposals(getL2GovernorAddress(type), from).then(
@@ -41,17 +41,15 @@ async function fetchProposalsFromL2Governor(type: L2CancellationType, from: bigi
 }
 
 export async function getActiveL2Proposals() {
-  const latestBlock = await getLatestBlock();
+  const latestBlock = await getLatestL2Block();
   // Proposal lifetime is:
   // - 7 days vote delay period
   // - 7 days voting period
   // - 7 days optional extended voting period
   // Another 3 days is added in the calculation to have a conservative
   // estimation of the oldest block with a valid proposal.
-  // Max proposal time is calculated in blocks, 1 second per block in L2,
-  // therefore 3600 blocks per hour.
-  // const maxProposalLifetimeInBlocks = BigInt((21 + 7) * 24 * 3600); // conservative estimation of oldest block with a valid proposal
-  const maxProposalLifetimeInBlocks = BigInt((21 + 3) * blocksInADay());
+  const blocksInADay = Math.floor((24 * 60 * 60) / EthereumConfig.l2.blockTime);
+  const maxProposalLifetimeInBlocks = BigInt((21 + 3) * blocksInADay);
 
   const from = bigIntMax(latestBlock.number - maxProposalLifetimeInBlocks, 1n);
   const govOpsProposals = await fetchProposalsFromL2Governor(

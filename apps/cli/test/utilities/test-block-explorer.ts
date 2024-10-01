@@ -1,4 +1,6 @@
-import type { BlockExplorer, ContractAbi, ContractData } from "@repo/common/ethereum";
+import type { BlockExplorer } from "../../src/ethereum/block-explorer-client";
+import type { ContractAbi } from "../../src/ethereum/contract-abi";
+import type { ContractData } from "../../src/ethereum/contract-data";
 
 export class TestBlockExplorer implements BlockExplorer {
   abis: Map<string, ContractAbi>;

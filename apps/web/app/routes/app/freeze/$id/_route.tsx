@@ -9,7 +9,6 @@ import VotingStatusIndicator from "@/components/voting-status-indicator";
 import { compareHexValues } from "@/utils/compare-hex-values";
 import { dateToUnixTimestamp } from "@/utils/date";
 import { notFound } from "@/utils/http";
-import { env } from "@config/env.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
@@ -29,6 +28,7 @@ import {
   securityCouncilUnfreezeThreshold,
 } from "@/.server/service/ethereum-l1/contracts/security-council";
 import { securityCouncilAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
+import { EthereumConfig } from "@config/ethereum.server";
 import ProposalArchivedCard from "@/components/proposal-archived-card";
 import ZkAdminArchiveProposal from "@/components/zk-admin-archive-proposal";
 import type { ZkAdminSignAction } from "@/routes/resources+/zk-admin-sign";
@@ -76,7 +76,9 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
     signatures,
     necessarySignatures,
     securityCouncilAddress: securityCouncil,
-    ethNetwork: env.ETH_NETWORK,
+    transactionUrl: proposal.transactionHash
+      ? EthereumConfig.getTransactionUrl(proposal.transactionHash)
+      : "",
   });
 }
 
@@ -105,7 +107,7 @@ export default function Freeze() {
     signatures,
     necessarySignatures,
     securityCouncilAddress,
-    ethNetwork,
+    transactionUrl,
   } = useLoaderData<typeof loader>();
   const user = useUser();
 
@@ -197,7 +199,7 @@ export default function Freeze() {
                 <div className="flex justify-between">
                   <span>Transaction Hash:</span>
                   <div className="flex flex-1 flex-col items-end space-y-1">
-                    <TxLink hash={proposal.transactionHash} network={ethNetwork} />
+                    <TxLink hash={proposal.transactionHash} url={transactionUrl} />
                     <TxStatus hash={proposal.transactionHash} />
                   </div>
                 </div>

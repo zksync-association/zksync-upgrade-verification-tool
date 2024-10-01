@@ -3,6 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "author": "moonsong-labs",
+  "license": "(MIT OR Apache-2.0)",
   "exports": {
     "./helpers/*": "./helpers/*.ts",
     "./artifacts/ProtocolUpgradeHandler/*": "./artifacts/src/zk-gov/l1-contracts/src/ProtocolUpgradeHandler.sol/*",

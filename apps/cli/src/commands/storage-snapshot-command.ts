@@ -1,9 +1,9 @@
 import { DIAMOND_ADDRS } from "@repo/common/ethereum";
-import { SnapshotReport } from "@repo/ethereum-reports/reports/storage-snapshot-report";
-import { RpcStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/rpc-storage-snapshot";
-import { mainDiamondFields } from "@repo/ethereum-reports/storage/storage-props";
-import { ZksyncEraState } from "@repo/ethereum-reports/zksync-era-state";
+import { ZksyncEraState } from "../reports/zksync-era-state";
 import type { EnvBuilder } from "../lib/env-builder.js";
+import { RpcStorageSnapshot } from "../reports/storage/snapshot";
+import { SnapshotReport } from "../reports/reports/storage-snapshot-report";
+import { mainDiamondFields } from "../reports/storage/storage-props";
 
 export async function storageSnapshotCommand(env: EnvBuilder): Promise<void> {
   const rpc = env.rpcL1();

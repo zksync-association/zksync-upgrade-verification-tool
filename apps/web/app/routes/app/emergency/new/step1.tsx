@@ -9,17 +9,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { parseFormData } from "@/utils/read-from-request";
-import { hexSchema } from "@repo/common/schemas";
+import { bytes32Schema } from "@repo/common/schemas";
 import { useState } from "react";
-import { type Hex, padHex } from "viem";
 import { z } from "zod";
 
 export const step1Schema = {
   title: z.string().min(1, "Cannot be empty"),
-  salt: hexSchema
-    .refine((a) => a.length <= 66, "Should be 32 byte number")
-    .transform((str) => str as Hex)
-    .transform((str) => padHex(str, { size: 32 })),
+  salt: bytes32Schema,
 };
 
 const step1SchemaObject = z.object(step1Schema);

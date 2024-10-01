@@ -1,8 +1,8 @@
-import { EthNetworkEnum } from "@/common/eth-network-enum";
 import { addressSchema } from "@repo/common/schemas";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 import "dotenv/config";
+import { EthNetworkEnum } from "@/common/eth-network-enum";
 
 export const NodeEnvEnum = z.enum(["development", "test", "production"]);
 
