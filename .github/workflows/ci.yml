@@ -44,7 +44,7 @@ jobs:
 
   ci-for-test-e2e:
     name: Test E2E
-    needs: ["changed-files", "ci-for-lint"]
+    needs: ["changed-files", "ci-for-lint", "ci-for-test"]
     if: ${{ needs.changed-files.outputs.app == 'true' }}
     uses: ./.github/workflows/test-e2e-reusable.yml
     secrets: inherit
