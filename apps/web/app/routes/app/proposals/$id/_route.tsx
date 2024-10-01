@@ -40,6 +40,7 @@ import {
   securityCouncilAddress,
 } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 import { EthereumConfig } from "@config/ethereum.server";
+import { decodeProposal, decodeProposalSerializable } from "@/utils/decode-proposal";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromRequest(request);
@@ -351,6 +352,7 @@ export default function Proposals() {
                     <Tabs className="mt-4 flex" defaultValue="raw-data">
                       <TabsList className="mt-12 mr-6">
                         <TabsTrigger value="raw-data">Raw Data</TabsTrigger>
+                        <TabsTrigger value="json">JSON</TabsTrigger>
                       </TabsList>
                       <TabsContent value="raw-data" className="w-full">
                         <Card className="pb-8">
@@ -359,6 +361,18 @@ export default function Proposals() {
                           </CardHeader>
                           <CardContent className="pt-4">
                             <RawStandardUpgrade encoded={proposal.raw} />
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+                      <TabsContent value="json" className="w-full">
+                        <Card className="pb-8">
+                          <CardHeader>
+                            <CardTitle>JSON</CardTitle>
+                          </CardHeader>
+                          <CardContent className="pt-4">
+                            <pre className="text-wrap break-words">
+                              {JSON.stringify(decodeProposalSerializable(proposal.raw), null, 2)}
+                            </pre>
                           </CardContent>
                         </Card>
                       </TabsContent>
