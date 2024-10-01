@@ -14,7 +14,7 @@
     "watch": "tsx esbuild.ts --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "validate": "./bin/validate.js"
+    "validate": "tsx ./src/entrypoint.ts"
   },
   "dependencies": {
     "@repo/common": "workspace:*",
