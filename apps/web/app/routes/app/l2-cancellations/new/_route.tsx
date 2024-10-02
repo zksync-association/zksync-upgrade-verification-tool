@@ -156,7 +156,7 @@ export default function NewL2GovernorVeto() {
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="text-center text-gray-500">No active proposals found.</div>
+                  <div className="text-center text-gray-500">No active Proposals found.</div>
                 )}
               </CardContent>
             </Card>

@@ -169,17 +169,17 @@ export default function EmergencyUpgradeDetails() {
           <CardContent>
             <div className="space-y-5">
               <StatusIndicator
-                label="Security Council Approvals"
+                role="securityCouncil"
                 signatures={gatheredScSignatures}
                 necessarySignatures={SEC_COUNCIL_THRESHOLD}
               />
               <StatusIndicator
-                label="Guardian Approvals"
+                role="guardian"
                 signatures={gatheredGuardianSignatures}
                 necessarySignatures={GUARDIANS_COUNCIL_THRESHOLD}
               />
               <StatusIndicator
-                label="ZKsync Foundation Approval"
+                role="zkFoundation"
                 signatures={gatheredZkFoundationSignatures}
                 necessarySignatures={ZK_FOUNDATION_THRESHOLD}
               />

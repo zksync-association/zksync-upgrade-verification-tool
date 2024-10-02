@@ -162,7 +162,7 @@ export default function Freeze() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card data-testid="proposal-details-card">
           <CardHeader>
-            <CardTitle>Proposal Details</CardTitle>
+            <CardTitle>Freeze Details</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -184,11 +184,15 @@ export default function Freeze() {
               )}
               <div className="flex justify-between">
                 <span>Valid Until:</span>
-                <span>{formatDateTime(proposalValidUntil)}</span>
+                <span data-testid="valid-until-timestamp">
+                  {formatDateTime(proposalValidUntil)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Proposed On:</span>
-                <span>{formatDateTime(proposal.proposedOn)}</span>
+                <span data-testid="proposed-on-timestamp">
+                  {formatDateTime(proposal.proposedOn)}
+                </span>
               </div>
               {proposal.transactionHash && (
                 <div className="flex justify-between">
@@ -212,7 +216,7 @@ export default function Freeze() {
         <Card className="flex flex-col">
           <CardHeader className="pt-7">
             <p className="text-red-500">{proposalArchived ? "Archived" : "\u00A0"}</p>
-            <CardTitle>Proposal Status</CardTitle>
+            <CardTitle>Freeze Status</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1">
             {proposal.transactionHash ? (

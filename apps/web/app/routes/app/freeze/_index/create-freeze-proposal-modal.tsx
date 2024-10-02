@@ -42,7 +42,7 @@ export function CreateFreezeProposalModal() {
   return (
     <Dialog onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <AddButton>Create Freeze Request</AddButton>
+        <AddButton data-testid="create-freeze-btn">Create Freeze Request</AddButton>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -102,8 +102,6 @@ export function CreateFreezeProposalModal() {
           {actionResult?.error_type === "general_error" && (
             <p className="text-red-500 text-sm">{actionResult.error}</p>
           )}
-
-          {/* <Input name="type" type="hidden" value={type ?? undefined} /> */}
 
           <div className="mt-4 flex">
             <div className="flex-1" />
