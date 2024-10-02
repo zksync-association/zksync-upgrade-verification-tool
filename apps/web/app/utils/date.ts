@@ -12,5 +12,5 @@ export function formatDate(date: Date | string) {
 
 export function formatDateTime(date: Date | string) {
   const parsedDate = typeof date === "string" ? parseISO(date) : date;
-  return `${format(toZonedTime(parsedDate, "UTC"), "MMM dd, yyyy, hh:mm:ss a")} GMT+0`;
+  return `${format(toZonedTime(parsedDate, "UTC"), "MMM dd, yyyy, hh:mm:ss a")} UTC`;
 }
