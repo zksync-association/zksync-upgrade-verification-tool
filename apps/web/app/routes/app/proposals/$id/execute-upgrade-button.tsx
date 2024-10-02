@@ -4,7 +4,7 @@ import { useNavigate } from "@remix-run/react";
 import type React from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
-import { type Hex } from "viem";
+import type { Hex } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
 import { decodeProposal } from "@/utils/decode-proposal";
 

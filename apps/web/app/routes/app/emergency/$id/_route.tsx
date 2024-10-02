@@ -246,15 +246,19 @@ export default function EmergencyUpgradeDetails() {
             </CardHeader>
             <CardContent className="pt-4">
               <pre className="text-wrap break-words">
-                {JSON.stringify({
-                  executor: addresses.emergencyBoard,
-                  salt: proposal.salt,
-                  calls: calls.map(c => ({
-                    target: c.target,
-                    value: c.value,
-                    data: c.data
-                  }))
-                }, null, 2)}
+                {JSON.stringify(
+                  {
+                    executor: addresses.emergencyBoard,
+                    salt: proposal.salt,
+                    calls: calls.map((c) => ({
+                      target: c.target,
+                      value: c.value,
+                      data: c.data,
+                    })),
+                  },
+                  null,
+                  2
+                )}
               </pre>
             </CardContent>
           </Card>

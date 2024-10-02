@@ -15,6 +15,6 @@ export function decodeProposalSerializable(proposalCalldata: Hex) {
   const decoded = decodeProposal(proposalCalldata);
   return {
     ...decodeProposal,
-    calls: decoded.calls.map(c => ( {...c, value: numberToHex(c.value)} )),
-  }
+    calls: decoded.calls.map((c) => ({ ...c, value: numberToHex(c.value) })),
+  };
 }

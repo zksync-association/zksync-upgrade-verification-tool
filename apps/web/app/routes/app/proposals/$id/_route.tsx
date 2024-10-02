@@ -40,7 +40,7 @@ import {
   securityCouncilAddress,
 } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 import { EthereumConfig } from "@config/ethereum.server";
-import { decodeProposal, decodeProposalSerializable } from "@/utils/decode-proposal";
+import { decodeProposalSerializable } from "@/utils/decode-proposal";
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromRequest(request);
