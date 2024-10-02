@@ -227,6 +227,7 @@ export default function EmergencyUpgradeDetails() {
       <Tabs className="mt-4 flex" defaultValue="raw-data">
         <TabsList className="mt-12 mr-6">
           <TabsTrigger value="raw-data">Raw upgrade data</TabsTrigger>
+          <TabsTrigger value="json">JSON</TabsTrigger>
         </TabsList>
         <TabsContent value="raw-data" className="w-full">
           <Card className="pb-8">
@@ -235,6 +236,30 @@ export default function EmergencyUpgradeDetails() {
             </CardHeader>
             <CardContent className="pt-4">
               <UpgradeRawData calls={calls} salt={proposal.salt} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="json" className="w-full">
+          <Card className="pb-8">
+            <CardHeader>
+              <CardTitle>JSON</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <pre className="text-wrap break-words">
+                {JSON.stringify(
+                  {
+                    executor: addresses.emergencyBoard,
+                    salt: proposal.salt,
+                    calls: calls.map((c) => ({
+                      target: c.target,
+                      value: c.value,
+                      data: c.data,
+                    })),
+                  },
+                  null,
+                  2
+                )}
+              </pre>
             </CardContent>
           </Card>
         </TabsContent>
