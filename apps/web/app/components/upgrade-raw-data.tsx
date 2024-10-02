@@ -9,10 +9,7 @@ export function CallsRawData({ calls }: { calls: Call[] }) {
       <h3 className="font-bold text-xl">Calls</h3>
 
       {calls.map((call) => (
-        <div
-          key={call.target + call.target + call.value}
-          className="mt-10 grid grid-cols-4 gap-y-3 border-t-2 pt-5"
-        >
+        <div key={call.target} className="mt-10 grid grid-cols-4 gap-y-3 border-t-2 pt-5">
           <div className="grid-col-span-1">Target</div>
           <div className="col-span-3 font-mono">
             <span className="break-words">{call.target}</span>
