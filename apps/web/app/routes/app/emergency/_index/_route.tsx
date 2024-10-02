@@ -78,7 +78,7 @@ export default function Index() {
                         </span>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
-                        {formatDateTime(new Date(ep.proposedOn))}
+                        {formatDateTime(ep.proposedOn)}
                       </TableCell>
                       <TableCell className="">
                         <div className="truncate">{`${ep.externalId.slice(0, 10)} ... ${ep.externalId.slice(-8)}`}</div>

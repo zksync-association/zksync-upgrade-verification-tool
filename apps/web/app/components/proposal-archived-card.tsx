@@ -1,3 +1,5 @@
+import { formatDateTime } from "@/utils/date";
+
 export default function ProposalArchivedCard({
   archivedOn,
   archivedReason,
@@ -11,10 +13,7 @@ export default function ProposalArchivedCard({
     <div className="flex flex-col space-y-6 rounded-sm p-2 text-red-500">
       <div className="flex justify-between">
         <span>Archived On:</span>
-        <div className="flex w-3/4 flex-col break-words text-right">
-          <span>{new Date(archivedOn ?? 0).toLocaleDateString()}</span>
-          <span>{new Date(archivedOn ?? 0).toLocaleTimeString()}</span>
-        </div>
+        <span>{formatDateTime(archivedOn)}</span>
       </div>
       <div className="flex justify-between">
         <span>Archived Reason:</span>
