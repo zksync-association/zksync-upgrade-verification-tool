@@ -9,8 +9,12 @@ test.beforeEach(async ({ testApp }) => {
 });
 
 function compareExtractedTextWithDate(extractedText: string | null, expectedDate: Date) {
+  if (!extractedText) {
+    throw new Error("No extracted text found for comparison");
+  }
+
   const expectedNumber = Math.floor(expectedDate.valueOf() / 1000);
-  const number = Number(extractedText?.replace("(", "").replace(")", ""));
+  const number = new Date(extractedText).valueOf() / 1000;
   expect(number).toBeLessThan(expectedNumber + 10);
   expect(number).toBeGreaterThan(expectedNumber - 10);
 }
@@ -27,7 +31,7 @@ async function goToFreezeDetailsPage(
     UNFREEZE: "Unfreeze",
   }[kind];
   await page.getByText(new RegExp(`^${label} - Proposal \\d+$`)).click();
-  await page.getByText("Proposal Details").isVisible();
+  await page.getByText("Freeze Details").isVisible();
 }
 
 async function assertCannotSignProposal(
@@ -37,7 +41,7 @@ async function assertCannotSignProposal(
   await createFreeze(page, kind);
   await goToFreezeDetailsPage(page, kind);
 
-  await expect(page.getByText("No role actions")).toBeVisible();
+  await expect(page.getByText("No actions available for this role.")).toBeVisible();
   const approveButtons = await page.getByRole("button", { name: "Approve" }).all();
   expect(approveButtons).toHaveLength(0);
 }
@@ -72,7 +76,7 @@ async function applyApprovals(
 }
 
 async function broadcastAndCheckFreeze(page: Page, wallet: Wallet) {
-  const broadcastButton = page.getByRole("button", { name: "Execute freeze" });
+  const broadcastButton = page.getByRole("button", { name: "Execute Freeze" });
   await expect(broadcastButton).toBeEnabled();
 
   await broadcastButton.click();
@@ -83,7 +87,7 @@ async function broadcastAndCheckFreeze(page: Page, wallet: Wallet) {
 
   expect(txid).toMatch(/^0x[0-9a-fA-F]+$/);
   await page.goBack();
-  await page.getByText("Proposal Details").isVisible();
+  await page.getByText("Freeze Details").isVisible();
   await expect(page.getByText("Transaction Hash:")).toBeVisible();
 }
 
@@ -98,8 +102,8 @@ async function approveFreeze(page: Page, wallet: Wallet) {
 
 async function openCreateProposal(page: Page) {
   await page.getByTestId("create-freeze-btn").click();
-  await expect(page.getByRole("heading", { name: "Create Proposal" })).toBeVisible();
-  await expect(page.getByText("Proposal Type", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create Freeze Request" })).toBeVisible();
+  await expect(page.getByText("Freeze Type", { exact: true })).toBeVisible();
   await expect(page.getByRole("combobox")).toBeEnabled();
   await expect(page.getByText("Valid Until")).toBeVisible();
   await expect(page.getByRole("button", { name: "Create" })).toBeEnabled();
@@ -118,10 +122,10 @@ test("TC301: Navigate to index page shows list of empty freezes", async ({ page,
   await switcher.council(1, page);
   await goToFreezeIndex(page);
   await expect(
-    page.getByTestId("active-proposals-card").getByText("No proposals found.")
+    page.getByTestId("active-proposals-card").getByText("No active Freeze Requests found.")
   ).toBeVisible();
   await expect(
-    page.getByTestId("inactive-proposals-card").getByText("No proposals found.")
+    page.getByTestId("inactive-proposals-card").getByText("No inactive Freeze Requests found.")
   ).toBeVisible();
 });
 
@@ -351,7 +355,7 @@ test("TC336, TC337: Freeze -> Gather unfreeze signatures -> Exec unfreeze tx -> 
 }) => {
   await createFreeze(page, "SOFT_FREEZE");
   await applyApprovals(page, "SOFT_FREEZE", switcher, wallet, [1, 2, 3]);
-  await page.getByRole("button", { name: "Execute freeze" }).click();
+  await page.getByRole("button", { name: "Execute Freeze" }).click();
   await wallet.confirmTransaction();
 
   await createFreeze(page, "UNFREEZE");
@@ -363,7 +367,7 @@ test("TC336, TC337: Freeze -> Gather unfreeze signatures -> Exec unfreeze tx -> 
 
 async function cannotSignChangeThreshold(page: Page) {
   await createFreeze(page, "SET_SOFT_FREEZE_THRESHOLD", 2);
-  await expect(page.getByText("No role actions")).toBeVisible();
+  await expect(page.getByText("No actions available for this role.")).toBeVisible();
   const approveButtons = await page.getByRole("button", { name: "Approve" }).all();
   expect(approveButtons).toHaveLength(0);
 }
