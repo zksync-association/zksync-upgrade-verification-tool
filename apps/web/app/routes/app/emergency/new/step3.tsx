@@ -48,7 +48,7 @@ export function Step3(props: Step3Props) {
       <DisplayCalls calls={props.calls} />
 
       <p>
-        <b>Upgrade id:</b> {upgradeId}
+        <b>Upgrade ID:</b> {upgradeId}
       </p>
 
       {!data && <div>Validating...</div>}
@@ -82,7 +82,7 @@ export function Step3(props: Step3Props) {
           Submit
         </Button>
 
-        <Button variant="ghost" onClick={props.onBack}>
+        <Button variant="secondary" onClick={props.onBack}>
           Back
         </Button>
       </div>

@@ -16,17 +16,17 @@ export function DisplayCalls({ calls, removeCall }: DisplayCallProps) {
           className="flex rounded-md bg-muted p-4 align-middle"
         >
           <div className="grid grid-cols-4">
-            <div className="col-span-1 font-medium text-muted-foreground text-sm">target:</div>
+            <div className="col-span-1 font-medium text-muted-foreground text-sm">Target:</div>
             <div className="col-span-3 overflow-x-hidden overflow-ellipsis font-mono">
               {call.target}
             </div>
 
-            <div className="col-span-1 font-medium text-muted-foreground text-sm">data:</div>
+            <div className="col-span-1 font-medium text-muted-foreground text-sm">Data:</div>
             <div className="col-span-3 overflow-x-hidden overflow-ellipsis font-mono">
               {call.data}
             </div>
 
-            <div className="col-span-1 font-medium text-muted-foreground text-sm">value:</div>
+            <div className="col-span-1 font-medium text-muted-foreground text-sm">Value:</div>
             <div className="col-span-3 overflow-x-hidden overflow-ellipsis font-mono">
               {formatEther(hexToBigInt(call.value))}
             </div>

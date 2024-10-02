@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formError, generalError } from "@/utils/action-errors";
-import { cn } from "@/utils/cn";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { Link, json, redirect, useLoaderData } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
@@ -23,6 +22,10 @@ import {
   securityCouncilUnfreezeNonce,
 } from "@/.server/service/ethereum-l1/contracts/security-council";
 import { CreateFreezeProposalModal } from "./create-freeze-proposal-modal";
+import { Meta } from "@/utils/meta";
+import { formatDateTime } from "@/utils/date";
+
+export const meta = Meta["/app/freeze"];
 
 export async function loader() {
   const proposals = await getAllFreezeProposals();
@@ -138,13 +141,13 @@ export default function Index() {
   return (
     <div className="space-y-4">
       <ProposalCard
-        title="Active Proposals"
+        title="Active Freeze Requests"
         proposals={activeProposals}
         type="active"
         data-testid="active-proposals-card"
       />
       <ProposalCard
-        title="Inactive Proposals"
+        title="Inactive Freeze Requests"
         proposals={inactiveProposals}
         type="inactive"
         data-testid="inactive-proposals-card"
@@ -167,7 +170,7 @@ function ProposalCard({
   "data-testid": string;
 }) {
   return (
-    <Card className={cn("pb-10", className)} data-testid={props["data-testid"]}>
+    <Card className={className} data-testid={props["data-testid"]}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{title}</CardTitle>
@@ -177,8 +180,6 @@ function ProposalCard({
       <CardContent>
         <div className="flex flex-col space-y-4">
           {proposals.map((proposal) => {
-            const validUntil = new Date(proposal.validUntil).toLocaleString();
-
             const label = {
               SOFT_FREEZE: "Soft Freeze",
               HARD_FREEZE: "Hard Freeze",
@@ -203,7 +204,7 @@ function ProposalCard({
                       </Badge>
                     )}
                     <Badge className="" variant="secondary">
-                      Valid until: {validUntil}
+                      Valid until: {formatDateTime(proposal.validUntil)}
                     </Badge>
                   </div>
                   <ArrowRight />
@@ -213,7 +214,7 @@ function ProposalCard({
           })}
         </div>
         {proposals.length === 0 && (
-          <div className="text-center text-gray-500">No proposals found.</div>
+          <div className="text-center text-gray-500">No {type} freeze requests found.</div>
         )}
       </CardContent>
     </Card>

@@ -3,10 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
 import { Await, Link, defer, useLoaderData } from "@remix-run/react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Rocket } from "lucide-react";
 import { Suspense } from "react";
 import { $path } from "remix-routes";
-import { PlusIcon } from "@radix-ui/react-icons";
+import { Meta } from "@/utils/meta";
+import AddButton from "@/components/add-button";
+
+export const meta = Meta["/app/proposals"];
 
 export function loader() {
   const getFilteredProposals = async () => {
@@ -37,14 +40,17 @@ export default function Index() {
         <Await resolve={proposals}>
           {({ active: activeProposals, inactive: inactiveProposals }) => (
             <>
-              <Card className="pb-10" data-testid="active-proposals-card">
+              <Card data-testid="active-proposals-card">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>Active Standard Proposals</CardTitle>
+                    <CardTitle>Active Protocol Upgrade Proposals</CardTitle>
                     <Link to={$path("/app/proposals/new")}>
-                      <Button data-testid="start-regular-upgrade" variant="secondary" size="icon">
-                        <PlusIcon className="h-4 w-4" />
-                      </Button>
+                      <AddButton
+                        data-testid="start-regular-upgrade"
+                        icon={<Rocket className="mr-2 h-4 w-4" />}
+                      >
+                        Initiate Protocol Upgrade Process
+                      </AddButton>
                     </Link>
                   </div>
                 </CardHeader>
@@ -71,9 +77,9 @@ export default function Index() {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="pb-10" data-testid="inactive-proposals-card">
+              <Card data-testid="inactive-proposals-card">
                 <CardHeader>
-                  <CardTitle>Inactive Standard Proposals</CardTitle>
+                  <CardTitle>Inactive Protocol Upgrade Proposals</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col space-y-4">

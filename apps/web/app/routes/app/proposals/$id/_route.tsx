@@ -16,7 +16,7 @@ import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
 import { displayBytes32 } from "@/utils/common-tables";
 import { compareHexValues } from "@/utils/compare-hex-values";
-import { dateToUnixTimestamp } from "@/utils/date";
+import { formatDateTime } from "@/utils/date";
 import { notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
@@ -40,6 +40,11 @@ import {
   securityCouncilAddress,
 } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 import { EthereumConfig } from "@config/ethereum.server";
+import { Meta } from "@/utils/meta";
+import SignActionsCard from "@/components/proposal-components/sign-actions-card";
+import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
+
+export const meta = Meta["/app/proposals/:id"];
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromRequest(request);
@@ -148,7 +153,7 @@ export default function Proposals() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <HeaderWithBackButton>Proposal {displayBytes32(proposalId)}</HeaderWithBackButton>
+      <HeaderWithBackButton>Upgrade {displayBytes32(proposalId)}</HeaderWithBackButton>
       <div className="flex flex-1 flex-col space-y-4">
         <Suspense
           fallback={
@@ -203,22 +208,19 @@ export default function Proposals() {
               return (
                 <>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <Card className="pb-10" data-testid="proposal-details-card">
+                    <Card data-testid="proposal-details-card">
                       <CardHeader>
-                        <CardTitle>Proposal Details</CardTitle>
+                        <CardTitle>Upgrade Details</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-6">
                           <div className="flex justify-between">
-                            <span>Proposal ID:</span>
+                            <span>Upgrade ID:</span>
                             <span className="w-1/2 justify-end break-words">{proposalId}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Proposed On:</span>
-                            <div className="flex w-1/2 flex-col break-words text-right">
-                              <span>{new Date(proposal.proposedOn).toISOString()}</span>
-                              <span>({dateToUnixTimestamp(new Date(proposal.proposedOn))})</span>
-                            </div>
+                            <span>{formatDateTime(proposal.proposedOn)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Executor:</span>
@@ -239,10 +241,10 @@ export default function Proposals() {
                         </div>
                       </CardContent>
                     </Card>
-                    <Card className="pb-10">
+                    <Card>
                       <CardHeader className="pt-7">
                         <ProposalState status={proposal.status} times={proposal.statusTimes} />
-                        <CardTitle>Proposal Status</CardTitle>
+                        <CardTitle>Approval Status</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-5">
@@ -267,84 +269,68 @@ export default function Proposals() {
                         </div>
                       </CardContent>
                     </Card>
-                    <Card className="pb-10" data-testid="role-actions">
-                      <CardHeader>
-                        <CardTitle>
-                          {user.role === "guardian" && "Guardian Actions"}
-                          {user.role === "securityCouncil" && "Security Council Actions"}
-                          {user.role === "visitor" && "No role actions"}
-                          {(user.role === "zkFoundation" || user.role === "zkAdmin") &&
-                            "No role actions"}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-col space-y-3">
-                        {user.role === "guardian" && (
-                          <ExtendVetoButton
-                            proposalId={proposalId}
-                            contractAddress={addresses.guardians}
-                            disabled={!signLegalVetoEnabled}
-                          />
-                        )}
-
-                        {(user.role === "guardian" || user.role === "securityCouncil") && (
-                          <ApproveSignButton
-                            proposalId={proposalId}
-                            role={user.role}
-                            contractAddress={signAddress()}
-                            disabled={!signProposalEnabled}
-                          />
-                        )}
-                      </CardContent>
-                    </Card>
-                    <Card className="pb-10" data-testid="proposal-actions">
-                      <CardHeader>
-                        <CardTitle>Proposal Actions</CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-col space-y-3">
-                        <ContractWriteButton
-                          target={addresses.council}
-                          signatures={proposal.signatures.approveUpgradeSecurityCouncil}
+                    <SignActionsCard
+                      role={user.role}
+                      enabledRoles={["guardian", "securityCouncil"]}
+                    >
+                      {user.role === "guardian" && (
+                        <ExtendVetoButton
                           proposalId={proposalId}
-                          functionName={"approveUpgradeSecurityCouncil"}
-                          abiName="council"
-                          threshold={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
-                          disabled={!executeSecurityCouncilApprovalEnabled}
-                        >
-                          Execute security council approval
-                        </ContractWriteButton>
-
-                        <ContractWriteButton
-                          target={addresses.guardians}
-                          signatures={proposal.signatures.approveUpgradeGuardians}
+                          contractAddress={addresses.guardians}
+                          disabled={!signLegalVetoEnabled}
+                        />
+                      )}
+                      {(user.role === "guardian" || user.role === "securityCouncil") && (
+                        <ApproveSignButton
                           proposalId={proposalId}
-                          functionName={"approveUpgradeGuardians"}
-                          abiName="guardians"
-                          threshold={NECESSARY_GUARDIAN_SIGNATURES}
-                          disabled={!executeGuardiansApprovalEnabled}
-                        >
-                          Execute guardian approval
-                        </ContractWriteButton>
-
-                        <ContractWriteButton
-                          target={addresses.guardians}
-                          signatures={proposal.signatures.extendLegalVetoPeriod}
-                          proposalId={proposalId}
-                          functionName={"extendLegalVeto"}
-                          abiName="guardians"
-                          threshold={NECESSARY_LEGAL_VETO_SIGNATURES}
-                          disabled={!executeLegalVetoExtensionEnabled}
-                        >
-                          Execute legal veto extension
-                        </ContractWriteButton>
-                        <ExecuteUpgradeButton
-                          target={addresses.upgradeHandler}
-                          proposalCalldata={proposal.raw}
-                          disabled={!executeProposalEnabled}
-                        >
-                          Execute upgrade
-                        </ExecuteUpgradeButton>
-                      </CardContent>
-                    </Card>
+                          role={user.role}
+                          contractAddress={signAddress()}
+                          disabled={!signProposalEnabled}
+                        />
+                      )}
+                    </SignActionsCard>
+                    <ExecuteActionsCard>
+                      <ContractWriteButton
+                        target={addresses.guardians}
+                        signatures={proposal.signatures.extendLegalVetoPeriod}
+                        proposalId={proposalId}
+                        functionName={"extendLegalVeto"}
+                        abiName="guardians"
+                        threshold={NECESSARY_LEGAL_VETO_SIGNATURES}
+                        disabled={!executeLegalVetoExtensionEnabled}
+                      >
+                        Execute legal veto extension
+                      </ContractWriteButton>
+                      <ContractWriteButton
+                        target={addresses.council}
+                        signatures={proposal.signatures.approveUpgradeSecurityCouncil}
+                        proposalId={proposalId}
+                        functionName={"approveUpgradeSecurityCouncil"}
+                        abiName="council"
+                        threshold={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
+                        disabled={!executeSecurityCouncilApprovalEnabled}
+                      >
+                        Execute security council approval
+                      </ContractWriteButton>
+                      <ContractWriteButton
+                        target={addresses.guardians}
+                        signatures={proposal.signatures.approveUpgradeGuardians}
+                        proposalId={proposalId}
+                        functionName={"approveUpgradeGuardians"}
+                        abiName="guardians"
+                        threshold={NECESSARY_GUARDIAN_SIGNATURES}
+                        disabled={!executeGuardiansApprovalEnabled}
+                      >
+                        Execute guardian approval
+                      </ContractWriteButton>
+                      <ExecuteUpgradeButton
+                        target={addresses.upgradeHandler}
+                        proposalCalldata={proposal.raw}
+                        disabled={!executeProposalEnabled}
+                      >
+                        Execute upgrade
+                      </ExecuteUpgradeButton>
+                    </ExecuteActionsCard>
                   </div>
                   <div className="pt-4">
                     <h2 className="font-bold text-3xl">Upgrade Analysis</h2>

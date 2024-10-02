@@ -20,6 +20,9 @@ import { badRequest } from "@/utils/http";
 import { $path } from "remix-routes";
 import { hexToBigInt } from "viem";
 import { displayBytes32 } from "@/utils/common-tables";
+import { Meta } from "@/utils/meta";
+
+export const meta = Meta["/app/proposals/new"];
 
 export async function loader() {
   const proposals = await searchNotStartedProposals();

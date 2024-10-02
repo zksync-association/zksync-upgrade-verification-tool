@@ -1,8 +1,5 @@
-"use client";
-import { add, format } from "date-fns";
+import { add } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
-
-import TimePicker24h from "@/components/time-picker/time-picker-24h";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -10,15 +7,14 @@ import { cn } from "@/utils/cn";
 import type { ComponentProps } from "react";
 import type { DayPicker } from "react-day-picker";
 import TimePicker12h from "./time-picker/time-picker-12h";
+import { formatDateTime } from "@/utils/date";
 
 export function DateTimePicker({
-  timeFormat,
   className,
   date,
   setDate,
   dayPicker,
 }: {
-  timeFormat: "12H" | "24H";
   className?: string;
   date: Date;
   setDate: (date: Date) => void;
@@ -43,10 +39,7 @@ export function DateTimePicker({
   };
 
   const formatDate = (date: Date) => {
-    if (timeFormat === "12H") {
-      return format(date, "PPP hh:mm:ss a");
-    }
-    return format(date, "PPP HH:mm:ss");
+    return formatDateTime(date);
   };
 
   return (
@@ -73,11 +66,7 @@ export function DateTimePicker({
           {...dayPicker}
         />
         <div className="border-border border-t p-3">
-          {timeFormat === "24H" ? (
-            <TimePicker24h setDate={setDate} date={date} />
-          ) : (
-            <TimePicker12h setDate={setDate} date={date} />
-          )}
+          <TimePicker12h setDate={setDate} date={date} />
         </div>
       </PopoverContent>
     </Popover>

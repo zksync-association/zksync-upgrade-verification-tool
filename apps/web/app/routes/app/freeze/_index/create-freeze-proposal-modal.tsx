@@ -14,7 +14,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { PlusIcon } from "lucide-react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {
   Select,
@@ -25,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { FreezeProposalsTypeEnum, type FreezeProposalsType } from "@/common/freeze-proposal-type";
 import { Label } from "@/components/ui/label";
+import AddButton from "@/components/add-button";
 
 export function CreateFreezeProposalModal() {
   const actionResult = useActionData<typeof action>();
@@ -42,26 +42,24 @@ export function CreateFreezeProposalModal() {
   return (
     <Dialog onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="secondary" size="icon" data-testid="create-freeze-btn">
-          <PlusIcon className="h-4 w-4" />
-        </Button>
+        <AddButton>Create Freeze Request</AddButton>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create Proposal</DialogTitle>
+          <DialogTitle>Create Freeze Request</DialogTitle>
           <DialogDescription>
-            <VisuallyHidden>Create Proposal</VisuallyHidden>
+            <VisuallyHidden>Create Freeze Request</VisuallyHidden>
           </DialogDescription>
         </DialogHeader>
         <Form method="POST">
-          <Label>Proposal Type</Label>
+          <Label>Freeze Type</Label>
           <Select
             name="type"
             value={proposalType}
             onValueChange={setProposalType as (value: string) => void}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select Proposal Type" />
+              <SelectValue placeholder="Select Freeze Type" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={FreezeProposalsTypeEnum.Values.SOFT_FREEZE}>
@@ -82,7 +80,6 @@ export function CreateFreezeProposalModal() {
             <DateTimePicker
               date={date}
               setDate={setDate}
-              timeFormat="12H"
               dayPicker={{
                 disabled: { before: new Date() },
               }}

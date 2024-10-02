@@ -11,12 +11,15 @@ import { NewEmergencyProposalStep2 } from "@/routes/app/emergency/new/step2";
 import { Step3 } from "@/routes/app/emergency/new/step3";
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import { badRequest } from "@/utils/http";
+import { Meta } from "@/utils/meta";
 import { type ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
 import { useState } from "react";
 import { $path } from "remix-routes";
 import { z } from "zod";
+
+export const meta = Meta["/app/emergency/new"];
 
 export async function loader() {
   return json({ emergencyBoardAddress: await emergencyUpgradeBoardAddress() });
@@ -101,7 +104,7 @@ export default function NewEmergencyUpgrade() {
 
   return (
     <div>
-      <h2 className="pt-10 pb-5 font-bold text-3xl">Create new emergency proposal</h2>
+      <h2 className="pt-10 pb-5 font-bold text-3xl">Create New Emergency Upgrade</h2>
 
       <StepsWizard currentStep={currentStep} totalSteps={3}>
         <WizardStep step={1}>

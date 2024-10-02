@@ -29,6 +29,9 @@ import { $path } from "remix-routes";
 import { numberToHex } from "viem";
 import { useAccount } from "wagmi";
 import { z } from "zod";
+import { Meta } from "@/utils/meta";
+
+export const meta = Meta["/app/l2-cancellations/new"];
 
 export async function loader() {
   const maybeBiggestNonce = await getMaxRegisteredNonce();
@@ -119,7 +122,7 @@ export default function NewL2GovernorVeto() {
       <Await resolve={activeL2Proposals}>
         {(activeL2Proposals) => (
           <Form method="POST" className="space-y-4">
-            <Card className="pb-10">
+            <Card>
               <CardHeader>
                 <CardTitle>1. Select an active proposal</CardTitle>
               </CardHeader>

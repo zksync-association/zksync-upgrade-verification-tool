@@ -30,6 +30,13 @@ import { guardianMembers } from "@/.server/service/ethereum-l1/contracts/guardia
 import { securityCouncilMembers } from "@/.server/service/ethereum-l1/contracts/security-council";
 import ZkAdminArchiveProposal from "@/components/zk-admin-archive-proposal";
 import ProposalArchivedCard from "@/components/proposal-archived-card";
+import { Meta } from "@/utils/meta";
+import { displayBytes32 } from "@/utils/common-tables";
+import { formatDateTime } from "@/utils/date";
+import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
+import SignActionsCard from "@/components/proposal-components/sign-actions-card";
+
+export const meta = Meta["/app/emergency/:id"];
 
 export async function loader(args: LoaderFunctionArgs) {
   const { id: proposalId } = extractFromParams(
@@ -119,12 +126,14 @@ export default function EmergencyUpgradeDetails() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <HeaderWithBackButton>Proposal {proposal.externalId}</HeaderWithBackButton>
+      <HeaderWithBackButton>
+        Emergency Upgrade {displayBytes32(proposal.externalId)}
+      </HeaderWithBackButton>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card className="pb-10" data-testid="proposal-details-card">
+        <Card data-testid="proposal-details-card">
           <CardHeader>
-            <CardTitle>Proposal Details</CardTitle>
+            <CardTitle>Emergency Upgrade Details</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -133,17 +142,14 @@ export default function EmergencyUpgradeDetails() {
                 <span className="w-4/5 justify-end break-words text-right">{proposal.title}</span>
               </div>
               <div className="flex justify-between">
-                <span>Proposal ID:</span>
-                <span className="w-4/5 justify-end break-words text-right">
+                <span>Emergency Upgrade ID:</span>
+                <span className="w-3/5 justify-end break-words text-right">
                   {proposal.externalId}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Proposed On:</span>
-                <div className="flex w-3/4 flex-col break-words text-right">
-                  <span>{new Date(proposal.proposedOn).toLocaleDateString()}</span>
-                  <span>{new Date(proposal.proposedOn).toLocaleTimeString()}</span>
-                </div>
+                <span>{formatDateTime(proposal.proposedOn)}</span>
               </div>
               {proposalArchived && (
                 <ProposalArchivedCard
@@ -155,10 +161,10 @@ export default function EmergencyUpgradeDetails() {
             </div>
           </CardContent>
         </Card>
-        <Card className="pb-10">
+        <Card>
           <CardHeader className="pt-7">
             <p className="text-red-500">{proposalArchived ? "Archived" : "\u00A0"}</p>
-            <CardTitle>Proposal Status</CardTitle>
+            <CardTitle>Approval Status</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-5">
@@ -173,55 +179,49 @@ export default function EmergencyUpgradeDetails() {
                 necessarySignatures={GUARDIANS_COUNCIL_THRESHOLD}
               />
               <StatusIndicator
-                label="ZkFoundation Approval"
+                label="ZKsync Foundation Approval"
                 signatures={gatheredZkFoundationSignatures}
                 necessarySignatures={ZK_FOUNDATION_THRESHOLD}
               />
             </div>
           </CardContent>
         </Card>
-        <Card className="pb-10" data-testid="role-actions-card">
-          <CardHeader>
-            <CardTitle>Signatures</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col space-y-3">
-            {user.role !== "visitor" && user.role !== "zkAdmin" && (
-              <EmergencySignButton
-                proposalId={proposal.externalId}
-                contractAddress={addresses.emergencyBoard}
-                role={user.role}
-                disabled={haveAlreadySigned || proposalArchived}
-              />
-            )}
-            {user.role === "visitor" && <p>No signing actions</p>}
-            {user.role === "zkAdmin" && (
-              <ZkAdminArchiveProposal
-                proposalId={BigInt(proposal.id)}
-                proposalType="ArchiveEmergencyProposal"
-                disabled={proposal.archivedOn !== null}
-              />
-            )}
-          </CardContent>
-        </Card>
-        <Card className="pb-10" data-testid="execute-actions-card">
-          <CardHeader>
-            <CardTitle>Broadcast actions</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col space-y-3">
-            <ExecuteEmergencyUpgradeButton
-              boardAddress={addresses.emergencyBoard}
-              gatheredSignatures={signatures}
-              allGuardians={allGuardians}
-              allCouncil={allSecurityCouncil}
-              zkFoundationAddress={addresses.zkFoundation}
-              proposal={proposal}
-              calls={calls}
-              disabled={proposalArchived}
-            >
-              Execute upgrade
-            </ExecuteEmergencyUpgradeButton>
-          </CardContent>
-        </Card>
+        <SignActionsCard
+          role={user.role}
+          enabledRoles={["securityCouncil", "guardian", "zkFoundation", "zkAdmin"]}
+        >
+          {(user.role === "guardian" ||
+            user.role === "securityCouncil" ||
+            user.role === "zkFoundation") && (
+            <EmergencySignButton
+              proposalId={proposal.externalId}
+              contractAddress={addresses.emergencyBoard}
+              role={user.role}
+              disabled={haveAlreadySigned || proposalArchived}
+            />
+          )}
+          {user.role === "zkAdmin" && (
+            <ZkAdminArchiveProposal
+              proposalId={BigInt(proposal.id)}
+              proposalType="ArchiveEmergencyProposal"
+              disabled={proposal.archivedOn !== null}
+            />
+          )}
+        </SignActionsCard>
+        <ExecuteActionsCard>
+          <ExecuteEmergencyUpgradeButton
+            boardAddress={addresses.emergencyBoard}
+            gatheredSignatures={signatures}
+            allGuardians={allGuardians}
+            allCouncil={allSecurityCouncil}
+            zkFoundationAddress={addresses.zkFoundation}
+            proposal={proposal}
+            calls={calls}
+            disabled={proposalArchived}
+          >
+            Execute Emergency Upgrade
+          </ExecuteEmergencyUpgradeButton>
+        </ExecuteActionsCard>
       </div>
 
       <Tabs className="mt-4 flex" defaultValue="raw-data">
