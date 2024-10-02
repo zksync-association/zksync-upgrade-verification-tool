@@ -41,7 +41,7 @@ export default function Index() {
                       }
                       className="w-[200px]"
                     >
-                      Standard Upgrades
+                      Protocol Upgrades
                     </Button>
                   </Link>
                   {showButtons && (
@@ -79,7 +79,7 @@ export default function Index() {
                           className="w-[200px]"
                           variant="secondary"
                         >
-                          Governor Veto
+                          Guardian Veto
                         </Button>
                       </Link>
                     </>

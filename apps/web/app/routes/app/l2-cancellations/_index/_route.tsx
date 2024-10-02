@@ -38,14 +38,14 @@ export default function L2Proposals() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Active Governor Veto Proposals</CardTitle>
+            <CardTitle>Active Guardian Vetoes</CardTitle>
             <Link to={$path("/app/l2-cancellations/new")}>
-              <AddButton data-testid="new-cancellation-proposal">Create Governor Veto</AddButton>
+              <AddButton data-testid="new-cancellation-proposal">Create Guardian Veto</AddButton>
             </Link>
           </div>
         </CardHeader>
         <CardContent>
-          {activeProposals.length > 0 && (
+          {activeProposals.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -70,20 +70,17 @@ export default function L2Proposals() {
                   ))}
               </TableBody>
             </Table>
-          )}
-          {activeProposals.length === 0 && (
-            <div className="text-center text-gray-500">
-              No active governor veto proposals found.
-            </div>
+          ) : (
+            <div className="text-center text-gray-500">No active Guardian Vetoes found.</div>
           )}
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Inactive Governor Veto Proposals</CardTitle>
+          <CardTitle>Inactive Guardian Vetoes</CardTitle>
         </CardHeader>
         <CardContent>
-          {inactiveProposals.length > 0 && (
+          {inactiveProposals.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -112,11 +109,8 @@ export default function L2Proposals() {
                   ))}
               </TableBody>
             </Table>
-          )}
-          {inactiveProposals.length === 0 && (
-            <div className="text-center text-gray-500">
-              No inactive governor veto proposals found.
-            </div>
+          ) : (
+            <div className="text-center text-gray-500">No inactive Guardian Vetoes found.</div>
           )}
         </CardContent>
       </Card>

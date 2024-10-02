@@ -33,9 +33,9 @@ function getTitle(path: string) {
     return "Freeze Requests";
   }
   if (path.startsWith($path("/app/l2-cancellations"))) {
-    return "Governor Veto Proposals";
+    return "Guardian Veto";
   }
   if (path.startsWith($path("/app/proposals"))) {
-    return "Standard Upgrade Proposals";
+    return "Protocol Upgrade Proposals";
   }
 }

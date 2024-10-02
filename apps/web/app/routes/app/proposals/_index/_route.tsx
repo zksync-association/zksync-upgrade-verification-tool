@@ -33,7 +33,7 @@ export default function Index() {
         fallback={
           <div className="flex flex-1 flex-col items-center justify-center space-y-6 pb-4">
             <Loading className="h-16 w-16" />
-            <h2>Fetching on-chain data for standard upgrade proposals...</h2>
+            <h2>Fetching on-chain data for Protocol Upgrade...</h2>
           </div>
         }
       >
@@ -49,7 +49,7 @@ export default function Index() {
                         data-testid="start-regular-upgrade"
                         icon={<Rocket className="mr-2 h-4 w-4" />}
                       >
-                        Initiate Protocol Upgrade Process
+                        Initiate Protocol Upgrade Approval
                       </AddButton>
                     </Link>
                   </div>
@@ -71,7 +71,7 @@ export default function Index() {
                     ))}
                     {activeProposals.length === 0 && (
                       <div className="text-center text-gray-500">
-                        No active standard proposals found.
+                        No active Proposal Upgrades found.
                       </div>
                     )}
                   </div>
@@ -99,7 +99,7 @@ export default function Index() {
                   </div>
                   {inactiveProposals.length === 0 && (
                     <div className="text-center text-gray-500">
-                      No inactive standard proposals found.
+                      No inactive Proposal Upgrades found.
                     </div>
                   )}
                 </CardContent>

@@ -249,6 +249,12 @@ export default function Proposals() {
                       <CardContent>
                         <div className="space-y-5">
                           <VotingStatusIndicator
+                            label="Extend Legal Veto Approvals"
+                            signatures={proposal.signatures.extendLegalVetoPeriod.length}
+                            necessarySignatures={NECESSARY_LEGAL_VETO_SIGNATURES}
+                            testId="legal-veto-signature-count"
+                          />
+                          <VotingStatusIndicator
                             label="Security Council Approvals"
                             signatures={proposal.signatures.approveUpgradeSecurityCouncil.length}
                             necessarySignatures={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
@@ -259,12 +265,6 @@ export default function Proposals() {
                             signatures={proposal.signatures.approveUpgradeGuardians.length}
                             necessarySignatures={NECESSARY_GUARDIAN_SIGNATURES}
                             testId="guardian-signature-count"
-                          />
-                          <VotingStatusIndicator
-                            label="Extend Legal Veto Approvals"
-                            signatures={proposal.signatures.extendLegalVetoPeriod.length}
-                            necessarySignatures={NECESSARY_LEGAL_VETO_SIGNATURES}
-                            testId="legal-veto-signature-count"
                           />
                         </div>
                       </CardContent>

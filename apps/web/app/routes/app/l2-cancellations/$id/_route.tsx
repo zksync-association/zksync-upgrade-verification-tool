@@ -120,12 +120,12 @@ export default function L2Cancellation() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <HeaderWithBackButton>Proposal {displayBytes32(proposal.externalId)}</HeaderWithBackButton>
+      <HeaderWithBackButton>Veto {displayBytes32(proposal.externalId)}</HeaderWithBackButton>
 
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card data-testid="proposal-details-card">
           <CardHeader>
-            <CardTitle>Proposal Details</CardTitle>
+            <CardTitle>Veto Details</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">

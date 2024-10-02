@@ -214,7 +214,7 @@ function ProposalCard({
           })}
         </div>
         {proposals.length === 0 && (
-          <div className="text-center text-gray-500">No {type} freeze requests found.</div>
+          <div className="text-center text-gray-500">No {type} Freeze Requests found.</div>
         )}
       </CardContent>
     </Card>

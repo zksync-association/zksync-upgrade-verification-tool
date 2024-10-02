@@ -45,7 +45,7 @@ export default function Index() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Active Emergency Upgrades Proposals</CardTitle>
+            <CardTitle>Active Emergency Upgrades</CardTitle>
             <Link to={$path("/app/emergency/new")}>
               <AddButton data-testid="new-emergency-proposal">Create Emergency Upgrade</AddButton>
             </Link>
@@ -53,7 +53,7 @@ export default function Index() {
         </CardHeader>
         <CardContent>
           {activeEmergencyProposals.length === 0 ? (
-            <div className="text-center text-gray-500">No active emergency upgrades found.</div>
+            <div className="text-center text-gray-500">No active Emergency Upgrades found.</div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -101,11 +101,11 @@ export default function Index() {
       </Card>
       <Card data-testid="inactive-proposals-card">
         <CardHeader>
-          <CardTitle>Inactive Emergency Upgrades Proposals</CardTitle>
+          <CardTitle>Inactive Emergency Upgrades</CardTitle>
         </CardHeader>
         <CardContent>
           {inactiveEmergencyProposals.length === 0 ? (
-            <div className="text-center text-gray-500">No inactive emergency upgrades found.</div>
+            <div className="text-center text-gray-500">No inactive Emergency Upgrades found.</div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -130,15 +130,7 @@ export default function Index() {
                         <div className="truncate">{`${ep.externalId.slice(0, 10)} ... ${ep.externalId.slice(-8)}`}</div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
-                        {new Date(ep.changedOn).toLocaleString("en-US", {
-                          weekday: "short",
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: false,
-                          timeZoneName: "short",
-                        })}
+                        {formatDateTime(ep.changedOn)}
                       </TableCell>
                       <TableCell>
                         <span
