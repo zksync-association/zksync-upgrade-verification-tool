@@ -14,7 +14,7 @@ import { useState } from "react";
 import { z } from "zod";
 
 export const step1Schema = {
-  title: z.string().min(1, "Cannot be empty"),
+  title: z.string().min(1, "Title cannot be empty"),
   salt: bytes32Schema,
 };
 
@@ -46,19 +46,18 @@ export function NewEmergencyProposalStep1(props: NewEmergencyProposalStep1Props)
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Basic data:</CardTitle>
+        <CardTitle>Step 1: Basic Information</CardTitle>
       </CardHeader>
       <CardContent>
         <Form onSubmit={handleSubmit}>
           <FormItem name="title">
             <FormLabel>Title</FormLabel>
-            <FormInput placeholder="..." />
+            <FormInput />
             <FormDescription>
-              This is to help signers identify the purpose of the upgrade.
+              Used to help signers identify the purpose of the upgrade.
             </FormDescription>
             <FormMessage data-testid="title-error">{formErrors.title}</FormMessage>
           </FormItem>
-
           <FormItem name="salt">
             <FormLabel>Salt</FormLabel>
             <FormInput defaultValue={`0x${"0".repeat(64)}`} />
