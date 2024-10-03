@@ -284,7 +284,7 @@ test("TC016: Click in plus button -> Start regular upgrade flow page is shown. U
 }) => {
   await goToStartProposal(page);
 
-  await expect(page.getByRole("button", { name: "Start" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Initiate Approval" })).toBeDisabled();
   await expect(page.locator("td").filter({ hasText: /^[0-9]{50}/ })).toBeVisible();
   await expect(
     page.locator("td").filter({ hasText: /0x[a-fA-F0-9]{8}...[a-fA-F0-9]{10}/ })
@@ -303,7 +303,7 @@ test("TC017: Start new regular upgrade page -> Upgrade can be started. Redirects
     .locator('[name="proposal"]')
     .click();
 
-  await page.getByRole("button", { name: "Start" }).click();
+  await page.getByRole("button", { name: "Initiate Approval" }).click();
   await wallet.confirmTransaction();
 
   await page.getByText("Transaction successful").waitFor();
@@ -319,7 +319,7 @@ test("TC017: Start new regular upgrade page -> Upgrade can be started. Redirects
 
 async function goToStartProposal(page: Page) {
   await page.getByTestId("start-regular-upgrade").click();
-  await page.getByText("Start regular upgrade flow").waitFor();
+  await page.getByText("Initiate Protocol Upgrade Approval").waitFor();
 }
 async function goToProposalDetails(page: Page) {
   const activeProposalsSection = activeProposalsCard(page);
