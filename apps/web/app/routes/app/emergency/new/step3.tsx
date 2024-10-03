@@ -43,7 +43,6 @@ export function Step3(props: Step3Props) {
     );
   }, []);
 
-
   const valid = data?.ok;
 
   return (
@@ -69,7 +68,13 @@ export function Step3(props: Step3Props) {
         </div>
 
         <h3 className="mb-2 font-medium text-lg">Validation Results:</h3>
-        <div className={cn("flex rounded-xl bg-muted p-4 text-sm", data && !valid && "bg-red-900/50", data && valid && "bg-green-900/50")}>
+        <div
+          className={cn(
+            "flex rounded-xl bg-muted p-4 text-sm",
+            data && !valid && "bg-red-900/50",
+            data && valid && "bg-green-900/50"
+          )}
+        >
           {!data ? (
             <div className="flex items-center gap-4">
               <Loading />
