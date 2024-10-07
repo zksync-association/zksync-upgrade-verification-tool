@@ -42,9 +42,16 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const calls = body.data.calls;
   const validations = await validateEmergencyProposalCalls(calls);
-
   const allValid = validations.every((v) => v.isValid);
-  if (allValid && body.data.intent === "save") {
+
+  // If intent is validate, we should return the validations and the status.
+  if (body.data.intent === "validate") {
+    return json({ ok: allValid, validations });
+  }
+
+  // Otherwise, we should just save the proposal, not caring if the validations are ok or not
+  // as the user will be responsible for the proposal being valid.
+  if (body.data.intent === "save") {
     try {
       const proposal = await saveEmergencyProposal(
         {
@@ -62,8 +69,6 @@ export async function action({ request }: ActionFunctionArgs) {
       throw err;
     }
   }
-
-  return json({ ok: allValid, validations });
 }
 
 export default function NewEmergencyUpgrade() {
@@ -105,7 +110,6 @@ export default function NewEmergencyUpgrade() {
   return (
     <div>
       <h2 className="pt-10 pb-5 font-bold text-3xl">Create New Emergency Upgrade</h2>
-
       <StepsWizard currentStep={currentStep} totalSteps={3}>
         <WizardStep step={1}>
           <NewEmergencyProposalStep1 callback={step1Submit} />
