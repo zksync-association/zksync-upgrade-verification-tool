@@ -22,6 +22,9 @@ import { useWaitForTransactionReceipt } from "wagmi";
 import { z } from "zod";
 import { extractFromParams } from "@/utils/read-from-request";
 import { EthereumConfig } from "@config/ethereum.server";
+import { Meta } from "@/utils/meta";
+
+export const meta = Meta["/app/transactions/:hash"];
 
 export function loader(args: LoaderFunctionArgs) {
   const { hash } = extractFromParams(args.params, z.object({ hash: hexSchema }), notFound());

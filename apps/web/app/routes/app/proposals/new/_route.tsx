@@ -20,6 +20,10 @@ import { badRequest } from "@/utils/http";
 import { $path } from "remix-routes";
 import { hexToBigInt } from "viem";
 import { displayBytes32 } from "@/utils/common-tables";
+import { Meta } from "@/utils/meta";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export const meta = Meta["/app/proposals/new"];
 
 export async function loader() {
   const proposals = await searchNotStartedProposals();
@@ -42,44 +46,46 @@ export default function startProposal() {
   const [upgradeData, setUpgradeData] = useState<StartUpgradeData | null>(null);
 
   return (
-    <div>
-      <h2 className="font-semibold text-2xl leading-none tracking-tight">
-        Start regular upgrade flow
-      </h2>
+    <Card>
+      <CardHeader>
+        <CardTitle>Initiate Protocol Upgrade Approval</CardTitle>
+      </CardHeader>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Tally id</TableHead>
-            <TableHead>L1 id</TableHead>
-            <TableHead>Error</TableHead>
-            <TableHead />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {proposals.map((proposal) => (
-            <TableRow key={proposal.l2ProposalId}>
-              <TableCell>{hexToBigInt(proposal.l2ProposalId).toString(10)}</TableCell>
-              <TableCell>
-                {proposal.l1ProposalId ? displayBytes32(proposal.l1ProposalId) : "-"}
-              </TableCell>
-              <TableCell>{proposal.error ?? "-"}</TableCell>
-              {proposal.ok && (
-                <TableCell>
-                  <Input
-                    type={"radio"}
-                    name={"proposal"}
-                    value={proposal.l2ProposalId}
-                    onClick={() => setUpgradeData(proposal.data)}
-                  />
-                </TableCell>
-              )}
-              {!proposal.ok && <TableCell />}
+      <CardContent className="space-y-8">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tally ID</TableHead>
+              <TableHead>Protocol Upgrade ID</TableHead>
+              <TableHead>Error</TableHead>
+              <TableHead />
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      <StartUpgradeButton target={target} data={upgradeData} />
-    </div>
+          </TableHeader>
+          <TableBody>
+            {proposals.map((proposal) => (
+              <TableRow key={proposal.l2ProposalId}>
+                <TableCell>{hexToBigInt(proposal.l2ProposalId).toString(10)}</TableCell>
+                <TableCell>
+                  {proposal.l1ProposalId ? displayBytes32(proposal.l1ProposalId) : "-"}
+                </TableCell>
+                <TableCell>{proposal.error ?? "-"}</TableCell>
+                {proposal.ok && (
+                  <TableCell>
+                    <Input
+                      type={"radio"}
+                      name={"proposal"}
+                      value={proposal.l2ProposalId}
+                      onClick={() => setUpgradeData(proposal.data)}
+                    />
+                  </TableCell>
+                )}
+                {!proposal.ok && <TableCell />}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <StartUpgradeButton target={target} data={upgradeData} />
+      </CardContent>
+    </Card>
   );
 }

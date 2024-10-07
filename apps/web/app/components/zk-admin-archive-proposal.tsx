@@ -36,8 +36,6 @@ export default function ZkAdminArchiveProposal({
   const success = isSuccess && fetcher.data?.ok;
   const buttonDisabled = disabled || archivedReason === "";
 
-  const archivedOn = new Date().toISOString();
-
   useEffect(() => {
     if (success) {
       toast.success("Archived successfully", { id: TOAST_ID });
@@ -49,6 +47,7 @@ export default function ZkAdminArchiveProposal({
     if (archivedReason === "") {
       return;
     }
+    const archivedOn = new Date().toISOString();
 
     toast.loading("Archiving...", { id: TOAST_ID });
     signTypedData(

@@ -71,8 +71,8 @@ export function StartUpgradeButton(props: StartUpgradeButtonProps) {
   }, [writeContract, props.data, props.target, address, fetcher.submit]);
 
   return (
-    <Button onClick={onClick} disabled={props.data === null} loading={loading}>
-      Start
+    <Button className="w-48" onClick={onClick} disabled={props.data === null} loading={loading}>
+      Initiate Approval
     </Button>
   );
 }

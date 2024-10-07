@@ -54,7 +54,7 @@ export function NewEmergencyProposalStep1(props: NewEmergencyProposalStep1Props)
             <FormLabel>Title</FormLabel>
             <FormInput placeholder="..." />
             <FormDescription>
-              This is to help voters identify which proposal this is.
+              This is to help signers identify the purpose of the upgrade.
             </FormDescription>
             <FormMessage data-testid="title-error">{formErrors.title}</FormMessage>
           </FormItem>
@@ -63,7 +63,7 @@ export function NewEmergencyProposalStep1(props: NewEmergencyProposalStep1Props)
             <FormLabel>Salt</FormLabel>
             <FormInput defaultValue={`0x${"0".repeat(64)}`} />
             <FormDescription>
-              A bytes32 value used for creating unique upgrade proposal hashes.
+              A bytes32 value used for creating unique upgrade hashes.
             </FormDescription>
             <FormMessage>{formErrors.salt}</FormMessage>
           </FormItem>

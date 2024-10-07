@@ -72,14 +72,14 @@ export function NewEmergencyProposalStep2(props: NewEmergencyProposalStep2Props)
             <FormItem name="data">
               <FormLabel>Calldata</FormLabel>
               <FormTextarea placeholder="0x..." />
-              <FormDescription>Calldata use in the upgrade transaction</FormDescription>
+              <FormDescription>Calldata for the upgrade transaction</FormDescription>
               <FormMessage>{formErrors.data}</FormMessage>
             </FormItem>
 
             <FormItem name="value">
               <FormLabel>Value</FormLabel>
               <FormInput type="number" defaultValue={0} />
-              <FormDescription>Calldata use in the upgrade transaction</FormDescription>
+              <FormDescription>Value for the upgrade transaction</FormDescription>
               <FormMessage>{formErrors.value}</FormMessage>
             </FormItem>
 

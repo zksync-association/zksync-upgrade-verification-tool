@@ -60,7 +60,7 @@ export function ApproveSignButton({
       }}
       dataTestId={"approve-button"}
     >
-      Approve upgrade
+      Approve Protocol Upgrade
     </BasicSignButton>
   );
 }

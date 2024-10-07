@@ -7,7 +7,7 @@ import TxStatus from "@/components/tx-status";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
 import { compareHexValues } from "@/utils/compare-hex-values";
-import { dateToUnixTimestamp } from "@/utils/date";
+import { formatDateTime } from "@/utils/date";
 import { notFound } from "@/utils/http";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, useLoaderData } from "@remix-run/react";
@@ -32,6 +32,11 @@ import { EthereumConfig } from "@config/ethereum.server";
 import ProposalArchivedCard from "@/components/proposal-archived-card";
 import ZkAdminArchiveProposal from "@/components/zk-admin-archive-proposal";
 import type { ZkAdminSignAction } from "@/routes/resources+/zk-admin-sign";
+import { Meta } from "@/utils/meta";
+import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
+import SignActionsCard from "@/components/proposal-components/sign-actions-card";
+
+export const meta = Meta["/app/freeze/:id"];
 
 export async function loader({ params: remixParams }: LoaderFunctionArgs) {
   const { id } = extractFromParams(remixParams, z.object({ id: z.coerce.number() }), notFound());
@@ -155,9 +160,9 @@ export default function Freeze() {
       </HeaderWithBackButton>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card className="pb-10" data-testid="proposal-details-card">
+        <Card data-testid="proposal-details-card">
           <CardHeader>
-            <CardTitle>Proposal Details</CardTitle>
+            <CardTitle>Freeze Details</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -179,21 +184,15 @@ export default function Freeze() {
               )}
               <div className="flex justify-between">
                 <span>Valid Until:</span>
-                <div className="flex w-1/2 flex-col break-words text-right">
-                  <span>{proposalValidUntil.toLocaleString()}</span>
-                  <span data-testid="valid-until-timestamp">
-                    ({dateToUnixTimestamp(proposalValidUntil)})
-                  </span>
-                </div>
+                <span data-testid="valid-until-timestamp">
+                  {formatDateTime(proposalValidUntil)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Proposed On:</span>
-                <div className="flex w-1/2 flex-col break-words text-right">
-                  <span>{new Date(proposal.proposedOn).toLocaleString()}</span>
-                  <span data-testid="proposed-on-timestamp">
-                    ({dateToUnixTimestamp(new Date(proposal.proposedOn))})
-                  </span>
-                </div>
+                <span data-testid="proposed-on-timestamp">
+                  {formatDateTime(proposal.proposedOn)}
+                </span>
               </div>
               {proposal.transactionHash && (
                 <div className="flex justify-between">
@@ -214,10 +213,10 @@ export default function Freeze() {
             </div>
           </CardContent>
         </Card>
-        <Card className="flex flex-col pb-10">
+        <Card className="flex flex-col">
           <CardHeader className="pt-7">
             <p className="text-red-500">{proposalArchived ? "Archived" : "\u00A0"}</p>
-            <CardTitle>Proposal Status</CardTitle>
+            <CardTitle>Freeze Status</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1">
             {proposal.transactionHash ? (
@@ -236,56 +235,40 @@ export default function Freeze() {
             )}
           </CardContent>
         </Card>
-        <Card className="pb-10" data-testid="role-actions-card">
-          <CardHeader>
-            <CardTitle>
-              {user.role === "securityCouncil"
-                ? "Security Council Actions"
-                : user.role === "zkAdmin"
-                  ? "Zk Admin Actions"
-                  : "No role actions"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col space-y-3">
-            {user.role === "securityCouncil" && (
-              <SignFreezeButton
-                softFreezeThreshold={proposal.softFreezeThreshold}
-                validUntil={proposalValidUntil}
-                contractAddress={securityCouncilAddress}
-                nonce={proposal.externalId}
-                freezeType={proposal.type}
-                proposalId={proposal.id}
-                disabled={signDisabled}
-              />
-            )}
-            {user.role === "zkAdmin" && (
-              <ZkAdminArchiveProposal
-                proposalId={BigInt(proposal.id)}
-                proposalType={zkAdminSignAction}
-                disabled={proposalArchived}
-              />
-            )}
-          </CardContent>
-        </Card>
-        <Card className="pb-10" data-testid="execute-actions-card">
-          <CardHeader>
-            <CardTitle>Execute Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col space-y-3">
-            <ContractWriteButton
-              proposalId={proposal.id}
-              target={securityCouncilAddress}
-              functionName={functionName}
-              signatures={signatures}
-              threshold={necessarySignatures}
-              disabled={!executeFreezeEnabled}
-              validUntil={proposalValidUntil}
+        <SignActionsCard role={user.role} enabledRoles={["securityCouncil", "zkAdmin"]}>
+          {user.role === "securityCouncil" && (
+            <SignFreezeButton
               softFreezeThreshold={proposal.softFreezeThreshold}
-            >
-              Execute freeze
-            </ContractWriteButton>
-          </CardContent>
-        </Card>
+              validUntil={proposalValidUntil}
+              contractAddress={securityCouncilAddress}
+              nonce={proposal.externalId}
+              freezeType={proposal.type}
+              proposalId={proposal.id}
+              disabled={signDisabled}
+            />
+          )}
+          {user.role === "zkAdmin" && (
+            <ZkAdminArchiveProposal
+              proposalId={BigInt(proposal.id)}
+              proposalType={zkAdminSignAction}
+              disabled={proposalArchived}
+            />
+          )}
+        </SignActionsCard>
+        <ExecuteActionsCard>
+          <ContractWriteButton
+            proposalId={proposal.id}
+            target={securityCouncilAddress}
+            functionName={functionName}
+            signatures={signatures}
+            threshold={necessarySignatures}
+            disabled={!executeFreezeEnabled}
+            validUntil={proposalValidUntil}
+            softFreezeThreshold={proposal.softFreezeThreshold}
+          >
+            Execute freeze
+          </ContractWriteButton>
+        </ExecuteActionsCard>
       </div>
     </div>
   );
