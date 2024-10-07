@@ -1,8 +1,8 @@
 import {
-  type Abi,
-  createPublicClient,
+  type Abi, type Address, BaseError, CallExecutionError,
+  createPublicClient, decodeErrorResult,
   decodeFunctionResult,
-  encodeFunctionData,
+  encodeFunctionData, getContractError,
   type Hex,
   hexToNumber,
   http,
@@ -76,18 +76,31 @@ export class RpcClient {
   }
 
   async contractReadRaw(target: string, callData: string, from?: Hex, value = 0n): Promise<Hex> {
-    const { data } = await this.viemClient.call({
-      to: target as Hex,
-      account: from,
-      data: callData as Hex,
-      value: value,
-    });
+    try {
+      const { data } = await this.viemClient.call({
+        to: target as Hex,
+        account: from,
+        data: callData as Hex,
+        value: value,
+      });
 
-    if (!data) {
-      return "0x";
+      if (!data) {
+        return "0x";
+      }
+
+      return data;
+    } catch (e) {
+      if (e instanceof BaseError) {
+        const walked = e.walk()
+      }
+
+      const data1 = (e as CallExecutionError).walk();
+      decodeErrorResult({
+        data: data1
+      })
+      throw e
     }
 
-    return data;
   }
 
   async getByteCode(addr: Hex): Promise<Hex | undefined> {
@@ -167,7 +180,7 @@ export class RpcClient {
     return res.json();
   }
 
-  async debugCallTraceStorage(from: string, to: string, callData: Hex): Promise<MemoryDiffRaw> {
+  async debugCallTraceStorage(from: Address, to: Address, callData: Hex): Promise<MemoryDiffRaw> {
     const data = await this.rawCall("debug_traceCall", [
       {
         from,

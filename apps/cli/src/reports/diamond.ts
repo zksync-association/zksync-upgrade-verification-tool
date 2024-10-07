@@ -1,11 +1,13 @@
 import { type Abi, bytesToHex, type Hex, hexToBytes, toFunctionSelector } from "viem";
-import type { ZodType } from "zod";
+import type { TypeOf, ZodType } from "zod";
 import { facetsResponseSchema } from "./schema/new-facets.js";
 import type { FacetData } from "./upgrade-changes.js";
 import type { BlockExplorer, BlockExplorerClient } from "../ethereum/block-explorer-client";
 import type { ContractAbi } from "../ethereum/contract-abi";
 import type { ContractData } from "../ethereum/contract-data";
 import type { RpcClient } from "../ethereum/rpc-client";
+import { StateTransitionManager } from "./state-transition-manager";
+import { addressSchema } from "@repo/common/schemas";
 
 const DIAMOND_FUNCTIONS = {
   facets: "facets",
@@ -106,7 +108,7 @@ export class Diamond {
     return bytesToHex(hexToBytes(data));
   }
 
-  async contractRead(rpc: RpcClient, fnName: string, schema: ZodType) {
+  async contractRead<T extends ZodType>(rpc: RpcClient, fnName: string, schema: T): Promise<Promise<TypeOf<typeof schema>>> {
     const selector = toFunctionSelector(`${fnName}()`);
     const facetAddr = this.selectorToFacet.get(this.sanitizeHex(selector));
     if (!facetAddr) {
@@ -119,5 +121,10 @@ export class Diamond {
     }
 
     return rpc.contractRead(this.address, fnName, abi.raw, schema);
+  }
+
+  async getTransitionManager(rpc: RpcClient, explorer: BlockExplorerClient) {
+    const proxyAddr = await this.contractRead(rpc, "getStateTransitionManager", addressSchema)
+    return StateTransitionManager.create(proxyAddr, rpc, explorer)
   }
 }
