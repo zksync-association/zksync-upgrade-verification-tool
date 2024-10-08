@@ -1,8 +1,8 @@
 import {
-  type Abi, type Address, BaseError, CallExecutionError,
+  type Abi, type Address, BaseError,
   createPublicClient, decodeErrorResult,
   decodeFunctionResult,
-  encodeFunctionData, getContractError,
+  encodeFunctionData,
   type Hex,
   hexToNumber,
   http,
@@ -91,14 +91,16 @@ export class RpcClient {
       return data;
     } catch (e) {
       if (e instanceof BaseError) {
-        const walked = e.walk()
+        const walked = e.walk() as any;
+        const data = walked.data;
+        const decoded = decodeErrorResult({
+          data
+        })
+        console.error(decoded)
+        throw "error doing this"
+      } else {
+        throw e
       }
-
-      const data1 = (e as CallExecutionError).walk();
-      decodeErrorResult({
-        data: data1
-      })
-      throw e
     }
 
   }
