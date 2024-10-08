@@ -34,6 +34,8 @@ import ProposalArchivedCard from "@/components/proposal-archived-card";
 import { Meta } from "@/utils/meta";
 import SignActionsCard from "@/components/proposal-components/sign-actions-card";
 import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
+import TallyLink from "@/components/tally-link";
+import { env } from "@config/env.server";
 
 export const meta = Meta["/app/l2-cancellations/:id"];
 
@@ -60,6 +62,7 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
     transactionUrl: proposal.transactionHash
       ? EthereumConfig.getTransactionUrl(proposal.transactionHash)
       : "",
+    tallyBaseUrl: env.TALLY_BASE_URL,
     currentNonce: await getL2VetoNonce(),
   });
 }
@@ -90,6 +93,7 @@ export default function L2Cancellation() {
     guardiansAddress,
     transactionUrl,
     currentNonce,
+    tallyBaseUrl,
   } = useLoaderData<typeof loader>();
   const user = useUser();
 
@@ -136,6 +140,10 @@ export default function L2Cancellation() {
               <div className="flex justify-between">
                 <span>Description:</span>
                 <span>{proposal.description}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tally ID:</span>
+                <TallyLink l2ProposalId={proposal.externalId} baseUrl={tallyBaseUrl} />
               </div>
               <div className="flex justify-between">
                 <span>Proposer:</span>

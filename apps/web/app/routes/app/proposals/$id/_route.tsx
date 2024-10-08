@@ -44,6 +44,7 @@ import { Meta } from "@/utils/meta";
 import SignActionsCard from "@/components/proposal-components/sign-actions-card";
 import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
 import { decodeProposalSerializable } from "@/utils/decode-proposal";
+import TallyLink from "@/components/tally-link";
 
 export const meta = Meta["/app/proposals/:id"];
 
@@ -97,6 +98,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
             .sort((a, b) => compareHexValues(a.signer, b.signer)),
         },
         transactionHash: proposal.transactionHash,
+        l2ProposalId: proposal.l2ProposalId,
       },
       addresses: {
         guardians,
@@ -118,6 +120,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
   return defer({
     proposalId: proposal.externalId as Hex,
+    tallyBaseUrl: env.TALLY_BASE_URL,
     asyncData: getAsyncData(),
     transactionUrl: proposal.transactionHash
       ? EthereumConfig.getTransactionUrl(proposal.transactionHash)
@@ -149,7 +152,7 @@ const NECESSARY_GUARDIAN_SIGNATURES = 5;
 const NECESSARY_LEGAL_VETO_SIGNATURES = 2;
 
 export default function Proposals() {
-  const { asyncData, proposalId, transactionUrl } = useLoaderData<typeof loader>();
+  const { asyncData, proposalId, transactionUrl, tallyBaseUrl } = useLoaderData<typeof loader>();
   const user = useUser();
 
   return (
@@ -218,6 +221,17 @@ export default function Proposals() {
                           <div className="flex justify-between">
                             <span>Upgrade ID:</span>
                             <span className="w-1/2 justify-end break-words">{proposalId}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Tally ID:</span>
+                            {proposal.l2ProposalId ? (
+                              <TallyLink
+                                l2ProposalId={proposal.l2ProposalId}
+                                baseUrl={tallyBaseUrl}
+                              />
+                            ) : (
+                              <span>Not available</span>
+                            )}
                           </div>
                           <div className="flex justify-between">
                             <span>Proposed On:</span>
