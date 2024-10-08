@@ -483,7 +483,7 @@ test("TC318: Create soft freeze → change threshold. New threshold is reflected
   await broadcastAndCheckFreeze(page, wallet);
 
   await goToFreezeDetailsPage(page, "SOFT_FREEZE");
-  const approvalCount = await page.getByTestId("signature-count").textContent();
+  const approvalCount = await page.getByTestId("security-signatures").textContent();
   if (!approvalCount) {
     throw new Error("approval count should be visible");
   }

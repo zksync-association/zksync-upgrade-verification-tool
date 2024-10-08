@@ -180,7 +180,7 @@ test("TC012 - Verify a security council approval can be executed", async ({
     await switcher.council(i as IntRange<1, 12>, page);
     await page.getByRole("button", { name: "Approve Protocol Upgrade" }).click();
     await wallet.sign();
-    await expect(page.getByTestId("council-signature-count")).toHaveText(`${i}/6`);
+    await expect(page.getByTestId("security-signatures")).toHaveText(`${i}/6`);
   }
 
   await expect(page.getByText("LEGAL VETO PERIOD")).toBeVisible();
@@ -205,7 +205,7 @@ test("TC013 - Verify a guardian approval can be executed", async ({ page, switch
     await switcher.guardian(i as IntRange<1, 8>, page);
     await page.getByRole("button", { name: "Approve Protocol Upgrade" }).click();
     await wallet.sign();
-    await expect(page.getByTestId("guardian-signature-count")).toHaveText(`${i}/5`);
+    await expect(page.getByTestId("guardian-signatures")).toHaveText(`${i}/5`);
   }
 
   await expect(page.getByText("LEGAL VETO PERIOD (day 1 out of 3)", { exact: true })).toBeVisible();
@@ -254,7 +254,7 @@ test("TC015 - Verify a proposal can be executed by anyone", async ({ page, switc
     await switcher.guardian(i as IntRange<1, 8>, page);
     await page.getByRole("button", { name: "Approve Protocol Upgrade" }).click();
     await wallet.sign();
-    await expect(page.getByTestId("guardian-signature-count")).toHaveText(`${i}/5`);
+    await expect(page.getByTestId("guardian-signatures")).toHaveText(`${i}/5`);
   }
 
   await expect(page.getByText("LEGAL VETO PERIOD (day 1 out of 3)", { exact: true })).toBeVisible();

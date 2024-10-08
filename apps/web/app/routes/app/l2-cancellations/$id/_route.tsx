@@ -209,10 +209,10 @@ export default function L2Cancellation() {
             {proposal.status === "ACTIVE" && (
               <VotingStatusIndicator
                 className="flex-1"
-                label="Approvals"
+                role="guardian"
                 signatures={signatures.length}
                 necessarySignatures={necessarySignatures}
-                testId={"approvals-count"}
+                signers={signatures.map((s) => s.signer)}
               />
             )}
             {proposal.status === "DONE" && (
