@@ -101,7 +101,7 @@ const voterNameMap: Record<string, string> = {
 
 function getVoterName(signer: Address) {
   const voterName = voterNameMap[signer.toLowerCase()];
-  return voterName ?? "Unknown";
+  return voterName ?? "Unrecognized Address Owner";
 }
 type UserRoleWithSignatures = Exclude<UserRole, "visitor" | "zkAdmin">;
 
