@@ -49,9 +49,8 @@ test("TC201: Go to index page, no proposals -> active and inactive emergency upg
   page,
 }) => {
   await goToEmergencyIndex(page);
-
-  await expect(page.getByText("No active emergency proposals found.")).toBeVisible();
-  await expect(page.getByText("No inactive emergency proposals found.")).toBeVisible();
+  await expect(page.getByText("No active Emergency Upgrades found.")).toBeVisible();
+  await expect(page.getByText("No inactive Emergency Upgrades found.")).toBeVisible();
 });
 
 test("TC202: Create a valid emergency proposal -> List it into active proposals", async ({
@@ -150,8 +149,8 @@ test("TC214: Visitor goes to detail page -> Approve button is not shown", async 
   await switcher.visitor(page);
   await createEmergencyProposal(page);
 
-  await expect(page.getByText("No signing actions")).toBeVisible();
-  await expect(page.getByText("Approve emergency upgrade")).not.toBeVisible();
+  await expect(page.getByText("No actions available for this role.")).toBeVisible();
+  await expect(page.getByText("Approve Emergency Upgrade")).not.toBeVisible();
   await expect(approveButton(page)).not.toBeAttached();
 });
 
@@ -185,19 +184,19 @@ test("TC207, TC208, TC209, TC210: Filled emergency proposal -> Every rol can see
 
   await switcher.council(1, page);
   await goToActiveEmergencyProposal(page);
-  await expect(page.getByRole("button", { name: "Execute upgrade" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Execute Emergency Upgrade" })).toBeEnabled();
 
   await switcher.guardian(1, page);
   await goToActiveEmergencyProposal(page);
-  await expect(page.getByRole("button", { name: "Execute upgrade" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Execute Emergency Upgrade" })).toBeEnabled();
 
   await switcher.zkFoundation(page);
   await goToActiveEmergencyProposal(page);
-  await expect(page.getByRole("button", { name: "Execute upgrade" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Execute Emergency Upgrade" })).toBeEnabled();
 
   await switcher.visitor(page);
   await goToActiveEmergencyProposal(page);
-  await expect(page.getByRole("button", { name: "Execute upgrade" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Execute Emergency Upgrade" })).toBeEnabled();
 });
 
 test("TC211, TC212, TC213: Broadcast emergency proposal -> Shows right txid -> Is shown as inactive -> No more actions available", async ({
@@ -209,7 +208,7 @@ test("TC211, TC212, TC213: Broadcast emergency proposal -> Shows right txid -> I
 
   await switcher.council(1, page);
   await goToActiveEmergencyProposal(page);
-  await page.getByRole("button", { name: "Execute upgrade" }).click();
+  await page.getByRole("button", { name: "Execute Emergency Upgrade" }).click();
   await wallet.confirmTransaction();
   await page.waitForURL("**/transactions/**");
 
@@ -221,6 +220,6 @@ test("TC211, TC212, TC213: Broadcast emergency proposal -> Shows right txid -> I
   await inactiveCard.getByText("View").click();
 
   await page.getByText("Proposal Details").isVisible();
-  await page.getByRole("button", { name: "Approve emergency upgrade" }).isDisabled();
-  await page.getByRole("button", { name: "Execute upgrade" }).isDisabled();
+  await page.getByRole("button", { name: "Approve Emergency Upgrade" }).isDisabled();
+  await page.getByRole("button", { name: "Execute Emergency Upgrade" }).isDisabled();
 });

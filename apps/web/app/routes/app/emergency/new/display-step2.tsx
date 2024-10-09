@@ -1,4 +1,5 @@
 import type { Call } from "@/common/calls";
+import { cn } from "@/utils/cn";
 import { Trash2 } from "lucide-react";
 import { formatEther, hexToBigInt } from "viem";
 
@@ -7,27 +8,29 @@ type DisplayCallProps = {
   removeCall?: (i: number) => void;
 };
 
-export function DisplayCalls({ calls, removeCall }: DisplayCallProps) {
+export default function DisplayStep2({
+  calls,
+  removeCall,
+  className,
+}: DisplayCallProps & { className?: string }) {
   return (
-    <div className="grid grid-cols-3 gap-x-4 pb-10">
+    <div className={cn("flex flex-col gap-4", className)}>
       {calls.map((call, i) => (
         <div
           key={call.target + call.data + call.value}
-          className="flex rounded-md bg-muted p-4 align-middle"
+          className="flex rounded-xl bg-muted p-4 align-middle"
         >
-          <div className="grid grid-cols-4">
-            <div className="col-span-1 font-medium text-muted-foreground text-sm">target:</div>
-            <div className="col-span-3 overflow-x-hidden overflow-ellipsis font-mono">
+          <div className="grid grid-cols-[70px_1fr]">
+            <div className="font-medium text-muted-foreground text-sm">Target:</div>
+            <div className="overflow-x-hidden overflow-ellipsis font-mono text-sm">
               {call.target}
             </div>
 
-            <div className="col-span-1 font-medium text-muted-foreground text-sm">data:</div>
-            <div className="col-span-3 overflow-x-hidden overflow-ellipsis font-mono">
-              {call.data}
-            </div>
+            <div className="font-medium text-muted-foreground text-sm">Calldata:</div>
+            <div className="overflow-x-hidden overflow-ellipsis font-mono text-sm">{call.data}</div>
 
-            <div className="col-span-1 font-medium text-muted-foreground text-sm">value:</div>
-            <div className="col-span-3 overflow-x-hidden overflow-ellipsis font-mono">
+            <div className="font-medium text-muted-foreground text-sm">Value:</div>
+            <div className="overflow-x-hidden overflow-ellipsis font-mono text-sm">
               {formatEther(hexToBigInt(call.value))}
             </div>
           </div>

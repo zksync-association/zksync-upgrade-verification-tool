@@ -30,6 +30,7 @@ export const proposalsTable = pgTable(
     executor: bytea("executor").notNull(),
     transactionHash: bytea("transaction_hash").notNull(),
     status: text("status", { enum: proposalStatusSchema.options }).notNull(),
+    l2ProposalId: bytea("l2_proposal_id"),
   },
   (table) => ({
     externalIdIdx: index("external_id_idx").on(table.externalId),

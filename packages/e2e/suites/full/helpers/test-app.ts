@@ -81,27 +81,22 @@ export class TestApp {
 
   async down() {
     const spinner = ora().start();
-    const pids = await this.getPids();
+    const pids = await this.getPids().catch(() => {
+      spinner.fail("Failed to get pids, are you sure the env is running?");
+      process.exit(1);
+    });
 
     spinner.start("Stopping app");
-    await killProcessByPid(pids.app).catch(() =>
-      console.log(`error stopping app, pid=${pids.app}`)
-    );
+    await killProcessByPid(pids.app, "App");
 
     spinner.start("Stopping backup node");
-    await killProcessByPid(pids.backupNode).catch(() =>
-      console.log(`error stopping backup node, pid=${pids.backupNode}`)
-    );
+    await killProcessByPid(pids.backupNode, "Backup node");
 
     spinner.start("Stopping main node");
-    await killProcessByPid(pids.mainNode).catch(() =>
-      console.log(`error stopping main node, pid=${pids.mainNode}`)
-    );
+    await killProcessByPid(pids.mainNode, "Main node");
 
     spinner.start("Stopping l2 node");
-    await killProcessByPid(pids.l2Node).catch(() =>
-      console.log(`error stopping l2 node, pid=${pids.l2Node}`)
-    );
+    await killProcessByPid(pids.l2Node, "L2 node");
 
     spinner.succeed("Test app stopped");
   }
@@ -288,8 +283,8 @@ export class TestApp {
         WALLET_CONNECT_PROJECT_ID: "test",
         ETHERSCAN_API_KEY: "test",
         ETH_NETWORK: "local",
-        LOCAL_CHAIN_PORT: this.mainNodePort.toString(),
         ZK_ADMIN_ADDRESS: this.zkAdminAddress,
+        TALLY_BASE_URL: "https://tally.xyz/gov/zksync",
         ...env,
       },
       outputFile: this.logPaths.app,

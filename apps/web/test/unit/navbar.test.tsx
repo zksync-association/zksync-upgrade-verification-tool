@@ -2,7 +2,7 @@ import Navbar from "@/components/navbar";
 import { render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import "@testing-library/jest-dom";
-import { useFetcher, useRouteLoaderData } from "@remix-run/react";
+import { useFetcher, useLocation, useRouteLoaderData } from "@remix-run/react";
 import { useAccount } from "wagmi";
 import "@testing-library/jest-dom";
 import useOptionalUser from "@/components/hooks/use-optional-user";
@@ -14,6 +14,7 @@ vi.mock("remix-routes", () => ({
 vi.mock("@remix-run/react", () => ({
   useRouteLoaderData: vi.fn(),
   useFetcher: vi.fn(),
+  useLocation: vi.fn(),
   Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
     <a href={to}>{children}</a>
   ),
@@ -36,6 +37,7 @@ const mockedUseRouteLoaderData = vi.mocked(useRouteLoaderData);
 const mockedUseAccount = vi.mocked(useAccount);
 const mockedUseUser = vi.mocked(useOptionalUser);
 const mockedUseFetcher = vi.mocked(useFetcher);
+const mockedUseLocation = vi.mocked(useLocation);
 
 describe("Navbar", () => {
   beforeEach(() => {
@@ -49,6 +51,7 @@ describe("Navbar", () => {
       address: "0x32c5409213853d317558b26384b4bF8342060E3d",
     });
     mockedUseFetcher.mockReturnValue({ state: "idle" } as any);
+    mockedUseLocation.mockReturnValue({ pathname: "/" } as any);
   });
 
   it("renders Navbar with Logo and correct link", async () => {

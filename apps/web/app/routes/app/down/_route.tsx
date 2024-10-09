@@ -1,5 +1,8 @@
 import { Card } from "@/components/ui/card";
+import { Meta } from "@/utils/meta";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
+
+export const meta = Meta["/app/down"];
 
 export default function ConnectionFailed() {
   return (

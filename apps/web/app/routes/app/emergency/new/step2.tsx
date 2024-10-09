@@ -10,11 +10,12 @@ import {
   FormMessage,
   FormTextarea,
 } from "@/components/ui/form";
-import { DisplayCalls } from "@/routes/app/emergency/new/display-calls";
-import { DisplayStep1 } from "@/routes/app/emergency/new/displayStep1";
 import type { Step1 } from "@/routes/app/emergency/new/step1";
 import { parseFormData } from "@/utils/read-from-request";
 import { useCallback, useState } from "react";
+import DisplayStep2 from "./display-step2";
+import DisplayStep1 from "./display-step1";
+import AddButton from "@/components/add-button";
 
 export type NewEmergencyProposalStep2Props = {
   step1: Step1;
@@ -38,6 +39,7 @@ export function NewEmergencyProposalStep2(props: NewEmergencyProposalStep2Props)
     }
     setFormErrors({});
     setCalls([...calls, data.data]);
+    e.currentTarget.reset();
   };
 
   const onNext = useCallback(() => {
@@ -49,53 +51,53 @@ export function NewEmergencyProposalStep2(props: NewEmergencyProposalStep2Props)
   };
 
   return (
-    <div>
-      <h2 className="mb-10 font-bold text-2xl">Define upgrade calls</h2>
+    <Card>
+      <CardHeader>
+        <CardTitle>Step 2: Define Upgrade Calls</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <DisplayStep1 className="mb-8" {...props.step1} />
 
-      <DisplayStep1 {...props.step1} />
+        <Form onSubmit={handleSubmit}>
+          <FormItem name="target">
+            <FormLabel>Target Address</FormLabel>
+            <FormInput />
+            <FormDescription>Target address for upgrade transaction</FormDescription>
+            <FormMessage data-testid="title-error">{formErrors.target}</FormMessage>
+          </FormItem>
 
-      <DisplayCalls calls={calls} removeCall={removeCall} />
+          <FormItem name="data">
+            <FormLabel>Calldata</FormLabel>
+            <FormTextarea />
+            <FormDescription>Calldata for the upgrade transaction</FormDescription>
+            <FormMessage>{formErrors.data}</FormMessage>
+          </FormItem>
 
-      <Card className="mb-10">
-        <CardHeader>
-          <CardTitle>New Call</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Form onSubmit={handleSubmit}>
-            <FormItem name="target">
-              <FormLabel>Target Address</FormLabel>
-              <FormInput placeholder="0x..." />
-              <FormDescription>Target address for upgrade transaction</FormDescription>
-              <FormMessage data-testid="title-error">{formErrors.target}</FormMessage>
-            </FormItem>
+          <FormItem name="value">
+            <FormLabel>Value</FormLabel>
+            <FormInput type="number" defaultValue={0} />
+            <FormDescription>Value for the upgrade transaction</FormDescription>
+            <FormMessage>{formErrors.value}</FormMessage>
+          </FormItem>
 
-            <FormItem name="data">
-              <FormLabel>Calldata</FormLabel>
-              <FormTextarea placeholder="0x..." />
-              <FormDescription>Calldata use in the upgrade transaction</FormDescription>
-              <FormMessage>{formErrors.data}</FormMessage>
-            </FormItem>
+          <AddButton>Add call</AddButton>
 
-            <FormItem name="value">
-              <FormLabel>Value</FormLabel>
-              <FormInput type="number" defaultValue={0} />
-              <FormDescription>Calldata use in the upgrade transaction</FormDescription>
-              <FormMessage>{formErrors.value}</FormMessage>
-            </FormItem>
-
-            <Button>Add call</Button>
-          </Form>
-        </CardContent>
-      </Card>
-      <div className="flex gap-5">
-        <Button disabled={calls.length === 0} onClick={onNext}>
-          Next
-        </Button>
-
-        <Button variant="ghost" onClick={props.onBack}>
-          Back
-        </Button>
-      </div>
-    </div>
+          {calls.length > 0 && (
+            <div className="pt-8">
+              <h3 className="mb-4 font-medium text-lg">Added Calls:</h3>
+              <DisplayStep2 calls={calls} removeCall={removeCall} />
+            </div>
+          )}
+        </Form>
+        <div className="mt-8 flex gap-5">
+          <Button variant="secondary" onClick={props.onBack}>
+            Back
+          </Button>
+          <Button disabled={calls.length === 0} onClick={onNext}>
+            Next
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
