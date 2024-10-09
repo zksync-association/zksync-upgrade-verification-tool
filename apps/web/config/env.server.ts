@@ -30,6 +30,7 @@ export const env = createEnv({
     ZK_PROTOCOL_GOVERNOR_ADDRESS: addressSchema,
     ALLOW_PRIVATE_ACTIONS: boolFromStrSchema,
     ZK_ADMIN_ADDRESS: addressSchema,
+    TALLY_BASE_URL: z.string().url(),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,

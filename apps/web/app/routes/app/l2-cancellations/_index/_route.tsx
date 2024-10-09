@@ -9,11 +9,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PlusIcon } from "@radix-ui/react-icons";
 import { json } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { $path } from "remix-routes";
+import { Meta } from "@/utils/meta";
+import AddButton from "@/components/add-button";
+
+export const meta = Meta["/app/l2-cancellations"];
 
 export async function loader() {
   const proposals = await getUpdatedL2Cancellations();
@@ -32,19 +35,17 @@ export default function L2Proposals() {
 
   return (
     <div className="space-y-4">
-      <Card className="pb-10">
+      <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Active L2 Veto Proposals</CardTitle>
+            <CardTitle>Active Guardian Vetoes</CardTitle>
             <Link to={$path("/app/l2-cancellations/new")}>
-              <Button data-testid="new-cancellation-proposal" variant="secondary" size="icon">
-                <PlusIcon className="h-4 w-4" />
-              </Button>
+              <AddButton data-testid="new-cancellation-proposal">Create Guardian Veto</AddButton>
             </Link>
           </div>
         </CardHeader>
         <CardContent>
-          {activeProposals.length > 0 && (
+          {activeProposals.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -69,18 +70,17 @@ export default function L2Proposals() {
                   ))}
               </TableBody>
             </Table>
-          )}
-          {activeProposals.length === 0 && (
-            <div className="text-center text-gray-500">No veto proposals found.</div>
+          ) : (
+            <div className="text-center text-gray-500">No active Guardian Vetoes found.</div>
           )}
         </CardContent>
       </Card>
-      <Card className="pb-10">
+      <Card>
         <CardHeader>
-          <CardTitle>Inactive L2 Veto Proposals</CardTitle>
+          <CardTitle>Inactive Guardian Vetoes</CardTitle>
         </CardHeader>
         <CardContent>
-          {inactiveProposals.length > 0 && (
+          {inactiveProposals.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -109,9 +109,8 @@ export default function L2Proposals() {
                   ))}
               </TableBody>
             </Table>
-          )}
-          {inactiveProposals.length === 0 && (
-            <div className="text-center text-gray-500">No veto proposals found.</div>
+          ) : (
+            <div className="text-center text-gray-500">No inactive Guardian Vetoes found.</div>
           )}
         </CardContent>
       </Card>

@@ -1,20 +1,21 @@
+import type { UserRole } from "@/common/user-role-schema";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/utils/cn";
 
 export function StatusIndicator({
   signatures,
   necessarySignatures,
-  label,
-}: { signatures: number; necessarySignatures: number; label: string }) {
+  role,
+}: { signatures: number; necessarySignatures: number; role: UserRoleWithSignatures }) {
   const necessarySignaturesReached = signatures >= necessarySignatures;
 
   return (
     <div className="space-y-3">
       <div className="flex justify-between">
-        <span>{label}</span>
+        <span>{Label[role]}</span>
         <span
           className={cn("text-muted-foreground", necessarySignaturesReached && "text-green-400")}
-          data-testid={`${label.split(" ")[0]?.toLowerCase()}-signatures`}
+          data-testid={DataTestId[role]}
         >
           {signatures}/{necessarySignatures}
         </span>
@@ -26,3 +27,17 @@ export function StatusIndicator({
     </div>
   );
 }
+
+type UserRoleWithSignatures = Exclude<UserRole, "visitor" | "zkAdmin">;
+
+const Label = {
+  securityCouncil: "Security Council Approvals",
+  guardian: "Guardian Approvals",
+  zkFoundation: "ZKsync Foundation Approval",
+} satisfies Record<UserRoleWithSignatures, string>;
+
+const DataTestId = {
+  securityCouncil: "security-signatures",
+  guardian: "guardian-signatures",
+  zkFoundation: "zkfoundation-signatures",
+} satisfies Record<UserRoleWithSignatures, string>;

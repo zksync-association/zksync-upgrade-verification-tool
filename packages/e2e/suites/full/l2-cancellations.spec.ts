@@ -9,8 +9,8 @@ test.beforeEach(async ({ testApp }) => {
 
 async function goToCancellationsIndex(page: Page) {
   await page.goto("/");
-  await page.getByText("L2 Proposals Veto").click();
-  await page.getByText("Active L2 Veto Proposals", { exact: true }).waitFor();
+  await page.getByText("Guardian Veto").click();
+  await page.getByText("Active Guardian Vetoes", { exact: true }).waitFor();
 }
 
 async function goToCreateCancellationPage(page: Page) {
@@ -22,7 +22,7 @@ async function goToCreateCancellationPage(page: Page) {
 async function goToCancellationDetail(page: Page) {
   await goToCancellationsIndex(page);
   await page.getByText("View").click();
-  await page.getByText("Proposal Details").waitFor();
+  await page.getByText("Veto Details").waitFor();
 }
 
 async function selectL2Proposal(page: Page, index: number) {
@@ -40,8 +40,8 @@ async function createCancellation(page: Page, proposalIndex = 0) {
   await goToCreateCancellationPage(page);
   await selectL2Proposal(page, proposalIndex);
 
-  await page.getByRole("button", { name: "Create Veto Proposal" }).click();
-  await page.getByText("Active L2 Veto Proposals", { exact: true }).waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "Create Guardian Veto" }).click();
+  await page.getByText("Active Guardian Vetoes", { exact: true }).waitFor({ state: "visible" });
 }
 
 async function withVoteIncrease(page: Page, fn: () => Promise<void>) {
@@ -82,17 +82,17 @@ async function signWithScroll(wallet: Wallet) {
 
 test("TC400: Go to / page -> l2 veto button is enabled", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("L2 Proposals Veto")).toBeEnabled();
+  await expect(page.getByText("Guardian Veto")).toBeEnabled();
 });
 
 test("TC401: Go to veto index page -> no vetos created.", async ({ page }) => {
   await page.goto("/");
-  await page.getByText("L2 Proposals Veto").click();
-  await page.getByText("Active L2 Veto Proposals").isVisible();
+  await page.getByText("Guardian Veto").click();
+  await page.getByText("Active Guardian Vetoes").isVisible();
   await page.waitForLoadState("networkidle");
 
-  const texts = await page.getByText("No veto proposals found.").all();
-  expect(texts.length).toBe(2);
+  await expect(page.getByText("No active Guardian Vetoes found.")).toBeVisible();
+  await expect(page.getByText("No inactive Guardian Vetoes found.")).toBeVisible();
 });
 
 test("TC402: Create a veto, missing no proposal selected -> Submit button is disabled.", async ({
@@ -100,7 +100,7 @@ test("TC402: Create a veto, missing no proposal selected -> Submit button is dis
 }) => {
   await goToCreateCancellationPage(page);
 
-  await expect(page.getByRole("button", { name: "Create Veto Proposal" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Create Guardian Veto" })).toBeDisabled();
 });
 
 test("TC403: Create a veto, proposal selected, empty l2 gas limit -> Submit errors.", async ({
@@ -112,7 +112,7 @@ test("TC403: Create a veto, proposal selected, empty l2 gas limit -> Submit erro
   await input.clear();
   await input.blur();
 
-  await page.getByRole("button", { name: "Create Veto Proposal" }).click();
+  await page.getByRole("button", { name: "Create Guardian Veto" }).click();
   await expect(page.getByText("L2 gas limit is required")).toBeVisible();
 });
 
@@ -125,7 +125,7 @@ test("TC404: Create a veto, proposal selected, empty l2 gas pubdata -> Submit bu
   await input.clear();
   await input.blur();
 
-  await page.getByRole("button", { name: "Create Veto Proposal" }).click();
+  await page.getByRole("button", { name: "Create Guardian Veto" }).click();
   await expect(page.getByText("L2 gas per pubdata byte limit is required")).toBeVisible();
 });
 
@@ -138,7 +138,7 @@ test("TC405: Create a veto, proposal selected, empty l2 gas pubdata -> Submit bu
   await refundRecipientInput.clear();
   await refundRecipientInput.blur();
 
-  await page.getByRole("button", { name: "Create Veto Proposal" }).click();
+  await page.getByRole("button", { name: "Create Guardian Veto" }).click();
   await expect(page.getByText("Not a valid hex")).toBeVisible();
 });
 
@@ -151,7 +151,7 @@ test("TC406: Create a veto, proposal selected, empty transaction mint value -> S
   await input.clear();
   await input.blur();
 
-  await page.getByRole("button", { name: "Create Veto Proposal" }).click();
+  await page.getByRole("button", { name: "Create Guardian Veto" }).click();
   await expect(page.getByText("Transaction mint value is required")).toBeVisible();
 });
 
@@ -162,7 +162,7 @@ test("TC407: Create a veto, proposal selected, empty nonce -> Submit button is e
   await selectL2Proposal(page, 0);
   await page.locator('[name="nonce"]').clear();
 
-  await page.getByRole("button", { name: "Create Veto Proposal" }).click();
+  await page.getByRole("button", { name: "Create Guardian Veto" }).click();
   await expect(page.getByText("Nonce is required")).toBeVisible();
 });
 
@@ -175,7 +175,7 @@ test("TC408: Create a veto with correct data -> Redirects to index page. new vet
   const goToDetail = page.getByText("View");
   await expect(goToDetail).toBeVisible();
   await goToDetail.click();
-  await page.getByText("Proposal Details").waitFor();
+  await page.getByText("Veto Details").waitFor();
 
   await expect(page.getByText("GovOps Governor Proposal")).toBeVisible();
   await expect(page.getByText("Test ZkGovOpsGovernor proposal")).toBeVisible();
@@ -193,7 +193,7 @@ test("TC409: Zk foundation goes to veto details page -> Approve button is not re
   await createCancellation(page, 0);
   await goToCancellationDetail(page);
 
-  await expect(page.getByText("No role actions")).toBeVisible();
+  await expect(page.getByText("No actions available for this role.")).toBeVisible();
   await expect(approveButton(page)).not.toBeAttached();
 });
 
@@ -205,7 +205,7 @@ test("TC410: visitor goes to veto details page -> Approve button is not rendered
   await createCancellation(page, 0);
   await goToCancellationDetail(page);
 
-  await expect(page.getByText("No role actions")).toBeVisible();
+  await expect(page.getByText("No actions available for this role.")).toBeVisible();
   await expect(approveButton(page)).not.toBeAttached();
 });
 
@@ -217,7 +217,7 @@ test("TC411: council goes to veto details page -> Approve button is not rendered
   await createCancellation(page, 0);
   await goToCancellationDetail(page);
 
-  await expect(page.getByText("No role actions")).toBeVisible();
+  await expect(page.getByText("No actions available for this role.")).toBeVisible();
   await expect(approveButton(page)).not.toBeAttached();
 });
 

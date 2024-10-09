@@ -1,5 +1,8 @@
 import { Card } from "@/components/ui/card";
 import denied from "@/images/denied.svg";
+import { Meta } from "@/utils/meta";
+
+export const meta = Meta["/app/denied"];
 
 export default function Denied() {
   return (

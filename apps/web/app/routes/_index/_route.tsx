@@ -1,10 +1,13 @@
 import ConnectButton from "@/components/connect-button";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
+import { Meta } from "@/utils/meta";
 import { env } from "@config/env.server";
 import { Link, useLoaderData, useNavigation } from "@remix-run/react";
 import { $path } from "remix-routes";
 import { useAccount } from "wagmi";
+
+export const meta = Meta["/"];
 
 export function loader() {
   const showButtons = env.ALLOW_PRIVATE_ACTIONS;
@@ -23,10 +26,8 @@ export default function Index() {
         <div className="cta-bg -z-10 pointer-events-none w-full" />
         <main className="flex flex-1 flex-col items-center justify-center">
           <div className="flex flex-1 flex-col items-center justify-center text-center md:max-w-3xl">
-            <h1 className="font-bold text-3xl md:text-5xl">Upgrade Analysis & Approval Tool</h1>
-            <p className="mt-10 text-lg md:max-w-xl">
-              Analyze proposals, coordinate signature gathering, and execute protocol upgrades.
-            </p>
+            <h1 className="font-bold text-3xl md:text-5xl">Governance Authentication</h1>
+            <p className="mt-10 text-lg md:max-w-xl">Authenticate ZKsync Governance</p>
             <div className="mt-10">
               {!account.isConnected ? (
                 <ConnectButton />
@@ -40,7 +41,7 @@ export default function Index() {
                       }
                       className="w-[200px]"
                     >
-                      Standard Upgrades
+                      Protocol Upgrades
                     </Button>
                   </Link>
                   {showButtons && (
@@ -78,7 +79,7 @@ export default function Index() {
                           className="w-[200px]"
                           variant="secondary"
                         >
-                          L2 Proposals Veto
+                          Guardian Veto
                         </Button>
                       </Link>
                     </>
