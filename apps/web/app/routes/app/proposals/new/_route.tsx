@@ -1,6 +1,6 @@
 import { type ActionFunctionArgs, json } from "@remix-run/node";
 import { redirect, useLoaderData } from "@remix-run/react";
-import { searchNotStartedProposals } from "@/.server/service/proposals";
+import { searchNotStartedProposalsFromL2 } from "@/.server/service/proposals";
 import {
   Table,
   TableBody,
@@ -26,7 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export const meta = Meta["/app/proposals/new"];
 
 export async function loader() {
-  const proposals = await searchNotStartedProposals();
+  const proposals = await searchNotStartedProposalsFromL2();
   return json({
     proposals,
     target: env.UPGRADE_HANDLER_ADDRESS,

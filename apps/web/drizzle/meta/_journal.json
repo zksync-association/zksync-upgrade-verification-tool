@@ -78,6 +78,13 @@
       "when": 1727120082087,
       "tag": "0010_aromatic_red_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1728312601423,
+      "tag": "0011_demonic_korvac",
+      "breakpoints": true
     }
   ]
 }

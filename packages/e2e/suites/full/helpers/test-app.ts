@@ -284,6 +284,7 @@ export class TestApp {
         ETHERSCAN_API_KEY: "test",
         ETH_NETWORK: "local",
         ZK_ADMIN_ADDRESS: this.zkAdminAddress,
+        TALLY_BASE_URL: "https://tally.xyz/gov/zksync",
         ...env,
       },
       outputFile: this.logPaths.app,

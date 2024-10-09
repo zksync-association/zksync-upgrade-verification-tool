@@ -1,4 +1,4 @@
-import { getProposals } from "@/.server/service/proposals";
+import { getProposalsFromL1 } from "@/.server/service/proposals";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/loading";
@@ -13,7 +13,7 @@ export const meta = Meta["/app/proposals"];
 
 export function loader() {
   const getFilteredProposals = async () => {
-    const proposals = await getProposals();
+    const proposals = await getProposalsFromL1();
     return {
       active: proposals.filter((p) => p.status === "ACTIVE"),
       inactive: proposals.filter((p) => p.status === "INACTIVE"),

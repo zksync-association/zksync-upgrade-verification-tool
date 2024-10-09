@@ -1,0 +1,1 @@
+ALTER TABLE "proposals" ADD COLUMN "l2_proposal_id" "bytea";
