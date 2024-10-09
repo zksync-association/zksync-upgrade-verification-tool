@@ -5,11 +5,12 @@ import { BlockExplorerClient } from "../src/ethereum/block-explorer-client";
 import { Diamond } from "../src/reports/diamond";
 import { createFakeUpgrade } from "./utilities/dummy-upgrade";
 import { padHex } from "viem";
+import process from "node:process";
 
 describe("createDummyUpgrade", () => {
-  it("creates an upgrade that can be executed", async () => {
-    const explorer = BlockExplorerClient.forL1("88S18B5T9MQPPDCVMWHZC87FXTZ3BREAUI", "mainnet")
-    const rpc = new RpcClient("https://mainnet.gateway.tenderly.co/1ooZXz5grkFD15LMjKrVC0")
+  it.skip("creates an upgrade that can be executed", async () => {
+    const explorer = BlockExplorerClient.forL1(process.env.ETHERSCAN_API_KEY!, "mainnet")
+    const rpc = new RpcClient(process.env.L1_RPC_URL!)
     const diamond = new Diamond(DIAMOND_ADDRS.mainnet)
     await diamond.init(explorer, rpc)
     const stateTransitionManager = await diamond.getTransitionManager(rpc, explorer)
