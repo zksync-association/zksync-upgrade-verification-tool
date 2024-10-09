@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { RpcClient } from "../src/ethereum/rpc-client";
 import { DIAMOND_ADDRS } from "@repo/common/ethereum";
 import { BlockExplorerClient } from "../src/ethereum/block-explorer-client";
@@ -7,7 +7,7 @@ import { createFakeUpgrade } from "./utilities/dummy-upgrade";
 import { padHex } from "viem";
 
 describe("createDummyUpgrade", () => {
-  it("works", async () => {
+  it("creates an upgrade that can be executed", async () => {
     const explorer = BlockExplorerClient.forL1("88S18B5T9MQPPDCVMWHZC87FXTZ3BREAUI", "mainnet")
     const rpc = new RpcClient("https://mainnet.gateway.tenderly.co/1ooZXz5grkFD15LMjKrVC0")
     const diamond = new Diamond(DIAMOND_ADDRS.mainnet)
@@ -21,6 +21,7 @@ describe("createDummyUpgrade", () => {
       callData,
       await stateTransitionManager.upgradeHandlerAddress(rpc)
     )
-    console.log(response)
+
+    expect(response).toEqual("0x")
   })
 })
