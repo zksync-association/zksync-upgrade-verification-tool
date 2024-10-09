@@ -35,8 +35,8 @@ export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
   const [proposed, systemContractsAddrs] = await withSpinner(
     () =>
       ZksyncEraState.fromCalldata(
-        stateManagerAddress,
-        DIAMOND_ADDRS[env.network],
+        "0x8f7a9912416e8AdC4D9c21FAe1415D3318A11897",
+        stateManagerAddress,  //DIAMOND_ADDRS[env.network],
         Buffer.from(hexToBytes(dataHex)),
         env.network,
         env.l1Client(),
@@ -48,6 +48,8 @@ export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
   );
 
   const diff = new ZkSyncEraDiff(current, proposed, systemContractsAddrs);
+
+  console.log(diff)
 
   const report = new StringCheckReport(diff, repo, env.l1Client());
   env.term().line(await report.format());

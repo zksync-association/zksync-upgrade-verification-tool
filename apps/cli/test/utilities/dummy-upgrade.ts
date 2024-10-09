@@ -1,7 +1,5 @@
-import { Diamond } from "../../src/reports/diamond";
 import { RpcClient } from "../../src/ethereum/rpc-client";
-import { BlockExplorerClient } from "../../src/ethereum/block-explorer-client";
-import { encodeFunctionData, padHex, zeroAddress } from "viem";
+import { type Address, encodeFunctionData, type Hex, padHex, zeroAddress } from "viem";
 import type { StateTransitionManager } from "../../src/reports/state-transition-manager";
 
 export const defaultUpgradeAbi = [{
@@ -822,9 +820,20 @@ export const stateTransitionManagerAbi = [{
   stateMutability: "view",
   type: "function"
 }] as const;
-type CreateFakeUpgradeOpts = {}
 
-export async function createFakeUpgrade(transitionManager: StateTransitionManager, rpc: RpcClient, opts: CreateFakeUpgradeOpts = {}) {
+type CreateFakeUpgradeOpts = {
+  verifier: Address;
+}
+
+const defaultOpts = {
+  verifier: zeroAddress
+}
+
+export async function createFakeUpgrade(
+  transitionManager: StateTransitionManager,
+  rpc: RpcClient,
+  opts: CreateFakeUpgradeOpts = defaultOpts
+): Promise<Hex> {
   const someHyperchainId = await transitionManager.allHyperchainIds(rpc)
     .then(all => all[0])
 
@@ -858,7 +867,7 @@ export async function createFakeUpgrade(transitionManager: StateTransitionManage
         factoryDeps: [],
         bootloaderHash: padHex("0x0"),
         defaultAccountHash: padHex("0x"),
-        verifier: zeroAddress,
+        verifier: opts.verifier,
         verifierParams: {
           recursionNodeLevelVkHash: padHex("0x"),
           recursionLeafLevelVkHash: padHex("0x"),
@@ -872,7 +881,7 @@ export async function createFakeUpgrade(transitionManager: StateTransitionManage
     ]
   })
 
-  const encoded = encodeFunctionData({
+  return encodeFunctionData({
     abi: stateTransitionManagerAbi,
     functionName: "executeUpgrade",
     args: [
@@ -883,6 +892,5 @@ export async function createFakeUpgrade(transitionManager: StateTransitionManage
         initCalldata: innerCalldata
       }
     ]
-  })
-  return encoded;
+  });
 }

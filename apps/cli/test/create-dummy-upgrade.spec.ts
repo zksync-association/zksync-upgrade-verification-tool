@@ -4,6 +4,7 @@ import { DIAMOND_ADDRS } from "@repo/common/ethereum";
 import { BlockExplorerClient } from "../src/ethereum/block-explorer-client";
 import { Diamond } from "../src/reports/diamond";
 import { createFakeUpgrade } from "./utilities/dummy-upgrade";
+import { padHex } from "viem";
 
 describe("createDummyUpgrade", () => {
   it("works", async () => {
@@ -13,7 +14,7 @@ describe("createDummyUpgrade", () => {
     await diamond.init(explorer, rpc)
     const stateTransitionManager = await diamond.getTransitionManager(rpc, explorer)
     const transitionManager  = stateTransitionManager
-    const callData = await createFakeUpgrade(stateTransitionManager, rpc, {});
+    const callData = await createFakeUpgrade(stateTransitionManager, rpc, { verifier: padHex("0x01", { size: 20 }) });
 
     const response = await rpc.contractReadRaw(
       transitionManager.publicAddress(),
