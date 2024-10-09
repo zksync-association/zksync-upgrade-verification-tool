@@ -265,21 +265,27 @@ export default function Proposals() {
                         <div className="space-y-5">
                           <VotingStatusIndicator
                             label="Extend Legal Veto Approvals"
+                            role="guardian"
                             signatures={proposal.signatures.extendLegalVetoPeriod.length}
                             necessarySignatures={NECESSARY_LEGAL_VETO_SIGNATURES}
-                            testId="legal-veto-signature-count"
+                            data-testid="legal-veto-signature-count"
+                            signers={proposal.signatures.extendLegalVetoPeriod.map((s) => s.signer)}
                           />
                           <VotingStatusIndicator
-                            label="Security Council Approvals"
+                            role="securityCouncil"
                             signatures={proposal.signatures.approveUpgradeSecurityCouncil.length}
                             necessarySignatures={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
-                            testId="council-signature-count"
+                            signers={proposal.signatures.approveUpgradeSecurityCouncil.map(
+                              (s) => s.signer
+                            )}
                           />
                           <VotingStatusIndicator
-                            label="Guardian Approvals"
+                            role="guardian"
                             signatures={proposal.signatures.approveUpgradeGuardians.length}
                             necessarySignatures={NECESSARY_GUARDIAN_SIGNATURES}
-                            testId="guardian-signature-count"
+                            signers={proposal.signatures.approveUpgradeGuardians.map(
+                              (s) => s.signer
+                            )}
                           />
                         </div>
                       </CardContent>

@@ -4,7 +4,6 @@ import { getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures"
 import { broadcastSuccess } from "@/.server/service/emergency-proposals";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
-import { StatusIndicator } from "@/components/status-indicator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UpgradeRawData } from "@/components/upgrade-raw-data";
@@ -19,7 +18,7 @@ import { badRequest, notFound } from "@/utils/http";
 import { type ActionFunctionArgs, json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
-import { type Hex, isAddressEqual } from "viem";
+import { isAddressEqual } from "viem";
 import { z } from "zod";
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
@@ -35,6 +34,7 @@ import { displayBytes32 } from "@/utils/common-tables";
 import { formatDateTime } from "@/utils/date";
 import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
 import SignActionsCard from "@/components/proposal-components/sign-actions-card";
+import VotingStatusIndicator from "@/components/voting-status-indicator";
 
 export const meta = Meta["/app/emergency/:id"];
 
@@ -59,6 +59,16 @@ export async function loader(args: LoaderFunctionArgs) {
     getSignaturesByEmergencyProposalId(proposal.externalId),
   ]);
 
+  const securityCouncilSignatures = signatures.filter((sig) => {
+    return allSecurityCouncil.some((addr) => isAddressEqual(addr, sig.signer));
+  });
+  const guardianSignatures = signatures.filter((sig) => {
+    return allGuardians.some((addr) => isAddressEqual(addr, sig.signer));
+  });
+  const zkFoundationSignatures = signatures.filter((sig) => {
+    return isAddressEqual(sig.signer, zkFoundation);
+  });
+
   return json({
     calls,
     proposal: {
@@ -76,7 +86,11 @@ export async function loader(args: LoaderFunctionArgs) {
       emergencyBoard,
       zkFoundation,
     },
-    signatures,
+    signatures: {
+      securityCouncil: securityCouncilSignatures,
+      guardian: guardianSignatures,
+      zkFoundation: zkFoundationSignatures,
+    },
     allGuardians,
     allSecurityCouncil,
   });
@@ -111,16 +125,14 @@ export default function EmergencyUpgradeDetails() {
     useLoaderData<typeof loader>();
   const user = useUser();
 
-  const haveAlreadySigned = signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
-  const gatheredScSignatures = signatures.filter((sig) => {
-    return allSecurityCouncil.some((addr) => isAddressEqual(addr, sig.signer));
-  }).length;
-  const gatheredGuardianSignatures = signatures.filter((sig) => {
-    return allGuardians.some((addr) => isAddressEqual(addr, sig.signer));
-  }).length;
-  const gatheredZkFoundationSignatures = signatures.filter((s) =>
-    isAddressEqual(s.signer, addresses.zkFoundation)
-  ).length;
+  const userAlreadySigned =
+    signatures.securityCouncil.some((s) => isAddressEqual(s.signer, user.address)) ||
+    signatures.guardian.some((s) => isAddressEqual(s.signer, user.address)) ||
+    signatures.zkFoundation.some((s) => isAddressEqual(s.signer, user.address));
+
+  const allSignatures = signatures.securityCouncil
+    .concat(signatures.guardian)
+    .concat(signatures.zkFoundation);
 
   const proposalArchived = proposal.archivedOn !== null;
 
@@ -168,20 +180,23 @@ export default function EmergencyUpgradeDetails() {
           </CardHeader>
           <CardContent>
             <div className="space-y-5">
-              <StatusIndicator
+              <VotingStatusIndicator
                 role="securityCouncil"
-                signatures={gatheredScSignatures}
+                signatures={signatures.securityCouncil.length}
                 necessarySignatures={SEC_COUNCIL_THRESHOLD}
+                signers={signatures.securityCouncil.map((s) => s.signer)}
               />
-              <StatusIndicator
+              <VotingStatusIndicator
                 role="guardian"
-                signatures={gatheredGuardianSignatures}
+                signatures={signatures.guardian.length}
                 necessarySignatures={GUARDIANS_COUNCIL_THRESHOLD}
+                signers={signatures.guardian.map((s) => s.signer)}
               />
-              <StatusIndicator
+              <VotingStatusIndicator
                 role="zkFoundation"
-                signatures={gatheredZkFoundationSignatures}
+                signatures={signatures.zkFoundation.length}
                 necessarySignatures={ZK_FOUNDATION_THRESHOLD}
+                signers={signatures.zkFoundation.map((s) => s.signer)}
               />
             </div>
           </CardContent>
@@ -197,7 +212,7 @@ export default function EmergencyUpgradeDetails() {
               proposalId={proposal.externalId}
               contractAddress={addresses.emergencyBoard}
               role={user.role}
-              disabled={haveAlreadySigned || proposalArchived}
+              disabled={userAlreadySigned || proposalArchived}
             />
           )}
           {user.role === "zkAdmin" && (
@@ -211,7 +226,7 @@ export default function EmergencyUpgradeDetails() {
         <ExecuteActionsCard>
           <ExecuteEmergencyUpgradeButton
             boardAddress={addresses.emergencyBoard}
-            gatheredSignatures={signatures}
+            gatheredSignatures={allSignatures}
             allGuardians={allGuardians}
             allCouncil={allSecurityCouncil}
             zkFoundationAddress={addresses.zkFoundation}

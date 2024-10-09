@@ -45,7 +45,7 @@ async function createCancellation(page: Page, proposalIndex = 0) {
 }
 
 async function withVoteIncrease(page: Page, fn: () => Promise<void>) {
-  const initialApprovals = await page.getByTestId("approvals-count").textContent();
+  const initialApprovals = await page.getByTestId("guardian-signatures").textContent();
   if (!initialApprovals) {
     throw new Error("No Security Council Approvals found for initialApprovals");
   }
@@ -53,7 +53,7 @@ async function withVoteIncrease(page: Page, fn: () => Promise<void>) {
 
   await fn();
 
-  await expect(page.getByTestId("approvals-count")).toHaveText(
+  await expect(page.getByTestId("guardian-signatures")).toHaveText(
     new RegExp(`${initialCount + 1}\/\\d`)
   );
 }

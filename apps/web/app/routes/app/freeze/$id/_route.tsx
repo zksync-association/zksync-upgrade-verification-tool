@@ -227,10 +227,10 @@ export default function Freeze() {
             ) : (
               <VotingStatusIndicator
                 className="flex-1"
-                label="Approvals"
+                role="securityCouncil"
                 signatures={signatures.length}
                 necessarySignatures={necessarySignatures}
-                testId={"signature-count"}
+                signers={signatures.map((s) => s.signer)}
               />
             )}
           </CardContent>

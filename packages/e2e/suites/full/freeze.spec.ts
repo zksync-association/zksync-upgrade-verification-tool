@@ -47,7 +47,7 @@ async function assertCannotSignProposal(
 }
 
 async function withVoteIncrease(page: Page, fn: () => Promise<void>) {
-  const initialApprovals = await page.getByTestId("signature-count").textContent();
+  const initialApprovals = await page.getByTestId("security-signatures").textContent();
   if (!initialApprovals) {
     throw new Error("No Security Council Approvals found for initialApprovals");
   }
@@ -55,7 +55,7 @@ async function withVoteIncrease(page: Page, fn: () => Promise<void>) {
 
   await fn();
 
-  await expect(page.getByTestId("signature-count")).toHaveText(
+  await expect(page.getByTestId("security-signatures")).toHaveText(
     new RegExp(`${initialCount + 1}\/\\d`)
   );
 }
@@ -483,7 +483,7 @@ test("TC318: Create soft freeze → change threshold. New threshold is reflected
   await broadcastAndCheckFreeze(page, wallet);
 
   await goToFreezeDetailsPage(page, "SOFT_FREEZE");
-  const approvalCount = await page.getByTestId("signature-count").textContent();
+  const approvalCount = await page.getByTestId("security-signatures").textContent();
   if (!approvalCount) {
     throw new Error("approval count should be visible");
   }
