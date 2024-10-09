@@ -109,11 +109,6 @@ export class RpcClient {
     return this.viemClient.getCode({ address: addr });
   }
 
-  async checkContractCode(addr: Hex): Promise<boolean> {
-    const code = await this.viemClient.getCode({ address: addr });
-    return code !== undefined && code.length > 2;
-  }
-
   async storageRead(addr: Hex, position: bigint): Promise<Hex> {
     const readValue = await getStorageAt(this.viemClient, {
       address: addr,
@@ -221,40 +216,5 @@ export class RpcClient {
     return this.viemClient.request({
       method: "net_version",
     });
-  }
-
-  async getLogs(address: Hex, fromBlock: string, toBLock: string, topics: Hex[] = []) {
-    const arg = {
-      fromBlock,
-      toBlock: toBLock,
-      address,
-      topics,
-    };
-
-    const data = await this.rawCall("eth_getLogs", [arg]);
-
-    if (data.error) {
-      throw new Error(`Error getting logs: ${data.error?.message}`);
-    }
-
-    const parsed = z
-      .object({
-        result: z.array(contractEventSchema),
-      })
-      .parse(data);
-
-    return parsed.result;
-  }
-
-  async getLatestBlock(): Promise<{ number: Hex; timestamp: number }> {
-    const block = (await this.viemClient.request({
-      method: "eth_getBlockByNumber",
-      params: ["latest", false],
-    })) as any;
-
-    return {
-      number: block.number,
-      timestamp: hexToNumber(block.timestamp),
-    };
   }
 }
