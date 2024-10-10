@@ -1,4 +1,4 @@
-import { type Abi, bytesToHex, type Hex, hexToBytes, toFunctionSelector } from "viem";
+import { type Abi, type Address, bytesToHex, type Hex, hexToBytes, toFunctionSelector } from "viem";
 import type { TypeOf, ZodType } from "zod";
 import { facetsResponseSchema } from "./schema/new-facets.js";
 import type { FacetData } from "./upgrade-changes.js";
@@ -34,6 +34,12 @@ export class Diamond {
     await this.initializeFacets(abi.raw, client, rpc);
     await this.initializeAbis(client);
     await this.initializeContractData(client);
+  }
+
+  static async create(addr: Address, client: BlockExplorerClient, rpc: RpcClient): Promise<Diamond> {
+    const diamond = new Diamond(addr)
+    await diamond.init(client, rpc);
+    return diamond;
   }
 
   allFacets(): FacetData[] {

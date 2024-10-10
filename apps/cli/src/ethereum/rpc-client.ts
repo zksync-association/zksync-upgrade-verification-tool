@@ -4,7 +4,6 @@ import {
   decodeFunctionResult,
   encodeFunctionData,
   type Hex,
-  hexToNumber,
   http,
   numberToHex,
 } from "viem";
@@ -217,4 +216,12 @@ export class RpcClient {
       method: "net_version",
     });
   }
+
+  async balanceOf(address: Address): Promise<bigint> {
+    return this.viemClient.getBalance({address, blockTag: "pending"})
+  }
+
+  // async execDebugTx(protocolHandlerAddress: Address, target: Address, data: Hex, value: bigint): Promise<void> {
+  //
+  // }
 }

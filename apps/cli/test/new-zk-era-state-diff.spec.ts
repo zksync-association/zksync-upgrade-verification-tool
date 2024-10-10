@@ -17,6 +17,8 @@ import { SystemContractList } from "../src/reports/system-contract-providers";
 import type { FacetData } from "../src/reports/upgrade-changes";
 import { ZkSyncEraDiff } from "../src/reports/zk-sync-era-diff";
 import { RpcClient } from "../src/ethereum/rpc-client";
+import { Diamond } from "../src/reports/diamond";
+import { DIAMOND_ADDRS } from "@repo/common/ethereum";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): ZkSyncEraDiff {
@@ -747,9 +749,13 @@ describe("NewZkSyncStateDiff", () => {
         return t.skip();
       }
 
-      const explorer = BlockExplorerClient.forL1(key, "mainnet");
-      const rpc = RpcClient.forL1("mainnet");
-      const state = await ZksyncEraState.fromBlockchain("mainnet", explorer, rpc);
+      const network = "mainnet";
+      const explorer = BlockExplorerClient.forL1(key, network);
+      const rpc = RpcClient.forL1(network);
+
+      const diamond = await Diamond.create(DIAMOND_ADDRS[network], explorer, rpc)
+
+      const state = await ZksyncEraState.fromBlockchain(network, rpc, diamond);
       expect(state.allFacets()).toHaveLength(4);
 
       expect(state.hexAttrValue("admin").unwrap()).toMatch(/0x.*/);

@@ -9,8 +9,10 @@ import process from "node:process";
 
 describe("createDummyUpgrade", () => {
   it.skip("creates an upgrade that can be executed", async () => {
-    const explorer = BlockExplorerClient.forL1(process.env.ETHERSCAN_API_KEY!, "mainnet")
-    const rpc = new RpcClient(process.env.L1_RPC_URL!)
+    const etherscanapikey = process.env.ETHERSCAN_API_KEY!;
+    const url = process.env.L1_RPC_URL!;
+    const explorer = BlockExplorerClient.forL1(etherscanapikey, "mainnet")
+    const rpc = new RpcClient(url)
     const diamond = new Diamond(DIAMOND_ADDRS.mainnet)
     await diamond.init(explorer, rpc)
     const stateTransitionManager = await diamond.getTransitionManager(rpc, explorer)

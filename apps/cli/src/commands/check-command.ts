@@ -6,14 +6,68 @@ import { ZkSyncEraDiff } from "../reports/zk-sync-era-diff";
 import { DIAMOND_ADDRS } from "@repo/common/ethereum";
 import { UpgradeFile } from "../lib/upgrade-file";
 import { StringCheckReport } from "../reports/reports/string-check-report";
+import { Diamond } from "../reports/diamond";
+import { LocalFork } from "../reports/local-fork";
 
 export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
+  const repo = await withSpinner(
+    async () => {
+      // const repo = await env.contractsRepo();
+      // await repo.compileSystemContracts();
+      // return repo;
+      return await env.contractsRepo();
+    },
+    "Locally compiling system contracts",
+    env
+  );
+
+  const file = UpgradeFile.fromFile(upgradeFilePath)
+
+  const diamondaddr = DIAMOND_ADDRS[env.network];
+  const diamond = await Diamond.create(diamondaddr, env.l1Client(), env.rpcL1())
+
+  const current = await withSpinner(
+    async () => ZksyncEraState.fromBlockchain(env.network, env.rpcL1(), diamond),
+    "Gathering current zksync state",
+    env
+  );
+
+  const localFork = await LocalFork.create(env.rpcL1().rpcUrl(), env.network)
+  const forkRpc = localFork.rpc()
+
+  const transitionManager = await diamond.getTransitionManager(env.rpcL1(), env.l1Client())
+  const protocolHandlerAddress = await transitionManager.upgradeHandlerAddress(env.rpcL1())
+
+
+  for (const call of file.calls) {
+    await localFork.execDebugTx(protocolHandlerAddress, call.target, call.data, call.value)
+  }
+
+  const finalDiamond = await Diamond.create(diamondaddr, env.l1Client(), forkRpc)
+  const proposed = await withSpinner(
+    async () => ZksyncEraState.fromBlockchain(env.network, forkRpc, finalDiamond),
+    "Gathering current zksync state",
+    env
+  );
+
+  const diff = new ZkSyncEraDiff(current, proposed, []);
+
+  const report = new StringCheckReport(diff, repo, env.l1Client());
+  env.term().line(await report.format());
+  await localFork.tearDown();
+}
+
+
+export async function checkCommandOld(env: EnvBuilder, upgradeFilePath: string) {
   const dataHex = UpgradeFile.fromFile(upgradeFilePath)
     .firstCallData()
     .expect(new Error("Missing calldata"));
 
   const current = await withSpinner(
-    async () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
+    async () => {
+      const diamond1 = await Diamond.create(DIAMOND_ADDRS[env.network], env.l1Client(), env.rpcL1());
+      return ZksyncEraState.fromBlockchain(env.network, env.rpcL1(), diamond1)
+    },
     "Gathering current zksync state",
     env
   );
@@ -48,8 +102,6 @@ export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
   );
 
   const diff = new ZkSyncEraDiff(current, proposed, systemContractsAddrs);
-
-  console.log(diff)
 
   const report = new StringCheckReport(diff, repo, env.l1Client());
   env.term().line(await report.format());

@@ -2,7 +2,8 @@ import { bytesToBigInt, bytesToHex, bytesToNumber, type Hex, numberToBytes } fro
 import type { FacetData } from "./upgrade-changes.js";
 import { Option } from "nochoices";
 import { Diamond } from "./diamond.js";
-import { RpcStorageSnapshot } from "./storage/snapshot";
+import type { StorageSnapshot } from "./storage/snapshot";
+import { RecordStorageSnapshot, RpcStorageSnapshot } from "./storage/snapshot";
 import { StringStorageVisitor } from "./reports/string-storage-visitor.js";
 import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props.js";
 import {
@@ -11,7 +12,6 @@ import {
   type SystemContractProvider,
 } from "./system-contract-providers.js";
 import { z } from "zod";
-import { RecordStorageSnapshot } from "./storage/snapshot";
 import {
   AddressExtractor,
   BigNumberExtractor,
@@ -20,11 +20,10 @@ import {
   ListOfAddressesExtractor,
 } from "./reports/extractors.js";
 import type { ContractField } from "./storage/contractField.js";
-import type { StorageSnapshot } from "./storage/snapshot";
 import type { StorageVisitor } from "./reports/storage-visitor.js";
-import { DIAMOND_ADDRS, UPGRADE_FN_SELECTOR, type Network } from "@repo/common/ethereum";
+import { DIAMOND_ADDRS, type Network, UPGRADE_FN_SELECTOR } from "@repo/common/ethereum";
 import { hexSchema } from "@repo/common/schemas";
-import { BlockExplorerClient, type BlockExplorer } from "../ethereum/block-explorer-client";
+import { type BlockExplorer, BlockExplorerClient } from "../ethereum/block-explorer-client";
 import { MissingRequiredProp } from "../lib/errors";
 import { RpcClient } from "../ethereum/rpc-client";
 
@@ -191,16 +190,12 @@ export class ZksyncEraState {
 
   static async fromBlockchain(
     network: Network,
-    explorer: BlockExplorerClient,
-    rpc: RpcClient
+    rpc: RpcClient,
+    diamond: Diamond
   ): Promise<ZksyncEraState> {
-    const addr = DIAMOND_ADDRS[network];
-    const diamond = new Diamond(addr);
-
-    await diamond.init(explorer, rpc);
     const facets = diamond.allFacets();
 
-    const memorySnapshot = new RpcStorageSnapshot(rpc, addr);
+    const memorySnapshot = new RpcStorageSnapshot(rpc, diamond.address);
     const visitor = new StringStorageVisitor();
 
     const blobVersionedHashRetrieverOpt = (

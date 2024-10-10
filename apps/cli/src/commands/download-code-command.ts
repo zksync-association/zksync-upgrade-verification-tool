@@ -1,4 +1,4 @@
-import { ADDRESS_ZERO, OPEN_ZEP_PROXY_IMPL_SLOT } from "@repo/common/ethereum";
+import { ADDRESS_ZERO, DIAMOND_ADDRS, OPEN_ZEP_PROXY_IMPL_SLOT } from "@repo/common/ethereum";
 import type { GitContractsRepo } from "../reports/git-contracts-repo";
 import { ZkSyncEraDiff, hexAreEq } from "../reports/zk-sync-era-diff";
 import { type HexEraPropName, ZksyncEraState } from "../reports/zksync-era-state";
@@ -8,6 +8,7 @@ import path from "node:path";
 import { hexToBigInt, hexToBytes } from "viem";
 import { UpgradeFile } from "../lib/upgrade-file";
 import { ContractData } from "../ethereum/contract-data";
+import { Diamond } from "../reports/diamond";
 
 async function downloadAllCode(
   diff: ZkSyncEraDiff,
@@ -104,7 +105,10 @@ export const downloadCodeCommand = async (
   const dataHex = file.calls[0]?.data;
 
   const current = await withSpinner(
-    async () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
+    async () => {
+      const d = await Diamond.create(DIAMOND_ADDRS[env.network], env.l1Client(), env.rpcL1())
+      return ZksyncEraState.fromBlockchain(env.network, env.rpcL1(), d)
+    },
     "Gathering current zksync state",
     env
   );

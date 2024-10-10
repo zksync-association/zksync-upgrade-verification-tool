@@ -32,6 +32,9 @@ importers:
       dotenv:
         specifier: ^16.4.5
         version: 16.4.5
+      hardhat:
+        specifier: ^2.22.6
+        version: 2.22.9(bufferutil@4.0.8)(ts-node@10.9.2(@types/node@22.5.1)(typescript@5.5.4))(typescript@5.5.4)(utf-8-validate@5.0.10)
       nochoices:
         specifier: ^1.1.4
         version: 1.1.4
