@@ -1,6 +1,10 @@
+import type { HttpTransport, PublicClient } from "viem";
 import {
-  type Abi, type Address, BaseError,
-  createPublicClient, decodeErrorResult,
+  type Abi,
+  type Address,
+  BaseError,
+  createPublicClient,
+  decodeErrorResult,
   decodeFunctionResult,
   encodeFunctionData,
   type Hex,
@@ -8,7 +12,6 @@ import {
   numberToHex,
 } from "viem";
 import { type TypeOf, z, type ZodType } from "zod";
-import type { PublicClient, HttpTransport } from "viem";
 import { getStorageAt } from "viem/actions";
 import { L1_DEFAULT_URLS, L2_DEFAULT_URLS, type Network } from "@repo/common/ethereum";
 import { hexSchema, optionSchema } from "@repo/common/schemas";
@@ -155,7 +158,7 @@ export class RpcClient {
     }
   }
 
-  private async rawCall(method: string, params: any[]): Promise<any> {
+  async rawCall(method: string, params: any[]): Promise<any> {
     const res = await fetch(this.rpcUrl(), {
       method: "POST",
       body: JSON.stringify({
@@ -174,6 +177,18 @@ export class RpcClient {
     }
 
     return res.json();
+  }
+
+  async traceCall(from: Address, to: Address, callData: Hex, value: bigint) {
+    return await this.rawCall("debug_traceCall", [
+      {
+        from,
+        to,
+        data: callData,
+        value: Number(value)
+      },
+      "latest",
+    ])
   }
 
   async debugCallTraceStorage(from: Address, to: Address, callData: Hex): Promise<MemoryDiffRaw> {

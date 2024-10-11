@@ -4,37 +4,51 @@ import { basePackageDir } from "../util/base-package-dir";
 import { RpcClient } from "../ethereum/rpc-client";
 import { type Address, createWalletClient, type Hex, http, parseEther, publicActions, testActions } from "viem";
 import { mainnet, sepolia } from "viem/chains";
+import { z } from "zod";
+import { addressSchema, hexSchema } from "@repo/common/schemas";
 
 const FORK_PORT = "9090";
 const RICH_ADDRESS = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 const RICH_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
+const debugInfoSchema = z.object({
+  result: z.array(
+    z.object({
+      type: z.string(),
+      depth: z.number(),
+      from: addressSchema,
+      to: addressSchema,
+      value: hexSchema,
+      input: hexSchema
+    })
+  )
+}).transform(obj => obj.result)
+export type DebugCallInfo = z.infer<typeof debugInfoSchema>;
+
+
 export class LocalFork {
-  // private baseUrl: string;
   private spawned: ChildProcessWithoutNullStreams;
   private network: Network;
 
   private constructor(baseUrl: string, network: Network) {
-    // this.baseUrl = baseUrl;
     this.network = network
     const baseDir = basePackageDir();
-    const hardhatBin = `${baseDir}/node_modules/.bin/hardhat`
+    // const hardhatBin = `${baseDir}/node_modules/.bin/hardhat`
 
     this.spawned = spawn(
-      hardhatBin,
+      "anvil",
       [
-        "node",
         "--port",
         FORK_PORT,
-        "--fork",
+        "-f",
         baseUrl
       ], {
         cwd: baseDir,
         detached: false,
         env: {
           ...process.env,
-          RICH_PRIVATE_KEY: RICH_PRIVATE_KEY,
-          CHAIN_ID: NET_VERSIONS[network]
+          RICH_PRIVATE_KEY: RICH_PRIVATE_KEY
+          // CHAIN_ID: NET_VERSIONS[network]
         }
       })
 
@@ -85,7 +99,7 @@ export class LocalFork {
       transport: http(this.url()),
       key: RICH_PRIVATE_KEY,
       chain: this.network === "mainnet" ? mainnet : sepolia
-    }).extend(publicActions).extend(testActions({mode: "hardhat"}))
+    }).extend(publicActions).extend(testActions({mode: "anvil"}))
 
     const txid = await wallet.sendTransaction({
       account: RICH_ADDRESS,
@@ -97,26 +111,31 @@ export class LocalFork {
     await wallet.mine({blocks: 10, interval: 0})
   }
 
-  async execDebugTx(from: Address, to: Address, data: Hex, value: bigint): Promise<void> {
+  async execDebugTx(from: Address, to: Address, data: Hex, value: bigint): Promise<[Hex, DebugCallInfo]> {
     const wallet = createWalletClient({
       transport: http(this.url()),
       key: RICH_PRIVATE_KEY,
       chain: this.network === "mainnet" ? mainnet : sepolia
-    }).extend(publicActions).extend(testActions({mode: "hardhat"}))
+    }).extend(publicActions).extend(testActions({mode: "anvil"}))
 
     // First put some eth to pay fees.
     await this.fund(from, parseEther("1"))
 
-    await wallet.setCode({ address: from, bytecode: "0x" })
-    await wallet.impersonateAccount({ address: from })
+    await wallet.setCode({address: from, bytecode: "0x"})
+    await wallet.impersonateAccount({address: from})
 
-    await wallet.sendTransaction({
+
+    const txid = await wallet.sendTransaction({
       account: from,
       to,
       data,
       value
     })
 
-    await wallet.stopImpersonatingAccount({ address: from })
+    await wallet.stopImpersonatingAccount({address: from})
+
+    const debugInfo = await this.rpc().rawCall("ots_traceTransaction", [txid])
+
+    return [txid, debugInfoSchema.parse(debugInfo)]
   }
 }
