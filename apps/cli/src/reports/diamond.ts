@@ -8,6 +8,7 @@ import type { ContractData } from "../ethereum/contract-data";
 import type { RpcClient } from "../ethereum/rpc-client";
 import { StateTransitionManager } from "./state-transition-manager";
 import { addressSchema } from "@repo/common/schemas";
+import { Option } from "nochoices";
 
 const DIAMOND_FUNCTIONS = {
   facets: "facets",
@@ -132,5 +133,12 @@ export class Diamond {
   async getTransitionManager(rpc: RpcClient, explorer: BlockExplorerClient) {
     const proxyAddr = await this.contractRead(rpc, "getStateTransitionManager", addressSchema)
     return StateTransitionManager.create(proxyAddr, rpc, explorer)
+  }
+
+  selectorFor(methodName: string): Option<Hex> {
+    const abi = [...this.abis.values()].find(abi => abi.hasFunction(methodName));
+    return Option.fromNullable(abi)
+      .map(abi => abi.selectorForFn(methodName))
+      .flatten()
   }
 }

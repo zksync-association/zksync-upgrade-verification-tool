@@ -41,7 +41,9 @@ export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
 
   for (const call of file.calls) {
     const [_, debugInfo] =  await localFork.execDebugTx(protocolHandlerAddress, call.target, call.data, call.value)
-    console.log(debugInfo)
+    const selector = diamond.selectorFor("executeUpgrade").unwrap()
+    const coso = debugInfo.find(di => di.input.startsWith(selector))
+    console.log(coso)
   }
 
   const finalDiamond = await Diamond.create(diamondaddr, env.l1Client(), forkRpc)
