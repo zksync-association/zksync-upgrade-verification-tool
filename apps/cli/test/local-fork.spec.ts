@@ -6,7 +6,7 @@ describe("LocalFork", () => {
   let fork: LocalFork;
 
   beforeAll(async () => {
-    fork = await LocalFork.create("https://eth.llamarpc.com", "mainnet");
+    fork = await LocalFork.create("https://ethereum-sepolia-rpc.publicnode.com", "sepolia");
   });
 
   afterAll(async () => {
@@ -16,11 +16,11 @@ describe("LocalFork", () => {
   it("can get correct network id:", async () => {
     const rpc = fork.rpc();
     const netVersion = await rpc.netVersion();
-    expect(netVersion).toEqual("1");
+    expect(netVersion).toEqual("11155111");
   });
 
   it("can fund an an address", async () => {
-    const someAddress = padHex("0xaa", { size: 20 });
+    const someAddress = padHex("0xaaaa", { size: 20 });
     const value = parseEther("1");
     const rpc = fork.rpc();
 

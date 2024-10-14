@@ -17,8 +17,6 @@ import { RpcSystemContractProvider, SystemContractList } from "../src/reports/sy
 import type { FacetData } from "../src/reports/upgrade-changes";
 import { ZkSyncEraDiff } from "../src/reports/zk-sync-era-diff";
 import { RpcClient } from "../src/ethereum/rpc-client";
-import { Diamond } from "../src/reports/diamond";
-import { DIAMOND_ADDRS } from "@repo/common/ethereum";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): ZkSyncEraDiff {

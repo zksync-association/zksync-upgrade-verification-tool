@@ -50,8 +50,7 @@ export class LocalFork {
       detached: false,
       env: {
         ...process.env,
-        RICH_PRIVATE_KEY: RICH_PRIVATE_KEY,
-        // CHAIN_ID: NET_VERSIONS[network]
+        RICH_PRIVATE_KEY: RICH_PRIVATE_KEY
       },
     });
 
@@ -75,8 +74,10 @@ export class LocalFork {
           headers: { "content-type": "application/json" },
           body: '{"id":1,"jsonrpc":"2.0","method":"net_version","params":[]}',
         });
-        const res = await response.json();
-        // if (res.id)
+        const res = await response.json() as any;
+        if (res.result === undefined) {
+          continue
+        }
         return;
       } catch (_error) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
