@@ -170,7 +170,6 @@ export class StringCheckReport {
 
   private async addSystemContracts(lines: string[], warnings: string[]) {
     const changes = await this.diff.systemContractChanges();
-    console.log("changes", changes);
 
     if (changes.length === 0) {
       return;

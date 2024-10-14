@@ -14,8 +14,7 @@
     "watch": "tsx esbuild.ts --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "validate": "tsx ./src/entrypoint.ts",
-    "coso": "pnpm validate check -f test/data/sample-upgrade.json"
+    "validate": "tsx ./src/entrypoint.ts"
   },
   "dependencies": {
     "@repo/common": "workspace:*",

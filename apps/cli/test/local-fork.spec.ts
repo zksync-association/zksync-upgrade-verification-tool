@@ -1,14 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { parseEther } from "viem";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { parseEther, padHex } from "viem";
 import { LocalFork } from "../src/reports/local-fork";
 
 describe("LocalFork", () => {
   let fork: LocalFork;
-  beforeEach(async () => {
+
+  beforeAll(async () => {
     fork = await LocalFork.create("https://eth.llamarpc.com", "mainnet");
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await fork.tearDown();
   });
 
@@ -18,11 +19,13 @@ describe("LocalFork", () => {
     expect(netVersion).toEqual("1");
   });
 
-  it("can fund an anddress", async () => {
-    const someAddress = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+  it("can fund an an address", async () => {
+    const someAddress = padHex("0xaa", { size: 20 });
     const value = parseEther("1");
-    await fork.fund(someAddress, value);
     const rpc = fork.rpc();
+
+    expect(await rpc.balanceOf(someAddress)).toEqual(0n);
+    await fork.fund(someAddress, value);
     const balance = await rpc.balanceOf(someAddress);
     expect(balance).toEqual(value);
   });

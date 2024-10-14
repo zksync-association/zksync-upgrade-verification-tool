@@ -1,11 +1,4 @@
-import {
-  bytesToBigInt,
-  bytesToHex,
-  bytesToNumber,
-  type Hex,
-  numberToBytes,
-  numberToHex,
-} from "viem";
+import { bytesToBigInt, bytesToHex, bytesToNumber, type Hex, numberToBytes, numberToHex, } from "viem";
 import type { FacetData } from "./upgrade-changes.js";
 import { Option } from "nochoices";
 import { Diamond } from "./diamond.js";
@@ -13,11 +6,7 @@ import type { StorageSnapshot } from "./storage/snapshot";
 import { RecordStorageSnapshot, RpcStorageSnapshot } from "./storage/snapshot";
 import { StringStorageVisitor } from "./reports/string-storage-visitor.js";
 import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props.js";
-import {
-  RpcSystemContractProvider,
-  SystemContractList,
-  type SystemContractProvider,
-} from "./system-contract-providers.js";
+import { SystemContractList, type SystemContractProvider, } from "./system-contract-providers.js";
 import { z } from "zod";
 import {
   AddressExtractor,
@@ -207,8 +196,12 @@ export class ZksyncEraState {
   static async fromBlockchain(
     network: Network,
     rpc: RpcClient,
-    diamond: Diamond
+    explorer: BlockExplorerClient,
+    systemContracts: SystemContractProvider,
+    affectedSystemContracts: L2ContractData[] = []
   ): Promise<ZksyncEraState> {
+    const diamond = new Diamond(DIAMOND_ADDRS[network]);
+    await diamond.init(explorer, rpc)
     const facets = diamond.allFacets();
 
     const memorySnapshot = new RpcStorageSnapshot(rpc, diamond.address);
@@ -276,8 +269,8 @@ export class ZksyncEraState {
     return new ZksyncEraState(
       data,
       facets,
-      new RpcSystemContractProvider(RpcClient.forL2(network), BlockExplorerClient.forL2(network)),
-      []
+      systemContracts,
+      affectedSystemContracts
     );
   }
 
@@ -440,13 +433,14 @@ export class ZksyncEraState {
       systemContracts.push(...upgradedSystemContracts);
     }
 
-    const forkRpc = localFork.rpc();
-    const newDiamond = new Diamond(DIAMOND_ADDRS[network]);
-    await newDiamond.init(l1Explorer, forkRpc);
     await localFork.tearDown();
-    const newState = await ZksyncEraState.fromBlockchain(network, forkRpc, newDiamond);
-    newState.affectedSystemContracts = systemContracts;
-    return newState;
+    return await ZksyncEraState.fromBlockchain(
+      network,
+      localFork.rpc(),
+      l1Explorer,
+      new SystemContractList(systemContracts),
+      systemContracts
+    );
   }
 }
 

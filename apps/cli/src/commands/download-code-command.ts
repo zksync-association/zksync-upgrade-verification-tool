@@ -9,6 +9,7 @@ import { hexToBigInt, hexToBytes } from "viem";
 import { UpgradeFile } from "../lib/upgrade-file";
 import { ContractData } from "../ethereum/contract-data";
 import { Diamond } from "../reports/diamond";
+import { SystemContractList } from "../reports/system-contract-providers";
 
 async function downloadAllCode(
   diff: ZkSyncEraDiff,
@@ -106,8 +107,7 @@ export const downloadCodeCommand = async (
 
   const current = await withSpinner(
     async () => {
-      const d = await Diamond.create(DIAMOND_ADDRS[env.network], env.l1Client(), env.rpcL1());
-      return ZksyncEraState.fromBlockchain(env.network, env.rpcL1(), d);
+      return ZksyncEraState.fromBlockchain(env.network, env.rpcL1(), env.l1Client(), new SystemContractList([]), []);
     },
     "Gathering current zksync state",
     env

@@ -15,7 +15,6 @@ import { mainnet, sepolia } from "viem/chains";
 import { z } from "zod";
 import { addressSchema, hexSchema } from "@repo/common/schemas";
 
-const FORK_PORT = "9090";
 const RICH_ADDRESS = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 const RICH_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
@@ -38,13 +37,15 @@ export type DebugCallInfo = z.infer<typeof debugInfoSchema>;
 export class LocalFork {
   private spawned: ChildProcessWithoutNullStreams;
   private network: Network;
+  private port: number;
 
-  private constructor(baseUrl: string, network: Network) {
+  private constructor(baseUrl: string, network: Network, port = 9090) {
     this.network = network;
     const baseDir = basePackageDir();
     // const hardhatBin = `${baseDir}/node_modules/.bin/hardhat`
+    this.port = port
 
-    this.spawned = spawn("anvil", ["--port", FORK_PORT, "-f", baseUrl], {
+    this.spawned = spawn("anvil", ["--port", port.toString(), "-f", baseUrl], {
       cwd: baseDir,
       detached: false,
       env: {
@@ -74,7 +75,8 @@ export class LocalFork {
           headers: { "content-type": "application/json" },
           body: '{"id":1,"jsonrpc":"2.0","method":"net_version","params":[]}',
         });
-        await response.json();
+        const res = await response.json();
+        // if (res.id)
         return;
       } catch (_error) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -84,11 +86,13 @@ export class LocalFork {
   }
 
   async tearDown() {
+    const prom = new Promise(resolve => this.spawned.on("exit", () => resolve(null )))
     this.spawned.kill("SIGKILL");
+    return prom
   }
 
   url() {
-    return `http://localhost:${FORK_PORT}`;
+    return `http://localhost:${this.port}`;
   }
 
   rpc(): RpcClient {

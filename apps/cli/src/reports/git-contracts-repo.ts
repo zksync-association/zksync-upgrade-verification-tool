@@ -57,7 +57,12 @@ export class GitContractsRepo implements ContractsRepo {
 
   async setRevision(ref: string): Promise<void> {
     this._currentRef.insert(Promise.resolve(ref));
+    await this.git.fetch();
     await this.git.checkout(ref, ["--force"]);
+    const currentBranch = await this.currentBranch();
+    if (currentBranch.isSome()) {
+      await this.git.pull()
+    }
   }
 
   async compileSystemContracts(): Promise<void> {
@@ -157,7 +162,8 @@ export class GitContractsRepo implements ContractsRepo {
   }
 
   async currentBranch(): Promise<Option<string>> {
-    const branch = await this.git.branch();
-    return Option.fromNullable(branch.current);
+    const branch = await this.git.branch(['--show-current']);
+    return Option.fromNullable(branch.current)
+      .filter(branchName => branchName.length > 0);
   }
 }
