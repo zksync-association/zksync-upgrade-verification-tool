@@ -37,8 +37,12 @@ export class Diamond {
     await this.initializeContractData(client);
   }
 
-  static async create(addr: Address, client: BlockExplorerClient, rpc: RpcClient): Promise<Diamond> {
-    const diamond = new Diamond(addr)
+  static async create(
+    addr: Address,
+    client: BlockExplorerClient,
+    rpc: RpcClient
+  ): Promise<Diamond> {
+    const diamond = new Diamond(addr);
     await diamond.init(client, rpc);
     return diamond;
   }
@@ -115,7 +119,11 @@ export class Diamond {
     return bytesToHex(hexToBytes(data));
   }
 
-  async contractRead<T extends ZodType>(rpc: RpcClient, fnName: string, schema: T): Promise<Promise<TypeOf<typeof schema>>> {
+  async contractRead<T extends ZodType>(
+    rpc: RpcClient,
+    fnName: string,
+    schema: T
+  ): Promise<Promise<TypeOf<typeof schema>>> {
     const selector = toFunctionSelector(`${fnName}()`);
     const facetAddr = this.selectorToFacet.get(this.sanitizeHex(selector));
     if (!facetAddr) {
@@ -131,25 +139,25 @@ export class Diamond {
   }
 
   async getTransitionManager(rpc: RpcClient, explorer: BlockExplorerClient) {
-    const proxyAddr = await this.contractRead(rpc, "getStateTransitionManager", addressSchema)
-    return StateTransitionManager.create(proxyAddr, rpc, explorer)
+    const proxyAddr = await this.contractRead(rpc, "getStateTransitionManager", addressSchema);
+    return StateTransitionManager.create(proxyAddr, rpc, explorer);
   }
 
   selectorFor(methodName: string): Option<Hex> {
-    const abi = [...this.abis.values()].find(abi => abi.hasFunction(methodName));
+    const abi = [...this.abis.values()].find((abi) => abi.hasFunction(methodName));
     return Option.fromNullable(abi)
-      .map(abi => abi.selectorForFn(methodName))
-      .flatten()
+      .map((abi) => abi.selectorForFn(methodName))
+      .flatten();
   }
 
   abiForSelector(selector: Hex): ContractAbi {
-    const facet = this.selectorToFacet.get(selector)
+    const facet = this.selectorToFacet.get(selector);
     if (facet === undefined) {
-      throw new Error(`Unknown selector ${selector}`)
+      throw new Error(`Unknown selector ${selector}`);
     }
     const abi = this.abis.get(this.sanitizeHex(facet));
     if (abi === undefined) {
-      throw new Error(`Unknown facet ${facet}`)
+      throw new Error(`Unknown facet ${facet}`);
     }
     return abi;
   }

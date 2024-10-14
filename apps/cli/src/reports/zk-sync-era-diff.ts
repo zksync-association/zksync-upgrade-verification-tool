@@ -26,7 +26,7 @@ export class ZkSyncEraDiff {
   constructor(current: ZksyncEraState, proposed: ZksyncEraState) {
     this.current = current;
     this.proposed = proposed;
-    this.affectedSystemContracts = this.proposed.affectedSystemContracts.map(sc => sc.address);
+    this.affectedSystemContracts = this.proposed.affectedSystemContracts.map((sc) => sc.address);
   }
 
   hexAttrDiff(prop: HexEraPropName): [Hex, Option<Hex>] {

@@ -106,8 +106,8 @@ export const downloadCodeCommand = async (
 
   const current = await withSpinner(
     async () => {
-      const d = await Diamond.create(DIAMOND_ADDRS[env.network], env.l1Client(), env.rpcL1())
-      return ZksyncEraState.fromBlockchain(env.network, env.rpcL1(), d)
+      const d = await Diamond.create(DIAMOND_ADDRS[env.network], env.l1Client(), env.rpcL1());
+      return ZksyncEraState.fromBlockchain(env.network, env.rpcL1(), d);
     },
     "Gathering current zksync state",
     env
@@ -127,7 +127,7 @@ export const downloadCodeCommand = async (
     env
   );
 
-  const [proposed, systemContractsAddrs] = await withSpinner(
+  const [proposed, _systemContractsAddrs] = await withSpinner(
     () =>
       ZksyncEraState.fromCalldata(
         "0x",

@@ -1,4 +1,11 @@
-import { bytesToBigInt, bytesToHex, bytesToNumber, type Hex, numberToBytes, numberToHex } from "viem";
+import {
+  bytesToBigInt,
+  bytesToHex,
+  bytesToNumber,
+  type Hex,
+  numberToBytes,
+  numberToHex,
+} from "viem";
 import type { FacetData } from "./upgrade-changes.js";
 import { Option } from "nochoices";
 import { Diamond } from "./diamond.js";
@@ -134,7 +141,7 @@ export class ZksyncEraState {
     this.data = data;
     this.facets = facets;
     this.systemContracts = systemContracts;
-    this.affectedSystemContracts = affectedSystemContracts
+    this.affectedSystemContracts = affectedSystemContracts;
   }
 
   // METADATA
@@ -390,42 +397,56 @@ export class ZksyncEraState {
     network: Network,
     calls: RawCall[]
   ): Promise<ZksyncEraState> {
-    const localFork = await LocalFork.create(l1Rpc.rpcUrl(), network)
-    const diamond = new Diamond(DIAMOND_ADDRS[network])
-    await diamond.init(l1Explorer, l1Rpc)
+    const localFork = await LocalFork.create(l1Rpc.rpcUrl(), network);
+    const diamond = new Diamond(DIAMOND_ADDRS[network]);
+    await diamond.init(l1Explorer, l1Rpc);
 
-    const transitionManager = await diamond.getTransitionManager(l1Rpc, l1Explorer)
-    const protocolHandlerAddress = await transitionManager.upgradeHandlerAddress(l1Rpc)
+    const transitionManager = await diamond.getTransitionManager(l1Rpc, l1Explorer);
+    const protocolHandlerAddress = await transitionManager.upgradeHandlerAddress(l1Rpc);
 
-    const systemContracts = []
+    const systemContracts = [];
 
     for (const call of calls) {
-      const [_, debugInfo] =  await localFork.execDebugTx(protocolHandlerAddress, call.target, call.data, call.value)
-      const execUpgradeCall = debugInfo.find(di => di.input.startsWith(UPGRADE_FN_SELECTOR))
-      if (execUpgradeCall === undefined || execUpgradeCall.to === undefined || execUpgradeCall.input === undefined) {
-        continue
+      const [_, debugInfo] = await localFork.execDebugTx(
+        protocolHandlerAddress,
+        call.target,
+        call.data,
+        call.value
+      );
+      const execUpgradeCall = debugInfo.find((di) => di.input.startsWith(UPGRADE_FN_SELECTOR));
+      if (
+        execUpgradeCall === undefined ||
+        execUpgradeCall.to === undefined ||
+        execUpgradeCall.input === undefined
+      ) {
+        continue;
       }
 
-      const abi = await l1Explorer.getAbi(execUpgradeCall.to)
-      const decoded = abi.decodeCallData(execUpgradeCall.input, upgradeCallDataSchema)
-      const l2Target = numberToHex(decoded.args[0].l2ProtocolUpgradeTx.to, { size: 20 })
-      const l2Abi = await l2Explorer.getAbi(l2Target)
-      const l2Call = l2Abi.decodeCallData(decoded.args[0].l2ProtocolUpgradeTx.data, l2UpgradeSchema)
-      const upgradedSystemContracts = l2Call.args[0].map((a): L2ContractData => ({
-        address: a.newAddress,
-        name: SYSTEM_CONTRACT_NAMES[a.newAddress] || "Unknown Name",
-        bytecodeHash: a.bytecodeHash
-      }))
-      systemContracts.push(...upgradedSystemContracts)
+      const abi = await l1Explorer.getAbi(execUpgradeCall.to);
+      const decoded = abi.decodeCallData(execUpgradeCall.input, upgradeCallDataSchema);
+      const l2Target = numberToHex(decoded.args[0].l2ProtocolUpgradeTx.to, { size: 20 });
+      const l2Abi = await l2Explorer.getAbi(l2Target);
+      const l2Call = l2Abi.decodeCallData(
+        decoded.args[0].l2ProtocolUpgradeTx.data,
+        l2UpgradeSchema
+      );
+      const upgradedSystemContracts = l2Call.args[0].map(
+        (a): L2ContractData => ({
+          address: a.newAddress,
+          name: SYSTEM_CONTRACT_NAMES[a.newAddress] || "Unknown Name",
+          bytecodeHash: a.bytecodeHash,
+        })
+      );
+      systemContracts.push(...upgradedSystemContracts);
     }
 
     const forkRpc = localFork.rpc();
-    const newDiamond = new Diamond(DIAMOND_ADDRS[network])
-    await newDiamond.init(l1Explorer, forkRpc)
-    await localFork.tearDown()
-    const newState = await ZksyncEraState.fromBlockchain(network, forkRpc, newDiamond)
-    newState.affectedSystemContracts = systemContracts
-    return newState
+    const newDiamond = new Diamond(DIAMOND_ADDRS[network]);
+    await newDiamond.init(l1Explorer, forkRpc);
+    await localFork.tearDown();
+    const newState = await ZksyncEraState.fromBlockchain(network, forkRpc, newDiamond);
+    newState.affectedSystemContracts = systemContracts;
+    return newState;
   }
 }
 

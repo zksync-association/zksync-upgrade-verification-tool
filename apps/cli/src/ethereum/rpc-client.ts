@@ -96,15 +96,12 @@ export class RpcClient {
         const walked = e.walk() as any;
         const data = walked.data;
         const decoded = decodeErrorResult({
-          data
-        })
-        console.error(decoded)
-        throw "error doing this"
-      } else {
-        throw e
+          data,
+        });
+        console.error(decoded);
       }
+      throw e;
     }
-
   }
 
   async getByteCode(addr: Hex): Promise<Hex | undefined> {
@@ -185,10 +182,10 @@ export class RpcClient {
         from,
         to,
         data: callData,
-        value: Number(value)
+        value: Number(value),
       },
       "latest",
-    ])
+    ]);
   }
 
   async debugCallTraceStorage(from: Address, to: Address, callData: Hex): Promise<MemoryDiffRaw> {
@@ -233,7 +230,7 @@ export class RpcClient {
   }
 
   async balanceOf(address: Address): Promise<bigint> {
-    return this.viemClient.getBalance({address, blockTag: "pending"})
+    return this.viemClient.getBalance({ address, blockTag: "pending" });
   }
 
   // async execDebugTx(protocolHandlerAddress: Address, target: Address, data: Hex, value: bigint): Promise<void> {

@@ -147,7 +147,8 @@ describe("CheckReport", () => {
           selectors: ctx.abi2.allSelectors(),
         },
       ],
-      new SystemContractList(ctx.sysContractsBefore)
+      new SystemContractList(ctx.sysContractsBefore),
+      ctx.sysContractsBefore
     );
 
     ctx.sysContractsAfter = [
@@ -196,7 +197,8 @@ describe("CheckReport", () => {
           selectors: ctx.abi3.allSelectors(),
         },
       ],
-      new SystemContractList(ctx.sysContractsAfter)
+      new SystemContractList(ctx.sysContractsAfter),
+      ctx.sysContractsAfter
     );
 
     const explorer = new TestBlockExplorer();

@@ -178,8 +178,8 @@ describe("NewZkSyncStateDiff", () => {
       currentFacets: FacetData[],
       proposedFacets: FacetData[]
     ): ZkSyncEraDiff {
-      const current = new ZksyncEraState({}, currentFacets, new SystemContractList([]));
-      const proposed = new ZksyncEraState({}, proposedFacets, new SystemContractList([]));
+      const current = new ZksyncEraState({}, currentFacets, new SystemContractList([]), []);
+      const proposed = new ZksyncEraState({}, proposedFacets, new SystemContractList([]), []);
       return new ZkSyncEraDiff(current, proposed);
     }
 
@@ -471,12 +471,16 @@ describe("NewZkSyncStateDiff", () => {
 
   describe("when changes are made in the l2 contracts", () => {
     function diffWithSystemContracts(
-      sysContractsAddrs: Hex[],
       currentList: L2ContractData[],
       proposedList: L2ContractData[]
     ) {
-      const current = new ZksyncEraState({}, [], new SystemContractList(currentList));
-      const proposed = new ZksyncEraState({}, [], new SystemContractList(proposedList));
+      const current = new ZksyncEraState({}, [], new SystemContractList(currentList), currentList);
+      const proposed = new ZksyncEraState(
+        {},
+        [],
+        new SystemContractList(proposedList),
+        proposedList
+      );
       return new ZkSyncEraDiff(current, proposed);
     }
 
@@ -497,11 +501,7 @@ describe("NewZkSyncStateDiff", () => {
         },
       ];
 
-      const diff = diffWithSystemContracts(
-        ["0x01"],
-        currentSystemContracts,
-        proposedSystemContracts
-      );
+      const diff = diffWithSystemContracts(currentSystemContracts, proposedSystemContracts);
 
       const changes = await diff.systemContractChanges();
       expect(changes.length).to.eql(1);
@@ -530,11 +530,7 @@ describe("NewZkSyncStateDiff", () => {
         },
       ];
 
-      const diff = diffWithSystemContracts(
-        ["0x01"],
-        currentSystemContracts,
-        proposedSystemContracts
-      );
+      const diff = diffWithSystemContracts(currentSystemContracts, proposedSystemContracts);
 
       const changes = await diff.systemContractChanges();
       expect(changes.length).to.eql(0);
@@ -753,7 +749,7 @@ describe("NewZkSyncStateDiff", () => {
       const explorer = BlockExplorerClient.forL1(key, network);
       const rpc = RpcClient.forL1(network);
 
-      const diamond = await Diamond.create(DIAMOND_ADDRS[network], explorer, rpc)
+      const diamond = await Diamond.create(DIAMOND_ADDRS[network], explorer, rpc);
 
       const state = await ZksyncEraState.fromBlockchain(network, rpc, diamond);
       expect(state.allFacets()).toHaveLength(4);

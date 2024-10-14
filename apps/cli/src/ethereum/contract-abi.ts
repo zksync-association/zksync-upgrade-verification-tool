@@ -1,7 +1,8 @@
 import {
   type Abi,
   type AbiEvent,
-  type AbiFunction, type AbiItem,
+  type AbiFunction,
+  type AbiItem,
   decodeFunctionData,
   encodeFunctionData,
   type Hex,
@@ -12,7 +13,7 @@ import type { z } from "zod";
 import { Option } from "nochoices";
 
 function isAbiFunction(abiElem: AbiItem): abiElem is AbiFunction {
-  return abiElem.type === "function"
+  return abiElem.type === "function";
 }
 
 export class ContractAbi {
@@ -46,7 +47,7 @@ export class ContractAbi {
   decodeCallData<T extends z.ZodTypeAny>(callData: Hex, schema: T): z.infer<typeof schema> {
     const raw = decodeFunctionData({
       data: callData,
-      abi: this.raw
+      abi: this.raw,
     });
     return schema.parse(raw);
   }
@@ -72,11 +73,11 @@ export class ContractAbi {
   }
 
   selectorForFn(name: string): Option<Hex> {
-    const found = this.raw.find((t) => t.type === "function" && t.name === name)
+    const found = this.raw.find((t) => t.type === "function" && t.name === name);
 
     return Option.fromNullable(found)
       .filter(isAbiFunction)
-      .map(abiFn => abiFn as AbiFunction)
-      .map(abiFn => toFunctionSelector(abiFn))
+      .map((abiFn) => abiFn as AbiFunction)
+      .map((abiFn) => toFunctionSelector(abiFn));
   }
 }

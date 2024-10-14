@@ -14,13 +14,13 @@ const config: HardhatUserConfig = {
         {
           privateKey: process.env.RICH_PRIVATE_KEY,
           balance: "10000000000000000000000",
-        }
+        },
       ],
       mining: {
-        auto: true
-      }
-    }
-  }
+        auto: true,
+      },
+    },
+  },
 };
 
 export default config;
