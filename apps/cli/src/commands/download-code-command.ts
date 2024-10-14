@@ -142,7 +142,7 @@ export const downloadCodeCommand = async (
     env
   );
 
-  const diff = new ZkSyncEraDiff(current, proposed, systemContractsAddrs);
+  const diff = new ZkSyncEraDiff(current, proposed);
 
   await withSpinner(
     async () => downloadAllCode(diff, env, targetDir, repo),

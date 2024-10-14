@@ -141,4 +141,16 @@ export class Diamond {
       .map(abi => abi.selectorForFn(methodName))
       .flatten()
   }
+
+  abiForSelector(selector: Hex): ContractAbi {
+    const facet = this.selectorToFacet.get(selector)
+    if (facet === undefined) {
+      throw new Error(`Unknown selector ${selector}`)
+    }
+    const abi = this.abis.get(this.sanitizeHex(facet));
+    if (abi === undefined) {
+      throw new Error(`Unknown facet ${facet}`)
+    }
+    return abi;
+  }
 }

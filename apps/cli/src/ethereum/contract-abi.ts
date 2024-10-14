@@ -46,7 +46,7 @@ export class ContractAbi {
   decodeCallData<T extends z.ZodTypeAny>(callData: Hex, schema: T): z.infer<typeof schema> {
     const raw = decodeFunctionData({
       data: callData,
-      abi: this.raw,
+      abi: this.raw
     });
     return schema.parse(raw);
   }

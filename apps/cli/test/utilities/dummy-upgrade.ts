@@ -1,6 +1,16 @@
 import { RpcClient } from "../../src/ethereum/rpc-client";
-import { type Address, encodeFunctionData, type Hex, padHex, zeroAddress } from "viem";
+import {
+  type Address,
+  bytesToBigInt,
+  encodeFunctionData,
+  type Hex,
+  hexToBigInt,
+  numberToBytes,
+  padHex,
+  zeroAddress
+} from "viem";
 import type { StateTransitionManager } from "../../src/reports/state-transition-manager";
+import { hexSchema } from "@repo/common/schemas";
 
 export const defaultUpgradeAbi = [{
   anonymous: false,
@@ -821,19 +831,507 @@ export const stateTransitionManagerAbi = [{
   type: "function"
 }] as const;
 
+const deployerAbi = [
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "accountAddress",
+        type: "address"
+      },
+      {
+        indexed: false,
+        internalType: "enum IContractDeployer.AccountNonceOrdering",
+        name: "nonceOrdering",
+        type: "uint8"
+      }
+    ],
+    name: "AccountNonceOrderingUpdated",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "accountAddress",
+        type: "address"
+      },
+      {
+        indexed: false,
+        internalType: "enum IContractDeployer.AccountAbstractionVersion",
+        name: "aaVersion",
+        type: "uint8"
+      }
+    ],
+    name: "AccountVersionUpdated",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "deployerAddress",
+        type: "address"
+      },
+      {
+        indexed: true,
+        internalType: "bytes32",
+        name: "bytecodeHash",
+        type: "bytes32"
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "contractAddress",
+        type: "address"
+      }
+    ],
+    name: "ContractDeployed",
+    type: "event"
+  },
+  {
+    inputs: [
+      {
+        internalType: "bytes32",
+        name: "_salt",
+        type: "bytes32"
+      },
+      {
+        internalType: "bytes32",
+        name: "_bytecodeHash",
+        type: "bytes32"
+      },
+      {
+        internalType: "bytes",
+        name: "_input",
+        type: "bytes"
+      }
+    ],
+    name: "create",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address"
+      }
+    ],
+    stateMutability: "payable",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
+        internalType: "bytes32",
+        name: "_salt",
+        type: "bytes32"
+      },
+      {
+        internalType: "bytes32",
+        name: "_bytecodeHash",
+        type: "bytes32"
+      },
+      {
+        internalType: "bytes",
+        name: "_input",
+        type: "bytes"
+      }
+    ],
+    name: "create2",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address"
+      }
+    ],
+    stateMutability: "payable",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
+        internalType: "bytes32",
+        name: "_salt",
+        type: "bytes32"
+      },
+      {
+        internalType: "bytes32",
+        name: "_bytecodeHash",
+        type: "bytes32"
+      },
+      {
+        internalType: "bytes",
+        name: "_input",
+        type: "bytes"
+      },
+      {
+        internalType: "enum IContractDeployer.AccountAbstractionVersion",
+        name: "_aaVersion",
+        type: "uint8"
+      }
+    ],
+    name: "create2Account",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address"
+      }
+    ],
+    stateMutability: "payable",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
+        internalType: "bytes32",
+        name: "",
+        type: "bytes32"
+      },
+      {
+        internalType: "bytes32",
+        name: "_bytecodeHash",
+        type: "bytes32"
+      },
+      {
+        internalType: "bytes",
+        name: "_input",
+        type: "bytes"
+      },
+      {
+        internalType: "enum IContractDeployer.AccountAbstractionVersion",
+        name: "_aaVersion",
+        type: "uint8"
+      }
+    ],
+    name: "createAccount",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address"
+      }
+    ],
+    stateMutability: "payable",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_address",
+        type: "address"
+      }
+    ],
+    name: "extendedAccountVersion",
+    outputs: [
+      {
+        internalType: "enum IContractDeployer.AccountAbstractionVersion",
+        name: "",
+        type: "uint8"
+      }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
+        components: [
+          {
+            internalType: "bytes32",
+            name: "bytecodeHash",
+            type: "bytes32"
+          },
+          {
+            internalType: "address",
+            name: "newAddress",
+            type: "address"
+          },
+          {
+            internalType: "bool",
+            name: "callConstructor",
+            type: "bool"
+          },
+          {
+            internalType: "uint256",
+            name: "value",
+            type: "uint256"
+          },
+          {
+            internalType: "bytes",
+            name: "input",
+            type: "bytes"
+          }
+        ],
+        internalType: "struct ContractDeployer.ForceDeployment",
+        name: "_deployment",
+        type: "tuple"
+      },
+      {
+        internalType: "address",
+        name: "_sender",
+        type: "address"
+      }
+    ],
+    name: "forceDeployOnAddress",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
+        components: [
+          {
+            internalType: "bytes32",
+            name: "bytecodeHash",
+            type: "bytes32"
+          },
+          {
+            internalType: "address",
+            name: "newAddress",
+            type: "address"
+          },
+          {
+            internalType: "bool",
+            name: "callConstructor",
+            type: "bool"
+          },
+          {
+            internalType: "uint256",
+            name: "value",
+            type: "uint256"
+          },
+          {
+            internalType: "bytes",
+            name: "input",
+            type: "bytes"
+          }
+        ],
+        internalType: "struct ContractDeployer.ForceDeployment[]",
+        name: "_deployments",
+        type: "tuple[]"
+      }
+    ],
+    name: "forceDeployOnAddresses",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_address",
+        type: "address"
+      }
+    ],
+    name: "getAccountInfo",
+    outputs: [
+      {
+        components: [
+          {
+            internalType: "enum IContractDeployer.AccountAbstractionVersion",
+            name: "supportedAAVersion",
+            type: "uint8"
+          },
+          {
+            internalType: "enum IContractDeployer.AccountNonceOrdering",
+            name: "nonceOrdering",
+            type: "uint8"
+          }
+        ],
+        internalType: "struct IContractDeployer.AccountInfo",
+        name: "info",
+        type: "tuple"
+      }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_sender",
+        type: "address"
+      },
+      {
+        internalType: "uint256",
+        name: "_senderNonce",
+        type: "uint256"
+      }
+    ],
+    name: "getNewAddressCreate",
+    outputs: [
+      {
+        internalType: "address",
+        name: "newAddress",
+        type: "address"
+      }
+    ],
+    stateMutability: "pure",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "_sender",
+        type: "address"
+      },
+      {
+        internalType: "bytes32",
+        name: "_bytecodeHash",
+        type: "bytes32"
+      },
+      {
+        internalType: "bytes32",
+        name: "_salt",
+        type: "bytes32"
+      },
+      {
+        internalType: "bytes",
+        name: "_input",
+        type: "bytes"
+      }
+    ],
+    name: "getNewAddressCreate2",
+    outputs: [
+      {
+        internalType: "address",
+        name: "newAddress",
+        type: "address"
+      }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
+        internalType: "enum IContractDeployer.AccountAbstractionVersion",
+        name: "_version",
+        type: "uint8"
+      }
+    ],
+    name: "updateAccountVersion",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
+        internalType: "enum IContractDeployer.AccountNonceOrdering",
+        name: "_nonceOrdering",
+        type: "uint8"
+      }
+    ],
+    name: "updateNonceOrdering",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  }
+] as const;
+
+
+type SysContractData = { address: Address, hash: Hex };
 type CreateFakeUpgradeOpts = {
-  verifier: Address;
+  verifier?: Address;
+  systemContracts?: Array<SysContractData>;
+  newVersion?: bigint;
 }
 
 const defaultOpts = {
-  verifier: zeroAddress
+  verifier: zeroAddress,
+  systemContracts: [],
+  newVersion: 103079215107n,
 }
+
+
+function encodeForceL2Deploy(data: SysContractData[]): Hex {
+  const args = data.map(sysContract => {
+    return {
+      bytecodeHash: sysContract.hash,
+      newAddress: sysContract.address,
+      callConstructor: false,
+      value: 0n,
+      input: "0x" as Hex
+    }
+  })
+
+  return  encodeFunctionData({
+    abi: deployerAbi,
+    functionName: "forceDeployOnAddresses",
+    args: [args]
+  })
+}
+
+type SemVer = {
+  major: bigint;
+  minor: bigint;
+  patch: bigint;
+}
+
+function destructureSemver(version: bigint): SemVer {
+  let bytes = Buffer.from(numberToBytes(version));
+  const patch = bytesToBigInt(bytes.subarray(-4));
+  bytes = bytes.subarray(0, -4)
+  const minor = bytesToBigInt(bytes.subarray(-4));
+  bytes = bytes.subarray(0, -4)
+  const rowMajor = bytes.subarray(-4);
+  const major = rowMajor.length === 0 ? 0n : bytesToBigInt(rowMajor);
+
+  return {
+    patch,
+    minor,
+    major
+  }
+}
+
+function buildL2Tx(systemContracts: SysContractData[], newVersion: bigint) {
+  const empty = systemContracts.length === 0;
+  const { minor } = destructureSemver(newVersion)
+
+  const data = empty
+    ? "0x"
+    : encodeForceL2Deploy(systemContracts)
+
+  return {
+    txType: empty ? 0n : 254n,
+    from: empty ? 0n : hexToBigInt("0x0000000000000000000000000000000000008007"),
+    to: empty ? 0n : hexToBigInt("0x0000000000000000000000000000000000008006"),
+    gasLimit: empty ? 0n : 72000000n,
+    gasPerPubdataByteLimit: empty ? 0n : 800n,
+    maxFeePerGas: 0n,
+    maxPriorityFeePerGas: 0n,
+    paymaster: 0n,
+    nonce: minor,
+    value: 0n,
+    reserved: [0n, 0n, 0n, 0n] as [bigint, bigint, bigint, bigint],
+    data: data as Hex,
+    signature: hexSchema.parse("0x"),
+    factoryDeps: [],
+    paymasterInput: "0x" as Hex,
+    reservedDynamic: "0x" as Hex
+  }
+}
+
 
 export async function createFakeUpgrade(
   transitionManager: StateTransitionManager,
   rpc: RpcClient,
-  opts: CreateFakeUpgradeOpts = defaultOpts
+  rawOpts: CreateFakeUpgradeOpts = {}
 ): Promise<Hex> {
+  const opts = Object.assign({}, defaultOpts, rawOpts);
   const someHyperchainId = await transitionManager.allHyperchainIds(rpc)
     .then(all => all[0])
 
@@ -846,24 +1344,7 @@ export async function createFakeUpgrade(
     functionName: "upgrade",
     args: [
       {
-        l2ProtocolUpgradeTx: {
-          txType: 0n,
-          from: 0n,
-          to: 0n,
-          gasLimit: 0n,
-          gasPerPubdataByteLimit: 0n,
-          maxFeePerGas: 0n,
-          maxPriorityFeePerGas: 0n,
-          paymaster: 0n,
-          nonce: 0n,
-          value: 0n,
-          reserved: [0n, 0n, 0n, 0n],
-          data: "0x",
-          signature: "0x",
-          factoryDeps: [],
-          paymasterInput: "0x",
-          reservedDynamic: "0x"
-        },
+        l2ProtocolUpgradeTx: buildL2Tx(opts.systemContracts, opts.newVersion),
         factoryDeps: [],
         bootloaderHash: padHex("0x0"),
         defaultAccountHash: padHex("0x"),
@@ -876,7 +1357,7 @@ export async function createFakeUpgrade(
         l1ContractsUpgradeCalldata: "0x",
         postUpgradeCalldata: "0x",
         upgradeTimestamp: 0n,
-        newProtocolVersion: 103079215107n
+        newProtocolVersion: opts.newVersion
       }
     ]
   })

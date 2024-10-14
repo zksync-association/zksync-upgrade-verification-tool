@@ -32,32 +32,18 @@ export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
     env
   );
 
-  const localFork = await LocalFork.create(env.rpcL1().rpcUrl(), env.network)
-  const forkRpc = localFork.rpc()
+  const proposed = await current.applyTxs(
+    env.l1Client(),
+    env.l2Client(),
+    env.rpcL1(),
+    env.network,
+    file.calls
+  )
 
-  const transitionManager = await diamond.getTransitionManager(env.rpcL1(), env.l1Client())
-  const protocolHandlerAddress = await transitionManager.upgradeHandlerAddress(env.rpcL1())
-
-
-  for (const call of file.calls) {
-    const [_, debugInfo] =  await localFork.execDebugTx(protocolHandlerAddress, call.target, call.data, call.value)
-    const selector = diamond.selectorFor("executeUpgrade").unwrap()
-    const coso = debugInfo.find(di => di.input.startsWith(selector))
-    console.log(coso)
-  }
-
-  const finalDiamond = await Diamond.create(diamondaddr, env.l1Client(), forkRpc)
-  const proposed = await withSpinner(
-    async () => ZksyncEraState.fromBlockchain(env.network, forkRpc, finalDiamond),
-    "Gathering current zksync state",
-    env
-  );
-
-  const diff = new ZkSyncEraDiff(current, proposed, []);
+  const diff = new ZkSyncEraDiff(current, proposed);
 
   const report = new StringCheckReport(diff, repo, env.l1Client());
   env.term().line(await report.format());
-  await localFork.tearDown();
 }
 
 
@@ -104,7 +90,7 @@ export async function checkCommandOld(env: EnvBuilder, upgradeFilePath: string) 
     env
   );
 
-  const diff = new ZkSyncEraDiff(current, proposed, systemContractsAddrs);
+  const diff = new ZkSyncEraDiff(current, proposed);
 
   const report = new StringCheckReport(diff, repo, env.l1Client());
   env.term().line(await report.format());

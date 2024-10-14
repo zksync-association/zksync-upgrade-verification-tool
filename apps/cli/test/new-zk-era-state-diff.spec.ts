@@ -22,10 +22,10 @@ import { DIAMOND_ADDRS } from "@repo/common/ethereum";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): ZkSyncEraDiff {
-    const current = new ZksyncEraState(oldData, [], new SystemContractList([]));
-    const changes = new ZksyncEraState(newData, [], new SystemContractList([]));
+    const current = new ZksyncEraState(oldData, [], new SystemContractList([]), []);
+    const changes = new ZksyncEraState(newData, [], new SystemContractList([]), []);
 
-    return new ZkSyncEraDiff(current, changes, []);
+    return new ZkSyncEraDiff(current, changes);
   }
 
   describe("hex property diffs", () => {
@@ -180,7 +180,7 @@ describe("NewZkSyncStateDiff", () => {
     ): ZkSyncEraDiff {
       const current = new ZksyncEraState({}, currentFacets, new SystemContractList([]));
       const proposed = new ZksyncEraState({}, proposedFacets, new SystemContractList([]));
-      return new ZkSyncEraDiff(current, proposed, []);
+      return new ZkSyncEraDiff(current, proposed);
     }
 
     describe("#addedFacets", () => {
@@ -477,7 +477,7 @@ describe("NewZkSyncStateDiff", () => {
     ) {
       const current = new ZksyncEraState({}, [], new SystemContractList(currentList));
       const proposed = new ZksyncEraState({}, [], new SystemContractList(proposedList));
-      return new ZkSyncEraDiff(current, proposed, sysContractsAddrs);
+      return new ZkSyncEraDiff(current, proposed);
     }
 
     it("returns changes for affected system contracts", async () => {

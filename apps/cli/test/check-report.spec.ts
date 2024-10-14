@@ -209,11 +209,7 @@ describe("CheckReport", () => {
 
   // biome-ignore lint/suspicious/noDuplicateTestHooks: <explanation>
   beforeEach<Ctx>((ctx) => {
-    ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
-      ctx.sysAddr1,
-      ctx.sysAddr2,
-      ctx.sysAddr3,
-    ]);
+    ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState);
   });
 
   async function createReportLines(ctx: Ctx): Promise<string[]> {
@@ -479,11 +475,7 @@ describe("CheckReport", () => {
       }
       ctx.contractsRepo = repo;
 
-      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
-        ctx.sysAddr1,
-        ctx.sysAddr2,
-        ctx.sysAddr3,
-      ]);
+      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState);
     });
 
     it<Ctx>("indicates that bytecode does not match", async (ctx) => {
@@ -516,11 +508,7 @@ describe("CheckReport", () => {
 
       ctx.contractsRepo = repo;
 
-      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
-        ctx.sysAddr1,
-        ctx.sysAddr2,
-        ctx.sysAddr3,
-      ]);
+      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState);
     });
 
     it<Ctx>("indicates that bytecode does not match", async (ctx) => {
