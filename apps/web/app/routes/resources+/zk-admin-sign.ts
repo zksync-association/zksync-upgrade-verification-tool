@@ -91,7 +91,7 @@ export async function action({ request }: ActionFunctionArgs) {
     signature: hexSchema,
   });
 
-  if (!isAddressEqual(data.archivedBy, env.ZK_ADMIN_ADDRESS)) {
+  if (!env.ZK_ADMIN_ADDRESS.some((adminAddress) => isAddressEqual(data.archivedBy, adminAddress))) {
     logger.error({ archivedBy: data.archivedBy }, "Address is not zk admin");
     throw unauthorized();
   }

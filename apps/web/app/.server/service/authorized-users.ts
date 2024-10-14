@@ -24,7 +24,7 @@ export async function getUserAuthRole(address: Address): Promise<UserRole> {
     return UserRoleEnum.enum.zkFoundation;
   }
 
-  if (isAddressEqual(address, env.ZK_ADMIN_ADDRESS)) {
+  if (env.ZK_ADMIN_ADDRESS.some((adminAddress) => isAddressEqual(address, adminAddress))) {
     return UserRoleEnum.enum.zkAdmin;
   }
 
