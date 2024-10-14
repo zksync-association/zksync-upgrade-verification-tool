@@ -29,7 +29,10 @@ export const env = createEnv({
     ZK_TOKEN_GOVERNOR_ADDRESS: addressSchema,
     ZK_PROTOCOL_GOVERNOR_ADDRESS: addressSchema,
     ALLOW_PRIVATE_ACTIONS: boolFromStrSchema,
-    ZK_ADMIN_ADDRESS: addressSchema,
+    ZK_ADMIN_ADDRESS: z
+      .string()
+      .transform((v) => v.split(",").map((v) => v.trim()))
+      .pipe(z.array(addressSchema)),
     TALLY_BASE_URL: z.string().url(),
   },
   runtimeEnv: process.env,
