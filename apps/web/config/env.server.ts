@@ -31,7 +31,7 @@ export const env = createEnv({
     ALLOW_PRIVATE_ACTIONS: boolFromStrSchema,
     ZK_ADMIN_ADDRESS: z
       .string()
-      .transform((v) => v.split(","))
+      .transform((v) => v.split(",").map((v) => v.trim()))
       .pipe(z.array(addressSchema)),
     TALLY_BASE_URL: z.string().url(),
   },
