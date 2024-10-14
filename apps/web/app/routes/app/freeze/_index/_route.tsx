@@ -5,12 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formError, generalError } from "@/utils/action-errors";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs, SerializeFrom } from "@remix-run/node";
 import { Link, json, redirect, useLoaderData } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
 import { ArrowRight } from "lucide-react";
 import { $path } from "remix-routes";
-import type { Jsonify } from "type-fest";
 import { z } from "zod";
 import { parseFormData } from "@/utils/read-from-request";
 import { FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
@@ -40,34 +39,62 @@ export async function loader() {
     ]);
 
   const isActive = (proposal: (typeof proposals)[number]) => {
+    if (proposal.transactionHash !== null) {
+      return {
+        active: false,
+        reason: "Broadcasted",
+      };
+    }
+
     // Filter proposals already executed or ignored
     if (new Date(proposal.validUntil) <= new Date()) {
-      return false;
+      return {
+        active: false,
+        reason: "Expired",
+      };
     }
 
     // Filter archived proposals
     if (proposal.archivedOn !== null) {
-      return false;
+      return {
+        active: false,
+        reason: "Archived",
+      };
     }
 
     // Filter proposals already executed or ignored
     switch (proposal.type) {
       case "SOFT_FREEZE":
-        return proposal.externalId >= softFreezeNonce;
+        return {
+          active: proposal.externalId >= softFreezeNonce,
+          reason: proposal.externalId >= softFreezeNonce ? undefined : "Expired",
+        };
       case "HARD_FREEZE":
-        return proposal.externalId >= hardFreezeNonce;
+        return {
+          active: proposal.externalId >= hardFreezeNonce,
+          reason: proposal.externalId >= hardFreezeNonce ? undefined : "Expired",
+        };
       case "SET_SOFT_FREEZE_THRESHOLD":
-        return proposal.externalId >= softFreezeThresholdSettingNonce;
+        return {
+          active: proposal.externalId >= softFreezeThresholdSettingNonce,
+          reason: proposal.externalId >= softFreezeThresholdSettingNonce ? undefined : "Expired",
+        };
       case "UNFREEZE":
-        return proposal.externalId >= unfreezeNonce;
+        return {
+          active: proposal.externalId >= unfreezeNonce,
+          reason: proposal.externalId >= unfreezeNonce ? undefined : "Expired",
+        };
     }
   };
 
-  const isInactive = (proposal: (typeof proposals)[number]) => !isActive(proposal);
-
   return json({
-    activeProposals: proposals.filter(isActive),
-    inactiveProposals: proposals.filter(isInactive),
+    activeProposals: proposals.filter((p) => isActive(p).active),
+    inactiveProposals: proposals
+      .filter((p) => !isActive(p).active)
+      .map((p) => ({
+        ...p,
+        reason: isActive(p).reason,
+      })),
   });
 }
 
@@ -164,7 +191,7 @@ function ProposalCard({
   ...props
 }: {
   title: string;
-  proposals: Jsonify<InferSelectModel<typeof freezeProposalsTable>>[];
+  proposals: SerializeFrom<typeof loader>["inactiveProposals"];
   className?: string;
   type: "active" | "inactive";
   "data-testid": string;
@@ -198,9 +225,9 @@ function ProposalCard({
                     <span className="mr-4">
                       {label} - Proposal {proposal.externalId}
                     </span>
-                    {proposal.archivedOn && (
+                    {type === "inactive" && (
                       <Badge className="mr-2" variant="destructive">
-                        Archived
+                        {proposal.reason}
                       </Badge>
                     )}
                     <Badge className="" variant="secondary">

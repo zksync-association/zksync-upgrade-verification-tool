@@ -2,7 +2,7 @@ import { getl2CancellationCallsByProposalId } from "@/.server/db/dto/l2-cancella
 import { getL2CancellationById } from "@/.server/db/dto/l2-cancellations";
 import { getSignaturesByL2CancellationId } from "@/.server/db/dto/signatures";
 import {
-  getAndUpdateL2CancellationByExternalId,
+  getAndUpdateL2Cancellation,
   getL2GovernorAddress,
   getL2VetoNonce,
 } from "@/.server/service/l2-cancellations";
@@ -40,9 +40,9 @@ import { env } from "@config/env.server";
 export const meta = Meta["/app/l2-cancellations/:id"];
 
 export async function loader({ params: remixParams }: LoaderFunctionArgs) {
-  const { id } = extractFromParams(remixParams, z.object({ id: hexSchema }), notFound());
+  const { id } = extractFromParams(remixParams, z.object({ id: z.coerce.number() }), notFound());
 
-  const proposal = await getAndUpdateL2CancellationByExternalId(id);
+  const proposal = await getAndUpdateL2Cancellation(id);
 
   const [calls, signatures, guardiansAddr, l2GovernorAddr] = await Promise.all([
     getl2CancellationCallsByProposalId(proposal.id),
@@ -275,8 +275,8 @@ export default function L2Cancellation() {
 
               {!isExactNonce && (
                 <p className="text-red-500 text-s">
-                  Nonce does not match with contract. Maybe some other veto has to be executed
-                  before.
+                  Veto nonce does not match contract's nonce. A veto with a lower nonce may have to
+                  be executed first.
                 </p>
               )}
             </>

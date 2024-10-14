@@ -162,7 +162,7 @@ export const l2CancellationStatusEnum = z.enum([
 
 export const l2CancellationsTable = pgTable("l2_governor_cancellations", {
   id: serial("id").primaryKey(),
-  externalId: bytea("external_id").notNull().unique(),
+  externalId: bytea("external_id").notNull(),
   type: text("type", { enum: l2CancellationTypeEnum.options }).notNull(),
   proposer: bytea("proposer").notNull(),
   description: text("description").notNull(),

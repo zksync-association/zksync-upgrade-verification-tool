@@ -20,7 +20,9 @@ export default function SignActionsCard({
   if (!isEnabled) {
     return (
       <Layout title={Title[role]}>
-        <div className="py-5 text-center text-gray-500">No actions available for this role.</div>
+        <div className="flex flex-1 items-center justify-center text-gray-500">
+          No actions available for this role.
+        </div>
       </Layout>
     );
   }

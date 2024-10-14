@@ -35,11 +35,12 @@ export const meta = Meta["/app/l2-cancellations/new"];
 
 export async function loader() {
   const maybeBiggestNonce = await getMaxRegisteredNonce();
+
   const biggestNonce = maybeBiggestNonce === null ? -1 : maybeBiggestNonce;
   const currentNonce = await getL2VetoNonce();
   return defer({
     activeL2Proposals: getActiveL2Proposals(),
-    currentNonce: currentNonce,
+    currentNonce,
     suggestedNonce: Math.max(currentNonce, biggestNonce + 1),
   });
 }
