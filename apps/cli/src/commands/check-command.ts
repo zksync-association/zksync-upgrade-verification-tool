@@ -12,7 +12,6 @@ export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
       const repo = await env.contractsRepo();
       await repo.compileSystemContracts();
       return repo;
-      // return await env.contractsRepo();
     },
     "Locally compiling system contracts",
     env

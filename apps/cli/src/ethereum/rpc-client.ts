@@ -232,8 +232,4 @@ export class RpcClient {
   async balanceOf(address: Address): Promise<bigint> {
     return this.viemClient.getBalance({ address, blockTag: "pending" });
   }
-
-  // async execDebugTx(protocolHandlerAddress: Address, target: Address, data: Hex, value: bigint): Promise<void> {
-  //
-  // }
 }
