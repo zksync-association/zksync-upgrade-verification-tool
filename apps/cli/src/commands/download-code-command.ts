@@ -5,7 +5,7 @@ import { type HexEraPropName, ZksyncEraState } from "../reports/zksync-era-state
 import type { EnvBuilder } from "../lib/env-builder.js";
 import { withSpinner } from "../lib/with-spinner.js";
 import path from "node:path";
-import { hexToBigInt, hexToBytes } from "viem";
+import { hexToBigInt } from "viem";
 import { UpgradeFile } from "../lib/upgrade-file";
 import { ContractData } from "../ethereum/contract-data";
 import { SystemContractList } from "../reports/system-contract-providers";
@@ -126,20 +126,11 @@ export const downloadCodeCommand = async (
     env
   );
 
-  const [proposed, _systemContractsAddrs] = await withSpinner(
-    () =>
-      ZksyncEraState.fromCalldata(
-        "0x",
-        "0x",
-        Buffer.from(hexToBytes(dataHex)),
-        env.network,
-        env.l1Client(),
-        env.rpcL1(),
-        env.l2Client()
-      ),
-    "Calculating upgrade changes",
+  const proposed = await withSpinner(
+    async () => current.applyTxs(env.l1Client(), env.l2Client(), env.rpcL1(), env.network, file.calls),
+    "Simulating upgrade",
     env
-  );
+  )
 
   const diff = new ZkSyncEraDiff(current, proposed);
 
