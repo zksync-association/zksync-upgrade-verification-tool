@@ -35,7 +35,14 @@ subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, hre) => {
 
 const config: HardhatUserConfig = {
   solidity: "0.8.24",
-  zksolc: { version: "latest" },
+  zksolc: {
+    version: "1.4.0",
+    settings: {
+      optimizer: {
+        enabled: true,
+      },
+    },
+  },
   paths: {
     sources: "src",
   },
