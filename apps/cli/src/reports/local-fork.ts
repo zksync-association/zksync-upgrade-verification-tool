@@ -4,6 +4,7 @@ import { basePackageDir } from "../util/base-package-dir";
 import { RpcClient } from "../ethereum/rpc-client";
 import {
   type Address,
+  bytesToHex,
   createWalletClient,
   type Hex,
   http,
@@ -14,9 +15,13 @@ import {
 import { mainnet, sepolia } from "viem/chains";
 import { z } from "zod";
 import { addressSchema, hexSchema } from "@repo/common/schemas";
+import { mnemonicToAccount } from "viem/accounts";
 
-const RICH_ADDRESS = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
-const RICH_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+const CLI_ANVIL_MNEMONIC =
+  "draw drastic exercise toilet stove bone grit clutch any stand phone ten";
+const account = mnemonicToAccount(CLI_ANVIL_MNEMONIC, { accountIndex: 0 });
+const FUNDED_PRIVATE_KEY = bytesToHex(account.getHdKey().privateKey as Uint8Array);
+const FUNDED_ADDRESS = account.address;
 
 const debugInfoSchema = z
   .object({
@@ -42,20 +47,20 @@ export class LocalFork {
   private constructor(baseUrl: string, network: Network, port = 9090) {
     this.network = network;
     const baseDir = basePackageDir();
-    // const hardhatBin = `${baseDir}/node_modules/.bin/hardhat`
     this.port = port;
 
-    this.spawned = spawn("anvil", ["--port", port.toString(), "-f", baseUrl], {
-      cwd: baseDir,
-      detached: false,
-      env: {
-        ...process.env,
-        RICH_PRIVATE_KEY: RICH_PRIVATE_KEY,
-      },
-    });
-
-    // this.spawned.stdout.on("data", (data) => console.log(data.toString()))
-    // this.spawned.stderr.on("data", (data) => console.log(data.toString()))
+    this.spawned = spawn(
+      "anvil",
+      ["--port", port.toString(), "-f", baseUrl, "-m", CLI_ANVIL_MNEMONIC, "-a", "1"],
+      {
+        cwd: baseDir,
+        detached: false,
+        env: {
+          ...process.env,
+          RICH_PRIVATE_KEY: FUNDED_PRIVATE_KEY,
+        },
+      }
+    );
   }
 
   static async create(baseUrl: string, network: Network, port = 9090) {
@@ -103,14 +108,14 @@ export class LocalFork {
   async fund(someAddress: Address, value: bigint) {
     const wallet = createWalletClient({
       transport: http(this.url()),
-      key: RICH_PRIVATE_KEY,
+      key: FUNDED_PRIVATE_KEY,
       chain: this.network === "mainnet" ? mainnet : sepolia,
     })
       .extend(publicActions)
       .extend(testActions({ mode: "anvil" }));
 
     const txid = await wallet.sendTransaction({
-      account: RICH_ADDRESS,
+      account: FUNDED_ADDRESS,
       to: someAddress,
       value,
     });
@@ -127,7 +132,7 @@ export class LocalFork {
   ): Promise<[Hex, DebugCallInfo]> {
     const wallet = createWalletClient({
       transport: http(this.url()),
-      key: RICH_PRIVATE_KEY,
+      key: FUNDED_PRIVATE_KEY,
       chain: this.network === "mainnet" ? mainnet : sepolia,
     })
       .extend(publicActions)
