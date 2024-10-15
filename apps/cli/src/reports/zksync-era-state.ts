@@ -1,32 +1,19 @@
-import { bytesToBigInt, bytesToHex, bytesToNumber, type Hex, numberToBytes } from "viem";
+import { bytesToBigInt, bytesToNumber, type Hex, numberToBytes, numberToHex } from "viem";
 import type { FacetData } from "./upgrade-changes.js";
 import { Option } from "nochoices";
 import { Diamond } from "./diamond.js";
 import { RpcStorageSnapshot } from "./storage/snapshot";
 import { StringStorageVisitor } from "./reports/string-storage-visitor.js";
 import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props.js";
-import {
-  RpcSystemContractProvider,
-  SystemContractList,
-  type SystemContractProvider,
-} from "./system-contract-providers.js";
+import { SystemContractList, type SystemContractProvider } from "./system-contract-providers.js";
 import { z } from "zod";
-import { RecordStorageSnapshot } from "./storage/snapshot";
-import {
-  AddressExtractor,
-  BigNumberExtractor,
-  BlobExtractor,
-  FacetsToSelectorsVisitor,
-  ListOfAddressesExtractor,
-} from "./reports/extractors.js";
-import type { ContractField } from "./storage/contractField.js";
-import type { StorageSnapshot } from "./storage/snapshot";
-import type { StorageVisitor } from "./reports/storage-visitor.js";
-import { DIAMOND_ADDRS, UPGRADE_FN_SELECTOR, type Network } from "@repo/common/ethereum";
+import { DIAMOND_ADDRS, type Network, UPGRADE_FN_SELECTOR } from "@repo/common/ethereum";
 import { hexSchema } from "@repo/common/schemas";
-import { BlockExplorerClient, type BlockExplorer } from "../ethereum/block-explorer-client";
+import type { BlockExplorerClient } from "../ethereum/block-explorer-client";
 import { MissingRequiredProp } from "../lib/errors";
-import { RpcClient } from "../ethereum/rpc-client";
+import type { RpcClient } from "../ethereum/rpc-client";
+import type { RawCall } from "../lib/upgrade-file";
+import { LocalFork } from "./local-fork";
 
 const baseCallTracerSchema = z.object({
   from: z.string(),
@@ -122,11 +109,18 @@ export class ZksyncEraState {
   data: ZkEraStateData;
   private facets: FacetData[];
   private systemContracts: SystemContractProvider;
+  affectedSystemContracts: L2ContractData[];
 
-  constructor(data: ZkEraStateData, facets: FacetData[], systemContracts: SystemContractProvider) {
+  constructor(
+    data: ZkEraStateData,
+    facets: FacetData[],
+    systemContracts: SystemContractProvider,
+    affectedSystemContracts: L2ContractData[]
+  ) {
     this.data = data;
     this.facets = facets;
     this.systemContracts = systemContracts;
+    this.affectedSystemContracts = affectedSystemContracts;
   }
 
   // METADATA
@@ -191,16 +185,16 @@ export class ZksyncEraState {
 
   static async fromBlockchain(
     network: Network,
+    rpc: RpcClient,
     explorer: BlockExplorerClient,
-    rpc: RpcClient
+    systemContracts: SystemContractProvider,
+    affectedSystemContracts: L2ContractData[] = []
   ): Promise<ZksyncEraState> {
-    const addr = DIAMOND_ADDRS[network];
-    const diamond = new Diamond(addr);
-
+    const diamond = new Diamond(DIAMOND_ADDRS[network]);
     await diamond.init(explorer, rpc);
     const facets = diamond.allFacets();
 
-    const memorySnapshot = new RpcStorageSnapshot(rpc, addr);
+    const memorySnapshot = new RpcStorageSnapshot(rpc, diamond.address);
     const visitor = new StringStorageVisitor();
 
     const blobVersionedHashRetrieverOpt = (
@@ -262,201 +256,72 @@ export class ZksyncEraState {
       data.baseTokenGasPriceMultiplierDenominator = value;
     });
 
-    return new ZksyncEraState(
-      data,
-      facets,
-      new RpcSystemContractProvider(RpcClient.forL2(network), BlockExplorerClient.forL2(network))
-    );
-  }
-
-  static async fromCalldata(
-    sender: Hex,
-    targetAddr: Hex,
-    callDataBuf: Buffer,
-    network: Network,
-    l1Explorer: BlockExplorerClient,
-    rpc: RpcClient,
-    l2Explorer: BlockExplorer
-  ): Promise<[ZksyncEraState, Hex[]]> {
-    const addr = DIAMOND_ADDRS[network];
-
-    const memoryMap = await rpc.debugCallTraceStorage(sender, targetAddr, bytesToHex(callDataBuf));
-
-    const post = Option.fromNullable(memoryMap.result.post[addr])
-      .map((post) => post.storage)
-      .flatten();
-
-    const base = new RpcStorageSnapshot(rpc, addr);
-    const storageWithUpgrade = base.apply(new RecordStorageSnapshot(post.unwrapOr({})));
-
-    const facetsAddresses = await extractValue(
-      MAIN_CONTRACT_FIELDS.facetAddresses,
-      storageWithUpgrade,
-      new ListOfAddressesExtractor()
-    );
-    const extractedFacetToSelectors = await extractValue(
-      MAIN_CONTRACT_FIELDS.facetToSelectors(facetsAddresses),
-      storageWithUpgrade,
-      new FacetsToSelectorsVisitor()
-    );
-    const facetToSelectors = extractedFacetToSelectors as Map<Hex, Hex[]>;
-
-    const facets = await Promise.all(
-      facetsAddresses.map(async (addr) => getFacetData(addr, l1Explorer, facetToSelectors))
-    );
-
-    const systemContracts: L2ContractData[] = await getSystemContracts(
-      rpc,
-      sender,
-      addr,
-      bytesToHex(callDataBuf),
-      l1Explorer,
-      l2Explorer
-    );
-    await extractValue(
-      MAIN_CONTRACT_FIELDS.verifierAddress,
-      storageWithUpgrade,
-      new AddressExtractor()
-    );
-
-    const state = new ZksyncEraState(
-      {
-        protocolVersion: await extractValue(
-          MAIN_CONTRACT_FIELDS.protocolVersion,
-          storageWithUpgrade,
-          new BigNumberExtractor()
-        ),
-        verifierAddress: await extractValue(
-          MAIN_CONTRACT_FIELDS.verifierAddress,
-          storageWithUpgrade,
-          new AddressExtractor()
-        ),
-        l2DefaultAccountBytecodeHash: await extractValue(
-          MAIN_CONTRACT_FIELDS.l2DefaultAccountBytecodeHash,
-          storageWithUpgrade,
-          new BlobExtractor()
-        ),
-        l2BootloaderBytecodeHash: await extractValue(
-          MAIN_CONTRACT_FIELDS.l2BootloaderBytecodeHash,
-          storageWithUpgrade,
-          new BlobExtractor()
-        ),
-        chainId: await extractValue(
-          MAIN_CONTRACT_FIELDS.chainId,
-          storageWithUpgrade,
-          new BigNumberExtractor()
-        ),
-        bridgeHubAddress: await extractValue(
-          MAIN_CONTRACT_FIELDS.bridgehubAddress,
-          storageWithUpgrade,
-          new AddressExtractor()
-        ),
-        stateTransitionManagerAddress: await extractValue(
-          MAIN_CONTRACT_FIELDS.stateTransitionManager,
-          storageWithUpgrade,
-          new AddressExtractor()
-        ),
-        baseTokenBridgeAddress: await extractValue(
-          MAIN_CONTRACT_FIELDS.baseTokenBridgeAddress,
-          storageWithUpgrade,
-          new AddressExtractor()
-        ),
-        admin: await extractValue(
-          MAIN_CONTRACT_FIELDS.adminAddress,
-          storageWithUpgrade,
-          new AddressExtractor()
-        ),
-      },
-      facets,
-      new SystemContractList(systemContracts)
-    );
-    return [state, systemContracts.map((l) => l.address)];
+    return new ZksyncEraState(data, facets, systemContracts, affectedSystemContracts);
   }
 
   allSelectors(): Hex[] {
     return this.facets.reduce((a, b) => a.concat(b.selectors), new Array<Hex>());
   }
-}
 
-async function extractValue<T>(
-  field: ContractField,
-  snapshot: StorageSnapshot,
-  visitor: StorageVisitor<T>
-) {
-  const value = await field.extract(snapshot);
-  const maybeRes = value.map((v) => v.accept(visitor));
-  return maybeRes.expect(new Error(`"${field.name}" should be present`));
-}
+  async applyTxs(
+    l1Explorer: BlockExplorerClient,
+    l2Explorer: BlockExplorerClient,
+    l1Rpc: RpcClient,
+    network: Network,
+    calls: RawCall[]
+  ): Promise<ZksyncEraState> {
+    const localFork = await LocalFork.create(l1Rpc.rpcUrl(), network);
+    const diamond = new Diamond(DIAMOND_ADDRS[network]);
+    await diamond.init(l1Explorer, l1Rpc);
 
-async function getFacetData(
-  address: Hex,
-  explorer: BlockExplorer,
-  selectorMap: Map<Hex, Hex[]>
-): Promise<FacetData> {
-  const contract = await explorer.getSourceCode(address);
-  const selectors = selectorMap.get(address);
-  if (!selectors) {
-    throw new Error("selectors should be present");
-  }
-  return {
-    name: contract.name,
-    address,
-    selectors,
-  };
-}
+    const transitionManager = await diamond.getTransitionManager(l1Rpc, l1Explorer);
+    const protocolHandlerAddress = await transitionManager.upgradeHandlerAddress(l1Rpc);
 
-function findCall(calls: CallTrace, selector: Hex): Option<CallTrace> {
-  if (calls.input.startsWith(selector)) {
-    return Option.Some(calls);
-  }
-  if (!calls.calls) return Option.None();
+    const systemContracts = [];
 
-  return calls.calls.reduce(
-    (partial, nextCall) => partial.or(findCall(nextCall, selector)),
-    Option.None<CallTrace>()
-  );
-}
+    for (const call of calls) {
+      const [_, debugInfo] = await localFork.execDebugTx(
+        protocolHandlerAddress,
+        call.target,
+        call.data,
+        call.value
+      );
+      const execUpgradeCall = debugInfo.find((di) => di.input.startsWith(UPGRADE_FN_SELECTOR));
+      if (
+        execUpgradeCall === undefined ||
+        execUpgradeCall.to === undefined ||
+        execUpgradeCall.input === undefined
+      ) {
+        continue;
+      }
 
-async function getSystemContracts(
-  rpc: RpcClient,
-  from: Hex,
-  to: Hex,
-  callData: Hex,
-  l1Explorer: BlockExplorer,
-  l2Explorer: BlockExplorer
-): Promise<L2ContractData[]> {
-  const calls = await rpc.debugCallTraceCalls(from, to, callData);
+      const abi = await l1Explorer.getAbi(execUpgradeCall.to);
+      const decoded = abi.decodeCallData(execUpgradeCall.input, upgradeCallDataSchema);
+      const l2Target = numberToHex(decoded.args[0].l2ProtocolUpgradeTx.to, { size: 20 });
+      const l2Abi = await l2Explorer.getAbi(l2Target);
+      const l2Call = l2Abi.decodeCallData(
+        decoded.args[0].l2ProtocolUpgradeTx.data,
+        l2UpgradeSchema
+      );
+      const upgradedSystemContracts = l2Call.args[0].map(
+        (a): L2ContractData => ({
+          address: a.newAddress,
+          name: SYSTEM_CONTRACT_NAMES[a.newAddress] || "Unknown Name",
+          bytecodeHash: a.bytecodeHash,
+        })
+      );
+      systemContracts.push(...upgradedSystemContracts);
+    }
 
-  const desiredCall = findCall(calls, UPGRADE_FN_SELECTOR);
-  if (desiredCall.isNone()) {
-    return [];
-  }
-  const { input: upgradeCalldata, to: upgradeAddr } = desiredCall.unwrap();
-
-  const upgradeAbi = await l1Explorer.getAbi(upgradeAddr);
-  const decodedUpgrade = upgradeAbi.decodeCallData(
-    hexSchema.parse(upgradeCalldata),
-    upgradeCallDataSchema
-  );
-
-  const hex = decodedUpgrade.args[0].l2ProtocolUpgradeTx.to.toString(16);
-  const deployAddr = `0x${"0".repeat(40 - hex.length)}${hex}`;
-  const deploySysContractsAbi = await l2Explorer.getAbi(deployAddr);
-  const decodedL2 = deploySysContractsAbi.decodeCallData(
-    decodedUpgrade.args[0].l2ProtocolUpgradeTx.data,
-    l2UpgradeSchema
-  );
-
-  return decodedL2.args[0].map((contract) => {
-    const name = Option.fromNullable(
-      SYSTEM_CONTRACT_NAMES[contract.newAddress.toLowerCase() as Hex]
+    await localFork.tearDown();
+    return await ZksyncEraState.fromBlockchain(
+      network,
+      localFork.rpc(),
+      l1Explorer,
+      new SystemContractList(systemContracts),
+      systemContracts
     );
-    return {
-      name: name.unwrapOr("New contract."),
-      address: contract.newAddress,
-      bytecodeHash: contract.bytecodeHash,
-    };
-  });
+  }
 }
 
 const SYSTEM_CONTRACT_NAMES: Record<Hex, string> = {

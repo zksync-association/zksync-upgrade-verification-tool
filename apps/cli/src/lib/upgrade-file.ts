@@ -16,7 +16,7 @@ const schema = z.object({
   salt: hexSchema,
 });
 
-type RawCall = {
+export type RawCall = {
   value: bigint;
   data: Hex;
   target: Address;

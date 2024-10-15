@@ -1,15 +1,17 @@
+import type { HttpTransport, PublicClient } from "viem";
 import {
   type Abi,
+  type Address,
+  BaseError,
   createPublicClient,
+  decodeErrorResult,
   decodeFunctionResult,
   encodeFunctionData,
   type Hex,
-  hexToNumber,
   http,
   numberToHex,
 } from "viem";
 import { type TypeOf, z, type ZodType } from "zod";
-import type { PublicClient, HttpTransport } from "viem";
 import { getStorageAt } from "viem/actions";
 import { L1_DEFAULT_URLS, L2_DEFAULT_URLS, type Network } from "@repo/common/ethereum";
 import { hexSchema, optionSchema } from "@repo/common/schemas";
@@ -76,27 +78,34 @@ export class RpcClient {
   }
 
   async contractReadRaw(target: string, callData: string, from?: Hex, value = 0n): Promise<Hex> {
-    const { data } = await this.viemClient.call({
-      to: target as Hex,
-      account: from,
-      data: callData as Hex,
-      value: value,
-    });
+    try {
+      const { data } = await this.viemClient.call({
+        to: target as Hex,
+        account: from,
+        data: callData as Hex,
+        value: value,
+      });
 
-    if (!data) {
-      return "0x";
+      if (!data) {
+        return "0x";
+      }
+
+      return data;
+    } catch (e) {
+      if (e instanceof BaseError) {
+        const walked = e.walk() as any;
+        const data = walked.data;
+        const decoded = decodeErrorResult({
+          data,
+        });
+        console.error(decoded);
+      }
+      throw e;
     }
-
-    return data;
   }
 
   async getByteCode(addr: Hex): Promise<Hex | undefined> {
     return this.viemClient.getCode({ address: addr });
-  }
-
-  async checkContractCode(addr: Hex): Promise<boolean> {
-    const code = await this.viemClient.getCode({ address: addr });
-    return code !== undefined && code.length > 2;
   }
 
   async storageRead(addr: Hex, position: bigint): Promise<Hex> {
@@ -146,7 +155,7 @@ export class RpcClient {
     }
   }
 
-  private async rawCall(method: string, params: any[]): Promise<any> {
+  async rawCall(method: string, params: any[]): Promise<any> {
     const res = await fetch(this.rpcUrl(), {
       method: "POST",
       body: JSON.stringify({
@@ -167,7 +176,19 @@ export class RpcClient {
     return res.json();
   }
 
-  async debugCallTraceStorage(from: string, to: string, callData: Hex): Promise<MemoryDiffRaw> {
+  async traceCall(from: Address, to: Address, callData: Hex, value: bigint) {
+    return await this.rawCall("debug_traceCall", [
+      {
+        from,
+        to,
+        data: callData,
+        value: Number(value),
+      },
+      "latest",
+    ]);
+  }
+
+  async debugCallTraceStorage(from: Address, to: Address, callData: Hex): Promise<MemoryDiffRaw> {
     const data = await this.rawCall("debug_traceCall", [
       {
         from,
@@ -208,38 +229,7 @@ export class RpcClient {
     });
   }
 
-  async getLogs(address: Hex, fromBlock: string, toBLock: string, topics: Hex[] = []) {
-    const arg = {
-      fromBlock,
-      toBlock: toBLock,
-      address,
-      topics,
-    };
-
-    const data = await this.rawCall("eth_getLogs", [arg]);
-
-    if (data.error) {
-      throw new Error(`Error getting logs: ${data.error?.message}`);
-    }
-
-    const parsed = z
-      .object({
-        result: z.array(contractEventSchema),
-      })
-      .parse(data);
-
-    return parsed.result;
-  }
-
-  async getLatestBlock(): Promise<{ number: Hex; timestamp: number }> {
-    const block = (await this.viemClient.request({
-      method: "eth_getBlockByNumber",
-      params: ["latest", false],
-    })) as any;
-
-    return {
-      number: block.number,
-      timestamp: hexToNumber(block.timestamp),
-    };
+  async balanceOf(address: Address): Promise<bigint> {
+    return this.viemClient.getBalance({ address, blockTag: "pending" });
   }
 }

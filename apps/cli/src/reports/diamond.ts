@@ -1,11 +1,14 @@
-import { type Abi, bytesToHex, type Hex, hexToBytes, toFunctionSelector } from "viem";
-import type { ZodType } from "zod";
+import { type Abi, type Address, bytesToHex, type Hex, hexToBytes, toFunctionSelector } from "viem";
+import type { TypeOf, ZodType } from "zod";
 import { facetsResponseSchema } from "./schema/new-facets.js";
 import type { FacetData } from "./upgrade-changes.js";
 import type { BlockExplorer, BlockExplorerClient } from "../ethereum/block-explorer-client";
 import type { ContractAbi } from "../ethereum/contract-abi";
 import type { ContractData } from "../ethereum/contract-data";
 import type { RpcClient } from "../ethereum/rpc-client";
+import { StateTransitionManager } from "./state-transition-manager";
+import { addressSchema } from "@repo/common/schemas";
+import { Option } from "nochoices";
 
 const DIAMOND_FUNCTIONS = {
   facets: "facets",
@@ -32,6 +35,16 @@ export class Diamond {
     await this.initializeFacets(abi.raw, client, rpc);
     await this.initializeAbis(client);
     await this.initializeContractData(client);
+  }
+
+  static async create(
+    addr: Address,
+    client: BlockExplorerClient,
+    rpc: RpcClient
+  ): Promise<Diamond> {
+    const diamond = new Diamond(addr);
+    await diamond.init(client, rpc);
+    return diamond;
   }
 
   allFacets(): FacetData[] {
@@ -106,7 +119,11 @@ export class Diamond {
     return bytesToHex(hexToBytes(data));
   }
 
-  async contractRead(rpc: RpcClient, fnName: string, schema: ZodType) {
+  async contractRead<T extends ZodType>(
+    rpc: RpcClient,
+    fnName: string,
+    schema: T
+  ): Promise<Promise<TypeOf<typeof schema>>> {
     const selector = toFunctionSelector(`${fnName}()`);
     const facetAddr = this.selectorToFacet.get(this.sanitizeHex(selector));
     if (!facetAddr) {
@@ -119,5 +136,29 @@ export class Diamond {
     }
 
     return rpc.contractRead(this.address, fnName, abi.raw, schema);
+  }
+
+  async getTransitionManager(rpc: RpcClient, explorer: BlockExplorerClient) {
+    const proxyAddr = await this.contractRead(rpc, "getStateTransitionManager", addressSchema);
+    return StateTransitionManager.create(proxyAddr, rpc, explorer);
+  }
+
+  selectorFor(methodName: string): Option<Hex> {
+    const abi = [...this.abis.values()].find((abi) => abi.hasFunction(methodName));
+    return Option.fromNullable(abi)
+      .map((abi) => abi.selectorForFn(methodName))
+      .flatten();
+  }
+
+  abiForSelector(selector: Hex): ContractAbi {
+    const facet = this.selectorToFacet.get(selector);
+    if (facet === undefined) {
+      throw new Error(`Unknown selector ${selector}`);
+    }
+    const abi = this.abis.get(this.sanitizeHex(facet));
+    if (abi === undefined) {
+      throw new Error(`Unknown facet ${facet}`);
+    }
+    return abi;
   }
 }
