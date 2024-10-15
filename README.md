@@ -246,8 +246,6 @@ pnpm test
 
 - **Improve Error Handling**: We plan to improve error messages and handling throughout the tool.
 
-- **Add HTML File Output Option**: Implementing HTML file output option to improve diff visualization and user experience.
-
 We welcome community feedback and suggestions which can be submitted via our GitHub repository.
 
 ## Web App
