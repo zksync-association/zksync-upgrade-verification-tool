@@ -2,7 +2,7 @@ import type { StorageValue } from "./storage-value.js";
 import type { StorageVisitor } from "../../reports/storage-visitor.js";
 
 export class BlobValue implements StorageValue {
-  private buf: Buffer;
+  buf: Buffer;
 
   constructor(buf: Buffer) {
     this.buf = buf;

@@ -23,10 +23,10 @@ export class ZkSyncEraDiff {
   proposed: ZksyncEraState;
   private affectedSystemContracts: Hex[];
 
-  constructor(current: ZksyncEraState, proposed: ZksyncEraState, sysContractsAddrs: Hex[]) {
+  constructor(current: ZksyncEraState, proposed: ZksyncEraState) {
     this.current = current;
     this.proposed = proposed;
-    this.affectedSystemContracts = sysContractsAddrs;
+    this.affectedSystemContracts = this.proposed.affectedSystemContracts.map((sc) => sc.address);
   }
 
   hexAttrDiff(prop: HexEraPropName): [Hex, Option<Hex>] {

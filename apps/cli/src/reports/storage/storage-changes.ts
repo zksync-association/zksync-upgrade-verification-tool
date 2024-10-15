@@ -4,6 +4,7 @@ import type { ContractField } from "./contractField.js";
 import type { StorageSnapshot } from "./snapshot";
 import { PropertyChange } from "./property-change.js";
 import { mainDiamondFields } from "./storage-props.js";
+import { EqualityVisitor } from "../reports/equality-visitor";
 
 export class StorageChanges {
   pre: StorageSnapshot;
@@ -31,22 +32,32 @@ export class StorageChanges {
     if (!found) {
       return Option.None();
     }
-    return Option.Some(
-      new PropertyChange(found, await found.extract(this.pre), await found.extract(this.post))
-    );
+
+    return this.extractChange(found);
+  }
+
+  private async extractChange(found: ContractField): Promise<Option<PropertyChange>> {
+    const pre = await found.extract(this.pre);
+    const after = await found.extract(this.post);
+
+    const zipped = pre.zip(after).filter(([p, a]) => {
+      const equalVisitor = new EqualityVisitor(a);
+      return !p.accept(equalVisitor);
+    });
+
+    return pre
+      .xor(after)
+      .map((_) => new PropertyChange(found, pre, after))
+      .or(zipped.map((_) => new PropertyChange(found, pre, after)));
   }
 
   async allChanges(): Promise<PropertyChange[]> {
     const all = await Promise.all(
       this.contractProps.map(async (prop) => {
-        return new PropertyChange(
-          prop,
-          await prop.extract(this.pre),
-          await prop.extract(this.post)
-        );
+        return this.extractChange(prop).then((opt) => opt.toArray());
       })
     );
-    return all.filter((change) => change.before.isSome() || change.after.isSome());
+    return all.flat().filter((change) => change.before.isSome() || change.after.isSome());
   }
 
   private allContractProps(): ContractField[] {

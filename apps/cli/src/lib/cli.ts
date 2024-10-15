@@ -8,7 +8,6 @@ import {
 } from "../commands";
 import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
-import { Option } from "nochoices";
 import { failHandler } from "../commands/fail-handler.js";
 import { NetworkSchema } from "@repo/common/ethereum";
 import pkg from "../../package.json";
@@ -92,7 +91,7 @@ export function buildCli(
           demandOption: false,
         }),
       async (yargs) => {
-        return storageDiffCbk(env, yargs.file, Option.fromNullable(yargs.precalculated));
+        return storageDiffCbk(env, yargs.file);
       }
     )
     .command(

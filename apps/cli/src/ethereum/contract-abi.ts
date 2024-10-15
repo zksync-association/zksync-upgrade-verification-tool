@@ -2,6 +2,7 @@ import {
   type Abi,
   type AbiEvent,
   type AbiFunction,
+  type AbiItem,
   decodeFunctionData,
   encodeFunctionData,
   type Hex,
@@ -9,6 +10,11 @@ import {
   toFunctionSelector,
 } from "viem";
 import type { z } from "zod";
+import { Option } from "nochoices";
+
+function isAbiFunction(abiElem: AbiItem): abiElem is AbiFunction {
+  return abiElem.type === "function";
+}
 
 export class ContractAbi {
   raw: Abi;
@@ -64,5 +70,14 @@ export class ContractAbi {
 
   hasFunction(name: string): boolean {
     return this.raw.some((t) => t.type === "function" && t.name === name);
+  }
+
+  selectorForFn(name: string): Option<Hex> {
+    for (const entry of this.raw) {
+      if (isAbiFunction(entry) && entry.name === name) {
+        return Option.Some(toFunctionSelector(entry));
+      }
+    }
+    return Option.None();
   }
 }

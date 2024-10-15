@@ -147,7 +147,8 @@ describe("CheckReport", () => {
           selectors: ctx.abi2.allSelectors(),
         },
       ],
-      new SystemContractList(ctx.sysContractsBefore)
+      new SystemContractList(ctx.sysContractsBefore),
+      ctx.sysContractsBefore
     );
 
     ctx.sysContractsAfter = [
@@ -196,7 +197,8 @@ describe("CheckReport", () => {
           selectors: ctx.abi3.allSelectors(),
         },
       ],
-      new SystemContractList(ctx.sysContractsAfter)
+      new SystemContractList(ctx.sysContractsAfter),
+      ctx.sysContractsAfter
     );
 
     const explorer = new TestBlockExplorer();
@@ -209,11 +211,7 @@ describe("CheckReport", () => {
 
   // biome-ignore lint/suspicious/noDuplicateTestHooks: <explanation>
   beforeEach<Ctx>((ctx) => {
-    ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
-      ctx.sysAddr1,
-      ctx.sysAddr2,
-      ctx.sysAddr3,
-    ]);
+    ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState);
   });
 
   async function createReportLines(ctx: Ctx): Promise<string[]> {
@@ -479,11 +477,7 @@ describe("CheckReport", () => {
       }
       ctx.contractsRepo = repo;
 
-      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
-        ctx.sysAddr1,
-        ctx.sysAddr2,
-        ctx.sysAddr3,
-      ]);
+      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState);
     });
 
     it<Ctx>("indicates that bytecode does not match", async (ctx) => {
@@ -516,11 +510,7 @@ describe("CheckReport", () => {
 
       ctx.contractsRepo = repo;
 
-      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
-        ctx.sysAddr1,
-        ctx.sysAddr2,
-        ctx.sysAddr3,
-      ]);
+      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState);
     });
 
     it<Ctx>("indicates that bytecode does not match", async (ctx) => {

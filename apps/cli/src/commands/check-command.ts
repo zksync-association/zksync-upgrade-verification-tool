@@ -1,23 +1,12 @@
 import type { EnvBuilder } from "../lib/env-builder.js";
-import { hexToBytes } from "viem";
 import { withSpinner } from "../lib/with-spinner.js";
 import { ZksyncEraState } from "../reports/zksync-era-state";
 import { ZkSyncEraDiff } from "../reports/zk-sync-era-diff";
-import { DIAMOND_ADDRS } from "@repo/common/ethereum";
 import { UpgradeFile } from "../lib/upgrade-file";
 import { StringCheckReport } from "../reports/reports/string-check-report";
+import { RpcSystemContractProvider } from "../reports/system-contract-providers";
 
 export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
-  const dataHex = UpgradeFile.fromFile(upgradeFilePath)
-    .firstCallData()
-    .expect(new Error("Missing calldata"));
-
-  const current = await withSpinner(
-    async () => ZksyncEraState.fromBlockchain(env.network, env.l1Client(), env.rpcL1()),
-    "Gathering current zksync state",
-    env
-  );
-
   const repo = await withSpinner(
     async () => {
       const repo = await env.contractsRepo();
@@ -28,27 +17,35 @@ export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
     env
   );
 
-  const stateManagerAddress = current
-    .hexAttrValue("stateTransitionManagerAddress")
-    .expect(new Error("Should be present"));
+  const upgradeFile = UpgradeFile.fromFile(upgradeFilePath);
 
-  const [proposed, systemContractsAddrs] = await withSpinner(
-    () =>
-      ZksyncEraState.fromCalldata(
-        stateManagerAddress,
-        DIAMOND_ADDRS[env.network],
-        Buffer.from(hexToBytes(dataHex)),
+  const current = await withSpinner(
+    async () =>
+      ZksyncEraState.fromBlockchain(
         env.network,
-        env.l1Client(),
         env.rpcL1(),
-        env.l2Client()
+        env.l1Client(),
+        new RpcSystemContractProvider(env.rpcL2(), env.l2Client())
       ),
-    "Calculating upgrade changes",
+    "Gathering current zksync state",
     env
   );
 
-  const diff = new ZkSyncEraDiff(current, proposed, systemContractsAddrs);
+  const proposed = await withSpinner(
+    async () =>
+      current.applyTxs(env.l1Client(), env.l2Client(), env.rpcL1(), env.network, upgradeFile.calls),
+    "Simulating upgrade",
+    env
+  );
 
-  const report = new StringCheckReport(diff, repo, env.l1Client());
+  const report = await withSpinner(
+    async () => {
+      const diff = new ZkSyncEraDiff(current, proposed);
+      return new StringCheckReport(diff, repo, env.l1Client());
+    },
+    "Generating report",
+    env
+  );
+
   env.term().line(await report.format());
 }
