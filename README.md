@@ -42,21 +42,16 @@ If you do not have `yarn` installed, please install it from [yarn installation g
 npm install -g yarn
 ```
 
-### **2. Access to Upgrade Directory**
+### **2. Upgrade file**
 
-For the `<upgradeDir>` parameter, you need access to a upgrade directory. For example, [zksync-era upgrades directory](https://github.com/matter-labs/zksync-era/tree/main/etc/upgrades)
+Upgrade file can be copied from an upgrade proposal: https://verify.zknation.io/
 
-You can clone [zkSync Era Repo](https://github.com/matter-labs/zksync-era) to access this directory:
+### **3. Install foundry**
 
-```bash
-git clone https://github.com/matter-labs/zksync-era.git
-```
+In order to simulate transactions the network is forked using foundry. Foundry
+needs to be installed before running any command.
 
-Later you can define the target `<upgradeDir>` in tool commands using the path to a specific upgrade, for example:
-
-```bash
-path-to-directory/zksync-era/etc/upgrades/1699353977-boojum
-```
+https://book.getfoundry.sh/getting-started/installation
 
 ## CLI
 
