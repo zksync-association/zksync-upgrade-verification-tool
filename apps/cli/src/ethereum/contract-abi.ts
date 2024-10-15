@@ -76,10 +76,9 @@ export class ContractAbi {
     const found = this.raw.find((t) => isAbiFunction(t) && t.name === name);
 
     if (found === undefined || !isAbiFunction(found)) {
-      return Option.None()
+      return Option.None();
     }
 
-    return Option.Some(found)
-      .map((abiFn) => toFunctionSelector(abiFn));
+    return Option.Some(found).map((abiFn) => toFunctionSelector(abiFn));
   }
 }
