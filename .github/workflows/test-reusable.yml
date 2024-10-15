@@ -44,7 +44,10 @@ jobs:
         with:
           node-version: 20
           cache: "pnpm"
-      - run: curl -L https://foundry.paradigm.xyz | bash
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
       - run: pnpm install
       - run: |
           cp packages/contracts/.env.example packages/contracts/.env
