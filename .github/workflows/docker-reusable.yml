@@ -29,7 +29,10 @@ jobs:
 
       - name: Get short SHA
         id: vars
-        run: echo "SHORT_SHA=$(git rev-parse --short $GITHUB_SHA)" >> $GITHUB_ENV
+        shell: bash
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short $GITHUB_SHA)" >> $GITHUB_ENV
+          echo "TS=$(date +%s)" >> $GITHUB_ENV
 
       - name: Build Docker image for dev
         if: ${{ github.ref == 'refs/heads/dev' }}
@@ -38,7 +41,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:dev-${{ env.SHORT_SHA }}
+            ghcr.io/${{ github.repository }}:dev-${{ env.TS }}
 
       - name: Build Docker image
         id: build
@@ -48,4 +51,4 @@ jobs:
           push: ${{ github.ref == 'refs/heads/main' }}
           tags: |
             ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ env.SHORT_SHA }}
+            ghcr.io/${{ github.repository }}:${{ env.SHORT_SHA }}-${{ env.TS }}
