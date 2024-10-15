@@ -73,11 +73,13 @@ export class ContractAbi {
   }
 
   selectorForFn(name: string): Option<Hex> {
-    const found = this.raw.find((t) => t.type === "function" && t.name === name);
+    const found = this.raw.find((t) => isAbiFunction(t) && t.name === name);
 
-    return Option.fromNullable(found)
-      .filter(isAbiFunction)
-      .map((abiFn) => abiFn as AbiFunction)
+    if (found === undefined || !isAbiFunction(found)) {
+      return Option.None()
+    }
+
+    return Option.Some(found)
       .map((abiFn) => toFunctionSelector(abiFn));
   }
 }
