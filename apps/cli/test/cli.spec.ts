@@ -56,10 +56,7 @@ describe("cli", () => {
   describe("storage-diff", () => {
     it("sends right arguments", async () => {
       let called = false;
-      const fakeStorageDiff = async (
-        _env: EnvBuilder,
-        upgradeDirectory: string,
-      ): Promise<void> => {
+      const fakeStorageDiff = async (_env: EnvBuilder, upgradeDirectory: string): Promise<void> => {
         expect(upgradeDirectory).to.equal("someDir");
         called = true;
       };
@@ -76,10 +73,7 @@ describe("cli", () => {
 
     it("when precalculated is specified it is received", async () => {
       let called = false;
-      const fakeStorageDiff = async (
-        _env: EnvBuilder,
-        upgradeDirectory: string,
-      ): Promise<void> => {
+      const fakeStorageDiff = async (_env: EnvBuilder, upgradeDirectory: string): Promise<void> => {
         expect(upgradeDirectory).toEqual("someDir");
         called = true;
       };
