@@ -58,8 +58,8 @@ export class LocalFork {
     // this.spawned.stderr.on("data", (data) => console.log(data.toString()))
   }
 
-  static async create(baseUrl: string, network: Network) {
-    const localFork = new LocalFork(baseUrl, network);
+  static async create(baseUrl: string, network: Network, port = 9090) {
+    const localFork = new LocalFork(baseUrl, network, port);
     await localFork.waitForReady();
     return localFork;
   }
