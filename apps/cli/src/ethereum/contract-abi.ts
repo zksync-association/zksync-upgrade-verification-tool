@@ -75,7 +75,7 @@ export class ContractAbi {
   selectorForFn(name: string): Option<Hex> {
     for (const entry of this.raw) {
       if (isAbiFunction(entry) && entry.name === name) {
-        return Option.Some(toFunctionSelector(entry))
+        return Option.Some(toFunctionSelector(entry));
       }
     }
     return Option.None();
