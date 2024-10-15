@@ -106,7 +106,13 @@ export const downloadCodeCommand = async (
 
   const current = await withSpinner(
     async () => {
-      return ZksyncEraState.fromBlockchain(env.network, env.rpcL1(), env.l1Client(), new SystemContractList([]), []);
+      return ZksyncEraState.fromBlockchain(
+        env.network,
+        env.rpcL1(),
+        env.l1Client(),
+        new SystemContractList([]),
+        []
+      );
     },
     "Gathering current zksync state",
     env
@@ -127,10 +133,11 @@ export const downloadCodeCommand = async (
   );
 
   const proposed = await withSpinner(
-    async () => current.applyTxs(env.l1Client(), env.l2Client(), env.rpcL1(), env.network, file.calls),
+    async () =>
+      current.applyTxs(env.l1Client(), env.l2Client(), env.rpcL1(), env.network, file.calls),
     "Simulating upgrade",
     env
-  )
+  );
 
   const diff = new ZkSyncEraDiff(current, proposed);
 

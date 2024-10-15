@@ -12,21 +12,20 @@ export async function storageSnapshotCommand(env: EnvBuilder): Promise<void> {
   const snapshot = new RpcStorageSnapshot(rpc, DIAMOND_ADDRS[env.network]);
 
   const state = await withSpinner(
-    async () => ZksyncEraState.fromBlockchain(
-      env.network,
-      await env.newRpcL1(),
-      env.l1Client(),
-      new RpcSystemContractProvider(env.rpcL2(), env.l2Client())
-    ),
+    async () =>
+      ZksyncEraState.fromBlockchain(
+        env.network,
+        await env.newRpcL1(),
+        env.l1Client(),
+        new RpcSystemContractProvider(env.rpcL2(), env.l2Client())
+      ),
     "Gathering current zksync state",
     env
-  )
+  );
 
   const report = await withSpinner(
-    async () => new SnapshotReport(
-      snapshot,
-      mainDiamondFields(state.allSelectors(), state.allFacetsAddrs())
-    ),
+    async () =>
+      new SnapshotReport(snapshot, mainDiamondFields(state.allSelectors(), state.allFacetsAddrs())),
     "Generating report",
     env
   );

@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Hex, hexToBigInt } from "viem";
 import { Option } from "nochoices";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { bytesToBigint } from "viem/utils";
 import {
   ZksyncEraState,
@@ -13,7 +11,10 @@ import {
 } from "../src/reports/zksync-era-state";
 import { BlockExplorerClient } from "../src/ethereum/block-explorer-client";
 import { MissingRequiredProp } from "../src/lib/errors";
-import { RpcSystemContractProvider, SystemContractList } from "../src/reports/system-contract-providers";
+import {
+  RpcSystemContractProvider,
+  SystemContractList,
+} from "../src/reports/system-contract-providers";
 import type { FacetData } from "../src/reports/upgrade-changes";
 import { ZkSyncEraDiff } from "../src/reports/zk-sync-era-diff";
 import { RpcClient } from "../src/ethereum/rpc-client";
@@ -546,7 +547,13 @@ describe("NewZkSyncStateDiff", () => {
       const explorer = BlockExplorerClient.forL1(key, network);
       const rpc = RpcClient.forL1(network);
 
-      const state = await ZksyncEraState.fromBlockchain(network, rpc, explorer, new RpcSystemContractProvider(rpc, explorer), []);
+      const state = await ZksyncEraState.fromBlockchain(
+        network,
+        rpc,
+        explorer,
+        new RpcSystemContractProvider(rpc, explorer),
+        []
+      );
       expect(state.allFacets()).toHaveLength(4);
 
       expect(state.hexAttrValue("admin").unwrap()).toMatch(/0x.*/);

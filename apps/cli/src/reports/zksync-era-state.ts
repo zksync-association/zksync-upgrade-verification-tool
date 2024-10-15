@@ -1,17 +1,17 @@
-import { bytesToBigInt, bytesToNumber, type Hex, numberToBytes, numberToHex, } from "viem";
+import { bytesToBigInt, bytesToNumber, type Hex, numberToBytes, numberToHex } from "viem";
 import type { FacetData } from "./upgrade-changes.js";
 import { Option } from "nochoices";
 import { Diamond } from "./diamond.js";
 import { RpcStorageSnapshot } from "./storage/snapshot";
 import { StringStorageVisitor } from "./reports/string-storage-visitor.js";
 import { MAIN_CONTRACT_FIELDS } from "./storage/storage-props.js";
-import { SystemContractList, type SystemContractProvider, } from "./system-contract-providers.js";
+import { SystemContractList, type SystemContractProvider } from "./system-contract-providers.js";
 import { z } from "zod";
 import { DIAMOND_ADDRS, type Network, UPGRADE_FN_SELECTOR } from "@repo/common/ethereum";
 import { hexSchema } from "@repo/common/schemas";
-import { BlockExplorerClient } from "../ethereum/block-explorer-client";
+import type { BlockExplorerClient } from "../ethereum/block-explorer-client";
 import { MissingRequiredProp } from "../lib/errors";
-import { RpcClient } from "../ethereum/rpc-client";
+import type { RpcClient } from "../ethereum/rpc-client";
 import type { RawCall } from "../lib/upgrade-file";
 import { LocalFork } from "./local-fork";
 
@@ -191,7 +191,7 @@ export class ZksyncEraState {
     affectedSystemContracts: L2ContractData[] = []
   ): Promise<ZksyncEraState> {
     const diamond = new Diamond(DIAMOND_ADDRS[network]);
-    await diamond.init(explorer, rpc)
+    await diamond.init(explorer, rpc);
     const facets = diamond.allFacets();
 
     const memorySnapshot = new RpcStorageSnapshot(rpc, diamond.address);
@@ -256,12 +256,7 @@ export class ZksyncEraState {
       data.baseTokenGasPriceMultiplierDenominator = value;
     });
 
-    return new ZksyncEraState(
-      data,
-      facets,
-      systemContracts,
-      affectedSystemContracts
-    );
+    return new ZksyncEraState(data, facets, systemContracts, affectedSystemContracts);
   }
 
   allSelectors(): Hex[] {

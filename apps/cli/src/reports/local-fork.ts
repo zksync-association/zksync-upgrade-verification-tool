@@ -43,14 +43,14 @@ export class LocalFork {
     this.network = network;
     const baseDir = basePackageDir();
     // const hardhatBin = `${baseDir}/node_modules/.bin/hardhat`
-    this.port = port
+    this.port = port;
 
     this.spawned = spawn("anvil", ["--port", port.toString(), "-f", baseUrl], {
       cwd: baseDir,
       detached: false,
       env: {
         ...process.env,
-        RICH_PRIVATE_KEY: RICH_PRIVATE_KEY
+        RICH_PRIVATE_KEY: RICH_PRIVATE_KEY,
       },
     });
 
@@ -74,9 +74,9 @@ export class LocalFork {
           headers: { "content-type": "application/json" },
           body: '{"id":1,"jsonrpc":"2.0","method":"net_version","params":[]}',
         });
-        const res = await response.json() as any;
+        const res = (await response.json()) as any;
         if (res.result === undefined) {
-          continue
+          continue;
         }
         return;
       } catch (_error) {
@@ -87,9 +87,9 @@ export class LocalFork {
   }
 
   async tearDown() {
-    const prom = new Promise(resolve => this.spawned.on("exit", () => resolve(null )))
+    const prom = new Promise((resolve) => this.spawned.on("exit", () => resolve(null)));
     this.spawned.kill("SIGKILL");
-    return prom
+    return prom;
   }
 
   url() {

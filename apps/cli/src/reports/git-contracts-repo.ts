@@ -61,7 +61,7 @@ export class GitContractsRepo implements ContractsRepo {
     await this.git.checkout(ref, ["--force"]);
     const currentBranch = await this.currentBranch();
     if (currentBranch.isSome()) {
-      await this.git.pull()
+      await this.git.pull();
     }
   }
 
@@ -162,8 +162,7 @@ export class GitContractsRepo implements ContractsRepo {
   }
 
   async currentBranch(): Promise<Option<string>> {
-    const branch = await this.git.branch(['--show-current']);
-    return Option.fromNullable(branch.current)
-      .filter(branchName => branchName.length > 0);
+    const branch = await this.git.branch(["--show-current"]);
+    return Option.fromNullable(branch.current).filter((branchName) => branchName.length > 0);
   }
 }

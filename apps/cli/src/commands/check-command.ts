@@ -21,26 +21,23 @@ export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
   const upgradeFile = UpgradeFile.fromFile(upgradeFilePath);
 
   const current = await withSpinner(
-    async () => ZksyncEraState.fromBlockchain(
-      env.network,
-      env.rpcL1(), env.l1Client(),
-      new RpcSystemContractProvider(env.rpcL2(), env.l2Client())
-    ),
+    async () =>
+      ZksyncEraState.fromBlockchain(
+        env.network,
+        env.rpcL1(),
+        env.l1Client(),
+        new RpcSystemContractProvider(env.rpcL2(), env.l2Client())
+      ),
     "Gathering current zksync state",
     env
   );
 
   const proposed = await withSpinner(
-    async () => current.applyTxs(
-      env.l1Client(),
-      env.l2Client(),
-      env.rpcL1(),
-      env.network,
-      upgradeFile.calls
-    ),
+    async () =>
+      current.applyTxs(env.l1Client(), env.l2Client(), env.rpcL1(), env.network, upgradeFile.calls),
     "Simulating upgrade",
     env
-  )
+  );
 
   const report = await withSpinner(
     async () => {
@@ -49,7 +46,7 @@ export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
     },
     "Generating report",
     env
-  )
+  );
 
   env.term().line(await report.format());
 }

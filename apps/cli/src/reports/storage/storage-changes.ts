@@ -33,27 +33,28 @@ export class StorageChanges {
       return Option.None();
     }
 
-    return this.extractChange(found)
+    return this.extractChange(found);
   }
 
   private async extractChange(found: ContractField): Promise<Option<PropertyChange>> {
     const pre = await found.extract(this.pre);
     const after = await found.extract(this.post);
 
-    const zipped = pre.zip(after)
-      .filter(([p, a]) => {
-        const equalVisitor = new EqualityVisitor(a)
-        return !p.accept(equalVisitor)
-      });
+    const zipped = pre.zip(after).filter(([p, a]) => {
+      const equalVisitor = new EqualityVisitor(a);
+      return !p.accept(equalVisitor);
+    });
 
-    return pre.xor(after).map((_) => new PropertyChange(found, pre, after))
-      .or(zipped.map((_) => new PropertyChange(found, pre, after)))
+    return pre
+      .xor(after)
+      .map((_) => new PropertyChange(found, pre, after))
+      .or(zipped.map((_) => new PropertyChange(found, pre, after)));
   }
 
   async allChanges(): Promise<PropertyChange[]> {
     const all = await Promise.all(
       this.contractProps.map(async (prop) => {
-        return this.extractChange(prop).then(opt => opt.toArray());
+        return this.extractChange(prop).then((opt) => opt.toArray());
       })
     );
     return all.flat().filter((change) => change.before.isSome() || change.after.isSome());
