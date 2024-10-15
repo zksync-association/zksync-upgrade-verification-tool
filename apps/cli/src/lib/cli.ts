@@ -92,7 +92,7 @@ export function buildCli(
           demandOption: false,
         }),
       async (yargs) => {
-        return storageDiffCbk(env, yargs.file, Option.fromNullable(yargs.precalculated));
+        return storageDiffCbk(env, yargs.file);
       }
     )
     .command(

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { Option } from "nochoices";
 import type { Argv } from "yargs";
 import { buildCli } from "../src/lib/cli.js";
 import type { EnvBuilder } from "../src/lib/env-builder.js";
@@ -60,10 +59,8 @@ describe("cli", () => {
       const fakeStorageDiff = async (
         _env: EnvBuilder,
         upgradeDirectory: string,
-        preCalculatedPath: Option<string>
       ): Promise<void> => {
         expect(upgradeDirectory).to.equal("someDir");
-        expect(preCalculatedPath.isNone()).to.equal(true);
         called = true;
       };
       const cli = buildCli(
@@ -82,10 +79,8 @@ describe("cli", () => {
       const fakeStorageDiff = async (
         _env: EnvBuilder,
         upgradeDirectory: string,
-        preCalculatedPath: Option<string>
       ): Promise<void> => {
         expect(upgradeDirectory).toEqual("someDir");
-        expect(preCalculatedPath.unwrap()).toEqual("path/to/data.json");
         called = true;
       };
       const cli = buildCli(
