@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { displayBytes32 } from "@/utils/common-tables";
 import { formatDateTime } from "@/utils/date";
 import { Meta } from "@/utils/meta";
 import { Link, json, useLoaderData } from "@remix-run/react";
@@ -137,7 +138,7 @@ export default function Index() {
                         {formatDateTime(ep.changedOn)}
                       </TableCell>
                       <TableCell>
-                        <div className="truncate">{`${ep.externalId.slice(0, 10)} ... ${ep.externalId.slice(-8)}`}</div>
+                        <div className="truncate">{displayBytes32(ep.externalId)}</div>
                       </TableCell>
 
                       <TableCell>
