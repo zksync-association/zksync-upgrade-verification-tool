@@ -11,12 +11,14 @@ import { EnvBuilder } from "./env-builder.js";
 import { failHandler } from "../commands/fail-handler.js";
 import { NetworkSchema } from "@repo/common/ethereum";
 import pkg from "../../package.json";
+import { idCommand } from "../commands/id-command";
 
 export function buildCli(
   args: string[],
   checkCbk: typeof checkCommand,
   downloadCodeCbk: typeof downloadCodeCommand,
   storageDiffCbk: typeof storageChangeCommand,
+  idCbk: typeof idCommand,
   failCbk: typeof failHandler
 ): Argv {
   const env = new EnvBuilder();
@@ -103,6 +105,14 @@ export function buildCli(
       }
     )
     .command(
+      "id",
+      "Calculates id for upgrade",
+      (yargs) => yargs,
+      (yargs) => {
+        idCbk(env, yargs.file)
+      }
+    )
+    .command(
       "download-code <targetSourceCodeDir>",
       "Download source code diff",
       (yargs) =>
@@ -166,6 +176,7 @@ export const cli = async () => {
     checkCommand,
     downloadCodeCommand,
     storageChangeCommand,
+    idCommand,
     failHandler
   );
   await argParser.parseAsync();
