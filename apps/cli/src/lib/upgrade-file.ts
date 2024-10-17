@@ -1,8 +1,9 @@
-import { type Address, type Hex, hexToBigInt } from "viem";
+import { type Address, type Hex, hexToBigInt, numberToHex } from "viem";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { addressSchema, hexSchema } from "@repo/common/schemas";
 import { Option } from "nochoices";
+import { calculateUpgradeProposalHash } from "@repo/common/util";
 
 const schema = z.object({
   calls: z.array(
@@ -42,5 +43,13 @@ export class UpgradeFile {
     const obj = JSON.parse(buff.toString());
     const parsed = schema.parse(obj);
     return new UpgradeFile(parsed.calls, parsed.executor, parsed.salt);
+  }
+
+  id(): Hex {
+    return calculateUpgradeProposalHash(
+      this.calls.map(c => ({ ...c, value: numberToHex(c.value) })),
+      this.salt,
+      this.executor,
+    )
   }
 }
