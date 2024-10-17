@@ -15,11 +15,11 @@ export const Meta = {
   "/app/proposals": () => [{ title: `Upgrades | ${AppName}` }],
   "/app/proposals/:id": ({ params }) => [{ title: `Upgrade ${params.id} | ${AppName}` }],
   "/app/proposals/new": () => [{ title: `Create Upgrade | ${AppName}` }],
-  "/app/l2-cancellations": () => [{ title: `Governor Veto | ${AppName}` }],
+  "/app/l2-cancellations": () => [{ title: `Guardian Veto | ${AppName}` }],
   "/app/l2-cancellations/:id": ({ params }) => [
-    { title: `Governor Veto ${params.id} | ${AppName}` },
+    { title: `Guardian Veto ${params.id} | ${AppName}` },
   ],
-  "/app/l2-cancellations/new": () => [{ title: `Create Governor Veto | ${AppName}` }],
+  "/app/l2-cancellations/new": () => [{ title: `Create Guardian Veto | ${AppName}` }],
   "/app/transactions/:hash": ({ params }) => [{ title: `Transaction ${params.hash} | ${AppName}` }],
 } satisfies Meta;
 

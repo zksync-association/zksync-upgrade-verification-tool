@@ -1,0 +1,1 @@
+ALTER TABLE "l2_governor_cancellations" DROP CONSTRAINT "l2_governor_cancellations_external_id_unique";
