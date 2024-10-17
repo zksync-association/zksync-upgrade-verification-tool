@@ -9,8 +9,9 @@ import {
   padHex,
   zeroAddress,
 } from "viem";
-import type { StateTransitionManager } from "../../src/reports/state-transition-manager";
-import { hexSchema } from "@repo/common/schemas";
+import { hexSchema, type Selector } from "@repo/common/schemas";
+import type { BlockExplorer } from "../../src/ethereum/block-explorer-client";
+import type { Diamond } from "../../src/reports/diamond";
 
 export const defaultUpgradeAbi = [
   {
@@ -1696,17 +1697,31 @@ const deployerAbi = [
   },
 ] as const;
 
+type FacetChange = {
+  facet: Address;
+  selectors: Selector[];
+};
+
+type FacetCut = {
+  facet: Address;
+  selectors: Selector[];
+  action: number;
+  isFreezable: boolean;
+};
+
 type SysContractData = { address: Address; hash: Hex };
 type CreateFakeUpgradeOpts = {
   verifier?: Address;
   systemContracts?: Array<SysContractData>;
   newVersion?: bigint;
+  newFacets?: FacetChange[];
 };
 
 const defaultOpts = {
   verifier: zeroAddress,
   systemContracts: [],
   newVersion: 103079215107n,
+  newFacets: [],
 };
 
 function encodeForceL2Deploy(data: SysContractData[]): Hex {
@@ -1775,12 +1790,43 @@ function buildL2Tx(systemContracts: SysContractData[], newVersion: bigint) {
   };
 }
 
+function buildFacetCuts(facets: FacetChange[], diamond: Diamond): FacetCut[] {
+  if (facets.length === 0) {
+    return [];
+  }
+
+  const allFacets = diamond.allFacets();
+
+  const res = [];
+  for (const facet of allFacets) {
+    res.push({
+      facet: zeroAddress,
+      selectors: diamond.facetToSelectors.get(facet.address) || [],
+      action: 2,
+      isFreezable: false,
+    });
+  }
+
+  for (const facet of facets) {
+    res.push({
+      facet: facet.facet,
+      selectors: facet.selectors,
+      action: 0,
+      isFreezable: false,
+    });
+  }
+
+  return res;
+}
+
 export async function createFakeUpgrade(
-  transitionManager: StateTransitionManager,
+  diamond: Diamond,
+  explorer: BlockExplorer,
   rpc: RpcClient,
   rawOpts: CreateFakeUpgradeOpts = {}
 ): Promise<Hex> {
   const opts = Object.assign({}, defaultOpts, rawOpts);
+  const transitionManager = await diamond.getTransitionManager(rpc, explorer);
   const someHyperchainId = await transitionManager.allHyperchainIds(rpc).then((all) => all[0]);
 
   if (someHyperchainId === undefined) {
@@ -1810,13 +1856,15 @@ export async function createFakeUpgrade(
     ],
   });
 
+  const facetCuts = buildFacetCuts(opts.newFacets, diamond);
+
   return encodeFunctionData({
     abi: stateTransitionManagerAbi,
     functionName: "executeUpgrade",
     args: [
       someHyperchainId,
       {
-        facetCuts: [],
+        facetCuts: facetCuts,
         initAddress: "0x4d376798Ba8F69cEd59642c3AE8687c7457e855d",
         initCalldata: innerCalldata,
       },
