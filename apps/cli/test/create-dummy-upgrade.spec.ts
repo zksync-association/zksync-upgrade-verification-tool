@@ -81,9 +81,22 @@ describe("createDummyUpgrade", () => {
     const rpc = new RpcClient(url);
     const diamond = new Diamond(DIAMOND_ADDRS.mainnet);
     await diamond.init(explorer, rpc);
+
+    const systemContracts = [
+      {
+        address: "0x0000000000000000000000000000000000008010" as Address,
+        hash: "0x0100000f248e111a1b587fef850dc4585c39af2dd505bc8a0d5cc6d3fcc7ed3c" as Hex,
+      },
+      {
+        address: "0x0000000000000000000000000000000000008012" as Address,
+        hash: "0x01000023b02bbb21baf1367835e56ae17b82688527dc8f78caf34b12e670ee60" as Hex,
+      },
+    ];
+
     const callData = await createFakeUpgrade(diamond, explorer, rpc, {
       verifier: padHex("0x01", { size: 20 }),
-      systemContracts: [],
+      newVersion: 204089315107n,
+      systemContracts,
       newFacets: [
         {
           facet: "0x230214F0224C7E0485f348a79512ad00514DB1F7",
