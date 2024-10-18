@@ -217,17 +217,21 @@ export class ZksyncEraState {
       .map((prop) => BigInt(prop));
 
     const data: ZkEraStateData = {
-      admin: await diamond.contractRead(rpc, "getAdmin", hexSchema),
-      pendingAdmin: await diamond.contractRead(rpc, "getPendingAdmin", hexSchema),
+      admin: await diamond.contractRead(rpc, "getAdmin", hexSchema).catch(() => undefined),
+      pendingAdmin: await diamond
+        .contractRead(rpc, "getPendingAdmin", hexSchema)
+        .catch(() => undefined),
       verifierAddress: await diamond.contractRead(rpc, "getVerifier", hexSchema),
-      bridgeHubAddress: await diamond.contractRead(rpc, "getBridgehub", hexSchema),
+      bridgeHubAddress: await diamond
+        .contractRead(rpc, "getBridgehub", hexSchema)
+        .catch(() => undefined),
       protocolVersion: await diamond.contractRead(rpc, "getProtocolVersion", z.bigint()),
-      baseTokenBridgeAddress: await diamond.contractRead(rpc, "getBaseTokenBridge", hexSchema),
-      stateTransitionManagerAddress: await diamond.contractRead(
-        rpc,
-        "getStateTransitionManager",
-        hexSchema
-      ),
+      baseTokenBridgeAddress: await diamond
+        .contractRead(rpc, "getBaseTokenBridge", hexSchema)
+        .catch(() => undefined),
+      stateTransitionManagerAddress: await diamond
+        .contractRead(rpc, "getStateTransitionManager", hexSchema)
+        .catch(() => undefined),
       l2DefaultAccountBytecodeHash: await diamond.contractRead(
         rpc,
         "getL2DefaultAccountBytecodeHash",
@@ -297,6 +301,9 @@ export class ZksyncEraState {
 
       const abi = await l1Explorer.getAbi(execUpgradeCall.to);
       const decoded = abi.decodeCallData(execUpgradeCall.input, upgradeCallDataSchema);
+      if (decoded.args[0].l2ProtocolUpgradeTx.data === "0x") {
+        continue;
+      }
       const l2Target = numberToHex(decoded.args[0].l2ProtocolUpgradeTx.to, { size: 20 });
       const l2Abi = await l2Explorer.getAbi(l2Target);
       const l2Call = l2Abi.decodeCallData(
@@ -313,14 +320,16 @@ export class ZksyncEraState {
       systemContracts.push(...upgradedSystemContracts);
     }
 
-    await localFork.tearDown();
-    return await ZksyncEraState.fromBlockchain(
+    const finalState = await ZksyncEraState.fromBlockchain(
       network,
       localFork.rpc(),
       l1Explorer,
       new SystemContractList(systemContracts),
       systemContracts
     );
+    await localFork.tearDown();
+
+    return finalState;
   }
 }
 

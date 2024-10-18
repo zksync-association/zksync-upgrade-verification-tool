@@ -131,7 +131,7 @@ export class LocalFork {
     value: bigint
   ): Promise<[Hex, DebugCallInfo]> {
     const wallet = createWalletClient({
-      transport: http(this.url()),
+      transport: http(this.url(), { timeout: 100_000 }),
       key: FUNDED_PRIVATE_KEY,
       chain: this.network === "mainnet" ? mainnet : sepolia,
     })

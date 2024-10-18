@@ -19,6 +19,7 @@ describe("cli", () => {
         fakeCheck,
         fail,
         fail,
+        fail,
         fail
       );
       await cli.parseAsync();
@@ -46,6 +47,7 @@ describe("cli", () => {
         fail,
         fakeDownload,
         fail,
+        fail,
         fail
       );
       await cli.parseAsync();
@@ -65,6 +67,7 @@ describe("cli", () => {
         fail,
         fail,
         fakeStorageDiff,
+        fail,
         fail
       );
       await cli.parseAsync();
@@ -88,6 +91,7 @@ describe("cli", () => {
         fail,
         fail,
         fakeStorageDiff,
+        fail,
         fail
       );
       await cli.parseAsync();
@@ -112,7 +116,7 @@ describe("cli", () => {
         error = err;
         called = true;
       };
-      const cli = buildCli(["unknown"], fail, fail, fail, fakeErrorHandler);
+      const cli = buildCli(["unknown"], fail, fail, fail, fail, fakeErrorHandler);
       await cli.parseAsync();
 
       expect(called).toBe(true);

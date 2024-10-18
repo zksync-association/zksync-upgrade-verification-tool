@@ -138,7 +138,7 @@ export class Diamond {
     return rpc.contractRead(this.address, fnName, abi.raw, schema);
   }
 
-  async getTransitionManager(rpc: RpcClient, explorer: BlockExplorerClient) {
+  async getTransitionManager(rpc: RpcClient, explorer: BlockExplorer) {
     const proxyAddr = await this.contractRead(rpc, "getStateTransitionManager", addressSchema);
     return StateTransitionManager.create(proxyAddr, rpc, explorer);
   }

@@ -41,7 +41,7 @@ export async function checkCommand(env: EnvBuilder, upgradeFilePath: string) {
   const report = await withSpinner(
     async () => {
       const diff = new ZkSyncEraDiff(current, proposed);
-      return new StringCheckReport(diff, repo, env.l1Client());
+      return new StringCheckReport(diff, repo, env.l1Client(), upgradeFile.id());
     },
     "Generating report",
     env
