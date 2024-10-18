@@ -1,1 +1,1 @@
-export * from './calculate-upgrade-proposal-hash'
+export * from "./calculate-upgrade-proposal-hash";

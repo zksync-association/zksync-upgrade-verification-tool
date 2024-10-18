@@ -21,12 +21,13 @@ export class StringCheckReport {
     diff: ZkSyncEraDiff,
     repo: ContractsRepo,
     explorer: BlockExplorer,
-    upgradeId: Hex
-    , opts?: CheckReportOptions) {
+    upgradeId: Hex,
+    opts?: CheckReportOptions
+  ) {
     this.diff = diff;
     this.repo = repo;
     this.explorer = explorer;
-    this.upgradeId = upgradeId
+    this.upgradeId = upgradeId;
     this.opts = opts || { shortOutput: true };
   }
 
@@ -69,7 +70,7 @@ export class StringCheckReport {
     const table = new CliTable({ style: { border: [] } });
     table.push(["Name", "Value"]);
     const [currentVersion, proposedVersion] = this.diff.protocolVersion();
-    table.push(["Upgrade id", this.upgradeId])
+    table.push(["Upgrade id", this.upgradeId]);
     table.push(["Current version", currentVersion]);
     table.push(["Proposed version", proposedVersion]);
     table.push(["Taking l2 contracts from", "https://github.com/matter-labs/era-contracts"]);

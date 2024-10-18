@@ -47,9 +47,9 @@ export class UpgradeFile {
 
   id(): Hex {
     return calculateUpgradeProposalHash(
-      this.calls.map(c => ({ ...c, value: numberToHex(c.value) })),
+      this.calls.map((c) => ({ ...c, value: numberToHex(c.value) })),
       this.salt,
-      this.executor,
-    )
+      this.executor
+    );
   }
 }

@@ -109,7 +109,7 @@ export function buildCli(
       "Calculates id for upgrade",
       (yargs) => yargs,
       (yargs) => {
-        idCbk(env, yargs.file)
+        idCbk(env, yargs.file);
       }
     )
     .command(
