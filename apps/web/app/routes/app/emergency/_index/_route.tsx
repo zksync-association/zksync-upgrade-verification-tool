@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { displayBytes32 } from "@/utils/common-tables";
 import { formatDateTime } from "@/utils/date";
 import { Meta } from "@/utils/meta";
 import { Link, json, useLoaderData } from "@remix-run/react";
@@ -111,34 +112,35 @@ export default function Index() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-16">ID</TableHead>
                     <TableHead className="w-[40%]">Title</TableHead>
-                    <TableHead className="w-32">ProposalId</TableHead>
-                    <TableHead className="w-32">Closed At</TableHead>
                     <TableHead className="w-24">Status</TableHead>
+                    <TableHead className="w-32">Closed At</TableHead>
+                    <TableHead className="w-32">Upgrade ID</TableHead>
                     <TableHead className="w-20" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {inactiveEmergencyProposals.map((ep) => (
                     <TableRow key={ep.id}>
-                      <TableCell>{ep.id}</TableCell>
                       <TableCell className="max-w-0">
                         <div className="truncate">{ep.title}</div>
-                      </TableCell>
-                      <TableCell className="">
-                        <div className="truncate">{`${ep.externalId.slice(0, 10)} ... ${ep.externalId.slice(-8)}`}</div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {formatDateTime(ep.changedOn)}
                       </TableCell>
                       <TableCell>
                         <span
                           className={`rounded-full px-2 py-1 text-xs ${getStatusColor(ep.status, ep.archivedOn !== null)}`}
                         >
-                          {ep.archivedOn === null ? ep.status : "Archived"}
+                          {ep.archivedOn === null
+                            ? ep.status.charAt(0).toUpperCase() + ep.status.slice(1).toLowerCase()
+                            : "Archived"}
                         </span>
                       </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {formatDateTime(ep.changedOn)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="truncate">{displayBytes32(ep.externalId)}</div>
+                      </TableCell>
+
                       <TableCell>
                         <Link to={$path("/app/emergency/:id", { id: ep.externalId })}>
                           <Button variant="outline" size="sm">

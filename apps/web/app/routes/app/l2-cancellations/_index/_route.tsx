@@ -21,12 +21,28 @@ export const meta = Meta["/app/l2-cancellations"];
 export async function loader() {
   const proposals = await getUpdatedL2Cancellations();
 
-  const isActive = (p: (typeof proposals)[number]) => p.status === "ACTIVE" && !p.archivedOn;
-  const isInactive = (p: (typeof proposals)[number]) => !isActive(p);
+  console.log(proposals);
+
+  const isActive = (p: (typeof proposals)[number]) => ({
+    active: p.status === "ACTIVE" && !p.archivedOn,
+    reason:
+      p.status === "ACTIVE" && !p.archivedOn
+        ? undefined
+        : p.archivedOn
+          ? "Archived"
+          : p.status === "DONE"
+            ? "Broadcasted"
+            : "Expired",
+  });
 
   return json({
-    activeProposals: proposals.filter(isActive),
-    inactiveProposals: proposals.filter(isInactive),
+    activeProposals: proposals.filter((p) => isActive(p).active),
+    inactiveProposals: proposals
+      .filter((p) => !isActive(p).active)
+      .map((p) => ({
+        ...p,
+        reason: isActive(p).reason,
+      })),
   });
 }
 
@@ -59,7 +75,7 @@ export default function L2Proposals() {
                     <TableRow key={proposal.id}>
                       <TableCell>{proposal.description}</TableCell>
                       <TableCell>
-                        <Link to={$path("/app/l2-cancellations/:id", { id: proposal.externalId })}>
+                        <Link to={$path("/app/l2-cancellations/:id", { id: proposal.id })}>
                           <Button variant="outline" size="sm">
                             View
                             <ArrowRight className="ml-2 h-4 w-4" />
@@ -95,10 +111,12 @@ export default function L2Proposals() {
                     <TableRow key={proposal.id}>
                       <TableCell>{proposal.description}</TableCell>
                       <TableCell>
-                        {proposal.archivedOn !== null ? "Archived" : "Inactive"}
+                        <span className="rounded-full bg-red-100 px-2 py-1 text-red-800 text-xs">
+                          {proposal.reason}
+                        </span>
                       </TableCell>
                       <TableCell>
-                        <Link to={$path("/app/l2-cancellations/:id", { id: proposal.externalId })}>
+                        <Link to={$path("/app/l2-cancellations/:id", { id: proposal.id })}>
                           <Button variant="outline" size="sm">
                             View
                             <ArrowRight className="ml-2 h-4 w-4" />
