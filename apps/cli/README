@@ -1,4 +1,19 @@
-# Verification CLI Tool
+![CoverImage](zkSyncEraUpgradeToolCover.png)
+
+# Upgrade Verification Tool
+
+This CLI tool is designed to **verify protocol upgrades in the ZKSync governance process**, assisting guardians & security council members in thoroughly reviewing and validating the protocol upgrades they're approving. 
+
+Every command of the CLI tool **takes an upgrade as input** and **then outputs data about that upgrade**. To define this input, is necessary: 
+
+###  1. Raw Upgrade 
+This can be obtained from the app **(formatted as JSON) and is used as a parameter**. The CLI is designed to work in conjunction with the governance web app.  To support this, the governance web app can display upgrades in a format that can be fed directly into the CLI that can be found in the JSON tab of each upgrade.
+
+> [!TIP]
+> The structure of the object it’s the same as used by the Protocol Upgrade Handler (https://github.com/zksync-association/zk-governance/blob/master/l1-contracts/src/interfaces/IProtocolUpgradeHandler.sol#L54). To verify this raw upgrade data, anyone can take this data from the events published by this contract and then format it in a JSON-like structure. 
+    
+### 2. Reference to a commit
+ The reference can be a **branch, a tag, or a commit ID**. This is used to recompile system contracts and check that deployed versions are correct. Usually, this reference is going to be provided to the guardians and security council via a secure communication channel.
 
 ## 🔍 **Prerequisites**
 

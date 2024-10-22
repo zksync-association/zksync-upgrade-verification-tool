@@ -1,18 +1,18 @@
-![CoverImage](zkSyncEraUpgradeToolCover.png)
+# 🧰 ZKsync Era Governance Tools
 
-# 🔍 zkSync Era Upgrade Verification Tool
+This repository provides essential tools to support governance actions within the ZKSync Era protocol, ensuring secure and efficient management of Security Council and Guardians governance actions. 
 
-The zkSync Era Upgrade Verification Tool is composed of a **CLI and Web App tool crafted to decode and present zkSync Era upgrade proposals in a human-readable format**.
+_The repository is organized into two main components:_
 
-## 🌟 **Features**
+### [1. Governace Web App](apps/web/README)
+ A platform designed to streamline the **signature-gathering process for the Security Council and Guardians**. 
+ 
+ It supports various governance actions, including standard and emergency protocol upgrades, freeze requests, and vetoes, ensuring a secure and coordinated decision-making workflow.
 
-> 🏗️ `Work In Progress` : This repo is being actively developed and does not represent final quality of the tool!
-
-- **_[L1]_ Facets**: Identifies contract upgrades including additions or removals of functions.
-- **_[L1]_ Verifier** : Detects upgrades and parameter changes in contracts.
-- **_[L2]_ System Contracts**: Lists changes and validates bytecode hashes.
-- **_[L2]_ Bootloader and DefaultAccount**: Validates bytecode hash.
-- **Solidity Diff Tool**: Compares current contracts with upgrade proposals for verification. \_Currently available for Facets, Verifier & System Contracts.
+### [2. Upgrade Verification Tool](apps/cli/README)
+  A CLI tool that helps the Security Council and Guardians to verify detailed information about protocol upgrades. 
+  
+  This tool enables the thorough review of upgrade proposals, ensuring transparency and accuracy before governance approval.
 
 ## 📄 **License**
 
