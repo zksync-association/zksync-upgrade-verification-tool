@@ -1,7 +1,9 @@
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, zeroAddress } from "viem";
 
 export const PROTOCOL_GOVERNOR_ADDRESS = "0x08c18e8359C3c6aA600A3726BA6dCC100e222021";
+export const GOVOPS_GOVERNOR_ADDRESS = "0xd39E2B556EB66b27e5532e629098022D3976e93B"
 export const ZK_TOKEN_ADDRESS = "0xfcd338217Fec145A3c8Dba9645cc2DaBD616B8E7";
+
 
 const calldata = encodeFunctionData({
   abi: [
@@ -35,6 +37,13 @@ export const EXAMPLE_PROTOCOL_UPGRADE = {
   values: [0n],
   callDatas: [calldata],
   description: "Test protocol proposal 02",
+};
+
+export const EXAMPLE_GOVOPS_PROPOSAL = {
+  addresses: [zeroAddress],
+  values: [0n],
+  callDatas: ["0x"],
+  description: "Test govops proposal 01",
 };
 
 export const ALL_PROPOSAL_STATES = [

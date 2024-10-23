@@ -1,7 +1,7 @@
 import { Contract, Provider, Wallet } from "zksync-ethers";
 import hre from "hardhat";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
-import { PROTOCOL_GOVERNOR_ADDRESS, ZK_TOKEN_ADDRESS } from "./constants.js";
+import { GOVOPS_GOVERNOR_ADDRESS, PROTOCOL_GOVERNOR_ADDRESS, ZK_TOKEN_ADDRESS } from "./constants.js";
 import type { Address } from "viem";
 
 type Callback = (contract: Contract, wallet: Wallet) => Promise<void>;
@@ -38,6 +38,10 @@ export async function getProtocolGovernor(): Promise<Contract> {
 
 export async function getZkTokenContract(): Promise<Contract> {
   return getContract("ZkTokenV2", ZK_TOKEN_ADDRESS);
+}
+
+export async function getGovOpsGovernor(): Promise<Contract> {
+  return getContract("ZkGovOpsGovernor" ,GOVOPS_GOVERNOR_ADDRESS)
 }
 
 export async function withProtocolGovernor(fn: Callback) {
