@@ -1,6 +1,7 @@
-import { withProtocolGovernor } from "./util/with-protocol-governor.js";
-import { ALL_PROPOSAL_STATES } from "./util/constants.js";
+import { getContract, withProtocolGovernor } from "./util/with-protocol-governor.js";
+import { ALL_PROPOSAL_STATES, EXAMPLE_PROTOCOL_UPGRADE } from "./util/constants.js";
 import "dotenv/config"
+import { Contract } from "zksync-ethers";
 
 async function main() {
   const proposalId = process.env.PROPOSAL_ID

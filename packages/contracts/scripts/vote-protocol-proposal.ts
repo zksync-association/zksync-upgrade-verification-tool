@@ -1,5 +1,5 @@
 import "dotenv/config"
-import { withProtocolGovernor } from "./util/with-protocol-governor";
+import { withProtocolGovernor } from "./util/with-protocol-governor.js";
 
 async function main() {
   const proposalId = process.env.PROPOSAL_ID
