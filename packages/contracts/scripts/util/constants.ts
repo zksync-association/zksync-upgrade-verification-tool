@@ -34,8 +34,8 @@ export const EXAMPLE_PROTOCOL_UPGRADE = {
   addresses: ["0x0000000000000000000000000000000000008008"],
   values: [0n],
   callDatas: [calldata],
-  description: "Test protocol proposal 02"
-}
+  description: "Test protocol proposal 02",
+};
 export const ALL_PROPOSAL_STATES = [
   "Pending",
   "Active",
@@ -44,5 +44,5 @@ export const ALL_PROPOSAL_STATES = [
   "Succeeded",
   "Queued",
   "Expired",
-  "Executed"
-]
+  "Executed",
+];
