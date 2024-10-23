@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseEther, padHex, zeroAddress } from "viem";
+import { parseEther, padHex } from "viem";
 import { LocalFork } from "../src/reports/local-fork";
 
 describe("LocalFork", () => {
