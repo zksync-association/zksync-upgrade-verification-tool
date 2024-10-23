@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { withProtocolGovernor } from "./util/with-protocol-governor.js";
+import { getProtocolGovernor } from "./util/with-protocol-governor.js";
 
 async function main() {
   const proposalId = process.env.PROPOSAL_ID;
@@ -8,12 +8,11 @@ async function main() {
     throw new Error("Please provide a private key via PRIV_KEY env var.");
   }
 
-  await withProtocolGovernor(async (contract) => {
-    const castVoteTx = await contract.getFunction("castVote").send(proposalId, 1n);
-    await castVoteTx.wait();
+  const contract = await getProtocolGovernor();
+  const castVoteTx = await contract.getFunction("castVote").send(proposalId, 1n);
+  await castVoteTx.wait();
 
-    console.log("Voted OK");
-  });
+  console.log("Voted OK");
 }
 
 main().catch((error) => {
