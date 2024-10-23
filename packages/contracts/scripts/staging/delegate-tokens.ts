@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { getZkTokenContract, getZkWallet } from "./util/with-protocol-governor";
+import { getZkTokenContract, getZkWallet } from "../util/with-protocol-governor";
 
 async function main() {
   const zkWallet = getZkWallet();

@@ -1,5 +1,5 @@
-import { getProtocolGovernor } from "./util/with-protocol-governor.js";
-import { ALL_PROPOSAL_STATES } from "./util/constants.js";
+import { getProtocolGovernor } from "../util/with-protocol-governor.js";
+import { ALL_PROPOSAL_STATES } from "../util/constants.js";
 import "dotenv/config";
 
 async function main() {
