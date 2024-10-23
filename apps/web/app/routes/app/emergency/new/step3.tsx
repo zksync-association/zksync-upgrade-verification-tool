@@ -30,7 +30,6 @@ export function Step3(props: Step3Props) {
     props.executorAddress
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     submit(
       {
@@ -41,7 +40,7 @@ export function Step3(props: Step3Props) {
       },
       { method: "POST", encType: "application/json", action: $path("/app/emergency/new") }
     );
-  }, []);
+  }, [props.calls, props.step1.salt, props.step1.title, submit]);
 
   const valid = data?.ok;
 
