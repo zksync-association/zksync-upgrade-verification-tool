@@ -1,10 +1,10 @@
-import { calculateProposalId, getGovOpsGovernor } from "../util/with-protocol-governor.js";
-import { ALL_PROPOSAL_STATES, EXAMPLE_GOVOPS_PROPOSAL } from "../util/constants.js";
+import { calculateProposalId, getTokenGovernor } from "../util/with-protocol-governor.js";
+import { ALL_PROPOSAL_STATES, EXAMPLE_TOKEN_PROPOSAL } from "../util/constants.js";
 import "dotenv/config";
 
 async function main() {
-  const contract = await getGovOpsGovernor();
-  const proposalId = calculateProposalId(contract, EXAMPLE_GOVOPS_PROPOSAL);
+  const contract = await getTokenGovernor();
+  const proposalId = calculateProposalId(contract, EXAMPLE_TOKEN_PROPOSAL);
   const proposalStateNumber = await contract.getFunction("state").staticCall(proposalId);
   const proposalVotes = await contract.getFunction("proposalVotes").staticCall(proposalId);
 

@@ -1,8 +1,8 @@
 import "dotenv/config";
 import { keccak256 } from "viem";
 
-import { getGovOpsGovernor, getProtocolGovernor } from "../util/with-protocol-governor.js";
-import { EXAMPLE_GOVOPS_PROPOSAL, EXAMPLE_PROTOCOL_UPGRADE } from "../util/constants.js";
+import { getGovOpsGovernor } from "../util/with-protocol-governor.js";
+import { EXAMPLE_GOVOPS_PROPOSAL } from "../util/constants.js";
 
 async function main() {
   const contract = await getGovOpsGovernor();

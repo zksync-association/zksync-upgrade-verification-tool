@@ -1,8 +1,14 @@
 import { Contract, Provider, Wallet } from "zksync-ethers";
 import hre from "hardhat";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
-import { GOVOPS_GOVERNOR_ADDRESS, PROTOCOL_GOVERNOR_ADDRESS, ZK_TOKEN_ADDRESS } from "./constants.js";
-import type { Address } from "viem";
+import {
+  GOVOPS_GOVERNOR_ADDRESS,
+  PROTOCOL_GOVERNOR_ADDRESS,
+  TOKEN_GOVERNOR_ADDRESS,
+  type UpgradeData,
+  ZK_TOKEN_ADDRESS,
+} from "./constants.js";
+import { type Address, type Hex, keccak256, numberToHex } from "viem";
 
 type Callback = (contract: Contract, wallet: Wallet) => Promise<void>;
 
@@ -41,7 +47,11 @@ export async function getZkTokenContract(): Promise<Contract> {
 }
 
 export async function getGovOpsGovernor(): Promise<Contract> {
-  return getContract("ZkGovOpsGovernor" ,GOVOPS_GOVERNOR_ADDRESS)
+  return getContract("ZkGovOpsGovernor", GOVOPS_GOVERNOR_ADDRESS);
+}
+
+export async function getTokenGovernor(): Promise<Contract> {
+  return getContract("ZkTokenGovernor", TOKEN_GOVERNOR_ADDRESS);
 }
 
 export async function withProtocolGovernor(fn: Callback) {
@@ -49,4 +59,16 @@ export async function withProtocolGovernor(fn: Callback) {
   const contract = await getContract("ZkProtocolGovernor", PROTOCOL_GOVERNOR_ADDRESS);
 
   await fn(contract, zkWallet);
+}
+
+export async function calculateProposalId(contract: Contract, upgrade: UpgradeData): Promise<Hex> {
+  const proposalIdBn = await contract
+    .getFunction("hashProposal")
+    .staticCall(
+      upgrade.addresses,
+      upgrade.values,
+      upgrade.callDatas,
+      keccak256(Buffer.from(upgrade.description))
+    );
+  return numberToHex(proposalIdBn);
 }
