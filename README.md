@@ -14,6 +14,8 @@ _The repository is organized into two main components:_
   
   This tool enables the thorough review of upgrade proposals, ensuring transparency and accuracy before governance approval.
 
+For more information please visit each specific section README file. 
+
 ## 📄 **License**
 
 This project is licensed under the MIT License. For more details, see the LICENSE file in the repository.
