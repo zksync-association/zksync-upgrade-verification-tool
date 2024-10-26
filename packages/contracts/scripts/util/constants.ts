@@ -1,11 +1,44 @@
-import { encodeFunctionData, type Hex, zeroAddress } from "viem";
+import { encodeAbiParameters, encodeFunctionData, type Hex, zeroAddress } from "viem";
 
 export const PROTOCOL_GOVERNOR_ADDRESS = "0x08c18e8359C3c6aA600A3726BA6dCC100e222021";
 export const GOVOPS_GOVERNOR_ADDRESS = "0xd39E2B556EB66b27e5532e629098022D3976e93B";
 export const TOKEN_GOVERNOR_ADDRESS = "0xE85eBc0a4245031669E7BC1d5F77EB17d5B50387";
 export const ZK_TOKEN_ADDRESS = "0xfcd338217Fec145A3c8Dba9645cc2DaBD616B8E7";
 
+export const upgradeStructAbi = {
+  type: "tuple",
+  components: [
+    {
+      type: "tuple[]",
+      components: [
+        { type: "address", name: "target" },
+        { type: "uint256", name: "value" },
+        { type: "bytes", name: "data" },
+      ],
+      name: "calls",
+    },
+    { type: "address", name: "executor" },
+    { type: "bytes32", name: "salt" },
+  ],
+} as const;
 
+
+const innerCallData = encodeAbiParameters(
+  [upgradeStructAbi],
+  [
+    {
+      calls: [
+        {
+          data: "0x",
+          target: zeroAddress,
+          value: 0n,
+        },
+      ],
+      executor: zeroAddress,
+      salt: "0x0000000000000000000000000000000000000000000000000000000000000000",
+    },
+  ]
+);
 
 const calldata = encodeFunctionData({
   abi: [
@@ -30,9 +63,7 @@ const calldata = encodeFunctionData({
     },
   ],
   functionName: "sendToL1",
-  args: [
-    "0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000358baca94dcd7931b7ba7aaf8a5ac6090e143a500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000004499a88ec400000000000000000000000035a54c8c757806eb6820629bc82d90e056394c92000000000000000000000000cb4c8d1ecdca0e256a7341c4487938cfaaed432200000000000000000000000000000000000000000000000000000000",
-  ],
+  args: [innerCallData],
 });
 
 export type UpgradeData = {
@@ -46,7 +77,7 @@ export const EXAMPLE_PROTOCOL_UPGRADE: UpgradeData = {
   addresses: ["0x0000000000000000000000000000000000008008"],
   values: [0n],
   callDatas: [calldata],
-  description: "Test protocol proposal 02",
+  description: "Test protocol proposal 03",
 };
 
 export const EXAMPLE_GOVOPS_PROPOSAL: UpgradeData = {
