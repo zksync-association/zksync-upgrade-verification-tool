@@ -5,6 +5,8 @@ export const GOVOPS_GOVERNOR_ADDRESS = "0xd39E2B556EB66b27e5532e629098022D3976e9
 export const TOKEN_GOVERNOR_ADDRESS = "0xE85eBc0a4245031669E7BC1d5F77EB17d5B50387";
 export const ZK_TOKEN_ADDRESS = "0xfcd338217Fec145A3c8Dba9645cc2DaBD616B8E7";
 
+
+
 const calldata = encodeFunctionData({
   abi: [
     {
@@ -58,7 +60,7 @@ export const EXAMPLE_TOKEN_PROPOSAL: UpgradeData = {
   addresses: [zeroAddress],
   values: [0n],
   callDatas: ["0x"],
-  description: "Test token proposal 01",
+  description: "Test token proposal 04",
 };
 
 export const ALL_PROPOSAL_STATES = [
