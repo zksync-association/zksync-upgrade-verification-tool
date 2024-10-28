@@ -30,7 +30,7 @@ The governance web app is used to follow the [soft/hard freeze, unfreezing & set
 
 The first step involves logging into the governance tool using **SAFE through WalletConnect integration.** 
 
-![ConnectWallet](connectWallet.png)
+![ConnectWallet](img/connectWallet.png)
 
 ### **Connect Wallet using Wallet Connect**
 
@@ -39,35 +39,35 @@ Remember that you will need to connect to the governance web app with your **SAF
 
 **You will need to connect to the governance web app with your safe**. Use WalletConnect for that:
 
-![walletConnect](walletConnect.png)
+![walletConnect](img/walletConnect.png)
 
-![walletConnect2](walletConnect2.png)
+![walletConnect2](img/walletConnect2.png)
 
 If you are using a **mobile wallet you can scan the QR code to continue.** 
 
 Otherwise, **you can open the full wallet connect popup to get the connection URL:**
 
-![walletConnect3](walletConnect3.png)
+![walletConnect3](img/walletConnect3.png)
 
 Once you have copied that link, you can use it inside your safe to connect with the governance web app:
 
-![walletConnect4](walletConnect4.png)
+![walletConnect4](img/walletConnect4.png)
 
-![walletConnect5](walletConnect5.png)
+![walletConnect5](img/walletConnect5.png)
 
 Now, back to the governance web app, you will see that you are already logged in, and you should see something as follows:
 
-![freezing](freezing.png)
+![freezing](img/freezing.png)
 
 ## Step 2: Find the Freezing Section and Review Freezing Proposals Details
 
 Let’s start going to the freezing section:
 
-![webAppFreezing](webAppFreezing.png)
+![webAppFreezing](img/webAppFreezing.png)
 
 If you click on "Freeze Requests", you will enter the following section with existing proposals related to freezing:
 
-![freezingHome](freezingHome.png)
+![freezingHome](img/freezingHome.png)
 
 Below are the four key sections on this page, each corresponding to a different type of freezing proposal:
 
@@ -94,7 +94,7 @@ In both cases, the proposal will be marked as inactive and will not be able to b
 > [!Note]
 **Navigation**: You can click on **the arrow (->)** to view more details about each proposal or the **“+” button** to add a new proposal. **Creation of a new proposal is only possible if there is no active proposal with the same nonce.**
 
-![freezingHome2](freezingHome2.png)
+![freezingHome2](img/freezingHome2.png)
 
 ## Step 3: Verify Freezing Proposal Information
 
