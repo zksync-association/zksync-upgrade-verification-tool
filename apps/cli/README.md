@@ -72,8 +72,6 @@ https://book.getfoundry.sh/getting-started/installation
 
 #### **1. Clone repository**
 
--> TO DO: Update link.
-
 ```bash
 git clone git@github.com:zksync-association/zksync-upgrade-verification-tool.git
 ```
@@ -195,7 +193,7 @@ Downloads both the current and proposed versions of each contract being upgraded
    `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences.
 
    _Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please
-   refer to [--ref in options section.](#🎛️-options)_
+   refer to [--ref in options section.](#options)_
 
 2. **Navigate to Directory:** After running the command, navigate to the `<targetSourceCodeDir>` directory.
 
@@ -206,7 +204,7 @@ Downloads both the current and proposed versions of each contract being upgraded
         - `meld old new`
         - `vimdiff old new`
 
-### 🎛️ **Options**
+### **Options**
 
 The following options are available to configure the zkSync Era Upgrade Verification Tool:
 
@@ -277,5 +275,3 @@ Lastly, this command will execute all automated tests associated with the tool:
 ```bash
 pnpm test
 ```
-
-
