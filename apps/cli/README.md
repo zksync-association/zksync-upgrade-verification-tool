@@ -2,21 +2,32 @@
 
 # Upgrade Verification Tool
 
-This CLI tool is designed to **verify protocol upgrades in the ZKSync governance process**, assisting guardians & security council members in thoroughly reviewing and validating the protocol upgrades they're approving. 
+This CLI tool is designed to **verify protocol upgrades in the ZKSync governance process**, assisting guardians &
+security council members in thoroughly reviewing and validating the protocol upgrades they're approving.
 
 ## **Prerequisites: Command Inputs**
 
-Every command of the CLI tool **takes an upgrade as input** and **then outputs data about that upgrade**. To define this input, is necessary: 
+Every command of the CLI tool **takes an upgrade as input** and **then outputs data about that upgrade**. To define this
+input, is necessary:
 
-###  1. Raw Upgrade 
-This can be obtained from the app **(formatted as JSON) and is used as a parameter**. The CLI is designed to work in conjunction with the governance web app.  To support this, the governance web app can display upgrades in a format that can be fed directly into the CLI that can be found in the JSON tab of each upgrade.
+### 1. Raw Upgrade
+
+This can be obtained from the app **(formatted as JSON) and is used as a parameter**. The CLI is designed to work in
+conjunction with the governance web app. To support this, the governance web app can display upgrades in a format that
+can be fed directly into the CLI that can be found in the JSON tab of each upgrade.
 
 > [!TIP]
-> The structure of the object it’s the same as used by the Protocol Upgrade Handler (https://github.com/zksync-association/zk-governance/blob/master/l1-contracts/src/interfaces/IProtocolUpgradeHandler.sol#L54). To verify this raw upgrade data, anyone can take this data from the events published by this contract and then format it in a JSON-like structure. 
-    
+> The structure of the object it’s the same as used by the Protocol Upgrade
+> Handler (https://github.com/zksync-association/zk-governance/blob/master/l1-contracts/src/interfaces/IProtocolUpgradeHandler.sol#L54).
+> To verify this raw upgrade data, anyone can take this data from the events published by this contract and then format it
+> in a JSON-like structure.
+
 ### 2. Reference to a commit
- The reference can be a **branch, a tag, or a commit ID**. This is used to recompile system contracts and check that deployed versions are correct. 
- Usually, this reference is going to be provided to the guardians and security council via a secure communication channel.
+
+The reference can be a **branch, a tag, or a commit ID**. This is used to recompile system contracts and check that
+deployed versions are correct.
+Usually, this reference is going to be provided to the guardians and security council via a secure communication
+channel.
 
 ## 🔍 **Prerequisites: Dependencies**
 
@@ -28,19 +39,22 @@ pnpm --version  # Checks the installed version of pnpm
 yarn --version  # Checks the installed version of yarn
 ```
 
-If you do not have Node.js installed, please install it from [nodejs.org](https://nodejs.org/en/download/package-manager). For example:
+If you do not have Node.js installed, please install it
+from [nodejs.org](https://nodejs.org/en/download/package-manager). For example:
 
 ```bash
 brew install node
 ```
 
-If you do not have `pnpm` installed, please install it from [pnpm installation guide](https://pnpm.io/installation). For example:
+If you do not have `pnpm` installed, please install it from [pnpm installation guide](https://pnpm.io/installation). For
+example:
 
 ```bash
 npm install -g pnpm
 ```
 
-If you do not have `yarn` installed, please install it from [yarn installation guide](https://classic.yarnpkg.com/en/docs/install). For example:
+If you do not have `yarn` installed, please install it
+from [yarn installation guide](https://classic.yarnpkg.com/en/docs/install). For example:
 
 ```bash
 npm install -g yarn
@@ -48,7 +62,8 @@ npm install -g yarn
 
 ### **2. Install Foundry**
 
-In order to simulate transactions the network is forked using Foundry. Foundry needs to be installed before running any command: 
+In order to simulate transactions the network is forked using Foundry. Foundry needs to be installed before running any
+command:
 https://book.getfoundry.sh/getting-started/installation
 
 ## Verification CLI
@@ -57,7 +72,8 @@ https://book.getfoundry.sh/getting-started/installation
 
 #### **1. Clone repository**
 
--> TO DO: Update link. 
+-> TO DO: Update link.
+
 ```bash
 git clone git@github.com:zksync-association/zksync-upgrade-verification-tool.git
 ```
@@ -72,13 +88,15 @@ pnpm build
 
 ### 🛠️ **Usage**
 
-The zkSync Era Upgrade Verification Tool provides a range of commands for interacting with and verifying zkSync protocol upgrade data.
+The zkSync Era Upgrade Verification Tool provides a range of commands for interacting with and verifying zkSync protocol
+upgrade data.
 
-> **[*JSON protocol upgrade file](#1-raw-upgrade{) & [reference to a commit](#2-reference-to-a-commit)** are required inputs.
+> **[*JSON protocol upgrade file](#1-raw-upgrade{) & [reference to a commit](#2-reference-to-a-commit)** are required
+> inputs.
 
 #### **`id -f <rawUpgradeDir>`**
 
-Uses the raw protocol upgrade file as an input and calculates and prints the ID for a given upgrade. 
+Uses the raw protocol upgrade file as an input and calculates and prints the ID for a given upgrade.
 
 ```bash
 pnpm validate id -f <rawUpgradeDir>
@@ -89,12 +107,16 @@ pnpm validate id -f test/data/sample-upgrade.json
 
 0xa480e5d6840457671b6aca4a836af548f8d62a8586043aaedeee0f538625cac7 #Example of id command with the reference to an upgrade directory containing the raw upgrade information. 
 ```
+
 > [!TIP]
-> When users attempt to approve an upgrade with their wallets, the only data displayed is the upgrade ID. To ensure they're approving the correct upgrade, users must recalculate the ID locally and verify that it matches the one shown in their wallets. This is why id is a standalone command in the CLI tool.
+> When users attempt to approve an upgrade with their wallets, the only data displayed is the upgrade ID. To ensure
+> they're approving the correct upgrade, users must recalculate the ID locally and verify that it matches the one shown in
+> their wallets. This is why id is a standalone command in the CLI tool.
 
 #### **`check -f <rawUpgradeDir> --ref=<commitRef>`**
 
-This command checks that the upgrade can be executed. Then, it summarizes the changes produced by the upgrade. The output has several sections:
+This command checks that the upgrade can be executed. Then, it summarizes the changes produced by the upgrade. The
+output has several sections:
 
 - **Metadata:** General information about the upgrade
 - **Facet changes**: Summary of facet changes for the main ZKsync diamond.
@@ -172,15 +194,17 @@ Downloads both the current and proposed versions of each contract being upgraded
 
    `<targetSourceCodeDir>`: The directory where you wish to save the downloaded differences.
 
-   _Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please refer to [--ref in options section.](#🎛️-options)_
+   _Note: Depending on the specific upgrade referenced, the `--ref` option might be necessary. For more info, please
+   refer to [--ref in options section.](#🎛️-options)_
 
 2. **Navigate to Directory:** After running the command, navigate to the `<targetSourceCodeDir>` directory.
 
-3. **Use Your Preferred Diff Tool:** Once in the `<targetSourceCodeDir>`, you can use your preferred diff tool to compare the 'old' (_current_) versus 'new' (_upgrade_) directory structure or specific files.
-   - _For example:_
-     - `diff -r old new`
-     - `meld old new`
-     - `vimdiff old new`
+3. **Use Your Preferred Diff Tool:** Once in the `<targetSourceCodeDir>`, you can use your preferred diff tool to
+   compare the 'old' (_current_) versus 'new' (_upgrade_) directory structure or specific files.
+    - _For example:_
+        - `diff -r old new`
+        - `meld old new`
+        - `vimdiff old new`
 
 ### 🎛️ **Options**
 
@@ -203,8 +227,8 @@ pnpm validate check ../zksync-era/etc/upgrades/1709067445-protodanksharding --ne
 Specifies the Ethereum RPC URL to be used for connecting to the blockchain.
 
 - **Default**:
-  - `mainnet`: `https://ethereum-rpc.publicnode.com`
-  - `sepolia`: `https://ethereum-sepolia-rpc.publicnode.com`
+    - `mainnet`: `https://ethereum-rpc.publicnode.com`
+    - `sepolia`: `https://ethereum-sepolia-rpc.publicnode.com`
 
 #### `--ref`
 
