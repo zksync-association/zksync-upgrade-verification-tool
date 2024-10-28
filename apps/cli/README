@@ -59,7 +59,7 @@ https://book.getfoundry.sh/getting-started/installation
 
 -> TO DO: Update link. 
 ```bash
-git clone https://github.com/Moonsong-Labs/zksync-upgrade-verification-tool.git
+git clone git@github.com:zksync-association/zksync-upgrade-verification-tool.git
 ```
 
 #### **2. Install dependencies & build**
@@ -78,31 +78,63 @@ The zkSync Era Upgrade Verification Tool provides a range of commands for intera
 
 #### **`id -f <rawUpgradeDir>`**
 
-Uses the raw protocol upgrade file as an input and outputs the ID of the protocol upgrade. 
+Uses the raw protocol upgrade file as an input and calculates and prints the ID for a given upgrade. 
 
 ```bash
 pnpm validate id -f <rawUpgradeDir>
 ```
 
 ```bash
-pnpm validate id ../protocolUpgrades/Upgrade1 #Example of id command with the reference to an upgrade directory containing the raw upgrade information. 
+pnpm validate id -f test/data/sample-upgrade.json
+
+0xa480e5d6840457671b6aca4a836af548f8d62a8586043aaedeee0f538625cac7 #Example of id command with the reference to an upgrade directory containing the raw upgrade information. 
 ```
+> [!TIP]
+> When users attempt to approve an upgrade with their wallets, the only data displayed is the upgrade ID. To ensure they're approving the correct upgrade, users must recalculate the ID locally and verify that it matches the one shown in their wallets. This is why id is a standalone command in the CLI tool.
 
-#### **`check <upgradeDir>`**
+#### **`check -f <rawUpgradeDir> --ref=<commitRef>`**
 
-Checks the validity of the upgrade and prints a summary of the changes.
+This command checks that the upgrade can be executed. Then, it summarizes the changes produced by the upgrade. The output has several sections:
+
+- **Metadata:** General information about the upgrade
+- **Facet changes**: Summary of facet changes for the main ZKsync diamond.
+- **Property changes:** Shows changes in the most important properties of the main diamond.
+- **System contract changes:** Lists system contracts being modified by the upgrade.
 
 ```bash
-pnpm validate check <upgradeDir>
+pnpm validate check -f <rawUpgradeDir> --ref=<commitRef>
 ```
 
 ```bash
-pnpm validate check ../zksync-era/etc/upgrades/1699353977-boojum #Example of check command with Boojum upgrade.
+pnpm validate check -f test/data/sample-upgrade.json --ref=main
+
+✔ Locally compiling system contracts
+✔ Gathering current zksync state
+✔ Simulating upgrade
+✔ Generating report
+
+[...]
 ```
 
+#### **`storage-diff -f <rawUpgradeDir> --ref=<commitRef>`**
 
+This command simulates the upgrade and then shows how the storage of the main diamond gets modified by the upgrade.
 
+```bash
+pnpm validate storage-diff -f <rawUpgradeDir> --ref=<commitRef>
+```
 
+```bash
+pnpm validate storage-diff -f test/data/sample-upgrade.json --ref=main
+
+✔ Gathering current zksync state
+✔ Forking network
+✔ Simulating upgrade
+✔ Gathering final state
+✔ Calculating report
+
+[...]
+```
 
 #### **`facet-diff <upgradeDir> <facetName>`**
 
