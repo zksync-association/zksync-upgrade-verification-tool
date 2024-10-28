@@ -1,0 +1,259 @@
+# Direct Connection to SAFE: Alternatives to WalletConnect
+
+This document outlines initial research on methods to connect the Governance Authentication App with a SAFE Wallet without using WalletConnect. The research focuses on two primary approaches: off-chain and on-chain Safe signature creation. 
+
+- **Off-chain:** Generate message in-app, sign offline, and submit to Safe Wallet
+- **On-chain:** Prepare message, create transaction, sign on-chain, and execute with multiple signatures.
+
+Let's review the details of these two options and initial explorations on the possible use of the Safe CLI in these approaches:
+
+> [!CAUTION] 
+> Please be aware that information here should be only considered as a starting point for further research and exploration. The specifics and details of the implementation may vary depending on the specific requirements and constraints if any of the approaches is chosen and developed.
+
+## 1. Off-chain Safe Signature Creation
+
+One alternative is to generate a message in the Governance Authentication App, sign it off-chain, and submit it to the Safe Wallet for additional signatures.
+
+### Process Overview
+
+1. **Message Generation:** The app creates a message for offline signing.
+2. **Offline Signing:** A Safe owner signs the message using their account.
+3. **Signature Submission:** The signed message is submitted to the *SAFE wallet* via a provided script or CLI.
+4. **Signature Gathering:** Once all required SAFE wallet owners approve the signed message, the app retrieves it using the SAFE wallet's public API.
+
+### Implementation Example
+
+The following code example demonstrates how steps 1, 2, and 3 might work.
+
+> [!Warning] 
+> In this example, we are using the owner's private key to sign the message. In a real-world scenario, this would be done via a native connection to the wallet (EOA) that doesn't expose sensitive information to the app.
+
+</aside>
+
+```tsx
+import Safe from "@safe-global/protocol-kit";
+import SafeApiKit from "@safe-global/api-kit";
+import { buildSignatureBytes } from "@safe-global/protocol-kit";
+
+// Configuration
+const MESSAGE = "Governance Action: Proposal #123";
+const SAFE_ADDRESS = "0x0df75c5082fF10580b7Fdd13F91C76942bF268f5";
+const OWNER_ADDRESS = "0x72D8dd6EE7ce73D545B229127E72c8AA013F4a9e";
+const OWNER_PRIVATE_KEY = "0xc01d..."; // Truncated for security
+
+async function signAndSubmitMessage() {
+  // Initialize Safe Protocol Kit
+  let protocolKit = await Safe.init({
+    provider: "<https://ethereum-sepolia-rpc.publicnode.com>",
+    safeAddress: SAFE_ADDRESS,
+    signer: OWNER_PRIVATE_KEY,
+  });
+
+  // Create and sign the message
+  const message = protocolKit.createMessage(MESSAGE);
+  const signature = await protocolKit.signMessage(message);
+  const ownerSignature = signature.getSignature(OWNER_ADDRESS);
+
+  if (!ownerSignature) {
+    throw new Error("Failed to get owner signature");
+  }
+
+  // Submit the signed message to the Safe wallet
+  const apiKit = new SafeApiKit({ chainId: 11155111n });
+  await apiKit.addMessage(SAFE_ADDRESS, {
+    message: MESSAGE,
+    signature: buildSignatureBytes([ownerSignature]),
+  });
+
+  console.log("Message signed and submitted successfully");
+}
+```
+
+The app will know the wallet's configuration by polling the `/api/v1/safes/<address>` endpoint:
+
+```bash
+$ curl -s https://safe-transaction-sepolia.safe.global/api/v1/safes/0x0df75c5082fF10580b7Fdd13F91C76942bF268f5/ | jq
+
+{
+  "address": "0x0df75c5082fF10580b7Fdd13F91C76942bF268f5",
+  "nonce": 3,
+  "threshold": 2,
+  "owners": [
+    "0xC8a6f2deD7FC49a5d53AC84A2AF5B1e5147Eb466",
+    "0x72D8dd6EE7ce73D545B229127E72c8AA013F4a9e"
+  ],
+  "masterCopy": "0x29fcB43b46531BcA003ddC8FCB67FFE91900C762",
+  "modules": [],
+  "fallbackHandler": "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99",
+  "guard": "0x0000000000000000000000000000000000000000",
+  "version": "1.4.1+L2"
+}
+```
+
+After the threshold is reached, SAFE wallet's signature can be polled by `/api/v1/messages/<message_hash>` :
+
+```bash
+$ curl -s https://safe-transaction-sepolia.safe.global/api/v1/messages/0x40cef7e530e75253d71348a3f9731782c18167ef225e7c67c17eebbd064cc47e/ | jq
+
+{
+  "created": "2024-10-24T13:10:02.640418Z",
+  "modified": "2024-10-24T13:12:11.253265Z",
+  "safe": "0x0df75c5082fF10580b7Fdd13F91C76942bF268f5",
+  "messageHash": "0x40cef7e530e75253d71348a3f9731782c18167ef225e7c67c17eebbd064cc47e",
+  "message": "Governance Action: Proposal #123",
+  "proposedBy": "0x72D8dd6EE7ce73D545B229127E72c8AA013F4a9e",
+  "safeAppId": null,
+  "confirmations": [
+    {
+      "created": "2024-10-24T13:10:02.648385Z",
+      "modified": "2024-10-24T13:10:02.648385Z",
+      "owner": "0x72D8dd6EE7ce73D545B229127E72c8AA013F4a9e",
+      "signature": "0x0186aedb18b2fa26e1358d557e02c9bab7d975f4a38d79eb0ef17b539f2261727869f9333bbf723d8a2246a7864080a07e28b13cd9223246152ad581cae5eada1c",
+      "signatureType": "EOA"
+    },
+    {
+      "created": "2024-10-24T13:12:11.253265Z",
+      "modified": "2024-10-24T13:12:11.253265Z",
+      "owner": "0xC8a6f2deD7FC49a5d53AC84A2AF5B1e5147Eb466",
+      "signature": "0xec35572762c5c027e8a72a0359bf0feff22fdfc5bf12c33a0d73a9fbd52a12e405542881641779edd59431f4643959a40fc5352188a754d06f5bb09fb58d19211c",
+      "signatureType": "EOA"
+    }
+  ],
+  "preparedSignature": "0x0186aedb18b2fa26e1358d557e02c9bab7d975f4a38d79eb0ef17b539f2261727869f9333bbf723d8a2246a7864080a07e28b13cd9223246152ad581cae5eada1cec35572762c5c027e8a72a0359bf0feff22fdfc5bf12c33a0d73a9fbd52a12e405542881641779edd59431f4643959a40fc5352188a754d06f5bb09fb58d19211c"
+} 
+```
+
+Finally, the signature should be stored in the app database and displayed as signature gathered. 
+
+### References
+
+- [Safe SDK docs](https://docs.safe.global/sdk/overview)
+- [API docs](https://safe-transaction-mainnet.safe.global)
+
+## 2. On-chain Safe Signature Creation
+
+This solution provides a secure and decentralized way to sign messages. However, it requires executing a separate transaction for each signature, which can be costly and time-consuming.
+
+### Process Overview
+
+1. **Message Generation:** The app creates a message for online signing.
+2. **Offline Signing:** A Safe owner signs the message using their account.
+3. **Signature Submission:** The signed message is submitted to the *SAFE smart contract* via a provided script or CLI.
+4. **Signature Execution:** Once required SAFE owners have signed and submitted their message, the sign message transaction is executed to save the signature into the smart contract.
+5. **Signature Gathering:** Once all required SAFE wallet owners approve the signed message, the app automatically retrieves it using the SAFE wallet's public API.
+
+### Implementation Example
+
+The following code example demonstrates how steps 1, 2, 3 and 4 might work.
+
+> [!Warning] 
+> In this example, we are using the owner's private key to sign the message. In a real-world scenario, this would be done via a native connection to the wallet (EOA) that doesn't expose sensitive information to the app.
+
+</aside>
+
+```tsx
+import Safe, {
+  getSignMessageLibContract,
+  hashSafeMessage,
+  SafeProvider,
+} from "@safe-global/protocol-kit";
+
+// Configuration
+const MESSAGE = "Governance Action: Proposal #123";
+const SAFE_ADDRESS = "0x0df75c5082fF10580b7Fdd13F91C76942bF268f5";
+const OWNER_1_PRIVATE_KEY = "0xc01d...";
+
+async function postMessageOrSignature(safeAddress: string, message: string) {
+  // Get the contract with the correct version
+  const signMessageLibContract = await getSignMessageLibContract({
+    safeProvider: new SafeProvider({
+      provider: "<https://ethereum-sepolia-rpc.publicnode.com>",
+    }),
+    safeVersion: "1.4.1",
+  });
+
+  // Initialize Safe Protocol Kit
+  const protocolKit = await Safe.init({
+    provider: "<https://ethereum-sepolia-rpc.publicnode.com>",
+    safeAddress,
+    signer: OWNER_1_PRIVATE_KEY,
+  });
+
+  const messageHash = hashSafeMessage(MESSAGE);
+  const txData = signMessageLibContract.encode("signMessage", [
+    messageHash as `0x${string}`,
+  ]);
+
+  // Prepare the transaction data
+  const safeTransactionData = {
+    to: signMessageLibContract.contractAddress,
+    value: "0",
+    data: txData,
+    operation: 1, // 0 = Call, 1 = DelegateCall
+  };
+  let signMessageTx = await protocolKit.createTransaction({
+    transactions: [safeTransactionData],
+  });
+
+  // At this point we can post the message on-chain
+  signMessageTx = await protocolKit.signTransaction(signMessageTx);
+  const signMessageTxHash = await protocolKit.getTransactionHash(signMessageTx);
+  await protocolKit.approveTransactionHash(signMessageTxHash);
+
+  // ...rest of owners sign on-chain
+
+  // ...last owner executes the transaction instead of `approveHash`
+  await protocolKit.executeTransaction(signMessageTx);
+}
+```
+
+> [!TIP] 
+> The executeTransaction method can also be called by non-owners of the SAFE wallet, allowing for easier signature flow if necessary.
+ 
+
+The app can determine the wallet's configuration by querying the smart contract's methods `getThreshold()` and `getOwners()`. Additionally, by polling the `approvedHashes(owner, txHash)` method, it can retrieve message information and verify whether the necessary owners have signed the message.
+
+### References
+
+- [Safe SDK docs](https://docs.safe.global/sdk/overview)
+- [Safe Smart Contracts repository](https://github.com/safe-global/safe-smart-account/tree/release/v1.4.1)
+
+## Safe CLI
+
+It's also worth noting the existence of [Safe CLI](https://github.com/safe-global/safe-cli), which could potentially enable Safe Wallet owners to interact with their wallets (sign and post messages) using both the off-chain and on-chain methods.
+
+The Safe CLI offers two operational modes:
+
+- **Blockchain mode:** Interacts directly with the SAFE smart contract
+- **tx-service mode:** Interacts with the SAFE wallet through Safe's centralized service
+
+For the off-chain approach, the CLI simplifies message signing and publishing to the SAFE wallet using the `sign-tx` command.
+
+The on-chain approach is more complex, requiring:
+
+1. Creation of the transaction outside the CLI
+2. Use of `approve_hash` command for signing
+3. `execute_tx` command for on-chain signing execution
+
+> [!IMPORTANT] 
+> Utilizing the CLI could significantly reduce the need for developing additional custom scripts or command-line interfaces for users.
+
+## 3. Conclusion
+
+After exploring alternatives to WalletConnect for connecting the Governance Authentication App with a Safe Wallet, we can draw the following conclusions:
+
+1. **Off-chain Safe Signature Creation:** 
+    - This method offers a viable alternative to WalletConnect. It allows for message generation and offline signing within the app.
+    - The message can be submitted to the SAFE wallet via a provided script or CLI. Once signed
+    - This approach maintains security while potentially simplifying the user experience.
+2. **On-chain Safe Signature Creation**
+    - This method provides a secure and decentralized way to sign messages, despite some drawbacks: It requires a separate transaction for each signature, which can be costly and time-consuming
+    - The process involves:
+        - Message preparation by the app
+        - On-chain signature by each owner
+        - Final execution to store the full signature on-chain
+
+Both methods effectively eliminate the dependency on WalletConnect. The off-chain approach relies on Safe Wallet's centralized services, while the on-chain method depends solely on smart contracts. SAFE CLI can be used to simplify the process of signing messages and posting them to the wallet, leveraging already available tools for parts of the task. 
+
+> [!CAUTION] 
+> Please be aware that information here should be only considered as a starting point for further research and exploration. Details of the implementation may vary depending on the requirements and constraints that could be applied during the development of any of the chosen approaches.
