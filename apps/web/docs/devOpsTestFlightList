@@ -1,0 +1,114 @@
+# DevOps TestFlight List - Web App V1
+
+This is a DevOps TestFlight List for the Web App. This list is intended to guide you through the deployment process and help that each step is executed correctly. 
+
+👉🏽 This page is complimentary to the readme web app setup guide.
+
+
+Feel free to refer back to this list at any point during the deployment to ensure all configurations are correctly set up and the application runs seamlessly! 
+
+> [!CAUTION]
+> Please be aware that information here should be only considered as a starting point for deployment. Environment variables and configurations may vary in newest version on the app and should be reviewed carefully. This doc should only be used as a reference.
+
+## 1. Setup a postgress db
+
+The app requires a PostgreSQL db to work. It access the db trough a postgres uri: 
+
+`postgresql://<username>:<password>@<host>:<port>/<dbname>`
+
+## 2. Setup an rpc provider
+
+The app needs an ethereum rpc to work. In order to create accurate reports it uses `debug_traceCall` with `prestateTracer` enabled. Tenderly supports this in every plan. Alchemy and Infura support this in the paid plans.
+
+## 3. Find address for ProtocolUpgradeHandler
+
+The app interacts closely with this contract. It needs the address of this contract to be send as an environment variable. 
+
+## 4. Create a project in Wallet Connect
+
+Signatures are done through [safes](https://app.safe.global). We connect to the safe through Wallet Connect.
+
+- A new project can be set up [here](https://cloud.walletconnect.com/sign-up)
+
+Once the project is created we are going to need the project id, which is going to be used as an environment variable.
+
+## 5. Get an Etherscan api key
+
+The app uses etherscan to do several things, including check that contracts are verified. Etherscan keys are not scoped to any network, so the same key can be used for mainnet and sepolia with no issues.
+
+The free tier is enough to make the app work.
+
+## 4. Build docker image
+
+Building the image has no other requisite than having docker installed:
+
+```jsx
+git clone git@github.com:Moonsong-Labs/zksync-upgrade-verification-tool.git
+cd zksync-upgrade-verification-tool
+docker build -t zksync-upgrade-verification-tool .
+```
+
+## 5. Run migrations
+
+```jsx
+# from repo root
+cd webapp
+pnpm i
+pnpm db:mibrate
+```
+
+Migrations can also be run from a docker container:
+
+```jsx
+POSTGRES_URL="<posgres_uri>"
+docker run --rm -ti \
+  -e "DATABASE_URL=$POSTGRES_URL" \
+  zksync-upgrade-verification-tool \
+  pnpm db:migrate
+```
+
+## 6. Start the app
+
+```jsx
+docker run \
+  -e "DATABASE_URL=<postgres_url>" \
+  -e "NODE_ENV=production" \
+  -e "SERVER_PORT=3000" \
+  -e "WALLET_CONNECT_PROJECT_ID=<wallet_connect_id" \
+  -e "L1_RPC_URL=<rpc_url>" \
+  -e "ETH_NETWORK=<mainnet|sepolia>" \
+  -e "ETHERSCAN_API_KEY=<etherscan_api_key>" \
+  -e "UPGRADE_HANDLER_ADDRESS=<contract_address_for_this_eth_network>" \
+	-p "3000:3000" \
+	zksync-upgrade-verification-tool
+```
+
+This is a docker-compose with a working configuration for sepolia to use as an example:
+
+```yaml
+services:
+  db:
+    image: postgres:13
+    ports:
+      - "5432:5432"
+    restart: always
+    container_name: integration-tests
+    environment:
+      POSTGRES_USER: "dbuser"
+      POSTGRES_PASSWORD: "sosecret"
+      POSTGRES_DB: "webapp"
+      
+  verification-tool:
+	  image: zksync-upgrade-verification-tool
+	  ports:
+	    - "80:3000"
+	  environment:
+	    DATABASE_URL: "postgresql://dbuser:sosecret@db:5432/webapp"
+	    NODE_ENV: production
+	    SERVER_PORT: 3000
+	    WALLET_CONNECT_PROJECT_ID: "a769cc69b7350ab9fb7fcf35b9c509da"
+	    L1_RPC_URL: https://sepolia.gateway.tenderly.co/2im7JzMFZWQLNRKenLDVPv
+	    ETH_NETWORK: sepolia
+	    ETHERSCAN_API_KEY: "IA817WPSNENBAK9EE3SNM1C5C31YUTZ4MV"
+	    UPGRADE_HANDLER_ADDRESS: "0x7444b49E49A4AD4376a3e3c036900869575f0FBf" # Sepolia address
+```
