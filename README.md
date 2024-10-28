@@ -5,7 +5,7 @@ and efficient management of Security Council and Guardians governance actions.
 
 _The repository is organized into two main components:_
 
-### [1. Governace Web App](apps/web/README.md)
+### [1. Governance Web App](apps/web/README.md)
 
 A platform designed to streamline the **signature-gathering process for the Security Council and Guardians**.
 
