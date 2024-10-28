@@ -22,7 +22,6 @@ export const env = createEnv({
     L1_RPC_URL: z.string().url(),
     L2_RPC_URL: z.string().url(),
     ETH_NETWORK: EthNetworkEnum.default("mainnet"),
-    ETHERSCAN_API_KEY: z.string(),
     UPGRADE_HANDLER_ADDRESS: addressSchema,
     SKIP_REPORTS: z.coerce.boolean().default(false),
     ZK_GOV_OPS_GOVERNOR_ADDRESS: addressSchema,

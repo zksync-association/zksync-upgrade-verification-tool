@@ -39,7 +39,7 @@ The governance web app is used to follow the [standard protocol upgrade procedur
 
 The first step involves logging into the governance tool using **SAFE through WalletConnect integration.** 
 
-![ConnectWallet](connectWallet.png)
+![ConnectWallet](img/connectWallet.png)
 
 ### **Connect Wallet using Wallet Connect**
 
@@ -48,35 +48,35 @@ Remember that you will need to connect to the governance web app with your **SAF
 
 **You will need to connect to the governance web app with your safe**. Use WalletConnect for that:
 
-![walletConnect](walletConnect.png)
+![walletConnect](img/walletConnect.png)
 
-![walletConnect2](walletConnect2.png)
+![walletConnect2](img/walletConnect2.png)
 
 If you are using a **mobile wallet you can scan the QR code to continue.** 
 
 Otherwise, **you can open the full wallet connect popup to get the connection URL:**
 
-![walletConnect3](walletConnect3.png)
+![walletConnect3](img/walletConnect3.png)
 
 Once you have copied that link, you can use it inside your safe to connect with the governance web app:
 
-![walletConnect4](walletConnect4.png)
+![walletConnect4](img/walletConnect4.png)
 
-![walletConnect5](walletConnect5.png)
+![walletConnect5](img/walletConnect5.png)
 
 Now, back to the governance web app, you will see that you are already logged in, and you should see something as follows:
 
-![walletConnect6](walletConnect6.png)
+![walletConnect6](img/walletConnect6.png)
 
 ## Step 2: Find the target Upgrade Proposal and Review General Details
 
 Let’s start going to the standard upgrade section:
 
-![webApp1](webApp1.png)
+![webApp1](img/webApp1.png)
 
 If you click on "Standard Upgrades," you will notice that the upgrade proposal you aim to approve should be in the active standard proposals section:
 
-![webApp4](webApp4.png)
+![webApp4](img/webApp4.png)
 
 🚨 If you expect to see a proposal and can't find it in this section, please check the following:
 1. **Is the proposal ready to be approved?** (Remember that the “[5. ZKSync Era Proposal Execution](https://docs.zknation.io/zksync-governance/schedule-1-standard-governance-procedures#id-3.-protocol-governor-proposal-process)” step should be complete for the proposal to be ready for approval.)
@@ -88,7 +88,7 @@ Once you select the target upgrade proposal ID, you will visualize further detai
 > [!IMPORTANT]  
 🚨 **Proposal ID should be provided by the ZKsync Association for approval through official communication channels.**
 
-![webApp2](webApp2.png)
+![webApp2](img/webApp2.png)
 
 > [!Note]
   👍🏽 **To verify the previous step was done correctly, please check that you can see the address of your SAFE and your role at the top.**
@@ -112,7 +112,7 @@ This is the moment when the upgrade information should be verified and double-ch
 
 → **Upgrade Analysis**: At the **bottom of the page**, the app will display a series of reports about the upgrade to aid analysis.
 
-![webApp3](webApp3.png)
+![webApp3](img/webApp3.png)
 
 However, each signer needs to do their own verification. **Remember that this is a security-focused procedure, so you should not trust anything, not even the information displayed by the browser**. You must keep an eye out for anything that may seem off and review with external tools that the data showcases what you expect. Even if it looks as expected in the app, you must do your outside verification before proceeding. 
 
@@ -142,7 +142,7 @@ This will send a petition to sign in your safe that includes the action (Approve
 
 **What comes next is REALLY important  👇🏽**
 
-![webApp5](webApp5.png)
+![webApp5](img/webApp5.png)
 
 > [!Caution]
 🚨 **It’s extremely important to check that the ID matches the ID of the upgrade you want to sign**. Whatever is signed here is being approved to make a protocol upgrade, so it’s very important to check, double-check, and triple-check the correctness of that ID. Don't rely solely on the ID shown in the web app; please verify this proposal ID as thoroughly as possible before proceeding.
@@ -154,7 +154,7 @@ After checking the ID, you can click on the sign. From there, two possible flows
 
 Once the confirmations are reached and the message is signed through SAFE, the signature will be collected and you should see that 1 approval is registered in the governance tool. The signature created by your SAFE is saved off-chain by the web app, in a local database.
 
-![webApp6](webApp6.png)
+![webApp6](img/webApp6.png)
 
 > [!Note]
 👍🏽  *If you are not the last signer of your safe, you will not see any change in the governor web app. That’s fine. When every signer of the safe approves the upgrade, a single signature is registered for the entire safe.*

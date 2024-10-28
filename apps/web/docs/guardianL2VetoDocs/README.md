@@ -33,7 +33,7 @@ The governance web app is used to follow the [On-chain Veto procedure](https://d
 
 The first step involves logging into the governance tool using **SAFE through WalletConnect integration.** 
 
-![ConnectWallet](connectWallet.png)
+![ConnectWallet](img/connectWallet.png)
 
 ### **Connect Wallet using Wallet Connect**
 
@@ -42,35 +42,35 @@ Remember that you will need to connect to the governance web app with your **SAF
 
 **You will need to connect to the governance web app with your safe**. Use WalletConnect for that:
 
-![walletConnect](walletConnect.png)
+![walletConnect](img/walletConnect.png)
 
-![walletConnect2](walletConnect2.png)
+![walletConnect2](img/walletConnect2.png)
 
 If you are using a **mobile wallet you can scan the QR code to continue.** 
 
 Otherwise, **you can open the full wallet connect popup to get the connection URL:**
 
-![walletConnect3](walletConnect3.png)
+![walletConnect3](img/walletConnect3.png)
 
 Once you have copied that link, you can use it inside your safe to connect with the governance web app:
 
-![walletConnect4](walletConnect4.png)
+![walletConnect4](img/walletConnect4.png)
 
-![walletConnect5](walletConnect5.png)
+![walletConnect5](img/walletConnect5.png)
 
 Now, back to the governance web app, you will see that you are already logged in, and you should see something as follows:
 
-![L2ProposalsVeto](L2ProposalsVeto.png)
+![L2ProposalsVeto](img/L2ProposalsVeto.png)
 
 ## Step 2: Find the Veto Section and Review Active Veto Details
 
 Let’s start going to the L2 Proposals Veto section:
 
-![L2ProposalsVeto2](L2ProposalsVeto2.png)
+![L2ProposalsVeto2](img/L2ProposalsVeto2.png)
 
 If you click on "Veto Requests", you will enter the following section with existing proposals to Veto L2 Governor proposals:
 
-![active&inactiveVeto](active&inactive.png)
+![active&inactiveVeto](img/active&inactive.png)
 
 > [!TIP]
 💡 Remember that you will only see here "veto proposals" that are meant to be voted by the guardians. In other words, you will only see here lists of proposals created to veto an underlying GovOps or Token Governor proposal.
@@ -94,7 +94,7 @@ For both Token Governor and GovOps Governor, the veto proposals follow the same 
 
 When you click on a specific veto proposal, you are brought to a detailed view where you can explore various aspects of the proposal. This view is crucial for understanding the specifics of the GovOps or Token proposalt that under voting to be veto and the information set when the veto proposal was created. The section is divided into four main parts:
 
-![VetoProposal](VetoProposal.png)
+![VetoProposal](img/VetoProposal.png)
 
 1. **Proposal Details:** This section provides the key information related to the veto proposal, the underlying GovOps or Token Governor proposal, and the configurations set when the veto proposal was created.
 
@@ -125,7 +125,7 @@ This will send a petition to sign in your safe that includes the action (it will
 > [!Caution]
 🚨 **It’s extremely important to check that everything matches to the veto proposal you want to approve**. Whatever is signed here is being approved may affect the protocol, so it’s very important to check, double-check, and triple-check the correctness of the information before signing.
 
-![SAFESign](SAFESign.png)
+![SAFESign](img/SAFESign.png)
 
 > [!WARNING]
 🚨 **Information in the message may be long and scrolling inside the message may be necessary to read it.**
