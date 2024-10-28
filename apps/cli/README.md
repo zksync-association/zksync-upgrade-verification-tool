@@ -19,8 +19,8 @@ can be fed directly into the CLI that can be found in the JSON tab of each upgra
 > [!TIP]
 > The structure of the object it’s the same as used by the Protocol Upgrade
 > Handler (https://github.com/zksync-association/zk-governance/blob/master/l1-contracts/src/interfaces/IProtocolUpgradeHandler.sol#L54).
-> To verify this raw upgrade data, anyone can take this data from the events published by this contract and then format it
-> in a JSON-like structure.
+> To verify this raw upgrade data, anyone can take this data from the events published by this contract 
+> and then format it in a JSON-like structure.
 
 ### 2. Reference to a commit
 
