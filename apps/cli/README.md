@@ -91,7 +91,7 @@ pnpm build
 The zkSync Era Upgrade Verification Tool provides a range of commands for interacting with and verifying zkSync protocol
 upgrade data.
 
-> **[*JSON protocol upgrade file](#1-raw-upgrade{) & [reference to a commit](#2-reference-to-a-commit)** are required
+> **[*JSON protocol upgrade file](#1-raw-upgrade) & [reference to a commit](#2-reference-to-a-commit)** are required
 > inputs.
 
 #### **`id -f <rawUpgradeDir>`**
