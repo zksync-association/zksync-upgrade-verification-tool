@@ -1,7 +1,7 @@
 import { type Address, type Hex, hexToBigInt, slice } from "viem";
 import type { ContractAbi } from "../ethereum/contract-abi";
 import type { RpcClient } from "../ethereum/rpc-client";
-import type { BlockExplorerClient } from "../ethereum/block-explorer-client";
+import type { BlockExplorer } from "../ethereum/block-explorer-client";
 import { addressSchema } from "@repo/common/schemas";
 import { z } from "zod";
 
@@ -24,7 +24,7 @@ export class StateTransitionManager {
   static async create(
     proxyAddress: Address,
     rpc: RpcClient,
-    explorer: BlockExplorerClient
+    explorer: BlockExplorer
   ): Promise<StateTransitionManager> {
     const managerAddress = bytes32ToAddress(
       await rpc.storageRead(proxyAddress, hexToBigInt(PROXY_IMPLEMENTATION_STORAGE_POS))
