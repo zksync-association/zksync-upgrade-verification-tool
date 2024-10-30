@@ -38,36 +38,36 @@ Remember that you will need to connect to the governance web app with your safe 
 
 **You will need to connect to the governance web app with your safe**. Use WalletConnect for that:
 
-![walletConnect](walletConnect.png)
+![walletConnect](img/walletConnect.png)
 
-![walletConnect2](walletConnect2.png)
+![walletConnect2](img/walletConnect2.png)
 
 If you are using a **mobile wallet you can scan the QR code to continue.** 
 
 Otherwise, **you can open the full wallet connect popup to get the connection URL:**
 
-![walletConnect3](walletConnect3.png)
+![walletConnect3](img/walletConnect3.png)
 
 Once you have copied that link, you can use it inside your safe to connect with the governance web app:
 
-![walletConnect4](walletConnect4.png)
+![walletConnect4](img/walletConnect4.png)
 
-![walletConnect5](walletConnect5.png)
+![walletConnect5](img/walletConnect5.png)
 
 Now, back to the governance web app, you will see that you are already logged in, and you should see something as follows:
 
-![walletConnect6](walletConnect6.png)
+![walletConnect6](img/walletConnect6.png)
 
 
 ## Step 2: Navigate to the Emergency Upgrade Section
 
 Let’s start going to the emergency upgrade section:
 
-![emergencyUpgrade](emergencyUpgradeSection.png)
+![emergencyUpgrade](img/emergencyUpgradeSection.png)
 
 If you click on "Emergency Upgrades," you will notice that the upgrade proposal you aim to approve should be in the active emergency proposals section:
 
-![emergencyUpgrade1](emergencyUpgradeSection1.png)
+![emergencyUpgrade1](img/emergencyUpgradeSection1.png)
 
 
 Here is a **quick guide to navigate** through this visualization: 
@@ -83,24 +83,24 @@ If you only need to approve an emergency upgrade proposal, go to step 4.
 
 If you click on the plus sign, you will be redirected to a new page:
 
-![create](create.png)
+![create](img/create.png)
 
 - The **title** field is used internally in the web app (it never goes on-chain). It is just a human-readable name for the upgrade, meant to make it easier for other signers to identify this particular upgrade.
 - The **salt** defaults to zero, and we recommend leaving it that way.
 
 Once this is set, you can click next:
 
-![create1](create1.png)
+![create1](img/create1.png)
 
 Here, you can define one or more ETH calls for the upgrade. Each call requires a target address, calldata, and a value (expressed in ETH).
 
 You can add as many calls as needed, and they will be accumulated at the top:
 
-![create2](create2.png)
+![create2](img/create2.png)
 
 Once you are ready, click "Next" at the bottom to verify the final data.
 
-![create3](create3.png)
+![create3](img/create3.png)
 
 Once you click "submit," the proposal will be created, and you will be redirected back to the index page.
 
@@ -108,11 +108,11 @@ Once you click "submit," the proposal will be created, and you will be redirecte
 
 Once you select the target emergency proposal, you will see further details about the proposal and the approval process. After clicking on the "view" button, you will see a screen like this:
 
-![create4](create4.png)
+![create4](img/create4.png)
 
 After clicking on the "view" button, you will see a screen like this:
 
-![create5](create5.png)
+![create5](img/create5.png)
 
 Here is a **quick guide to navigate** through this visualization: 
 
@@ -133,7 +133,7 @@ This is the moment when the upgrade information should be verified and double-ch
 
 → **Upgrade Analysis**: At the **bottom of the page**, the app will display the raw data correspondent to the upgrade. 
 
-![create6](create6.png)
+![create6](img/create6.png)
 
 However, each signer needs to do their own verification. **Remember that this is a security-focused procedure, so you should not trust anything, not even the information displayed by the browser**. You must keep an eye out for anything that may seem off and review with external tools that the data showcases what you expect. Even if it looks as expected in the app, you must do your outside verification before proceeding. 
 
@@ -156,7 +156,7 @@ This will send a petition to sign in your safe that includes the action (Approve
 
 **What comes next is REALLY important  👇🏽**
 
-![verify](verify.png)
+![verify](img/verify.png)
 
 The message to sign (1) shows the action being executed ("EXECUTEEMERGENCYUPGRADESECURITYCOUNCIL") and the ID of the upgrade (0x59e.... in this case). It's crucial to double-check and triple-check this ID. The upgrade with that ID is the one that will be executed.
 
@@ -169,7 +169,7 @@ After checking the ID, you can click on the sign. From there, two possible flows
 
 **Once the confirmations are reached and the message is signed through SAFE**, the signature will be collected and you should see that 1 approval is registered in the governance tool. The signature created by your SAFE is saved off-chain by the web app, in a local database.
 
-![signature](signature.png)
+![signature](img/signature.png)
 
 > [!Note]
  *If you are not the last signer of your safe, you will not see any change in the governor web app. That’s fine. When every signer of the safe approves the upgrade, a single signature is registered for the entire safe.* 

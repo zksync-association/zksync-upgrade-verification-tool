@@ -1,0 +1,58 @@
+# Security Concerns 
+
+## **Introduction**
+
+Even though most of the security for the ZKSync upgrade protocol is provided by the on-chain mechanism, a few web app security points still need consideration. Some can be addressed by improving UX in the future, while others can be significantly mitigated with standard web2 security practices. This document will address the main security concerns for the web app.
+
+## 1. DDoS attacks
+
+DDoS attacks are something to consider if the app is open to the internet. The delay of an important upgrade due to a DDoS attack is a realistic scenario.
+
+>[!TIP]
+> 💡 The best solution here is to implement standard web2 rate limiting or use something like Cloudflare in front of the app to automatically handle this.
+
+## 2. Phishing-like attacks
+
+The way phishing could be used here is delicate. It is theoretically possible to trick someone into signing an upgrade while they think they are signing a different one.
+
+Using, for example, a DNS poisoning attack, a user could be misled with a fake web app to sign the wrong upgrade.
+
+**The final solution is educating the users.** When a signature is requested, the wallet (and safe) shows which app is requesting the signature and the ID of the upgrade. **These two things should always be double-checked by the signers:**
+
+If the app is public, a phishing attack could be used to make people think that an upgrade does something different from what it actually does, spreading fake news.
+
+The first barrier against this is serving the page over HTTPS with DNSSEC only.
+
+> [!TIP]
+> 💡 Both MetaMask and Safe are external to our apps. Users should be educated on how to obtain and access them securely, as well as how to interpret the data displayed.
+
+## 3. Fake data feeding the app
+
+The app consumes data from two sources:
+
+- Etherscan
+- An Ethereum RPC
+
+Etherscan is a constant service, but the RPC can be configured and should be a trusted one. The app should consume data from trusted sources like Tenderly, Infura, or Alchemy.
+
+## 4. Dependencies
+
+The app only has well-maintained dependencies. However, every dependency can be a potential attack vector. There have been cases in the past where a package was altered to target a specific app (such as the Copay case).
+
+An attacker doing this could make signers sign something fake or make the signatures invalid to delay an upgrade.
+
+The best defense against this is to use only well-maintained dependencies and keep them up to date. Also, it’s very important to avoid floating dependency versions and have good tools to detect vulnerabilities, like recurring CI tasks, GitHub pro features for audit, etc. This is something that has to be taken care of over time.
+
+> [!TIP]
+> 💡 The JavaScript ecosystem is very dynamic. It makes sense to release new versions of the app just to update dependencies.
+
+## 5. Database
+
+The app uses the database for two main reasons:
+
+- To cache data that takes time to calculate.
+- To save signatures.
+
+**If an attacker gains access to the database**, they could alter the caches to make the app display fake data or invalidate signatures, causing delays in important upgrades.
+
+**Access to the database should be protected by following standard web security practices,** such as making it accessible only via a private network, using strong passwords, and providing access only to those who need it.
