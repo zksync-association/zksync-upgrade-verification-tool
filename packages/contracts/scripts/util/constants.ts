@@ -75,9 +75,7 @@ export type UpgradeData = {
 export const EXAMPLE_PROTOCOL_UPGRADE: UpgradeData = {
   addresses: ["0x0000000000000000000000000000000000008008"],
   values: [0n],
-  callDatas: [
-    calldata,
-  ],
+  callDatas: [calldata],
   description: "Test protocol proposal 06",
 };
 
@@ -109,23 +107,25 @@ export const PROTOCOL_GOV_TIME_CONTROLLER_ADDR = "0xd29db7d43077eab1d1c6b2aa1cfa
 export const PROVE_L2_INCLUSION_ABI = [
   {
     inputs: [
-      {internalType: "uint256", name: "_batchNumber", type: "uint256"},
-      {internalType: "uint256", name: "_index", type: "uint256"},
+      { internalType: "uint256", name: "_batchNumber", type: "uint256" },
+      { internalType: "uint256", name: "_index", type: "uint256" },
       {
         components: [
-          {internalType: "uint16", name: "txNumberInBatch", type: "uint16"},
-          {internalType: "address", name: "sender", type: "address"},
-          {internalType: "bytes", name: "data", type: "bytes"}
+          { internalType: "uint16", name: "txNumberInBatch", type: "uint16" },
+          { internalType: "address", name: "sender", type: "address" },
+          { internalType: "bytes", name: "data", type: "bytes" },
         ],
-        internalType: "struct L2Message", name: "_message", type: "tuple"
+        internalType: "struct L2Message",
+        name: "_message",
+        type: "tuple",
       },
-      {internalType: "bytes32[]", name: "_proof", type: "bytes32[]"}
+      { internalType: "bytes32[]", name: "_proof", type: "bytes32[]" },
     ],
     name: "proveL2MessageInclusion",
-    outputs: [{internalType: "bool", name: "", type: "bool"}],
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
     stateMutability: "view",
-    type: "function"
-  }
+    type: "function",
+  },
 ] as const;
 
 export const STAGING_DIAMOND_ADDRESS = "0x6d6e010a2680e2e5a3b097ce411528b36d880ef6";

@@ -5,11 +5,11 @@ import {
   PROTOCOL_GOV_TIME_CONTROLLER_ADDR,
   PROVE_L2_INCLUSION_ABI,
   STAGING_DIAMOND_ADDRESS,
-  upgradeStructAbi
+  upgradeStructAbi,
 } from "../util/constants.js";
 
 async function main() {
-  const provider = new Provider("https://rpc.sepolia.org")
+  const provider = new Provider("https://rpc.sepolia.org");
   const contract = new Contract(STAGING_DIAMOND_ADDRESS, PROVE_L2_INCLUSION_ABI, provider);
 
   const content = encodeAbiParameters(
@@ -20,19 +20,19 @@ async function main() {
           {
             target: "0x0000000000000000000000000000000000000000",
             value: 0n,
-            data: "0x"
+            data: "0x",
           },
           {
             target: "0x0000000000000000000000000000000000000000",
             value: 0n,
-            data: "0x"
-          }
+            data: "0x",
+          },
         ],
         executor: "0x0000000000000000000000000000000000000000",
-        salt: "0x0000000000000000000000000000000000000000000000000000000000000000"
-      }
+        salt: "0x0000000000000000000000000000000000000000000000000000000000000000",
+      },
     ]
-  )
+  );
 
   const proof = [
     "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba",
@@ -51,20 +51,15 @@ async function main() {
     "0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291",
   ];
   const message = {
-    "txNumberInBatch": 1,
-    "sender": PROTOCOL_GOV_TIME_CONTROLLER_ADDR,
-    "data": content
+    txNumberInBatch: 1,
+    sender: PROTOCOL_GOV_TIME_CONTROLLER_ADDR,
+    data: content,
   };
   const txBatchNumber = 616251n;
   const msgIndex = 0n;
   const tx = await contract
     .getFunction("proveL2MessageInclusion")
-    .staticCallResult(
-      txBatchNumber,
-      msgIndex,
-      message,
-      proof
-    );
+    .staticCallResult(txBatchNumber, msgIndex, message, proof);
 
   console.log(tx);
 }
