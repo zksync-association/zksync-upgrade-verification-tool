@@ -1,136 +1,96 @@
 import type { EnvBuilder } from "../lib/env-builder.js";
-import type { Hex } from "viem";
-import { Option } from "nochoices";
 import { withSpinner } from "../lib/with-spinner.js";
 import { DIAMOND_ADDRS } from "@repo/common/ethereum";
-import { type MemoryDiffRaw, memoryDiffParser } from "@repo/common/schemas";
+import { UpgradeFile } from "../lib/upgrade-file";
+import { RpcStorageSnapshot } from "../reports/storage/snapshot";
+import { StorageChanges } from "../reports/storage/storage-changes";
+import { StringStorageChangeReport } from "../reports/reports/string-storage-change-report";
+import { ZksyncEraState } from "../reports/zksync-era-state";
 import {
-  ListOfAddressesExtractor,
-  FacetsToSelectorsVisitor,
-} from "@repo/ethereum-reports/reports/extractors";
-import { StringStorageChangeReport } from "@repo/ethereum-reports/reports/string-storage-change-report";
-import { RecordStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/record-storage-snapshot";
-import { RpcStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/rpc-storage-snapshot";
-import { StorageChanges } from "@repo/ethereum-reports/storage/storage-changes";
-import { MAIN_CONTRACT_FIELDS } from "@repo/ethereum-reports/storage/storage-props";
-import type { UpgradeChanges } from "@repo/ethereum-reports/upgrade-changes";
-import { UpgradeImporter } from "../lib/importer.js";
-
-async function getMemoryPath(
-  preCalculatedPath: Option<string>,
-  env: EnvBuilder,
-  address: Hex,
-  changes: UpgradeChanges
-): Promise<MemoryDiffRaw> {
-  return preCalculatedPath
-    .map((path) =>
-      env
-        .fs()
-        .readFile(path)
-        .then((buf) => JSON.parse(buf.toString()))
-        .then((json) => memoryDiffParser.parse(json))
-    )
-    .unwrapOrElse(() => {
-      return env
-        .rpcL1()
-        .debugCallTraceStorage(
-          "0x0b622a2061eaccae1c664ebc3e868b8438e03f61",
-          address,
-          changes.upgradeCalldataHex.expect(new Error("Missing upgrade calldata"))
-        );
-    });
-}
+  RpcSystemContractProvider,
+  SystemContractList,
+} from "../reports/system-contract-providers";
+import { LocalFork } from "../reports/local-fork";
+import { Diamond } from "../reports/diamond";
 
 export async function storageChangeCommand(
   env: EnvBuilder,
-  dir: string,
-  preCalculatedPath: Option<string>
+  upgradeFilePath: string
 ): Promise<void> {
-  const diamondAddress = DIAMOND_ADDRS[env.network];
+  const upgradeFile = UpgradeFile.fromFile(upgradeFilePath);
+  const dataHex = upgradeFile.firstCallData().expect(new Error("Missing calldata"));
 
-  const rawMap = await withSpinner(
-    async () => {
-      const importer = new UpgradeImporter(env.fs());
-      const changes = await importer.readFromFiles(dir, env.network);
+  if (!dataHex) {
+    throw new Error("Missing calldata");
+  }
 
-      return getMemoryPath(preCalculatedPath, env, diamondAddress, changes);
-    },
-    "Calculating storage changes",
+  const currentState = await withSpinner(
+    async () =>
+      ZksyncEraState.fromBlockchain(
+        env.network,
+        await env.newRpcL1(),
+        env.l1Client(),
+        new RpcSystemContractProvider(env.rpcL2(), env.l2Client())
+      ),
+    "Gathering current zksync state",
     env
   );
 
-  const changesSnapshot = Option.fromNullable(rawMap.result.post[diamondAddress])
-    .map((data) => data.storage)
-    .flatten()
-    .orElse(() => Option.Some({}))
-    .map((s) => new RecordStorageSnapshot(s))
-    .unwrap();
-
-  const pre = new RpcStorageSnapshot(env.rpcL1(), diamondAddress);
-  const post = pre.apply(changesSnapshot);
-
-  const [facetsPre, facetsPost] = await withSpinner(
-    async () => {
-      const facetsPre = await MAIN_CONTRACT_FIELDS.facetAddresses
-        .extract(pre)
-        .then((opt) =>
-          opt.map((value) => value.accept(new ListOfAddressesExtractor())).or(Option.Some([]))
-        );
-      const facetsPost = await MAIN_CONTRACT_FIELDS.facetAddresses
-        .extract(post)
-        .then((opt) =>
-          opt.map((value) => value.accept(new ListOfAddressesExtractor())).or(Option.Some([]))
-        );
-      return [facetsPre, facetsPost];
-    },
-    "Searching all facet addresses",
+  const localFork = await withSpinner(
+    () => LocalFork.create(env.rpcL1().rpcUrl(), env.network),
+    "Forking network",
     env
   );
 
-  const allFacets = facetsPre
-    .zip(facetsPost)
-    .map(([pre, post]) => [...pre, ...post])
-    .unwrapOr([]);
-
-  const [selectorsPre, selectorsPost] = await withSpinner(
+  const [pre, post] = await withSpinner(
     async () => {
-      const selectorsPre = await MAIN_CONTRACT_FIELDS.facetToSelectors(allFacets)
-        .extract(pre)
-        .then((opt) =>
-          opt
-            .map((value) => value.accept(new FacetsToSelectorsVisitor()) as Map<Hex, Hex[]>)
-            .or(Option.Some(new Map()))
-        );
+      const diamond = await Diamond.create(DIAMOND_ADDRS[env.network], env.l1Client(), env.rpcL1());
+      const stateTransitionManager = await diamond.getTransitionManager(
+        env.rpcL1(),
+        env.l1Client()
+      );
+      const upgradeHandlerAddress = await stateTransitionManager.upgradeHandlerAddress(env.rpcL1());
 
-      const selectorsPost = await MAIN_CONTRACT_FIELDS.facetToSelectors(allFacets)
-        .extract(post)
-        .then((opt) =>
-          opt
-            .map((value) => value.accept(new FacetsToSelectorsVisitor()) as Map<Hex, Hex[]>)
-            .or(Option.Some(new Map()))
-        );
-      return [selectorsPre, selectorsPost];
+      for (const call of upgradeFile.calls) {
+        await localFork.execDebugTx(upgradeHandlerAddress, call.target, call.data, call.value);
+      }
+
+      const pre = new RpcStorageSnapshot(env.rpcL1(), diamond.address);
+      const post = new RpcStorageSnapshot(localFork.rpc(), diamond.address);
+      return [pre, post];
     },
-    "Searching all selectors",
+    "Simulating upgrade",
     env
   );
 
-  const allSelectors = selectorsPre
-    .zip(selectorsPost)
-    .map(([pre, post]) => {
-      return [...pre.values(), ...post.values()].flat();
-    })
-    .unwrapOr([]);
+  const proposedState = await withSpinner(
+    async () =>
+      ZksyncEraState.fromBlockchain(
+        env.network,
+        localFork.rpc(),
+        env.l1Client(),
+        new SystemContractList([])
+      ),
+    "Gathering final state",
+    env
+  );
+
+  const allFacetsData = [...currentState.allFacets(), ...proposedState.allFacets()];
+  const allFacetAddresses = allFacetsData.map((f) => f.address);
+
+  const allSelectors = [...currentState.allSelectors(), ...proposedState.allSelectors()];
 
   const report = await withSpinner(
     async () => {
-      const storageChanges = new StorageChanges(pre, post, allFacets, [...allSelectors]);
+      const storageChanges = new StorageChanges(pre, post, allFacetAddresses, [...allSelectors]);
       const report = new StringStorageChangeReport(storageChanges, env.colored);
       return await report.format();
     },
-    "calculating report",
+    "Calculating report",
     env
   );
+
+  await localFork.tearDown();
 
   env.term().line(report);
 }

@@ -44,6 +44,10 @@ jobs:
         with:
           node-version: 20
           cache: "pnpm"
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
       - run: pnpm install
       - run: |
           cp packages/contracts/.env.example packages/contracts/.env

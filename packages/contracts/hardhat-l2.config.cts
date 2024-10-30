@@ -55,6 +55,11 @@ const config: HardhatUserConfig = {
     hardhat: {
       zksync: true,
     },
+    staging: {
+      zksync: true,
+      url: "https://z2-dev-api.zksync.dev/",
+      ethNetwork: "https://mainnet.gateway.tenderly.co",
+    },
   },
 };
 

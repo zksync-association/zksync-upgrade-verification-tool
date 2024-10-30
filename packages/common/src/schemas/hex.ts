@@ -15,3 +15,4 @@ export const addressSchema = hexSchema
 export const bytes32Schema = hexSchema.refine((str) => str.length === 66, "Invalid Ethereum word");
 
 export const selectorSchema = hexSchema.refine((str) => str.length === 10, "Invalid Selector hash");
+export type Selector = z.infer<typeof selectorSchema>;

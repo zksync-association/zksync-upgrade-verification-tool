@@ -34,6 +34,9 @@ export const DERIVATION_INDEXES = {
   GUARDIAN_6: 19,
   GUARDIAN_7: 20,
   GUARDIAN_8: 21,
+
+  // ZkAdmin is derived from here as well
+  ZK_ADMIN: 22,
 } as const;
 
 export const COUNCIL_INDEXES = [

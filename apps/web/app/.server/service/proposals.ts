@@ -14,12 +14,19 @@ import {
 import { fetchL2LogProof, l2Rpc, queryL2Logs } from "@/.server/service/ethereum-l2/client";
 import { zkProtocolGovernorAbi } from "@/utils/contract-abis";
 import { env } from "@config/env.server";
-import { decodeAbiParameters, type Hex, keccak256, numberToHex, toEventSelector } from "viem";
+import {
+  decodeAbiParameters,
+  type Hex,
+  keccak256,
+  numberToHex,
+  toEventSelector,
+  toHex,
+} from "viem";
 import type { StartUpgradeData } from "@/common/types";
 import { defaultLogger } from "@config/log.server";
 import { EthereumConfig } from "@config/ethereum.server";
 
-export async function getProposals() {
+export async function getProposalsFromL1() {
   // First, we will update the status of all stored active proposals
   const storedProposals = await getStoredProposals();
   const activeStoredProposals = storedProposals.filter((p) => p.status === "ACTIVE");
@@ -47,6 +54,23 @@ export async function getProposals() {
     toBlock: "latest",
   });
 
+  // Map l1 proposal ids to l2 proposal ids
+  const proposalsL1ToL2Id: { [l1ProposalId: Hex]: Hex } = {};
+  const executedInL2 = await getL2ExecutedProposals();
+
+  for (const { proposalId, transactionHash } of executedInL2) {
+    const receipt = await l2Rpc.getTransactionReceipt({ hash: transactionHash });
+    const l1MessageEventId = toEventSelector("L1MessageSent(address,bytes32,bytes)");
+    const bodyLog = receipt.logs.find((l) => l.topics[0] === l1MessageEventId);
+    if (!bodyLog) {
+      continue;
+    }
+
+    const [body] = decodeAbiParameters([{ name: "_", type: "bytes" }], bodyLog.data);
+    const l1ProposalId = keccak256(body);
+    proposalsL1ToL2Id[l1ProposalId] = toHex(proposalId);
+  }
+
   for (const log of logs) {
     const [_signature, id] = log.topics;
     // TODO: verify in which cases can the log args be undefined
@@ -54,8 +78,21 @@ export async function getProposals() {
       throw new Error("Invalid log");
     }
 
-    // If proposal is already stored, we skip it
-    if (storedProposals.some((p) => p.externalId === id)) {
+    // If proposal is already stored, check and update l2 proposal id if available
+    const storedProposal = storedProposals.find((p) => p.externalId === id);
+    if (storedProposal) {
+      if (storedProposal.l2ProposalId) {
+        continue;
+      }
+
+      const l2ProposalId = proposalsL1ToL2Id[id];
+      if (l2ProposalId) {
+        await updateProposal({
+          id: storedProposal.id,
+          l2ProposalId,
+        });
+      }
+
       continue;
     }
 
@@ -71,6 +108,7 @@ export async function getProposals() {
       executor: log.args._proposal.executor,
       transactionHash: log.transactionHash,
       status: isProposalActive(status) ? "ACTIVE" : "INACTIVE",
+      l2ProposalId: proposalsL1ToL2Id[id],
     });
   }
 
@@ -94,25 +132,15 @@ export type ProposalDataResponse = {
     }
 );
 
-export async function searchNotStartedProposals() {
+export async function searchNotStartedProposalsFromL2() {
   // First we look for proposals that have already been executed
   // in l2.
-  const executedInL2 = await queryL2Logs(
-    zkProtocolGovernorAbi,
-    env.ZK_PROTOCOL_GOVERNOR_ADDRESS,
-    "ProposalExecuted",
-    0n
-  );
+  const executedInL2 = await getL2ExecutedProposals();
 
   // Now we need to check if these events have not been already started in l1
   const filtered = [];
-  for (const { args, transactionHash } of executedInL2) {
-    if (!transactionHash) {
-      throw new Error("transactionHash should be present");
-    }
-
-    const data = await extractProposalData(transactionHash, numberToHex(args.proposalId));
-
+  for (const { proposalId, transactionHash } of executedInL2) {
+    const data = await extractProposalData(transactionHash, numberToHex(proposalId));
     if (!data.ok) {
       filtered.push(data);
       continue;
@@ -182,4 +210,24 @@ async function extractProposalData(txHash: Hex, l2ProposalId: Hex): Promise<Prop
       proposal: body,
     },
   };
+}
+
+async function getL2ExecutedProposals() {
+  const logs = await queryL2Logs(
+    zkProtocolGovernorAbi,
+    env.ZK_PROTOCOL_GOVERNOR_ADDRESS,
+    "ProposalExecuted",
+    0n
+  );
+
+  return logs.map((log) => {
+    if (!log.transactionHash) {
+      throw new Error("Missing transaction hash");
+    }
+
+    return {
+      proposalId: log.args.proposalId,
+      transactionHash: log.transactionHash,
+    };
+  });
 }

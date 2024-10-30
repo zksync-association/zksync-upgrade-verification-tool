@@ -4,18 +4,15 @@ import type { freezeProposalsTable } from "@/.server/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreateFreezeProposalModal } from "@/routes/app/freeze/_index/create-freeze-proposal-modal";
 import { formError, generalError } from "@/utils/action-errors";
-import { cn } from "@/utils/cn";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs, SerializeFrom } from "@remix-run/node";
 import { Link, json, redirect, useLoaderData } from "@remix-run/react";
 import type { InferSelectModel } from "drizzle-orm";
 import { ArrowRight } from "lucide-react";
 import { $path } from "remix-routes";
-import type { Jsonify } from "type-fest";
 import { z } from "zod";
 import { parseFormData } from "@/utils/read-from-request";
-import { type FreezeProposalsType, FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
+import { FreezeProposalsTypeEnum } from "@/common/freeze-proposal-type";
 import { securityCouncilAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 import {
   securityCouncilHardFreezeNonce,
@@ -23,15 +20,15 @@ import {
   securityCouncilSoftFreezeThresholdSettingNonce,
   securityCouncilUnfreezeNonce,
 } from "@/.server/service/ethereum-l1/contracts/security-council";
+import { CreateFreezeProposalModal } from "./create-freeze-proposal-modal";
+import { Meta } from "@/utils/meta";
+import { formatDateTime } from "@/utils/date";
+
+export const meta = Meta["/app/freeze"];
 
 export async function loader() {
   const proposals = await getAllFreezeProposals();
 
-  // Filter expired proposals
-  const now = new Date();
-  const validProposals = proposals.filter((p) => new Date(p.validUntil) > now);
-
-  // Filter proposals already executed or ignored
   const securityCouncil = await securityCouncilAddress();
   const [softFreezeNonce, hardFreezeNonce, softFreezeThresholdSettingNonce, unfreezeNonce] =
     await Promise.all([
@@ -41,26 +38,63 @@ export async function loader() {
       securityCouncilUnfreezeNonce(securityCouncil),
     ]);
 
-  const validAndActiveProposals = validProposals.filter((p) => {
-    switch (p.type) {
-      case "SOFT_FREEZE":
-        return p.externalId >= softFreezeNonce;
-      case "HARD_FREEZE":
-        return p.externalId >= hardFreezeNonce;
-      case "SET_SOFT_FREEZE_THRESHOLD":
-        return p.externalId >= softFreezeThresholdSettingNonce;
-      case "UNFREEZE":
-        return p.externalId >= unfreezeNonce;
+  const isActive = (proposal: (typeof proposals)[number]) => {
+    if (proposal.transactionHash !== null) {
+      return {
+        active: false,
+        reason: "Broadcasted",
+      };
     }
-  });
+
+    // Filter proposals already executed or ignored
+    if (new Date(proposal.validUntil) <= new Date()) {
+      return {
+        active: false,
+        reason: "Expired",
+      };
+    }
+
+    // Filter archived proposals
+    if (proposal.archivedOn !== null) {
+      return {
+        active: false,
+        reason: "Archived",
+      };
+    }
+
+    // Filter proposals already executed or ignored
+    switch (proposal.type) {
+      case "SOFT_FREEZE":
+        return {
+          active: proposal.externalId >= softFreezeNonce,
+          reason: proposal.externalId >= softFreezeNonce ? undefined : "Expired",
+        };
+      case "HARD_FREEZE":
+        return {
+          active: proposal.externalId >= hardFreezeNonce,
+          reason: proposal.externalId >= hardFreezeNonce ? undefined : "Expired",
+        };
+      case "SET_SOFT_FREEZE_THRESHOLD":
+        return {
+          active: proposal.externalId >= softFreezeThresholdSettingNonce,
+          reason: proposal.externalId >= softFreezeThresholdSettingNonce ? undefined : "Expired",
+        };
+      case "UNFREEZE":
+        return {
+          active: proposal.externalId >= unfreezeNonce,
+          reason: proposal.externalId >= unfreezeNonce ? undefined : "Expired",
+        };
+    }
+  };
 
   return json({
-    softFreezeProposals: validAndActiveProposals.filter((p) => p.type === "SOFT_FREEZE"),
-    hardFreezeProposals: validAndActiveProposals.filter((p) => p.type === "HARD_FREEZE"),
-    setSoftFreezeThresholdProposals: validAndActiveProposals.filter(
-      (p) => p.type === "SET_SOFT_FREEZE_THRESHOLD"
-    ),
-    unfreezeProposals: validAndActiveProposals.filter((p) => p.type === "UNFREEZE"),
+    activeProposals: proposals.filter((p) => isActive(p).active),
+    inactiveProposals: proposals
+      .filter((p) => !isActive(p).active)
+      .map((p) => ({
+        ...p,
+        reason: isActive(p).reason,
+      })),
   });
 }
 
@@ -130,37 +164,20 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Index() {
-  const {
-    softFreezeProposals,
-    hardFreezeProposals,
-    setSoftFreezeThresholdProposals,
-    unfreezeProposals,
-  } = useLoaderData<typeof loader>();
+  const { activeProposals, inactiveProposals } = useLoaderData<typeof loader>();
   return (
     <div className="space-y-4">
       <ProposalCard
-        title="Soft Freeze Proposals"
-        proposals={softFreezeProposals}
-        type="SOFT_FREEZE"
-        testNamespace="soft"
+        title="Active Freeze Requests"
+        proposals={activeProposals}
+        type="active"
+        data-testid="active-proposals-card"
       />
       <ProposalCard
-        title="Hard Freeze Proposals"
-        proposals={hardFreezeProposals}
-        type="HARD_FREEZE"
-        testNamespace="hard"
-      />
-      <ProposalCard
-        title="Set Soft Freeze Threshold Proposals"
-        proposals={setSoftFreezeThresholdProposals}
-        type="SET_SOFT_FREEZE_THRESHOLD"
-        testNamespace="change-threshold"
-      />
-      <ProposalCard
-        title="Unfreeze Proposals"
-        proposals={unfreezeProposals}
-        type="UNFREEZE"
-        testNamespace="unfreeze"
+        title="Inactive Freeze Requests"
+        proposals={inactiveProposals}
+        type="inactive"
+        data-testid="inactive-proposals-card"
       />
     </div>
   );
@@ -169,28 +186,33 @@ export default function Index() {
 function ProposalCard({
   title,
   proposals,
-  type,
   className,
-  testNamespace,
+  type,
+  ...props
 }: {
   title: string;
-  proposals: Jsonify<InferSelectModel<typeof freezeProposalsTable>>[];
-  type: FreezeProposalsType;
+  proposals: SerializeFrom<typeof loader>["inactiveProposals"];
   className?: string;
-  testNamespace: string;
+  type: "active" | "inactive";
+  "data-testid": string;
 }) {
   return (
-    <Card className={cn("pb-10", className)} data-testid={`${testNamespace}-card`}>
+    <Card className={className} data-testid={props["data-testid"]}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{title}</CardTitle>
-          <CreateFreezeProposalModal type={type} testNamespace={testNamespace} />
+          {type === "active" && <CreateFreezeProposalModal />}
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col space-y-4" data-testid={`${testNamespace}-proposals`}>
+        <div className="flex flex-col space-y-4">
           {proposals.map((proposal) => {
-            const validUntil = new Date(proposal.validUntil).toLocaleString();
+            const label = {
+              SOFT_FREEZE: "Soft Freeze",
+              HARD_FREEZE: "Hard Freeze",
+              SET_SOFT_FREEZE_THRESHOLD: "Set Soft Freeze Threshold",
+              UNFREEZE: "Unfreeze",
+            }[proposal.type];
 
             return (
               <Link
@@ -200,9 +222,16 @@ function ProposalCard({
               >
                 <Button className="flex flex-1 justify-between pr-4" variant="outline">
                   <div className="flex items-center">
-                    <span className="text-base">Proposal {proposal.externalId}</span>
-                    <Badge className="ml-4" variant="secondary">
-                      Valid until: {validUntil}
+                    <span className="mr-4">
+                      {label} - Proposal {proposal.externalId}
+                    </span>
+                    {type === "inactive" && (
+                      <Badge className="mr-2" variant="destructive">
+                        {proposal.reason}
+                      </Badge>
+                    )}
+                    <Badge className="" variant="secondary">
+                      Valid until: {formatDateTime(proposal.validUntil)}
                     </Badge>
                   </div>
                   <ArrowRight />
@@ -212,7 +241,7 @@ function ProposalCard({
           })}
         </div>
         {proposals.length === 0 && (
-          <div className="text-center text-gray-500">No proposals found.</div>
+          <div className="text-center text-gray-500">No {type} Freeze Requests found.</div>
         )}
       </CardContent>
     </Card>

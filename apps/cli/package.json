@@ -2,26 +2,26 @@
   "name": "cli",
   "version": "1.0.0",
   "description": "cli tool to check details about zk-sync era upgrades.",
-  "type": "module",
   "author": "moonsong-labs",
   "license": "(MIT OR Apache-2.0)",
   "bin": {
     "validate": "./bin/validate.js"
   },
+  "type": "module",
   "scripts": {
     "start": "tsx src/entrypoint.ts",
     "build": "tsx esbuild.ts",
     "watch": "tsx esbuild.ts --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "validate": "./bin/validate.js"
+    "validate": "tsx ./src/entrypoint.ts"
   },
   "dependencies": {
     "@repo/common": "workspace:*",
-    "@repo/ethereum-reports": "workspace:*",
     "chalk": "^5.3.0",
     "cli-table3": "^0.6.4",
     "dotenv": "^16.4.5",
+    "hardhat": "^2.22.6",
     "nochoices": "^1.1.4",
     "ora": "^8.0.1",
     "simple-git": "^3.24.0",

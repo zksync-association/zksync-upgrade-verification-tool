@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { type SignAction, signActionEnum } from "@/common/sign-action";
 
-export const UserRoleEnum = z.enum(["guardian", "securityCouncil", "zkFoundation", "visitor"]);
+export const UserRoleEnum = z.enum([
+  "guardian",
+  "securityCouncil",
+  "zkFoundation",
+  "visitor",
+  "zkAdmin",
+]);
 export type UserRole = z.infer<typeof UserRoleEnum>;
 
 const USER_ROLE_DATA = {
@@ -21,6 +27,11 @@ const USER_ROLE_DATA = {
     regularUpgradeContractNameByRole: null,
   },
   [UserRoleEnum.enum.visitor]: {
+    emergencyUpgradeAction: null,
+    standardUpgradeActionForRole: null,
+    regularUpgradeContractNameByRole: null,
+  },
+  [UserRoleEnum.enum.zkAdmin]: {
     emergencyUpgradeAction: null,
     standardUpgradeActionForRole: null,
     regularUpgradeContractNameByRole: null,

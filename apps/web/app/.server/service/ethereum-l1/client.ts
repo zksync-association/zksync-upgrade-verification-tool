@@ -1,5 +1,6 @@
 import { createPublicClient, http } from "viem";
 import { EthereumConfig } from "@config/ethereum.server";
+import { defaultLogger } from "@config/log.server";
 import { env } from "@config/env.server";
 
 export const l1Rpc = createPublicClient({
@@ -27,10 +28,10 @@ export const checkConnection = async () => {
     const data: any = await response.json();
     return "result" in data;
   } catch (error) {
-    console.error("Error checking connection to :", EthereumConfig.l1.rpcUrl);
+    defaultLogger.error("Error checking connection to :", EthereumConfig.l1.rpcUrl);
     if (error instanceof Error) {
-      console.error(error.message);
-      console.error(error.cause);
+      defaultLogger.error(error.message);
+      defaultLogger.error(error.cause);
     }
     return false;
   }

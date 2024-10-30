@@ -1,12 +1,10 @@
 import { DateTimePicker } from "@/components/date-time-picker";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Share2Icon } from "@radix-ui/react-icons";
 import { useActionData, useNavigation, useRevalidator } from "@remix-run/react";
 import { add } from "date-fns";
 import { useState } from "react";
 import type { action } from "./_route";
-import type { FreezeProposalsType } from "@/common/freeze-proposal-type";
 import { Form, FormInput, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import {
   Dialog,
@@ -16,39 +14,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { PlusIcon } from "lucide-react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { FreezeProposalsTypeEnum, type FreezeProposalsType } from "@/common/freeze-proposal-type";
+import { Label } from "@/components/ui/label";
+import AddButton from "@/components/add-button";
 
-export function CreateFreezeProposalModal({
-  type,
-  testNamespace,
-}: {
-  type: FreezeProposalsType | null;
-  testNamespace: string;
-}) {
+export function CreateFreezeProposalModal() {
   const actionResult = useActionData<typeof action>();
   const [date, setDate] = useState<Date>(add(new Date(), { days: 7 }));
   const navigation = useNavigation();
   const revalidator = useRevalidator();
-
-  let title: string;
-  switch (type) {
-    case "SOFT_FREEZE":
-      title = "Create Soft Freeze Proposal";
-      break;
-    case "HARD_FREEZE":
-      title = "Create Hard Freeze Proposal";
-      break;
-    case "SET_SOFT_FREEZE_THRESHOLD":
-      title = "Create Set Soft Freeze Threshold Proposal";
-      break;
-    case "UNFREEZE":
-      title = "Create Unfreeze Proposal";
-      break;
-    default:
-      title = "";
-      break;
-  }
+  const [proposalType, setProposalType] = useState<FreezeProposalsType | undefined>(undefined);
 
   const handleOpenChange = () => {
     if (actionResult !== null && actionResult !== undefined) {
@@ -59,26 +42,44 @@ export function CreateFreezeProposalModal({
   return (
     <Dialog onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="secondary" size="icon" data-testid={`${testNamespace}-create-btn`}>
-          <PlusIcon className="h-4 w-4" />
-        </Button>
+        <AddButton data-testid="create-freeze-btn">Create Freeze Request</AddButton>
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle className="mb-4 flex w-full items-center justify-between">
-            {title}
-          </DialogTitle>
+        <DialogHeader>
+          <DialogTitle>Create Freeze Request</DialogTitle>
           <DialogDescription>
-            <VisuallyHidden>{title}</VisuallyHidden>
+            <VisuallyHidden>Create Freeze Request</VisuallyHidden>
           </DialogDescription>
         </DialogHeader>
         <Form method="POST">
+          <Label>Freeze Type</Label>
+          <Select
+            name="type"
+            value={proposalType}
+            onValueChange={setProposalType as (value: string) => void}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select Freeze Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={FreezeProposalsTypeEnum.Values.SOFT_FREEZE}>
+                Soft Freeze
+              </SelectItem>
+              <SelectItem value={FreezeProposalsTypeEnum.Values.HARD_FREEZE}>
+                Hard Freeze
+              </SelectItem>
+              <SelectItem value={FreezeProposalsTypeEnum.Values.UNFREEZE}>Unfreeze</SelectItem>
+              <SelectItem value={FreezeProposalsTypeEnum.Values.SET_SOFT_FREEZE_THRESHOLD}>
+                Set Soft Freeze Threshold
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
           <FormItem name="validUntil" className="space-y-4">
             <FormLabel>Valid Until</FormLabel>
             <DateTimePicker
               date={date}
               setDate={setDate}
-              timeFormat="12H"
               dayPicker={{
                 disabled: { before: new Date() },
               }}
@@ -88,7 +89,7 @@ export function CreateFreezeProposalModal({
               <p className="text-red-500 text-sm">{actionResult.errors.validUntil}</p>
             )}
           </FormItem>
-          {type === "SET_SOFT_FREEZE_THRESHOLD" && (
+          {proposalType === "SET_SOFT_FREEZE_THRESHOLD" && (
             <FormItem name="threshold">
               <FormLabel>Threshold</FormLabel>
               <FormInput type="number" min={1} max={9} />
@@ -101,8 +102,6 @@ export function CreateFreezeProposalModal({
           {actionResult?.error_type === "general_error" && (
             <p className="text-red-500 text-sm">{actionResult.error}</p>
           )}
-
-          <Input name="type" type="hidden" value={type ?? undefined} />
 
           <div className="mt-4 flex">
             <div className="flex-1" />

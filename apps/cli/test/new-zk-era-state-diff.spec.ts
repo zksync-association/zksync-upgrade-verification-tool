@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type Hex, hexToBigInt } from "viem";
 import { Option } from "nochoices";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { bytesToBigint } from "viem/utils";
 import {
   ZksyncEraState,
@@ -10,18 +8,23 @@ import {
   type L2ContractData,
   type NumberEraPropNames,
   type ZkEraStateData,
-} from "@repo/ethereum-reports/zksync-era-state";
-import { MissingRequiredProp, BlockExplorerClient, RpcClient } from "@repo/common/ethereum";
-import { SystemContractList } from "@repo/ethereum-reports/system-contract-providers";
-import type { FacetData } from "@repo/ethereum-reports/upgrade-changes";
-import { ZkSyncEraDiff } from "@repo/ethereum-reports/zk-sync-era-diff";
+} from "../src/reports/zksync-era-state";
+import { BlockExplorerClient } from "../src/ethereum/block-explorer-client";
+import { MissingRequiredProp } from "../src/lib/errors";
+import {
+  RpcSystemContractProvider,
+  SystemContractList,
+} from "../src/reports/system-contract-providers";
+import type { FacetData } from "../src/reports/upgrade-changes";
+import { ZkSyncEraDiff } from "../src/reports/zk-sync-era-diff";
+import { RpcClient } from "../src/ethereum/rpc-client";
 
 describe("NewZkSyncStateDiff", () => {
   function diffWithDataChanges(oldData: ZkEraStateData, newData: ZkEraStateData): ZkSyncEraDiff {
-    const current = new ZksyncEraState(oldData, [], new SystemContractList([]));
-    const changes = new ZksyncEraState(newData, [], new SystemContractList([]));
+    const current = new ZksyncEraState(oldData, [], new SystemContractList([]), []);
+    const changes = new ZksyncEraState(newData, [], new SystemContractList([]), []);
 
-    return new ZkSyncEraDiff(current, changes, []);
+    return new ZkSyncEraDiff(current, changes);
   }
 
   describe("hex property diffs", () => {
@@ -174,9 +177,9 @@ describe("NewZkSyncStateDiff", () => {
       currentFacets: FacetData[],
       proposedFacets: FacetData[]
     ): ZkSyncEraDiff {
-      const current = new ZksyncEraState({}, currentFacets, new SystemContractList([]));
-      const proposed = new ZksyncEraState({}, proposedFacets, new SystemContractList([]));
-      return new ZkSyncEraDiff(current, proposed, []);
+      const current = new ZksyncEraState({}, currentFacets, new SystemContractList([]), []);
+      const proposed = new ZksyncEraState({}, proposedFacets, new SystemContractList([]), []);
+      return new ZkSyncEraDiff(current, proposed);
     }
 
     describe("#addedFacets", () => {
@@ -467,13 +470,17 @@ describe("NewZkSyncStateDiff", () => {
 
   describe("when changes are made in the l2 contracts", () => {
     function diffWithSystemContracts(
-      sysContractsAddrs: Hex[],
       currentList: L2ContractData[],
       proposedList: L2ContractData[]
     ) {
-      const current = new ZksyncEraState({}, [], new SystemContractList(currentList));
-      const proposed = new ZksyncEraState({}, [], new SystemContractList(proposedList));
-      return new ZkSyncEraDiff(current, proposed, sysContractsAddrs);
+      const current = new ZksyncEraState({}, [], new SystemContractList(currentList), currentList);
+      const proposed = new ZksyncEraState(
+        {},
+        [],
+        new SystemContractList(proposedList),
+        proposedList
+      );
+      return new ZkSyncEraDiff(current, proposed);
     }
 
     it("returns changes for affected system contracts", async () => {
@@ -493,11 +500,7 @@ describe("NewZkSyncStateDiff", () => {
         },
       ];
 
-      const diff = diffWithSystemContracts(
-        ["0x01"],
-        currentSystemContracts,
-        proposedSystemContracts
-      );
+      const diff = diffWithSystemContracts(currentSystemContracts, proposedSystemContracts);
 
       const changes = await diff.systemContractChanges();
       expect(changes.length).to.eql(1);
@@ -526,215 +529,10 @@ describe("NewZkSyncStateDiff", () => {
         },
       ];
 
-      const diff = diffWithSystemContracts(
-        ["0x01"],
-        currentSystemContracts,
-        proposedSystemContracts
-      );
+      const diff = diffWithSystemContracts(currentSystemContracts, proposedSystemContracts);
 
       const changes = await diff.systemContractChanges();
       expect(changes.length).to.eql(0);
-    });
-  });
-
-  describe("#createFromCallData", () => {
-    it("works", async (t) => {
-      const etherscanKey = process.env.ETHERSCAN_API_KEY;
-      const rpcUrl = process.env.RPC_URL;
-
-      if (!etherscanKey || !rpcUrl) {
-        return t.skip();
-      }
-
-      // This is a very specific calldata made by hand
-      const hexBuff = await fs.readFile(
-        path.join(import.meta.dirname, "data", "upgrade-calldata.hex")
-      );
-      const buff = Buffer.from(hexBuff.toString(), "hex");
-
-      const explorerL1 = BlockExplorerClient.forL1(etherscanKey, "mainnet");
-      const explorerL2 = BlockExplorerClient.forL2("mainnet");
-      const rpc = new RpcClient(rpcUrl);
-
-      const [state] = await ZksyncEraState.fromCalldata(
-        "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C",
-        "0x32400084c286cf3e17e7b677ea9583e60a000324",
-        buff,
-        "mainnet",
-        explorerL1,
-        rpc,
-        explorerL2
-      );
-
-      const facets = state.allFacets();
-      const admin = facets.find((f) => f.name === "AdminFacet");
-      if (!admin) {
-        return expect.fail("admin should be present");
-      }
-      expect(admin.address).toEqual("0x230214f0224c7e0485f348a79512ad00514db1f7");
-
-      const getters = facets.find((f) => f.name === "GettersFacet");
-      expect(getters).toBe(undefined);
-
-      const mailbox = facets.find((f) => f.name === "MailboxFacet");
-      if (!mailbox) {
-        return expect.fail("mailbox should be present");
-      }
-      expect(mailbox.address).toEqual("0xa57f9ffd65fc0f5792b5e958df42399a114ec7e7");
-
-      const executor = facets.find((f) => f.name === "ExecutorFacet");
-      expect(executor).toBe(undefined);
-
-      expect(state.numberAttrValue("chainId").unwrap()).toEqual(324n);
-      expect(state.hexAttrValue("bridgeHubAddress").unwrap().toLowerCase()).toEqual(
-        "0x303a465B659cBB0ab36eE643eA362c509EEb5213".toLowerCase()
-      );
-      expect(state.hexAttrValue("stateTransitionManagerAddress").unwrap().toLowerCase()).toEqual(
-        "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C".toLowerCase()
-      );
-      expect(state.hexAttrValue("baseTokenBridgeAddress").unwrap().toLowerCase()).toEqual(
-        "0xD7f9f54194C633F36CCD5F3da84ad4a1c38cB2cB".toLowerCase()
-      );
-      expect(state.hexAttrValue("admin").unwrap().toLowerCase()).toEqual(
-        "0x0b622A2061EaccAE1c664eBC3E868b8438e03F61".toLowerCase()
-      );
-
-      const l2Addresses = [
-        {
-          address: "0x0000000000000000000000000000000000000000",
-          name: "EmptyContract",
-          hash: "0x0100000781e55a60f3f14fd7dd67e3c8caab896b7b0fca4a662583959299eede",
-        },
-        {
-          address: "0x0000000000000000000000000000000000000001",
-          name: "Ecrecover",
-          hash: "0x0100001112e34172b2bc31574d155893a087a1cf4b608cf9895a2201ea7bd6ee",
-        },
-        {
-          address: "0x0000000000000000000000000000000000000002",
-          name: "SHA256",
-          hash: "0x0100001752dc8a1a374a6346781205017b7b594d97c28812265865f3a45fcb45",
-        },
-        {
-          address: "0x0000000000000000000000000000000000000006",
-          name: "EcAdd",
-          hash: "0x010000872dd7e2dc1b34416c174086aa84fd80c78acc7b670214da955bd55728",
-        },
-        {
-          address: "0x0000000000000000000000000000000000000007",
-          name: "EcMul",
-          hash: "0x010000bd8bd7ab008f76e359dc296ff5fe0e8a95fedce1d570943e90143acdfd",
-        },
-        {
-          address: "0x0000000000000000000000000000000000000008",
-          name: "EcPairing",
-          hash: "0x01000f1b3432a32f9fba2115f5dd3b0ee8127e7bf2c609d57d3e231f19119c43",
-        },
-        {
-          address: "0x0000000000000000000000000000000000008001",
-          name: "EmptyContract",
-          hash: "0x0100000781e55a60f3f14fd7dd67e3c8caab896b7b0fca4a662583959299eede",
-        },
-        {
-          address: "0x0000000000000000000000000000000000008002",
-          name: "AccountCodeStorage",
-          hash: "0x0100007549287362e4263ea5b204f01fc3c7f2ac09d71e6eb21029698220f01a",
-        },
-        {
-          address: "0x0000000000000000000000000000000000008003",
-          name: "NonceHolder",
-          hash: "0x010000e563d4ad7b4822cc19d8f74f2c41ee3d3153379be4b02b27d4498d52b6",
-        },
-        {
-          address: "0x0000000000000000000000000000000000008004",
-          name: "KnownCodesStorage",
-          hash: "0x0100007d82d4a2eb62e539e3c89cc641f507132b247022ba05ef1ddfed2b0073",
-        },
-        {
-          address: "0x0000000000000000000000000000000000008005",
-          name: "ImmutableSimulator",
-          hash: "0x0100003de00c5ceaa3fdf4566a9822ce94abe676f68b17a6ae11c453e14455fd",
-        },
-        {
-          address: "0x0000000000000000000000000000000000008006",
-          name: "ContractDeployer",
-          hash: "0x010005215fda00bfbf95847a13078bd16cdcb1b875534261c1dda9940c7754fe",
-        },
-        {
-          address: "0x0000000000000000000000000000000000008008",
-          name: "L1Messenger",
-          hash: "0x010002b97ebf3c481ead775617590ffca139bee428e443aa49eb38b6a5b83657",
-        },
-        {
-          address: "0x0000000000000000000000000000000000008009",
-          name: "MsgValueSimulator",
-          hash: "0x010000695a1e821b6d5fcb25e25793b81de0bdca3ff8277e3ac93a38e729e0a1",
-        },
-        {
-          address: "0x000000000000000000000000000000000000800a",
-          name: "L2BaseToken",
-          hash: "0x010001039329e4bb55b24531c7e7d27ed40d2c82ad145033fdd5ed5b8ea86cf3",
-        },
-        {
-          address: "0x000000000000000000000000000000000000800b",
-          name: "SystemContext",
-          hash: "0x010001b3f2c3a6bdd5ad00ae29a7cbbb32dca3c31fb608b5cd52f8f3056a3847",
-        },
-        {
-          address: "0x000000000000000000000000000000000000800c",
-          name: "BootloaderUtilities",
-          hash: "0x010007d1e53f2dca05f7e27ae5b7062291ed3a1470ca511140b8e786aae7eb77",
-        },
-        {
-          address: "0x000000000000000000000000000000000000800d",
-          name: "EventWriter",
-          hash: "0x010000159a3a08da3ac57cdefec0e9e30da60456bc5643134cf16d6957bcf1ac",
-        },
-        {
-          address: "0x000000000000000000000000000000000000800e",
-          name: "Compressor",
-          hash: "0x01000179842b5aa1c76036f5b90652fe614dacb28438a89649d6ca48131bd402",
-        },
-        {
-          address: "0x000000000000000000000000000000000000800f",
-          name: "ComplexUpgrader",
-          hash: "0x01000055c1f27b8316ba61bf07959b11cf3b2a418aa357ccc5531c0914a2da27",
-        },
-        {
-          address: "0x0000000000000000000000000000000000008010",
-          name: "Keccak256",
-          hash: "0x0100000f248e111a1b587fef850dc4585c39af2dd505bc8a0d5cc6d3fcc7ed3c",
-        },
-        {
-          address: "0x0000000000000000000000000000000000008012",
-          name: "CodeOracle",
-          hash: "0x01000023b02bbb21baf1367835e56ae17b82688527dc8f78caf34b12e670ee65",
-        },
-        {
-          address: "0x0000000000000000000000000000000000000100",
-          name: "P256Verify",
-          hash: "0x0100001169cd6aa311c1bc9bbe2e7dd085720c96bb197e3223be7e9c66e46ef9",
-        },
-        {
-          address: "0x0000000000000000000000000000000000008011",
-          name: "PubdataChunkPublisher",
-          hash: "0x01000049eb6d79244e74e5286ed4d3f6eef2b5eb746b67d98691dbc28fa16984",
-        },
-        {
-          address: "0x0000000000000000000000000000000000010000",
-          name: "Create2Factory",
-          hash: "0x0100004bc85f45ebf0f0bf004752bcbff1bb99792d6cc6494227970ec77fe53b",
-        },
-      ];
-
-      for (const { address, name, hash } of l2Addresses) {
-        const sysContractData = await state
-          .dataForL2Address(address as Hex)
-          .then((o) => o.unwrap());
-        expect(sysContractData.address.toLowerCase()).toEqual(address.toLowerCase());
-        expect(sysContractData.name).toEqual(name);
-        expect(sysContractData.bytecodeHash).toEqual(hash);
-      }
     });
   });
 
@@ -745,9 +543,17 @@ describe("NewZkSyncStateDiff", () => {
         return t.skip();
       }
 
-      const explorer = BlockExplorerClient.forL1(key, "mainnet");
-      const rpc = RpcClient.forL1("mainnet");
-      const state = await ZksyncEraState.fromBlockchain("mainnet", explorer, rpc);
+      const network = "mainnet";
+      const explorer = BlockExplorerClient.forL1(key, network);
+      const rpc = RpcClient.forL1(network);
+
+      const state = await ZksyncEraState.fromBlockchain(
+        network,
+        rpc,
+        explorer,
+        new RpcSystemContractProvider(rpc, explorer),
+        []
+      );
       expect(state.allFacets()).toHaveLength(4);
 
       expect(state.hexAttrValue("admin").unwrap()).toMatch(/0x.*/);

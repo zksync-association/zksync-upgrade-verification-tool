@@ -2,7 +2,6 @@ import { getProposalByExternalId } from "@/.server/db/dto/proposals";
 import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
 import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
 import { getLatestL1BlockTimestamp } from "@/.server/service/ethereum-l1/client";
-import { getCheckReport, getStorageChangeReport } from "@/.server/service/reports";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
 import TxLink from "@/components/tx-link";
@@ -13,15 +12,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
 import ContractWriteButton from "@/routes/app/proposals/$id/contract-write-button";
 import ExecuteUpgradeButton from "@/routes/app/proposals/$id/execute-upgrade-button";
-import FacetChangesTable from "@/routes/app/proposals/$id/facet-changes-table";
-import FieldChangesTable from "@/routes/app/proposals/$id/field-changes-table";
-import FieldStorageChangesTable from "@/routes/app/proposals/$id/field-storage-changes-table";
 import ProposalState from "@/routes/app/proposals/$id/proposal-state";
 import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
-import SystemContractChangesTable from "@/routes/app/proposals/$id/system-contract-changes-table";
 import { displayBytes32 } from "@/utils/common-tables";
 import { compareHexValues } from "@/utils/compare-hex-values";
-import { dateToUnixTimestamp } from "@/utils/date";
+import { formatDateTime } from "@/utils/date";
 import { notFound } from "@/utils/http";
 import { PROPOSAL_STATES } from "@/utils/proposal-states";
 import { env } from "@config/env.server";
@@ -45,6 +40,13 @@ import {
   securityCouncilAddress,
 } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 import { EthereumConfig } from "@config/ethereum.server";
+import { Meta } from "@/utils/meta";
+import SignActionsCard from "@/components/proposal-components/sign-actions-card";
+import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
+import { decodeProposalSerializable } from "@/utils/decode-proposal";
+import TallyLink from "@/components/tally-link";
+
+export const meta = Meta["/app/proposals/:id"];
 
 export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
   const user = requireUserFromRequest(request);
@@ -58,8 +60,6 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
   }
 
   const getAsyncData = async () => {
-    const checkReport = await getCheckReport(id);
-    const storageChangeReport = await getStorageChangeReport(id);
     const [guardians, council, proposalStatus, signatures, proposalData] = await Promise.all([
       guardiansAddress(),
       securityCouncilAddress(),
@@ -71,8 +71,6 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
     return {
       proposal: {
-        currentVersion: checkReport.metadata.currentVersion,
-        proposedVersion: checkReport.metadata.proposedVersion,
         proposedOn: proposal.proposedOn,
         executor: proposal.executor,
         status: proposalStatus,
@@ -100,12 +98,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
             .sort((a, b) => compareHexValues(a.signer, b.signer)),
         },
         transactionHash: proposal.transactionHash,
-      },
-      reports: {
-        facetChanges: checkReport.facetChanges,
-        systemContractChanges: checkReport.systemContractChanges,
-        fieldChanges: checkReport.fieldChanges,
-        fieldStorageChanges: storageChangeReport,
+        l2ProposalId: proposal.l2ProposalId,
       },
       addresses: {
         guardians,
@@ -127,6 +120,7 @@ export async function loader({ request, params: remixParams }: LoaderFunctionArg
 
   return defer({
     proposalId: proposal.externalId as Hex,
+    tallyBaseUrl: env.TALLY_BASE_URL,
     asyncData: getAsyncData(),
     transactionUrl: proposal.transactionHash
       ? EthereumConfig.getTransactionUrl(proposal.transactionHash)
@@ -158,12 +152,12 @@ const NECESSARY_GUARDIAN_SIGNATURES = 5;
 const NECESSARY_LEGAL_VETO_SIGNATURES = 2;
 
 export default function Proposals() {
-  const { asyncData, proposalId, transactionUrl } = useLoaderData<typeof loader>();
+  const { asyncData, proposalId, transactionUrl, tallyBaseUrl } = useLoaderData<typeof loader>();
   const user = useUser();
 
   return (
     <div className="flex flex-1 flex-col">
-      <HeaderWithBackButton>Proposal {displayBytes32(proposalId)}</HeaderWithBackButton>
+      <HeaderWithBackButton>Upgrade {displayBytes32(proposalId)}</HeaderWithBackButton>
       <div className="flex flex-1 flex-col space-y-4">
         <Suspense
           fallback={
@@ -174,7 +168,7 @@ export default function Proposals() {
           }
         >
           <Await resolve={asyncData}>
-            {({ addresses, proposal, reports, userSignedLegalVeto, userSignedProposal }) => {
+            {({ addresses, proposal, userSignedLegalVeto, userSignedProposal }) => {
               const securityCouncilSignaturesReached =
                 proposal.signatures.approveUpgradeSecurityCouncil.length >=
                 NECESSARY_SECURITY_COUNCIL_SIGNATURES;
@@ -218,34 +212,30 @@ export default function Proposals() {
               return (
                 <>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <Card className="pb-10">
+                    <Card data-testid="proposal-details-card">
                       <CardHeader>
-                        <CardTitle>Proposal Details</CardTitle>
+                        <CardTitle>Upgrade Details</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-6">
                           <div className="flex justify-between">
-                            <span>Current Version:</span>
-                            <span className="w-1/2 break-words text-right">
-                              {proposal.currentVersion}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Proposed Version:</span>
-                            <span className="w-1/2 break-words text-right">
-                              {proposal.proposedVersion}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Proposal ID:</span>
+                            <span>Upgrade ID:</span>
                             <span className="w-1/2 justify-end break-words">{proposalId}</span>
                           </div>
                           <div className="flex justify-between">
+                            <span>Tally ID:</span>
+                            {proposal.l2ProposalId ? (
+                              <TallyLink
+                                l2ProposalId={proposal.l2ProposalId}
+                                baseUrl={tallyBaseUrl}
+                              />
+                            ) : (
+                              <span>Not available</span>
+                            )}
+                          </div>
+                          <div className="flex justify-between">
                             <span>Proposed On:</span>
-                            <div className="flex w-1/2 flex-col break-words text-right">
-                              <span>{new Date(proposal.proposedOn).toISOString()}</span>
-                              <span>({dateToUnixTimestamp(new Date(proposal.proposedOn))})</span>
-                            </div>
+                            <span>{formatDateTime(proposal.proposedOn)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Executor:</span>
@@ -266,167 +256,110 @@ export default function Proposals() {
                         </div>
                       </CardContent>
                     </Card>
-                    <Card className="pb-10">
+                    <Card>
                       <CardHeader className="pt-7">
                         <ProposalState status={proposal.status} times={proposal.statusTimes} />
-                        <CardTitle>Proposal Status</CardTitle>
+                        <CardTitle>Approval Status</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-5">
                           <VotingStatusIndicator
-                            label="Security Council Approvals"
-                            signatures={proposal.signatures.approveUpgradeSecurityCouncil.length}
-                            necessarySignatures={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
-                            testId="council-signature-count"
-                          />
-                          <VotingStatusIndicator
-                            label="Guardian Approvals"
-                            signatures={proposal.signatures.approveUpgradeGuardians.length}
-                            necessarySignatures={NECESSARY_GUARDIAN_SIGNATURES}
-                            testId="guardian-signature-count"
-                          />
-                          <VotingStatusIndicator
                             label="Extend Legal Veto Approvals"
+                            role="guardian"
                             signatures={proposal.signatures.extendLegalVetoPeriod.length}
                             necessarySignatures={NECESSARY_LEGAL_VETO_SIGNATURES}
-                            testId="legal-veto-signature-count"
+                            data-testid="legal-veto-signature-count"
+                            signers={proposal.signatures.extendLegalVetoPeriod.map((s) => s.signer)}
+                          />
+                          <VotingStatusIndicator
+                            role="securityCouncil"
+                            signatures={proposal.signatures.approveUpgradeSecurityCouncil.length}
+                            necessarySignatures={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
+                            signers={proposal.signatures.approveUpgradeSecurityCouncil.map(
+                              (s) => s.signer
+                            )}
+                          />
+                          <VotingStatusIndicator
+                            role="guardian"
+                            signatures={proposal.signatures.approveUpgradeGuardians.length}
+                            necessarySignatures={NECESSARY_GUARDIAN_SIGNATURES}
+                            signers={proposal.signatures.approveUpgradeGuardians.map(
+                              (s) => s.signer
+                            )}
                           />
                         </div>
                       </CardContent>
                     </Card>
-                    <Card className="pb-10" data-testid="role-actions">
-                      <CardHeader>
-                        <CardTitle>
-                          {user.role === "guardian" && "Guardian Actions"}
-                          {user.role === "securityCouncil" && "Security Council Actions"}
-                          {user.role === "visitor" && "No role actions"}
-                          {user.role === "zkFoundation" && "No role actions"}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-col space-y-3">
-                        {user.role === "guardian" && (
-                          <ExtendVetoButton
-                            proposalId={proposalId}
-                            contractAddress={addresses.guardians}
-                            disabled={!signLegalVetoEnabled}
-                          />
-                        )}
-
-                        {(user.role === "guardian" || user.role === "securityCouncil") && (
-                          <ApproveSignButton
-                            proposalId={proposalId}
-                            role={user.role}
-                            contractAddress={signAddress()}
-                            disabled={!signProposalEnabled}
-                          />
-                        )}
-                      </CardContent>
-                    </Card>
-                    <Card className="pb-10" data-testid="proposal-actions">
-                      <CardHeader>
-                        <CardTitle>Proposal Actions</CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-col space-y-3">
-                        <ContractWriteButton
-                          target={addresses.council}
-                          signatures={proposal.signatures.approveUpgradeSecurityCouncil}
+                    <SignActionsCard
+                      role={user.role}
+                      enabledRoles={["guardian", "securityCouncil"]}
+                    >
+                      {user.role === "guardian" && (
+                        <ExtendVetoButton
                           proposalId={proposalId}
-                          functionName={"approveUpgradeSecurityCouncil"}
-                          abiName="council"
-                          threshold={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
-                          disabled={!executeSecurityCouncilApprovalEnabled}
-                        >
-                          Execute security council approval
-                        </ContractWriteButton>
-
-                        <ContractWriteButton
-                          target={addresses.guardians}
-                          signatures={proposal.signatures.approveUpgradeGuardians}
+                          contractAddress={addresses.guardians}
+                          disabled={!signLegalVetoEnabled}
+                        />
+                      )}
+                      {(user.role === "guardian" || user.role === "securityCouncil") && (
+                        <ApproveSignButton
                           proposalId={proposalId}
-                          functionName={"approveUpgradeGuardians"}
-                          abiName="guardians"
-                          threshold={NECESSARY_GUARDIAN_SIGNATURES}
-                          disabled={!executeGuardiansApprovalEnabled}
-                        >
-                          Execute guardian approval
-                        </ContractWriteButton>
-
-                        <ContractWriteButton
-                          target={addresses.guardians}
-                          signatures={proposal.signatures.extendLegalVetoPeriod}
-                          proposalId={proposalId}
-                          functionName={"extendLegalVeto"}
-                          abiName="guardians"
-                          threshold={NECESSARY_LEGAL_VETO_SIGNATURES}
-                          disabled={!executeLegalVetoExtensionEnabled}
-                        >
-                          Execute legal veto extension
-                        </ContractWriteButton>
-                        <ExecuteUpgradeButton
-                          target={addresses.upgradeHandler}
-                          proposalCalldata={proposal.raw}
-                          disabled={!executeProposalEnabled}
-                        >
-                          Execute upgrade
-                        </ExecuteUpgradeButton>
-                      </CardContent>
-                    </Card>
+                          role={user.role}
+                          contractAddress={signAddress()}
+                          disabled={!signProposalEnabled}
+                        />
+                      )}
+                    </SignActionsCard>
+                    <ExecuteActionsCard>
+                      <ContractWriteButton
+                        target={addresses.guardians}
+                        signatures={proposal.signatures.extendLegalVetoPeriod}
+                        proposalId={proposalId}
+                        functionName={"extendLegalVeto"}
+                        abiName="guardians"
+                        threshold={NECESSARY_LEGAL_VETO_SIGNATURES}
+                        disabled={!executeLegalVetoExtensionEnabled}
+                      >
+                        Execute legal veto extension
+                      </ContractWriteButton>
+                      <ContractWriteButton
+                        target={addresses.council}
+                        signatures={proposal.signatures.approveUpgradeSecurityCouncil}
+                        proposalId={proposalId}
+                        functionName={"approveUpgradeSecurityCouncil"}
+                        abiName="council"
+                        threshold={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
+                        disabled={!executeSecurityCouncilApprovalEnabled}
+                      >
+                        Execute security council approval
+                      </ContractWriteButton>
+                      <ContractWriteButton
+                        target={addresses.guardians}
+                        signatures={proposal.signatures.approveUpgradeGuardians}
+                        proposalId={proposalId}
+                        functionName={"approveUpgradeGuardians"}
+                        abiName="guardians"
+                        threshold={NECESSARY_GUARDIAN_SIGNATURES}
+                        disabled={!executeGuardiansApprovalEnabled}
+                      >
+                        Execute guardian approval
+                      </ContractWriteButton>
+                      <ExecuteUpgradeButton
+                        target={addresses.upgradeHandler}
+                        proposalCalldata={proposal.raw}
+                        disabled={!executeProposalEnabled}
+                      >
+                        Execute upgrade
+                      </ExecuteUpgradeButton>
+                    </ExecuteActionsCard>
                   </div>
                   <div className="pt-4">
                     <h2 className="font-bold text-3xl">Upgrade Analysis</h2>
-                    <Tabs className="mt-4 flex" defaultValue="facet-changes">
+                    <Tabs className="mt-4 flex" defaultValue="raw-data">
                       <TabsList className="mt-12 mr-6">
-                        <TabsTrigger value="facet-changes">Facet Changes</TabsTrigger>
-                        <TabsTrigger value="system-contract-changes">
-                          System Contract Changes
-                        </TabsTrigger>
-                        <TabsTrigger value="field-changes">Field Changes</TabsTrigger>
-                        <TabsTrigger value="field-storage-changes">
-                          Field Storage Changes
-                        </TabsTrigger>
                         <TabsTrigger value="raw-data">Raw Data</TabsTrigger>
+                        <TabsTrigger value="json">JSON</TabsTrigger>
                       </TabsList>
-                      <TabsContent value="facet-changes" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>Facet Changes</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <FacetChangesTable data={reports.facetChanges} />
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                      <TabsContent value="system-contract-changes" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>System Contract Changes</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <SystemContractChangesTable data={reports.systemContractChanges} />
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                      <TabsContent value="field-changes" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>Field Changes</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <FieldChangesTable data={reports.fieldChanges} />
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                      <TabsContent value="field-storage-changes" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>Field Storage Changes</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <FieldStorageChangesTable data={reports.fieldStorageChanges} />{" "}
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-
                       <TabsContent value="raw-data" className="w-full">
                         <Card className="pb-8">
                           <CardHeader>
@@ -434,6 +367,18 @@ export default function Proposals() {
                           </CardHeader>
                           <CardContent className="pt-4">
                             <RawStandardUpgrade encoded={proposal.raw} />
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+                      <TabsContent value="json" className="w-full">
+                        <Card className="pb-8">
+                          <CardHeader>
+                            <CardTitle>JSON</CardTitle>
+                          </CardHeader>
+                          <CardContent className="pt-4">
+                            <pre className="text-wrap break-words">
+                              {JSON.stringify(decodeProposalSerializable(proposal.raw), null, 2)}
+                            </pre>
                           </CardContent>
                         </Card>
                       </TabsContent>

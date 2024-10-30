@@ -61,8 +61,8 @@ export const saveEmergencyProposal = async (data: FullEmergencyProp, calls: Call
 
   const currentDate = new Date();
 
-  await db.transaction(async (sqlTx) => {
-    const { id } = await createEmergencyProposal(
+  return await db.transaction(async (sqlTx) => {
+    const proposal = await createEmergencyProposal(
       {
         status: "ACTIVE",
         proposer: data.proposer as Hex,
@@ -78,12 +78,13 @@ export const saveEmergencyProposal = async (data: FullEmergencyProp, calls: Call
       await createEmergencyProposalCall(
         {
           data: call.data,
-          proposalId: id,
+          proposalId: proposal.id,
           value: call.value,
           target: call.target,
         },
         { tx: sqlTx }
       );
     }
+    return proposal;
   });
 };

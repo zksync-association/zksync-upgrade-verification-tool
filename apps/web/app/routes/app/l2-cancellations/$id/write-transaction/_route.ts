@@ -19,7 +19,8 @@ export async function action({ request, params: remixParams }: ActionFunctionArg
     throw notFound();
   }
 
-  await updateL2Cancellation(proposal.id, {
+  await updateL2Cancellation({
+    id: proposal.id,
     transactionHash: hash,
     status: l2CancellationStatusEnum.enum.DONE,
   });

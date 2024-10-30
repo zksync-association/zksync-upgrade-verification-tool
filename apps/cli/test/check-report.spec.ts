@@ -1,24 +1,22 @@
-import { ContractAbi, type BlockExplorer } from "@repo/common/ethereum";
-import type { ContractsRepo } from "@repo/ethereum-reports/git-contracts-repo";
-import {
-  type CheckReportObj,
-  ObjectCheckReport,
-} from "@repo/ethereum-reports/reports/object-check-report";
-import { StringCheckReport } from "@repo/ethereum-reports/reports/string-check-report";
-import { SystemContractList } from "@repo/ethereum-reports/system-contract-providers";
-import { ZkSyncEraDiff } from "@repo/ethereum-reports/zk-sync-era-diff";
+import type { BlockExplorer } from "../src/ethereum/block-explorer-client";
+import type { ContractsRepo } from "../src/reports/git-contracts-repo";
+import { SystemContractList } from "../src/reports/system-contract-providers";
+import { ZkSyncEraDiff } from "../src/reports/zk-sync-era-diff";
 import {
   type L2ContractData,
   type ZkEraStateData,
   ZksyncEraState,
   HEX_ZKSYNC_FIELDS,
   NUMERIC_ZKSYNC_FIELDS,
-} from "@repo/ethereum-reports/zksync-era-state";
+} from "../src/reports/zksync-era-state";
 import { Option } from "nochoices";
 import { type Hex, hexToBigInt } from "viem";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TestBlockExplorer } from "./utilities/test-block-explorer.js";
 import { TestContractRepo } from "./utilities/test-contract-repo.js";
+import { type CheckReportObj, ObjectCheckReport } from "../src/reports/reports/object-check-report";
+import { StringCheckReport } from "../src/reports/reports/string-check-report";
+import { ContractAbi } from "../src/ethereum/contract-abi";
 
 interface Ctx {
   abi1: ContractAbi;
@@ -149,7 +147,8 @@ describe("CheckReport", () => {
           selectors: ctx.abi2.allSelectors(),
         },
       ],
-      new SystemContractList(ctx.sysContractsBefore)
+      new SystemContractList(ctx.sysContractsBefore),
+      ctx.sysContractsBefore
     );
 
     ctx.sysContractsAfter = [
@@ -198,7 +197,8 @@ describe("CheckReport", () => {
           selectors: ctx.abi3.allSelectors(),
         },
       ],
-      new SystemContractList(ctx.sysContractsAfter)
+      new SystemContractList(ctx.sysContractsAfter),
+      ctx.sysContractsAfter
     );
 
     const explorer = new TestBlockExplorer();
@@ -211,15 +211,11 @@ describe("CheckReport", () => {
 
   // biome-ignore lint/suspicious/noDuplicateTestHooks: <explanation>
   beforeEach<Ctx>((ctx) => {
-    ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
-      ctx.sysAddr1,
-      ctx.sysAddr2,
-      ctx.sysAddr3,
-    ]);
+    ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState);
   });
 
   async function createReportLines(ctx: Ctx): Promise<string[]> {
-    const report = new StringCheckReport(ctx.diff, ctx.contractsRepo, ctx.explorer, {
+    const report = new StringCheckReport(ctx.diff, ctx.contractsRepo, ctx.explorer, "0x", {
       shortOutput: false,
     });
     const string = await report.format();
@@ -481,11 +477,7 @@ describe("CheckReport", () => {
       }
       ctx.contractsRepo = repo;
 
-      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
-        ctx.sysAddr1,
-        ctx.sysAddr2,
-        ctx.sysAddr3,
-      ]);
+      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState);
     });
 
     it<Ctx>("indicates that bytecode does not match", async (ctx) => {
@@ -518,11 +510,7 @@ describe("CheckReport", () => {
 
       ctx.contractsRepo = repo;
 
-      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState, [
-        ctx.sysAddr1,
-        ctx.sysAddr2,
-        ctx.sysAddr3,
-      ]);
+      ctx.diff = new ZkSyncEraDiff(ctx.currentState, ctx.proposedState);
     });
 
     it<Ctx>("indicates that bytecode does not match", async (ctx) => {
