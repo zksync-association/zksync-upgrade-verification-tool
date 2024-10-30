@@ -105,3 +105,27 @@ export const ALL_PROPOSAL_STATES = [
   "Expired",
   "Executed",
 ];
+export const PROTOCOL_GOV_TIME_CONTROLLER_ADDR = "0xd29db7d43077eab1d1c6b2aa1cfa160d669ed7cf";
+export const PROVE_L2_INCLUSION_ABI = [
+  {
+    inputs: [
+      {internalType: "uint256", name: "_batchNumber", type: "uint256"},
+      {internalType: "uint256", name: "_index", type: "uint256"},
+      {
+        components: [
+          {internalType: "uint16", name: "txNumberInBatch", type: "uint16"},
+          {internalType: "address", name: "sender", type: "address"},
+          {internalType: "bytes", name: "data", type: "bytes"}
+        ],
+        internalType: "struct L2Message", name: "_message", type: "tuple"
+      },
+      {internalType: "bytes32[]", name: "_proof", type: "bytes32[]"}
+    ],
+    name: "proveL2MessageInclusion",
+    outputs: [{internalType: "bool", name: "", type: "bool"}],
+    stateMutability: "view",
+    type: "function"
+  }
+] as const;
+
+export const STAGING_DIAMOND_ADDRESS = "0x6d6e010a2680e2e5a3b097ce411528b36d880ef6";
