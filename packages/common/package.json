@@ -10,7 +10,8 @@
   },
   "exports": {
     "./ethereum": "./src/ethereum/index.ts",
-    "./schemas": "./src/schemas/index.ts"
+    "./schemas": "./src/schemas/index.ts",
+    "./util": "./src/util/index.ts"
   },
   "dependencies": {
     "nochoices": "^1.1.4",

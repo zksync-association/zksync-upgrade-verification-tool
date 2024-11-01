@@ -11,12 +11,15 @@ import { NewEmergencyProposalStep2 } from "@/routes/app/emergency/new/step2";
 import { Step3 } from "@/routes/app/emergency/new/step3";
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import { badRequest } from "@/utils/http";
+import { Meta } from "@/utils/meta";
 import { type ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
 import { useState } from "react";
 import { $path } from "remix-routes";
 import { z } from "zod";
+
+export const meta = Meta["/app/emergency/new"];
 
 export async function loader() {
   return json({ emergencyBoardAddress: await emergencyUpgradeBoardAddress() });
@@ -39,11 +42,18 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const calls = body.data.calls;
   const validations = await validateEmergencyProposalCalls(calls);
-
   const allValid = validations.every((v) => v.isValid);
-  if (allValid && body.data.intent === "save") {
+
+  // If intent is validate, we should return the validations and the status.
+  if (body.data.intent === "validate") {
+    return json({ ok: allValid, validations });
+  }
+
+  // Otherwise, we should just save the proposal, not caring if the validations are ok or not
+  // as the user will be responsible for the proposal being valid.
+  if (body.data.intent === "save") {
     try {
-      await saveEmergencyProposal(
+      const proposal = await saveEmergencyProposal(
         {
           salt: body.data.salt,
           title: body.data.title,
@@ -51,16 +61,14 @@ export async function action({ request }: ActionFunctionArgs) {
         },
         calls
       );
+      return redirect($path("/app/emergency/:id", { id: proposal.externalId }));
     } catch (err) {
       if (isUniqueConstraintError(err)) {
         throw badRequest("Proposal with these params already exists.");
       }
       throw err;
     }
-    return redirect($path("/app/emergency"));
   }
-
-  return json({ ok: allValid, validations });
 }
 
 export default function NewEmergencyUpgrade() {
@@ -101,8 +109,7 @@ export default function NewEmergencyUpgrade() {
 
   return (
     <div>
-      <h2 className="pt-10 pb-5 font-bold text-3xl">Create new emergency proposal</h2>
-
+      <h2 className="pt-10 pb-5 font-bold text-3xl">Create New Emergency Upgrade</h2>
       <StepsWizard currentStep={currentStep} totalSteps={3}>
         <WizardStep step={1}>
           <NewEmergencyProposalStep1 callback={step1Submit} />

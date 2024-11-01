@@ -14,9 +14,9 @@ import type { Address, Hex } from "viem";
 import { db } from "../db";
 import { createL2CancellationCall } from "../db/dto/l2-cancellation-calls";
 import {
-  createOrIgnoreL2Cancellation,
+  createL2Cancellation,
   existActiveProposalWithNonce,
-  getL2CancellationByExternalId,
+  getL2CancellationById,
   getL2Cancellations,
   updateL2Cancellation,
 } from "../db/dto/l2-cancellations";
@@ -93,7 +93,7 @@ export async function createVetoProposalFor(
   }
 
   await db.transaction(async (tx) => {
-    const l2Cancellation = await createOrIgnoreL2Cancellation(
+    const l2Cancellation = await createL2Cancellation(
       {
         externalId: proposalData.proposalId,
         proposer: proposalData.proposer,
@@ -109,9 +109,6 @@ export async function createVetoProposalFor(
       },
       { tx }
     );
-    if (l2Cancellation === undefined) {
-      return;
-    }
 
     for (const [i, data] of proposalData.calldatas.entries()) {
       const target = proposalData.targets[i];
@@ -154,10 +151,10 @@ export function getL2GovernorAddress(proposalType: L2CancellationType) {
   return l2GovernorAddress;
 }
 
-export async function getAndUpdateL2CancellationByExternalId(
-  externalId: Hex
+export async function getAndUpdateL2Cancellation(
+  id: number
 ): Promise<InferSelectModel<typeof l2CancellationsTable>> {
-  const proposal = await getL2CancellationByExternalId(externalId);
+  const proposal = await getL2CancellationById(id);
   if (!proposal) {
     throw notFound();
   }
@@ -175,20 +172,20 @@ async function upgradeCancellationStatus(
 
   if (hexSchema.safeParse(cancellation.transactionHash).success) {
     cancellation.status = l2CancellationStatusEnum.enum.DONE;
-    await updateL2Cancellation(cancellation.id, cancellation);
+    await updateL2Cancellation(cancellation);
     return cancellation;
   }
 
   const state = await getL2ProposalState(cancellation.txRequestTo, cancellation.externalId);
   if (!isValidCancellationState(state)) {
     cancellation.status = l2CancellationStatusEnum.enum.L2_PROPOSAL_EXPIRED;
-    await updateL2Cancellation(cancellation.id, cancellation);
+    await updateL2Cancellation(cancellation);
     return cancellation;
   }
 
   if (cancellation.nonce < currentNonce) {
     cancellation.status = l2CancellationStatusEnum.enum.NONCE_TOO_LOW;
-    await updateL2Cancellation(cancellation.id, cancellation);
+    await updateL2Cancellation(cancellation);
     return cancellation;
   }
 

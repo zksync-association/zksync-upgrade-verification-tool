@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { type Hex, hexToBigInt, keccak256, numberToBytes, numberToHex } from "viem";
 import chalk from "chalk";
-import { StringStorageChangeReport } from "@repo/ethereum-reports/reports/string-storage-change-report";
-import { ContractField } from "@repo/ethereum-reports/storage/contractField";
-import { RecordStorageSnapshot } from "@repo/ethereum-reports/storage/snapshot/record-storage-snapshot";
-import { StorageChanges } from "@repo/ethereum-reports/storage/storage-changes";
-import { AddressType } from "@repo/ethereum-reports/storage/types/address-type";
-import { ArrayType } from "@repo/ethereum-reports/storage/types/array-type";
-import { BigNumberType } from "@repo/ethereum-reports/storage/types/big-number-type";
-import { BlobType } from "@repo/ethereum-reports/storage/types/blob-type";
-import { BooleanType } from "@repo/ethereum-reports/storage/types/boolean-type";
-import { FixedArrayType } from "@repo/ethereum-reports/storage/types/fixed-array-type";
-import { StructType } from "@repo/ethereum-reports/storage/types/struct-type";
+import { RecordStorageSnapshot } from "../src/reports/storage/snapshot";
+import { ContractField } from "../src/reports/storage/contractField";
+import { AddressType } from "../src/reports/storage/types/address-type";
+import { StorageChanges } from "../src/reports/storage/storage-changes";
+import { StringStorageChangeReport } from "../src/reports/reports/string-storage-change-report";
+import { BigNumberType } from "../src/reports/storage/types/big-number-type";
+import { BlobType } from "../src/reports/storage/types/blob-type";
+import { BooleanType } from "../src/reports/storage/types/boolean-type";
+import { ArrayType } from "../src/reports/storage/types/array-type";
+import { FixedArrayType } from "../src/reports/storage/types/fixed-array-type";
+import { StructType } from "../src/reports/storage/types/struct-type";
 
 describe("MemoryMapReport", () => {
   describe("For simple memory diff", () => {

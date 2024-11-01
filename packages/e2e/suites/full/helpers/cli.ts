@@ -41,9 +41,18 @@ export function spawnBackground(
   return pid;
 }
 
-export async function killProcessByPid(pid: number) {
+export async function killProcessByPid(pid: number, name?: string) {
   // Kills the process and its children with "-pid"
-  process.kill(-pid, "SIGKILL");
+  try {
+    process.kill(-pid);
+  } catch (err) {
+    if (typeof err === "object" && err !== null && "code" in err && err.code === "ESRCH") {
+      console.warn(`${name ?? "Process"} was not running`);
+      return;
+    }
+    console.error("Failed to kill process", err);
+    throw err;
+  }
   await waitForProcessToExit(pid);
 }
 

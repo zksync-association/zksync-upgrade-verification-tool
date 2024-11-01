@@ -5,23 +5,26 @@ import {
   downloadCodeCommand,
   storageChangeCommand,
   storageSnapshotCommand,
-} from "../commands/index.js";
+} from "../commands";
 import * as process from "node:process";
 import { EnvBuilder } from "./env-builder.js";
-import { Option } from "nochoices";
 import { failHandler } from "../commands/fail-handler.js";
 import { NetworkSchema } from "@repo/common/ethereum";
+import pkg from "../../package.json";
+import { idCommand } from "../commands/id-command";
 
 export function buildCli(
   args: string[],
   checkCbk: typeof checkCommand,
   downloadCodeCbk: typeof downloadCodeCommand,
   storageDiffCbk: typeof storageChangeCommand,
+  idCbk: typeof idCommand,
   failCbk: typeof failHandler
 ): Argv {
   const env = new EnvBuilder();
   const argParser = yargs(args)
     .scriptName("validate")
+    .version(pkg.version)
     .middleware((yargs) => {
       if (!yargs.ethscankey) {
         yargs.ethscankey = process.env.ETHERSCAN_API_KEY;
@@ -31,7 +34,7 @@ export function buildCli(
       }
     }, true)
     .option("ethscankey", {
-      describe: "Api key for etherscan",
+      describe: "Api key for ethereum",
       type: "string",
       demandOption:
         "Please provide a valid Etherscan api key. You can set ETHERSCAN_API_KEY env var or use the option --ethscankey",
@@ -60,6 +63,12 @@ export function buildCli(
       describe: "Use colored output",
       default: false,
     })
+    .option("file", {
+      alias: "f",
+      type: "string",
+      describe: "File with raw upgrade",
+      demandOption: true,
+    })
     .middleware((yargs) => {
       env.withNetwork(NetworkSchema.parse(yargs.network));
       env.withL1RpcUrl(yargs.l1RpcUrl);
@@ -68,34 +77,23 @@ export function buildCli(
       env.withColored(!yargs.noColor);
     })
     .command(
-      "check <upgradeDirectory>",
+      "check",
       "get current state of contracts",
-      (yargs) =>
-        yargs.positional("upgradeDirectory", {
-          describe: "FolderName of the upgrade to check",
-          type: "string",
-          demandOption: true,
-        }),
+      (yargs) => yargs,
       async (yargs) => {
-        await checkCbk(env, yargs.upgradeDirectory);
+        await checkCbk(env, yargs.file);
       }
     )
     .command(
-      "storage-diff <upgradeDir>",
+      "storage-diff",
       "Executes the upgrade transaction in debug mode to analyze the changes in contract storage",
       (yargs) =>
-        yargs
-          .positional("upgradeDir", {
-            describe: "FolderName of the upgrade to check",
-            type: "string",
-            demandOption: true,
-          })
-          .option("precalculated", {
-            type: "string",
-            demandOption: false,
-          }),
+        yargs.option("precalculated", {
+          type: "string",
+          demandOption: false,
+        }),
       async (yargs) => {
-        return storageDiffCbk(env, yargs.upgradeDir, Option.fromNullable(yargs.precalculated));
+        return storageDiffCbk(env, yargs.file);
       }
     )
     .command(
@@ -107,15 +105,18 @@ export function buildCli(
       }
     )
     .command(
-      "download-code <upgradeDir> <targetSourceCodeDir>",
+      "id",
+      "Calculates id for upgrade",
+      (yargs) => yargs,
+      (yargs) => {
+        idCbk(env, yargs.file);
+      }
+    )
+    .command(
+      "download-code <targetSourceCodeDir>",
       "Download source code diff",
       (yargs) =>
         yargs
-          .positional("upgradeDir", {
-            describe: "FolderName of the upgrade to check",
-            type: "string",
-            demandOption: true,
-          })
           .positional("targetSourceCodeDir", {
             describe: "Directory to save the downloaded source code",
             type: "string",
@@ -155,7 +156,7 @@ export function buildCli(
             .map((sc) => `sc:${sc}`)
         );
 
-        await downloadCodeCbk(env, yargs.upgradeDir, yargs.targetSourceCodeDir, filter);
+        await downloadCodeCbk(env, yargs.file, yargs.targetSourceCodeDir, filter);
       }
     )
     .demandCommand(1, "Please specify a command")
@@ -175,6 +176,7 @@ export const cli = async () => {
     checkCommand,
     downloadCodeCommand,
     storageChangeCommand,
+    idCommand,
     failHandler
   );
   await argParser.parseAsync();

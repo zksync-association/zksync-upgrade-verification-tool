@@ -4,7 +4,6 @@ import { getSignaturesByEmergencyProposalId } from "@/.server/db/dto/signatures"
 import { broadcastSuccess } from "@/.server/service/emergency-proposals";
 import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
 import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
-import { StatusIndicator } from "@/components/status-indicator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UpgradeRawData } from "@/components/upgrade-raw-data";
@@ -19,7 +18,7 @@ import { badRequest, notFound } from "@/utils/http";
 import { type ActionFunctionArgs, json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
-import { type Hex, isAddressEqual } from "viem";
+import { isAddressEqual } from "viem";
 import { z } from "zod";
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
@@ -28,6 +27,16 @@ import { emergencyUpgradeBoardAddress } from "@/.server/service/ethereum-l1/cont
 import { zkFoundationAddress } from "@/.server/service/ethereum-l1/contracts/emergency-upgrade-board";
 import { guardianMembers } from "@/.server/service/ethereum-l1/contracts/guardians";
 import { securityCouncilMembers } from "@/.server/service/ethereum-l1/contracts/security-council";
+import ZkAdminArchiveProposal from "@/components/zk-admin-archive-proposal";
+import ProposalArchivedCard from "@/components/proposal-archived-card";
+import { Meta } from "@/utils/meta";
+import { displayBytes32 } from "@/utils/common-tables";
+import { formatDateTime } from "@/utils/date";
+import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
+import SignActionsCard from "@/components/proposal-components/sign-actions-card";
+import VotingStatusIndicator from "@/components/voting-status-indicator";
+
+export const meta = Meta["/app/emergency/:id"];
 
 export async function loader(args: LoaderFunctionArgs) {
   const { id: proposalId } = extractFromParams(
@@ -50,20 +59,38 @@ export async function loader(args: LoaderFunctionArgs) {
     getSignaturesByEmergencyProposalId(proposal.externalId),
   ]);
 
+  const securityCouncilSignatures = signatures.filter((sig) => {
+    return allSecurityCouncil.some((addr) => isAddressEqual(addr, sig.signer));
+  });
+  const guardianSignatures = signatures.filter((sig) => {
+    return allGuardians.some((addr) => isAddressEqual(addr, sig.signer));
+  });
+  const zkFoundationSignatures = signatures.filter((sig) => {
+    return isAddressEqual(sig.signer, zkFoundation);
+  });
+
   return json({
     calls,
     proposal: {
+      id: proposal.id,
       title: proposal?.title,
       externalId: proposal.externalId,
       proposedOn: proposal.proposedOn,
       salt: proposal.salt,
       status: proposal.status,
+      archivedOn: proposal.archivedOn,
+      archivedReason: proposal.archivedReason,
+      archivedBy: proposal.archivedBy,
     },
     addresses: {
       emergencyBoard,
       zkFoundation,
     },
-    signatures,
+    signatures: {
+      securityCouncil: securityCouncilSignatures,
+      guardian: guardianSignatures,
+      zkFoundation: zkFoundationSignatures,
+    },
     allGuardians,
     allSecurityCouncil,
   });
@@ -98,24 +125,27 @@ export default function EmergencyUpgradeDetails() {
     useLoaderData<typeof loader>();
   const user = useUser();
 
-  const haveAlreadySigned = signatures.some((s) => isAddressEqual(s.signer, user.address as Hex));
-  const gatheredScSignatures = signatures.filter((sig) => {
-    return allSecurityCouncil.some((addr) => isAddressEqual(addr, sig.signer));
-  }).length;
-  const gatheredGuardianSignatures = signatures.filter((sig) => {
-    return allGuardians.some((addr) => isAddressEqual(addr, sig.signer));
-  }).length;
-  const gatheredZkFoundationSignatures = signatures.filter((s) =>
-    isAddressEqual(s.signer, addresses.zkFoundation)
-  ).length;
+  const userAlreadySigned =
+    signatures.securityCouncil.some((s) => isAddressEqual(s.signer, user.address)) ||
+    signatures.guardian.some((s) => isAddressEqual(s.signer, user.address)) ||
+    signatures.zkFoundation.some((s) => isAddressEqual(s.signer, user.address));
+
+  const allSignatures = signatures.securityCouncil
+    .concat(signatures.guardian)
+    .concat(signatures.zkFoundation);
+
+  const proposalArchived = proposal.archivedOn !== null;
+
   return (
     <div className="flex min-h-screen flex-col">
-      <HeaderWithBackButton>Proposal {proposal.externalId}</HeaderWithBackButton>
+      <HeaderWithBackButton>
+        Emergency Upgrade {displayBytes32(proposal.externalId)}
+      </HeaderWithBackButton>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card className="pb-10">
+        <Card data-testid="proposal-details-card">
           <CardHeader>
-            <CardTitle>Proposal Details</CardTitle>
+            <CardTitle>Emergency Upgrade Details</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -124,84 +154,95 @@ export default function EmergencyUpgradeDetails() {
                 <span className="w-4/5 justify-end break-words text-right">{proposal.title}</span>
               </div>
               <div className="flex justify-between">
-                <span>Proposal ID:</span>
-                <span className="w-4/5 justify-end break-words text-right">
+                <span>Emergency Upgrade ID:</span>
+                <span className="w-3/5 justify-end break-words text-right">
                   {proposal.externalId}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Proposed On:</span>
-                <div className="flex w-3/4 flex-col break-words text-right">
-                  <span>{new Date(proposal.proposedOn).toLocaleDateString()}</span>
-                  <span>{new Date(proposal.proposedOn).toLocaleTimeString()}</span>
-                </div>
+                <span>{formatDateTime(proposal.proposedOn)}</span>
               </div>
+              {proposalArchived && (
+                <ProposalArchivedCard
+                  archivedOn={new Date(proposal.archivedOn ?? 0)}
+                  archivedReason={proposal.archivedReason ?? ""}
+                  archivedBy={proposal.archivedBy ?? ""}
+                />
+              )}
             </div>
           </CardContent>
         </Card>
-        <Card className="pb-10">
+        <Card>
           <CardHeader className="pt-7">
-            <CardTitle>Proposal Status</CardTitle>
+            <p className="text-red-500">{proposalArchived ? "Archived" : "\u00A0"}</p>
+            <CardTitle>Approval Status</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-5">
-              <StatusIndicator
-                label="Security Council Approvals"
-                signatures={gatheredScSignatures}
+              <VotingStatusIndicator
+                role="securityCouncil"
+                signatures={signatures.securityCouncil.length}
                 necessarySignatures={SEC_COUNCIL_THRESHOLD}
+                signers={signatures.securityCouncil.map((s) => s.signer)}
               />
-              <StatusIndicator
-                label="Guardian Approvals"
-                signatures={gatheredGuardianSignatures}
+              <VotingStatusIndicator
+                role="guardian"
+                signatures={signatures.guardian.length}
                 necessarySignatures={GUARDIANS_COUNCIL_THRESHOLD}
+                signers={signatures.guardian.map((s) => s.signer)}
               />
-              <StatusIndicator
-                label="ZkFoundation Approval"
-                signatures={gatheredZkFoundationSignatures}
+              <VotingStatusIndicator
+                role="zkFoundation"
+                signatures={signatures.zkFoundation.length}
                 necessarySignatures={ZK_FOUNDATION_THRESHOLD}
+                signers={signatures.zkFoundation.map((s) => s.signer)}
               />
             </div>
           </CardContent>
         </Card>
-        <Card className="pb-10">
-          <CardHeader>
-            <CardTitle>Signatures</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col space-y-3">
-            {user.role !== "visitor" && (
-              <EmergencySignButton
-                proposalId={proposal.externalId}
-                contractAddress={addresses.emergencyBoard}
-                role={user.role}
-                disabled={haveAlreadySigned}
-              />
-            )}
-            {user.role === "visitor" && <p>No signing actions</p>}
-          </CardContent>
-        </Card>
-        <Card className="pb-10">
-          <CardHeader>
-            <CardTitle>Broadcast actions</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col space-y-3">
-            <ExecuteEmergencyUpgradeButton
-              boardAddress={addresses.emergencyBoard}
-              gatheredSignatures={signatures}
-              allGuardians={allGuardians}
-              allCouncil={allSecurityCouncil}
-              zkFoundationAddress={addresses.zkFoundation}
-              proposal={proposal}
-              calls={calls}
-            >
-              Execute upgrade
-            </ExecuteEmergencyUpgradeButton>
-          </CardContent>
-        </Card>
+        <SignActionsCard
+          role={user.role}
+          enabledRoles={["securityCouncil", "guardian", "zkFoundation", "zkAdmin"]}
+        >
+          {(user.role === "guardian" ||
+            user.role === "securityCouncil" ||
+            user.role === "zkFoundation") && (
+            <EmergencySignButton
+              proposalId={proposal.externalId}
+              contractAddress={addresses.emergencyBoard}
+              role={user.role}
+              disabled={userAlreadySigned || proposalArchived}
+            />
+          )}
+          {user.role === "zkAdmin" && (
+            <ZkAdminArchiveProposal
+              proposalId={BigInt(proposal.id)}
+              proposalType="ArchiveEmergencyProposal"
+              disabled={proposal.archivedOn !== null}
+            />
+          )}
+        </SignActionsCard>
+        <ExecuteActionsCard>
+          <ExecuteEmergencyUpgradeButton
+            boardAddress={addresses.emergencyBoard}
+            gatheredSignatures={allSignatures}
+            allGuardians={allGuardians}
+            allCouncil={allSecurityCouncil}
+            zkFoundationAddress={addresses.zkFoundation}
+            proposal={proposal}
+            calls={calls}
+            disabled={proposalArchived}
+          >
+            Execute Emergency Upgrade
+          </ExecuteEmergencyUpgradeButton>
+        </ExecuteActionsCard>
       </div>
 
       <Tabs className="mt-4 flex" defaultValue="raw-data">
         <TabsList className="mt-12 mr-6">
           <TabsTrigger value="raw-data">Raw upgrade data</TabsTrigger>
+          <TabsTrigger value="json">JSON</TabsTrigger>
         </TabsList>
         <TabsContent value="raw-data" className="w-full">
           <Card className="pb-8">
@@ -210,6 +251,30 @@ export default function EmergencyUpgradeDetails() {
             </CardHeader>
             <CardContent className="pt-4">
               <UpgradeRawData calls={calls} salt={proposal.salt} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="json" className="w-full">
+          <Card className="pb-8">
+            <CardHeader>
+              <CardTitle>JSON</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <pre className="text-wrap break-words">
+                {JSON.stringify(
+                  {
+                    executor: addresses.emergencyBoard,
+                    salt: proposal.salt,
+                    calls: calls.map((c) => ({
+                      target: c.target,
+                      value: c.value,
+                      data: c.data,
+                    })),
+                  },
+                  null,
+                  2
+                )}
+              </pre>
             </CardContent>
           </Card>
         </TabsContent>

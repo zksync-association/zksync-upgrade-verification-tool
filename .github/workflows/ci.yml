@@ -14,7 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     name: Get changed files
     outputs:
-      app: ${{ steps.changed-files.outputs.app_any_changed }}
+      all: ${{ steps.changed-files.outputs.all_any_changed }}
+      webapp: ${{ steps.changed-files.outputs.webapp_any_changed }}
+      cli: ${{ steps.changed-files.outputs.cli_any_changed }}
     steps:
       - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
         with:
@@ -25,34 +27,57 @@ jobs:
         uses: tj-actions/changed-files@c3a1bb2c992d77180ae65be6ae6c166cf40f857c # v45.0.3
         with:
           files_yaml: |
-            app:
+            all:
               - '**/*'
               - '!**/*.md'
               - '!**/*.MD'
-
+            
+            webapp:
+              - 'apps/web/**/*'
+              - 'packages/common/**/*'
+              - 'packages/contracts/**/*'
+              - 'packages/e2e/**/*'
+              - '!packages/e2e/suits/cli/**/*'
+              - '!**/*.md'
+              - '!**/*.MD'
+            
+            cli:
+              - 'apps/cli/**/*'
+              - 'packages/common/**/*'
+              - 'packages/e2e/**/*'
+              - '!packages/e2e/suits/full/**/*'
+              - '!**/*.md'
+              - '!**/*.MD'
   ci-for-lint:
     name: Lint
     needs: ["changed-files"]
-    if: ${{ needs.changed-files.outputs.app == 'true' }}
+    if: ${{ needs.changed-files.outputs.all == 'true' }}
     uses: ./.github/workflows/lint-reusable.yml
 
   ci-for-test:
     name: Test
     needs: ["changed-files", "ci-for-lint"]
-    if: ${{ needs.changed-files.outputs.app == 'true' }}
+    if: ${{ needs.changed-files.outputs.all == 'true' }}
     uses: ./.github/workflows/test-reusable.yml
 
-  ci-for-test-e2e:
-    name: Test E2E
+  ci-for-test-e2e-cli:
+    name: Test E2E cli
     needs: ["changed-files", "ci-for-lint", "ci-for-test"]
-    if: ${{ needs.changed-files.outputs.app == 'true' }}
-    uses: ./.github/workflows/test-e2e-reusable.yml
+    if: ${{ needs.changed-files.outputs.cli == 'true' }}
+    uses: ./.github/workflows/test-e2e-cli-reusable.yml
+    secrets: inherit
+
+  ci-for-test-e2e-web:
+    name: Test E2E web
+    needs: [ "changed-files", "ci-for-lint", "ci-for-test"]
+    if: ${{ needs.changed-files.outputs.webapp == 'true' }}
+    uses: ./.github/workflows/test-e2e-web-reusable.yml
     secrets: inherit
 
   ci-for-docker:
     name: Docker
-    needs: ["changed-files", "ci-for-lint", "ci-for-test", "ci-for-test-e2e"]
-    if: ${{ needs.changed-files.outputs.app == 'true' }}
+    needs: ["changed-files", "ci-for-lint", "ci-for-test", "ci-for-test-e2e-cli", "ci-for-test-e2e-web"]
+    if: ${{ needs.changed-files.outputs.all == 'true' }}
     uses: ./.github/workflows/docker-reusable.yml
     permissions:
       contents: read

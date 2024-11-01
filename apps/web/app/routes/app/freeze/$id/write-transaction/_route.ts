@@ -18,7 +18,8 @@ export async function action({ request, params: remixParams }: ActionFunctionArg
     throw notFound();
   }
 
-  await updateFreezeProposal(freezeProposal.id, {
+  await updateFreezeProposal({
+    id: freezeProposal.id,
     transactionHash: hash,
   });
   return redirect($path("/app/transactions/:hash", { hash }));

@@ -71,7 +71,7 @@ describe("EnvBuilder", () => {
     });
   });
 
-  describe("when network is set to sepolia and the etherscan key is set", () => {
+  describe("when network is set to sepolia and the ethereum key is set", () => {
     const target = () => {
       const env = new EnvBuilder();
       env.withNetwork("sepolia");

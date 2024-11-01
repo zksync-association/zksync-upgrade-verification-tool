@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { Option } from "nochoices";
 import type { Argv } from "yargs";
 import { buildCli } from "../src/lib/cli.js";
 import type { EnvBuilder } from "../src/lib/env-builder.js";
@@ -10,14 +9,15 @@ describe("cli", () => {
   describe("check", () => {
     it("sends right arguments", async () => {
       let called = false;
-      const fakeCheck = async (env: EnvBuilder, upgradeDirectory: string): Promise<void> => {
-        expect(upgradeDirectory).to.equal("someDir");
+      const fakeCheck = async (env: EnvBuilder, filePath: string): Promise<void> => {
+        expect(filePath).to.equal("pathToJsonFile");
         expect(env.etherscanApiKey).to.eql("fakeKey");
         called = true;
       };
       const cli = buildCli(
-        ["check", "someDir", "--ethscankey=fakeKey"],
+        ["check", "--file=pathToJsonFile", "--ethscankey=fakeKey"],
         fakeCheck,
+        fail,
         fail,
         fail,
         fail
@@ -43,9 +43,10 @@ describe("cli", () => {
         called = true;
       };
       const cli = buildCli(
-        ["download-code", "someDir", "targetDir", "--ethscankey=fakeKey"],
+        ["download-code", "-f", "someDir", "targetDir", "--ethscankey=fakeKey"],
         fail,
         fakeDownload,
+        fail,
         fail,
         fail
       );
@@ -57,20 +58,16 @@ describe("cli", () => {
   describe("storage-diff", () => {
     it("sends right arguments", async () => {
       let called = false;
-      const fakeStorageDiff = async (
-        _env: EnvBuilder,
-        upgradeDirectory: string,
-        preCalculatedPath: Option<string>
-      ): Promise<void> => {
+      const fakeStorageDiff = async (_env: EnvBuilder, upgradeDirectory: string): Promise<void> => {
         expect(upgradeDirectory).to.equal("someDir");
-        expect(preCalculatedPath.isNone()).to.equal(true);
         called = true;
       };
       const cli = buildCli(
-        ["storage-diff", "someDir", "--ethscankey=fakeKey"],
+        ["storage-diff", "-f", "someDir", "--ethscankey=fakeKey"],
         fail,
         fail,
         fakeStorageDiff,
+        fail,
         fail
       );
       await cli.parseAsync();
@@ -79,20 +76,22 @@ describe("cli", () => {
 
     it("when precalculated is specified it is received", async () => {
       let called = false;
-      const fakeStorageDiff = async (
-        _env: EnvBuilder,
-        upgradeDirectory: string,
-        preCalculatedPath: Option<string>
-      ): Promise<void> => {
+      const fakeStorageDiff = async (_env: EnvBuilder, upgradeDirectory: string): Promise<void> => {
         expect(upgradeDirectory).toEqual("someDir");
-        expect(preCalculatedPath.unwrap()).toEqual("path/to/data.json");
         called = true;
       };
       const cli = buildCli(
-        ["storage-diff", "someDir", "--ethscankey=fakeKey", "--precalculated=path/to/data.json"],
+        [
+          "storage-diff",
+          "-f",
+          "someDir",
+          "--ethscankey=fakeKey",
+          "--precalculated=path/to/data.json",
+        ],
         fail,
         fail,
         fakeStorageDiff,
+        fail,
         fail
       );
       await cli.parseAsync();
@@ -117,7 +116,7 @@ describe("cli", () => {
         error = err;
         called = true;
       };
-      const cli = buildCli(["unknown"], fail, fail, fail, fakeErrorHandler);
+      const cli = buildCli(["unknown"], fail, fail, fail, fail, fakeErrorHandler);
       await cli.parseAsync();
 
       expect(called).toBe(true);

@@ -2,7 +2,7 @@ import { getl2CancellationCallsByProposalId } from "@/.server/db/dto/l2-cancella
 import { getL2CancellationById } from "@/.server/db/dto/l2-cancellations";
 import { getSignaturesByL2CancellationId } from "@/.server/db/dto/signatures";
 import {
-  getAndUpdateL2CancellationByExternalId,
+  getAndUpdateL2Cancellation,
   getL2GovernorAddress,
   getL2VetoNonce,
 } from "@/.server/service/l2-cancellations";
@@ -29,11 +29,20 @@ import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
 import { guardiansAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
 import { EthereumConfig } from "@config/ethereum.server";
+import ZkAdminArchiveProposal from "@/components/zk-admin-archive-proposal";
+import ProposalArchivedCard from "@/components/proposal-archived-card";
+import { Meta } from "@/utils/meta";
+import SignActionsCard from "@/components/proposal-components/sign-actions-card";
+import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
+import TallyLink from "@/components/tally-link";
+import { env } from "@config/env.server";
+
+export const meta = Meta["/app/l2-cancellations/:id"];
 
 export async function loader({ params: remixParams }: LoaderFunctionArgs) {
-  const { id } = extractFromParams(remixParams, z.object({ id: hexSchema }), notFound());
+  const { id } = extractFromParams(remixParams, z.object({ id: z.coerce.number() }), notFound());
 
-  const proposal = await getAndUpdateL2CancellationByExternalId(id);
+  const proposal = await getAndUpdateL2Cancellation(id);
 
   const [calls, signatures, guardiansAddr, l2GovernorAddr] = await Promise.all([
     getl2CancellationCallsByProposalId(proposal.id),
@@ -53,6 +62,7 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
     transactionUrl: proposal.transactionHash
       ? EthereumConfig.getTransactionUrl(proposal.transactionHash)
       : "",
+    tallyBaseUrl: env.TALLY_BASE_URL,
     currentNonce: await getL2VetoNonce(),
   });
 }
@@ -83,6 +93,7 @@ export default function L2Cancellation() {
     guardiansAddress,
     transactionUrl,
     currentNonce,
+    tallyBaseUrl,
   } = useLoaderData<typeof loader>();
   const user = useUser();
 
@@ -98,20 +109,27 @@ export default function L2Cancellation() {
 
   const isExactNonce = proposal.nonce === currentNonce;
 
+  const proposalArchived = proposal.archivedOn !== null;
+
   const signDisabled =
-    user.role !== "guardian" || signatures.some((s) => isAddressEqual(s.signer, user.address));
+    user.role !== "guardian" ||
+    signatures.some((s) => isAddressEqual(s.signer, user.address)) ||
+    proposalArchived;
 
   const execDisabled =
-    signatures.length < necessarySignatures || proposal.transactionHash !== null || !isExactNonce;
+    signatures.length < necessarySignatures ||
+    proposal.transactionHash !== null ||
+    !isExactNonce ||
+    proposalArchived;
 
   return (
     <div className="flex flex-1 flex-col">
-      <HeaderWithBackButton>Proposal {displayBytes32(proposal.externalId)}</HeaderWithBackButton>
+      <HeaderWithBackButton>Veto {displayBytes32(proposal.externalId)}</HeaderWithBackButton>
 
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card className="pb-10">
+        <Card data-testid="proposal-details-card">
           <CardHeader>
-            <CardTitle>Proposal Details</CardTitle>
+            <CardTitle>Veto Details</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -122,6 +140,10 @@ export default function L2Cancellation() {
               <div className="flex justify-between">
                 <span>Description:</span>
                 <span>{proposal.description}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tally ID:</span>
+                <TallyLink l2ProposalId={proposal.externalId} baseUrl={tallyBaseUrl} />
               </div>
               <div className="flex justify-between">
                 <span>Proposer:</span>
@@ -168,21 +190,29 @@ export default function L2Cancellation() {
                   </div>
                 </div>
               )}
+              {proposalArchived && (
+                <ProposalArchivedCard
+                  archivedBy={proposal.archivedBy ?? ""}
+                  archivedOn={new Date(proposal.archivedOn ?? 0)}
+                  archivedReason={proposal.archivedReason ?? ""}
+                />
+              )}
             </div>
           </CardContent>
         </Card>
-        <Card className="pb-10">
-          <CardHeader>
+        <Card>
+          <CardHeader className="pt-7">
+            <p className="text-red-500">{proposalArchived ? "Archived" : "\u00A0"}</p>
             <CardTitle>Veto Status</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1">
             {proposal.status === "ACTIVE" && (
               <VotingStatusIndicator
                 className="flex-1"
-                label="Approvals"
+                role="guardian"
                 signatures={signatures.length}
                 necessarySignatures={necessarySignatures}
-                testId={"approvals-count"}
+                signers={signatures.map((s) => s.signer)}
               />
             )}
             {proposal.status === "DONE" && (
@@ -205,58 +235,53 @@ export default function L2Cancellation() {
             )}
           </CardContent>
         </Card>
-        <Card className="pb-10">
-          <CardHeader>
-            <CardTitle>
-              {user.role === "guardian" ? "Guardian Actions" : "No role actions"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col space-y-3">
-            {user.role === "guardian" && (
-              <SignCancellationButton
-                contractAddress={guardiansAddress}
+        <SignActionsCard role={user.role} enabledRoles={["guardian", "zkAdmin"]}>
+          {user.role === "guardian" && (
+            <SignCancellationButton
+              contractAddress={guardiansAddress}
+              proposalId={proposal.id}
+              nonce={proposal.nonce}
+              externalId={proposal.externalId}
+              l2GasLimit={proposal.txRequestGasLimit}
+              l2GasPerPubdataByteLimit={proposal.txRequestL2GasPerPubdataByteLimit}
+              l2GovernorAddress={proposal.txRequestTo}
+              refundRecipient={proposal.txRequestRefundRecipient}
+              txMintValue={proposal.txRequestTxMintValue}
+              disabled={signDisabled}
+            />
+          )}
+          {user.role === "zkAdmin" && (
+            <ZkAdminArchiveProposal
+              proposalId={BigInt(proposal.id)}
+              proposalType="ArchiveL2CancellationProposal"
+              disabled={proposalArchived}
+            />
+          )}
+        </SignActionsCard>
+        <ExecuteActionsCard>
+          {proposal.status === "ACTIVE" && (
+            <>
+              <ExecL2VetoForm
                 proposalId={proposal.id}
-                nonce={proposal.nonce}
-                externalId={proposal.externalId}
-                l2GasLimit={proposal.txRequestGasLimit}
-                l2GasPerPubdataByteLimit={proposal.txRequestL2GasPerPubdataByteLimit}
-                l2GovernorAddress={proposal.txRequestTo}
-                refundRecipient={proposal.txRequestRefundRecipient}
-                txMintValue={proposal.txRequestTxMintValue}
-                disabled={signDisabled}
-              />
-            )}
-          </CardContent>
-        </Card>
-        <Card className="pb-10">
-          <CardHeader>
-            <CardTitle>Execute Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col space-y-3">
-            {proposal.status === "ACTIVE" && (
-              <>
-                <ExecL2VetoForm
-                  proposalId={proposal.id}
-                  guardiansAddress={guardiansAddress}
-                  signatures={signatures}
-                  threshold={necessarySignatures}
-                  proposal={proposal}
-                  disabled={execDisabled}
-                  calls={calls}
-                >
-                  Execute Veto
-                </ExecL2VetoForm>
+                guardiansAddress={guardiansAddress}
+                signatures={signatures}
+                threshold={necessarySignatures}
+                proposal={proposal}
+                disabled={execDisabled}
+                calls={calls}
+              >
+                Execute Veto
+              </ExecL2VetoForm>
 
-                {!isExactNonce && (
-                  <p className="text-red-500 text-s">
-                    Nonce does not match with contract. Maybe some other veto has to be executed
-                    before.
-                  </p>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
+              {!isExactNonce && (
+                <p className="text-red-500 text-s">
+                  Veto nonce does not match contract's nonce. A veto with a lower nonce may have to
+                  be executed first.
+                </p>
+              )}
+            </>
+          )}
+        </ExecuteActionsCard>
       </div>
 
       <Tabs className="mt-4 flex" defaultValue="raw-data">

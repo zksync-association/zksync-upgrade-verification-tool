@@ -18,7 +18,6 @@ COPY ./pnpm-workspace.yaml /app/pnpm-workspace.yaml
 COPY ./packages/common/package.json /app/packages/common/package.json
 COPY ./packages/contracts/package.json /app/packages/contracts/package.json
 COPY ./packages/e2e/package.json /app/packages/e2e/package.json
-COPY ./packages/ethereum-reports/package.json /app/packages/ethereum-reports/package.json
 COPY ./packages/typescript-config/package.json /app/packages/typescript-config/package.json
 COPY ./apps/web/package.json /app/apps/web/package.json
 COPY ./apps/cli/package.json /app/apps/cli/package.json

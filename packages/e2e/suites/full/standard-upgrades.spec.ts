@@ -32,7 +32,7 @@ test("TC003 - Check list of active proposals is displayed without active proposa
   await testApp.increaseBlockTimestamp({ days: 40 });
   await page.reload();
   await expect(
-    activeProposalsCard(page).getByText("No active standard proposals found.")
+    activeProposalsCard(page).getByText("No active Proposal Upgrades found.")
   ).toBeVisible();
 });
 
@@ -53,36 +53,34 @@ test("TC005 - Check list of inactive proposals is displayed without inactive pro
   const inactiveProposalsSection = inactiveProposalsCard(page);
   await expect(inactiveProposalsSection.getByRole("button")).toHaveCount(0);
   await expect(
-    inactiveProposalsSection.getByText("No inactive standard proposals found.")
+    inactiveProposalsSection.getByText("No inactive Proposal Upgrades found.")
   ).toBeVisible();
 });
 
-test("TC006 - Verify proposal details are correctly displayed on an active proposal", async ({
+test("TC006 - Verify upgrade details are correctly displayed on an active proposal", async ({
   page,
 }) => {
   await goToProposalDetails(page);
 
-  await expect(page.getByText("Proposal Details")).toBeVisible();
-  await expect(page.getByText("Current Version")).toBeVisible();
-  await expect(page.getByText("Proposed Version")).toBeVisible();
-  await expect(page.getByText("Proposal ID")).toBeVisible();
+  await expect(page.getByText("Upgrade Details")).toBeVisible();
+  await expect(page.getByText("Upgrade ID")).toBeVisible();
   await expect(page.getByText("Proposed On")).toBeVisible();
   await expect(page.getByText("Executor")).toBeVisible();
   await expect(page.getByText("Transaction hash")).toBeVisible();
 
-  await expect(page.getByText("Proposal Status")).toBeVisible();
+  await expect(page.getByText("Approval Status")).toBeVisible();
   await expect(page.getByText("Security Council Approvals")).toBeVisible();
   await expect(page.getByText("Guardian Approvals")).toBeVisible();
   await expect(page.getByText("Extend Legal Veto Approvals")).toBeVisible();
 });
 
-test("TC007 - Verify proposal details are correctly displayed on an inactive proposal", async ({
+test("TC007 - Verify upgrade details are correctly displayed on an inactive proposal", async ({
   page,
 }) => {
   await testApp.increaseBlockTimestamp({ days: 40 });
   await page.reload();
   const inactiveProposalsSection = page
-    .getByRole("heading", { name: "Inactive Standard Proposals" })
+    .getByRole("heading", { name: "Inactive Protocol Upgrade Proposals" })
     .locator("..")
     .locator("..")
     .locator("..");
@@ -91,15 +89,13 @@ test("TC007 - Verify proposal details are correctly displayed on an inactive pro
   });
   await proposalButton.click();
 
-  await expect(page.getByText("Proposal Details")).toBeVisible();
-  await expect(page.getByText("Current Version")).toBeVisible();
-  await expect(page.getByText("Proposed Version")).toBeVisible();
-  await expect(page.getByText("Proposal ID")).toBeVisible();
+  await expect(page.getByText("Upgrade Details")).toBeVisible();
+  await expect(page.getByText("Upgrade ID")).toBeVisible();
   await expect(page.getByText("Proposed On")).toBeVisible();
   await expect(page.getByText("Executor")).toBeVisible();
   await expect(page.getByText("Transaction hash")).toBeVisible();
 
-  await expect(page.getByText("Proposal Status")).toBeVisible();
+  await expect(page.getByText("Approval Status")).toBeVisible();
   await expect(page.getByText("Security Council Approvals")).toBeVisible();
   await expect(page.getByText("Guardian Approvals")).toBeVisible();
   await expect(page.getByText("Extend Legal Veto Approvals")).toBeVisible();
@@ -107,7 +103,7 @@ test("TC007 - Verify proposal details are correctly displayed on an inactive pro
   await expect(page.getByText("EXPIRED")).toBeVisible();
 
   // Check if all buttons are disabled
-  const roleActions = page.getByTestId("role-actions");
+  const roleActions = page.getByTestId("role-actions-card");
   const roleButtons = await roleActions.locator("button").all();
   for (const button of roleButtons) {
     await expect(button).toBeDisabled();
@@ -124,16 +120,16 @@ test("TC008 - Verify a guardian can only see guardian role actions", async ({ pa
   await switcher.guardian(1, page);
   await goToProposalDetails(page);
 
-  const roleActions = page.getByTestId("role-actions");
+  const roleActions = page.getByTestId("role-actions-card");
   await expect(roleActions.getByText("Guardian Actions")).toBeVisible();
   await expect(roleActions.getByText("Security Council Actions")).not.toBeVisible();
-  await expect(roleActions.getByText("No role actions")).not.toBeVisible();
+  await expect(roleActions.getByText("No actions available for this role.")).not.toBeVisible();
   await expect(roleActions.getByText("ZK Foundation Actions")).not.toBeVisible();
 
   const buttons = await roleActions.getByRole("button").all();
   expect(buttons.length).toBe(2);
   await expect(roleActions.getByRole("button", { name: "Extend Legal Veto Period" })).toBeVisible();
-  await expect(roleActions.getByRole("button", { name: "Approve Upgrade" })).toBeVisible();
+  await expect(roleActions.getByRole("button", { name: "Approve Protocol Upgrade" })).toBeVisible();
 });
 
 test("TC009 - Verify a council member can only see council role actions", async ({
@@ -143,34 +139,34 @@ test("TC009 - Verify a council member can only see council role actions", async 
   await switcher.council(1, page);
   await goToProposalDetails(page);
 
-  const roleActions = page.getByTestId("role-actions");
+  const roleActions = page.getByTestId("role-actions-card");
   await expect(roleActions.getByText("Guardian Actions")).not.toBeVisible();
   await expect(roleActions.getByText("Security Council Actions")).toBeVisible();
-  await expect(roleActions.getByText("No role actions")).not.toBeVisible();
+  await expect(roleActions.getByText("No actions available for this role.")).not.toBeVisible();
 
   const buttons = await roleActions.getByRole("button").all();
   expect(buttons.length).toBe(1);
-  await expect(roleActions.getByRole("button", { name: "Approve Upgrade" })).toBeVisible();
+  await expect(roleActions.getByRole("button", { name: "Approve Protocol Upgrade" })).toBeVisible();
 });
 
 test("TC010 - Verify a visitor can't see any role actions", async ({ page, switcher }) => {
   await switcher.visitor(page);
   await goToProposalDetails(page);
 
-  const roleActions = page.getByTestId("role-actions");
+  const roleActions = page.getByTestId("role-actions-card");
   await expect(roleActions.getByText("Guardian Actions")).not.toBeVisible();
   await expect(roleActions.getByText("Security Council Actions")).not.toBeVisible();
-  await expect(roleActions.getByText("No role actions")).toBeVisible();
+  await expect(roleActions.getByText("No actions available for this role.")).toBeVisible();
 });
 
 test("TC011 - Verify a zkFoundation can't see any role actions", async ({ page, switcher }) => {
   await switcher.zkFoundation(page);
   await goToProposalDetails(page);
 
-  const roleActions = page.getByTestId("role-actions");
+  const roleActions = page.getByTestId("role-actions-card");
   await expect(roleActions.getByText("Guardian Actions")).not.toBeVisible();
   await expect(roleActions.getByText("Security Council Actions")).not.toBeVisible();
-  await expect(roleActions.getByText("No role actions")).toBeVisible();
+  await expect(roleActions.getByText("No actions available for this role.")).toBeVisible();
 });
 
 test("TC012 - Verify a security council approval can be executed", async ({
@@ -182,9 +178,9 @@ test("TC012 - Verify a security council approval can be executed", async ({
 
   for (let i = 1; i <= 6; i++) {
     await switcher.council(i as IntRange<1, 12>, page);
-    await page.getByRole("button", { name: "Approve Upgrade" }).click();
+    await page.getByRole("button", { name: "Approve Protocol Upgrade" }).click();
     await wallet.sign();
-    await expect(page.getByTestId("council-signature-count")).toHaveText(`${i}/6`);
+    await expect(page.getByTestId("security-signatures")).toHaveText(`${i}/6`);
   }
 
   await expect(page.getByText("LEGAL VETO PERIOD")).toBeVisible();
@@ -207,9 +203,9 @@ test("TC013 - Verify a guardian approval can be executed", async ({ page, switch
 
   for (let i = 1; i <= 5; i++) {
     await switcher.guardian(i as IntRange<1, 8>, page);
-    await page.getByRole("button", { name: "Approve Upgrade" }).click();
+    await page.getByRole("button", { name: "Approve Protocol Upgrade" }).click();
     await wallet.sign();
-    await expect(page.getByTestId("guardian-signature-count")).toHaveText(`${i}/5`);
+    await expect(page.getByTestId("guardian-signatures")).toHaveText(`${i}/5`);
   }
 
   await expect(page.getByText("LEGAL VETO PERIOD (day 1 out of 3)", { exact: true })).toBeVisible();
@@ -256,9 +252,9 @@ test("TC015 - Verify a proposal can be executed by anyone", async ({ page, switc
 
   for (let i = 1; i <= 5; i++) {
     await switcher.guardian(i as IntRange<1, 8>, page);
-    await page.getByRole("button", { name: "Approve Upgrade" }).click();
+    await page.getByRole("button", { name: "Approve Protocol Upgrade" }).click();
     await wallet.sign();
-    await expect(page.getByTestId("guardian-signature-count")).toHaveText(`${i}/5`);
+    await expect(page.getByTestId("guardian-signatures")).toHaveText(`${i}/5`);
   }
 
   await expect(page.getByText("LEGAL VETO PERIOD (day 1 out of 3)", { exact: true })).toBeVisible();
@@ -272,7 +268,7 @@ test("TC015 - Verify a proposal can be executed by anyone", async ({ page, switc
   await expect(page.getByText("Transaction successful")).toBeVisible();
 
   await page.goBack();
-  await expect(page.getByText("Proposal Details")).toBeVisible();
+  await expect(page.getByText("Upgrade Details")).toBeVisible();
 
   await testApp.increaseBlockTimestamp({ days: 31 });
   await page.reload();
@@ -288,7 +284,7 @@ test("TC016: Click in plus button -> Start regular upgrade flow page is shown. U
 }) => {
   await goToStartProposal(page);
 
-  await expect(page.getByRole("button", { name: "Start" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Initiate Approval" })).toBeDisabled();
   await expect(page.locator("td").filter({ hasText: /^[0-9]{50}/ })).toBeVisible();
   await expect(
     page.locator("td").filter({ hasText: /0x[a-fA-F0-9]{8}...[a-fA-F0-9]{10}/ })
@@ -307,13 +303,13 @@ test("TC017: Start new regular upgrade page -> Upgrade can be started. Redirects
     .locator('[name="proposal"]')
     .click();
 
-  await page.getByRole("button", { name: "Start" }).click();
+  await page.getByRole("button", { name: "Initiate Approval" }).click();
   await wallet.confirmTransaction();
 
   await page.getByText("Transaction successful").waitFor();
 
   await page.goto("/app/proposals");
-  await page.getByText("Active Standard Proposals", { exact: true }).waitFor();
+  await page.getByText("Active Protocol Upgrade Proposals", { exact: true }).waitFor();
 
   const activeProposalsSection = activeProposalsCard(page);
   await activeProposalsSection.getByText(/0x/).first().waitFor();
@@ -323,7 +319,7 @@ test("TC017: Start new regular upgrade page -> Upgrade can be started. Redirects
 
 async function goToStartProposal(page: Page) {
   await page.getByTestId("start-regular-upgrade").click();
-  await page.getByText("Start regular upgrade flow").waitFor();
+  await page.getByText("Initiate Protocol Upgrade Approval").waitFor();
 }
 async function goToProposalDetails(page: Page) {
   const activeProposalsSection = activeProposalsCard(page);
@@ -331,5 +327,5 @@ async function goToProposalDetails(page: Page) {
     name: /^0x[a-fA-F0-9]{64}$/,
   });
   await proposalButton.click();
-  await expect(page.getByText("Proposal Details")).toBeVisible();
+  await expect(page.getByText("Upgrade Details")).toBeVisible();
 }

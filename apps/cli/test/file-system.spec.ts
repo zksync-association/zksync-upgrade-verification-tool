@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { temporaryDirectory, temporaryFile } from "tempy";
-import { NotADir } from "@repo/common/ethereum";
 import { FileSystem } from "../src/lib/file-system.js";
+import { NotADir } from "../src/lib/errors";
 
 describe("FileSystem class", () => {
   const subject = () => new FileSystem();

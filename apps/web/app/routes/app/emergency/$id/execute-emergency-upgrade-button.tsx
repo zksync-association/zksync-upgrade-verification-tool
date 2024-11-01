@@ -19,6 +19,7 @@ export type ExecuteEmergencyUpgradeButtonProps = {
   zkFoundationAddress: Hex;
   proposal: BasicProposal;
   calls: Call[];
+  disabled?: boolean;
 };
 
 function encodeSignatures(signatures: BasicSignature[]): Hex {
@@ -40,6 +41,7 @@ export function ExecuteEmergencyUpgradeButton({
   zkFoundationAddress,
   proposal,
   calls,
+  disabled,
 }: ExecuteEmergencyUpgradeButtonProps) {
   const { writeContract, isPending } = useWriteContract();
   const { submit } = useFetcher();
@@ -51,7 +53,7 @@ export function ExecuteEmergencyUpgradeButton({
     foundation: zkFoundationSignature,
   } = classifySignatures(allGuardians, allCouncil, zkFoundationAddress, gatheredSignatures);
 
-  const enabled = proposal.status === emergencyProposalStatusSchema.enum.READY;
+  const enabled = proposal.status === emergencyProposalStatusSchema.enum.READY && !disabled;
 
   const onClick = () => {
     if (!zkFoundationSignature) {

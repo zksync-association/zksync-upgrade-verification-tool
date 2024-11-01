@@ -29,14 +29,18 @@ import { $path } from "remix-routes";
 import { numberToHex } from "viem";
 import { useAccount } from "wagmi";
 import { z } from "zod";
+import { Meta } from "@/utils/meta";
+
+export const meta = Meta["/app/l2-cancellations/new"];
 
 export async function loader() {
   const maybeBiggestNonce = await getMaxRegisteredNonce();
+
   const biggestNonce = maybeBiggestNonce === null ? -1 : maybeBiggestNonce;
   const currentNonce = await getL2VetoNonce();
   return defer({
     activeL2Proposals: getActiveL2Proposals(),
-    currentNonce: currentNonce,
+    currentNonce,
     suggestedNonce: Math.max(currentNonce, biggestNonce + 1),
   });
 }
@@ -119,12 +123,12 @@ export default function NewL2GovernorVeto() {
       <Await resolve={activeL2Proposals}>
         {(activeL2Proposals) => (
           <Form method="POST" className="space-y-4">
-            <Card className="pb-10">
+            <Card>
               <CardHeader>
                 <CardTitle>1. Select an active proposal</CardTitle>
               </CardHeader>
               <CardContent>
-                {activeL2Proposals.length > 0 && (
+                {activeL2Proposals.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -152,16 +156,15 @@ export default function NewL2GovernorVeto() {
                       ))}
                     </TableBody>
                   </Table>
-                )}
-                {activeL2Proposals.length === 0 && (
-                  <div className="text-center text-gray-500">No active proposals found.</div>
+                ) : (
+                  <div className="text-center text-gray-500">No active Proposals found.</div>
                 )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>2. Fill in the details for the veto proposal</CardTitle>
+                <CardTitle>2. Fill in the details for the Guardian Veto</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FormItem name="l2GasLimit">
@@ -224,7 +227,7 @@ export default function NewL2GovernorVeto() {
               type="submit"
               disabled={!selectedProposalId}
             >
-              Create Veto Proposal
+              Create Guardian Veto
             </Button>
           </Form>
         )}
