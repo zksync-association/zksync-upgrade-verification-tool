@@ -15,7 +15,7 @@ const Networks = {
       default: {
         http: [rpcUrl],
       },
-    }
+    },
   }),
   sepolia: (rpcUrl: string) => ({
     ...sepolia,
@@ -23,16 +23,14 @@ const Networks = {
       default: {
         http: [rpcUrl],
       },
-    }
+    },
   }),
   local: (rpcUrl: string) => ({
     ...localhost,
     id: 11155111,
     rpcUrls: {
       default: {
-        http: [
-          rpcUrl
-        ]
+        http: [rpcUrl],
       },
     },
   }),
