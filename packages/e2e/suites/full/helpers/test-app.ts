@@ -274,6 +274,7 @@ export class TestApp {
         SERVER_PORT: this.appPort.toString(),
         L1_RPC_URL: this.mainNodeUrl,
         L2_RPC_URL: this.l2NodeUrl,
+        L1_PUBLIC_RPC_URL: this.mainNodeUrl,
         ALLOW_PRIVATE_ACTIONS: "true",
         NODE_ENV: "production",
         UPGRADE_HANDLER_ADDRESS: "0xab3ab5d67ed26ac1935dd790f4f013d222ba5073",
