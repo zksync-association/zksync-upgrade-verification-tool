@@ -46,7 +46,7 @@ export default function App() {
           initialState={walletProviderInitialState}
           projectId={env.WALLET_CONNECT_PROJECT_ID}
           network={env.ETH_NETWORK}
-          rpcUrl={env.L1_RPC_PUBLIC_URL}
+          rpcUrl={env.L1_PUBLIC_RPC_URL}
         >
           <RoleRevalidatorProvider>
             <ConnectRedirectProvider>

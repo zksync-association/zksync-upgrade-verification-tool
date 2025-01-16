@@ -21,7 +21,7 @@ export const env = createEnv({
     WALLET_CONNECT_PROJECT_ID: z.string(),
     L1_RPC_URL: z.string().url(),
     L2_RPC_URL: z.string().url(),
-    L1_RPC_PUBLIC_URL: z.string().url(),
+    L1_PUBLIC_RPC_URL: z.string().url(),
     ETH_NETWORK: EthNetworkEnum.default("mainnet"),
     UPGRADE_HANDLER_ADDRESS: addressSchema,
     SKIP_REPORTS: z.coerce.boolean().default(false),
@@ -46,7 +46,7 @@ export const clientEnv = {
   ETH_NETWORK: env.ETH_NETWORK,
   WALLET_CONNECT_PROJECT_ID: env.WALLET_CONNECT_PROJECT_ID,
   ALLOW_PRIVATE_ACTIONS: env.ALLOW_PRIVATE_ACTIONS,
-  L1_RPC_PUBLIC_URL: env.L1_RPC_PUBLIC_URL,
+  L1_PUBLIC_RPC_URL: env.L1_PUBLIC_RPC_URL,
 };
 
 export type CLIENT_ENV = typeof clientEnv;
