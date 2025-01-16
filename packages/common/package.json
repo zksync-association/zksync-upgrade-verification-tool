@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "nochoices": "^1.1.4",
-    "viem": "^2.20.0",
-    "zod": "^3.23.8"
+    "viem": "2.22.9",
+    "zod": "3.24.1"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
