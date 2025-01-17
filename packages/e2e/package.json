@@ -24,7 +24,7 @@
     "@playwright/test": "^1.46.0",
     "@repo/contracts": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "@tenkeylabs/dappwright": "^2.8.5",
+    "@tenkeylabs/dappwright": "2.9.1",
     "@types/mocha": "^10.0.7",
     "@types/node": "^22.5.1",
     "dotenv": "^16.4.5",
