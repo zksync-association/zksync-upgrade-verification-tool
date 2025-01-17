@@ -114,14 +114,18 @@ export const test = baseTest.extend<{
       });
 
       try {
+        await wallet.deleteNetwork("Sepolia");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         await wallet.addNetwork({
           networkName: "Hardhat",
           rpc: testApp.mainNodeUrl,
           chainId: 11155111,
           symbol: "SepoliaETH",
         });
+        // await new Promise(resolve => setTimeout(resolve, 30000))
         await wallet.switchNetwork("Hardhat");
-      } catch {
+      } catch (e) {
+        console.error(e);
         throw new Error("Please verify there's a node running at http://localhost:8545");
       }
 
@@ -143,6 +147,7 @@ export const test = baseTest.extend<{
       await page.goto("/");
       await page.getByText("Connect Wallet").click();
       await page.getByText("Metamask").click();
+      patchWalletApprove(wallet);
       await wallet.approve();
 
       // Cache context
@@ -166,7 +171,6 @@ export const test = baseTest.extend<{
 
   wallet: async ({ context }, use) => {
     const metamask = await dappwright.getWallet("metamask", context);
-    patchWalletSign(metamask);
     await use(metamask);
   },
 
@@ -207,12 +211,8 @@ export const test = baseTest.extend<{
   },
 });
 
-function patchWalletSign(wallet: Dappwright) {
-  wallet.sign = () => signWithScroll(wallet);
-}
-
 // This code is copied from: https://github.com/TenKeyLabs/dappwright/blob/main/src/wallets/metamask/actions/util.ts#L3
-// The reason is that we need to scroll before signed, and that's not included in the current version of dappright.
+// We need to select all wallets at the moment of connect, and that's not the current behavior of dappwright.
 async function performPopupAction(
   page: Page,
   action: (popup: Page) => Promise<void>
@@ -223,21 +223,27 @@ async function performPopupAction(
   if (!popup.isClosed()) await popup.waitForEvent("close");
 }
 
-// Our message has scroll. That is not included in dappwrights logic. That's why it's re implemented here.
-async function signWithScroll(wallet: Dappwright) {
-  await performPopupAction(wallet.page, async (popup) => {
-    await popup.bringToFront();
-    await popup.reload();
-
-    // We must wait until the signature request is visible
-    await popup.getByText("Signature Request").waitFor({ state: "visible" });
-
-    // If the scroll button is visible, we click it, otherwise we sign directly
-    const scrollButton = popup.getByTestId("signature-request-scroll-button");
-    if (await scrollButton.isVisible({ timeout: 500 })) {
-      await scrollButton.click();
-    }
-
-    await popup.getByRole("button", { name: "Sign" }).click();
-  });
+function patchWalletApprove(wallet: Dappwright) {
+  wallet.approve = approveForAllAccounts(wallet.page);
 }
+
+const approveForAllAccounts = (page: Page) => async (): Promise<void> => {
+  await performPopupAction(page, async (popup) => {
+    await connect(popup);
+    await page.waitForTimeout(3000);
+  });
+};
+
+const connect = async (popup: Page): Promise<void> => {
+  // Wait for popup to load
+  await popup.waitForLoadState();
+  await popup.bringToFront();
+
+  // Select first account
+  await popup.getByTestId("edit").first().click();
+  await popup.locator('input[type="checkbox"]').first().check();
+  await popup.getByTestId("connect-more-accounts-button").click();
+
+  // Go through the prompts
+  await popup.getByTestId("confirm-btn").click();
+};
