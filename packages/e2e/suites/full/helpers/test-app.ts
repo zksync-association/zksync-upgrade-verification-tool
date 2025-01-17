@@ -203,10 +203,11 @@ export class TestApp {
       outputFile: this.logPaths.backupNode,
     });
     await this.waitForHardhatNode(this.backupNodeUrl);
-    await exec("pnpm deploy:setup", {
+    const res = await exec("pnpm deploy:setup", {
       cwd: this.contractsDir,
       env: { ...process.env, L1_RPC_URL: this.backupNodeUrl, MNEMONIC: this.walletMnemonic },
     });
+    console.log(res.stdout);
     return pid;
   }
 
@@ -242,14 +243,16 @@ export class TestApp {
       }
     );
     await this.waitForHardhatNode(this.l2NodeUrl);
-    await exec("pnpm deploy:setup:l2", {
+    const res = await exec("pnpm deploy:setup:l2", {
       cwd: this.contractsDir,
+
       env: {
         ...process.env,
         L1_RPC_URL: this.backupNodeUrl,
         L2_RPC_URL: this.l2NodeUrl,
       },
     });
+    console.log(res.stdout);
     return pid;
   }
 
