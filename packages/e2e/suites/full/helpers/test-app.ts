@@ -5,7 +5,7 @@ import postgres from "postgres";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { type Hex, hexToNumber, numberToHex } from "viem";
-import ora from "ora";
+import ora, { oraPromise } from "ora";
 import z from "zod";
 import fs from "node:fs/promises";
 
@@ -55,24 +55,12 @@ export class TestApp {
 
   async up() {
     const spinner = ora().start();
-
-    spinner.start("Building app");
-    await this.buildApp();
-
-    spinner.start("Setting up database");
-    await this.setupDb();
-
-    spinner.start("Starting backup node");
-    const backupNode = await this.startBackupNode();
-
-    spinner.start("Starting main node");
-    const mainNode = await this.startMainHardhatNode();
-
-    spinner.start("Starting l2 node");
-    const l2Node = await this.startL2Node();
-
-    spinner.start("Starting app");
-    const app = await this.startApp();
+    await oraPromise(this.buildApp(), "Building app");
+    await oraPromise(this.setupDb(), "Setting up database");
+    const backupNode = await oraPromise(this.startBackupNode(), "Starting backup node") ;
+    const mainNode = await oraPromise(this.startMainHardhatNode(), "Starting main node") ;
+    const l2Node = await oraPromise(this.startL2Node(), "Starting l2 node");
+    const app = await oraPromise(this.startApp(), "Starting app");
 
     await this.savePids({ backupNode, mainNode, app, l2Node });
 
@@ -277,10 +265,10 @@ export class TestApp {
         L1_PUBLIC_RPC_URL: this.mainNodeUrl,
         ALLOW_PRIVATE_ACTIONS: "true",
         NODE_ENV: "production",
-        UPGRADE_HANDLER_ADDRESS: "0xab3ab5d67ed26ac1935dd790f4f013d222ba5073",
-        ZK_GOV_OPS_GOVERNOR_ADDRESS: "0xaAF5f437fB0524492886fbA64D703df15BF619AE",
-        ZK_TOKEN_GOVERNOR_ADDRESS: "0x99E12239CBf8112fBB3f7Fd473d0558031abcbb5",
-        ZK_PROTOCOL_GOVERNOR_ADDRESS: "0x23b13d016E973C9915c6252271fF06cCA2098885",
+        UPGRADE_HANDLER_ADDRESS: "0x0b3bce26d93f35a6e564b2cc291f74a00bd68bf2",
+        ZK_GOV_OPS_GOVERNOR_ADDRESS: "0x5f4CEf51F6bbeaff5D7B6fd31B42C49B1EEfE51b",
+        ZK_TOKEN_GOVERNOR_ADDRESS: "0xa85a2DFAe6bead4f408Fcc6EB8a3ec6C7AaCE9Eb",
+        ZK_PROTOCOL_GOVERNOR_ADDRESS: "0x035dF2F8Abe59F28600D5A2e488195495aF777ad",
         WALLET_CONNECT_PROJECT_ID: "test",
         ETHERSCAN_API_KEY: "test",
         ETH_NETWORK: "local",

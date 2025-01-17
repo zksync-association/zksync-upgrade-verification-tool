@@ -114,14 +114,18 @@ export const test = baseTest.extend<{
       });
 
       try {
+        await wallet.deleteNetwork("Sepolia");
+        await new Promise(resolve => setTimeout(resolve, 1000))
         await wallet.addNetwork({
           networkName: "Hardhat",
           rpc: testApp.mainNodeUrl,
           chainId: 11155111,
           symbol: "SepoliaETH",
         });
+        // await new Promise(resolve => setTimeout(resolve, 30000))
         await wallet.switchNetwork("Hardhat");
-      } catch {
+      } catch (e) {
+        console.error(e);
         throw new Error("Please verify there's a node running at http://localhost:8545");
       }
 
@@ -166,7 +170,7 @@ export const test = baseTest.extend<{
 
   wallet: async ({ context }, use) => {
     const metamask = await dappwright.getWallet("metamask", context);
-    patchWalletSign(metamask);
+    // patchWalletSign(metamask);
     await use(metamask);
   },
 
