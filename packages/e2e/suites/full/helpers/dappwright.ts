@@ -115,7 +115,7 @@ export const test = baseTest.extend<{
 
       try {
         await wallet.deleteNetwork("Sepolia");
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         await wallet.addNetwork({
           networkName: "Hardhat",
           rpc: testApp.mainNodeUrl,
@@ -211,37 +211,37 @@ export const test = baseTest.extend<{
   },
 });
 
-function patchWalletSign(wallet: Dappwright) {
-  wallet.sign = () => signWithScroll(wallet);
-}
+// function patchWalletSign(wallet: Dappwright) {
+//   wallet.sign = () => signWithScroll(wallet);
+// }
 
 // This code is copied from: https://github.com/TenKeyLabs/dappwright/blob/main/src/wallets/metamask/actions/util.ts#L3
 // The reason is that we need to scroll before signed, and that's not included in the current version of dappright.
-async function performPopupAction(
-  page: Page,
-  action: (popup: Page) => Promise<void>
-): Promise<void> {
-  const popup = await page.context().waitForEvent("page"); // Wait for the popup to show up
-
-  await action(popup);
-  if (!popup.isClosed()) await popup.waitForEvent("close");
-}
+// async function performPopupAction(
+//   page: Page,
+//   action: (popup: Page) => Promise<void>
+// ): Promise<void> {
+//   const popup = await page.context().waitForEvent("page"); // Wait for the popup to show up
+//
+//   await action(popup);
+//   if (!popup.isClosed()) await popup.waitForEvent("close");
+// }
 
 // Our message has scroll. That is not included in dappwrights logic. That's why it's re implemented here.
-async function signWithScroll(wallet: Dappwright) {
-  await performPopupAction(wallet.page, async (popup) => {
-    await popup.bringToFront();
-    await popup.reload();
-
-    // We must wait until the signature request is visible
-    await popup.getByText("Signature Request").waitFor({ state: "visible" });
-
-    // If the scroll button is visible, we click it, otherwise we sign directly
-    const scrollButton = popup.getByTestId("signature-request-scroll-button");
-    if (await scrollButton.isVisible({ timeout: 500 })) {
-      await scrollButton.click();
-    }
-
-    await popup.getByRole("button", { name: "Sign" }).click();
-  });
-}
+// async function signWithScroll(wallet: Dappwright) {
+//   await performPopupAction(wallet.page, async (popup) => {
+//     await popup.bringToFront();
+//     await popup.reload();
+//
+//     // We must wait until the signature request is visible
+//     await popup.getByText("Signature Request").waitFor({ state: "visible" });
+//
+//     // If the scroll button is visible, we click it, otherwise we sign directly
+//     const scrollButton = popup.getByTestId("signature-request-scroll-button");
+//     if (await scrollButton.isVisible({ timeout: 500 })) {
+//       await scrollButton.click();
+//     }
+//
+//     await popup.getByRole("button", { name: "Sign" }).click();
+//   });
+// }

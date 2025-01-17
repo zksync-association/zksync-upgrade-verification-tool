@@ -57,8 +57,8 @@ export class TestApp {
     const spinner = ora().start();
     await oraPromise(this.buildApp(), "Building app");
     await oraPromise(this.setupDb(), "Setting up database");
-    const backupNode = await oraPromise(this.startBackupNode(), "Starting backup node") ;
-    const mainNode = await oraPromise(this.startMainHardhatNode(), "Starting main node") ;
+    const backupNode = await oraPromise(this.startBackupNode(), "Starting backup node");
+    const mainNode = await oraPromise(this.startMainHardhatNode(), "Starting main node");
     const l2Node = await oraPromise(this.startL2Node(), "Starting l2 node");
     const app = await oraPromise(this.startApp(), "Starting app");
 
