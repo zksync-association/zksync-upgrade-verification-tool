@@ -66,26 +66,26 @@ jobs:
   ci-for-lint:
     name: Lint
     needs: [changed-files]
-    if: ${{ github.event_name == 'workflow_dispatch' || needs.changed-files.outputs.all == 'true' }}
+    if: ${{ needs.changed-files.outputs.all == 'true' }}
     uses: ./.github/workflows/lint-reusable.yml
 
   ci-for-test:
     name: Test
     needs: [changed-files, ci-for-lint]
-    if: ${{ github.event_name == 'workflow_dispatch' || needs.changed-files.outputs.all == 'true' }}
+    if: ${{ needs.changed-files.outputs.all == 'true' }}
     uses: ./.github/workflows/test-reusable.yml
 
   ci-for-test-e2e-cli:
     name: Test E2E cli
     needs: [changed-files, ci-for-lint, ci-for-test]
-    if: ${{ github.event_name == 'workflow_dispatch' || needs.changed-files.outputs.cli == 'true' }}
+    if: ${{ needs.changed-files.outputs.cli == 'true' }}
     uses: ./.github/workflows/test-e2e-cli-reusable.yml
     secrets: inherit
 
   ci-for-test-e2e-web:
     name: Test E2E web
     needs: [changed-files, ci-for-lint, ci-for-test]
-    if: ${{ github.event_name == 'workflow_dispatch' || needs.changed-files.outputs.webapp == 'true' }}
+    if: ${{ needs.changed-files.outputs.webapp == 'true' }}
     uses: ./.github/workflows/test-e2e-web-reusable.yml
     secrets: inherit
 
@@ -99,7 +99,7 @@ jobs:
         ci-for-test-e2e-cli,
         ci-for-test-e2e-web,
       ]
-    if: ${{ github.event_name == 'workflow_dispatch' || needs.changed-files.outputs.all == 'true' }}
+    if: ${{ needs.changed-files.outputs.all == 'true' }}
     uses: ./.github/workflows/docker-reusable.yml
     permissions:
       contents: read
