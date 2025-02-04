@@ -19,7 +19,7 @@ on:
         required: false
 
 concurrency:
-  group: ${{ format('{0}-{1}', github.workflow, github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.ref) }}
+  group: ${{ github.workflow + '-' + (github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.ref) }}
   cancel-in-progress: true
 
 jobs:
