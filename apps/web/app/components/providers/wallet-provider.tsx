@@ -9,13 +9,29 @@ import { localhost, mainnet, sepolia } from "wagmi/chains";
 const queryClient = new QueryClient();
 
 const Networks = {
-  mainnet: () => mainnet,
-  sepolia: () => sepolia,
-  local: (port: number) => ({
+  mainnet: (rpcUrl: string) => ({
+    ...mainnet,
+    rpcUrls: {
+      default: {
+        http: [rpcUrl],
+      },
+    },
+  }),
+  sepolia: (rpcUrl: string) => ({
+    ...sepolia,
+    rpcUrls: {
+      default: {
+        http: [rpcUrl],
+      },
+    },
+  }),
+  local: (rpcUrl: string) => ({
     ...localhost,
     id: 11155111,
     rpcUrls: {
-      default: { http: [`http://127.0.0.1:${port}`] },
+      default: {
+        http: [rpcUrl],
+      },
     },
   }),
 };
@@ -24,26 +40,26 @@ export function WalletProvider({
   children,
   initialState,
   projectId,
+  rpcUrl,
   network: networkName,
-  chainPort,
 }: {
   children: ReactNode;
   initialState?: State;
   projectId: string;
   network: EthNetwork;
-  chainPort: number;
+  rpcUrl: string;
 }) {
   const config = useMemo(() => {
     return getDefaultConfig({
       appName: "zkSync Upgrade Verification Tool",
-      chains: [Networks[networkName](chainPort)],
+      chains: [Networks[networkName](rpcUrl)],
       projectId,
       ssr: true,
       storage: createStorage({
         storage: cookieStorage,
       }),
     });
-  }, [projectId, networkName, chainPort]);
+  }, [projectId, networkName, rpcUrl]);
 
   return (
     <WagmiProvider config={config} initialState={initialState}>

@@ -70,16 +70,6 @@ async function performPopupAction(
   if (!popup.isClosed()) await popup.waitForEvent("close");
 }
 
-// Our message has scroll. That is not included in dappwrights logic. That's why it's re implemented here.
-async function signWithScroll(wallet: Wallet) {
-  await performPopupAction(wallet.page, async (popup) => {
-    await popup.bringToFront();
-    await popup.reload();
-    await popup.getByTestId("signature-request-scroll-button").click();
-    await popup.getByRole("button", { name: "Sign" }).click();
-  });
-}
-
 test("TC400: Go to / page -> l2 veto button is enabled", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("Guardian Veto")).toBeEnabled();
@@ -232,7 +222,7 @@ test("TC412: Guardian goes to veto details page -> Approvals count increased in 
 
   await withVoteIncrease(page, async () => {
     await approveButton(page).click();
-    await signWithScroll(wallet);
+    await wallet.sign();
   });
 
   await expect(approveButton(page)).toBeDisabled();
@@ -251,7 +241,7 @@ async function createAndApproveCancellation(
   await repeatFor(guardianRange(1, 5), async (n) => {
     await switcher.guardian(n, page);
     await approveButton(page).click();
-    await signWithScroll(wallet);
+    await wallet.sign();
   });
 }
 

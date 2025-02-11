@@ -5,7 +5,7 @@ import postgres from "postgres";
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { type Hex, hexToNumber, numberToHex } from "viem";
-import ora from "ora";
+import ora, { oraPromise } from "ora";
 import z from "zod";
 import fs from "node:fs/promises";
 
@@ -55,24 +55,12 @@ export class TestApp {
 
   async up() {
     const spinner = ora().start();
-
-    spinner.start("Building app");
-    await this.buildApp();
-
-    spinner.start("Setting up database");
-    await this.setupDb();
-
-    spinner.start("Starting backup node");
-    const backupNode = await this.startBackupNode();
-
-    spinner.start("Starting main node");
-    const mainNode = await this.startMainHardhatNode();
-
-    spinner.start("Starting l2 node");
-    const l2Node = await this.startL2Node();
-
-    spinner.start("Starting app");
-    const app = await this.startApp();
+    await oraPromise(this.buildApp(), "Building app");
+    await oraPromise(this.setupDb(), "Setting up database");
+    const backupNode = await oraPromise(this.startBackupNode(), "Starting backup node");
+    const mainNode = await oraPromise(this.startMainHardhatNode(), "Starting main node");
+    const l2Node = await oraPromise(this.startL2Node(), "Starting l2 node");
+    const app = await oraPromise(this.startApp(), "Starting app");
 
     await this.savePids({ backupNode, mainNode, app, l2Node });
 
@@ -215,10 +203,11 @@ export class TestApp {
       outputFile: this.logPaths.backupNode,
     });
     await this.waitForHardhatNode(this.backupNodeUrl);
-    await exec("pnpm deploy:setup", {
+    const res = await exec("pnpm deploy:setup", {
       cwd: this.contractsDir,
       env: { ...process.env, L1_RPC_URL: this.backupNodeUrl, MNEMONIC: this.walletMnemonic },
     });
+    console.log(res.stdout);
     return pid;
   }
 
@@ -254,14 +243,16 @@ export class TestApp {
       }
     );
     await this.waitForHardhatNode(this.l2NodeUrl);
-    await exec("pnpm deploy:setup:l2", {
+    const res = await exec("pnpm deploy:setup:l2", {
       cwd: this.contractsDir,
+
       env: {
         ...process.env,
         L1_RPC_URL: this.backupNodeUrl,
         L2_RPC_URL: this.l2NodeUrl,
       },
     });
+    console.log(res.stdout);
     return pid;
   }
 
@@ -274,6 +265,7 @@ export class TestApp {
         SERVER_PORT: this.appPort.toString(),
         L1_RPC_URL: this.mainNodeUrl,
         L2_RPC_URL: this.l2NodeUrl,
+        L1_PUBLIC_RPC_URL: this.mainNodeUrl,
         ALLOW_PRIVATE_ACTIONS: "true",
         NODE_ENV: "production",
         UPGRADE_HANDLER_ADDRESS: "0xab3ab5d67ed26ac1935dd790f4f013d222ba5073",
