@@ -27,7 +27,7 @@ export default function App() {
 
 function getTitle(path: string) {
   if (path.startsWith($path("/app/emergency"))) {
-    return "Emergency Upgrades";
+    return "Emergency Upgrades.";
   }
   if (path.startsWith($path("/app/freeze"))) {
     return "Freeze Requests";
