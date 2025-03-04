@@ -24,6 +24,7 @@ export ALLOW_PRIVATE_ACTIONS="0x"
 export DATABASE_URL=postgresql://user:password@localhost:5432/webapp
 export ETH_NETWORK="mainnet"
 export L1_RPC_URL=":placeholder:"
+export L1_PUBLIC_RPC_URL=":placeholder:"
 export LOG_LEVEL=info
 export NODE_ENV=development
 export TALLY_BASE_URL="https://tally.xyz/gov/zksync"
@@ -40,6 +41,7 @@ export ZK_TOKEN_GOVERNOR_ADDRESS="0x"
 - `DATABASE_URL`: The URL to the Postgres database.
 - `ETH_NETWORK`: The Ethereum network the Web App is running on, can be `mainnet`, `sepolia` or `local`. Local is for development only.
 - `L1_RPC_URL`: The RPC URL for the L1 network. A good option with a nice free tier is [Tenderly](https://tenderly.co/).
+- `L1_PUBLIC_RPC_URL`: This is the rpc that is going to be used in the client side. 
 - `LOG_LEVEL`: The log level for the Web App, can be `info`, `debug`, `warn`, `error`.
 - `NODE_ENV`: The environment the Web App is running in, can be `production`, `development`, `test`.
 - `TALLY_BASE_URL`: Tally url for zksync. For example, in mainnet is `https://tally.xyz/gov/zksync`
