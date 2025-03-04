@@ -15,7 +15,6 @@ export default function App() {
           alt="Blur overlay"
         />
         <div className="w-full text-center">
-
           <h1 className="pt-20 pb-14 font-bold text-3xl md:text-5xl">
             {getTitle(location.pathname)}
           </h1>
