@@ -1,5 +1,5 @@
 import { createRequestHandler } from "@remix-run/express";
-import { type ServerBuild } from "@remix-run/node";
+import type { ServerBuild } from "@remix-run/node";
 import { ip as ipAddress } from "address";
 import chalk from "chalk";
 import closeWithGrace from "close-with-grace";
