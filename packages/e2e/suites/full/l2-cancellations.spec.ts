@@ -58,18 +58,6 @@ async function withVoteIncrease(page: Page, fn: () => Promise<void>) {
   );
 }
 
-// This code is copied from: https://github.com/TenKeyLabs/dappwright/blob/main/src/wallets/metamask/actions/util.ts#L3
-// Thre eason is that we need to scroll before signed, and that's not included in the current version of dappright.
-async function performPopupAction(
-  page: Page,
-  action: (popup: Page) => Promise<void>
-): Promise<void> {
-  const popup = await page.context().waitForEvent("page"); // Wait for the popup to show up
-
-  await action(popup);
-  if (!popup.isClosed()) await popup.waitForEvent("close");
-}
-
 test("TC400: Go to / page -> l2 veto button is enabled", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("Guardian Veto")).toBeEnabled();
