@@ -1,5 +1,5 @@
 import { createRequestHandler } from "@remix-run/express";
-import { type ServerBuild, installGlobals } from "@remix-run/node";
+import { type ServerBuild } from "@remix-run/node";
 import { ip as ipAddress } from "address";
 import chalk from "chalk";
 import closeWithGrace from "close-with-grace";
@@ -19,7 +19,6 @@ import { removeTrailingSlash } from "./middlewares/remove-trailing-slash";
 import { requireHttps } from "./middlewares/require-https";
 import { validateHandlerAddress } from "@/.server/service/ethereum-l1/client";
 
-installGlobals();
 patchBigintToJSON();
 
 const viteDevServer =
