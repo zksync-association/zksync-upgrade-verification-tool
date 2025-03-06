@@ -1,8 +1,4 @@
-import {
-  createProposal,
-  getProposals as getStoredProposals,
-  updateProposal,
-} from "@/.server/db/dto/proposals";
+import { createProposal, getProposals as getStoredProposals, updateProposal, } from "@/.server/db/dto/proposals";
 import { isProposalActive, PROPOSAL_STATES } from "@/utils/proposal-states";
 import { bigIntMax } from "@/utils/bigint";
 import { l1Rpc } from "./ethereum-l1/client";
@@ -14,14 +10,7 @@ import {
 import { fetchL2LogProof, l2Rpc, queryL2Logs } from "@/.server/service/ethereum-l2/client";
 import { zkProtocolGovernorAbi } from "@/utils/contract-abis";
 import { env } from "@config/env.server";
-import {
-  decodeAbiParameters,
-  type Hex,
-  keccak256,
-  numberToHex,
-  toEventSelector,
-  toHex,
-} from "viem";
+import { decodeAbiParameters, type Hex, keccak256, numberToHex, toEventSelector, toHex, } from "viem";
 import type { StartUpgradeData } from "@/common/types";
 import { defaultLogger } from "@config/log.server";
 import { EthereumConfig } from "@config/ethereum.server";
@@ -48,10 +37,16 @@ export async function getProposalsFromL1() {
   // Logs are calculated from the last 40 days,
   // as this is a conservative estimation of oldest block with a valid upgrade.
   const blocksInADay = Math.floor((24 * 60 * 60) / EthereumConfig.l1.blockTime);
-  const from = bigIntMax(currentBlock - BigInt(40 * blocksInADay), BigInt(0));
+  const minimumPossibleBlock = bigIntMax(currentBlock - BigInt(40 * blocksInADay), BigInt(0));
+  const newestKnownTimestamp = storedProposals
+    .map(p => BigInt(p.proposedOn.valueOf()) / 1000n)
+    .sort()
+    .at(-1) || latestBlock.timestamp;
+
+  const newestKnownBlock = currentBlock - (latestBlock.timestamp - newestKnownTimestamp) / BigInt(EthereumConfig.l1.blockTime)
   const logs = await getUpgradeStartedEvents({
-    fromBlock: from,
-    toBlock: "latest",
+    fromBlock: bigIntMax(minimumPossibleBlock, newestKnownBlock),
+    toBlock: latestBlock.number,
   });
 
   // Map l1 proposal ids to l2 proposal ids

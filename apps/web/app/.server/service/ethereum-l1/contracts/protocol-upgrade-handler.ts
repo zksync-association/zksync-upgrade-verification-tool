@@ -3,6 +3,7 @@ import { getContract, type Hex } from "viem";
 
 import { l1Rpc } from "../client";
 import { upgradeHandlerAbi } from "@/utils/contract-abis";
+import { EthereumConfig } from '@config/ethereum.server';
 
 const upgradeHandler = getContract({
   address: env.UPGRADE_HANDLER_ADDRESS,
@@ -23,9 +24,25 @@ export async function emergencyUpgradeBoardAddress() {
 }
 
 export async function getUpgradeStartedEvents(
-  params: Parameters<typeof upgradeHandler.getEvents.UpgradeStarted>[1]
+  params: { fromBlock: bigint, toBlock: bigint }
 ) {
-  return upgradeHandler.getEvents.UpgradeStarted(undefined, params);
+  const blocksInADay = BigInt(Math.floor((24 * 60 * 60) / EthereumConfig.l1.blockTime));
+
+  const calls = []
+  let currentFromBlock = params.fromBlock;
+  while ((currentFromBlock + blocksInADay) < params.toBlock) {
+    calls.push(upgradeHandler.getEvents.UpgradeStarted(undefined, {
+      fromBlock: currentFromBlock,
+      toBlock: currentFromBlock + blocksInADay - 1n,
+    }))
+    currentFromBlock += blocksInADay;
+  }
+  calls.push(upgradeHandler.getEvents.UpgradeStarted(undefined, {
+    fromBlock: currentFromBlock,
+    toBlock: "latest",
+  }))
+
+  return Promise.all(calls).then(lists => lists.flat() );
 }
 
 export async function getUpgradeState(id: Hex) {
