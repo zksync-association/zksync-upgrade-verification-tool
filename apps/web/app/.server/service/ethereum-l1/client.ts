@@ -5,7 +5,7 @@ import { env } from "@config/env.server";
 
 export const l1Rpc = createPublicClient({
   transport: http(EthereumConfig.l1.rpcUrl, {
-    timeout: 15_000
+    timeout: 15_000,
   }),
 });
 
