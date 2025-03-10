@@ -26,10 +26,6 @@ import type { StartUpgradeData } from "@/common/types";
 import { defaultLogger } from "@config/log.server";
 import { EthereumConfig } from "@config/ethereum.server";
 
-// This variable is used as a super simple
-// cache for the latest block queried for new upgrades.
-let latestSuccess = 0n;
-
 export async function getProposalsFromL1() {
   // First, we will update the status of all stored active proposals
   const storedProposals = await getStoredProposals();
@@ -53,17 +49,19 @@ export async function getProposalsFromL1() {
   // as this is a conservative estimation of oldest block with a valid upgrade.
   const blocksInADay = Math.floor((24 * 60 * 60) / EthereumConfig.l1.blockTime);
   const minimumPossibleBlock = bigIntMax(currentBlock - BigInt(40 * blocksInADay), BigInt(0));
-  const newestKnownTimestamp =
+  const newestKnownBlock =
     storedProposals
       .map((p) => BigInt(p.proposedOn.valueOf()) / 1000n)
       .sort()
-      .at(-1) || latestBlock.timestamp;
+      .map((timestamp) => {
+        return (
+          currentBlock - (latestBlock.timestamp - timestamp) / BigInt(EthereumConfig.l1.blockTime)
+        );
+      })
+      .at(-1) || minimumPossibleBlock;
 
-  const newestKnownBlock =
-    currentBlock -
-    (latestBlock.timestamp - newestKnownTimestamp) / BigInt(EthereumConfig.l1.blockTime);
   const logs = await getUpgradeStartedEvents({
-    fromBlock: bigIntMax(minimumPossibleBlock, newestKnownBlock, latestSuccess),
+    fromBlock: bigIntMax(minimumPossibleBlock, newestKnownBlock),
     toBlock: latestBlock.number,
   });
 
@@ -124,8 +122,6 @@ export async function getProposalsFromL1() {
       l2ProposalId: proposalsL1ToL2Id[id],
     });
   }
-
-  latestSuccess = latestBlock.number;
   return getStoredProposals();
 }
 
