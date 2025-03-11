@@ -213,7 +213,7 @@ test("TC013 - Verify a guardian approval can be executed", async ({ page, switch
   await page.reload();
   await expect(page.getByText("WAITING")).toBeVisible();
 
-  await page.getByText("Execute guardian approval").click();
+  await page.getByText("Execute Guardian Approval").click();
   await wallet.confirmTransaction();
 
   await expect(page.getByText("Transaction successful")).toBeVisible();

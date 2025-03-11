@@ -48,10 +48,21 @@ export async function getProposalsFromL1() {
   // Logs are calculated from the last 40 days,
   // as this is a conservative estimation of oldest block with a valid upgrade.
   const blocksInADay = Math.floor((24 * 60 * 60) / EthereumConfig.l1.blockTime);
-  const from = bigIntMax(currentBlock - BigInt(40 * blocksInADay), BigInt(0));
+  const minimumPossibleBlock = bigIntMax(currentBlock - BigInt(40 * blocksInADay), BigInt(0));
+  const newestKnownBlock =
+    storedProposals
+      .map((p) => BigInt(p.proposedOn.valueOf()) / 1000n)
+      .sort()
+      .map((timestamp) => {
+        return (
+          currentBlock - (latestBlock.timestamp - timestamp) / BigInt(EthereumConfig.l1.blockTime)
+        );
+      })
+      .at(-1) || minimumPossibleBlock;
+
   const logs = await getUpgradeStartedEvents({
-    fromBlock: from,
-    toBlock: "latest",
+    fromBlock: bigIntMax(minimumPossibleBlock, newestKnownBlock),
+    toBlock: latestBlock.number,
   });
 
   // Map l1 proposal ids to l2 proposal ids
@@ -111,7 +122,6 @@ export async function getProposalsFromL1() {
       l2ProposalId: proposalsL1ToL2Id[id],
     });
   }
-
   return getStoredProposals();
 }
 
