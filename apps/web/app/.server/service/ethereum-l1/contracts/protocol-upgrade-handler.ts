@@ -40,7 +40,7 @@ export async function getUpgradeStartedEvents(params: { fromBlock: bigint; toBlo
   calls.push(
     upgradeHandler.getEvents.UpgradeStarted(undefined, {
       fromBlock: currentFromBlock,
-      toBlock: "latest",
+      toBlock: params.toBlock,
     })
   );
 
