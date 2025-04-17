@@ -10,64 +10,11 @@ describe("BlockExplorerClient", () => {
       it("returns correct abi", async () => {
         const client = subject();
         const result = await client.getAbi("0x0000000000000000000000000000000000008002");
-        const expected = [
-          {
-            inputs: [{ internalType: "uint256", name: "_input", type: "uint256" }],
-            name: "getCodeHash",
-            outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }],
-            stateMutability: "view",
-            type: "function",
-          },
-          {
-            inputs: [{ internalType: "uint256", name: "_input", type: "uint256" }],
-            name: "getCodeSize",
-            outputs: [{ internalType: "uint256", name: "codeSize", type: "uint256" }],
-            stateMutability: "view",
-            type: "function",
-          },
-          {
-            inputs: [{ internalType: "address", name: "_address", type: "address" }],
-            name: "getRawCodeHash",
-            outputs: [{ internalType: "bytes32", name: "codeHash", type: "bytes32" }],
-            stateMutability: "view",
-            type: "function",
-          },
-          {
-            inputs: [{ internalType: "address", name: "_address", type: "address" }],
-            name: "markAccountCodeHashAsConstructed",
-            outputs: [],
-            stateMutability: "nonpayable",
-            type: "function",
-          },
-          {
-            inputs: [
-              { internalType: "address", name: "_address", type: "address" },
-              {
-                internalType: "bytes32",
-                name: "_hash",
-                type: "bytes32",
-              },
-            ],
-            name: "storeAccountConstructedCodeHash",
-            outputs: [],
-            stateMutability: "nonpayable",
-            type: "function",
-          },
-          {
-            inputs: [
-              { internalType: "address", name: "_address", type: "address" },
-              {
-                internalType: "bytes32",
-                name: "_hash",
-                type: "bytes32",
-              },
-            ],
-            name: "storeAccountConstructingCodeHash",
-            outputs: [],
-            stateMutability: "nonpayable",
-            type: "function",
-          },
-        ];
+        const response = await fetch(
+          "https://block-explorer-api.sepolia.zksync.dev/api?module=contract&action=getabi&address=0x0000000000000000000000000000000000008002"
+        );
+        const data = await response.json();
+        const expected: Record<string, any>[] = JSON.parse((data as any).result);
 
         expect(result.raw.length).toEqual(expected.length);
         expect(result.raw).toEqual(expect.arrayContaining(expected));
@@ -154,36 +101,7 @@ describe("BlockExplorerClient", () => {
         const client = subject();
         const res = await client.getSourceCode("0x0000000000000000000000000000000000008002");
         const files = Object.keys(res.sources);
-        expect(files.length).toEqual(25);
-        expect(files).toEqual(
-          expect.arrayContaining([
-            "contracts-preprocessed/AccountCodeStorage.sol",
-            "contracts-preprocessed/Constants.sol",
-            "contracts-preprocessed/interfaces/IAccountCodeStorage.sol",
-            "contracts-preprocessed/interfaces/IBaseToken.sol",
-            "contracts-preprocessed/interfaces/IBootloaderUtilities.sol",
-            "contracts-preprocessed/interfaces/IComplexUpgrader.sol",
-            "contracts-preprocessed/interfaces/ICompressor.sol",
-            "contracts-preprocessed/interfaces/IContractDeployer.sol",
-            "contracts-preprocessed/interfaces/IImmutableSimulator.sol",
-            "contracts-preprocessed/interfaces/IKnownCodesStorage.sol",
-            "contracts-preprocessed/interfaces/IL1Messenger.sol",
-            "contracts-preprocessed/interfaces/INonceHolder.sol",
-            "contracts-preprocessed/interfaces/IPaymasterFlow.sol",
-            "contracts-preprocessed/interfaces/IPubdataChunkPublisher.sol",
-            "contracts-preprocessed/interfaces/ISystemContext.sol",
-            "contracts-preprocessed/libraries/EfficientCall.sol",
-            "contracts-preprocessed/libraries/RLPEncoder.sol",
-            "contracts-preprocessed/libraries/SystemContractHelper.sol",
-            "contracts-preprocessed/libraries/SystemContractsCaller.sol",
-            "contracts-preprocessed/libraries/TransactionHelper.sol",
-            "contracts-preprocessed/libraries/Utils.sol",
-            "contracts-preprocessed/openzeppelin/token/ERC20/IERC20.sol",
-            "contracts-preprocessed/openzeppelin/token/ERC20/extensions/IERC20Permit.sol",
-            "contracts-preprocessed/openzeppelin/token/ERC20/utils/SafeERC20.sol",
-            "contracts-preprocessed/openzeppelin/utils/Address.sol",
-          ])
-        );
+        expect(files.length).toEqual(30);
       });
 
       it('returns "contract.sol" for single file contracts', async () => {

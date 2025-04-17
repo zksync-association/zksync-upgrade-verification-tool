@@ -75,7 +75,7 @@ export function NewEmergencyProposalStep2(props: NewEmergencyProposalStep2Props)
 
           <FormItem name="value">
             <FormLabel>Value</FormLabel>
-            <FormInput type="number" defaultValue={0} />
+            <FormInput defaultValue={0} />
             <FormDescription>Value for the upgrade transaction</FormDescription>
             <FormMessage>{formErrors.value}</FormMessage>
           </FormItem>
