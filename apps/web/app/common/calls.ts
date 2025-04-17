@@ -7,7 +7,10 @@ export const formCallSchemaWithoutObject = {
   target: addressSchema,
   data: hexSchema,
   value: z.coerce
-    .number({ invalid_type_error: "Please input a valid number", required_error: "Please input a valid number" })
+    .number({
+      invalid_type_error: "Please input a valid number",
+      required_error: "Please input a valid number",
+    })
     .transform((n) => n.toString())
     .transform((str) => numberToHex(parseEther(str))),
 };
