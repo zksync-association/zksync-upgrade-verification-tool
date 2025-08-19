@@ -75,15 +75,15 @@ const voterNameMap: Record<string, string> = {
   // Security Council
   // https://docs.zknation.io/zksync-governance/schedule-3-zksync-security-council
   "0x9b39ea22e838b316ea7d74e7c4b07d91d51cca88": "aleph_v",
-  "0x84bf0ac41eeb74373ddddae8b7055bf2bd3ce6e0": "Chainlight (Tim Becker)",
-  "0x35ea56fd9ead2567f339eb9564b6940b9dd5653f": "Cyfrin (Mark Scrine)",
-  "0xb7ac3a79a23b148c85fba259712c5a1e7ad0ca44": "Dedaub (Neville Grech)",
+  "0x84bf0ac41eeb74373ddddae8b7055bf2bd3ce6e0": "Chainlight",
+  "0x35ea56fd9ead2567f339eb9564b6940b9dd5653f": "Cyfrin",
+  "0xb7ac3a79a23b148c85fba259712c5a1e7ad0ca44": "Dedaub",
   "0x725065b4eb99294baae57adda9c32e42f453fa8a": "Mariano Conti",
-  "0xc3abc9f9aa75be8341e831482cda0125a7b1a23e": "Matter Labs (Anton Astafiev)",
-  "0x69462a81ba94d64c404575f1899a464f123497a2": "Nethermind (Victor Badra)",
-  "0x34ea62d4b9bbb8ad927efb6ab31e3ab3474ac93a": "Open Zeppelin (Michael Lewellen)",
-  "0xfb90da9dc45378a1b50775beb03ad10c7e8dc231": "Peckshield (Xuxian Jiang)",
-  "0x9b8be3278b7f0168d82059eb6bac5991dcdfa803": "Spearbit (Mike Leffer)",
+  "0xc3abc9f9aa75be8341e831482cda0125a7b1a23e": "Matter Labs",
+  "0x69462a81ba94d64c404575f1899a464f123497a2": "Nethermind",
+  "0x34ea62d4b9bbb8ad927efb6ab31e3ab3474ac93a": "Open Zeppelin",
+  "0xfb90da9dc45378a1b50775beb03ad10c7e8dc231": "Peckshield",
+  "0x9b8be3278b7f0168d82059eb6bac5991dcdfa803": "Spearbit",
   "0x13f07d9bf17615f6a17f272fe1a913168c275a66": "Yev Broshevan",
   "0x3888777686f0b0d8c3108fc22ad8de9e049be26f": "Yoav Weiss",
 
