@@ -3,10 +3,35 @@
 This document provides step-by-step instructions for manually reproducing
 front-running scenarios on a local Anvil / Hardhat node.
 
+## What these scripts actually show
+
+Running `pnpm test` alone prints pass/fail output to the terminal — it does NOT
+open a browser.  To see the reinforce UI respond to a front-run in the browser you
+need all four pieces running at once:
+
+| Terminal | Command | Purpose |
+|----------|---------|---------|
+| 1 | `cd packages/contracts && pnpm node` | Local L1 at localhost:8545 |
+| 2 | `pnpm deploy:setup` then `cast send …` | Deploy contracts + trigger freeze |
+| 3 | Start Postgres; `cd apps/web && pnpm dev` | Web app at localhost:5173 |
+| 4 | Browser → localhost:5173/app/reinforce | See the partial-freeze warning |
+
+The web app also requires `apps/web/.env.local` with at minimum:
+```
+UPGRADE_HANDLER_ADDRESS=<from addresses.txt>
+L1_RPC_URL=http://localhost:8545
+L1_PUBLIC_RPC_URL=http://localhost:8545
+DATABASE_URL=postgresql://user:pass@localhost:5432/governance
+ETH_NETWORK=local
+ALLOW_PRIVATE_ACTIONS=true
+WALLET_CONNECT_PROJECT_ID=<get from walletconnect.com>
+```
+
 ## Prerequisites
 
 ```bash
-# From repo root
+# From repo root — requires SSH access to git@github.com:Moonsong-Labs/zk-governance.git
+git submodule update --init --recursive
 pnpm install
 cd packages/contracts
 pnpm node        # starts Hardhat node on http://localhost:8545
