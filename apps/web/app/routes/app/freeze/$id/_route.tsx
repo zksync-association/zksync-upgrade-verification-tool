@@ -27,7 +27,14 @@ import {
   securityCouncilSoftFreezeThreshold,
   securityCouncilUnfreezeThreshold,
 } from "@/.server/service/ethereum-l1/contracts/security-council";
-import { securityCouncilAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
+import {
+  securityCouncilAddress,
+  getProtocolFreezeState,
+  getLastFreezeBlockNumber,
+  getReinforcedFreezeChainIds,
+  getStateTransitionManagerAddress,
+} from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
+import { getAllHyperchainChainIDs } from "@/.server/service/ethereum-l1/contracts/state-transition-manager";
 import { EthereumConfig } from "@config/ethereum.server";
 import ProposalArchivedCard from "@/components/proposal-archived-card";
 import ZkAdminArchiveProposal from "@/components/zk-admin-archive-proposal";
@@ -35,6 +42,10 @@ import type { ZkAdminSignAction } from "@/routes/resources+/zk-admin-sign";
 import { Meta } from "@/utils/meta";
 import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
 import SignActionsCard from "@/components/proposal-components/sign-actions-card";
+import { FrontRunWarningBanner } from "@/components/front-run-warning-banner";
+import { FreezeStatus } from "@/utils/reinforce-abis";
+import { Link } from "@remix-run/react";
+import { env } from "@config/env.server";
 
 export const meta = Meta["/app/freeze/:id"];
 
@@ -75,6 +86,40 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
       break;
   }
 
+  // Fetch protocol freeze state for front-run detection and reinforce status
+  const { protocolFrozenUntil, lastFreezeStatusInUpgradeCycle } = await getProtocolFreezeState();
+  const nowSec = BigInt(Math.floor(Date.now() / 1000));
+  const protocolIsCurrentlyFrozen =
+    protocolFrozenUntil > nowSec &&
+    (lastFreezeStatusInUpgradeCycle === FreezeStatus.Soft ||
+      lastFreezeStatusInUpgradeCycle === FreezeStatus.Hard);
+
+  // Best-effort chain reinforcement status
+  let unreinforcedChainCount = 0;
+  try {
+    const stmAddress = await getStateTransitionManagerAddress();
+    const allChainIds = await getAllHyperchainChainIDs(stmAddress as Hex);
+    if (allChainIds.length > 0 && protocolIsCurrentlyFrozen) {
+      const freezeBlock = await getLastFreezeBlockNumber();
+      if (freezeBlock !== null) {
+        const reinforced = await getReinforcedFreezeChainIds(freezeBlock);
+        unreinforcedChainCount = allChainIds.filter((id) => !reinforced.includes(id)).length;
+      }
+    }
+  } catch {
+    // Non-critical: STM may not be configured
+  }
+
+  // Front-run detection: tx is recorded as submitted but the protocol is
+  // already frozen (meaning a different party's tx executed first).
+  // We surface this when the proposal has a transactionHash (the SC tried to
+  // broadcast) but the protocol is already in a frozen cycle.
+  const frontRunDetected =
+    proposal.transactionHash !== null &&
+    proposal.type !== "UNFREEZE" &&
+    proposal.type !== "SET_SOFT_FREEZE_THRESHOLD" &&
+    protocolIsCurrentlyFrozen;
+
   return json({
     proposal,
     currentSoftFreezeThreshold,
@@ -84,6 +129,10 @@ export async function loader({ params: remixParams }: LoaderFunctionArgs) {
     transactionUrl: proposal.transactionHash
       ? EthereumConfig.getTransactionUrl(proposal.transactionHash)
       : "",
+    protocolIsCurrentlyFrozen,
+    unreinforcedChainCount,
+    frontRunDetected,
+    handlerAddress: env.UPGRADE_HANDLER_ADDRESS as Hex,
   });
 }
 
@@ -113,6 +162,9 @@ export default function Freeze() {
     necessarySignatures,
     securityCouncilAddress,
     transactionUrl,
+    protocolIsCurrentlyFrozen,
+    unreinforcedChainCount,
+    frontRunDetected,
   } = useLoaderData<typeof loader>();
   const user = useUser();
 
@@ -154,10 +206,36 @@ export default function Freeze() {
     signatures.length >= necessarySignatures && !proposal.transactionHash && !proposalArchived;
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col gap-4">
       <HeaderWithBackButton>
         {proposalType} - Proposal {proposal.externalId}
       </HeaderWithBackButton>
+
+      {/* Front-run warning: tx was broadcast but protocol already frozen */}
+      {frontRunDetected && (
+        <FrontRunWarningBanner
+          type="freeze"
+          unreinforcedChains={unreinforcedChainCount}
+        />
+      )}
+
+      {/* Reinforce reminder: tx executed, but chains may still need reinforcement */}
+      {!frontRunDetected &&
+        proposal.transactionHash &&
+        protocolIsCurrentlyFrozen &&
+        unreinforcedChainCount > 0 && (
+          <div className="flex items-center gap-3 rounded-lg border border-yellow-600 bg-yellow-950/40 p-3 text-yellow-200 text-sm">
+            <span>
+              ⚠ The freeze was executed, but{" "}
+              <strong>{unreinforcedChainCount}</strong> hyperchain(s) have not yet been
+              reinforced. Visit the{" "}
+              <Link to="/app/reinforce" className="underline hover:text-yellow-100">
+                Reinforce page
+              </Link>{" "}
+              to freeze them.
+            </span>
+          </div>
+        )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card data-testid="proposal-details-card">

@@ -38,4 +38,7 @@ function getTitle(path: string) {
   if (path.startsWith($path("/app/proposals"))) {
     return "Protocol Upgrade Proposals";
   }
+  if (path.startsWith("/app/reinforce")) {
+    return "Reinforce Freeze / Unfreeze";
+  }
 }

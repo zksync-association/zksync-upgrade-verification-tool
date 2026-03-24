@@ -16,14 +16,21 @@ import {
 import { extract, extractFromParams } from "@/utils/read-from-request";
 import { badRequest, notFound } from "@/utils/http";
 import { type ActionFunctionArgs, json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { Link, useLoaderData } from "@remix-run/react";
 import { hexSchema } from "@repo/common/schemas";
-import { isAddressEqual } from "viem";
+import { type Hex, isAddressEqual } from "viem";
 import { z } from "zod";
 import { requireUserFromRequest } from "@/utils/auth-headers";
 import useUser from "@/components/hooks/use-user";
 import { EmergencySignButton } from "@/routes/app/emergency/$id/emergency-sign-button";
-import { emergencyUpgradeBoardAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
+import {
+  emergencyUpgradeBoardAddress,
+  getProtocolFreezeState,
+  getLastFreezeBlockNumber,
+  getReinforcedFreezeChainIds,
+  getStateTransitionManagerAddress,
+} from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
+import { getAllHyperchainChainIDs } from "@/.server/service/ethereum-l1/contracts/state-transition-manager";
 import { zkFoundationAddress } from "@/.server/service/ethereum-l1/contracts/emergency-upgrade-board";
 import { guardianMembers } from "@/.server/service/ethereum-l1/contracts/guardians";
 import { securityCouncilMembers } from "@/.server/service/ethereum-l1/contracts/security-council";
@@ -35,6 +42,8 @@ import { formatDateTime } from "@/utils/date";
 import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
 import SignActionsCard from "@/components/proposal-components/sign-actions-card";
 import VotingStatusIndicator from "@/components/voting-status-indicator";
+import { FrontRunWarningBanner } from "@/components/front-run-warning-banner";
+import { FreezeStatus } from "@/utils/reinforce-abis";
 
 export const meta = Meta["/app/emergency/:id"];
 
@@ -69,6 +78,42 @@ export async function loader(args: LoaderFunctionArgs) {
     return isAddressEqual(sig.signer, zkFoundation);
   });
 
+  // Freeze state for front-run detection:
+  // After an emergency upgrade executes, it calls _unfreeze() which is currently
+  // commented out. This means bridges/chains remain frozen. We surface a warning
+  // when the proposal is BROADCAST but the protocol is still frozen.
+  const { protocolFrozenUntil, lastFreezeStatusInUpgradeCycle } = await getProtocolFreezeState();
+  const nowSec = BigInt(Math.floor(Date.now() / 1000));
+  const protocolIsCurrentlyFrozen =
+    protocolFrozenUntil > nowSec &&
+    (lastFreezeStatusInUpgradeCycle === FreezeStatus.Soft ||
+      lastFreezeStatusInUpgradeCycle === FreezeStatus.Hard);
+
+  // Also detect the inverse: emergency upgrade is READY/BROADCAST but the
+  // protocol is already frozen because someone front-ran the freeze.
+  let unreinforcedChainCount = 0;
+  try {
+    const stmAddress = await getStateTransitionManagerAddress();
+    const allChainIds = await getAllHyperchainChainIDs(stmAddress as Hex);
+    if (allChainIds.length > 0 && protocolIsCurrentlyFrozen) {
+      const freezeBlock = await getLastFreezeBlockNumber();
+      if (freezeBlock !== null) {
+        const reinforced = await getReinforcedFreezeChainIds(freezeBlock);
+        unreinforcedChainCount = allChainIds.filter((id) => !reinforced.includes(id)).length;
+      }
+    }
+  } catch {
+    // Non-critical
+  }
+
+  // Detect front-run scenario: proposal is READY but protocol is already
+  // frozen (someone froze it before the emergency upgrade could execute,
+  // or signatures were gathered while the system was unfrozen but a freeze
+  // tx was front-run).
+  const frontRunFreezeDetected =
+    (proposal.status === "READY" || proposal.status === "BROADCAST") &&
+    protocolIsCurrentlyFrozen;
+
   return json({
     calls,
     proposal: {
@@ -93,6 +138,9 @@ export async function loader(args: LoaderFunctionArgs) {
     },
     allGuardians,
     allSecurityCouncil,
+    protocolIsCurrentlyFrozen,
+    unreinforcedChainCount,
+    frontRunFreezeDetected,
   });
 }
 
@@ -121,8 +169,17 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function EmergencyUpgradeDetails() {
-  const { calls, proposal, addresses, signatures, allSecurityCouncil, allGuardians } =
-    useLoaderData<typeof loader>();
+  const {
+    calls,
+    proposal,
+    addresses,
+    signatures,
+    allSecurityCouncil,
+    allGuardians,
+    protocolIsCurrentlyFrozen,
+    unreinforcedChainCount,
+    frontRunFreezeDetected,
+  } = useLoaderData<typeof loader>();
   const user = useUser();
 
   const userAlreadySigned =
@@ -137,10 +194,37 @@ export default function EmergencyUpgradeDetails() {
   const proposalArchived = proposal.archivedOn !== null;
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col gap-4">
       <HeaderWithBackButton>
         Emergency Upgrade {displayBytes32(proposal.externalId)}
       </HeaderWithBackButton>
+
+      {/* Front-run warning: protocol frozen while emergency upgrade is pending */}
+      {frontRunFreezeDetected && (
+        <FrontRunWarningBanner
+          type="freeze"
+          unreinforcedChains={unreinforcedChainCount}
+        />
+      )}
+
+      {/* Post-execution reinforce reminder */}
+      {!frontRunFreezeDetected &&
+        proposal.status === "BROADCAST" &&
+        protocolIsCurrentlyFrozen &&
+        unreinforcedChainCount > 0 && (
+          <div className="flex items-center gap-3 rounded-lg border border-yellow-600 bg-yellow-950/40 p-3 text-yellow-200 text-sm">
+            <span>
+              ⚠ The emergency upgrade was executed, but{" "}
+              <strong>{unreinforcedChainCount}</strong> hyperchain(s) remain frozen.
+              The <code>_unfreeze()</code> multi-chain logic is pending deployment.
+              Visit the{" "}
+              <Link to="/app/reinforce" className="underline hover:text-yellow-100">
+                Reinforce Unfreeze page
+              </Link>{" "}
+              to unfreeze them.
+            </span>
+          </div>
+        )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card data-testid="proposal-details-card">
