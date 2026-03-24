@@ -82,6 +82,18 @@ export default function Index() {
                           Guardian Veto
                         </Button>
                       </Link>
+                      <Link to="/app/reinforce">
+                        <Button
+                          loading={
+                            navigation.state === "loading" &&
+                            navigation.location.pathname === "/app/reinforce"
+                          }
+                          className="w-[200px]"
+                          variant="outline"
+                        >
+                          Reinforce Freeze
+                        </Button>
+                      </Link>
                     </>
                   )}
                 </div>
