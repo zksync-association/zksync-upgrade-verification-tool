@@ -4,7 +4,7 @@ import { l1Rpc } from "../client";
 import { securityCouncilAbi } from "@/utils/contract-abis";
 import { securityCouncilAddress } from "./protocol-upgrade-handler";
 
-const SECURITY_COUNCIL_MEMBER_COUNT = 8;
+const MAX_SECURITY_COUNCIL_MEMBER_COUNT = 12;
 
 const securityCouncil = (address: Address) =>
   getContract({
@@ -17,11 +17,13 @@ export async function securityCouncilMembers(councilAddress?: Address) {
   const address = await securityCouncilAddressOrDefault(councilAddress);
   const contract = securityCouncil(address);
 
-  const memberPromises = Array.from({ length: SECURITY_COUNCIL_MEMBER_COUNT }, (_, i) =>
+  const memberPromises = Array.from({ length: MAX_SECURITY_COUNCIL_MEMBER_COUNT }, (_, i) =>
     contract.read.members([BigInt(i)])
   );
 
-  return Promise.all(memberPromises);
+  const memberResults = await Promise.allSettled(memberPromises);
+
+  return memberResults.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
 }
 
 export async function securityCouncilSoftFreezeNonce(councilAddress?: Address) {
