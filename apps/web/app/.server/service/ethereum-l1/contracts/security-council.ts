@@ -4,7 +4,7 @@ import { l1Rpc } from "../client";
 import { securityCouncilAbi } from "@/utils/contract-abis";
 import { securityCouncilAddress } from "./protocol-upgrade-handler";
 
-const SECURITY_COUNCIL_MEMBER_COUNT = 12;
+const SECURITY_COUNCIL_MEMBER_COUNT = 8;
 
 const securityCouncil = (address: Address) =>
   getContract({
