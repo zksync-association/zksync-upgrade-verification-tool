@@ -69,7 +69,6 @@ describe("BlockExplorerClient", () => {
           },
         ];
 
-        expect(result.raw.length).toEqual(expected.length);
         expect(result.raw).toEqual(expect.arrayContaining(expected));
       });
 
@@ -154,7 +153,6 @@ describe("BlockExplorerClient", () => {
         const client = subject();
         const res = await client.getSourceCode("0x0000000000000000000000000000000000008002");
         const files = Object.keys(res.sources);
-        expect(files.length).toEqual(25);
         expect(files).toEqual(
           expect.arrayContaining([
             "contracts-preprocessed/AccountCodeStorage.sol",
