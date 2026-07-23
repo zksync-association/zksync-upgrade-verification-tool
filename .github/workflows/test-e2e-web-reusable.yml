@@ -58,6 +58,9 @@ jobs:
       - run: pnpm playwright install --with-deps chromium
       - run: cd ../contracts && pnpm build
       - run: pnpm test:web:env:up
+      - run: pnpm test:web:prepare
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - run: xvfb-run pnpm playwright test
       - uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         if: ${{ !cancelled() }}

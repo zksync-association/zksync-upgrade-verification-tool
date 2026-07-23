@@ -25,10 +25,10 @@ describe("LocalFork", () => {
     const value = parseEther("1");
     const rpc = fork.rpc();
 
-    expect(await rpc.balanceOf(someAddress)).toEqual(0n);
+    const initialBalance = await rpc.balanceOf(someAddress);
     await fork.fund(someAddress, value);
     const balance = await rpc.balanceOf(someAddress);
-    expect(balance).toEqual(value);
+    expect(balance).toEqual(initialBalance + value);
     await fork.tearDown();
   });
 });
