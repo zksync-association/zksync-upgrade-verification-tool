@@ -25,6 +25,8 @@ export const env = createEnv({
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
     NODE_ENV: NodeEnvEnum.default("production"),
     SERVER_PORT: z.coerce.number().default(3000),
+    // Local runs answer only this machine (the app spends the user's RPC); the image sets 0.0.0.0.
+    SERVER_HOST: z.string().default("127.0.0.1"),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,

@@ -63,4 +63,10 @@
   .mono {
     @apply font-mono text-[13px] leading-5 tracking-tight;
   }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }

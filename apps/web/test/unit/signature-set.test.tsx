@@ -169,5 +169,10 @@ describe("SignatureSetCard", () => {
     expect(screen.getByTestId("simulation-ok")).toBeInTheDocument();
     expect(screen.getByTestId("used-match")).toHaveTextContent("1 of 1");
     expect(screen.queryByTestId("sign-button")).not.toBeInTheDocument();
+    // Done: Safe's copies falling below the threshold today is not "signatures needed".
+    expect(screen.getByTestId("threshold-below")).toHaveTextContent(
+      "no longer reach the threshold"
+    );
+    expect(screen.queryByText(/more valid signature/)).not.toBeInTheDocument();
   });
 });

@@ -76,7 +76,7 @@ export default function Index() {
         />
         <div className="relative max-w-2xl space-y-4">
           <h1 className="text-[40px] leading-[48px] tracking-[-0.03em] sm:text-[48px] sm:leading-[56px]">
-            ZKsync governance, <span className="font-extrabold">verified on-chain.</span>
+            ZKsync governance, <span className="font-extrabold">verified on‑chain.</span>
           </h1>
           <p className="text-[17px] text-slate-950 leading-7">
             Proposals come from the ProtocolUpgradeHandler on {governance.network.label}. Signatures
@@ -87,7 +87,7 @@ export default function Index() {
             <Form method="post" className="flex flex-col gap-2 sm:flex-row">
               <Input
                 name="id"
-                placeholder="Open an upgrade or emergency id (0x…)"
+                placeholder="Upgrade or emergency id (0x…)"
                 className="mono border-transparent text-[13px] focus-visible:border-brand-600"
                 aria-label="Upgrade or emergency id"
                 autoComplete="off"

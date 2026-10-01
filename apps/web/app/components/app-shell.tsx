@@ -26,7 +26,7 @@ const NAV = [
   { to: $path("/app/proposals"), label: "Upgrades" },
   { to: $path("/app/emergency"), label: "Emergency" },
   { to: $path("/app/freeze"), label: "Freeze" },
-  { to: $path("/app/l2-cancellations"), label: "Guardian veto" },
+  { to: $path("/app/l2-cancellations"), label: "L2 veto" },
 ];
 
 export default function AppShell({ status, children }: { status: OkStatus; children: ReactNode }) {
@@ -44,13 +44,13 @@ function Header({ status }: { status: OkStatus }) {
   const { network, latestBlock } = status.governance;
   return (
     <header className="sticky top-0 z-40 border-slate-200/60 border-b bg-white/70 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-[1200px] items-center gap-6 px-4 sm:px-6">
+      <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6 md:h-16 md:flex-nowrap md:py-0">
         <Link to="/" className="flex shrink-0 items-center gap-3" aria-label="Home">
           <Logo className="h-6 w-auto" />
           <span className="hidden h-5 w-px bg-slate-200 sm:block" />
           <span className="hidden font-medium text-[15px] text-slate-950 sm:block">Governance</span>
         </Link>
-        <nav className="-mx-2 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+        <nav className="no-scrollbar -mx-2 order-last flex w-full min-w-0 items-center gap-1 overflow-x-auto md:order-none md:w-auto md:flex-1">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
@@ -67,9 +67,9 @@ function Header({ status }: { status: OkStatus }) {
             </NavLink>
           ))}
         </nav>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <span
-            className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[13px] text-slate-700 md:inline-flex"
+            className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[13px] text-slate-700 lg:inline-flex"
             title={`Block ${latestBlock.number} via your RPC`}
             data-testid="network-pill"
           >

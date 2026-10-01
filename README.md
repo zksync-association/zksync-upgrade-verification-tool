@@ -11,7 +11,7 @@ calldata to execute.
 
 ## Run it
 
-Needs git and Node.js 20+ (with corepack). Use your own Ethereum mainnet or Sepolia RPC with log history (any
+Needs git and Node.js 20 or newer. Use your own Ethereum mainnet or Sepolia RPC with log history (any
 archive RPC works, e.g. `https://mainnet.gateway.tenderly.co`); the network is detected from it.
 
 ```bash

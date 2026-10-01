@@ -15,7 +15,7 @@ How to run this app for a ZKsync governance signer, verify a proposal with it, a
 
 ## Run
 
-Needs Node.js 20+ with corepack, plus an Ethereum mainnet or Sepolia RPC with log history. Use the signer's own
+Needs Node.js 20+, plus an Ethereum mainnet or Sepolia RPC with log history. Use the signer's own
 RPC, or `https://mainnet.gateway.tenderly.co` / `https://sepolia.gateway.tenderly.co`.
 
 ```bash
@@ -84,6 +84,8 @@ A signature held outside Safe can be checked by adding `?sig=<memberSafe>:<signa
 JSON URL. It is verified on-chain like the others and stored nowhere.
 
 ## Test
+
+On Node 25+, which no longer bundles corepack, use `npx pnpm@9.7.1` where these say `corepack pnpm`.
 
 ```bash
 corepack pnpm install

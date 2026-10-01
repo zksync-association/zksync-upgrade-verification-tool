@@ -40,7 +40,7 @@ export function SignatureSetCard({
   const met = set.thresholdCheck.status === "met";
   return (
     <Card data-testid={testId} className="overflow-hidden">
-      <div className="space-y-3 px-6 pt-5 pb-4">
+      <div className="space-y-3 px-4 pt-5 pb-4 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
@@ -57,14 +57,23 @@ export function SignatureSetCard({
               {valid}
               <span className="text-slate-400"> / {set.threshold}</span>
             </p>
-            <p className="text-slate-600 text-xs">valid signatures / required</p>
+            <p className="text-slate-600 text-xs">
+              {state.status === "done" ? "valid today / required" : "valid signatures / required"}
+            </p>
           </div>
         </div>
         <Progress
           value={(valid / Math.max(set.threshold, 1)) * 100}
           indicatorClassName={cn(met && "bg-green-600")}
         />
-        <ThresholdLine set={set} />
+        {state.status === "done" && set.thresholdCheck.status !== "met" ? (
+          <p className="text-slate-600 text-sm" data-testid="threshold-below">
+            Safe's copies no longer reach the threshold today (for example, because owners changed).
+            What counted is the transaction below.
+          </p>
+        ) : (
+          <ThresholdLine set={set} />
+        )}
         {set.safeApiError && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 text-sm">
             Safe Transaction Service: {set.safeApiError}. On-chain approvals are still checked.
@@ -74,7 +83,7 @@ export function SignatureSetCard({
 
       <MemberList set={set} />
 
-      <div className="space-y-4 border-slate-200 border-t px-6 py-5">
+      <div className="space-y-4 border-slate-200 border-t px-4 py-5 sm:px-6">
         {state.status === "done" && (
           <DoneSummary state={state} used={used} historical={historical} />
         )}
@@ -144,36 +153,38 @@ function MemberList({ set }: { set: Serialized<SignatureSet> }) {
             <button
               type="button"
               onClick={() => setOpen(expanded ? "" : m.member)}
-              className="flex w-full items-center gap-4 px-6 py-3 text-left transition-colors hover:bg-slate-25"
+              className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-25 sm:items-center sm:gap-4 sm:px-6"
               aria-expanded={expanded}
             >
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="flex items-center gap-2 font-medium text-slate-950 text-sm">
-                  {m.label ?? "Member"}
-                  {isYou && (
-                    <span className="rounded-full bg-brand-50 px-2 text-[11px] text-brand-600">
-                      you
-                    </span>
-                  )}
+              <span className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="flex items-center gap-2 font-medium text-slate-950 text-sm">
+                    {m.label ?? "Member"}
+                    {isYou && (
+                      <span className="rounded-full bg-brand-50 px-2 text-[11px] text-brand-600">
+                        you
+                      </span>
+                    )}
+                  </span>
+                  <span className="mono break-all text-slate-600">{m.member}</span>
                 </span>
-                <span className="mono text-slate-600">{m.member}</span>
-              </span>
-              <span className="hidden w-32 text-slate-600 text-xs md:block">
-                {m.safe.isContract
-                  ? `Safe ${m.safe.version ?? "?"} · ${m.safe.threshold ?? "?"} of ${m.safe.owners.length}`
-                  : "Not a Safe"}
-              </span>
-              <span className="flex w-56 justify-end">
-                <MemberStatusBadge
-                  status={m.status}
-                  source={m.source}
-                  confirmations={m.confirmations}
-                  safeThreshold={m.safe.threshold}
-                />
+                <span className="hidden w-32 text-slate-600 text-xs md:block">
+                  {m.safe.isContract
+                    ? `Safe ${m.safe.version ?? "?"} · ${m.safe.threshold ?? "?"} of ${m.safe.owners.length}`
+                    : "Not a Safe"}
+                </span>
+                <span className="flex sm:w-56 sm:justify-end">
+                  <MemberStatusBadge
+                    status={m.status}
+                    source={m.source}
+                    confirmations={m.confirmations}
+                    safeThreshold={m.safe.threshold}
+                  />
+                </span>
               </span>
               <ChevronDown
                 className={cn(
-                  "h-4 w-4 shrink-0 text-slate-400 transition-transform",
+                  "mt-0.5 h-4 w-4 shrink-0 text-slate-400 transition-transform sm:mt-0",
                   expanded && "rotate-180"
                 )}
               />
@@ -188,7 +199,7 @@ function MemberList({ set }: { set: Serialized<SignatureSet> }) {
 
 function MemberDetail({ member: m }: { member: Serialized<MemberResult> }) {
   return (
-    <div className="space-y-4 bg-slate-25 px-6 pt-1 pb-5 text-sm">
+    <div className="space-y-4 bg-slate-25 px-4 pt-1 pb-5 text-sm sm:px-6">
       {m.hashes && (
         <div className="space-y-2">
           <p className="font-medium text-slate-950">
@@ -268,12 +279,15 @@ function SignedData({ set }: { set: Serialized<SignatureSet> }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left font-medium text-slate-950 text-sm"
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left font-medium text-slate-950 text-sm"
         aria-expanded={open}
       >
-        What members sign: {set.typedData.primaryType}
+        <span className="min-w-0 break-words">What members sign: {set.typedData.primaryType}</span>
         <ChevronDown
-          className={cn("h-4 w-4 text-slate-400 transition-transform", open && "rotate-180")}
+          className={cn(
+            "h-4 w-4 shrink-0 text-slate-400 transition-transform",
+            open && "rotate-180"
+          )}
         />
       </button>
       {open && (
@@ -324,8 +338,8 @@ function DoneSummary({
   const matching = used?.filter((u) => u.matchesSafe === true).length ?? 0;
   return (
     <div className="space-y-2 rounded-xl bg-green-50 p-4 text-sm" data-testid="done-summary">
-      <p className="flex items-center gap-2 font-medium text-green-800">
-        <CheckCircle2 className="h-4 w-4" /> {state.detail}
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium text-green-800">
+        <CheckCircle2 className="h-4 w-4 shrink-0" /> {state.detail}
         {state.txHash && (
           <>
             {" "}
@@ -343,7 +357,8 @@ function DoneSummary({
           {used.some((u) => u.matchesSafe === false) && (
             <span className="text-amber-800">
               {" "}
-              Some differ from Safe's copy (the signers re-signed or signed elsewhere).
+              Some differ from Safe's current copy (for example, it no longer lists an owner's
+              confirmation). The re-check below shows whether the contract accepted what was used.
             </span>
           )}
         </p>

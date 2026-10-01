@@ -122,7 +122,7 @@ async function startServer() {
     const chain = await checkRpc();
     console.log(`Reading governance from ${chain} through L1_RPC_URL.`);
 
-    const server = app.listen(portToUse, () => {
+    const server = app.listen(portToUse, env.SERVER_HOST, () => {
       if (!portAvailable) {
         console.warn(
           chalk.yellow(`⚠️  Port ${desiredPort} is not available, using ${portToUse} instead.`)
@@ -132,16 +132,21 @@ async function startServer() {
       const localUrl = `http://localhost:${portToUse}`;
       let lanUrl: string | null = null;
       const localIp = ipAddress() ?? "Unknown";
-      if (/^10[.]|^172[.](1[6-9]|2[0-9]|3[0-1])[.]|^192[.]168[.]/.test(localIp)) {
+      if (
+        env.SERVER_HOST === "0.0.0.0" &&
+        /^10[.]|^172[.](1[6-9]|2[0-9]|3[0-1])[.]|^192[.]168[.]/.test(localIp)
+      ) {
         lanUrl = `http://${localIp}:${portToUse}`;
       }
 
       console.log(
-        `
-${chalk.bold("Local:")}            ${chalk.cyan(localUrl)}
-${lanUrl ? `${chalk.bold("On Your Network:")}  ${chalk.cyan(lanUrl)}` : ""}
-${chalk.bold("Press Ctrl+C to stop")}
-        `.trim()
+        [
+          `${chalk.bold("Local:")}            ${chalk.cyan(localUrl)}`,
+          lanUrl && `${chalk.bold("On Your Network:")}  ${chalk.cyan(lanUrl)}`,
+          chalk.bold("Press Ctrl+C to stop"),
+        ]
+          .filter(Boolean)
+          .join("\n")
       );
     });
 

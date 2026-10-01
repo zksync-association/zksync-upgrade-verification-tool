@@ -38,4 +38,5 @@ shared with the Playwright suite in `packages/e2e`.
 ## Environment
 
 Only `L1_RPC_URL` is required. The optional variables are listed in the root README. `LOG_LEVEL`, `SERVER_PORT`
-(default 3000) and `ALLOW_INDEXING` (default false) behave as before.
+(default 3000) and `ALLOW_INDEXING` (default false) behave as before. `SERVER_HOST` defaults to `127.0.0.1`, so a
+local run (which spends your RPC) answers only your machine; the Docker image sets `0.0.0.0`.
