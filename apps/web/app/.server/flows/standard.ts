@@ -1,0 +1,454 @@
+import { guardiansAbi, upgradeHandlerAbi } from "@/common/abis";
+import {
+  approvalExecution,
+  executeUpgradeExecution,
+  type MemberSignature,
+} from "@/common/execution";
+import {
+  type DecodedCall,
+  type UpgradeProposal,
+  decodeCall,
+  fromAbi,
+  upgradeProposalId,
+} from "@/common/proposal";
+import { type ActionName, buildTypedData } from "@/common/typed-data";
+import { UPGRADE_STATES, UPGRADE_STATE_LABELS, type UpgradeState } from "@/common/upgrade-states";
+import { type Address, type Hex, decodeEventLog, isAddressEqual, zeroAddress } from "viem";
+import { cached } from "../cache";
+import { type Governance, governance } from "../governance";
+import { findBlockByTimestamp, getLogs } from "../logs";
+import { l1, latestBlock, network, safeBlockNumber } from "../rpc";
+import {
+  type SignatureSet,
+  isRevert,
+  revertReason,
+  simulate,
+  verifySignatureSet,
+} from "../signatures";
+import {
+  type ExecutionView,
+  type SetState,
+  type UsedSignature,
+  callTo,
+  compareUsedSignatures,
+  decodeApprovalCall,
+  eventsWithId,
+  executionFor,
+  hasArchiveState,
+  topicOf,
+} from "./common";
+import { findL2ProposalForUpgrade } from "./l2";
+
+const DAY = 86_400n;
+// Longest a standard upgrade can still need signatures: 7-day extended legal veto + 30 days waiting.
+const ACTIVE_WINDOW_DAYS = 45n;
+
+type Status = {
+  creationTimestamp: number;
+  securityCouncilApprovalTimestamp: number;
+  guardiansApproval: boolean;
+  guardiansExtendedLegalVeto: boolean;
+  executed: boolean;
+};
+
+async function readStatus(id: Hex): Promise<{ state: UpgradeState; status: Status }> {
+  const { upgradeHandler } = await network();
+  const [state, raw] = await Promise.all([
+    l1.readContract({
+      address: upgradeHandler,
+      abi: upgradeHandlerAbi,
+      functionName: "upgradeState",
+      args: [id],
+    }),
+    l1.readContract({
+      address: upgradeHandler,
+      abi: upgradeHandlerAbi,
+      functionName: "upgradeStatus",
+      args: [id],
+    }),
+  ]);
+  return {
+    state: state as UpgradeState,
+    status: {
+      creationTimestamp: raw[0],
+      securityCouncilApprovalTimestamp: raw[1],
+      guardiansApproval: raw[2],
+      guardiansExtendedLegalVeto: raw[3],
+      executed: raw[4],
+    },
+  };
+}
+
+export type StartedUpgrade = {
+  id: Hex;
+  proposal: UpgradeProposal;
+  // Recomputed from the decoded proposal; must equal the indexed id.
+  idMatches: boolean;
+  blockNumber: string;
+  txHash: Hex;
+};
+
+function decodeStarted(log: Awaited<ReturnType<typeof getLogs>>[number]): StartedUpgrade {
+  const { args } = decodeEventLog({
+    abi: upgradeHandlerAbi,
+    eventName: "UpgradeStarted",
+    data: log.data,
+    topics: log.topics,
+  });
+  const proposal = fromAbi(args._proposal);
+  return {
+    id: args._id,
+    proposal,
+    idMatches: upgradeProposalId(proposal).toLowerCase() === args._id.toLowerCase(),
+    blockNumber: (log.blockNumber ?? 0n).toString(),
+    txHash: log.transactionHash as Hex,
+  };
+}
+
+export type UpgradeSummary = StartedUpgrade & {
+  state: UpgradeState;
+  stateLabel: string;
+  createdAt: number;
+  approvedBySecurityCouncil: boolean;
+  approvedByGuardians: boolean;
+  legalVetoExtended: boolean;
+};
+
+export async function listStandardUpgrades({ allHistory }: { allHistory: boolean }) {
+  const net = await network();
+  const head = await latestBlock();
+  const windowStart = head.number - (ACTIVE_WINDOW_DAYS * DAY) / BigInt(net.blockTimeSeconds);
+  const from =
+    allHistory || windowStart < net.upgradeHandlerDeployBlock
+      ? net.upgradeHandlerDeployBlock
+      : windowStart;
+  const logs = await getLogs(
+    l1,
+    { address: net.upgradeHandler, topics: [topicOf(upgradeHandlerAbi, "UpgradeStarted")] },
+    from
+  );
+  const upgrades = await Promise.all(
+    logs.map(async (log): Promise<UpgradeSummary> => {
+      const started = decodeStarted(log);
+      const { state, status } = await readStatus(started.id);
+      return {
+        ...started,
+        state,
+        stateLabel: UPGRADE_STATE_LABELS[state],
+        createdAt: status.creationTimestamp,
+        approvedBySecurityCouncil: status.securityCouncilApprovalTimestamp !== 0,
+        approvedByGuardians: status.guardiansApproval,
+        legalVetoExtended: status.guardiansExtendedLegalVeto,
+      };
+    })
+  );
+  return {
+    upgrades: upgrades.reverse(),
+    fromBlock: from.toString(),
+    allHistory: from === net.upgradeHandlerDeployBlock,
+  };
+}
+
+/** The UpgradeStarted event for `id`, found from the on-chain creation timestamp (no full scan). */
+async function findStarted(id: Hex, creationTimestamp: number): Promise<StartedUpgrade | null> {
+  const net = await network();
+  const head = await latestBlock();
+  const block = await blockAt(creationTimestamp);
+  const logs = await getLogs(
+    l1,
+    { address: net.upgradeHandler, topics: [topicOf(upgradeHandlerAbi, "UpgradeStarted"), id] },
+    block,
+    // Dev chains can share a timestamp across several blocks.
+    block + 16n < head.number ? block + 16n : head.number
+  );
+  const log = logs[0];
+  return log ? decodeStarted(log) : null;
+}
+
+export type ApprovalSet = {
+  key: "securityCouncil" | "guardians" | "legalVeto";
+  title: string;
+  set: SignatureSet;
+  state: SetState;
+  execution: ExecutionView | null;
+  // For a completed action: the signatures the transaction used, and whether Safe has the same bytes.
+  used: UsedSignature[] | null;
+  // Re-verification of the used signatures at the block before execution (needs archive state).
+  historical: { block: string; accepted: boolean | null; error: string | null } | null;
+};
+
+export type UpgradeTimeline = {
+  createdAt: number;
+  legalVetoEndsAt: number;
+  waitingEndsAt: number;
+  approvedAt: number | null;
+  readyAt: number | null;
+};
+
+export type StandardUpgradeDetail = {
+  id: Hex;
+  started: StartedUpgrade;
+  calls: DecodedCall[];
+  state: UpgradeState;
+  stateLabel: string;
+  status: Status;
+  timeline: UpgradeTimeline;
+  sets: ApprovalSet[];
+  execute: ExecutionView | null;
+  executedTx: Hex | null;
+  l2Proposal: Awaited<ReturnType<typeof findL2ProposalForUpgrade>>;
+  governance: Governance;
+};
+
+export class UpgradeNotFound extends Error {}
+
+export async function getStandardUpgrade(
+  id: Hex,
+  { supplied = [] }: { supplied?: MemberSignature[] } = {}
+): Promise<StandardUpgradeDetail> {
+  const [gov, { state, status }] = await Promise.all([governance(), readStatus(id)]);
+  if (state === UPGRADE_STATES.None || status.creationTimestamp === 0) {
+    throw new UpgradeNotFound(`ProtocolUpgradeHandler has no standard upgrade ${id}`);
+  }
+  const started = await cached(
+    `started:${id}`,
+    gov.network.isDevNode ? 0 : Number.POSITIVE_INFINITY,
+    () => findStarted(id, status.creationTimestamp)
+  );
+  if (!started) {
+    throw new UpgradeNotFound(
+      `Upgrade ${id} exists on-chain but its UpgradeStarted log was not returned by the RPC. Use an RPC that serves logs.`
+    );
+  }
+
+  const vetoDays = BigInt(
+    status.guardiansExtendedLegalVeto ? 7 : gov.network.standardLegalVetoDays
+  );
+  const created = BigInt(status.creationTimestamp);
+  const timeline: UpgradeTimeline = {
+    createdAt: status.creationTimestamp,
+    legalVetoEndsAt: Number(created + vetoDays * DAY),
+    waitingEndsAt: Number(created + vetoDays * DAY + 30n * DAY),
+    approvedAt: status.securityCouncilApprovalTimestamp || null,
+    readyAt: status.securityCouncilApprovalTimestamp
+      ? status.securityCouncilApprovalTimestamp + Number(DAY)
+      : status.guardiansApproval
+        ? Number(created + vetoDays * DAY + 31n * DAY)
+        : null,
+  };
+
+  const specs: {
+    key: ApprovalSet["key"];
+    title: string;
+    action: Extract<
+      ActionName,
+      "ApproveUpgradeSecurityCouncil" | "ApproveUpgradeGuardians" | "ExtendLegalVetoPeriod"
+    >;
+    group: "securityCouncil" | "guardians";
+    threshold: number;
+    state: SetState;
+    event: string;
+  }[] = [
+    {
+      key: "securityCouncil",
+      title: "Security Council approval",
+      action: "ApproveUpgradeSecurityCouncil",
+      group: "securityCouncil",
+      threshold: gov.securityCouncil.thresholds.approveUpgrade,
+      event: "UpgradeApprovedBySecurityCouncil",
+      state:
+        status.securityCouncilApprovalTimestamp !== 0
+          ? { status: "done", detail: "Approved by the Security Council", txHash: null }
+          : state === UPGRADE_STATES.Waiting
+            ? { status: "open" }
+            : { status: "closed", detail: closedReason(state, "Waiting") },
+    },
+    {
+      key: "guardians",
+      title: "Guardians approval",
+      action: "ApproveUpgradeGuardians",
+      group: "guardians",
+      threshold: gov.guardians.thresholds.approveUpgrade,
+      event: "UpgradeApprovedByGuardians",
+      state: status.guardiansApproval
+        ? { status: "done", detail: "Approved by the Guardians", txHash: null }
+        : state === UPGRADE_STATES.Waiting
+          ? { status: "open" }
+          : { status: "closed", detail: closedReason(state, "Waiting") },
+    },
+    {
+      key: "legalVeto",
+      title: "Legal veto extension (Guardians)",
+      action: "ExtendLegalVetoPeriod",
+      group: "guardians",
+      threshold: gov.guardians.thresholds.extendLegalVeto,
+      event: "UpgradeLegalVetoExtended",
+      state: status.guardiansExtendedLegalVeto
+        ? { status: "done", detail: "Legal veto period extended to 7 days", txHash: null }
+        : state === UPGRADE_STATES.LegalVetoPeriod
+          ? { status: "open" }
+          : { status: "closed", detail: "Only possible during the legal veto period" },
+    },
+  ];
+
+  const sets = await Promise.all(
+    specs.map(async (spec): Promise<ApprovalSet> => {
+      const contract = spec.group === "securityCouncil" ? gov.securityCouncil : gov.guardians;
+      const set = await verifySignatureSet({
+        action: spec.action,
+        signerGroup: spec.group,
+        typedData: buildTypedData(spec.action, contract.domain, { id }),
+        members: contract.members,
+        threshold: spec.threshold,
+        check: { kind: "multisig", contract: contract.address },
+        supplied,
+      });
+      const execution = await executionFor(set, spec.state, (valid) =>
+        approvalExecution(spec.action, contract.address, id, valid)
+      );
+      let used: UsedSignature[] | null = null;
+      let historical: ApprovalSet["historical"] = null;
+      let state = spec.state;
+      if (spec.state.status === "done") {
+        // The Security Council approval time is on-chain, so its event is found without a scan.
+        const near =
+          spec.key === "securityCouncil" && status.securityCouncilApprovalTimestamp
+            ? await blockAt(status.securityCouncilApprovalTimestamp)
+            : null;
+        const events = await eventsWithId(
+          gov.upgradeHandler,
+          upgradeHandlerAbi,
+          spec.event,
+          id,
+          near ?? BigInt(started.blockNumber),
+          near === null ? undefined : near + 16n
+        );
+        const txHash = (events[0]?.log.transactionHash ?? null) as Hex | null;
+        state = { ...spec.state, txHash };
+        const call = txHash ? await callTo(txHash, contract.address) : null;
+        const decoded = call ? decodeApprovalCall(call.data) : null;
+        if (decoded && txHash) {
+          used = compareUsedSignatures(decoded, set);
+          const block = (events[0]?.log.blockNumber ?? 1n) - 1n;
+          historical = await recheckAt(contract.address, set, decoded, block);
+        }
+      }
+      return { key: spec.key, title: spec.title, set, state, execution, used, historical };
+    })
+  );
+
+  let execute: ExecutionView | null = null;
+  let executedTx: Hex | null = null;
+  if (state === UPGRADE_STATES.Ready) {
+    const execution = executeUpgradeExecution(gov.upgradeHandler, started.proposal);
+    execute = { ...execution, simulation: await simulateAs(execution, started.proposal.executor) };
+  }
+  if (state === UPGRADE_STATES.Done) {
+    const events = await eventsWithId(
+      gov.upgradeHandler,
+      upgradeHandlerAbi,
+      "UpgradeExecuted",
+      id,
+      BigInt(started.blockNumber)
+    );
+    executedTx = (events[0]?.log.transactionHash ?? null) as Hex | null;
+  }
+
+  return {
+    id,
+    started,
+    calls: started.proposal.calls.map(decodeCall),
+    state,
+    stateLabel: UPGRADE_STATE_LABELS[state],
+    status,
+    timeline,
+    sets,
+    execute,
+    executedTx,
+    l2Proposal: await findL2ProposalForUpgrade(id, status.creationTimestamp).catch(() => null),
+    governance: gov,
+  };
+}
+
+async function recheckAt(
+  contract: Address,
+  set: SignatureSet,
+  used: { signers: readonly Address[]; signatures: readonly Hex[] },
+  block: bigint
+): Promise<ApprovalSet["historical"]> {
+  if (!(await hasArchiveState(contract, block))) {
+    return {
+      block: block.toString(),
+      accepted: null,
+      error: "RPC has no archive state for this block",
+    };
+  }
+  const key = `recheck:${contract}:${set.hashes.digest}:${used.signatures.join("")}:${block}`;
+  return cached(key, (await network()).isDevNode ? 0 : 10 * 60_000, () =>
+    recheck(contract, set, used, block)
+  );
+}
+
+async function recheck(
+  contract: Address,
+  set: SignatureSet,
+  used: { signers: readonly Address[]; signatures: readonly Hex[] },
+  block: bigint
+): Promise<ApprovalSet["historical"]> {
+  try {
+    await l1.readContract({
+      address: contract,
+      abi: guardiansAbi,
+      functionName: "checkSignatures",
+      args: [set.hashes.digest, [...used.signers], [...used.signatures], BigInt(set.threshold)],
+      blockNumber: block,
+    });
+    return { block: block.toString(), accepted: true, error: null };
+  } catch (error) {
+    return {
+      block: block.toString(),
+      accepted: isRevert(error) ? false : null,
+      error: revertReason(error),
+    };
+  }
+}
+
+async function blockAt(timestamp: number) {
+  const net = await network();
+  const head = await latestBlock();
+  return findBlockByTimestamp(
+    l1,
+    BigInt(timestamp),
+    net.upgradeHandlerDeployBlock,
+    head.number,
+    net.isDevNode ? null : { key: "l1", safeHead: await safeBlockNumber() }
+  );
+}
+
+function simulateAs(execution: ExecutionView | Parameters<typeof simulate>[0], executor: Address) {
+  // A proposal with an executor can only be executed by it; simulate from that address.
+  if (!isAddressEqual(executor, zeroAddress)) {
+    return l1
+      .call({ account: executor, to: execution.to, data: execution.data })
+      .then(() => ({ status: "ok" as const }))
+      .catch((error: unknown) =>
+        isRevert(error)
+          ? { status: "reverted" as const, error: revertReason(error) }
+          : { status: "skipped" as const, reason: `RPC error: ${revertReason(error)}` }
+      );
+  }
+  return simulate(execution);
+}
+
+function closedReason(state: UpgradeState, needed: string) {
+  switch (state) {
+    case UPGRADE_STATES.LegalVetoPeriod:
+      return `Opens when the legal veto period ends (needs state ${needed})`;
+    case UPGRADE_STATES.Expired:
+      return "The upgrade expired without approval";
+    case UPGRADE_STATES.Done:
+      return "The upgrade was executed";
+    default:
+      return `Only possible while the upgrade is ${needed}`;
+  }
+}

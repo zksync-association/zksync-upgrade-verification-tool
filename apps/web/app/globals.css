@@ -2,38 +2,40 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ZKsync light theme: slate-50 page, white cards, navy-800 headings, brand-600 for interactive only. */
 @layer base {
   :root {
-    --background: 0 0% 0%;
-    --foreground: 210 40% 98%;
+    --background: 216 45% 98%; /* slate-50 */
+    --foreground: 220 21% 8%; /* slate-950 */
 
-    --card: 0 0% 10%;
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 21% 8%;
 
-    --popover: 0 0% 0%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 223 91% 52%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 21% 8%;
+
+    --primary: 237 90% 49%; /* brand-600 */
     --primary-foreground: 0 0% 100%;
 
-    --alternative: 223 100% 63%;
+    --secondary: 231 84% 95%; /* brand-50 */
+    --secondary-foreground: 237 90% 49%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --muted: 218 33% 95%; /* slate-75 */
+    --muted-foreground: 219 8% 46%; /* slate-600 */
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 0 0% 55%;
+    --accent: 216 45% 98%;
+    --accent-foreground: 220 21% 8%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --border: 224 17% 88%; /* slate-200 */
+    --input: 224 17% 88%;
+    --ring: 237 90% 49%;
 
-    --border: 0 0% 100%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --heading: 230 82% 22%; /* navy-800 */
 
-    --radius: 2rem;
+    --radius: 1rem;
   }
 }
 
@@ -41,21 +43,24 @@
   * {
     @apply border-border;
   }
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+  }
+  h1,
+  h2 {
+    @apply font-medium text-heading;
+  }
+  ::selection {
+    background: rgba(12, 24, 236, 0.15);
   }
 }
 
-.cta-bg {
-  background: radial-gradient(75% 75% at 50% 50%, black 0, transparent 100%),
-    linear-gradient(to left, transparent 90%, black 100%),
-    linear-gradient(to right, transparent 90%, black 100%),
-    url(/graphics/cta.svg);
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
+@layer components {
+  .mono {
+    @apply font-mono text-[13px] leading-5 tracking-tight;
+  }
 }

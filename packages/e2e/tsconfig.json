@@ -1,5 +1,9 @@
 {
   "extends": "@repo/typescript-config/base.json",
+  "compilerOptions": {
+    // suites/web runs code inside the browser page (addInitScript / evaluate).
+    "lib": ["es2022", "DOM"]
+  },
   "include": ["**/*.ts"],
   "exclude": ["node_modules"]
 }

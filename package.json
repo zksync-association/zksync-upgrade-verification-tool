@@ -5,6 +5,7 @@
   "author": "moonsong-labs",
   "license": "(MIT OR Apache-2.0)",
   "scripts": {
+    "start": "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile && corepack pnpm --filter web build && corepack pnpm --filter web start",
     "docker:build": "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t upgrade-checker:local .",
     "build": "turbo build",
     "test": "turbo test",

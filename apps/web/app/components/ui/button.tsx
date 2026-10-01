@@ -1,29 +1,28 @@
-import { Transition } from "@headlessui/react";
 import { Slot } from "@radix-ui/react-slot";
 import { type VariantProps, cva } from "class-variance-authority";
+import { Loader2 } from "lucide-react";
 import * as React from "react";
 
-import Loading from "@/components/ui/loading";
 import { cn } from "@/utils/cn";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 disabled:pointer-events-none disabled:bg-gray-600 drop-shadow-md capitalize",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-600/20 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-foreground hover:bg-background/70 hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-        success: "bg-green-600 hover:bg-green-700 text-white focus-visible:ring-green-600",
+        default: "bg-brand-600 text-white hover:bg-brand-500 active:bg-brand-700",
+        secondary:
+          "border border-brand-600/25 bg-brand-600/5 font-normal text-brand-600 hover:bg-brand-600/10",
+        outline: "border border-slate-200 bg-white text-slate-950 hover:bg-slate-50",
+        ghost: "font-medium text-slate-700 hover:bg-slate-75 hover:text-slate-950",
+        destructive: "bg-red-600 text-white hover:bg-red-700",
+        link: "rounded-none px-0 font-medium text-brand-600 underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-10 py-6",
-        sm: "h-9 rounded-md px-4 py-5",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        default: "h-10 px-5 text-sm",
+        sm: "h-8 px-3.5 text-[13px]",
+        lg: "h-12 px-6 text-base",
+        icon: "h-9 w-9",
       },
     },
     defaultVariants: {
@@ -43,28 +42,23 @@ export interface ButtonProps
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, loading, disabled, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
+    if (asChild) {
+      return (
+        <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props}>
+          {children}
+        </Comp>
+      );
+    }
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, className }), "relative overflow-hidden")}
+        className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         disabled={disabled || loading}
+        aria-busy={loading || undefined}
         {...props}
       >
-        <Transition show={loading ?? false} unmount={false}>
-          <div className="data-[leave]:data-[closed]:-translate-y-full absolute transition ease-in-out data-[enter]:data-[closed]:translate-y-full data-[closed]:opacity-0">
-            <Loading className="h-6 w-6" />
-          </div>
-        </Transition>
-        <Transition show={!loading}>
-          <div
-            className={cn(
-              "data-[leave]:data-[closed]:-translate-y-full inline-flex items-center justify-center transition ease-in-out data-[enter]:data-[closed]:translate-y-full data-[closed]:opacity-0",
-              className
-            )}
-          >
-            {children}
-          </div>
-        </Transition>
+        {loading && <Loader2 className="animate-spin" />}
+        {children}
       </Comp>
     );
   }

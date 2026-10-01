@@ -1,304 +1,156 @@
-import { getl2CancellationCallsByProposalId } from "@/.server/db/dto/l2-cancellation-calls";
-import { getL2CancellationById } from "@/.server/db/dto/l2-cancellations";
-import { getSignaturesByL2CancellationId } from "@/.server/db/dto/signatures";
-import {
-  getAndUpdateL2Cancellation,
-  getL2GovernorAddress,
-  getL2VetoNonce,
-} from "@/.server/service/l2-cancellations";
-import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
-import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
-import TxLink from "@/components/tx-link";
-import TxStatus from "@/components/tx-status";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CallsRawData } from "@/components/upgrade-raw-data";
-import VotingStatusIndicator from "@/components/voting-status-indicator";
-import ExecL2VetoForm from "@/routes/app/l2-cancellations/$id/exec-l2-veto-form";
-import { displayBytes32 } from "@/utils/common-tables";
-import { badRequest, notFound } from "@/utils/http";
-import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
-import { CircleCheckBig, CircleX } from "lucide-react";
-import { hexSchema } from "@repo/common/schemas";
-import { hexToBigInt, isAddressEqual } from "viem";
-import { z } from "zod";
-import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
-import { SignCancellationButton } from "@/routes/app/l2-cancellations/$id/sign-cancellation-button";
-import { requireUserFromRequest } from "@/utils/auth-headers";
-import useUser from "@/components/hooks/use-user";
-import { guardiansAddress } from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
-import { EthereumConfig } from "@config/ethereum.server";
-import ZkAdminArchiveProposal from "@/components/zk-admin-archive-proposal";
-import ProposalArchivedCard from "@/components/proposal-archived-card";
+import { type VetoDetail, getL2Veto } from "@/.server/flows/l2-veto";
+import { parseVetoParams } from "@/.server/params";
+import { suppliedSignatures } from "@/.server/request";
+import { decodeCall } from "@/common/proposal";
+import { useStatus } from "@/components/app-shell";
+import { AddressLink, ExternalAnchor, TxLink } from "@/components/hex";
+import { Check, EmptyState, Facts, LoadingCard, PageHeader, Section } from "@/components/page";
+import { Badge } from "@/components/ui/badge";
+import { CallList } from "@/components/verification/calls";
+import { SetStateBadge } from "@/components/verification/badges";
+import { SignatureSetCard } from "@/components/verification/signature-set";
+import { formatEth, formatTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
-import SignActionsCard from "@/components/proposal-components/sign-actions-card";
-import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
-import TallyLink from "@/components/tally-link";
-import { env } from "@config/env.server";
+import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
+import { Await, useLoaderData } from "@remix-run/react";
+import { Suspense } from "react";
+import { $path } from "remix-routes";
 
 export const meta = Meta["/app/l2-cancellations/:id"];
 
-export async function loader({ params: remixParams }: LoaderFunctionArgs) {
-  const { id } = extractFromParams(remixParams, z.object({ id: z.coerce.number() }), notFound());
-
-  const proposal = await getAndUpdateL2Cancellation(id);
-
-  const [calls, signatures, guardiansAddr, l2GovernorAddr] = await Promise.all([
-    getl2CancellationCallsByProposalId(proposal.id),
-    getSignaturesByL2CancellationId(proposal.id),
-    guardiansAddress(),
-    getL2GovernorAddress(proposal.type),
-  ]);
-  const necessarySignatures = 5; //FIXME: centralize this information or pull from contract
-
-  return json({
-    proposal,
-    signatures,
-    calls,
-    necessarySignatures,
-    guardiansAddress: guardiansAddr,
-    l2GovernorAddress: l2GovernorAddr,
-    transactionUrl: proposal.transactionHash
-      ? EthereumConfig.getTransactionUrl(proposal.transactionHash)
-      : "",
-    tallyBaseUrl: env.TALLY_BASE_URL,
-    currentNonce: await getL2VetoNonce(),
-  });
+export function loader({ params, request }: LoaderFunctionArgs) {
+  const veto = parseVetoParams(params.id, new URL(request.url));
+  return defer({ veto, detail: getL2Veto(veto, { supplied: suppliedSignatures(request) }) });
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  const user = requireUserFromRequest(request);
-  const data = await getFormDataOrThrow(request, {
-    signature: hexSchema,
-    proposalId: z.coerce.number(),
-  });
-
-  const proposal = await getL2CancellationById(data.proposalId);
-  if (!proposal) {
-    throw badRequest("Proposal not found");
-  }
-
-  await SIGNATURE_FACTORIES.l2Cancellation(data.proposalId, user.address, data.signature);
-
-  return json({ ok: true });
-}
-
-export default function L2Cancellation() {
-  const {
-    proposal,
-    calls,
-    signatures,
-    necessarySignatures,
-    guardiansAddress,
-    transactionUrl,
-    currentNonce,
-    tallyBaseUrl,
-  } = useLoaderData<typeof loader>();
-  const user = useUser();
-
-  let proposalType: string;
-  switch (proposal.type) {
-    case "ZK_GOV_OPS_GOVERNOR":
-      proposalType = "GovOps Governor Proposal";
-      break;
-    case "ZK_TOKEN_GOVERNOR":
-      proposalType = "Token Governor Proposal";
-      break;
-  }
-
-  const isExactNonce = proposal.nonce === currentNonce;
-
-  const proposalArchived = proposal.archivedOn !== null;
-
-  const signDisabled =
-    user.role !== "guardian" ||
-    signatures.some((s) => isAddressEqual(s.signer, user.address)) ||
-    proposalArchived;
-
-  const execDisabled =
-    signatures.length < necessarySignatures ||
-    proposal.transactionHash !== null ||
-    !isExactNonce ||
-    proposalArchived;
-
+export default function VetoPage() {
+  const { veto, detail } = useLoaderData<typeof loader>();
   return (
-    <div className="flex flex-1 flex-col">
-      <HeaderWithBackButton>Veto {displayBytes32(proposal.externalId)}</HeaderWithBackButton>
+    <Suspense
+      fallback={
+        <>
+          <PageHeader
+            back={{ to: $path("/app/l2-cancellations"), label: "Guardian veto" }}
+            eyebrow="Guardian veto"
+            title="Veto"
+            id={veto.l2ProposalId}
+          />
+          <LoadingCard label="Reading the L2 proposal and checking Guardian signatures on-chain…" />
+        </>
+      }
+    >
+      <Await resolve={detail}>{(d) => <Detail detail={d} />}</Await>
+    </Suspense>
+  );
+}
 
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card data-testid="proposal-details-card">
-          <CardHeader>
-            <CardTitle>Veto Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div className="flex justify-between">
-                <span>Type:</span>
-                <span>{proposalType}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Description:</span>
-                <span>{proposal.description}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tally ID:</span>
-                <TallyLink l2ProposalId={proposal.externalId} baseUrl={tallyBaseUrl} />
-              </div>
-              <div className="flex justify-between">
-                <span>Proposer:</span>
-                <span className="w-1/2 break-words text-right">{proposal.proposer}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Nonce:</span>
-                <span className="w-1/2 break-words text-right">{proposal.nonce}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Veto L2 Gas Limit:</span>
-                <span className="w-1/2 break-words text-right">
-                  {hexToBigInt(proposal.txRequestGasLimit).toString()}
+function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
+  const { governance } = useStatus();
+  const p = d.params;
+  const l2 = d.l2Proposal;
+  return (
+    <div className="space-y-10">
+      <PageHeader
+        back={{ to: $path("/app/l2-cancellations"), label: "Guardian veto" }}
+        eyebrow="Guardian veto"
+        title={l2?.description.split("\n")[0] || "Veto of an L2 proposal"}
+        badges={
+          <>
+            <SetStateBadge state={d.state} />
+            {!d.governorKnown && <Badge variant="error">Not a known governor</Badge>}
+          </>
+        }
+        id={p.l2ProposalId}
+      />
+      <Facts
+        items={[
+          {
+            label: "L2 governor",
+            value: <AddressLink address={p.l2GovernorAddress} label={l2?.governorName} l2 />,
+          },
+          {
+            label: "L2 proposal",
+            value: l2 ? (
+              <span className="space-x-2">
+                <span>{l2.state}</span>
+                <span className="text-slate-600">
+                  voting {formatTime(l2.voteStart)} → {formatTime(l2.voteEnd)}
                 </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Veto L2 gas per pubdata byte limit:</span>
-                <span className="w-1/2 break-words text-right">
-                  {hexToBigInt(proposal.txRequestL2GasPerPubdataByteLimit).toString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Veto Refund Recipient:</span>
-                <span className="w-1/2 break-words text-right">
-                  {proposal.txRequestRefundRecipient}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Veto Transaction Mint Value:</span>
-                <span className="w-1/2 break-words text-right">
-                  {hexToBigInt(proposal.txRequestTxMintValue).toString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Veto Transaction To:</span>
-                <span className="w-1/2 break-words text-right">{proposal.txRequestTo}</span>
-              </div>
-              {proposal.transactionHash && (
-                <div className="flex justify-between">
-                  <span>Transaction Hash:</span>
-                  <div className="flex flex-1 flex-col items-end space-y-1">
-                    <TxLink hash={proposal.transactionHash} url={transactionUrl} />
-                    <TxStatus hash={proposal.transactionHash} />
-                  </div>
-                </div>
-              )}
-              {proposalArchived && (
-                <ProposalArchivedCard
-                  archivedBy={proposal.archivedBy ?? ""}
-                  archivedOn={new Date(proposal.archivedOn ?? 0)}
-                  archivedReason={proposal.archivedReason ?? ""}
-                />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pt-7">
-            <p className="text-red-500">{proposalArchived ? "Archived" : "\u00A0"}</p>
-            <CardTitle>Veto Status</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-1">
-            {proposal.status === "ACTIVE" && (
-              <VotingStatusIndicator
-                className="flex-1"
-                role="guardian"
-                signatures={signatures.length}
-                necessarySignatures={necessarySignatures}
-                signers={signatures.map((s) => s.signer)}
-              />
-            )}
-            {proposal.status === "DONE" && (
-              <div className="flex flex-1 flex-col items-center justify-center space-y-2">
-                <CircleCheckBig className="h-16 w-16 stroke-green-500" />
-                <p>Executed</p>
-              </div>
-            )}
-            {proposal.status === "NONCE_TOO_LOW" && (
-              <div className="flex flex-1 flex-col items-center justify-center space-y-2">
-                <CircleX className="h-16 w-16 stroke-red-500" />
-                <p>Nonce too low.</p>
-              </div>
-            )}
-            {proposal.status === "L2_PROPOSAL_EXPIRED" && (
-              <div className="flex flex-1 flex-col items-center justify-center space-y-2">
-                <CircleX className="h-16 w-16 stroke-red-500" />
-                <p>Proposal expired in l2</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <SignActionsCard role={user.role} enabledRoles={["guardian", "zkAdmin"]}>
-          {user.role === "guardian" && (
-            <SignCancellationButton
-              contractAddress={guardiansAddress}
-              proposalId={proposal.id}
-              nonce={proposal.nonce}
-              externalId={proposal.externalId}
-              l2GasLimit={proposal.txRequestGasLimit}
-              l2GasPerPubdataByteLimit={proposal.txRequestL2GasPerPubdataByteLimit}
-              l2GovernorAddress={proposal.txRequestTo}
-              refundRecipient={proposal.txRequestRefundRecipient}
-              txMintValue={proposal.txRequestTxMintValue}
-              disabled={signDisabled}
+                {governance.network.tallyUrl && (
+                  <ExternalAnchor
+                    href={`${governance.network.tallyUrl}/proposal/${p.l2ProposalId}`}
+                  >
+                    Tally
+                  </ExternalAnchor>
+                )}
+              </span>
+            ) : (
+              <span className="text-amber-700">Not found on ZKsync Era</span>
+            ),
+          },
+          {
+            label: "L1 → L2 transaction",
+            value: `gas limit ${p.l2GasLimit} · ${p.l2GasPerPubdataByteLimit} gas per pubdata byte`,
+          },
+          { label: "Mint value (sent with the L1 transaction)", value: formatEth(p.txMintValue) },
+          {
+            label: "Refund recipient on L2",
+            value: <AddressLink address={p.refundRecipient} l2 />,
+          },
+          {
+            label: "Nonce",
+            value: `${p.nonce} (Guardians' next is ${governance.guardians.nonce})`,
+          },
+        ]}
+      />
+      <Section
+        title="The proposal being cancelled"
+        description="From the governor's ProposalCreated event on ZKsync Era. Guardians sign only its id; the content is checked against it."
+      >
+        {l2 ? (
+          <div className="space-y-4">
+            <Facts
+              items={[
+                {
+                  label: "Content matches the signed id",
+                  value: (
+                    <span className="flex flex-col gap-0.5">
+                      <Check ok={l2.idMatchesLocal}>hashL2Proposal recomputed here</Check>
+                      <Check ok={l2.idMatchesContract}>Guardians.hashL2Proposal on L1</Check>
+                    </span>
+                  ),
+                  testId: "id-check",
+                },
+                { label: "Proposer", value: <AddressLink address={l2.proposer} l2 /> },
+                { label: "Created in", value: <TxLink hash={l2.createdTx} l2 /> },
+              ]}
             />
-          )}
-          {user.role === "zkAdmin" && (
-            <ZkAdminArchiveProposal
-              proposalId={BigInt(proposal.id)}
-              proposalType="ArchiveL2CancellationProposal"
-              disabled={proposalArchived}
-            />
-          )}
-        </SignActionsCard>
-        <ExecuteActionsCard>
-          {proposal.status === "ACTIVE" && (
-            <>
-              <ExecL2VetoForm
-                proposalId={proposal.id}
-                guardiansAddress={guardiansAddress}
-                signatures={signatures}
-                threshold={necessarySignatures}
-                proposal={proposal}
-                disabled={execDisabled}
-                calls={calls}
-              >
-                Execute Veto
-              </ExecL2VetoForm>
-
-              {!isExactNonce && (
-                <p className="text-red-500 text-s">
-                  Veto nonce does not match contract's nonce. A veto with a lower nonce may have to
-                  be executed first.
-                </p>
+            <CallList
+              calls={l2.targets.map((target, i) =>
+                decodeCall({ target, value: l2.values[i] ?? "0", data: l2.calldatas[i] ?? "0x" })
               )}
-            </>
-          )}
-        </ExecuteActionsCard>
-      </div>
-
-      <Tabs className="mt-4 flex" defaultValue="raw-data">
-        <TabsList className="mt-12 mr-6">
-          <TabsTrigger value="raw-data">L2 Calls</TabsTrigger>
-        </TabsList>
-        <TabsContent value="raw-data" className="w-full">
-          <Card className="pb-8">
-            <CardHeader>
-              <CardTitle>L2 Calls</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <CallsRawData calls={calls} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            />
+            <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
+              <summary className="cursor-pointer font-medium text-slate-950">
+                Full description
+              </summary>
+              <pre className="mt-3 whitespace-pre-wrap text-slate-950">{l2.description}</pre>
+            </details>
+          </div>
+        ) : (
+          <EmptyState>
+            The L2 proposal could not be read, so the veto cannot be executed from here yet.
+          </EmptyState>
+        )}
+      </Section>
+      <SignatureSetCard
+        testId="set-veto"
+        title="Guardian signatures"
+        set={d.set}
+        state={d.state}
+        execution={d.execution}
+        executionToLabel="Guardians"
+      />
     </div>
   );
 }

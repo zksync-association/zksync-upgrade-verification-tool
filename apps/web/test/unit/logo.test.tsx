@@ -5,7 +5,7 @@ import "@testing-library/jest-dom";
 describe("Logo component", () => {
   it("renders the logo image", () => {
     render(<Logo />);
-    const logoImage = screen.getByAltText("Zksync Logo");
+    const logoImage = screen.getByAltText("ZKsync");
     expect(logoImage).toBeInTheDocument();
     expect(logoImage).toHaveAttribute("src", expect.stringContaining("zksync"));
   });
@@ -13,7 +13,7 @@ describe("Logo component", () => {
   it("applies custom className when provided", () => {
     const customClass = "custom-logo-class";
     render(<Logo className={customClass} />);
-    const logoImage = screen.getByAltText("Zksync Logo");
+    const logoImage = screen.getByAltText("ZKsync");
     expect(logoImage).toHaveClass(customClass);
   });
 });

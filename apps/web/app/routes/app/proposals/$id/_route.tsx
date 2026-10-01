@@ -1,395 +1,245 @@
-import { getProposalByExternalId } from "@/.server/db/dto/proposals";
-import { getSignaturesByExternalProposalId } from "@/.server/db/dto/signatures";
-import { calculateStatusPendingDays } from "@/.server/service/proposal-times";
-import { getLatestL1BlockTimestamp } from "@/.server/service/ethereum-l1/client";
-import { SIGNATURE_FACTORIES } from "@/.server/service/signatures";
-import HeaderWithBackButton from "@/components/proposal-header-with-back-button";
-import TxLink from "@/components/tx-link";
-import TxStatus from "@/components/tx-status";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Loading from "@/components/ui/loading";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import VotingStatusIndicator from "@/components/voting-status-indicator";
-import ContractWriteButton from "@/routes/app/proposals/$id/contract-write-button";
-import ExecuteUpgradeButton from "@/routes/app/proposals/$id/execute-upgrade-button";
-import ProposalState from "@/routes/app/proposals/$id/proposal-state";
-import { RawStandardUpgrade } from "@/routes/app/proposals/$id/raw-standard-upgrade";
-import { displayBytes32 } from "@/utils/common-tables";
-import { compareHexValues } from "@/utils/compare-hex-values";
-import { formatDateTime } from "@/utils/date";
-import { notFound } from "@/utils/http";
-import { PROPOSAL_STATES } from "@/utils/proposal-states";
-import { env } from "@config/env.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { defer, json } from "@remix-run/node";
-import { Await, useLoaderData } from "@remix-run/react";
-import { hexSchema } from "@repo/common/schemas";
-import { Suspense } from "react";
-import { type Hex, isAddressEqual, zeroAddress } from "viem";
-import { z } from "zod";
-import { getFormDataOrThrow, extractFromParams } from "@/utils/read-from-request";
-import { ApproveSignButton } from "@/routes/app/proposals/$id/approve-sign-button";
-import { ExtendVetoButton } from "@/routes/app/proposals/$id/extend-veto-button";
-import { requireUserFromRequest } from "@/utils/auth-headers";
-import useUser from "@/components/hooks/use-user";
-import { chooseByRole } from "@/common/user-role-schema";
-import {
-  getUpgradeState,
-  getUpgradeStatus,
-  guardiansAddress,
-  securityCouncilAddress,
-} from "@/.server/service/ethereum-l1/contracts/protocol-upgrade-handler";
-import { EthereumConfig } from "@config/ethereum.server";
+import { type StandardUpgradeDetail, getStandardUpgrade } from "@/.server/flows/standard";
+import { parseId } from "@/.server/params";
+import { suppliedSignatures } from "@/.server/request";
+import { UPGRADE_STATES } from "@/common/upgrade-states";
+import { useStatus } from "@/components/app-shell";
+import { AddressLink, ExternalAnchor, Hash, TxLink } from "@/components/hex";
+import { Check, EmptyState, Facts, LoadingCard, PageHeader, Section } from "@/components/page";
+import { CallList } from "@/components/verification/calls";
+import { ExecutionPanel } from "@/components/verification/execution-panel";
+import { SignatureSetCard } from "@/components/verification/signature-set";
+import { UpgradeStateBadge } from "@/components/verification/badges";
+import { Timeline } from "@/components/verification/timeline";
+import { UpgradeFile } from "@/components/verification/upgrade-file";
+import { formatTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
-import SignActionsCard from "@/components/proposal-components/sign-actions-card";
-import ExecuteActionsCard from "@/components/proposal-components/execute-actions-card";
-import { decodeProposalSerializable } from "@/utils/decode-proposal";
-import TallyLink from "@/components/tally-link";
+import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
+import { Await, Link, useAsyncError, useLoaderData } from "@remix-run/react";
+import { Suspense } from "react";
+import { $path } from "remix-routes";
+import { zeroAddress } from "viem";
 
 export const meta = Meta["/app/proposals/:id"];
 
-export async function loader({ request, params: remixParams }: LoaderFunctionArgs) {
-  const user = requireUserFromRequest(request);
-
-  const { id } = extractFromParams(remixParams, z.object({ id: hexSchema }), notFound());
-
-  // Id is external_id coming from the smart contract
-  const proposal = await getProposalByExternalId(id);
-  if (!proposal) {
-    throw notFound();
-  }
-
-  const getAsyncData = async () => {
-    const [guardians, council, proposalStatus, signatures, proposalData] = await Promise.all([
-      guardiansAddress(),
-      securityCouncilAddress(),
-      getUpgradeState(id),
-      getSignaturesByExternalProposalId(id),
-      getUpgradeStatus(id),
-    ]);
-    const upgradeHandler = env.UPGRADE_HANDLER_ADDRESS;
-
-    return {
-      proposal: {
-        proposedOn: proposal.proposedOn,
-        executor: proposal.executor,
-        status: proposalStatus,
-        statusTimes: calculateStatusPendingDays(
-          proposalStatus,
-          proposalData.creationTimestamp,
-          proposalData.guardiansExtendedLegalVeto,
-          Number(await getLatestL1BlockTimestamp())
-        ),
-        extendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
-        approvedByGuardians: proposalData.guardiansApproval,
-        approvedByCouncil: proposalData.securityCouncilApprovalTimestamp !== 0,
-        guardiansApproval: proposalData.guardiansApproval,
-        guardiansExtendedLegalVeto: proposalData.guardiansExtendedLegalVeto,
-        raw: proposal.calldata,
-        signatures: {
-          extendLegalVetoPeriod: signatures
-            .filter((signature) => signature.action === "ExtendLegalVetoPeriod")
-            .sort((a, b) => compareHexValues(a.signer, b.signer)),
-          approveUpgradeGuardians: signatures
-            .filter((signature) => signature.action === "ApproveUpgradeGuardians")
-            .sort((a, b) => compareHexValues(a.signer, b.signer)),
-          approveUpgradeSecurityCouncil: signatures
-            .filter((signature) => signature.action === "ApproveUpgradeSecurityCouncil")
-            .sort((a, b) => compareHexValues(a.signer, b.signer)),
-        },
-        transactionHash: proposal.transactionHash,
-        l2ProposalId: proposal.l2ProposalId,
-      },
-      addresses: {
-        guardians,
-        council,
-        upgradeHandler,
-      },
-      userSignedProposal: signatures
-        .filter((s) =>
-          user.role === "guardian"
-            ? s.action === "ApproveUpgradeGuardians"
-            : s.action === "ApproveUpgradeSecurityCouncil"
-        )
-        .some((s) => isAddressEqual(s.signer as Hex, user.address as Hex)),
-      userSignedLegalVeto: signatures
-        .filter((s) => s.action === "ExtendLegalVetoPeriod")
-        .some((s) => isAddressEqual(s.signer as Hex, user.address as Hex)),
-    };
-  };
-
-  return defer({
-    proposalId: proposal.externalId as Hex,
-    tallyBaseUrl: env.TALLY_BASE_URL,
-    asyncData: getAsyncData(),
-    transactionUrl: proposal.transactionHash
-      ? EthereumConfig.getTransactionUrl(proposal.transactionHash)
-      : "",
-  });
+export function loader({ params, request }: LoaderFunctionArgs) {
+  const id = parseId(params.id);
+  return defer({ id, detail: getStandardUpgrade(id, { supplied: suppliedSignatures(request) }) });
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  const user = requireUserFromRequest(request);
-  const data = await getFormDataOrThrow(request, {
-    signature: hexSchema,
-    proposalId: hexSchema,
-    intent: z.enum(["approve", "extendVeto"], { message: "Unknown intent" }),
-  });
-
-  if (data.intent === "approve") {
-    await SIGNATURE_FACTORIES.regularUpgrade(data.proposalId, user.address, data.signature);
-  }
-
-  if (data.intent === "extendVeto") {
-    await SIGNATURE_FACTORIES.extendVetoPeriod(data.proposalId, user.address, data.signature);
-  }
-
-  return json({ ok: true });
-}
-
-const NECESSARY_SECURITY_COUNCIL_SIGNATURES = 6;
-const NECESSARY_GUARDIAN_SIGNATURES = 5;
-const NECESSARY_LEGAL_VETO_SIGNATURES = 2;
-
-export default function Proposals() {
-  const { asyncData, proposalId, transactionUrl, tallyBaseUrl } = useLoaderData<typeof loader>();
-  const user = useUser();
-
+export default function UpgradePage() {
+  const { id, detail } = useLoaderData<typeof loader>();
   return (
-    <div className="flex flex-1 flex-col">
-      <HeaderWithBackButton>Upgrade {displayBytes32(proposalId)}</HeaderWithBackButton>
-      <div className="flex flex-1 flex-col space-y-4">
-        <Suspense
-          fallback={
-            <div className="flex flex-1 flex-col items-center justify-center space-y-6">
-              <Loading />
-              <h2>Loading proposal...</h2>
-            </div>
-          }
-        >
-          <Await resolve={asyncData}>
-            {({ addresses, proposal, userSignedLegalVeto, userSignedProposal }) => {
-              const securityCouncilSignaturesReached =
-                proposal.signatures.approveUpgradeSecurityCouncil.length >=
-                NECESSARY_SECURITY_COUNCIL_SIGNATURES;
-              const guardiansSignaturesReached =
-                proposal.signatures.approveUpgradeGuardians.length >= NECESSARY_GUARDIAN_SIGNATURES;
-
-              const signProposalEnabled =
-                !userSignedProposal &&
-                [PROPOSAL_STATES.LegalVetoPeriod, PROPOSAL_STATES.Waiting].includes(
-                  proposal.status
-                ) &&
-                (user.role === "guardian" ? !proposal.guardiansApproval : true);
-              const signLegalVetoEnabled =
-                !userSignedLegalVeto &&
-                !proposal.guardiansExtendedLegalVeto &&
-                proposal.status === PROPOSAL_STATES.LegalVetoPeriod &&
-                user.role === "guardian";
-
-              const executeSecurityCouncilApprovalEnabled =
-                proposal.status === PROPOSAL_STATES.Waiting && securityCouncilSignaturesReached;
-              const executeGuardiansApprovalEnabled =
-                !proposal.guardiansApproval &&
-                proposal.status === PROPOSAL_STATES.Waiting &&
-                guardiansSignaturesReached;
-              const executeLegalVetoExtensionEnabled =
-                !proposal.extendedLegalVeto && proposal.status === PROPOSAL_STATES.LegalVetoPeriod;
-              const executeProposalEnabled =
-                proposal.status === PROPOSAL_STATES.Ready &&
-                (isAddressEqual(proposal.executor as Hex, user.address as Hex) ||
-                  isAddressEqual(proposal.executor as Hex, zeroAddress));
-
-              const signAddress = chooseByRole(
-                user.role,
-                () => addresses.guardians,
-                () => addresses.council,
-                () => {
-                  throw new Error(`Role "${user.role}" cannot sign`);
-                }
-              );
-
-              return (
-                <>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <Card data-testid="proposal-details-card">
-                      <CardHeader>
-                        <CardTitle>Upgrade Details</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-6">
-                          <div className="flex justify-between">
-                            <span>Upgrade ID:</span>
-                            <span className="w-1/2 justify-end break-words">{proposalId}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Tally ID:</span>
-                            {proposal.l2ProposalId ? (
-                              <TallyLink
-                                l2ProposalId={proposal.l2ProposalId}
-                                baseUrl={tallyBaseUrl}
-                              />
-                            ) : (
-                              <span>Not available</span>
-                            )}
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Proposed On:</span>
-                            <span>{formatDateTime(proposal.proposedOn)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Executor:</span>
-                            <span className="w-1/2 break-words text-right">
-                              {isAddressEqual(proposal.executor as `0x${string}`, zeroAddress)
-                                ? "Anyone"
-                                : proposal.executor}
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between">
-                            <span>Transaction hash:</span>
-                            <div className="flex flex-1 flex-col items-end space-y-1">
-                              <TxLink hash={proposal.transactionHash} url={transactionUrl} />
-                              <TxStatus hash={proposal.transactionHash} />
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader className="pt-7">
-                        <ProposalState status={proposal.status} times={proposal.statusTimes} />
-                        <CardTitle>Approval Status</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-5">
-                          <VotingStatusIndicator
-                            label="Extend Legal Veto Approvals"
-                            role="guardian"
-                            signatures={proposal.signatures.extendLegalVetoPeriod.length}
-                            necessarySignatures={NECESSARY_LEGAL_VETO_SIGNATURES}
-                            data-testid="legal-veto-signature-count"
-                            signers={proposal.signatures.extendLegalVetoPeriod.map((s) => s.signer)}
-                          />
-                          <VotingStatusIndicator
-                            role="securityCouncil"
-                            signatures={proposal.signatures.approveUpgradeSecurityCouncil.length}
-                            necessarySignatures={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
-                            signers={proposal.signatures.approveUpgradeSecurityCouncil.map(
-                              (s) => s.signer
-                            )}
-                          />
-                          <VotingStatusIndicator
-                            role="guardian"
-                            signatures={proposal.signatures.approveUpgradeGuardians.length}
-                            necessarySignatures={NECESSARY_GUARDIAN_SIGNATURES}
-                            signers={proposal.signatures.approveUpgradeGuardians.map(
-                              (s) => s.signer
-                            )}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <SignActionsCard
-                      role={user.role}
-                      enabledRoles={["guardian", "securityCouncil"]}
-                    >
-                      {user.role === "guardian" && (
-                        <ExtendVetoButton
-                          proposalId={proposalId}
-                          contractAddress={addresses.guardians}
-                          disabled={!signLegalVetoEnabled}
-                        />
-                      )}
-                      {(user.role === "guardian" || user.role === "securityCouncil") && (
-                        <ApproveSignButton
-                          proposalId={proposalId}
-                          role={user.role}
-                          contractAddress={signAddress()}
-                          disabled={!signProposalEnabled}
-                        />
-                      )}
-                    </SignActionsCard>
-                    <ExecuteActionsCard>
-                      <ContractWriteButton
-                        target={addresses.guardians}
-                        signatures={proposal.signatures.extendLegalVetoPeriod}
-                        proposalId={proposalId}
-                        functionName={"extendLegalVeto"}
-                        abiName="guardians"
-                        threshold={NECESSARY_LEGAL_VETO_SIGNATURES}
-                        disabled={!executeLegalVetoExtensionEnabled}
-                      >
-                        Execute legal veto extension
-                      </ContractWriteButton>
-                      <ContractWriteButton
-                        target={addresses.council}
-                        signatures={proposal.signatures.approveUpgradeSecurityCouncil}
-                        proposalId={proposalId}
-                        functionName={"approveUpgradeSecurityCouncil"}
-                        abiName="council"
-                        threshold={NECESSARY_SECURITY_COUNCIL_SIGNATURES}
-                        disabled={!executeSecurityCouncilApprovalEnabled}
-                      >
-                        Execute security council approval
-                      </ContractWriteButton>
-                      <ContractWriteButton
-                        target={addresses.guardians}
-                        signatures={proposal.signatures.approveUpgradeGuardians}
-                        proposalId={proposalId}
-                        functionName={"approveUpgradeGuardians"}
-                        abiName="guardians"
-                        threshold={NECESSARY_GUARDIAN_SIGNATURES}
-                        disabled={!executeGuardiansApprovalEnabled}
-                      >
-                        Execute guardian approval
-                      </ContractWriteButton>
-                      <ExecuteUpgradeButton
-                        target={addresses.upgradeHandler}
-                        proposalCalldata={proposal.raw}
-                        disabled={!executeProposalEnabled}
-                      >
-                        Execute upgrade
-                      </ExecuteUpgradeButton>
-                    </ExecuteActionsCard>
-                  </div>
-                  <div className="pt-4">
-                    <h2 className="font-bold text-3xl">Upgrade Analysis</h2>
-                    <Tabs className="mt-4 flex" defaultValue="raw-data">
-                      <TabsList className="mt-12 mr-6">
-                        <TabsTrigger value="raw-data">Raw Data</TabsTrigger>
-                        <TabsTrigger value="json">JSON</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="raw-data" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>Raw Data</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <RawStandardUpgrade encoded={proposal.raw} />
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                      <TabsContent value="json" className="w-full">
-                        <Card className="pb-8">
-                          <CardHeader>
-                            <CardTitle>JSON</CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-4">
-                            <pre className="text-wrap break-words">
-                              {JSON.stringify(decodeProposalSerializable(proposal.raw), null, 2)}
-                            </pre>
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-                    </Tabs>
-                  </div>
-                </>
-              );
-            }}
-          </Await>
-        </Suspense>
-      </div>
+    <div>
+      <Suspense
+        fallback={
+          <>
+            <PageHeader
+              back={{ to: $path("/app/proposals"), label: "Upgrades" }}
+              eyebrow="Protocol upgrade"
+              title="Upgrade"
+              id={id}
+            />
+            <LoadingCard label="Reading the upgrade and checking every member's signature on-chain…" />
+          </>
+        }
+      >
+        <Await resolve={detail} errorElement={<DetailError id={id} />}>
+          {(d) => <Detail detail={d} />}
+        </Await>
+      </Suspense>
     </div>
   );
+}
+
+function DetailError({ id }: { id: string }) {
+  const error = useAsyncError() as Error;
+  const notFound = error?.message?.includes("no standard upgrade");
+  return (
+    <>
+      <PageHeader
+        back={{ to: $path("/app/proposals"), label: "Upgrades" }}
+        eyebrow="Protocol upgrade"
+        title="Upgrade"
+        id={id}
+      />
+      <EmptyState>
+        {notFound ? (
+          <>
+            The ProtocolUpgradeHandler has no standard upgrade with this id.{" "}
+            <Link
+              className="text-brand-600 hover:underline"
+              to={$path("/app/emergency/:id", { id })}
+            >
+              Open it as an emergency upgrade
+            </Link>
+            .
+          </>
+        ) : (
+          <span className="text-red-700">{error?.message ?? "Failed to load"}</span>
+        )}
+      </EmptyState>
+    </>
+  );
+}
+
+function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeDetail> }) {
+  const { governance } = useStatus();
+  const labels = {
+    [governance.upgradeHandler.toLowerCase()]: "ProtocolUpgradeHandler",
+    [governance.securityCouncil.address.toLowerCase()]: "SecurityCouncil",
+    [governance.guardians.address.toLowerCase()]: "Guardians",
+    [governance.emergencyUpgradeBoard.address.toLowerCase()]: "EmergencyUpgradeBoard",
+  };
+  const now = Number(governance.latestBlock.timestamp);
+  const anyone = d.started.proposal.executor.toLowerCase() === zeroAddress;
+
+  return (
+    <div className="space-y-10">
+      <PageHeader
+        back={{ to: $path("/app/proposals"), label: "Upgrades" }}
+        eyebrow="Protocol upgrade"
+        title="Upgrade"
+        badges={<UpgradeStateBadge state={d.state} />}
+        id={d.id}
+      />
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
+        <Facts
+          items={[
+            {
+              label: "Started",
+              value: (
+                <span className="space-x-2">
+                  <span>{formatTime(d.status.creationTimestamp)}</span>
+                  <TxLink hash={d.started.txHash} />
+                </span>
+              ),
+            },
+            {
+              label: "Executor",
+              value: anyone ? "Anyone" : <AddressLink address={d.started.proposal.executor} />,
+            },
+            { label: "Salt", value: <Hash value={d.started.proposal.salt} /> },
+            {
+              label: "L2 vote",
+              value: d.l2Proposal ? (
+                <span className="space-x-2">
+                  <span className="mono">
+                    ZkProtocolGovernor #{shortId(d.l2Proposal.proposalId)}
+                  </span>
+                  {governance.network.tallyUrl && (
+                    <ExternalAnchor
+                      href={`${governance.network.tallyUrl}/proposal/${d.l2Proposal.proposalId}`}
+                    >
+                      Tally
+                    </ExternalAnchor>
+                  )}
+                </span>
+              ) : (
+                <span className="text-slate-600">Not found on ZKsync Era</span>
+              ),
+            },
+            {
+              label: "Content matches the id",
+              value: (
+                <Check ok={d.started.idMatches}>
+                  keccak256(abi.encode(calls, executor, salt)) {d.started.idMatches ? "=" : "≠"} id
+                </Check>
+              ),
+              testId: "id-check",
+            },
+            {
+              label: "Executed",
+              value: d.executedTx ? (
+                <TxLink hash={d.executedTx} />
+              ) : (
+                <span className="text-slate-600">Not yet</span>
+              ),
+            },
+          ]}
+        />
+        <Timeline
+          now={now}
+          steps={[
+            { label: "Started on L1", at: d.timeline.createdAt, done: true },
+            {
+              label: d.status.guardiansExtendedLegalVeto
+                ? "Legal veto (extended to 7 days)"
+                : "Legal veto period",
+              at: d.timeline.legalVetoEndsAt,
+              done: now >= d.timeline.legalVetoEndsAt,
+              current: d.state === UPGRADE_STATES.LegalVetoPeriod,
+            },
+            {
+              label: d.timeline.approvedAt
+                ? "Approved by the Security Council"
+                : "Waiting for approval (30 days)",
+              at: d.timeline.approvedAt ?? d.timeline.waitingEndsAt,
+              done: d.timeline.approvedAt !== null || d.status.guardiansApproval,
+              current: d.state === UPGRADE_STATES.Waiting,
+              failed: d.state === UPGRADE_STATES.Expired,
+            },
+            {
+              label: "Ready to execute",
+              at: d.timeline.readyAt,
+              done: d.state === UPGRADE_STATES.Ready || d.state === UPGRADE_STATES.Done,
+              current:
+                d.state === UPGRADE_STATES.ExecutionPending || d.state === UPGRADE_STATES.Ready,
+            },
+            { label: "Executed", at: null, done: d.state === UPGRADE_STATES.Done },
+          ]}
+        />
+      </div>
+
+      <Section
+        title={`What the upgrade does · ${d.calls.length} call${d.calls.length === 1 ? "" : "s"}`}
+        description="Decoded from the UpgradeStarted event. The handler executes these calls in order when the upgrade runs."
+      >
+        <CallList calls={d.calls} labels={labels} />
+        <UpgradeFile proposal={d.started.proposal} name={`upgrade-${d.id.slice(0, 10)}`} />
+      </Section>
+
+      <Section
+        title="Approvals"
+        description="Each member is a Safe. Its signature is looked up in the Safe Transaction Service by the hash this page computes, and counted only if the contract accepts it."
+      >
+        <div className="space-y-6">
+          {d.sets.map((s) => (
+            <SignatureSetCard
+              key={s.key}
+              testId={`set-${s.key}`}
+              title={s.title}
+              set={s.set}
+              state={s.state}
+              execution={s.execution}
+              executionToLabel={s.key === "securityCouncil" ? "SecurityCouncil" : "Guardians"}
+              used={s.used}
+              historical={s.historical}
+            />
+          ))}
+        </div>
+      </Section>
+
+      {d.execute && (
+        <Section
+          title="Execute the upgrade"
+          description="Ready: the handler accepts execute(proposal) from the executor."
+        >
+          <ExecutionPanel
+            execution={d.execute}
+            toLabel="ProtocolUpgradeHandler"
+            note={
+              anyone
+                ? "Anyone can execute this upgrade."
+                : "Only the executor can execute this upgrade."
+            }
+          />
+        </Section>
+      )}
+    </div>
+  );
+}
+
+function shortId(id: string) {
+  return id.length > 14 ? `${id.slice(0, 6)}…${id.slice(-6)}` : id;
 }

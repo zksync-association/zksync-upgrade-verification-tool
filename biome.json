@@ -16,11 +16,9 @@
       "*.md"
     ],
     "ignore": [
-      "apps/web/drizzle",
-      "e2e/contracts/zk-gov",
-      "packages/contracts/src/zk-gov",
-      "packages/contracts/src/zk-gov-preprocessed",
-      "packages/e2e/playwright-report"
+      "packages/e2e/playwright-report",
+      "packages/e2e/test-results",
+      "apps/web/test/fixtures"
     ]
   },
   "organizeImports": {

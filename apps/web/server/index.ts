@@ -7,17 +7,13 @@ import compression from "compression";
 import express, { type RequestHandler, type Request, type Response } from "express";
 import getPort, { portNumbers } from "get-port";
 
-import { testDbConnection } from "@/.server/db";
 import { env } from "@config/env.server";
-import { auth } from "@server/middlewares/auth";
 import { cspNonce } from "@server/middlewares/csp-nonce";
-import { protectPrivateRoutes } from "@server/middlewares/protect-private-routes";
 import { patchBigintToJSON } from "@server/utils/bigint";
 import { logger } from "./middlewares/logger";
 import { rateLimit } from "./middlewares/rate-limit";
 import { removeTrailingSlash } from "./middlewares/remove-trailing-slash";
 import { requireHttps } from "./middlewares/require-https";
-import { validateHandlerAddress } from "@/.server/service/ethereum-l1/client";
 
 patchBigintToJSON();
 
@@ -59,8 +55,6 @@ app.get(["/img/*", "/favicons/*"], (_req, res) => {
 });
 
 app.use(logger);
-app.use(protectPrivateRoutes);
-app.use(auth);
 app.use(cspNonce);
 app.use(rateLimit);
 
@@ -103,10 +97,30 @@ if (!portAvailable && env.NODE_ENV !== "development") {
   process.exit(1);
 }
 
+// Fail fast with a readable message instead of on the first page load.
+async function checkRpc() {
+  const response = await fetch(env.L1_RPC_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
+  });
+  const body = (await response.json()) as { result?: string; error?: { message: string } };
+  if (!body.result)
+    throw new Error(`L1_RPC_URL answered eth_chainId with ${JSON.stringify(body.error ?? body)}`);
+  const chainId = Number(body.result);
+  const known = chainId === 1 ? "Ethereum mainnet" : chainId === 11155111 ? "Sepolia" : null;
+  if (!known && !env.UPGRADE_HANDLER_ADDRESS) {
+    throw new Error(
+      `L1_RPC_URL is on chain ${chainId}. Use a mainnet or Sepolia RPC, or set UPGRADE_HANDLER_ADDRESS.`
+    );
+  }
+  return known ?? `chain ${chainId}`;
+}
+
 async function startServer() {
   try {
-    await testDbConnection();
-    await validateHandlerAddress();
+    const chain = await checkRpc();
+    console.log(`Reading governance from ${chain} through L1_RPC_URL.`);
 
     const server = app.listen(portToUse, () => {
       if (!portAvailable) {

@@ -28,11 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SKIP_ENV_VALIDATION: true
-      DATABASE_URL: postgresql://user:password@localhost:5432/webapp
     steps:
       - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
-        with:
-          submodules: recursive
       - uses: actions/cache@v4
         with:
           path: .turbo
@@ -49,6 +46,4 @@ jobs:
         with:
           version: nightly
       - run: pnpm install
-      - run: |
-          cp packages/contracts/.env.example packages/contracts/.env
       - run: pnpm test
