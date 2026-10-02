@@ -3,31 +3,32 @@ import type * as React from "react";
 
 import { cn } from "@/utils/cn";
 
+// Status colors from the ZKsync web-app guide: success / warning / error / info / neutral.
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 font-medium text-xs leading-5 [&_svg]:size-3.5",
   {
     variants: {
       variant: {
-        default: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
-        secondary:
-          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        destructive:
-          "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
-        outline: "text-foreground",
+        neutral: "border-slate-200 bg-slate-50 text-slate-700",
+        success: "border-green-200 bg-green-50 text-green-700",
+        warning: "border-amber-200 bg-amber-50 text-amber-700",
+        error: "border-red-200 bg-red-50 text-red-700",
+        info: "border-brand-100 bg-brand-50 text-brand-600",
+        navy: "border-navy-100 bg-navy-50 text-navy-800",
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "neutral",
     },
   }
 );
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof badgeVariants> {}
 
 function Badge({ className, variant, ...props }: BadgeProps) {
-  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
+  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
 }
 
 export { Badge, badgeVariants };

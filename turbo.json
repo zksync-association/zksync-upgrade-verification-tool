@@ -6,16 +6,10 @@
       "outputs": ["dist/**", "build/**", "server-build/**"]
     },
     "typecheck": {},
-    "@repo/contracts#typecheck": {
-      "dependsOn": ["@repo/contracts#build"]
-    },
-    "@repo/contracts#build": {
-      "cache": false
-    },
     "web#typecheck": {
-      "dependsOn": ["@repo/contracts#build", "web#build"]
+      "dependsOn": ["web#build"]
     },
     "test": {}
   },
-  "globalPassThroughEnv": ["DATABASE_URL", "SKIP_ENV_VALIDATION"]
+  "globalPassThroughEnv": ["SKIP_ENV_VALIDATION"]
 }

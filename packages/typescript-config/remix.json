@@ -6,13 +6,7 @@
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "types": [
-      "@remix-run/node",
-      "vite/client",
-      "vitest/globals",
-      "react",
-      "@vitest/browser/providers/playwright"
-    ],
+    "types": ["@remix-run/node", "vite/client", "vitest/globals", "react"],
     "jsx": "react-jsx",
     "noEmit": true
   }

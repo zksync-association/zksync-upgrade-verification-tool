@@ -1,1 +1,0 @@
-ALTER TABLE "freeze_proposals" DROP CONSTRAINT "freeze_proposals_external_id_type_unique";

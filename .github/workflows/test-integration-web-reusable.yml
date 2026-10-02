@@ -1,0 +1,32 @@
+name: Workflow template for web integration tests
+on:
+  workflow_call:
+
+env:
+  FORCE_COLOR: 1
+
+# Network-backed, read-only on mainnet: the brief's evidence (test:i) through the app's own code,
+# and every write path against the real contracts on a local anvil fork (test:fork).
+# Optional secrets: L1_RPC_URL / FORK_URL (an archive RPC with logs), SAFE_API_KEY.
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/web
+    env:
+      L1_RPC_URL: ${{ secrets.L1_RPC_URL }}
+      FORK_URL: ${{ secrets.FORK_URL }}
+      SAFE_API_KEY: ${{ secrets.SAFE_API_KEY }}
+    steps:
+      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+      - uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2.4.1
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4.0.4
+        with:
+          node-version: 20
+          cache: "pnpm"
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - run: pnpm install
+      - run: pnpm test:i
+      - run: pnpm test:fork

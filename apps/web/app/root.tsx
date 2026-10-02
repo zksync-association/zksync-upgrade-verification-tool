@@ -1,3 +1,5 @@
+import { appStatus } from "@/.server/status";
+import AppShell, { StatusProblem } from "@/components/app-shell";
 import { GeneralErrorBoundary } from "@/components/error-boundary";
 import { WalletProvider } from "@/components/providers/wallet-provider";
 import { useNonce } from "@/utils/nonce-provider";
@@ -10,53 +12,51 @@ import {
   deserialize as deserializeWagmiCookie,
   parseCookie as parseWagmiCookie,
 } from "wagmi";
-import { Cookies, CookiesProvider } from "react-cookie";
 
 import "@/globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
-import ConnectRedirectProvider from "@/components/providers/connect-redirect-provider";
-import RoleRevalidatorProvider from "./components/providers/role-revalidator-provider";
 
 export const links: LinksFunction = () => [
+  { rel: "preconnect", href: "https://fonts.googleapis.com" },
+  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
   {
     rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap",
+    href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;500&display=swap",
   },
 ];
 
-export function loader({ request }: LoaderFunctionArgs) {
-  // Get wagmi cookie for SSR
+export async function loader({ request }: LoaderFunctionArgs) {
   const cookies = request.headers.get("Cookie");
   const wagmiCookie = cookies ? parseWagmiCookie(cookies, "wagmi.store") : undefined;
-  return json({ env: clientEnv, wagmiCookie, cookies });
+  return json({ env: clientEnv, wagmiCookie, status: await appStatus() });
 }
+
+export type RootLoader = typeof loader;
 
 export default function App() {
   const nonce = useNonce();
-  const { env, wagmiCookie, cookies } = useLoaderData<typeof loader>();
-
-  const walletProviderInitialState = wagmiCookie
+  const { env, wagmiCookie, status } = useLoaderData<typeof loader>();
+  const initialState = wagmiCookie
     ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
     : undefined;
 
   return (
     <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
-      <CookiesProvider cookies={new Cookies(cookies)}>
+      {status.ok ? (
         <WalletProvider
-          initialState={walletProviderInitialState}
+          initialState={initialState}
           projectId={env.WALLET_CONNECT_PROJECT_ID}
-          network={env.ETH_NETWORK}
-          rpcUrl={env.L1_PUBLIC_RPC_URL}
+          safeWalletOrigins={env.SAFE_WALLET_ORIGINS}
+          chainId={status.governance.network.chainId}
+          chainLabel={status.governance.network.label}
         >
-          <RoleRevalidatorProvider>
-            <ConnectRedirectProvider>
-              <div className="flex min-h-screen flex-col px-10 py-10 lg:px-40">
-                <Outlet />
-              </div>
-            </ConnectRedirectProvider>
-          </RoleRevalidatorProvider>
+          <AppShell status={status}>
+            <Outlet />
+          </AppShell>
         </WalletProvider>
-      </CookiesProvider>
+      ) : (
+        <StatusProblem error={status.error} hint={status.hint} />
+      )}
     </Document>
   );
 }
@@ -81,15 +81,13 @@ function Document({
         {allowIndexing ? null : <meta name="robots" content="noindex, nofollow" />}
         <Links />
       </head>
-      <body>
-        <div className="relative mx-auto min-h-screen w-full max-w-[1500px]">{children}</div>
-        <Toaster position="bottom-center" />
+      <body className="min-h-screen bg-slate-50">
+        {children}
+        <Toaster position="bottom-center" toastOptions={{ className: "!rounded-xl !text-sm" }} />
         <script
           nonce={nonce}
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
-          dangerouslySetInnerHTML={{
-            __html: `window.ENV = ${JSON.stringify(env)}`,
-          }}
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: public client env only
+          dangerouslySetInnerHTML={{ __html: `window.ENV = ${JSON.stringify(env)}` }}
           suppressHydrationWarning
         />
         <ScrollRestoration nonce={nonce} />
@@ -101,10 +99,11 @@ function Document({
 
 export function ErrorBoundary() {
   const nonce = useNonce();
-
   return (
     <Document nonce={nonce}>
-      <GeneralErrorBoundary />
+      <div className="mx-auto max-w-3xl px-6 py-24">
+        <GeneralErrorBoundary />
+      </div>
     </Document>
   );
 }

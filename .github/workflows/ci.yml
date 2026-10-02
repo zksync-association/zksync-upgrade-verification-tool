@@ -33,7 +33,6 @@ jobs:
     steps:
       - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
         with:
-          submodules: recursive
           ref: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.commit || github.event.inputs.branch) || github.ref }}
 
       - name: Get changed files
@@ -49,9 +48,8 @@ jobs:
             webapp:
               - 'apps/web/**/*'
               - 'packages/common/**/*'
-              - 'packages/contracts/**/*'
               - 'packages/e2e/**/*'
-              - '!packages/e2e/suits/cli/**/*'
+              - '!packages/e2e/suites/cli/**/*'
               - '!**/*.md'
               - '!**/*.MD'
 
@@ -59,7 +57,7 @@ jobs:
               - 'apps/cli/**/*'
               - 'packages/common/**/*'
               - 'packages/e2e/**/*'
-              - '!packages/e2e/suits/full/**/*'
+              - '!packages/e2e/suites/web/**/*'
               - '!**/*.md'
               - '!**/*.MD'
 
@@ -74,6 +72,13 @@ jobs:
     needs: [changed-files, ci-for-lint]
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changed-files.outputs.all == 'true' }}
     uses: ./.github/workflows/test-reusable.yml
+
+  ci-for-test-integration-web:
+    name: Integration web
+    needs: [changed-files, ci-for-lint, ci-for-test]
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.changed-files.outputs.webapp == 'true' }}
+    uses: ./.github/workflows/test-integration-web-reusable.yml
+    secrets: inherit
 
   ci-for-test-e2e-cli:
     name: Test E2E cli
@@ -96,6 +101,7 @@ jobs:
         changed-files,
         ci-for-lint,
         ci-for-test,
+        ci-for-test-integration-web,
         ci-for-test-e2e-cli,
         ci-for-test-e2e-web,
       ]

@@ -1,134 +1,81 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Loading from "@/components/ui/loading";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { displayBytes32 } from "@/utils/common-tables";
-import { capitalizeFirstLetter } from "@/utils/string";
-
+import { l1 } from "@/.server/rpc";
+import { TxLink } from "@/components/hex";
+import { PageHeader } from "@/components/page";
+import { Card } from "@/components/ui/card";
+import { formatEth } from "@/utils/format";
 import { notFound } from "@/utils/http";
-import { type LoaderFunctionArgs, json } from "@remix-run/node";
-import { useLoaderData, useNavigate } from "@remix-run/react";
-import { hexSchema } from "@repo/common/schemas";
-import { ArrowLeft, CircleCheckBig, CircleX, SquareArrowOutUpRight } from "lucide-react";
-import { formatEther, formatGwei } from "viem";
-import { useWaitForTransactionReceipt } from "wagmi";
-import { z } from "zod";
-import { extractFromParams } from "@/utils/read-from-request";
-import { EthereumConfig } from "@config/ethereum.server";
 import { Meta } from "@/utils/meta";
+import { type LoaderFunctionArgs, json } from "@remix-run/node";
+import { useLoaderData, useRevalidator } from "@remix-run/react";
+import { CheckCircle2, Clock, XCircle } from "lucide-react";
+import { useEffect } from "react";
+import type { Hex } from "viem";
 
 export const meta = Meta["/app/transactions/:hash"];
 
-export function loader(args: LoaderFunctionArgs) {
-  const { hash } = extractFromParams(args.params, z.object({ hash: hexSchema }), notFound());
-  const txUrl = EthereumConfig.getTransactionUrl(hash);
-  return json({ txUrl, hash });
+// Receipt read on the server through the app's RPC, polled until mined.
+export async function loader({ params }: LoaderFunctionArgs) {
+  const hash = params.hash ?? "";
+  if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) throw notFound();
+  const receipt = await l1.getTransactionReceipt({ hash: hash as Hex }).catch(() => null);
+  return json({
+    hash,
+    receipt: receipt && {
+      status: receipt.status,
+      blockNumber: receipt.blockNumber.toString(),
+      from: receipt.from,
+      to: receipt.to,
+      fee: (receipt.gasUsed * receipt.effectiveGasPrice).toString(),
+    },
+  });
 }
 
-export default function Transactions() {
-  const navigate = useNavigate();
-  const { txUrl, hash } = useLoaderData<typeof loader>();
-  const { data, isSuccess, isLoading } = useWaitForTransactionReceipt({ hash });
+export default function Transaction() {
+  const { hash, receipt } = useLoaderData<typeof loader>();
+  const revalidator = useRevalidator();
+  useEffect(() => {
+    if (receipt) return;
+    const timer = setInterval(() => revalidator.state === "idle" && revalidator.revalidate(), 4000);
+    return () => clearInterval(timer);
+  }, [receipt, revalidator]);
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="mb-4 flex items-center pl-2">
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="mr-2 hover:bg-transparent"
-        >
-          <ArrowLeft />
-        </Button>
-        <h2 className="font-semibold">Go back</h2>
-      </div>
-
-      <Card className="flex flex-1 flex-col">
-        <CardHeader>
-          <CardTitle className="flex">
-            Transaction
-            <a
-              href={txUrl}
-              className="ml-2 flex items-center hover:underline"
-              target="_blank"
-              rel="noreferrer"
+    <div className="space-y-6">
+      <PageHeader eyebrow="Transaction" title="Transaction" id={hash} />
+      <Card className="p-6">
+        {!receipt ? (
+          <p className="flex items-center gap-2 text-slate-950">
+            <Clock className="h-5 w-5 text-slate-500" /> Waiting for the transaction to be mined… If
+            you sent it from a Safe, this may be a Safe transaction hash; follow it in Safe{"{"}
+            Wallet{"}"}.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            <p
+              className={`flex items-center gap-2 font-medium ${receipt.status === "success" ? "text-green-700" : "text-red-700"}`}
             >
-              <span>{displayBytes32(hash)}</span>
-              <SquareArrowOutUpRight className="ml-1" width={12} height={12} />
-            </a>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-1 flex-col">
-          {isLoading && (
-            <div className="flex flex-1 flex-col items-center justify-center space-y-8">
-              <Loading className="h-24 w-24" />
-              <h2>Waiting for transaction...</h2>
-            </div>
-          )}
-          {isSuccess && (
-            <div className="flex flex-1 flex-col items-center">
-              <div className="mt-10 flex flex-col items-center space-y-4">
-                {data.status === "success" ? (
-                  <>
-                    <CircleCheckBig className="h-24 w-24 stroke-green-500" />
-                    <h2 className="text-green-400">Transaction successful</h2>
-                  </>
-                ) : (
-                  <>
-                    <CircleX className="h-24 w-24 stroke-red-500" />
-                    <h2 className="text-red-400">Transaction failed</h2>
-                  </>
-                )}
-              </div>
-              <Table className="mt-4">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Detail</TableHead>
-                    <TableHead>Value</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>Transaction Hash</TableCell>
-                    <TableCell data-testid={"transaction-hash"}>{data.transactionHash}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Status</TableCell>
-                    <TableCell>{capitalizeFirstLetter(data.status)}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Block</TableCell>
-                    <TableCell>{data.blockNumber.toString()}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>From</TableCell>
-                    <TableCell>{data.from}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>To</TableCell>
-                    <TableCell>{data.to}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Transaction Fee</TableCell>
-                    <TableCell>{formatEther(data.gasUsed * data.effectiveGasPrice)} ETH</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Gas Price</TableCell>
-                    <TableCell>{formatGwei(data.effectiveGasPrice)} Gwei</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
+              {receipt.status === "success" ? (
+                <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                <XCircle className="h-5 w-5" />
+              )}
+              {receipt.status === "success" ? "Succeeded" : "Reverted"} in block{" "}
+              {receipt.blockNumber}
+            </p>
+            <dl className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-[120px_1fr]">
+              <dt className="text-slate-600">Hash</dt>
+              <dd>
+                <TxLink hash={hash} />
+              </dd>
+              <dt className="text-slate-600">From</dt>
+              <dd className="mono">{receipt.from}</dd>
+              <dt className="text-slate-600">To</dt>
+              <dd className="mono">{receipt.to}</dd>
+              <dt className="text-slate-600">Fee</dt>
+              <dd>{formatEth(receipt.fee)}</dd>
+            </dl>
+          </div>
+        )}
       </Card>
     </div>
   );

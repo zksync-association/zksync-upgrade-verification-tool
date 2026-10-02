@@ -1,1 +1,0 @@
-ALTER TABLE "freeze_proposals" ADD COLUMN "transaction_hash" "bytea";

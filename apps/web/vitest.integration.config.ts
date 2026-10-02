@@ -1,19 +1,19 @@
-import dotenv from "dotenv";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vitest/config";
-dotenv.config({ path: ".env" });
 
+// Integration tests talk to real networks, read-only: mainnet through a public RPC with log
+// history (override with L1_RPC_URL) and the public Safe Transaction Service.
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
-    env: process.env,
     globals: true,
-    poolOptions: {
-      threads: {
-        singleThread: true,
-      },
-    },
-    globalSetup: "./test/setup.integration.ts",
+    environment: "node",
     include: ["test/integration/*.{test,spec}.{ts,tsx}"],
+    testTimeout: 300_000,
+    hookTimeout: 300_000,
+    env: {
+      L1_RPC_URL: process.env.L1_RPC_URL ?? "https://mainnet.gateway.tenderly.co",
+      LOG_LEVEL: "warn",
+    },
   },
 });

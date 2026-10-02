@@ -20,9 +20,45 @@ const config = {
     },
     extend: {
       fontFamily: {
-        sans: ["Inter var", ...defaultTheme.fontFamily.sans],
+        sans: ["Inter", ...defaultTheme.fontFamily.sans],
+        mono: ["JetBrains Mono", ...defaultTheme.fontFamily.mono],
       },
       colors: {
+        // ZKsync palette (see the zksync-visual-style guide). slate has a blue tint on purpose.
+        slate: {
+          25: "#FAFBFC",
+          50: "#F7F9FC",
+          75: "#EFF2F7",
+          100: "#E8ECF2",
+          200: "#DADDE5",
+          300: "#BEC2CC",
+          400: "#A1A7B3",
+          500: "#858C99",
+          600: "#6C7380",
+          700: "#555A66",
+          800: "#3D424D",
+          900: "#262B33",
+          950: "#11141A",
+        },
+        brand: {
+          25: "#F4F5FE",
+          50: "#E8EBFD",
+          100: "#D5D9FB",
+          200: "#B5BCF8",
+          500: "#3A4AE9",
+          600: "#0C18EC",
+          700: "#0914C4",
+        },
+        navy: {
+          50: "#EEF1F6",
+          100: "#DAE2F2",
+          800: "#0A1A66",
+        },
+        sand: {
+          50: "#FFF6E5",
+          600: "#D49A28",
+        },
+        heading: "hsl(var(--heading))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -55,9 +91,6 @@ const config = {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
-        },
-        alternative: {
-          DEFAULT: "hsl(var(--alternative))",
         },
       },
       borderRadius: {
