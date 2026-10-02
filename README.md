@@ -24,9 +24,11 @@ Then open http://localhost:3000. The same build runs in the CI Docker image:
 ## Sign
 
 Signing happens in your own Safe and needs no setup. With the app running, open your member Safe in Safe{Wallet}
-and add `http://localhost:3000` as a custom Safe App (**Apps → My custom apps**). Open it there: it is already
-connected to your Safe. Go to the action and press **Sign**, then compare the hashes on your hardware wallet with
-the ones on the page. Once your Safe's owners have confirmed, the signature appears on the page for everyone,
+and add `http://localhost:3000` as a custom Safe App (**Apps → My custom apps**). When Chrome asks whether
+app.safe.global may access apps on this device, allow it; otherwise Safe{Wallet} reports that the app doesn't
+support Safe Apps. Open it there: it is already connected to your Safe. Go to the action and press **Sign**, then
+compare the hashes on your hardware wallet with the ones on the page (Safe{Wallet} shows the same ones under
+**SafeMessage details**). Once your Safe's owners have confirmed, the signature appears on the page for everyone,
 verified on-chain.
 
 You can also connect your Safe over WalletConnect: start the app with `WALLET_CONNECT_PROJECT_ID` set (free at
