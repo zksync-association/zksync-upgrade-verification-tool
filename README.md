@@ -23,17 +23,22 @@ Then open http://localhost:3000. The same build runs in the CI Docker image:
 
 ## Sign
 
-Signing happens in your own Safe. Start the app with `WALLET_CONNECT_PROJECT_ID` set (free at
-[cloud.reown.com](https://cloud.reown.com)), connect your member Safe from Safe{Wallet} through WalletConnect, open
-the action and press **Sign**. Compare the hashes on your hardware wallet with the ones on the page. Once your
-Safe's owners have confirmed, the signature appears on the page for everyone, verified on-chain.
+Signing happens in your own Safe and needs no setup. With the app running, open your member Safe in Safe{Wallet}
+and add `http://localhost:3000` as a custom Safe App (**Apps → My custom apps**). Open it there: it is already
+connected to your Safe. Go to the action and press **Sign**, then compare the hashes on your hardware wallet with
+the ones on the page. Once your Safe's owners have confirmed, the signature appears on the page for everyone,
+verified on-chain.
+
+You can also connect your Safe over WalletConnect: start the app with `WALLET_CONNECT_PROJECT_ID` set (free at
+[cloud.reown.com](https://cloud.reown.com)).
 
 ## Optional settings
 
 | Variable | Use |
 | --- | --- |
 | `L2_RPC_URL` | ZKsync Era RPC for vetoes and L2 links (default: the public one) |
-| `WALLET_CONNECT_PROJECT_ID` | Enables signing through WalletConnect |
+| `WALLET_CONNECT_PROJECT_ID` | Lets members connect their Safe over WalletConnect |
+| `SAFE_WALLET_ORIGINS` | Safe{Wallet} origins that may open the app as a Safe App (default `https://app.safe.global`) |
 | `SAFE_API_KEY` | Safe API key. Without one, Safe allows 2 requests/s and 5,000 a month per IP: enough for one signer, not for a hosted instance |
 | `UPGRADE_HANDLER_ADDRESS`, `SAFE_TX_SERVICE_URL`, `ZK_*_GOVERNOR_ADDRESS` | Overrides for local chains. The app warns when a pinned address is overridden |
 

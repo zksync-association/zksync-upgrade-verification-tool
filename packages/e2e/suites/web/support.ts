@@ -15,6 +15,9 @@ export const SAFE_PORT = 18646;
 export const ANVIL_URL = `http://127.0.0.1:${ANVIL_PORT}`;
 export const SAFE_URL = `http://127.0.0.1:${SAFE_PORT}`;
 export const APP_URL = "http://127.0.0.1:4000";
+// A stand-in for Safe{Wallet} the app accepts as a Safe App host, and one it doesn't.
+export const SAFE_SHELL_PORT = 18647;
+export const OTHER_SHELL_PORT = 18648;
 export const SNAPSHOT_FILE = path.join(tmpdir(), "zksync-governance-e2e-snapshot");
 
 export const UPGRADE_ID = "0x77d5461c37515d627820ab6573efe63fb0b253cf83308dbb368b859e9835eaaa";

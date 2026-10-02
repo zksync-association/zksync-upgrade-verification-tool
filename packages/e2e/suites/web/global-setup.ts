@@ -3,7 +3,7 @@ import { mkdirSync, openSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { startFork } from "../../../../apps/web/test/support/fork";
 import { startMockSafe } from "../../../../apps/web/test/support/mock-safe";
-import { ANVIL_PORT, APP_URL, SAFE_PORT, SNAPSHOT_FILE } from "./support";
+import { ANVIL_PORT, APP_URL, SAFE_PORT, SAFE_SHELL_PORT, SNAPSHOT_FILE } from "./support";
 
 const WEB_DIR = path.resolve(import.meta.dirname, "../../../../apps/web");
 const LOGS = path.resolve(import.meta.dirname, "../../logs");
@@ -27,6 +27,7 @@ export default async function globalSetup() {
       SERVER_PORT: "4000",
       LOG_LEVEL: "warn",
       WALLET_CONNECT_PROJECT_ID: "",
+      SAFE_WALLET_ORIGINS: `https://app.safe.global,http://127.0.0.1:${SAFE_SHELL_PORT}`,
     },
   });
   for (let i = 0; ; i++) {

@@ -5,6 +5,7 @@ import type { SignerGroup } from "@/common/typed-data";
 import { shortHex } from "@/utils/format";
 import { ConnectButton as RainbowConnectButton } from "@rainbow-me/rainbowkit";
 import { ChevronDown } from "lucide-react";
+import { type Dispatch, type SetStateAction, createContext, useContext, useEffect } from "react";
 import { type Address, isAddressEqual } from "viem";
 import { useAccount } from "wagmi";
 
@@ -29,16 +30,39 @@ export function useConnectedGroups(): { address: Address | undefined; groups: Si
   return { address, groups };
 }
 
-export default function ConnectButton() {
+export const WalletOfferContext = createContext<Dispatch<SetStateAction<number>> | null>(null);
+
+/** Call from a component that needs a wallet (Sign, Send): while it is shown, the header offers one. */
+export function useOfferWallet() {
+  const setOffers = useContext(WalletOfferContext);
+  useEffect(() => {
+    if (!setOffers) return;
+    setOffers((n) => n + 1);
+    return () => setOffers((n) => n - 1);
+  }, [setOffers]);
+}
+
+/**
+ * The connected account, or (while `offer` is set: something on the page can be signed or
+ * executed) a button to connect one. Checking never needs a wallet.
+ */
+export default function ConnectButton({ offer }: { offer: boolean }) {
   const { groups } = useConnectedGroups();
   return (
     <RainbowConnectButton.Custom>
       {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
-        if (!mounted) return <div className="h-10 w-[104px]" aria-hidden />;
+        if (!mounted) return offer ? <div className="h-10 w-[104px]" aria-hidden /> : null;
         if (!account || !chain) {
+          if (!offer) return null;
           return (
-            <Button variant="secondary" onClick={openConnectModal} data-testid="connect-wallet">
-              Connect
+            <Button
+              variant="secondary"
+              onClick={openConnectModal}
+              data-testid="connect-wallet"
+              title="Only needed to sign as a member Safe or to send a transaction. Checking needs no wallet."
+            >
+              <span className="xl:hidden">Connect</span>
+              <span className="hidden xl:inline">Connect to sign or execute</span>
             </Button>
           );
         }

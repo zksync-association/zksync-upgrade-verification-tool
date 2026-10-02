@@ -46,6 +46,7 @@ export default function App() {
         <WalletProvider
           initialState={initialState}
           projectId={env.WALLET_CONNECT_PROJECT_ID}
+          safeWalletOrigins={env.SAFE_WALLET_ORIGINS}
           chainId={status.governance.network.chainId}
           chainLabel={status.governance.network.label}
         >

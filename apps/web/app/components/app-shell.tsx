@@ -1,5 +1,5 @@
 import type { AppStatus } from "@/.server/status";
-import ConnectButton from "@/components/connect-button";
+import ConnectButton, { WalletOfferContext } from "@/components/connect-button";
 import { AddressLink } from "@/components/hex";
 import Logo from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { formatNumber } from "@/utils/format";
 import type { SerializeFrom } from "@remix-run/node";
 import { Link, NavLink, useFetcher, useRevalidator, useRouteLoaderData } from "@remix-run/react";
 import { AlertTriangle, Info, RefreshCw, ShieldAlert } from "lucide-react";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
 
@@ -30,17 +30,21 @@ const NAV = [
 ];
 
 export default function AppShell({ status, children }: { status: OkStatus; children: ReactNode }) {
+  // How many Sign / Send buttons are on screen; the header offers to connect only while some are.
+  const [walletOffers, setWalletOffers] = useState(0);
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header status={status} />
-      <Banners status={status} />
-      <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-8 sm:px-6">{children}</main>
-      <Footer status={status} />
-    </div>
+    <WalletOfferContext.Provider value={setWalletOffers}>
+      <div className="flex min-h-screen flex-col">
+        <Header status={status} offerWallet={walletOffers > 0} />
+        <Banners status={status} />
+        <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-8 sm:px-6">{children}</main>
+        <Footer status={status} />
+      </div>
+    </WalletOfferContext.Provider>
   );
 }
 
-function Header({ status }: { status: OkStatus }) {
+function Header({ status, offerWallet }: { status: OkStatus; offerWallet: boolean }) {
   const { network, latestBlock } = status.governance;
   return (
     <header className="sticky top-0 z-40 border-slate-200/60 border-b bg-white/70 backdrop-blur-md">
@@ -83,7 +87,7 @@ function Header({ status }: { status: OkStatus }) {
             <span className="text-slate-400">#{formatNumber(latestBlock.number)}</span>
           </span>
           <RefreshButton />
-          <ConnectButton />
+          <ConnectButton offer={offerWallet} />
         </div>
       </div>
     </header>

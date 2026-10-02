@@ -15,6 +15,11 @@ in an `eth_call`. An RPC failure is reported as a failure, never as an invalid s
 the page. They are computed per member Safe and cross-checked against the Safe's on-chain `domainSeparator()`. Phishing
 a signer still needs them to skip this check.
 
+**Embedding.** Only the app itself and the Safe{Wallet} origins in `SAFE_WALLET_ORIGINS` may show it in a frame
+(`frame-ancestors`), so another site can't overlay it. Inside Safe{Wallet}, the Safe Apps SDK accepts messages only
+from those origins. As a Safe App it can only ask the Safe for signatures and transactions, which the Safe's owners
+review in Safe{Wallet} and on their hardware wallets.
+
 **Emergency payloads** are confidential until executed. The page checks a payload against the signed id in your
 browser and never sends it to the server unless you press "Simulate". For confidential payloads, run the app
 locally rather than using a hosted instance.

@@ -7,13 +7,14 @@ import compression from "compression";
 import express, { type RequestHandler, type Request, type Response } from "express";
 import getPort, { portNumbers } from "get-port";
 
-import { env } from "@config/env.server";
+import { env, safeWalletOrigins } from "@config/env.server";
 import { cspNonce } from "@server/middlewares/csp-nonce";
 import { patchBigintToJSON } from "@server/utils/bigint";
 import { logger } from "./middlewares/logger";
 import { rateLimit } from "./middlewares/rate-limit";
 import { removeTrailingSlash } from "./middlewares/remove-trailing-slash";
 import { requireHttps } from "./middlewares/require-https";
+import { safeAppHeaders, safeAppManifest } from "./middlewares/safe-app";
 
 patchBigintToJSON();
 
@@ -31,6 +32,7 @@ const app = express();
 app.set("trust proxy", true);
 
 app.use(requireHttps);
+app.use(safeAppHeaders(safeWalletOrigins));
 app.get("*", removeTrailingSlash);
 app.use(compression());
 
@@ -47,6 +49,10 @@ if (viteDevServer) {
   // more aggressive with this caching.
   app.use(express.static("build/client", { maxAge: "1h" }));
 }
+
+app.get("/manifest.json", (_req, res) => {
+  res.json(safeAppManifest);
+});
 
 app.get(["/img/*", "/favicons/*"], (_req, res) => {
   // if we made it past the express.static for these, then we're missing something.

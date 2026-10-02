@@ -1,11 +1,12 @@
 import type { Simulation } from "@/.server/signatures";
+import { useOfferWallet } from "@/components/connect-button";
 import { AddressLink, CopyButton } from "@/components/hex";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
 import { formatEth } from "@/utils/format";
 import { useNavigate } from "@remix-run/react";
 import { CheckCircle2, MinusCircle, Send, XCircle } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
 import type { Hex } from "viem";
@@ -59,16 +60,31 @@ export function ExecutionPanel({
   note?: ReactNode;
   extra?: ReactNode;
 }) {
-  const { isConnected } = useAccount();
+  useOfferWallet();
+  const { isConnected, connector } = useAccount();
   const { sendTransaction, isPending } = useSendTransaction();
   const navigate = useNavigate();
+  // Inside Safe{Wallet} the transaction becomes one of the Safe's own, which its owners confirm
+  // and execute there; what comes back is its safeTxHash, not a transaction hash.
+  const viaSafe = connector?.id === "safe";
+  const [safeTxHash, setSafeTxHash] = useState<Hex | null>(null);
 
   const send = () => {
-    toast.loading("Confirm the transaction in your wallet…", { id: "send-tx" });
+    toast.loading(
+      viaSafe
+        ? "Review the transaction in Safe{Wallet}…"
+        : "Confirm the transaction in your wallet…",
+      { id: "send-tx" }
+    );
     sendTransaction(
       { to: execution.to as Hex, data: execution.data as Hex, value: BigInt(execution.value) },
       {
         onSuccess: (hash) => {
+          if (viaSafe) {
+            toast.success("Your Safe has the transaction", { id: "send-tx" });
+            setSafeTxHash(hash);
+            return;
+          }
           toast.success("Transaction sent", { id: "send-tx" });
           navigate($path("/app/transactions/:hash", { hash }));
         },
@@ -95,7 +111,7 @@ export function ExecutionPanel({
             disabled={!isConnected}
             title={isConnected ? undefined : "Connect a wallet to send"}
           >
-            <Send /> Send transaction
+            <Send /> {viaSafe ? "Create Safe transaction" : "Send transaction"}
           </Button>
         </div>
       </div>
@@ -125,6 +141,16 @@ export function ExecutionPanel({
         </dd>
       </dl>
       {execution.simulation && <SimulationResult simulation={execution.simulation} />}
+      {safeTxHash && (
+        <p
+          className="rounded-lg bg-green-50 px-3 py-2 text-green-800 text-sm"
+          data-testid="safe-tx-created"
+        >
+          Your Safe has the transaction (safeTxHash{" "}
+          <span className="mono break-all">{safeTxHash}</span>). Its owners confirm and execute it
+          in Safe{"{"}Wallet{"}"}.
+        </p>
+      )}
       {extra}
     </div>
   );

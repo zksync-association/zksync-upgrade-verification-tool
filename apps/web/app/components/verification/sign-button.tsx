@@ -1,6 +1,6 @@
 import type { MemberResult } from "@/.server/signatures";
 import { type GovernanceTypedData, type SignerGroup, toSignable } from "@/common/typed-data";
-import { GROUP_LABEL, useConnectedGroups } from "@/components/connect-button";
+import { GROUP_LABEL, useConnectedGroups, useOfferWallet } from "@/components/connect-button";
 import { Hash } from "@/components/hex";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,9 +19,9 @@ import { toast } from "react-hot-toast";
 import { isAddressEqual } from "viem";
 import { useSignTypedData } from "wagmi";
 
-// Signing is a request to the connected member Safe (WalletConnect from Safe{Wallet}). The Safe
-// files the message in its Transaction Service; this page then picks it up from there and checks
-// it on-chain like every other signature. Nothing is posted to this app.
+// Signing is a request to the connected member Safe (this app opened inside Safe{Wallet}, or
+// WalletConnect). The Safe files the message in its Transaction Service; this page then picks it
+// up from there and checks it on-chain like every other signature. Nothing is posted to this app.
 
 export function SignButton({
   typedData,
@@ -34,6 +34,7 @@ export function SignButton({
   members: SerializeFrom<MemberResult>[];
   disabledReason: string | null;
 }) {
+  useOfferWallet();
   const { address, groups } = useConnectedGroups();
   const { openConnectModal } = useConnectModal();
   const [open, setOpen] = useState(false);
@@ -68,7 +69,9 @@ export function SignButton({
     toast.loading("Waiting for your Safe…", { id: "sign" });
     signTypedData(toSignable(typedData) as Parameters<typeof signTypedData>[0], {
       onSuccess: () => {
-        toast.success("Signed. Refreshing from Safe…", { id: "sign" });
+        toast.success("Sent to your Safe. It shows here once Safe has the signature.", {
+          id: "sign",
+        });
         setOpen(false);
         revalidator.revalidate();
       },
@@ -131,7 +134,8 @@ export function SignButton({
             </div>
           ) : (
             <p className="text-amber-700 text-sm">
-              The connected account is not a Safe; its signature would not be usable.
+              The connected account is not a Safe. This page only picks up signatures that a member
+              Safe files with Safe's service.
             </p>
           )}
           <div className="flex justify-end gap-2">

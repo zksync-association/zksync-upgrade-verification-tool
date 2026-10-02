@@ -98,7 +98,9 @@ corepack pnpm --filter web build && cd packages/e2e && corepack pnpm test:web   
 
 Test data recorded from mainnet lives in `apps/web/test/fixtures` (re-record with
 `apps/web/test/support/record-fixtures.ts`). The fork tests make a public anvil test key an owner of member Safes,
-on the local fork only, and serve its signatures from a local mock of the Safe API (`apps/web/test/support`).
+on the local fork only, and serve its signatures from a local mock of the Safe API (`apps/web/test/support`). The
+Playwright suite opens the app as a Safe App in a local stand-in for Safe{Wallet}
+(`packages/e2e/suites/web/safe-shell.ts`).
 
 ## Map
 

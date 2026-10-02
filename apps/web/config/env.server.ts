@@ -13,6 +13,14 @@ export const env = createEnv({
     L2_RPC_URL: z.string().url().optional(),
     // Signing through WalletConnect is disabled without it. Verifying never needs it.
     WALLET_CONNECT_PROJECT_ID: z.string().optional(),
+    // Safe{Wallet} instances that may open the app as a Safe App (comma-separated origins).
+    SAFE_WALLET_ORIGINS: z
+      .string()
+      .default("https://app.safe.global")
+      .refine(
+        (value) => splitOrigins(value).every((o) => URL.canParse(o) && new URL(o).origin === o),
+        "SAFE_WALLET_ORIGINS must be comma-separated origins, e.g. https://app.safe.global"
+      ),
     // Only needed when the Safe Transaction Service rate limits you (e.g. a hosted instance).
     SAFE_API_KEY: z.string().optional(),
     // Overrides for local chains and tests. Mainnet and Sepolia have pinned defaults.
@@ -33,10 +41,20 @@ export const env = createEnv({
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
 });
 
+function splitOrigins(value: string) {
+  return value
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+}
+
+export const safeWalletOrigins = splitOrigins(env.SAFE_WALLET_ORIGINS);
+
 export const clientEnv = {
   ALLOW_INDEXING: env.ALLOW_INDEXING,
   NODE_ENV: env.NODE_ENV,
   WALLET_CONNECT_PROJECT_ID: env.WALLET_CONNECT_PROJECT_ID ?? null,
+  SAFE_WALLET_ORIGINS: safeWalletOrigins,
 };
 
 export type CLIENT_ENV = typeof clientEnv;
