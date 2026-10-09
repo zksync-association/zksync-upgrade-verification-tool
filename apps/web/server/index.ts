@@ -80,6 +80,44 @@ async function getBuild() {
   return build as unknown as ServerBuild;
 }
 
+// What the app build's entry module exports for the server (app/entry.server.tsx).
+type AppEntry = {
+  prewarm?: (reason: "boot") => Promise<void>;
+  startSync?: () => void;
+  touchSync?: () => void;
+};
+
+let productionEntry: Promise<AppEntry> | undefined;
+
+/** The app build's entry module: one for the process in production; Vite's current one in dev. */
+function appEntry(): Promise<AppEntry> {
+  if (productionEntry) return productionEntry;
+  const loading = (async () => {
+    // A module in production; in development a function that loads it from Vite.
+    const build = (await getBuild()) as ServerBuild | (() => Promise<ServerBuild>);
+    const { entry } = typeof build === "function" ? await build() : build;
+    return entry.module as AppEntry;
+  })();
+  if (!viteDevServer) {
+    productionEntry = loading;
+    loading.catch(() => {
+      if (productionEntry === loading) productionEntry = undefined;
+    });
+  }
+  return loading;
+}
+
+// Every request that reaches the app (pages, /api/*, resources; not static files) is activity
+// for the sync engine, which follows the chain only while the app is in use (SYNC_MODE,
+// SYNC_KEEPWARM_MS). The request itself never waits on it.
+app.use((_req, _res, next) => {
+  appEntry().then(
+    (entry) => entry.touchSync?.(),
+    () => {}
+  );
+  next();
+});
+
 app.all(
   "*",
   createRequestHandler({
@@ -124,14 +162,13 @@ async function checkRpc() {
 }
 
 // Warms the caches a first page needs (network, governance, the handler's log index, Safe
-// listings) through the app build's own modules, so requests share them. PREWARM=0 turns it off
-// (the build's prewarm() checks). Logs step names and timings only, and never stops the server.
+// listings) through the app build's own modules, so requests share them, and starts the sync
+// engine. PREWARM=0 turns the warm-up off (the build's prewarm() checks), SYNC_MODE=off the
+// engine. Logs step names and timings only, and never stops the server.
 async function prewarmApp() {
   try {
-    // A module in production; in development a function that loads it from Vite.
-    const build = (await getBuild()) as ServerBuild | (() => Promise<ServerBuild>);
-    const { entry } = typeof build === "function" ? await build() : build;
-    const { prewarm } = entry.module as { prewarm?: (reason: "boot") => Promise<void> };
+    const { prewarm, startSync } = await appEntry();
+    startSync?.();
     await prewarm?.("boot");
   } catch {
     console.warn("Start-up warm-up skipped; pages read everything on first use.");

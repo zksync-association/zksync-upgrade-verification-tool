@@ -57,6 +57,30 @@ it("combines independent reads into one HTTP request and matches reordered respo
   expect(JSON.parse(fetch.mock.calls[0]?.[1].body)).toHaveLength(2);
 });
 
+it("keeps an unbatched transport's reads out of another transport's batches to the same URL", async () => {
+  // viem batches JSON-RPC per URL across transports: only batch: false keeps a read apart.
+  const fetch = vi.fn(async (_url, init) => {
+    const request = JSON.parse(init.body);
+    const answer = (r: { id: number }) => ({ jsonrpc: "2.0", id: r.id, result: "0x1" });
+    return Response.json(Array.isArray(request) ? request.map(answer) : answer(request));
+  });
+  vi.stubGlobal("fetch", fetch);
+  const url = "http://shared.example";
+  const batched = createPublicClient({
+    transport: limitedHttp(url, { label: "L1", maxInFlight: 8 }),
+  });
+  const apart = createPublicClient({
+    transport: limitedHttp(url, { label: "L1-state", maxInFlight: 4, batch: false }),
+  });
+  await Promise.all([batched.getChainId(), batched.getBlockNumber(), apart.getChainId()]);
+  const bodies = fetch.mock.calls.map((call) => JSON.parse(call[1].body));
+  expect(bodies).toHaveLength(2);
+  expect(bodies.filter(Array.isArray).map((batch) => batch.length)).toEqual([2]);
+  expect(bodies.filter((body) => !Array.isArray(body)).map((body) => body.method)).toEqual([
+    "eth_chainId",
+  ]);
+});
+
 it.each([200, 400, 413])(
   "falls back for good when a provider rejects batches with HTTP %s",
   async (status) => {

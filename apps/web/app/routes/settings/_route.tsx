@@ -1,5 +1,6 @@
 import { prewarm } from "@/.server/prewarm";
 import { requireLocalSettings, settingsSummary, updateSettings } from "@/.server/settings";
+import { startSync } from "@/.server/sync/engine";
 import { PageHeader } from "@/components/page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,8 +17,10 @@ export async function action({ request }: ActionFunctionArgs) {
   requireLocalSettings(request);
   try {
     await updateSettings(await request.formData());
-    // Warm the new data sources in the background (never rejects; PREWARM=0 turns it off).
+    // Warm the new data sources in the background (never rejects; PREWARM=0 turns it off), and
+    // follow the head through them: the old settings' engine is retired, its reads dropped.
     void prewarm("settings");
+    startSync();
     return json({ saved: true, error: null }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return json(

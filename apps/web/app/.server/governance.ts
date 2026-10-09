@@ -11,7 +11,7 @@ import { type Abi, type Address, getAddress, isAddressEqual, zeroHash } from "vi
 import { cached } from "./cache";
 import { callFn, classify } from "./chain/call";
 import { readMemberList } from "./member-list";
-import { type Network, l1, latestBlock, network } from "./rpc";
+import { type BlockRef, type Network, l1, latestBlock, network } from "./rpc";
 
 // Everything the old database cached about roles and thresholds is re-read from the chain. The
 // only pinned input is the ProtocolUpgradeHandler address; the rest is derived from it.
@@ -131,151 +131,162 @@ async function readDomain(
   return { name, version, chainId, verifyingContract: address };
 }
 
+// Today's bound for roles, thresholds and warnings. The sync engine re-reads them on every new
+// block while the app is in use (replacing the entry), so requests then never wait on this read.
+export const GOVERNANCE_KEY = "governance";
+export const GOVERNANCE_TTL_MS = 30_000;
+
 export function governance(): Promise<Governance> {
-  return cached("governance", 30_000, async () => {
-    const net = await network();
-    const puh = net.upgradeHandler;
-    const warnings: string[] = [];
+  return cached(GOVERNANCE_KEY, GOVERNANCE_TTL_MS, readGovernance);
+}
 
-    const code = await l1.getCode({ address: puh });
-    if (!code || code === "0x") {
-      throw new Error(`No contract at ProtocolUpgradeHandler ${puh} on chain ${net.chainId}`);
-    }
+/**
+ * Reads everything governance() serves, now (uncached). `head`: the head to report as the latest
+ * block (the sync engine's new head, before it is published); default the cached head.
+ */
+export async function readGovernance(head?: BlockRef): Promise<Governance> {
+  const net = await network();
+  const puh = net.upgradeHandler;
+  const warnings: string[] = [];
 
-    const [scAddress, gAddress, eubAddress, frozenUntil, freezeStatus, block] = await Promise.all([
-      read<Address>(puh, upgradeHandlerAbi, "securityCouncil"),
-      read<Address>(puh, upgradeHandlerAbi, "guardians"),
-      read<Address>(puh, upgradeHandlerAbi, "emergencyUpgradeBoard"),
-      read<bigint>(puh, upgradeHandlerAbi, "protocolFrozenUntil"),
-      read<number>(puh, upgradeHandlerAbi, "lastFreezeStatusInUpgradeCycle"),
-      latestBlock(),
+  const code = await l1.getCode({ address: puh });
+  if (!code || code === "0x") {
+    throw new Error(`No contract at ProtocolUpgradeHandler ${puh} on chain ${net.chainId}`);
+  }
+
+  const [scAddress, gAddress, eubAddress, frozenUntil, freezeStatus, block] = await Promise.all([
+    read<Address>(puh, upgradeHandlerAbi, "securityCouncil"),
+    read<Address>(puh, upgradeHandlerAbi, "guardians"),
+    read<Address>(puh, upgradeHandlerAbi, "emergencyUpgradeBoard"),
+    read<bigint>(puh, upgradeHandlerAbi, "protocolFrozenUntil"),
+    read<number>(puh, upgradeHandlerAbi, "lastFreezeStatusInUpgradeCycle"),
+    head ?? latestBlock(),
+  ]);
+  const sc = getAddress(scAddress);
+  const g = getAddress(gAddress);
+  const eub = getAddress(eubAddress);
+
+  const scRead = <T>(fn: string) => read<T>(sc, securityCouncilAbi, fn);
+  const gRead = <T>(fn: string) => read<T>(g, guardiansAbi, fn);
+  const eubRead = <T>(fn: string) => read<T>(eub, emergencyUpgradeBoardAbi, fn);
+
+  const [scMembers, gMembers, scDomain, gDomain, eubDomain, scValues, gValues, eubValues] =
+    await Promise.all([
+      readMembers(sc, securityCouncilAbi),
+      readMembers(g, guardiansAbi),
+      readDomain(sc, securityCouncilAbi, "SecurityCouncil", net.chainId, warnings),
+      readDomain(g, guardiansAbi, "Guardians", net.chainId, warnings),
+      readDomain(eub, emergencyUpgradeBoardAbi, "EmergencyUpgradeBoard", net.chainId, warnings),
+      Promise.all([
+        scRead<bigint>("EIP1271_THRESHOLD"),
+        scRead<bigint>("APPROVE_UPGRADE_SECURITY_COUNCIL_THRESHOLD"),
+        scRead<bigint>("softFreezeThreshold"),
+        scRead<bigint>("SOFT_FREEZE_CONSERVATIVE_THRESHOLD"),
+        scRead<bigint>("HARD_FREEZE_THRESHOLD"),
+        scRead<bigint>("UNFREEZE_THRESHOLD"),
+        scRead<bigint>("softFreezeNonce"),
+        scRead<bigint>("hardFreezeNonce"),
+        scRead<bigint>("unfreezeNonce"),
+        scRead<bigint>("softFreezeThresholdSettingNonce"),
+        scRead<Address>("PROTOCOL_UPGRADE_HANDLER"),
+      ]),
+      Promise.all([
+        gRead<bigint>("EIP1271_THRESHOLD"),
+        gRead<bigint>("APPROVE_UPGRADE_GUARDIANS_THRESHOLD"),
+        gRead<bigint>("EXTEND_LEGAL_VETO_THRESHOLD"),
+        gRead<bigint>("CANCEL_L2_GOVERNOR_PROPOSAL_THRESHOLD"),
+        gRead<bigint>("nonce"),
+        gRead<Address>("PROTOCOL_UPGRADE_HANDLER"),
+      ]),
+      Promise.all([
+        eubRead<Address>("ZK_FOUNDATION_SAFE"),
+        eubRead<Address>("SECURITY_COUNCIL"),
+        eubRead<Address>("GUARDIANS"),
+        eubRead<Address>("PROTOCOL_UPGRADE_HANDLER"),
+      ]),
     ]);
-    const sc = getAddress(scAddress);
-    const g = getAddress(gAddress);
-    const eub = getAddress(eubAddress);
 
-    const scRead = <T>(fn: string) => read<T>(sc, securityCouncilAbi, fn);
-    const gRead = <T>(fn: string) => read<T>(g, guardiansAbi, fn);
-    const eubRead = <T>(fn: string) => read<T>(eub, emergencyUpgradeBoardAbi, fn);
+  const [scEip1271, scApprove, scSoft, scSoftConservative, scHard, scUnfreeze, ...scRest] =
+    scValues;
+  const [softNonce, hardNonce, unfreezeNonce, thresholdNonce, scHandler] = scRest as [
+    bigint,
+    bigint,
+    bigint,
+    bigint,
+    Address,
+  ];
+  const [gEip1271, gApprove, gVeto, gCancel, gNonce, gHandler] = gValues;
+  const [zkFoundation, eubSc, eubG, eubHandler] = eubValues;
 
-    const [scMembers, gMembers, scDomain, gDomain, eubDomain, scValues, gValues, eubValues] =
-      await Promise.all([
-        readMembers(sc, securityCouncilAbi),
-        readMembers(g, guardiansAbi),
-        readDomain(sc, securityCouncilAbi, "SecurityCouncil", net.chainId, warnings),
-        readDomain(g, guardiansAbi, "Guardians", net.chainId, warnings),
-        readDomain(eub, emergencyUpgradeBoardAbi, "EmergencyUpgradeBoard", net.chainId, warnings),
-        Promise.all([
-          scRead<bigint>("EIP1271_THRESHOLD"),
-          scRead<bigint>("APPROVE_UPGRADE_SECURITY_COUNCIL_THRESHOLD"),
-          scRead<bigint>("softFreezeThreshold"),
-          scRead<bigint>("SOFT_FREEZE_CONSERVATIVE_THRESHOLD"),
-          scRead<bigint>("HARD_FREEZE_THRESHOLD"),
-          scRead<bigint>("UNFREEZE_THRESHOLD"),
-          scRead<bigint>("softFreezeNonce"),
-          scRead<bigint>("hardFreezeNonce"),
-          scRead<bigint>("unfreezeNonce"),
-          scRead<bigint>("softFreezeThresholdSettingNonce"),
-          scRead<Address>("PROTOCOL_UPGRADE_HANDLER"),
-        ]),
-        Promise.all([
-          gRead<bigint>("EIP1271_THRESHOLD"),
-          gRead<bigint>("APPROVE_UPGRADE_GUARDIANS_THRESHOLD"),
-          gRead<bigint>("EXTEND_LEGAL_VETO_THRESHOLD"),
-          gRead<bigint>("CANCEL_L2_GOVERNOR_PROPOSAL_THRESHOLD"),
-          gRead<bigint>("nonce"),
-          gRead<Address>("PROTOCOL_UPGRADE_HANDLER"),
-        ]),
-        Promise.all([
-          eubRead<Address>("ZK_FOUNDATION_SAFE"),
-          eubRead<Address>("SECURITY_COUNCIL"),
-          eubRead<Address>("GUARDIANS"),
-          eubRead<Address>("PROTOCOL_UPGRADE_HANDLER"),
-        ]),
-      ]);
+  const expect = (what: string, actual: Address, expected: Address) => {
+    if (!isAddressEqual(actual, expected))
+      warnings.push(`${what} is ${actual}, expected ${expected}`);
+  };
+  expect("SecurityCouncil.PROTOCOL_UPGRADE_HANDLER", scHandler, puh);
+  expect("Guardians.PROTOCOL_UPGRADE_HANDLER", gHandler as Address, puh);
+  expect("EmergencyUpgradeBoard.PROTOCOL_UPGRADE_HANDLER", eubHandler, puh);
+  expect("EmergencyUpgradeBoard.SECURITY_COUNCIL", eubSc, sc);
+  expect("EmergencyUpgradeBoard.GUARDIANS", eubG, g);
+  if (scMembers.length === 0) warnings.push(`SecurityCouncil ${sc} reports no members`);
+  if (gMembers.length === 0) warnings.push(`Guardians ${g} reports no members`);
 
-    const [scEip1271, scApprove, scSoft, scSoftConservative, scHard, scUnfreeze, ...scRest] =
-      scValues;
-    const [softNonce, hardNonce, unfreezeNonce, thresholdNonce, scHandler] = scRest as [
-      bigint,
-      bigint,
-      bigint,
-      bigint,
-      Address,
-    ];
-    const [gEip1271, gApprove, gVeto, gCancel, gNonce, gHandler] = gValues;
-    const [zkFoundation, eubSc, eubG, eubHandler] = eubValues;
-
-    const expect = (what: string, actual: Address, expected: Address) => {
-      if (!isAddressEqual(actual, expected))
-        warnings.push(`${what} is ${actual}, expected ${expected}`);
-    };
-    expect("SecurityCouncil.PROTOCOL_UPGRADE_HANDLER", scHandler, puh);
-    expect("Guardians.PROTOCOL_UPGRADE_HANDLER", gHandler as Address, puh);
-    expect("EmergencyUpgradeBoard.PROTOCOL_UPGRADE_HANDLER", eubHandler, puh);
-    expect("EmergencyUpgradeBoard.SECURITY_COUNCIL", eubSc, sc);
-    expect("EmergencyUpgradeBoard.GUARDIANS", eubG, g);
-    if (scMembers.length === 0) warnings.push(`SecurityCouncil ${sc} reports no members`);
-    if (gMembers.length === 0) warnings.push(`Guardians ${g} reports no members`);
-
-    return {
-      network: {
-        name: net.name,
-        label: net.label,
-        chainId: net.chainId,
-        explorerUrl: net.explorerUrl,
-        l2ExplorerUrl: net.l2ExplorerUrl,
-        tallyUrl: net.tallyUrl,
-        isDevNode: net.isDevNode,
-        overrides: net.overrides,
-        standardLegalVetoDays: net.standardLegalVetoDays,
-        safeWalletPrefix: net.safeWalletPrefix,
+  return {
+    network: {
+      name: net.name,
+      label: net.label,
+      chainId: net.chainId,
+      explorerUrl: net.explorerUrl,
+      l2ExplorerUrl: net.l2ExplorerUrl,
+      tallyUrl: net.tallyUrl,
+      isDevNode: net.isDevNode,
+      overrides: net.overrides,
+      standardLegalVetoDays: net.standardLegalVetoDays,
+      safeWalletPrefix: net.safeWalletPrefix,
+    },
+    upgradeHandler: puh,
+    securityCouncil: {
+      address: sc,
+      domain: scDomain,
+      members: scMembers,
+      eip1271Threshold: Number(scEip1271),
+      thresholds: {
+        approveUpgrade: Number(scApprove),
+        softFreeze: Number(scSoft),
+        softFreezeConservative: Number(scSoftConservative),
+        hardFreeze: Number(scHard),
+        unfreeze: Number(scUnfreeze),
       },
-      upgradeHandler: puh,
-      securityCouncil: {
-        address: sc,
-        domain: scDomain,
-        members: scMembers,
-        eip1271Threshold: Number(scEip1271),
-        thresholds: {
-          approveUpgrade: Number(scApprove),
-          softFreeze: Number(scSoft),
-          softFreezeConservative: Number(scSoftConservative),
-          hardFreeze: Number(scHard),
-          unfreeze: Number(scUnfreeze),
-        },
-        nonces: {
-          softFreeze: softNonce.toString(),
-          hardFreeze: hardNonce.toString(),
-          unfreeze: unfreezeNonce.toString(),
-          setSoftFreezeThreshold: thresholdNonce.toString(),
-        },
+      nonces: {
+        softFreeze: softNonce.toString(),
+        hardFreeze: hardNonce.toString(),
+        unfreeze: unfreezeNonce.toString(),
+        setSoftFreezeThreshold: thresholdNonce.toString(),
       },
-      guardians: {
-        address: g,
-        domain: gDomain,
-        members: gMembers,
-        eip1271Threshold: Number(gEip1271),
-        thresholds: {
-          approveUpgrade: Number(gApprove),
-          extendLegalVeto: Number(gVeto),
-          cancelL2Proposal: Number(gCancel),
-        },
-        nonce: (gNonce as bigint).toString(),
+    },
+    guardians: {
+      address: g,
+      domain: gDomain,
+      members: gMembers,
+      eip1271Threshold: Number(gEip1271),
+      thresholds: {
+        approveUpgrade: Number(gApprove),
+        extendLegalVeto: Number(gVeto),
+        cancelL2Proposal: Number(gCancel),
       },
-      emergencyUpgradeBoard: {
-        address: eub,
-        domain: eubDomain,
-        zkFoundation: getAddress(zkFoundation),
-      },
-      freeze: {
-        protocolFrozenUntil: frozenUntil.toString(),
-        lastFreezeStatus: Number(freezeStatus),
-      },
-      latestBlock: { number: block.number.toString(), timestamp: block.timestamp.toString() },
-      warnings,
-    } satisfies Governance;
-  });
+      nonce: (gNonce as bigint).toString(),
+    },
+    emergencyUpgradeBoard: {
+      address: eub,
+      domain: eubDomain,
+      zkFoundation: getAddress(zkFoundation),
+    },
+    freeze: {
+      protocolFrozenUntil: frozenUntil.toString(),
+      lastFreezeStatus: Number(freezeStatus),
+    },
+    latestBlock: { number: block.number.toString(), timestamp: block.timestamp.toString() },
+    warnings,
+  } satisfies Governance;
 }
 
 export type SafeInfo = {
@@ -288,39 +299,45 @@ export type SafeInfo = {
   domainSeparatorMatches: boolean | null;
 };
 
+export const SAFE_INFO_TTL_MS = 5 * 60_000;
+export const safeInfoKey = (address: Address) => `safe-info:${address.toLowerCase()}`;
+
 export function safeInfo(address: Address): Promise<SafeInfo> {
-  return cached(`safe-info:${address.toLowerCase()}`, 5 * 60_000, async () => {
-    const { chainId } = await network();
-    const code = await l1.getCode({ address });
-    if (!code || code === "0x") {
-      return {
-        address,
-        isContract: false,
-        version: null,
-        threshold: null,
-        owners: [],
-        domainSeparatorMatches: null,
-      };
-    }
-    // A getter the contract does not have (it reverts) reads as null. An RPC failure fails the
-    // read instead: a threshold lost to a flaky RPC would turn a Safe still collecting
-    // signatures into an invalid one.
-    const optional = <T>(functionName: string) =>
-      confirmedRead<T>(address, safeAbi, functionName).catch(orNullOnRevert);
-    const [version, threshold, owners, separator] = await Promise.all([
-      optional<string>("VERSION"),
-      optional<bigint>("getThreshold"),
-      optional<Address[]>("getOwners"),
-      optional<`0x${string}`>("domainSeparator"),
-    ]);
-    const expected = safeMessageHashes(chainId, address, zeroHash).domainHash;
+  return cached(safeInfoKey(address), SAFE_INFO_TTL_MS, () => readSafeInfo(address));
+}
+
+/** Reads what safeInfo() serves, now (uncached). */
+export async function readSafeInfo(address: Address): Promise<SafeInfo> {
+  const { chainId } = await network();
+  const code = await l1.getCode({ address });
+  if (!code || code === "0x") {
     return {
       address,
-      isContract: true,
-      version,
-      threshold: threshold === null ? null : Number(threshold),
-      owners: owners === null ? [] : owners.map((o) => getAddress(o)),
-      domainSeparatorMatches: separator === null ? null : separator === expected,
+      isContract: false,
+      version: null,
+      threshold: null,
+      owners: [],
+      domainSeparatorMatches: null,
     };
-  });
+  }
+  // A getter the contract does not have (it reverts) reads as null. An RPC failure fails the
+  // read instead: a threshold lost to a flaky RPC would turn a Safe still collecting
+  // signatures into an invalid one.
+  const optional = <T>(functionName: string) =>
+    confirmedRead<T>(address, safeAbi, functionName).catch(orNullOnRevert);
+  const [version, threshold, owners, separator] = await Promise.all([
+    optional<string>("VERSION"),
+    optional<bigint>("getThreshold"),
+    optional<Address[]>("getOwners"),
+    optional<`0x${string}`>("domainSeparator"),
+  ]);
+  const expected = safeMessageHashes(chainId, address, zeroHash).domainHash;
+  return {
+    address,
+    isContract: true,
+    version,
+    threshold: threshold === null ? null : Number(threshold),
+    owners: owners === null ? [] : owners.map((o) => getAddress(o)),
+    domainSeparatorMatches: separator === null ? null : separator === expected,
+  };
 }

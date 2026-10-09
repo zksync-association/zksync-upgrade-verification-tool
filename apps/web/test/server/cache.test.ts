@@ -1,4 +1,4 @@
-import { cached, clearCache } from "@/.server/cache";
+import { cacheSize, cached, clearCache, remainingMs, replace } from "@/.server/cache";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 beforeEach(() => {
@@ -114,4 +114,52 @@ it("seeds a known value without waiting on, joining or replacing a live entry", 
   expect(await cachedUntil("start", compute)).toBe(5);
   seed("nothing", 1, 0);
   expect(await cachedUntil("nothing", compute)).toBe(9);
+});
+
+it("replaces an entry, resolved or in flight, with a value read ahead of requests", async () => {
+  let resolve!: (value: number) => void;
+  const inFlight = cached(
+    "head",
+    4_000,
+    () =>
+      new Promise<number>((done) => {
+        resolve = done;
+      })
+  );
+  // In flight: served until it answers.
+  expect(remainingMs("head")).toBe(Number.POSITIVE_INFINITY);
+  replace("head", 2, 4_000);
+  const compute = vi.fn(async () => 9);
+  expect(await cached("head", 4_000, compute)).toBe(2);
+  // Callers already waiting keep their own read's answer, which is not stored.
+  resolve(1);
+  expect(await inFlight).toBe(1);
+  expect(await cached("head", 4_000, compute)).toBe(2);
+  expect(compute).not.toHaveBeenCalled();
+  expect(remainingMs("head")).toBe(4_000);
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(remainingMs("head")).toBe(3_000);
+  // A replacement restarts the lifetime.
+  replace("head", 3, 4_000);
+  expect(remainingMs("head")).toBe(4_000);
+  await vi.advanceTimersByTimeAsync(4_000);
+  expect(remainingMs("head")).toBeNull();
+  expect(await cached("head", 4_000, compute)).toBe(9);
+  replace("nothing", 1, 0);
+  expect(remainingMs("nothing")).toBeNull();
+});
+
+it("drops expired entries now and then, so per-block keys do not pile up", async () => {
+  for (let block = 0; block < 1_000; block++)
+    await cached(`status:${block}`, 1_000, async () => block);
+  const forever = cached("final", Number.POSITIVE_INFINITY, async () => "kept");
+  await forever;
+  const pending = cached("slow", 1_000, () => new Promise<number>(() => {}));
+  expect(cacheSize()).toBe(1_002);
+  await vi.advanceTimersByTimeAsync(61_000);
+  // The next write sweeps: only the entry for good and the read in flight are left.
+  await cached("next", 1_000, async () => 0);
+  expect(cacheSize()).toBe(3);
+  expect(cached("final", Number.POSITIVE_INFINITY, async () => "again")).toBe(forever);
+  expect(cached("slow", 1_000, async () => 1)).toBe(pending);
 });

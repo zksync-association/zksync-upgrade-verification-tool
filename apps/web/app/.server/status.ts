@@ -4,6 +4,7 @@ import { type Governance, governance } from "./governance";
 import { type LogHistoryStatus, checkLogHistory } from "./logs";
 import { ConfigError, l1, network } from "./rpc";
 import { quota } from "./safe-api";
+import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
 
 // What the header, footer and every page's trust panel show: which chain the RPC is on, the
 // pinned trust anchor, everything derived from it, and anything that should worry a signer.
@@ -11,8 +12,10 @@ import { quota } from "./safe-api";
 /**
  * Background reads, for information: `index` is the ProtocolUpgradeHandler log index (deployment
  * to head). Lists wait for it, for a bounded time, or fail; they never answer from part of it.
+ * `engine` is the sync engine, which follows the head while the app is in use and refreshes what
+ * requests read ahead of them (never a source of answers of its own).
  */
-export type SyncStatus = { index: PuhIndexStatus };
+export type SyncStatus = { index: PuhIndexStatus; engine: SyncEngineStatus };
 
 export type AppStatus =
   | {
@@ -36,7 +39,7 @@ export async function appStatus(): Promise<AppStatus> {
       safeApi: { url: net.safeTxServiceUrl, withKey: !!env.SAFE_API_KEY, quota: { ...quota } },
       l2RpcConfigured: net.l2RpcUrl !== null,
       clientVersion: net.clientVersion,
-      sync: { index: puhIndex().status() },
+      sync: { index: puhIndex().status(), engine: syncEngineStatus() },
     };
   } catch (error) {
     if (error instanceof ConfigError) {

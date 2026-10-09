@@ -720,6 +720,7 @@ describe("rpc lanes", () => {
     expect(lanes()).toBe(before);
     expect(before.history.stats()).toMatchObject({ maxBatch: 25, maxInFlight: 8 });
     expect(before.call.stats()).toMatchObject({ maxBatch: 20, maxInFlight: 8 });
+    expect(before.head.stats()).toMatchObject({ maxBatch: 2, maxInFlight: 4 });
     const generation = rpcGeneration();
 
     resetRpcClients();
@@ -727,6 +728,7 @@ describe("rpc lanes", () => {
     const after = lanes();
     expect(after).not.toBe(before);
     await expect(before.call.request("eth_chainId")).rejects.toMatchObject({ kind: "aborted" });
+    await expect(before.head.request("eth_chainId")).rejects.toMatchObject({ kind: "aborted" });
     await expect(after.history.request("eth_sendRawTransaction" as never)).rejects.toMatchObject({
       kind: "method-not-allowed",
     });

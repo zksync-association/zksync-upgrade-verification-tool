@@ -704,6 +704,62 @@ describe("heads", () => {
     expect(ctx.index.status().state).toBe("ready");
   });
 
+  it("reads the tail for the head ahead of queries (syncHead), and shares it with them", async () => {
+    const ctx = setup({});
+    await ctx.index.startBackfill();
+    const before = ctx.chain.ranges().length;
+    await ctx.index.syncHead();
+    expect(ctx.chain.ranges().slice(before)).toEqual([[FINAL + 1n, H]]);
+    expect(ctx.index.status().headTo).toBe(H.toString());
+    // Queries at that head answer without another read.
+    await Promise.all([ctx.index.logs(), ctx.index.logs({ fromBlock: FINAL - 10n })]);
+    expect(ctx.chain.ranges()).toHaveLength(before + 1);
+    // The next head is read once more.
+    ctx.head.current = { head: { number: H + 1n, hash: blockHash(H + 1n) }, safe: FINAL };
+    await ctx.index.syncHead();
+    expect(ctx.chain.ranges().slice(before + 1)).toEqual([[FINAL + 1n, H + 1n]]);
+  });
+
+  it("keeps the reads of the last few heads: a query at the head still served reads nothing", async () => {
+    const logs = history();
+    logs.push({ blockNumber: H, logIndex: 0, topics: [blockHash(6n)] });
+    const ctx = setup({ logs });
+    await ctx.index.startBackfill();
+    const atH = ctx.head.current;
+    expect((await ctx.index.logs()).map((l) => l.blockNumber)).toContain(H);
+    const before = ctx.chain.ranges().length;
+    // The engine reads the next head before it is served...
+    const next: IndexHead = { head: { number: H + 1n, hash: blockHash(H + 1n) }, safe: FINAL + 1n };
+    await ctx.index.syncHead(next);
+    expect(ctx.chain.ranges()).toHaveLength(before + 1);
+    // ...while requests still answer at H, from H's own read.
+    const old = await ctx.index.logs({ head: atH });
+    expect(old.map((l) => l.blockNumber)).toContain(H);
+    expect(old.filter((l) => l.blockNumber > H)).toEqual([]);
+    expect(ctx.chain.ranges()).toHaveLength(before + 1);
+    await ctx.index.logs();
+    expect(ctx.chain.ranges()).toHaveLength(before + 1);
+    // Then H+1 is served: its read is the one the engine made.
+    ctx.head.current = next;
+    await ctx.index.logs();
+    expect(ctx.chain.ranges()).toHaveLength(before + 1);
+  });
+
+  it("starts the backfill from syncHead, and rejects when the tail cannot be read", async () => {
+    const ctx = setup({});
+    await ctx.index.syncHead();
+    expect(ctx.index.status().state).not.toBe("idle");
+    await ctx.index.startBackfill();
+    expect(ctx.index.status().state).toBe("ready");
+
+    const failing = setup({
+      override: ({ from }) =>
+        from > FINAL ? new FakeRpcError(-32603, "internal error") : undefined,
+    });
+    await failing.index.startBackfill();
+    await expect(failing.index.syncHead()).rejects.toThrow(IndexUnavailable);
+  });
+
   it("answers a range at or below the boundary without a tail read", async () => {
     const ctx = setup({});
     await ctx.index.startBackfill();

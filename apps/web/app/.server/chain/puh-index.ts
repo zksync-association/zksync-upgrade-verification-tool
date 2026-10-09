@@ -13,6 +13,7 @@ import { type Network, chainHead, lanes, network, rpcGeneration } from "../rpc";
 import { scrubText, secretsOf } from "./jsonrpc";
 import {
   IndexClosed,
+  type IndexHead,
   type IndexStatus,
   type IndexedLog,
   type LogIndex,
@@ -139,6 +140,11 @@ export class PuhIndex {
     } catch {
       // Reported through status().
     }
+  }
+
+  /** Reads the tail for the current head (or `head`) now: the sync engine, ahead of requests. */
+  async syncHead(head?: IndexHead): Promise<void> {
+    await (await this.#index()).index.syncHead(head);
   }
 
   status(): PuhIndexStatus {

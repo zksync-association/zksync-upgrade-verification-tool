@@ -30,6 +30,11 @@ const baseEnv = createEnv({
     ZK_PROTOCOL_GOVERNOR_ADDRESS: addressSchema.optional(),
     ZK_TOKEN_GOVERNOR_ADDRESS: addressSchema.optional(),
     ZK_GOV_OPS_GOVERNOR_ADDRESS: addressSchema.optional(),
+    // The sync engine follows the chain head and refreshes shared reads ahead of requests:
+    // "window" while the app is in use (a request within SYNC_KEEPWARM_MS), "always", or "off"
+    // (every request reads on demand). Dev nodes (anvil, hardhat) always read on demand.
+    SYNC_MODE: z.enum(["window", "always", "off"]).default("window"),
+    SYNC_KEEPWARM_MS: z.coerce.number().int().min(0).default(600_000),
     ALLOW_INDEXING: z.coerce.boolean().default(false),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
     NODE_ENV: NodeEnvEnum.default("production"),

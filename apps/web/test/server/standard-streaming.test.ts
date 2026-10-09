@@ -40,19 +40,23 @@ vi.mock("@/.server/chain/puh-index", async (original) => ({
   }),
 }));
 
-vi.mock("@/.server/rpc", () => ({
-  network: async () => ({ isDevNode: state.devNode }),
-  safeBlockNumber: async () => (state.devNode ? -1n : 900n),
-  l1: {
+vi.mock("@/.server/rpc", () => {
+  const l1 = {
     getTransaction: async () => TRANSACTIONS[APPROVAL_TX],
     readContract: async ({ functionName }: { functionName: string }) => {
       if (functionName === "upgradeState") return UPGRADE_STATES.Done;
       if (functionName === "upgradeStatus") return [100, 200, false, false, true];
       throw new Error(`Unexpected ${functionName}`);
     },
-  },
-  latestBlock: async () => ({ number: 1_000n }),
-}));
+  };
+  return {
+    network: async () => ({ isDevNode: state.devNode }),
+    safeBlockNumber: async () => (state.devNode ? -1n : 900n),
+    latestBlock: async () => ({ number: 1_000n, hash: `0x${"0b".repeat(32)}` }),
+    l1,
+    l1State: l1,
+  };
+});
 // The historical checkSignatures is a direct eth_call (chain/call.ts).
 vi.mock("@/.server/chain/call", async (original) => ({
   ...(await original<typeof import("@/.server/chain/call")>()),

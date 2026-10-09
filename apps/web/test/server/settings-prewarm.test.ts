@@ -23,8 +23,15 @@ vi.mock("@/.server/prewarm", () => ({
   }),
 }));
 
+vi.mock("@/.server/sync/engine", () => ({
+  startSync: vi.fn(() => {
+    state.order.push("sync");
+  }),
+}));
+
 const { action } = await import("@/routes/settings/_route");
 const { prewarm } = await import("@/.server/prewarm");
+const { startSync } = await import("@/.server/sync/engine");
 
 const save = () =>
   action({
@@ -43,15 +50,16 @@ beforeEach(() => {
   state.order = [];
 });
 
-it("prewarms after a successful settings change, without waiting for it", async () => {
+it("prewarms and restarts the sync engine after a successful settings change, without waiting", async () => {
   const response = await save();
   expect(response.status).toBe(200);
-  expect(state.order).toEqual(["update", "prewarm:settings"]);
+  expect(state.order).toEqual(["update", "prewarm:settings", "sync"]);
 });
 
-it("does not prewarm when the settings were not saved", async () => {
+it("does not prewarm or restart the engine when the settings were not saved", async () => {
   state.fail = true;
   const response = await save();
   expect(response.status).toBe(400);
   expect(prewarm).not.toHaveBeenCalled();
+  expect(startSync).not.toHaveBeenCalled();
 });

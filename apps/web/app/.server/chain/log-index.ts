@@ -54,6 +54,8 @@ export type LogQuery = {
   /** How long to wait for the backfill to cover `fromBlock` before IndexIncomplete. */
   waitMs?: number;
   signal?: AbortSignal;
+  /** Answer at this head instead of the current one (the sync engine, before it publishes it). */
+  head?: IndexHead;
 };
 
 export type LogIndexOptions = {
@@ -106,6 +108,12 @@ export interface LogIndex {
   logs(query?: LogQuery): Promise<IndexedLog[]>;
   /** As logs(), with the finality boundary the answer was given at (see IndexRead). */
   read(query?: LogQuery): Promise<IndexRead>;
+  /**
+   * Reads the tail (finalizedTo, head] for the current head (or `head`) now, as the first query
+   * at that head would (and shared with it), and starts or resumes the backfill. Rejects when the
+   * tail cannot be read.
+   */
+  syncHead(head?: IndexHead): Promise<void>;
   /** Drops everything; later results are discarded and queries fail. */
   close(): void;
 }
@@ -712,7 +720,11 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
   // ---- heads ----
 
   let chain: Promise<unknown> = Promise.resolve();
-  let lastSync: { key: string; promise: Promise<Tail> } | null = null;
+  // The reads for the last few heads. A query answers from the read for its own head, and the
+  // sync engine reads a new head's tail before it serves that head: queries at the head still
+  // served meanwhile keep theirs instead of reading it again.
+  const recentSyncs = new Map<string, Promise<Tail>>();
+  const RECENT_HEADS = 4;
 
   /**
    * Reads (finalizedTo, head] once per head (number and hash); the part at or below the new
@@ -722,13 +734,17 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
    */
   function sync(head: IndexHead): Promise<Tail> {
     const key = `${head.head.number}:${head.head.hash.toLowerCase()}`;
-    if (lastSync?.key === key) return lastSync.promise;
+    const known = recentSyncs.get(key);
+    if (known) return known;
     const promise = chain.then(() => applyHead(head));
     chain = promise.catch(() => {});
-    const entry = { key, promise };
-    lastSync = entry;
+    recentSyncs.set(key, promise);
+    for (const old of recentSyncs.keys()) {
+      if (recentSyncs.size <= RECENT_HEADS) break;
+      recentSyncs.delete(old);
+    }
     promise.catch(() => {
-      if (lastSync === entry) lastSync = null;
+      if (recentSyncs.get(key) === promise) recentSyncs.delete(key);
     });
     return promise;
   }
@@ -792,15 +808,19 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     });
   }
 
+  /** The failure a query reports for now instead of hammering the RPC; null to resume. */
+  const recentFailure = () =>
+    failure !== null && Date.now() - failure.at < retryMs ? failure : null;
+
   async function read(query: LogQuery = {}): Promise<IndexRead> {
     ensureCurrent();
     const from = max(query.fromBlock ?? deployBlock, deployBlock);
-    const observed = await options.head();
+    const observed = query.head ?? (await options.head());
     ensureCurrent();
     anchor(observed.safe);
     if (!complete()) {
       // After a failure, report it for a while instead of hammering the RPC; then resume.
-      const recent = failure !== null && Date.now() - failure.at < retryMs ? failure : null;
+      const recent = recentFailure();
       if (recent && !covers(from)) throw unavailable(recent);
       if (!recent) void startBackfill();
     }
@@ -836,6 +856,15 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     return { logs: out, finalTo: top };
   }
 
+  async function syncHead(head?: IndexHead): Promise<void> {
+    ensureCurrent();
+    const observed = head ?? (await options.head());
+    ensureCurrent();
+    anchor(observed.safe);
+    if (!complete() && !recentFailure()) void startBackfill();
+    await sync(observed);
+  }
+
   return {
     label,
     address,
@@ -843,6 +872,7 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     startBackfill,
     logs: async (query) => (await read(query)).logs,
     read,
+    syncHead,
     finalRange: () => (anchored && bottom <= top ? { from: bottom, to: top } : null),
     status(): IndexStatus {
       const state: IndexState = failure
@@ -878,6 +908,7 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
       final = [];
       finalKeys.clear();
       pending.clear();
+      recentSyncs.clear();
       tail = null;
       notify();
     },

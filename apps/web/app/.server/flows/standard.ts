@@ -44,6 +44,7 @@ import {
 import { type Located, indexCannotAnswer, locateEvent } from "./indexed";
 import { findL2ProposalForUpgrade } from "./l2";
 import { defaultLogger } from "@config/log.server";
+import { type UpgradeStatus, currentUpgradeStatus } from "../upgrade-status";
 
 async function timedRead<T>(id: Hex, stage: string, read: () => Promise<T>): Promise<T> {
   const start = performance.now();
@@ -59,41 +60,10 @@ const DAY = 86_400n;
 // Longest a standard upgrade can still need signatures: 7-day extended legal veto + 30 days waiting.
 const ACTIVE_WINDOW_DAYS = 45n;
 
-type Status = {
-  creationTimestamp: number;
-  securityCouncilApprovalTimestamp: number;
-  guardiansApproval: boolean;
-  guardiansExtendedLegalVeto: boolean;
-  executed: boolean;
-};
+type Status = UpgradeStatus;
 
-async function readStatus(id: Hex): Promise<{ state: UpgradeState; status: Status }> {
-  const { upgradeHandler } = await network();
-  const [state, raw] = await Promise.all([
-    l1.readContract({
-      address: upgradeHandler,
-      abi: upgradeHandlerAbi,
-      functionName: "upgradeState",
-      args: [id],
-    }),
-    l1.readContract({
-      address: upgradeHandler,
-      abi: upgradeHandlerAbi,
-      functionName: "upgradeStatus",
-      args: [id],
-    }),
-  ]);
-  return {
-    state: state as UpgradeState,
-    status: {
-      creationTimestamp: raw[0],
-      securityCouncilApprovalTimestamp: raw[1],
-      guardiansApproval: raw[2],
-      guardiansExtendedLegalVeto: raw[3],
-      executed: raw[4],
-    },
-  };
-}
+/** The id's state and status at the current head (shared with the sync engine's reads). */
+const readStatus = (id: Hex) => currentUpgradeStatus(id);
 
 export type StartedUpgrade = {
   id: Hex;
@@ -214,8 +184,10 @@ async function startedUpgrade(
   try {
     started = await indexed;
     if (!started) {
-      // The status may come from a newer block than the head the index answered at (the head
-      // is cached for 4 s): look once more at the newest head before calling the index wrong.
+      // The status and the index each read the cached head on their own, and a newer head can be
+      // served between the two reads (the sync engine publishes the next block, or the head's
+      // 4 s run out; dev nodes read the status at 'latest'): look once more at the newest head
+      // before calling the index wrong.
       // Read directly, not through the cache, which could hand back another request's lookup
       // still answering at the old head.
       refreshHead();

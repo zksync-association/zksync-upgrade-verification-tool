@@ -31,6 +31,7 @@ import {
 } from "./common";
 import { collectMessages } from "./messages";
 import { findEmergencyEvent } from "./emergency-event";
+import { currentUpgradeStatus } from "../upgrade-status";
 
 // Emergency upgrades sign only the id = keccak256(abi.encode(calls, executor, salt)); Safe never
 // sees the calls or salt. Before execution they must come from the proposer (a payload file the
@@ -155,13 +156,8 @@ export async function loadEmergencyList({ allHistory = false } = {}) {
     // Concurrent current-state calls are batched by the RPC client. No archive or log scan needed.
     const entries = await Promise.all(
       [...byId.values()].map(async (entry) => {
-        const status = await l1.readContract({
-          address: gov.upgradeHandler,
-          abi: upgradeHandlerAbi,
-          functionName: "upgradeStatus",
-          args: [entry.id],
-        });
-        return status[4] ? null : entry;
+        const { status } = await currentUpgradeStatus(entry.id);
+        return status.executed ? null : entry;
       })
     );
     return {
@@ -285,12 +281,7 @@ export async function loadEmergencyUpgrade(
 ) {
   const gov = await governance();
   const board = gov.emergencyUpgradeBoard;
-  const state = await l1.readContract({
-    address: gov.upgradeHandler,
-    abi: upgradeHandlerAbi,
-    functionName: "upgradeState",
-    args: [id],
-  });
+  const { state } = await currentUpgradeStatus(id);
 
   const specs = [
     {

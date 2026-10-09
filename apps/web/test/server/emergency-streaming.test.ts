@@ -31,7 +31,11 @@ const state = vi.hoisted(() => ({
 }));
 // Executed emergency upgrades in the handler's log index: block → id. Blocks are 12 s apart from
 // timestamp 1,700,000,000 except one missed slot; the head is HEAD.
-const HEAD = { number: 26_128_706n, timestamp: 1_700_000_000n + 26_128_706n * 12n + 12n };
+const HEAD = {
+  number: 26_128_706n,
+  hash: `0x${"0e".repeat(32)}`,
+  timestamp: 1_700_000_000n + 26_128_706n * 12n + 12n,
+};
 const blockTime = (n: bigint) => 1_700_000_000n + n * 12n + (n > 26_100_000n ? 12n : 0n);
 const WEEK = 7n * 24n * 3600n;
 const EXECUTED: [bigint, `0x${string}`][] = [
@@ -77,20 +81,8 @@ vi.mock("@/.server/chain/puh-index", () => ({
     },
   }),
 }));
-vi.mock("@/.server/rpc", () => ({
-  network: async () => ({
-    isDevNode: false,
-    upgradeHandler: MAINNET.upgradeHandler,
-    upgradeHandlerDeployBlock: 21_788_382n,
-    blockTimeSeconds: 12,
-  }),
-  latestBlock: async () => HEAD,
-  safeBlockNumber: async () => HEAD.number - 64n,
-  blockTimestamps: async (numbers: bigint[]) => {
-    state.times(numbers);
-    return new Map(numbers.map((n) => [n, blockTime(n)]));
-  },
-  l1: {
+vi.mock("@/.server/rpc", () => {
+  const l1 = {
     getTransaction: async () => TRANSACTIONS[EMERGENCY_TX],
     readContract: async (params: {
       functionName: string;
@@ -103,8 +95,24 @@ vi.mock("@/.server/rpc", () => ({
         return [0, 0, false, false, params.args[0] === EMERGENCY_ID];
       throw new Error(`Unexpected ${params.functionName}`);
     },
-  },
-}));
+  };
+  return {
+    network: async () => ({
+      isDevNode: false,
+      upgradeHandler: MAINNET.upgradeHandler,
+      upgradeHandlerDeployBlock: 21_788_382n,
+      blockTimeSeconds: 12,
+    }),
+    latestBlock: async () => HEAD,
+    safeBlockNumber: async () => HEAD.number - 64n,
+    blockTimestamps: async (numbers: bigint[]) => {
+      state.times(numbers);
+      return new Map(numbers.map((n) => [n, blockTime(n)]));
+    },
+    l1,
+    l1State: l1,
+  };
+});
 // The historical EIP-1271 checks are direct eth_calls (chain/call.ts).
 vi.mock("@/.server/chain/call", async (original) => ({
   ...(await original<typeof import("@/.server/chain/call")>()),

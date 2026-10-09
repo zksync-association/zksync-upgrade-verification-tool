@@ -52,27 +52,25 @@ vi.mock("@/.server/cache", async (importOriginal) => {
 vi.mock("@/.server/rpc", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/.server/rpc")>();
   const { FakeRpcError } = await import("../support/fake-jsonrpc");
-  return {
-    ...actual,
-    l1: {
-      getBlockNumber: async () => HEAD,
-      readContract: async ({
-        functionName,
-        args,
-        blockNumber,
-      }: { functionName: string; args: [Hex]; blockNumber?: bigint }) => {
-        if (functionName !== "upgradeStatus") throw new Error(`Unexpected ${functionName}`);
-        if (blockNumber !== undefined) state.archiveReads++;
-        const at = state.executedAt.get(args[0].toLowerCase());
-        return [0, 0, false, false, at !== undefined && (blockNumber ?? HEAD) >= at];
-      },
-      request: async ({ method, params }: { method: string; params: unknown[] }) => {
-        const result = state.chain?.handle({ id: 0, method, params });
-        if (result instanceof FakeRpcError) throw new Error(result.message);
-        return result;
-      },
+  const l1 = {
+    getBlockNumber: async () => HEAD,
+    readContract: async ({
+      functionName,
+      args,
+      blockNumber,
+    }: { functionName: string; args: [Hex]; blockNumber?: bigint }) => {
+      if (functionName !== "upgradeStatus") throw new Error(`Unexpected ${functionName}`);
+      if (blockNumber !== undefined) state.archiveReads++;
+      const at = state.executedAt.get(args[0].toLowerCase());
+      return [0, 0, false, false, at !== undefined && (blockNumber ?? HEAD) >= at];
+    },
+    request: async ({ method, params }: { method: string; params: unknown[] }) => {
+      const result = state.chain?.handle({ id: 0, method, params });
+      if (result instanceof FakeRpcError) throw new Error(result.message);
+      return result;
     },
   };
+  return { ...actual, l1, l1State: l1 };
 });
 
 // The archive bisection's upgradeStatus reads are direct eth_calls (chain/call.ts).

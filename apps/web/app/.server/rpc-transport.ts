@@ -9,13 +9,19 @@ export type LimitedHttpOptions = {
   maxInFlight: number;
   /** Requests per JSON-RPC batch. Defaults to `maxInFlight`. */
   batchSize?: number;
+  /**
+   * false: one request per POST. viem batches JSON-RPC requests per URL across every transport,
+   * so this is the only way to keep this transport's requests out of other transports' batches
+   * (and their slow entries). Default true.
+   */
+  batch?: boolean;
 };
 
 /** Batch read-only JSON-RPC traffic, with a per-client fallback for providers rejecting batches. */
 export function limitedHttp(url: string, options: LimitedHttpOptions): Transport {
   const { label, maxInFlight } = options;
   const limit = concurrencyLimit(maxInFlight);
-  let acceptsBatch: boolean | undefined;
+  let acceptsBatch: boolean | undefined = options.batch === false ? false : undefined;
   const batchUnavailable = () => acceptsBatch === false;
   const httpOptions = { timeout: 10_000, retryCount: 0 };
   const single = http(url, httpOptions);

@@ -18,9 +18,10 @@ export function indexCannotAnswer(error: unknown, net: { isDevNode: boolean }): 
 
 /**
  * The one `name` event for `id`, for an event the contract's current state says has happened.
- * That state is read at 'latest', which can be newer than the head the index answered at (the
- * head is cached for 4 s), so a miss is looked up once more at the newest head. Null only when
- * that read has no event either. Two events for one id is an error.
+ * That state and the index each read the cached head on their own (dev nodes read the state at
+ * 'latest'), and a newer head can be served between the two reads (the sync engine publishes the
+ * next block, or the head's 4 s run out), so a miss is looked up once more at the newest head.
+ * Null only when that read has no event either. Two events for one id is an error.
  */
 export async function expectedEvent<N extends PuhEventName>(
   name: N,

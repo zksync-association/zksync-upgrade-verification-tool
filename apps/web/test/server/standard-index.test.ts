@@ -53,38 +53,36 @@ vi.mock("@/.server/cache", async (importOriginal) => {
 vi.mock("@/.server/rpc", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/.server/rpc")>();
   const { FakeRpcError } = await import("../support/fake-jsonrpc");
-  return {
-    ...actual,
-    l1: {
-      readContract: async ({ functionName, args }: { functionName: string; args: [Hex] }) => {
-        await state.barrier?.("status");
-        const status = state.status.get(args[0].toLowerCase());
-        if (functionName === "upgradeState") {
-          if (!status) return UPGRADE_STATES.None;
-          return status[2] ? UPGRADE_STATES.Done : UPGRADE_STATES.LegalVetoPeriod;
-        }
-        if (functionName === "upgradeStatus") {
-          const [created, approved, executed] = status ?? [0, 0, false];
-          return [created, approved, false, false, executed];
-        }
-        throw new Error(`Unexpected ${functionName}`);
-      },
-      // Not an approval call: the evidence keeps its transaction and decodes nothing more.
-      getTransaction: async ({ hash }: { hash: Hex }) => {
-        state.transactions.push(hash);
-        return { hash, to: "0x0000000000000000000000000000000000000001", input: "0x" };
-      },
-      getBlock: async ({ blockNumber }: { blockNumber: bigint }) => {
-        state.headers.push(blockNumber);
-        return { number: blockNumber, timestamp: 1_700_000_000n + blockNumber * 12n };
-      },
-      request: async ({ method, params }: { method: string; params: unknown[] }) => {
-        const result = state.chain?.handle({ id: 0, method, params });
-        if (result instanceof FakeRpcError) throw new Error(result.message);
-        return result;
-      },
+  const l1 = {
+    readContract: async ({ functionName, args }: { functionName: string; args: [Hex] }) => {
+      await state.barrier?.("status");
+      const status = state.status.get(args[0].toLowerCase());
+      if (functionName === "upgradeState") {
+        if (!status) return UPGRADE_STATES.None;
+        return status[2] ? UPGRADE_STATES.Done : UPGRADE_STATES.LegalVetoPeriod;
+      }
+      if (functionName === "upgradeStatus") {
+        const [created, approved, executed] = status ?? [0, 0, false];
+        return [created, approved, false, false, executed];
+      }
+      throw new Error(`Unexpected ${functionName}`);
+    },
+    // Not an approval call: the evidence keeps its transaction and decodes nothing more.
+    getTransaction: async ({ hash }: { hash: Hex }) => {
+      state.transactions.push(hash);
+      return { hash, to: "0x0000000000000000000000000000000000000001", input: "0x" };
+    },
+    getBlock: async ({ blockNumber }: { blockNumber: bigint }) => {
+      state.headers.push(blockNumber);
+      return { number: blockNumber, timestamp: 1_700_000_000n + blockNumber * 12n };
+    },
+    request: async ({ method, params }: { method: string; params: unknown[] }) => {
+      const result = state.chain?.handle({ id: 0, method, params });
+      if (result instanceof FakeRpcError) throw new Error(result.message);
+      return result;
     },
   };
+  return { ...actual, l1, l1State: l1 };
 });
 
 vi.mock("@/.server/governance", () => ({
@@ -321,12 +319,11 @@ describe("one upgrade", () => {
     expect(chain.queries.length).toBe(again);
   });
 
-  it("finds an execution in a block newer than the cached head", async () => {
+  it("reads the state at the cached head, and finds the execution once the head moves", async () => {
     const { chain } = upstream();
     await puhIndex().startBackfill();
     const id = upgradeProposalId(RECENT);
-    // A page load caches the head; the upgrade is executed in the next block, and the state
-    // (read at 'latest') already says Done.
+    // A page load caches the head; the upgrade is executed in the next block.
     await getStandardUpgradeOverview(id);
     const executed: ChainLog = {
       blockNumber: HEAD + 1n,
@@ -336,6 +333,12 @@ describe("one upgrade", () => {
     chain.options.logs.push(executed);
     chain.options.head = { number: HEAD + 1n };
     state.status.set(id, [Number(time(RECENT_BLOCK)), 0, true]);
+    // The state is the one at the cached head (read at that block), like the index's view.
+    const before = await getStandardUpgradeOverview(id);
+    expect(before.state).toBe(UPGRADE_STATES.LegalVetoPeriod);
+    expect(before.executedTx).toBeNull();
+    // The head expires: state and execution are both read at the new head.
+    invalidate("latest-block");
     const overview = await getStandardUpgradeOverview(id);
     expect(overview.state).toBe(UPGRADE_STATES.Done);
     expect(overview.executedTx).toBe(txHash(executed));

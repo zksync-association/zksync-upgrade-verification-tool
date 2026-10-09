@@ -7,6 +7,20 @@ const store = new Map<string, Entry<unknown>>();
 
 export const FOREVER = Number.POSITIVE_INFINITY;
 
+// Entries keyed by a block hash are never asked for again once the head moves on, so expired
+// entries are dropped now and then instead of piling up for the life of the process.
+const SWEEP_EVERY_MS = 60_000;
+let lastSweep = Date.now();
+
+function sweepExpired() {
+  const now = Date.now();
+  // A clock stepped back (NTP) must not postpone the next sweep until it catches up.
+  if (now >= lastSweep && now - lastSweep < SWEEP_EVERY_MS) return;
+  lastSweep = now;
+  // An entry in flight never expires (FOREVER until it resolves).
+  for (const [key, entry] of store) if (entry.expiresAt <= now) store.delete(key);
+}
+
 /**
  * Returns the cached value for `key`, or computes it. Concurrent callers share one in-flight
  * promise. Rejections are never cached.
@@ -19,6 +33,7 @@ export function cached<T>(key: string, ttlMs: number, compute: () => Promise<T>)
     return hit.value;
   }
 
+  sweepExpired();
   const value = compute();
   const entry = { value, expiresAt: FOREVER };
   store.set(key, entry);
@@ -51,6 +66,7 @@ export function cachedUntil<T>(
   const hit = store.get(key) as Entry<T> | undefined;
   if (hit && hit.expiresAt > Date.now()) return hit.value;
 
+  sweepExpired();
   const result = compute();
   const value = result.then((r) => r.value);
   const entry = { value, expiresAt: FOREVER };
@@ -77,7 +93,30 @@ export function seed<T>(key: string, value: T, ttlMs: number) {
   if (ttlMs <= 0) return;
   const hit = store.get(key);
   if (hit && hit.expiresAt > Date.now()) return;
+  sweepExpired();
   store.set(key, { value: Promise.resolve(value), expiresAt: Date.now() + ttlMs });
+}
+
+/**
+ * Stores a value already in hand under `key` for `ttlMs`, in place of whatever is there (resolved
+ * or still in flight). For values read ahead of requests (the sync engine): callers already
+ * waiting on a replaced read still get that read's answer, which is then not stored.
+ */
+export function replace<T>(key: string, value: T, ttlMs: number) {
+  if (ttlMs <= 0) return;
+  sweepExpired();
+  store.set(key, { value: Promise.resolve(value), expiresAt: Date.now() + ttlMs });
+}
+
+/**
+ * How much longer the entry under `key` is served: null when there is none (or it expired),
+ * Infinity while its read is still in flight or when it is kept for good.
+ */
+export function remainingMs(key: string): number | null {
+  const hit = store.get(key);
+  if (!hit) return null;
+  const left = hit.expiresAt - Date.now();
+  return left > 0 ? left : null;
 }
 
 export function invalidate(prefix: string) {
@@ -90,6 +129,11 @@ export function invalidate(prefix: string) {
 
 export function clearCache() {
   store.clear();
+}
+
+/** Entries held, expired ones not yet dropped included. */
+export function cacheSize(): number {
+  return store.size;
 }
 
 /** Runs at most `limit` tasks at once. */

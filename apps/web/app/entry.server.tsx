@@ -13,9 +13,11 @@ import { RemixServer } from "@remix-run/react";
 import { isbot } from "isbot";
 import { renderToPipeableStream } from "react-dom/server";
 
-// The server (server/index.ts) warms caches after it starts listening. It must reach this
-// build's own modules (build.entry.module.prewarm), not a second copy bundled into the server.
+// The server (server/index.ts) warms caches after it starts listening, starts the sync engine,
+// and marks every request as activity for it. It must reach this build's own modules
+// (build.entry.module), not a second copy bundled into the server.
 export { prewarm } from "@/.server/prewarm";
+export { startSync, touchSync } from "@/.server/sync/engine";
 
 const ABORT_DELAY = 60_000;
 
