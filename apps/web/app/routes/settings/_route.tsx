@@ -1,3 +1,4 @@
+import { prewarm } from "@/.server/prewarm";
 import { requireLocalSettings, settingsSummary, updateSettings } from "@/.server/settings";
 import { PageHeader } from "@/components/page";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ export async function action({ request }: ActionFunctionArgs) {
   requireLocalSettings(request);
   try {
     await updateSettings(await request.formData());
+    // Warm the new data sources in the background (never rejects; PREWARM=0 turns it off).
+    void prewarm("settings");
     return json({ saved: true, error: null }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return json(

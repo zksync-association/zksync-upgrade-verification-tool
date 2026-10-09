@@ -1,5 +1,5 @@
 import { env } from "@config/env.server";
-import { puhIndex } from "./chain/puh-index";
+import { type PuhIndexStatus, puhIndex } from "./chain/puh-index";
 import { type Governance, governance } from "./governance";
 import { type LogHistoryStatus, checkLogHistory } from "./logs";
 import { ConfigError, l1, network } from "./rpc";
@@ -7,6 +7,12 @@ import { quota } from "./safe-api";
 
 // What the header, footer and every page's trust panel show: which chain the RPC is on, the
 // pinned trust anchor, everything derived from it, and anything that should worry a signer.
+
+/**
+ * Background reads, for information: `index` is the ProtocolUpgradeHandler log index (deployment
+ * to head). Lists wait for it, for a bounded time, or fail; they never answer from part of it.
+ */
+export type SyncStatus = { index: PuhIndexStatus };
 
 export type AppStatus =
   | {
@@ -16,6 +22,7 @@ export type AppStatus =
       safeApi: { url: string | null; withKey: boolean; quota: typeof quota };
       l2RpcConfigured: boolean;
       clientVersion: string;
+      sync: SyncStatus;
     }
   | { ok: false; error: string; hint: string };
 
@@ -29,6 +36,7 @@ export async function appStatus(): Promise<AppStatus> {
       safeApi: { url: net.safeTxServiceUrl, withKey: !!env.SAFE_API_KEY, quota: { ...quota } },
       l2RpcConfigured: net.l2RpcUrl !== null,
       clientVersion: net.clientVersion,
+      sync: { index: puhIndex().status() },
     };
   } catch (error) {
     if (error instanceof ConfigError) {

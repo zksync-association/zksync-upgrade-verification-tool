@@ -123,6 +123,21 @@ async function checkRpc() {
   return known ?? `chain ${chainId}`;
 }
 
+// Warms the caches a first page needs (network, governance, the handler's log index, Safe
+// listings) through the app build's own modules, so requests share them. PREWARM=0 turns it off
+// (the build's prewarm() checks). Logs step names and timings only, and never stops the server.
+async function prewarmApp() {
+  try {
+    // A module in production; in development a function that loads it from Vite.
+    const build = (await getBuild()) as ServerBuild | (() => Promise<ServerBuild>);
+    const { entry } = typeof build === "function" ? await build() : build;
+    const { prewarm } = entry.module as { prewarm?: (reason: "boot") => Promise<void> };
+    await prewarm?.("boot");
+  } catch {
+    console.warn("Start-up warm-up skipped; pages read everything on first use.");
+  }
+}
+
 async function startServer() {
   try {
     const chain = await checkRpc();
@@ -154,6 +169,7 @@ async function startServer() {
           .filter(Boolean)
           .join("\n")
       );
+      void prewarmApp();
     });
 
     closeWithGrace(async () => {

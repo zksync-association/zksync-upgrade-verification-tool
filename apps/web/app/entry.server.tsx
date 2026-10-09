@@ -13,6 +13,10 @@ import { RemixServer } from "@remix-run/react";
 import { isbot } from "isbot";
 import { renderToPipeableStream } from "react-dom/server";
 
+// The server (server/index.ts) warms caches after it starts listening. It must reach this
+// build's own modules (build.entry.module.prewarm), not a second copy bundled into the server.
+export { prewarm } from "@/.server/prewarm";
+
 const ABORT_DELAY = 60_000;
 
 const logger = defaultLogger.child({ module: "remix" });

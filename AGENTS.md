@@ -26,6 +26,11 @@ curl -s localhost:3000/api/status | jq '{ok, chain: .governance.network.label, w
 The first load of a page takes up to about 15 s. Without a Safe API key, Safe allows 2 requests/s, and every result
 is cached for a minute.
 
+At start the app reads the ProtocolUpgradeHandler's log history in the background (`PREWARM=0` turns this off).
+`/api/status` shows its progress in `sync.index`: `state` goes from `idle` to `backfilling` to `ready`, or is
+`unavailable` with an `error`. Lists wait a bounded time for it and fail rather than answer from part of the
+history. `logHistory` is still the check that counts.
+
 ## Verify
 
 Every page has a JSON twin. Both run the same code.
