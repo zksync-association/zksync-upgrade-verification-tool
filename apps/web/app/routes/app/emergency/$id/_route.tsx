@@ -1,3 +1,4 @@
+import { pageLoad, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import {
   type EmergencyDetail,
@@ -54,12 +55,14 @@ export const meta = Meta["/app/emergency/:id"];
 export function loader({ params, request }: LoaderFunctionArgs) {
   const id = parseId(params.id);
   // The page shows the signatures' first answer at once (possibly from an older block or older
-  // Safe copies, labelled) and the strict result after it in the same response.
-  const loading = loadEmergencyUpgrade(id, {
-    supplied: suppliedSignatures(request),
-    freshness: "page",
-  });
+  // Safe copies, labelled) and the strict result after it in the same response. Its sets' keys
+  // join the page load's grace as they are found.
+  const page = pageLoad(request, [watchKeys.emergency(id)]);
+  const loading = page.run(() =>
+    loadEmergencyUpgrade(id, { supplied: suppliedSignatures(request), freshness: "page" })
+  );
   return defer({
+    watch: page.watch,
     id,
     detail: loading.then((d) => d.overview),
     // While this run's index reads the history, the execution may come first from the history

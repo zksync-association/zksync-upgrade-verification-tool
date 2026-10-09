@@ -318,10 +318,6 @@ async function recentFromScan(client: PublicClient, governor: Address): Promise<
   return Promise.all(logs.map((log) => viewOf(client, governor, log, null)));
 }
 
-// When the vetoable proposals (or a veto's proposal) were last asked for, for the sync engine.
-let vetoInterestAt: number | null = null;
-const VETO_INTEREST_MS = 10 * 60_000;
-
 /**
  * Proposals on the Token and GovOps governors that Guardians can still veto (Pending or Active,
  * or a state value the app does not know: listed rather than hidden). A failed read fails the list.
@@ -338,7 +334,6 @@ export async function activeL2Proposals(): Promise<L2ProposalView[]> {
 export async function activeL2ProposalsAnswer({
   provisional = false,
 }: { provisional?: boolean } = {}): Promise<VetoableAnswer> {
-  vetoInterestAt = Date.now();
   const client = await l2();
   if (!client) return { proposals: [], provisional: false };
   const [net, all] = await Promise.all([network(), knownGovernors()]);
@@ -369,14 +364,13 @@ export async function activeL2ProposalsAnswer({
 }
 
 /**
- * For the sync engine, on a new L1 head: when vetoable proposals were asked for in the last 10
- * minutes, reads Era's head now, the governor index's tail at the Era head served then (this one,
- * unless a newer one is known) and those proposals' states, so requests in the next 4 s find them
- * in memory. False when they were not asked for lately, no vetoable governor is indexed, or Era
- * does not know the 'finalized' tag (requests then scan on demand).
+ * For the sync engine, on a new L1 head while a page showing ZKsync Era is on screen: reads Era's
+ * head now, the governor index's tail at the Era head served then (this one, unless a newer one is
+ * known) and the vetoable proposals' states, so requests in the next 4 s find them in memory.
+ * False when no vetoable governor is indexed, or Era does not know the 'finalized' tag (requests
+ * then scan on demand).
  */
 export async function refreshVetoableL2(): Promise<boolean> {
-  if (vetoInterestAt === null || Date.now() - vetoInterestAt > VETO_INTEREST_MS) return false;
   const client = await l2();
   if (!client) return false;
   const [net, all] = await Promise.all([network(), knownGovernors()]);
@@ -398,7 +392,6 @@ export async function getL2Proposal(
   governor: Address,
   proposalId: bigint
 ): Promise<L2ProposalView | null> {
-  vetoInterestAt = Date.now();
   const client = await l2();
   if (!client) return null;
   const net = await network();

@@ -66,7 +66,11 @@ vi.mock("@/.server/governance", async () => {
   };
 });
 
-const { verifySignatureSet, firstSignatureSet } = await import("@/.server/signatures");
+const { verifySignatureSet, firstSignatureSet, watchSignatureSet } = await import(
+  "@/.server/signatures"
+);
+/** The key a page reports for a set it shows. */
+const SET_KEY = /^set:[0-9a-f]{32}$/;
 const { streamSignatureSet } = await import("@/.server/flows/common");
 const { collectHeldMessages, collectMessages } = await import("@/.server/flows/messages");
 const { listSafeMessages } = await import("@/.server/safe/store");
@@ -282,7 +286,10 @@ describe("a page's first answer for a signature set", () => {
     const page = streamSignatureSet({ ...params }, "page");
     const [first, fresh] = await Promise.all([page.immediate, page.fresh]);
     expect(first).toBe(fresh);
-    expect(first).toBe(strict);
+    // The page's copy of the strict result, with the key the page reports while it shows the
+    // set; JSON's (the kept result) has none.
+    expect(first).toEqual({ ...strict, watch: { key: expect.stringMatching(SET_KEY), rev: null } });
+    expect(strict.watch).toBeUndefined();
     expect(first.stale).toBe(false);
     expect(state.sent.length).toBe(sent);
   });
@@ -346,6 +353,8 @@ describe("a page's first answer for a signature set", () => {
     release();
     const set = await strict.fresh;
     expect(set.stale).toBe(false);
+    // JSON never carries a page's key.
+    expect(set.watch).toBeUndefined();
     expect(Date.parse(set.safeFetchedAt as string)).toBeGreaterThan(readAt + 10 * 60_000 - 1);
   });
 });
@@ -360,6 +369,8 @@ describe("a signature the viewer supplies (?sig=)", () => {
     const [first, fresh] = await Promise.all([withSig.immediate, withSig.fresh]);
     expect(first).toBe(fresh);
     expect(first.members[1]).toMatchObject({ status: "valid", source: "supplied" });
+    // The page reports the set without the signature: the same key as without it.
+    expect(first.watch).toEqual(watchSignatureSet({ ...params }));
     expect((await verifySignatureSet({ ...params, supplied })).thresholdCheck.status).toBe("met");
 
     // Without it, at the same head: nothing kept carries it.

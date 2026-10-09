@@ -22,6 +22,7 @@ import {
   isAddressEqual,
   keccak256,
 } from "viem";
+import { createHash } from "node:crypto";
 import { FOREVER, cached, cachedUntil, concurrencyLimit, linkStore, peek } from "./cache";
 import {
   type CallRequest,
@@ -41,12 +42,12 @@ import {
   freshListingVersion,
   listSafeMessages,
   lookupSafeMessage,
-  markSafeDemand,
   onSafeListingChange,
   peekHeldSafeMessage,
   peekSafeMessage,
 } from "./safe/store";
 import { SafeApiError, safeWalletUrl } from "./safe-api";
+import { type WatchItem, onPageLoad, presence } from "./sync/presence";
 
 // The verification core. A signature counts only if the contract that will consume it accepts it in
 // an eth_call: Multisig.checkSignatures for council/guardian members, and the Safe's own
@@ -64,12 +65,11 @@ import { SafeApiError, safeWalletUrl } from "./safe-api";
 // block at that height during a reorg can still answer for it, until the head moves on.) A whole
 // set's result is kept per head too, while the Safe listings and Safe info it was computed from
 // are still the ones served (listings at most 60 s old); a request that finds the set being
-// computed takes that result only on the same terms, and otherwise computes it itself. The sets
-// pages viewed are remembered for 24 hours; the sync engine computes them again at each new head
-// before it serves that head to requests (see precomputeSignatureSets): while the app is in use,
-// those viewed in the last 10 minutes and those that were open (still signable) when last viewed;
-// while it is idle, only the open ones. Nothing involving a signature the viewer supplied (?sig=)
-// is kept.
+// computed takes that result only on the same terms, and otherwise computes it itself. Each set a
+// page shows has a key (`set:…`, see watchSignatureSet) the page reports as on screen
+// (sync/presence.ts); the sync engine computes the sets on screen again at each new head before
+// it serves that head to requests (see precomputeSignatureSets), and nothing else. Nothing
+// involving a signature the viewer supplied (?sig=) is kept, keyed or registered.
 //
 // Pages may show a first answer before that result (see firstSignatureSet): the set's last result,
 // labelled with the block it was verified at, or a verification at the head from Safe listings
@@ -139,6 +139,12 @@ export type SignatureSet = {
   stale?: boolean;
   /** On a stale first answer: the head the strict result is being verified at, when known. */
   reverifyingAt?: string | null;
+  /**
+   * Pages only (never /api/* JSON): the key the page reports while it shows this set (see
+   * watchSignatureSet), the same for every answer of the set and never derived from a supplied
+   * signature.
+   */
+  watch?: WatchItem;
 };
 
 /**
@@ -323,10 +329,7 @@ export type SignatureSetParams = {
   supplied?: MemberSignature[];
   /** A past block to check at (verdicts kept for good once it is final). Omitted: the head. */
   blockNumber?: bigint;
-  /**
-   * The set's state is open (it can still be signed and executed): the sync engine keeps
-   * computing it at each new head even while nobody uses the app. Default false.
-   */
+  /** The set's state is open (it can still be signed and executed). Default false. */
   open?: boolean;
 };
 
@@ -400,9 +403,7 @@ export async function verifySignatureSet(params: SignatureSetParams): Promise<Si
   // Supplied signatures are checked afresh every time, and nothing about them is kept.
   if (supplied.length > 0)
     return (await computeSet(params, supplied, { kind: "head", head }, fromSafe)).set;
-  const spec = specOf(params);
-  watch(spec, params.open === true);
-  return memoized(spec, head, false);
+  return memoized(specOf(params), head, false);
 }
 
 /**
@@ -691,7 +692,7 @@ async function resolveSet(
   const key = memoKey(spec, head);
   for (let joins = 0; joins < MAX_JOINS; joins++) {
     const found = memo.get(key);
-    if (holds(found)) return answered(found.kept, background);
+    if (holds(found)) return answered(found.kept);
     if (!found || found.kept !== null || found.expiresAt <= Date.now()) break;
     const shared = await found.promise.then(
       (computed) => ({ ok: true as const, computed }),
@@ -701,7 +702,7 @@ async function resolveSet(
       // Taken only if it stands for what is served now: a listing it came from may have changed
       // or turned 60 s old, or a Safe's info been read again, while it was computed. Otherwise
       // this call reads them itself, as it would have without it.
-      if (stands(shared.computed)) return answered(shared.computed, background);
+      if (stands(shared.computed)) return answered(shared.computed);
     } else if (background || !found.background) {
       throw shared.error;
     }
@@ -710,9 +711,7 @@ async function resolveSet(
   return { set: computed.set, computed: true };
 }
 
-function answered(computed: Computed, background: boolean) {
-  // A page answered from these listings: the sweep keeps them fresh as if it had read them.
-  if (!background) markSafeDemand(computed.listings.keys());
+function answered(computed: Computed) {
   return { set: computed.set, computed: false };
 }
 
@@ -838,70 +837,76 @@ function asFirstAnswer(set: SignatureSet, head: BlockRef | null): SignatureSet {
   return { ...set, stale: true, reverifyingAt: head ? head.number.toString() : null };
 }
 
-// The sets pages verified (without supplied signatures) in the last 24 hours, at most 256, most
-// recent last, each with whether it was open when last viewed. A precompute covers, most recently
-// viewed first, up to 64 of those viewed in the last 10 minutes (only while the app is in use) and
-// up to 16 open ones: any URL a visitor opens registers a set, so what runs at every block stays
-// bounded.
-const WATCH_LIMIT = 256;
-const WATCH_FOR_MS = 24 * 60 * 60_000;
-const RECENT_MS = 10 * 60_000;
-const PRECOMPUTE_RECENT_LIMIT = 64;
-const PRECOMPUTE_OPEN_LIMIT = 16;
-type Watched = { spec: SetSpec; viewedAt: number; open: boolean };
-const watched = new Map<string, Watched>();
+// The sets pages show, by the key each page reports while it shows one (watchSignatureSet): at
+// most 256, each for 24 hours after a page last showed it, most recent last. Only pages register
+// sets (JSON never does), and only without supplied signatures (a page with ?sig= registers its
+// set without them). A precompute covers the sets whose keys are on screen now (presence), at
+// most 64: what runs at every block stays bounded whatever URLs are opened.
+const PAGE_SETS_LIMIT = 256;
+const PAGE_SET_FOR_MS = 24 * 60 * 60_000;
+const PRECOMPUTE_LIMIT = 64;
+type PageSet = { spec: SetSpec; shownAt: number; open: boolean };
+const pageSets = new Map<string, PageSet>();
 
-function watch(spec: SetSpec, open: boolean) {
-  watched.delete(spec.key);
-  watched.set(spec.key, { spec, viewedAt: Date.now(), open });
-  while (watched.size > WATCH_LIMIT) {
-    const oldest = watched.keys().next().value as string;
-    watched.delete(oldest);
-  }
+/** A set's page key: `set:` and the first 16 bytes of sha256 of its spec key, in hex. */
+function setKeyOf(spec: SetSpec): string {
+  return `set:${createHash("sha256").update(spec.key).digest("hex").slice(0, 32)}`;
 }
 
-/** The sets remembered (viewed in the last 24 hours), most recent first. */
-function watchedSets(): Watched[] {
+/**
+ * For a page that shows this set (flows/common.ts, page freshness): remembers the set under its
+ * key, for the engine to verify at each new head while the key is on screen, and returns the key
+ * the page reports (`watch`). Supplied signatures are never part of it. Shown while a page loads
+ * (its loader's work runs in sync/presence.ts pageLoad), the key is on screen for that load's
+ * grace at once, before the page's first beat.
+ */
+export function watchSignatureSet(params: SignatureSetParams): WatchItem {
+  const spec = specOf(params);
+  const key = setKeyOf(spec);
+  pageSets.delete(key);
+  pageSets.set(key, { spec, shownAt: Date.now(), open: params.open === true });
+  while (pageSets.size > PAGE_SETS_LIMIT) pageSets.delete(pageSets.keys().next().value as string);
+  onPageLoad(key);
+  return { key, rev: null };
+}
+
+/** The sets pages showed in the last 24 hours that are on screen now, most recent first. */
+function onScreenSets(): PageSet[] {
+  const keys = presence().onScreen();
   const now = Date.now();
-  const sets: Watched[] = [];
-  for (const [key, entry] of watched) {
-    if (now - entry.viewedAt > WATCH_FOR_MS) watched.delete(key);
-    else sets.push(entry);
+  const sets: PageSet[] = [];
+  for (const [key, entry] of pageSets) {
+    if (now - entry.shownAt > PAGE_SET_FOR_MS) pageSets.delete(key);
+    else if (keys.has(key)) sets.push(entry);
   }
   return sets.reverse();
 }
 
-/**
- * What a precompute covers: while the app is in use (`viewing`), the sets viewed in the last 10
- * minutes and the open ones; while idle, only the open ones. Most recently viewed first, bounded.
- */
-function precomputeSpecs(viewing: boolean): SetSpec[] {
-  const now = Date.now();
-  const specs: SetSpec[] = [];
-  let recent = 0;
-  let open = 0;
-  for (const entry of watchedSets()) {
-    if (entry.open && open < PRECOMPUTE_OPEN_LIMIT) {
-      open++;
-      specs.push(entry.spec);
-    } else if (viewing && now - entry.viewedAt <= RECENT_MS && recent < PRECOMPUTE_RECENT_LIMIT) {
-      recent++;
-      specs.push(entry.spec);
-    }
-  }
-  return specs;
+/** What a precompute covers: the sets on screen, most recently shown first, at most 64. */
+function precomputeSpecs(): SetSpec[] {
+  return onScreenSets()
+    .slice(0, PRECOMPUTE_LIMIT)
+    .map((entry) => entry.spec);
 }
 
-/** How many watched sets a precompute verifies at once (each is one POST of eth_calls or so). */
+/**
+ * The signer group and member Safes of each set on screen (the Safe store keeps their listings
+ * fresh while the app is in use).
+ */
+export function onScreenSigners(): { group: SignerGroup; members: readonly Address[] }[] {
+  return precomputeSpecs().map((spec) => ({ group: spec.signerGroup, members: spec.members }));
+}
+
+/** How many sets a precompute verifies at once (each is one POST of eth_calls or so). */
 const PRECOMPUTE_CONCURRENCY = 4;
 
 export type PrecomputeRun = {
   block: string;
   /** "head": a new head; "safe": a member Safe's listing changed. */
   trigger: "head" | "safe";
-  /** "viewing": recently viewed and open sets; "idle": open sets only. */
+  /** "viewing": someone uses the app; "idle": nobody does (then nothing is on screen). */
   profile: "viewing" | "idle";
-  /** Watched sets considered. */
+  /** Sets on screen considered. */
   sets: number;
   /** Verified now. */
   verified: number;
@@ -917,22 +922,21 @@ export type PrecomputeRun = {
 let lastRun: PrecomputeRun | null = null;
 
 // settings changes and dev-node refreshes (clearCache) drop kept results, the sets' last results
-// and watched sets alike; an invalidate() covering "verify:" drops the results.
+// and the sets pages showed alike; an invalidate() covering "verify:" drops the results.
 linkStore("verify:", (prefix) => {
   memo.clear();
   lastResults.clear();
   if (prefix === null) {
-    watched.clear();
+    pageSets.clear();
     lastRun = null;
   }
 });
 
 /**
- * Verifies at `head` the watched sets (see precomputeSpecs: with `viewing`, the default, those
- * viewed in the last 10 minutes and the open ones; otherwise only the open ones; only those with a
- * member in `safes`, when given), so the next request at that head finds them. Only Safe listings
- * the store holds (at most 60 s old) are used; a set that would need Safe is left to the request.
- * Never rejects; failures leave nothing kept.
+ * Verifies at `head` the sets on screen (see precomputeSpecs; only those with a member in `safes`,
+ * when given), so the next request at that head finds them. Only Safe listings the store holds (at
+ * most 60 s old) are used; a set that would need Safe is left to the request. `viewing` (default
+ * true) only labels the run. Never rejects; failures leave nothing kept.
  */
 export async function precomputeSignatureSets(
   head: BlockRef,
@@ -942,7 +946,7 @@ export async function precomputeSignatureSets(
   const current = options.current ?? (() => true);
   const safes = options.safes;
   const viewing = options.viewing ?? true;
-  const specs = precomputeSpecs(viewing).filter(
+  const specs = precomputeSpecs().filter(
     (spec) => !safes || spec.members.some((m) => safes.has(m.toLowerCase()))
   );
   const run: PrecomputeRun = {
@@ -980,7 +984,7 @@ export async function precomputeSignatureSets(
   return run;
 }
 
-/** Drives re-verification when a watched member Safe's listing changes (the sync engine). */
+/** Drives re-verification when the listing of a member Safe of a set on screen changes (the sync engine). */
 export type SignatureWatchDriver = {
   /** The engine is following the chain. */
   active: () => boolean;
@@ -999,8 +1003,8 @@ let rechecking = false;
 const CHANGE_SETTLE_MS = 100;
 
 /**
- * While `next.active()`, a watched set is verified again at the served head whenever the listing
- * of one of its member Safes is stored with a new version. Idempotent.
+ * While `next.active()`, a set on screen is verified again at the served head whenever the
+ * listing of one of its member Safes is stored with a new version. Idempotent.
  */
 export function startSignatureWatch(next: SignatureWatchDriver) {
   driver = next;
@@ -1019,7 +1023,7 @@ export function stopSignatureWatch() {
 function noteListingChange(safe: Address) {
   if (!driver?.active()) return;
   const key = safe.toLowerCase();
-  const wanted = precomputeSpecs(driver.viewing?.() ?? true).some((spec) =>
+  const wanted = precomputeSpecs().some((spec) =>
     spec.members.some((m) => m.toLowerCase() === key)
   );
   if (!wanted) return;
@@ -1048,7 +1052,11 @@ async function recheckChanged() {
     await precomputeSignatureSets(await head, {
       safes,
       viewing: current.viewing?.() ?? true,
-      current: () => rpcGeneration() === generation && current === driver && current.active(),
+      current: () =>
+        rpcGeneration() === generation &&
+        current === driver &&
+        current.active() &&
+        (current.viewing?.() ?? true),
     });
   } catch {
     // No head to verify at (its read failed): the next tick or request verifies.
@@ -1059,11 +1067,13 @@ async function recheckChanged() {
 }
 
 export type SignatureSetsStatus = {
-  /** Sets pages verified in the last 24 hours (without supplied signatures), at most 256. */
+  /** Sets pages showed in the last 24 hours (without supplied signatures), at most 256. */
   watched: number;
-  /** Of those, viewed in the last 10 minutes. */
+  /** Of those, on screen now: what the engine verifies at each new head. */
+  onScreen: number;
+  /** The same as onScreen (kept for older readers). */
   recent: number;
-  /** Of those, open (still signable) when last viewed. */
+  /** Of those on screen, open (still signable) when last shown. */
   open: number;
   /** The last precompute: its block, what it did, how long it took. */
   lastRun: PrecomputeRun | null;
@@ -1071,11 +1081,11 @@ export type SignatureSetsStatus = {
 
 /** What the precompute does, for /api/status. */
 export function signatureSetsStatus(): SignatureSetsStatus {
-  const sets = watchedSets();
-  const now = Date.now();
+  const sets = onScreenSets();
   return {
-    watched: sets.length,
-    recent: sets.filter((entry) => now - entry.viewedAt <= RECENT_MS).length,
+    watched: pageSets.size,
+    onScreen: sets.length,
+    recent: sets.length,
     open: sets.filter((entry) => entry.open).length,
     lastRun: lastRun && { ...lastRun },
   };

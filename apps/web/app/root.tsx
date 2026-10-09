@@ -1,11 +1,13 @@
 import { appStatus, shellChain } from "@/.server/status";
+import { watchItems, watchKeys } from "@/.server/sync/presence";
 import AppShell, { AppFrame, StatusProblem } from "@/components/app-shell";
 import { GeneralErrorBoundary } from "@/components/error-boundary";
 import { ChainContext } from "@/components/governance-context";
+import { PresenceProvider } from "@/components/presence";
 import { WalletProvider } from "@/components/providers/wallet-provider";
 import { useNonce } from "@/utils/nonce-provider";
 import { shouldRevalidateRoot } from "@/utils/revalidation";
-import { type CLIENT_ENV, clientEnv } from "@config/env.server";
+import { type CLIENT_ENV, clientEnv, env as serverEnv } from "@config/env.server";
 import { type LinksFunction, type LoaderFunctionArgs, defer } from "@remix-run/node";
 import {
   Await,
@@ -41,11 +43,20 @@ export const links: LinksFunction = () => [
 
 // Nothing here waits on the network before the first bytes of the page: the status is deferred
 // (the shell renders while it is read), and the chain the RPC is on is in hand once the server
-// has read it (before it starts listening), else deferred too.
+// has read it (before it starts listening), else deferred too. `watch` and `presence` are for the
+// tab's beats (components/presence.tsx): every page shows the status; a tab nobody touches for
+// `awayMs` stops beating.
 export function loader({ request }: LoaderFunctionArgs) {
   const cookies = request.headers.get("Cookie");
   const wagmiCookie = cookies ? parseWagmiCookie(cookies, "wagmi.store") : undefined;
-  return defer({ env: clientEnv, wagmiCookie, chain: shellChain(), status: appStatus() });
+  return defer({
+    env: clientEnv,
+    wagmiCookie,
+    watch: watchItems(request, [watchKeys.status]),
+    presence: { awayMs: serverEnv.SYNC_AWAY_MS },
+    chain: shellChain(),
+    status: appStatus(),
+  });
 }
 
 export type RootLoader = typeof loader;
@@ -56,7 +67,7 @@ export const shouldRevalidate: ShouldRevalidateFunction = shouldRevalidateRoot;
 
 export default function App() {
   const nonce = useNonce();
-  const { env, wagmiCookie, chain, status } = useLoaderData<typeof loader>();
+  const { env, wagmiCookie, chain, status, presence } = useLoaderData<typeof loader>();
   const initialState = wagmiCookie
     ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
     : undefined;
@@ -65,25 +76,27 @@ export default function App() {
   // first (in hand unless the server has not read it yet). The status fills in as it is read.
   return (
     <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
-      <Suspense fallback={<AppFrame />}>
-        <Await resolve={chain} errorElement={<ChainProblem status={status} />}>
-          {(chain) => (
-            <ChainContext.Provider value={chain}>
-              <WalletProvider
-                initialState={initialState}
-                projectId={env.WALLET_CONNECT_PROJECT_ID}
-                safeWalletOrigins={env.SAFE_WALLET_ORIGINS}
-                chainId={chain.chainId}
-                chainLabel={chain.label}
-              >
-                <AppShell status={status}>
-                  <Outlet />
-                </AppShell>
-              </WalletProvider>
-            </ChainContext.Provider>
-          )}
-        </Await>
-      </Suspense>
+      <PresenceProvider awayMs={presence.awayMs}>
+        <Suspense fallback={<AppFrame />}>
+          <Await resolve={chain} errorElement={<ChainProblem status={status} />}>
+            {(chain) => (
+              <ChainContext.Provider value={chain}>
+                <WalletProvider
+                  initialState={initialState}
+                  projectId={env.WALLET_CONNECT_PROJECT_ID}
+                  safeWalletOrigins={env.SAFE_WALLET_ORIGINS}
+                  chainId={chain.chainId}
+                  chainLabel={chain.label}
+                >
+                  <AppShell status={status}>
+                    <Outlet />
+                  </AppShell>
+                </WalletProvider>
+              </ChainContext.Provider>
+            )}
+          </Await>
+        </Suspense>
+      </PresenceProvider>
     </Document>
   );
 }

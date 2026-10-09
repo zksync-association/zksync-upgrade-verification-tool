@@ -1,4 +1,5 @@
 import { l1 } from "@/.server/rpc";
+import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { useStatus } from "@/components/governance-context";
 import { TxLink } from "@/components/hex";
 import { PageHeader } from "@/components/page";
@@ -7,17 +8,18 @@ import { formatEth } from "@/utils/format";
 import { notFound } from "@/utils/http";
 import { Meta } from "@/utils/meta";
 import { requestStatusRevalidation } from "@/utils/revalidation";
+import { useDocumentVisible } from "@/utils/visibility";
 import { type LoaderFunctionArgs, defer } from "@remix-run/node";
 import { Await, useLoaderData, useRevalidator } from "@remix-run/react";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import type { Hex } from "viem";
 
 export const meta = Meta["/app/transactions/:hash"];
 
-// Receipt read on the server through the app's RPC, polled until mined. Deferred: the page is
-// sent before the RPC answers.
-export function loader({ params }: LoaderFunctionArgs) {
+// Receipt read on the server through the app's RPC, polled until mined (while the tab is visible,
+// for at most 30 minutes). Deferred: the page is sent before the RPC answers.
+export function loader({ params, request }: LoaderFunctionArgs) {
   const hash = params.hash ?? "";
   if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) throw notFound();
   const receipt: Promise<Receipt> = l1
@@ -30,7 +32,7 @@ export function loader({ params }: LoaderFunctionArgs) {
       fee: (receipt.gasUsed * receipt.effectiveGasPrice).toString(),
     }))
     .catch(() => null);
-  return defer({ hash, receipt });
+  return defer({ watch: watchItems(request, [watchKeys.tx(hash)]), hash, receipt });
 }
 
 /** The receipt, once mined; null while it is not (or could not be read). */
@@ -43,6 +45,8 @@ type Receipt = {
 } | null;
 
 const POLL_MS = 4_000;
+// A hash that is never mined (a Safe transaction hash pasted here, say) is not polled forever.
+export const RECEIPT_POLL_FOR_MS = 30 * 60_000;
 // Root status reads at most, once mined, while it is still older than the transaction's block
 // (the server's head can trail the receipt by a moment).
 const STATUS_READS = 3;
@@ -72,15 +76,26 @@ export default function Transaction() {
 function TransactionStatus({ hash, receipt }: { hash: string; receipt: Receipt }) {
   const { governance } = useStatus();
   const revalidator = useRevalidator();
-  // Until mined, poll for the receipt. These polls leave the app status alone.
+  const visible = useDocumentVisible();
+  // Until mined, poll for the receipt: only while the tab is visible (a hidden tab asks nothing),
+  // and for at most 30 minutes after the page started waiting for this hash. These polls leave
+  // the app status alone.
+  const waiting = useRef<{ hash: string; since: number } | null>(null);
+  const [gaveUp, setGaveUp] = useState<string | null>(null);
   useEffect(() => {
-    if (receipt) return;
-    const timer = setInterval(
-      () => revalidator.state === "idle" && revalidator.revalidate(),
-      POLL_MS
-    );
+    if (receipt || !visible || gaveUp === hash) return;
+    if (waiting.current?.hash !== hash) waiting.current = { hash, since: Date.now() };
+    const { since } = waiting.current;
+    const timer = setInterval(() => {
+      if (Date.now() - since >= RECEIPT_POLL_FOR_MS) {
+        clearInterval(timer);
+        setGaveUp(hash);
+        return;
+      }
+      if (revalidator.state === "idle") revalidator.revalidate();
+    }, POLL_MS);
     return () => clearInterval(timer);
-  }, [receipt, revalidator]);
+  }, [receipt, revalidator, visible, hash, gaveUp]);
 
   // Once mined, the app status other pages read (freeze state and nonces, members, thresholds)
   // predates the transaction until it is read at or after its block: read it again, right away
@@ -107,8 +122,11 @@ function TransactionStatus({ hash, receipt }: { hash: string; receipt: Receipt }
     <Card className="p-6">
       {!receipt ? (
         <p className="flex items-center gap-2 text-slate-950">
-          <Clock className="h-5 w-5 text-slate-600" /> Waiting for the transaction to be mined… If
-          you sent it from a Safe, this may be a Safe transaction hash; follow it in Safe{"{"}
+          <Clock className="h-5 w-5 text-slate-600" />{" "}
+          {gaveUp === hash
+            ? "Stopped checking after 30 minutes without a receipt. Reload the page to check again."
+            : "Waiting for the transaction to be mined…"}{" "}
+          If you sent it from a Safe, this may be a Safe transaction hash; follow it in Safe{"{"}
           Wallet{"}"}.
         </p>
       ) : (

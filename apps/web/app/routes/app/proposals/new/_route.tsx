@@ -1,3 +1,4 @@
+import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { notStartedUpgrades } from "@/.server/flows/l2";
 import { network } from "@/.server/rpc";
 import { simulate } from "@/.server/signatures";
@@ -8,7 +9,7 @@ import { EmptyState, LoadingCard, PageHeader } from "@/components/page";
 import { Card } from "@/components/ui/card";
 import { ExecutionPanel } from "@/components/verification/execution-panel";
 import { Meta } from "@/utils/meta";
-import { defer } from "@remix-run/node";
+import { type LoaderFunctionArgs, defer } from "@remix-run/node";
 import { Await, useLoaderData } from "@remix-run/react";
 import { Suspense } from "react";
 import { $path } from "remix-routes";
@@ -54,8 +55,8 @@ async function startable() {
   );
 }
 
-export function loader() {
-  return defer({ items: startable() });
+export function loader({ request }: LoaderFunctionArgs) {
+  return defer({ watch: watchItems(request, [watchKeys.startable]), items: startable() });
 }
 
 export default function StartUpgrade() {

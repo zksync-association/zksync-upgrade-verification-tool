@@ -1,13 +1,13 @@
 import type { SafeMessage } from "@/.server/safe-api";
-import type { SafeGroups, SafeSweepDriver } from "@/.server/safe/store";
+import type { SafeGroups, SafeSweepDriver, SignerGroupName } from "@/.server/safe/store";
 import { type Address, type Hex, getAddress } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The Safe snapshot store: listings served while at most 60 s old (from the answer's arrival),
 // older ones read again for the request ahead of background work, and the background sweep that
-// keeps the listings of recently viewed signer groups fresh with one small change check per Safe,
-// within its hourly budget, never keyless on the public service and never during a cooldown.
-// Driven by a fake Safe Transaction Service and fake timers.
+// keeps the listings of the member Safes of the signature sets on screen fresh with one small
+// change check per Safe, within its hourly budget, never keyless on the public service and never
+// during a cooldown. Driven by a fake Safe Transaction Service and fake timers.
 
 const net = vi.hoisted(() => ({
   chainId: 1,
@@ -141,21 +141,42 @@ async function load({ key = "test-key", budget }: { key?: string; budget?: numbe
   store = await import("@/.server/safe/store");
 }
 
-/** The sync engine's side of the sweep: active while `on`, groups as given. */
-function driver(groups: Partial<SafeGroups>, activity = { on: true }): SafeSweepDriver {
+/**
+ * The sync engine's side of the sweep: active while `on`, groups as given, and a set of each group
+ * in `screen.groups` on screen (default: of every group given members).
+ */
+function driver(
+  groups: Partial<SafeGroups>,
+  activity = { on: true },
+  screen: { groups?: SignerGroupName[] } = {}
+): SafeSweepDriver {
+  const all: SafeGroups = { securityCouncil: [], guardians: [], zkFoundation: [], ...groups };
+  const shown = () =>
+    screen.groups ?? (Object.keys(all) as SignerGroupName[]).filter((g) => all[g].length > 0);
   return {
     active: () => activity.on,
-    groups: async () => ({ securityCouncil: [], guardians: [], zkFoundation: [], ...groups }),
+    onScreen: () => shown().map((group) => ({ group, members: all[group] })),
+    groups: async () => all,
   };
 }
+
+/** What the engine's side of a sweep says: active, someone using the app, what is on screen. */
+type Controls = {
+  activity: { on: boolean; viewing: boolean };
+  screen: { groups: SignerGroupName[] };
+};
 
 /**
  * The engine in SYNC_MODE=always: always active, viewing while `viewing`, and every governance
  * member Safe swept at the quota-paced interval.
  */
-function alwaysDriver(groups: Partial<SafeGroups>, activity = { viewing: false }): SafeSweepDriver {
+function alwaysDriver(
+  groups: Partial<SafeGroups>,
+  activity = { viewing: false },
+  screen: { groups?: SignerGroupName[] } = {}
+): SafeSweepDriver {
   return {
-    ...driver(groups),
+    ...driver(groups, { on: true }, screen),
     viewing: () => activity.viewing,
     baseline: () => true,
   };
@@ -268,9 +289,15 @@ describe("listings on the request path", () => {
       version: listing.version,
       fetchedAt: listing.fetchedAt,
     });
-    // Never a read, and never a page's interest: the sweep is not asked to keep it fresh.
+    // Never a read; and with no set on screen the sweep keeps nothing fresh.
     expect(safe.sent).toHaveLength(1);
-    store.startSafeSweep(driver({ securityCouncil: [A], guardians: [], zkFoundation: [] }));
+    store.startSafeSweep(
+      driver(
+        { securityCouncil: [A], guardians: [], zkFoundation: [] },
+        { on: true },
+        { groups: [] }
+      )
+    );
     await vi.advanceTimersByTimeAsync(5_000);
     expect(store.safeStoreStatus().groups).toEqual([]);
     store.stopSafeSweep();
@@ -450,14 +477,23 @@ describe("listings on the request path", () => {
 });
 
 describe("the background sweep", () => {
-  it("keeps a viewed group's listings fresh with one change check per Safe, never re-reading unchanged listings", async () => {
+  it("keeps the listings of a set on screen fresh with one change check per Safe, never re-reading unchanged listings", async () => {
     await load();
     const safe = fakeSafe();
     for (const n of [1, 2, 3]) safe.add(W[0], n);
     safe.add(W[1], 1);
     const first = await store.listSafeMessages(W[0]);
     await within(1_000, store.listSafeMessages(W[1]));
-    store.startSafeSweep(driver({ securityCouncil: [W[0], W[1]], guardians: G }));
+    // A council set is on screen; no Guardians set is.
+    store.startSafeSweep(
+      driver(
+        { securityCouncil: [W[0], W[1]], guardians: G },
+        { on: true },
+        {
+          groups: ["securityCouncil"],
+        }
+      )
+    );
 
     // Ten minutes in use: every listing a page reads is at most 60 s old, without a request.
     for (let t = 0; t < 10; t++) {
@@ -475,7 +511,7 @@ describe("the background sweep", () => {
     expect(checks.length).toBeLessThanOrEqual(13);
     for (let i = 1; i < checks.length; i++)
       expect((checks[i] as Sent).at - (checks[i - 1] as Sent).at).toBeLessThan(60_000);
-    // The Guardians were not viewed: not swept.
+    // No Guardians set was on screen: not swept.
     expect(safe.sent.some((s) => G.some((g) => g.toLowerCase() === s.safe))).toBe(false);
     expect(store.safeStoreStatus()).toMatchObject({
       sweeping: true,
@@ -649,25 +685,33 @@ describe("the background sweep", () => {
     expect(first.version).toBeGreaterThan(0);
   });
 
-  it("sweeps only groups viewed in the last SYNC_SAFE_ACTIVE_MS, and stops when the app is idle", async () => {
+  it("sweeps only the Safes of sets on screen, at once when one leaves the screen, and stops when the app is idle", async () => {
     await load();
     const safe = fakeSafe();
     safe.add(A, 1);
     await store.listSafeMessages(A);
     const activity = { on: true };
-    store.startSafeSweep(driver({ guardians: [A] }, activity));
+    const screen: { groups: SignerGroupName[] } = { groups: ["guardians"] };
+    store.startSafeSweep(driver({ guardians: [A] }, activity, screen));
     await vi.advanceTimersByTimeAsync(4 * 60_000);
     const swept = safe.count("newest");
     expect(swept).toBeGreaterThan(3);
-    // Nobody looked at the Guardians for 5 minutes: no more sweeping.
-    await vi.advanceTimersByTimeAsync(2 * 60_000);
+    // The Guardians set left the screen: no more sweeping from the next wake on (no grace).
+    screen.groups = [];
+    await vi.advanceTimersByTimeAsync(10_000);
     const settled = safe.count("newest");
     await vi.advanceTimersByTimeAsync(5 * 60_000);
     expect(safe.count("newest")).toBe(settled);
     expect(store.safeStoreStatus()).toMatchObject({ sweeping: false, groups: [] });
-
-    // Viewed again: swept again, until the engine goes idle.
+    // A request's read is not a set on screen: still nothing in the background.
+    await vi.advanceTimersByTimeAsync(2 * 60_000);
     await within(1_000, store.listSafeMessages(A));
+    const read = safe.sent.length;
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(safe.sent.length).toBe(read);
+
+    // On screen again: swept again, until the engine goes idle.
+    screen.groups = ["guardians"];
     await vi.advanceTimersByTimeAsync(2 * 60_000);
     expect(safe.count("newest")).toBeGreaterThan(settled);
     activity.on = false;
@@ -677,6 +721,60 @@ describe("the background sweep", () => {
     expect(safe.sent.length).toBe(idle);
     expect(store.safeStoreStatus()).toMatchObject({ sweeping: false, paused: "idle" });
   });
+
+  it.each([
+    [
+      "the last tab leaves",
+      (c: Controls) => {
+        c.activity.viewing = false;
+      },
+    ],
+    [
+      "the set leaves the screen",
+      (c: Controls) => {
+        c.screen.groups = [];
+      },
+    ],
+    [
+      "the engine stops",
+      (c: Controls) => {
+        c.activity.on = false;
+      },
+    ],
+  ])(
+    "sends none of the reads it already queued once %s; a request still reads",
+    async (_name, end) => {
+      await load();
+      const safe = fakeSafe();
+      // 16 member Safes on screen (an upgrade's council), each answer 150 ms away: the sweep
+      // queues 16 reads, of which the pacer sends two at a time, 220 ms apart.
+      safe.latencyMs = 150;
+      const members = Array.from({ length: 16 }, (_, i) => address(0x300 + i));
+      const controls: Controls = {
+        activity: { on: true, viewing: true },
+        screen: { groups: ["securityCouncil"] },
+      };
+      store.startSafeSweep({
+        ...driver({ securityCouncil: members }, controls.activity, controls.screen),
+        viewing: () => controls.activity.viewing,
+      });
+      for (let waited = 0; safe.sent.length === 0; waited += 10) {
+        if (waited > 5_000) throw new Error("the sweep sent nothing");
+        await vi.advanceTimersByTimeAsync(10);
+      }
+      const endedAt = Date.now();
+      end(controls);
+      await vi.advanceTimersByTimeAsync(60_000);
+      // Only what was already out when it ended: nothing sent after it.
+      expect(safe.sent.filter((s) => s.at > endedAt)).toEqual([]);
+      expect(safe.sent.length).toBeLessThan(members.length);
+      expect(store.safeStoreStatus().budgetUsedThisHour).toBe(safe.sent.length);
+      // A page's request still reads a Safe whose background read was dropped.
+      const listed = await within(1_000, store.listSafeMessages(members[15] as Address));
+      expect(listed.messages).toEqual([]);
+      expect(safe.count(undefined, members[15])).toBe(1);
+    }
+  );
 
   it("never sweeps on a dev node", async () => {
     await load();
@@ -838,19 +936,20 @@ describe("the background sweep", () => {
     expect(checks.length).toBeLessThanOrEqual(7);
   });
 
-  it("does not count the boot warm-up as a page's interest", async () => {
+  it("puts nothing on screen through the boot warm-up", async () => {
     await load();
     const safe = fakeSafe();
     for (const s of W) safe.add(s, 1);
     await within(5_000, Promise.all(W.map((s) => store.warmSafeListing(s))));
     expect(safe.count("listing")).toBe(W.length);
-    store.startSafeSweep(driver({ securityCouncil: W }));
+    const screen: { groups: SignerGroupName[] } = { groups: [] };
+    store.startSafeSweep(driver({ securityCouncil: W }, { on: true }, screen));
     await vi.advanceTimersByTimeAsync(10 * 60_000);
     expect(safe.sent).toHaveLength(W.length);
     expect(store.safeStoreStatus()).toMatchObject({ sweeping: false, groups: [] });
 
-    // A page views one member: the group is swept from then on.
-    await within(1_000, store.listSafeMessages(W[0]));
+    // A page shows a council set: the group is swept from then on.
+    screen.groups = ["securityCouncil"];
     await vi.advanceTimersByTimeAsync(60_000);
     expect(safe.count("newest", W[1])).toBeGreaterThan(0);
     expect(safe.count("listing", W[1])).toBe(1);
@@ -919,7 +1018,7 @@ describe("background reads (warm-up, precomputing)", () => {
     expect(safe.sent.map((s) => s.kind)).toEqual(["listing", "newest"]);
   });
 
-  it("do not mark a page's interest, and leave lookups by hash to requests", async () => {
+  it("put nothing on screen, and leave lookups by hash to requests", async () => {
     await load();
     const safe = fakeSafe();
     // More messages than the five pages a listing reads: the oldest is not in it.
@@ -936,8 +1035,8 @@ describe("background reads (warm-up, precomputing)", () => {
       messageHash: messageHash(501),
     });
 
-    // Not a page's interest: the sweep leaves A's group alone.
-    store.startSafeSweep(driver({ securityCouncil: [A] }));
+    // Nothing on screen: the sweep leaves A's group alone.
+    store.startSafeSweep(driver({ securityCouncil: [A] }, { on: true }, { groups: [] }));
     await vi.advanceTimersByTimeAsync(2 * 60_000);
     expect(safe.count("newest")).toBe(0);
     expect(safe.count("listing", A)).toBe(5);
@@ -1039,14 +1138,22 @@ describe("the quota-paced sweep of every governance Safe (SYNC_MODE=always)", ()
     expect(store.safeStoreStatus()).toMatchObject({ sweeping: false, baseline: null });
   });
 
-  it("while viewing keeps the groups pages asked for under 60 s old, and the others at the interval", async () => {
+  it("while viewing keeps the Safes of the sets on screen under 60 s old, and the others at the interval", async () => {
     await load();
     const safe = fakeSafe();
     safe.headers = QUOTA_HEADERS;
     for (const s of [...W, ...G]) safe.add(s, 1);
-    // A page views a council member.
+    // A page shows a council set.
     await within(1_000, store.listSafeMessages(W[0]));
-    store.startSafeSweep(alwaysDriver({ securityCouncil: W, guardians: G }, { viewing: true }));
+    store.startSafeSweep(
+      alwaysDriver(
+        { securityCouncil: W, guardians: G },
+        { viewing: true },
+        {
+          groups: ["securityCouncil"],
+        }
+      )
+    );
     await vi.advanceTimersByTimeAsync(4 * MIN);
     // The council about every 50 s; the Guardians once (their listing), then not yet again.
     expect(safe.count("newest", W[1])).toBeGreaterThanOrEqual(4);

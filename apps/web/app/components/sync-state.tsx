@@ -2,6 +2,7 @@ import type { OkStatus } from "@/components/governance-context";
 import { LoadingCard } from "@/components/page";
 import { cn } from "@/utils/cn";
 import { formatAge, formatNumber, formatTime } from "@/utils/format";
+import { useDocumentVisible } from "@/utils/visibility";
 import { Loader2 } from "lucide-react";
 import {
   type ReactNode,
@@ -89,8 +90,9 @@ const unsettled = (index: IndexStatusView) =>
 /**
  * Provides the index progress from the root status (`initial`; null until it is in this
  * browser), and while the index is backfilling polls /api/status for fresher progress; while it
- * has not started (idle), only IDLE_POLLS times in a row. Never otherwise: an idle tab must not
- * poll forever, and the server does not count these reads as a visit. A failed poll keeps the
+ * has not started (idle), only IDLE_POLLS times in a row. Never otherwise, and never while the tab
+ * is hidden (it resumes when shown): an idle or hidden tab must not poll (each read of the status
+ * can reach the RPC), and the server does not count these reads as use. A failed poll keeps the
  * last value.
  *
  * `onSettled` runs once when a poll finds the index ready or unavailable. The root status is not
@@ -126,7 +128,9 @@ export function IndexProgressProvider({
   }, [onSettled]);
 
   const value = useMemo(() => ({ progress: indexProgress(index), known: index !== null }), [index]);
+  const visible = useDocumentVisible();
   const polling =
+    visible &&
     index !== null &&
     (index.state === "backfilling" || (index.state === "idle" && idlePolls < IDLE_POLLS));
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import type { L2ProposalView } from "@/.server/flows/l2";
 import {
@@ -18,7 +19,7 @@ import { LastRunNote } from "@/components/verification/last-run";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { formatEth, formatTime, relativeTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
-import { type SerializeFrom, defer } from "@remix-run/node";
+import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
 import { Await, Link, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { Suspense } from "react";
@@ -26,12 +27,13 @@ import { $path } from "remix-routes";
 
 export const meta = Meta["/app/l2-cancellations"];
 
-export function loader() {
+export function loader({ request }: LoaderFunctionArgs) {
   // Each list streams on its own: the vetoes from the Guardians' Safe copies held (labelled with
   // their age when older than 60 s), the vetoable proposals from the governors' history the last
   // run saved while this run reads it again (labelled); the fresh lists follow in the response.
   const loading = loadL2VetoList({ freshness: "page" });
   return defer({
+    watch: watchItems(request, [watchKeys.vetoes]),
     signed: loading.signed,
     freshSigned: freshAfter(loading.signed, loading.freshSigned, (s) => s.stale),
     vetoable: loading.vetoable,

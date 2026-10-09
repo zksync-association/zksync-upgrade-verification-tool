@@ -25,6 +25,7 @@ import {
   firstSignatureSet,
   simulate,
   verifySignatureSet,
+  watchSignatureSet,
 } from "../signatures";
 
 export type SetState =
@@ -37,12 +38,28 @@ export type ExecutionView = Execution & { simulation: Simulation };
 /**
  * A signature set for a flow. "strict" (JSON): the strict result, once (`immediate` is `fresh`).
  * "page": the strict result is started first, and the page's first answer beside it (see
- * firstSignatureSet: a labelled stale set, or the strict result).
+ * firstSignatureSet: a labelled stale set, or the strict result); both carry the key the page
+ * reports while it shows the set (`watch`, see watchSignatureSet), which JSON never gets.
  */
 export function streamSignatureSet(params: SignatureSetParams, freshness: Freshness): StreamedSet {
-  const fresh = verifySignatureSet(params);
-  if (freshness !== "page") return { immediate: fresh, fresh };
-  const immediate = firstSignatureSet(params, fresh);
+  const strict = verifySignatureSet(params);
+  if (freshness !== "page") return { immediate: strict, fresh: strict };
+  const watch = watchSignatureSet(params);
+  // Registered before anything else waits on it: known by the time a first answer that is the
+  // strict result resolves.
+  let strictSet: SignatureSet | null = null;
+  strict.then(
+    (set) => {
+      strictSet = set;
+    },
+    () => {}
+  );
+  const fresh = strict.then((set) => ({ ...set, watch }));
+  // A first answer that is the strict result is the page's fresh result itself (one object); an
+  // earlier one is copied, never waiting for the strict result.
+  const immediate = firstSignatureSet(params, strict).then((set) =>
+    set === strictSet ? fresh : { ...set, watch }
+  );
   // Callers attach their handlers to what they use; neither may go unhandled meanwhile.
   void immediate.catch(() => {});
   void fresh.catch(() => {});

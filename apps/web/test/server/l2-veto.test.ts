@@ -134,6 +134,8 @@ vi.mock("@/.server/signatures", () => ({
         }
       : fresh,
   simulate: async () => ({ status: "ok" }),
+  // The key a page reports while it shows the set.
+  watchSignatureSet: () => ({ key: "set:0123456789abcdef0123456789abcdef", rev: null }),
 }));
 // Members' Safe messages: the fresh listings (`collectMessages`, which a test may hold) and the
 // copies held now, whatever their age (`collectHeldMessages`).

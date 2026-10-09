@@ -80,8 +80,6 @@ const state = vi.hoisted(() => ({
   delay: 0,
   // Every listing is incomplete: messages are looked up by their hash (no listing version).
   byHash: false,
-  // The Safes each markSafeDemand call named (a page answered from a kept or shared result).
-  demand: [] as string[][],
 }));
 
 vi.mock("@/.server/rpc", () => ({
@@ -140,9 +138,6 @@ vi.mock("@/.server/safe/store", async () => {
     peekSafeMessage: (_safe: string, hash: string) =>
       state.listingFresh && !state.safeApiDown && !state.byHash ? answer(hash) : null,
     freshListingVersion: () => (state.listingFresh ? state.listingVersion : null),
-    markSafeDemand: (safes: Iterable<string>) => {
-      state.demand.push([...safes]);
-    },
     onSafeListingChange: (listener: (safe: string) => void) => {
       state.listeners.add(listener);
       return () => state.listeners.delete(listener);
@@ -160,7 +155,10 @@ const {
   signatureSetsStatus,
   startSignatureWatch,
   stopSignatureWatch,
+  watchSignatureSet,
+  onScreenSigners,
 } = await import("@/.server/signatures");
+const { presence, resetPresence } = await import("@/.server/sync/presence");
 const { safeMessageHashes } = await import("@/common/safe");
 
 const COUNCIL = getAddress("0x59195219d1176E42f8e607e9AC114926D47f9035");
@@ -227,20 +225,34 @@ let calls: () => { params: unknown[] }[];
 let posts: () => number;
 let codeReads: () => number;
 
-const run = (
+const paramsOf = (
   threshold = 2,
   supplied: { signer: Hex; signature: Hex }[] = [],
   check: Parameters<typeof verifySignatureSet>[0]["check"] = { kind: "multisig", contract: COUNCIL }
-) =>
-  verifySignatureSet({
-    action: "ApproveUpgradeSecurityCouncil",
-    signerGroup: "securityCouncil",
-    typedData,
-    members: MEMBERS,
-    threshold,
-    check,
-    supplied,
+) => ({
+  action: "ApproveUpgradeSecurityCouncil" as const,
+  signerGroup: "securityCouncil" as const,
+  typedData,
+  members: MEMBERS,
+  threshold,
+  check,
+  supplied,
+});
+
+const run = (...args: Parameters<typeof paramsOf>) => verifySignatureSet(paramsOf(...args));
+
+/**
+ * A visible tab shows these sets (a page registered each, and the tab beats their keys): what the
+ * engine's precompute covers. `tab` names the tab (each tab's beat replaces its own keys).
+ */
+const onScreen = (sets: Parameters<typeof verifySignatureSet>[0][], tab = "tab-under-test") =>
+  presence().beat({
+    tab,
+    reason: "interval",
+    items: sets.map((set) => watchSignatureSet(set)),
   });
+/** The default set (threshold 2, no supplied signature) on screen. */
+const shown = () => onScreen([paramsOf()]);
 
 beforeEach(() => {
   clearCache();
@@ -268,7 +280,7 @@ beforeEach(() => {
   state.combined = 0;
   state.delay = 0;
   state.byHash = false;
-  state.demand = [];
+  resetPresence();
   stopSignatureWatch();
   state.listeners.clear();
   const fake = fakeCallLane(
@@ -511,7 +523,7 @@ describe("what is kept", () => {
 });
 
 // A set's result is kept for the head it was verified at, while the Safe listings it came from
-// are still the ones served; the sync engine verifies the sets pages watch again at each new head
+// are still the ones served; the sync engine verifies the sets on screen again at each new head
 // (precomputeSignatureSets), and when a member Safe's listing changes.
 describe("kept per head, and precomputed", () => {
   const H1 = `0x${"a1".repeat(32)}` as Hex;
@@ -543,8 +555,9 @@ describe("kept per head, and precomputed", () => {
     expect(state.lookups).toBe(MEMBERS.length);
   });
 
-  it("at the next head the precompute verifies watched sets, and the request asks nothing upstream", async () => {
+  it("at the next head the precompute verifies the sets on screen, and the request asks nothing upstream", async () => {
     twoSigned();
+    shown();
     await run();
     const head = nextHead();
     const precomputed = await precomputeSignatureSets(head);
@@ -563,12 +576,28 @@ describe("kept per head, and precomputed", () => {
     expect(posts()).toBe(sent);
     expect(signatureSetsStatus()).toMatchObject({
       watched: 1,
+      onScreen: 1,
       lastRun: { block: "1101", reused: 1 },
     });
   });
 
+  it("a request alone (JSON) puts nothing on screen: the precompute covers no set", async () => {
+    twoSigned();
+    await run();
+    expect(signatureSetsStatus()).toMatchObject({ watched: 0, onScreen: 0 });
+    expect(await precomputeSignatureSets(nextHead())).toMatchObject({ sets: 0 });
+    // A page registers the set, but until a tab shows it (beats its key) it is not on screen.
+    watchSignatureSet(paramsOf());
+    expect(await precomputeSignatureSets(state.head)).toMatchObject({ sets: 0 });
+    expect(signatureSetsStatus()).toMatchObject({ watched: 1, onScreen: 0 });
+    shown();
+    expect(await precomputeSignatureSets(state.head)).toMatchObject({ sets: 1, verified: 1 });
+    expect(onScreenSigners()).toEqual([{ group: "securityCouncil", members: MEMBERS }]);
+  });
+
   it("leaves to the request a set whose listings are older than 60 s, and the request reads them", async () => {
     twoSigned();
+    shown();
     await run();
     state.listingFresh = false;
     const head = nextHead();
@@ -586,6 +615,7 @@ describe("kept per head, and precomputed", () => {
 
   it("a new listing version: the kept result no longer stands, and the watch verifies it again at the served head", async () => {
     twoSigned();
+    shown();
     const before = await run();
     expect(before.members[2]?.status).toBe("missing");
     startSignatureWatch({ active: () => true, head: () => Promise.resolve(state.head) });
@@ -604,8 +634,9 @@ describe("kept per head, and precomputed", () => {
     expect(after.members.map((m) => m.status)).toEqual(["valid", "valid", "valid"]);
   });
 
-  it("does not verify again for a listing change while the engine is idle, or of a Safe no watched set has", async () => {
+  it("does not verify again for a listing change while the engine is idle, or of a Safe no set on screen has", async () => {
     twoSigned();
+    shown();
     await run();
     let active = false;
     startSignatureWatch({ active: () => active, head: () => Promise.resolve(state.head) });
@@ -618,7 +649,7 @@ describe("kept per head, and precomputed", () => {
     expect(signatureSetsStatus().lastRun).toBeNull();
   });
 
-  it("never keeps a set with a supplied signature, and does not watch it", async () => {
+  it("never keeps a set with a supplied signature, and does not register it", async () => {
     state.valid.add(`${MEMBERS[1]}:0xcc`);
     const supplied = [{ signer: MEMBERS[1] as Hex, signature: "0xcc" as Hex }];
     await run(2, supplied);
@@ -634,6 +665,7 @@ describe("kept per head, and precomputed", () => {
 
   it("an upstream error (-32603) during the precompute keeps nothing: the request verifies on its own (and fails)", async () => {
     twoSigned();
+    shown();
     await run();
     nextHead();
     state.inject.set("checkSignatures", internalError());
@@ -651,6 +683,7 @@ describe("kept per head, and precomputed", () => {
 
   it("a request that shared a precompute's computation which failed verifies on its own", async () => {
     twoSigned();
+    shown();
     await run();
     nextHead();
     // The precompute's first member check fails; the request's own reads succeed.
@@ -679,6 +712,7 @@ describe("kept per head, and precomputed", () => {
 
     it("is taken while its listings are still served: no Safe read of the request's own", async () => {
       twoSigned();
+      shown();
       await run();
       nextHead();
       state.delay = 120;
@@ -686,20 +720,17 @@ describe("kept per head, and precomputed", () => {
       // The precompute has read the listings; its eth_calls are in flight.
       await sleep(40);
       const lookups = state.lookups;
-      state.demand = [];
       const set = await run();
       expect(state.lookups).toBe(lookups);
       expect(set.members.map((m) => m.status)).toEqual(["valid", "valid", "missing"]);
       expect(await precompute).toMatchObject({ verified: 1 });
       // The precompute's result, kept: the next request at this head gets the same object.
       expect(await run()).toBe(set);
-      // Both pages count as asking for the member Safes (the sweep keeps them fresh).
-      const all = MEMBERS.map((m) => m.toLowerCase()).sort();
-      expect(state.demand.map((safes) => [...safes].sort())).toEqual([all, all]);
     });
 
     it("is not taken when a listing it read is replaced meanwhile: the request reads Safe and sees the new signature", async () => {
       twoSigned();
+      shown();
       await run();
       nextHead();
       state.delay = 120;
@@ -717,6 +748,7 @@ describe("kept per head, and precomputed", () => {
 
     it("is not taken when its listings turn 60 s old meanwhile: the request reads them again", async () => {
       twoSigned();
+      shown();
       await run();
       nextHead();
       state.delay = 120;
@@ -744,6 +776,7 @@ describe("kept per head, and precomputed", () => {
 
     it("is not taken when a member's Safe info is read again meanwhile", async () => {
       twoSigned();
+      shown();
       await run();
       nextHead();
       state.delay = 120;
@@ -778,17 +811,6 @@ describe("kept per head, and precomputed", () => {
     expect(again).not.toBe(first);
     expect(state.lookups - lookups).toBe(MEMBERS.length);
     expect(await run()).toBe(again);
-  });
-
-  it("a page answered from a kept set still counts as asking for its member Safes", async () => {
-    twoSigned();
-    await run();
-    expect(state.demand).toEqual([]);
-    await run();
-    expect(state.demand).toEqual([MEMBERS.map((m) => m.toLowerCase())]);
-    // A precompute is not a page.
-    await precomputeSignatureSets(nextHead());
-    expect(state.demand).toHaveLength(1);
   });
 
   // What is never kept, whatever else holds.
@@ -841,7 +863,8 @@ describe("kept per head, and precomputed", () => {
 
     it("a precompute across a settings change: no result, no further sets, no last run", async () => {
       twoSigned();
-      // Five watched sets (one more than the precompute verifies at once).
+      // Five sets on screen (one more than the precompute verifies at once).
+      onScreen([1, 2, 3, 4, 5].map((threshold) => paramsOf(threshold)));
       for (let threshold = 1; threshold <= 5; threshold++) await run(threshold);
       const head = nextHead();
       state.delay = 60;
@@ -891,102 +914,97 @@ describe("kept per head, and precomputed", () => {
     expect(state.attempts).toBe(4);
   });
 
-  /** A page views set `n` (one per upgrade id), open (still signable) or not. */
-  const view = (n: number, open = false) =>
-    verifySignatureSet({
-      action: "ApproveUpgradeSecurityCouncil",
-      signerGroup: "securityCouncil",
-      typedData: buildTypedData("ApproveUpgradeSecurityCouncil", typedData.domain, {
-        id: `0x${n.toString(16).padStart(64, "0")}`,
-      }),
-      members: MEMBERS,
-      threshold: 2,
-      check: { kind: "multisig", contract: COUNCIL },
-      open,
-    });
-
-  it("remembers at most 256 sets, each for 24 hours after it was last viewed", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    for (let n = 1; n <= 257; n++) await view(n, n % 2 === 0);
-    expect(signatureSetsStatus()).toMatchObject({ watched: 256, recent: 256, open: 128 });
-    vi.setSystemTime(Date.now() + 9 * 60_000);
-    await view(257);
-    // Past 10 minutes: no longer recent, still remembered (its last result is known).
-    vi.setSystemTime(Date.now() + 60_001);
-    expect(signatureSetsStatus()).toMatchObject({ watched: 256, recent: 1, open: 128 });
-    // 24 hours after the first views (set 257 was viewed again 9 minutes later).
-    vi.setSystemTime(Date.now() + 24 * 60 * 60_000 - 10 * 60_000);
-    expect(signatureSetsStatus()).toMatchObject({ watched: 1, recent: 0, open: 0 });
-    vi.setSystemTime(Date.now() + 9 * 60_000);
-    expect(signatureSetsStatus()).toMatchObject({ watched: 0, recent: 0, open: 0 });
+  /** The params of set `n` (one per upgrade id), open (still signable) or not. */
+  const setOf = (n: number, open = false) => ({
+    action: "ApproveUpgradeSecurityCouncil" as const,
+    signerGroup: "securityCouncil" as const,
+    typedData: buildTypedData("ApproveUpgradeSecurityCouncil", typedData.domain, {
+      id: `0x${n.toString(16).padStart(64, "0")}`,
+    }),
+    members: MEMBERS,
+    threshold: 2,
+    check: { kind: "multisig" as const, contract: COUNCIL },
+    open,
   });
 
-  it("precomputes while the app is in use the sets viewed in the last 10 minutes and the open ones; while idle only the open ones", async () => {
+  it("remembers at most 256 sets pages showed, each for 24 hours after it was last shown", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    for (let n = 1; n <= 257; n++) watchSignatureSet(setOf(n, n % 2 === 0));
+    // None on screen yet: no tab shows them.
+    expect(signatureSetsStatus()).toMatchObject({ watched: 256, onScreen: 0, open: 0 });
+    // A tab shows set 257 (open: no) and set 256 (open).
+    onScreen([setOf(257), setOf(256, true)]);
+    expect(signatureSetsStatus()).toMatchObject({ watched: 256, onScreen: 2, recent: 2, open: 1 });
+    // The tab stops beating: after SYNC_KEEPWARM_MS nothing is on screen, all still remembered.
+    vi.setSystemTime(Date.now() + 31_000);
+    expect(signatureSetsStatus()).toMatchObject({ watched: 256, onScreen: 0, open: 0 });
+    // 24 hours after they were shown, forgotten (set 257 shown again 9 minutes later).
+    vi.setSystemTime(Date.now() + 9 * 60_000);
+    watchSignatureSet(setOf(257));
+    vi.setSystemTime(Date.now() + 24 * 60 * 60_000 - 9 * 60_000);
+    expect(signatureSetsStatus()).toMatchObject({ watched: 1, onScreen: 0 });
+    vi.setSystemTime(Date.now() + 9 * 60_000 + 1);
+    expect(signatureSetsStatus()).toMatchObject({ watched: 0, onScreen: 0 });
+  });
+
+  it("precomputes only the sets on screen, open or done, and none once they leave it", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     twoSigned();
     // Set 1 is open (e.g. an upgrade waiting for the council), set 2 is done.
-    await view(1, true);
-    await view(2, false);
+    onScreen([setOf(1, true), setOf(2, false)]);
+    await verifySignatureSet(setOf(1, true));
+    await verifySignatureSet(setOf(2, false));
     const h2 = nextHead();
-    expect(await precomputeSignatureSets(h2, { viewing: false })).toMatchObject({
+    expect(await precomputeSignatureSets(h2)).toMatchObject({
       block: "1101",
-      profile: "idle",
-      sets: 1,
-      verified: 1,
-    });
-    expect(await precomputeSignatureSets(h2, { viewing: true })).toMatchObject({
-      profile: "viewing",
       sets: 2,
-      verified: 1,
-      reused: 1,
+      verified: 2,
     });
-    // Eleven minutes later, still in use: the done set was not viewed again, the open one stays.
-    vi.setSystemTime(Date.now() + 11 * 60_000);
-    expect(await precomputeSignatureSets(nextHead(`0x${"a3".repeat(32)}`), {})).toMatchObject({
-      profile: "viewing",
+    // The tab navigates to set 2 only.
+    onScreen([setOf(2, false)]);
+    expect(await precomputeSignatureSets(nextHead(`0x${"a3".repeat(32)}`))).toMatchObject({
       sets: 1,
       verified: 1,
     });
-    // A later view that finds it closed takes it out of the idle precompute.
-    await view(1, false);
-    expect(
-      await precomputeSignatureSets(nextHead(`0x${"a4".repeat(32)}`), { viewing: false })
-    ).toMatchObject({ sets: 0 });
-  });
-
-  it("precomputes at most the 16 most recently viewed open sets, and 64 recent ones", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    for (let n = 1; n <= 20; n++) await view(n, true);
-    for (let n = 101; n <= 170; n++) await view(n, false);
-    const head = nextHead();
-    expect(await precomputeSignatureSets(head, { viewing: false })).toMatchObject({ sets: 16 });
-    expect(await precomputeSignatureSets(head, { viewing: true })).toMatchObject({
-      sets: 16 + 64,
+    // The tab leaves (hidden): nothing on screen, nothing precomputed, open or not.
+    presence().beat({ tab: "tab-under-test", reason: "leave", items: [] });
+    expect(await precomputeSignatureSets(nextHead(`0x${"a4".repeat(32)}`))).toMatchObject({
+      sets: 0,
     });
   });
 
-  it("verifies again on a listing change only the sets the current profile covers", async () => {
+  it("precomputes at most 64 sets on screen, the most recently shown first", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // Three tabs show 30 sets each (a beat carries at most 32 keys).
+    for (const tab of [0, 1, 2])
+      onScreen(
+        Array.from({ length: 30 }, (_, i) => setOf(tab * 100 + i + 1)),
+        `tab-under-test-${tab}`
+      );
+    expect(signatureSetsStatus()).toMatchObject({ watched: 90, onScreen: 90 });
+    expect(await precomputeSignatureSets(nextHead())).toMatchObject({ sets: 64 });
+  });
+
+  it("verifies again on a listing change only the sets on screen", async () => {
     twoSigned();
-    await view(1, false);
-    let viewing = false;
+    await verifySignatureSet(setOf(1, false));
+    watchSignatureSet(setOf(1, false));
     startSignatureWatch({
       active: () => true,
-      viewing: () => viewing,
       head: () => Promise.resolve(state.head),
     });
-    // Idle: the done set is not verified again when a member's listing changes.
+    // Not on screen: not verified again when a member's listing changes.
     state.listingVersion = 2;
     for (const listener of state.listeners) listener((MEMBERS[2] as string).toLowerCase());
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(signatureSetsStatus().lastRun).toBeNull();
-    // In use: it is.
-    viewing = true;
+    // On screen: it is.
+    onScreen([setOf(1, false)]);
     state.listingVersion = 3;
     for (const listener of state.listeners) listener((MEMBERS[2] as string).toLowerCase());
     await vi.waitFor(() =>
       expect(signatureSetsStatus().lastRun).toMatchObject({
         trigger: "safe",
-        profile: "viewing",
         sets: 1,
         verified: 1,
       })

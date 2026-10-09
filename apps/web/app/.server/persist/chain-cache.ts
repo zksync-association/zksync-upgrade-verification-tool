@@ -21,10 +21,13 @@ import {
   chainIdentity,
   dropProvisionalTimestamps,
   finalBlockTimestamps,
+  knownChainIdentity,
+  knownL2ChainId,
   l2ChainHead,
   l2ChainId,
   latestBlock,
   network,
+  resolvedNetwork,
   rpcGeneration,
   seedProvisionalTimestamps,
 } from "../rpc";
@@ -34,6 +37,8 @@ import {
   holdLastRunListings,
   listingsToKeep,
 } from "../safe/store";
+import { shouldPrewarm } from "../prewarm";
+import { presence } from "../sync/presence";
 import { safeMessageSchema } from "../safe-api";
 
 // A local cache of PUBLIC chain data, kept between runs in apps/web/.cache/chain/ (one file per
@@ -335,7 +340,19 @@ export async function loadChainCache({ dir }: { dir?: string } = {}): Promise<vo
     loaded.resolve();
     if (!l2Handed) l2Seeded.resolve();
   }
+  // The saver never asks the node while the app is idle: what a save needs to know about the
+  // chain (its identity, and Era's chain id) is read once now, beside the load (a memory hit when
+  // the load read it). Not with PREWARM=0, which keeps the start silent: then the first check
+  // while the app is in use reads them (or the shutdown save).
+  void readIdentities();
   startSaver();
+}
+
+async function readIdentities() {
+  if (!chainCacheEnabled() || state.fixed === "disabled" || !shouldPrewarm()) return;
+  const net = await network().catch(() => null);
+  if (!net || net.isDevNode) return;
+  await Promise.all([chainIdentity().catch(() => null), l2ChainId().catch(() => null)]);
 }
 
 /** A promise and the function that resolves it. */
@@ -613,10 +630,21 @@ export function saveChainCache({ force = true }: { force?: boolean } = {}): Prom
 async function save(force: boolean): Promise<boolean> {
   if (!chainCacheEnabled() || state.fixed === "disabled") return false;
   const generation = rpcGeneration();
-  const net = await network();
-  if (net.isDevNode) return false;
-  const identity = await chainIdentity();
-  const contents = await collect(net, identity);
+  // The saver's checks (every 10 s, for as long as the process runs) never ask the node while
+  // nobody uses the app: they use what this run already read about the chain, and skip until it
+  // has (a failed read is not kept, so asking would repeat it every 10 s). While the app is in
+  // use (sync/presence.ts), a check reads what is missing: the chain's identity when the read at
+  // start failed, was skipped (PREWARM=0) or the settings changed since; kept once answered.
+  // Saving at shutdown may ask.
+  const mayRead = force || presence().inUse();
+  const known = force ? null : resolvedNetwork();
+  const net = force ? await network() : known;
+  if (!net || net.isDevNode) return false;
+  const identity = force
+    ? await chainIdentity()
+    : knownChainIdentity() ?? (mayRead ? await chainIdentity().catch(() => null) : null);
+  if (!identity) return false;
+  const contents = await collect(net, identity, mayRead);
   if (!contents || rpcGeneration() !== generation) return false;
   const now = Date.now();
   if (!force) {
@@ -646,12 +674,18 @@ async function save(force: boolean): Promise<boolean> {
  */
 async function collect(
   net: Network,
-  identity: { chainId: number; genesisHash: Hex }
+  identity: { chainId: number; genesisHash: Hex },
+  mayRead: boolean
 ): Promise<{ build: () => CacheFile; signature: string } | null> {
   const puh = puhIndex().snapshot();
   if (!puh || puh.chainId !== identity.chainId) return null;
   const l2 = l2GovernorIndex().snapshot();
-  const l2Id = l2 && l2.chainId === identity.chainId ? await l2ChainId().catch(() => null) : null;
+  const l2Id =
+    l2 && l2.chainId === identity.chainId
+      ? mayRead
+        ? await l2ChainId().catch(() => null)
+        : knownL2ChainId()
+      : null;
   const l1Times = [...finalBlockTimestamps()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   const l2Times = finalL2BlockTimes();
   const service = safeServiceId(net);

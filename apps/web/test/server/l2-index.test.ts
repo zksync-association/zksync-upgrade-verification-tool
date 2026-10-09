@@ -661,9 +661,9 @@ describe("the flows on the index", () => {
     expect(methods.filter((m) => m === "eth_getBlockByNumber")).toHaveLength(2); // latest, finalized
   });
 
-  it("are refreshed by the sync engine while vetoes were viewed in the last 10 minutes", async () => {
+  it("are refreshed by the sync engine (while an Era page is on screen: the engine decides)", async () => {
     const { era, fake } = upstream();
-    // A page views the vetoable list (what the engine's refresh waits for).
+    // A page views the vetoable list.
     await activeL2Proposals();
     // The next Era head (a block later, so the 24-day window drops its first block).
     era.setHead(HEAD + 2n);
@@ -674,10 +674,6 @@ describe("the flows on the index", () => {
     expect(fake.posts.length).toBe(posts);
     expect(listed.map((p) => p.description)).toEqual(["in the tail", "pending on GovOps"]);
     expect((await l2GovernorIndex().read()).head.head.number).toBe(HEAD + 2n);
-
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(Date.now() + 11 * 60_000);
-    expect(await refreshVetoableL2()).toBe(false);
   });
 
   it("never serve an older Era head after the engine's refresh is answered by a backend behind", async () => {

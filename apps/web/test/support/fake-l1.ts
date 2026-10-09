@@ -68,6 +68,13 @@ export type FakeL1Options = {
   clientVersion?: string;
   /** Answers a call instead of the contract (e.g. a FakeRpcError); undefined: the contract answers. */
   inject?: (call: L1Call) => FakeRpcError | undefined;
+  /**
+   * The contract's value for a call instead of the table's (REVERTS: it reverts, as a member list
+   * past its end does); undefined: the table answers.
+   */
+  answer?: (call: L1Call) => unknown;
+  /** Contracts at other addresses that behave as these (new address → existing contract). */
+  aliases?: Map<Address, Address>;
   /** Awaited before answering a call (to hold a read in flight). */
   gate?: (call: L1Call) => Promise<void> | undefined;
   /**
@@ -86,9 +93,12 @@ export type FakeL1Options = {
 const errorAbi = parseAbi(["error Panic(uint256)"]);
 const outOfBounds = encodeErrorResult({ abi: errorAbi, errorName: "Panic", args: [0x32n] });
 const REVERT = Symbol("revert");
+/** FakeL1Options.answer's way to make a call revert (Panic 0x32, as members(i) past the end). */
+export const REVERTS = REVERT;
 
-function abiOf(to: Address): Abi {
-  switch (getAddress(to)) {
+function abiOf(to: Address, aliases?: Map<Address, Address>): Abi {
+  const address = getAddress(to);
+  switch (aliases?.get(address) ?? address) {
     case L1.upgradeHandler:
       return upgradeHandlerAbi as Abi;
     case L1.securityCouncil:
@@ -113,10 +123,12 @@ export function fakeL1(options: FakeL1Options) {
   const calls: L1Call[] = [];
   /** Block of every aggregate3 the node answered. */
   const multicalls: string[] = [];
+  /** Every aggregate3 the node answered: its block and the functions it called. */
+  const aggregates: { block: string; functions: string[] }[] = [];
 
   function value(call: L1Call): unknown {
-    const to = getAddress(call.to);
-    const domain = (name: string) => ["0x0f", name, "1", 1n, to, zeroHash, []];
+    const to = options.aliases?.get(getAddress(call.to)) ?? getAddress(call.to);
+    const domain = (name: string) => ["0x0f", name, "1", 1n, getAddress(call.to), zeroHash, []];
     const id = String(call.args[0] ?? "").toLowerCase();
     // Multisig.checkSignatures(digest, signers, signatures, threshold): returns nothing.
     const checkSignatures = () => {
@@ -176,10 +188,12 @@ export function fakeL1(options: FakeL1Options) {
       VERSION: () => "1.4.1",
       getThreshold: () => 2n,
       getOwners: () => [member(0xc, 0), member(0xc, 1)],
-      domainSeparator: () => safeMessageHashes(1, to, zeroHash).domainHash,
+      domainSeparator: () => safeMessageHashes(1, getAddress(call.to), zeroHash).domainHash,
       // No message approved on-chain (SignMessageLib).
       signedMessages: () => 0n,
     };
+    const overridden = options.answer?.(call);
+    if (overridden !== undefined) return overridden;
     const answer = (tables[to] ?? safe)[call.functionName];
     if (!answer) throw new Error(`fake L1: unexpected ${to}.${call.functionName}`);
     return answer();
@@ -192,7 +206,7 @@ export function fakeL1(options: FakeL1Options) {
     block: string,
     viaMulticall: boolean
   ): Promise<{ data: Hex } | { error: FakeRpcError }> {
-    const abi = abiOf(to);
+    const abi = abiOf(to, options.aliases);
     const decoded = decodeFunctionData({ abi, data }) as {
       functionName: string;
       args?: readonly unknown[];
@@ -243,8 +257,17 @@ export function fakeL1(options: FakeL1Options) {
         multicalls.push(block);
         const { args } = decodeFunctionData({ abi: multicall3Abi, data: tx.data });
         const subcalls = (args?.[0] ?? []) as readonly { target: Address; callData: Hex }[];
+        const aggregate = { block, functions: [] as string[] };
+        aggregates.push(aggregate);
         const results = await Promise.all(
           subcalls.map(async ({ target, callData }) => {
+            aggregate.functions.push(
+              (
+                decodeFunctionData({ abi: abiOf(target, options.aliases), data: callData }) as {
+                  functionName: string;
+                }
+              ).functionName
+            );
             const answer = await evaluate(target, callData, block, true);
             // Inside aggregate3 a failure is only (false, revert data).
             if ("error" in answer)
@@ -278,6 +301,10 @@ export function fakeL1(options: FakeL1Options) {
     upgrades,
     calls,
     multicalls,
+    aggregates,
+    /** The aggregate3 calls at `block` that read upgrade states (the sync engine's status step). */
+    stateAggregates: (block: string) =>
+      aggregates.filter((a) => a.block === block && a.functions.includes("upgradeState")),
     /** JSON-RPC requests of one method, across every POST. */
     requests: (method: string) =>
       upstream.posts.flatMap((post) => post.calls.filter((c) => c.method === method)),

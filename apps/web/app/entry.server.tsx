@@ -15,10 +15,11 @@ import { renderToPipeableStream } from "react-dom/server";
 
 // The server (server/index.ts) reads which chain the RPC is on before it starts listening, loads
 // the chain cache kept from the last run, warms caches after it starts listening, starts the sync
-// engine, marks every request as activity for it, and saves the chain cache on shutdown. It must
-// reach this build's own modules (build.entry.module), not a second copy bundled into the server.
+// engine, tells it about every request (a page load is use, see sync/presence.ts), and saves the
+// chain cache on shutdown. It must reach this build's own modules (build.entry.module), not a
+// second copy bundled into the server.
 export { prewarm, readNetwork } from "@/.server/prewarm";
-export { startSync, touchSync } from "@/.server/sync/engine";
+export { noteRequest, startSync } from "@/.server/sync/engine";
 export { loadChainCache, saveChainCache } from "@/.server/persist/chain-cache";
 
 const ABORT_DELAY = 60_000;

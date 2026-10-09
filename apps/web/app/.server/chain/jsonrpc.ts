@@ -77,8 +77,15 @@ export type LaneOptions = {
   waitMs?: number;
   /** Per-POST timeout. */
   timeoutMs?: number;
-  /** Retries after a timeout, network error, 5xx or a missing reply entry. */
+  /** Retries after a timeout, network error, 5xx, a missing reply entry (or see askAgain). */
   retries?: number;
+  /**
+   * Also retry (within `retries`) a request the node failed to answer: an internal error with
+   * nothing more to say, or "temporarily unavailable" (NODE_FAILURE). For lanes whose reads
+   * fail a whole answer when one fails (eth_call, eth_getCode, the head). Never eth_getLogs: the
+   * log index retries each range itself, with its own backoff.
+   */
+  askAgain?: boolean;
   /** Base delay before a transient retry, and the rate-limit backoff without Retry-After. */
   backoffMs?: number;
   /** Retries of one request after rate limiting, before it fails. */
@@ -170,6 +177,7 @@ export function createLane(options: LaneOptions): Lane {
   const rateLimitRetries = options.rateLimitRetries ?? 6;
   const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const { onSend, yieldTo } = options;
+  const asksAgain = options.askAgain === true;
   const scrub = scrubber(secretsOf(url));
 
   const queue: Entry[] = [];
@@ -399,6 +407,7 @@ export function createLane(options: LaneOptions): Lane {
     for (const reply of replies) if (isReply(reply)) byId.set(idOf(reply), reply);
     const missing: Entry[] = [];
     const limited: Entry[] = [];
+    const failed: Entry[] = [];
     for (const entry of group) {
       // A null id can only answer a lone request, and only with an error.
       const orphan = group.length === 1 ? byId.get(null) : undefined;
@@ -410,6 +419,8 @@ export function createLane(options: LaneOptions): Lane {
       const error = errorOf(reply);
       if (error) {
         if (isRateLimit(error)) limited.push(entry);
+        else if (asksAgain && entry.transient < retries && askable(entry, error))
+          failed.push(entry);
         else
           fail(
             entry,
@@ -429,7 +440,24 @@ export function createLane(options: LaneOptions): Lane {
     }
     if (limited.length > 0) limit(limited, group.length, sentEpoch, retryAfterMs(headers));
     if (missing.length > 0) transient(missing, "bad-response", "no reply for this request");
+    if (failed.length > 0) askAgain(failed);
     if (limited.length === 0 && missing.length === 0) recover(group.length);
+  }
+
+  /**
+   * The node failed these requests without saying anything about them (askable). Every method a
+   * lane sends is a read, so each is asked again after a moment (backoffMs, then 3x that), within
+   * the same `retries` as a timeout; the last failure is the node's own error, which no caller
+   * reads as an answer (call.ts classify). Not a sign of load: batch size and in-flight stay.
+   */
+  function askAgain(entries: Entry[]) {
+    let attempt = 0;
+    for (const entry of entries) {
+      entry.transient++;
+      attempt = Math.max(attempt, entry.transient);
+    }
+    retried += entries.length;
+    requeue(entries, backoffMs * (2 * attempt - 1));
   }
 
   function transient(entries: Entry[], kind: LaneErrorKind, message: string, status?: number) {
@@ -681,6 +709,22 @@ const RANGE_ANSWER =
 function isRateLimit({ code, message }: ErrorObject) {
   if (code === 429) return true;
   return code === -32005 && !RANGE_ANSWER.test(message);
+}
+
+// JSON-RPC's internal error with nothing more to say, or a service that is "temporarily
+// unavailable": the node failed to answer, it said nothing about the request. Infura answers a
+// read pinned to a block it just named "Internal error" for up to about a second (a backend that
+// does not have the block yet), and an eth_getLogs "service temporarily unavailable". Never a
+// dev node's revert: Hardhat sends reverts as -32603 too, but its message names the revert.
+const NODE_FAILURE =
+  /^\s*(?:internal error[\s.!]*)?$|temporar(?:il)?y unavailable|service unavailable/i;
+
+/**
+ * The node failed to answer this request (NODE_FAILURE), and it is one a lane asks again
+ * (LaneOptions.askAgain): never eth_getLogs, whose ranges the log index retries itself.
+ */
+function askable(entry: Entry, { code, message }: ErrorObject) {
+  return entry.method !== "eth_getLogs" && code === -32603 && NODE_FAILURE.test(message);
 }
 
 function retryAfterMs(headers: Headers): number | undefined {

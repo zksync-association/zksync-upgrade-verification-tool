@@ -134,7 +134,7 @@ beforeEach(() => {
 });
 
 describe("appStatus", () => {
-  it("adds sync.index, sync.l2Index, sync.engine, sync.safe, sync.signatures and sync.cache next to the fields it always had", async () => {
+  it("adds sync.index, sync.l2Index, sync.presence, sync.engine, sync.safe, sync.signatures and sync.cache next to the fields it always had", async () => {
     const status = await appStatus();
     expect(status).toEqual({
       ok: true,
@@ -150,6 +150,15 @@ describe("appStatus", () => {
       sync: {
         index: state.index,
         l2Index: L2_INDEX,
+        // Nobody uses the app in this test (no tab beat, no page loaded).
+        presence: {
+          inUse: false,
+          reason: null,
+          tabs: 0,
+          keys: 0,
+          lastBeatAt: null,
+          pausedAway: 0,
+        },
         engine: ENGINE,
         safe: SAFE,
         signatures: SIGNATURES,

@@ -29,6 +29,7 @@ import {
   peekSafeMessage,
 } from "@/.server/safe/store";
 import { resetSafeClient } from "@/.server/safe-api";
+import { presence, resetPresence } from "@/.server/sync/presence";
 import { saveLocalSettings } from "@config/local-settings.server";
 import { type Address, type Hex, numberToHex, toEventSelector } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -72,6 +73,11 @@ vi.mock("@/.server/cache", async (importOriginal) => {
       key === "network" ? Promise.resolve(state.network) : actual.cached(key, ttlMs, compute),
   };
 });
+// The network as read (the saver's checks use only what was read, never asking the node).
+vi.mock("@/.server/rpc", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/.server/rpc")>()),
+  resolvedNetwork: () => state.network,
+}));
 
 const mainnet = (overrides: Record<string, unknown> = {}) => ({
   name: "mainnet",
@@ -212,6 +218,61 @@ afterEach(() => {
 });
 
 describe("saving", () => {
+  it("the saver's checks never ask the node: nothing is sent while the chain's identity is unknown", async () => {
+    restart();
+    vi.useFakeTimers();
+    let sent = 0;
+    // The RPC is down from the start: the identity read at load fails (and is not kept).
+    vi.stubGlobal("fetch", async () => {
+      sent++;
+      return new Response("unavailable", { status: 503 });
+    });
+    await loadChainCache({ dir: cacheDir() });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(sent).toBeGreaterThan(0);
+    const before = sent;
+    // Ten minutes of the saver's checks (one every 10 s): nothing asked again.
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(sent).toBe(before);
+    expect(await saveChainCache({ force: false })).toBe(false);
+    expect(sent).toBe(before);
+  });
+
+  it("while the app is in use, a check reads the chain's identity the start did not, and saves; idle it asks nothing", async () => {
+    // PREWARM=0: the start reads nothing (the same as a failed read at start, or a settings
+    // change since: no identity known for these settings).
+    vi.stubEnv("PREWARM", "0");
+    restart();
+    resetPresence();
+    const up = upstream();
+    await loadChainCache({ dir: cacheDir() });
+    await puhIndex().startBackfill();
+    const identityReads = () =>
+      up.l1.posts
+        .flatMap((p) => p.calls)
+        .filter(
+          (c) =>
+            c.method === "eth_chainId" ||
+            (c.method === "eth_getBlockByNumber" && c.params[0] === "0x0")
+        ).length;
+    const before = identityReads();
+    // Idle: the check skips without asking.
+    expect(await saveChainCache({ force: false })).toBe(false);
+    expect(identityReads()).toBe(before);
+    expect(existsSync(filePath())).toBe(false);
+    // A page load: the next check reads the identity once, and saves.
+    presence().load();
+    expect(await saveChainCache({ force: false })).toBe(true);
+    expect(readFile().chain).toEqual({ chainId: 1, genesisHash: GENESIS });
+    const read = identityReads();
+    expect(read).toBeGreaterThan(before);
+    // Known from now on: later checks ask nothing about it.
+    await blockTimestamps([DEPLOY + 5n]);
+    await saveChainCache({ force: false });
+    expect(identityReads()).toBe(read);
+    resetPresence();
+  });
+
   it("writes the complete history, final timestamps and Safe listings atomically, 0600 in a 0700 directory", async () => {
     restart();
     upstream();

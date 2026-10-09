@@ -137,7 +137,10 @@ describe("chain head", () => {
       expect(fake.posts.filter((p) => p.calls.some((c) => c.params[0] === "latest"))).toHaveLength(
         1
       );
-    }
+    },
+    // The head lane asks a read the node failed to answer (-32603 "internal error") again twice,
+    // 250 and 750 ms later, before the failure stands: four reads here.
+    15_000
   );
 
   it("falls back to the last finalized block known when a later 'finalized' read fails", async () => {

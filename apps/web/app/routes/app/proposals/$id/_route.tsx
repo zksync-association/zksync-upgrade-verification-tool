@@ -1,3 +1,4 @@
+import { pageLoad, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import { type StandardUpgradeCore, loadStandardUpgrade } from "@/.server/flows/standard";
 import { parseId } from "@/.server/params";
@@ -31,12 +32,14 @@ export const meta = Meta["/app/proposals/:id"];
 export function loader({ params, request }: LoaderFunctionArgs) {
   const id = parseId(params.id);
   // The page shows each set's first answer at once (possibly from an older block or older Safe
-  // copies, labelled) and the strict result after it in the same response.
-  const loading = loadStandardUpgrade(id, {
-    supplied: suppliedSignatures(request),
-    freshness: "page",
-  });
+  // copies, labelled) and the strict result after it in the same response. Its sets' keys join
+  // the page load's grace as they are found.
+  const page = pageLoad(request, [watchKeys.upgrade(id)]);
+  const loading = page.run(() =>
+    loadStandardUpgrade(id, { supplied: suppliedSignatures(request), freshness: "page" })
+  );
   return defer({
+    watch: page.watch,
     id,
     detail: loading.then((d) => d.overview),
     // A start found in the history the last run saved, or located directly while this run's

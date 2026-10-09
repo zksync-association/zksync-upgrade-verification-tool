@@ -1,3 +1,4 @@
+import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import {
   type EmergencySummary,
@@ -34,6 +35,7 @@ export function loader({ request }: LoaderFunctionArgs) {
   // Executions likewise: from the history the last run saved while this run re-reads it
   // (labelled), and the list from this run's history after it. They need no governance read.
   return defer({
+    watch: watchItems(request, [watchKeys.emergencies(allHistory)]),
     allHistory,
     pending: loading.pending,
     freshPending: freshAfter(loading.pending, loading.freshPending, (p) => p.stale),

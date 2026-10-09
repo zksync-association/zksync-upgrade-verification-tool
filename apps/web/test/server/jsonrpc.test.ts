@@ -468,6 +468,88 @@ describe("transient failures", () => {
     expect(fake.sizes()).toEqual([2, 2, 1]);
   });
 
+  // Infura answers a read pinned to a block it just named "Internal error" for a moment (a
+  // backend that does not have the block yet): one failed entry would fail a whole JSON answer.
+  it.each([
+    ["Internal error", -32603],
+    ["service temporarily unavailable", -32603],
+  ])(
+    "with askAgain, asks an entry the node failed to answer (%s) again, alone, and keeps batching",
+    async (message, code) => {
+      const failures = new Map<number, number>([[2, 1]]);
+      const call = (i: number) => [{ to: "0x00", data: `0x0${i}` }, "0x10"];
+      const indexOf = (c: { params: unknown[] }) =>
+        Number((c.params[0] as { data: string }).data.slice(2));
+      const { lane: l, fake } = lane(
+        {
+          handle: (c) => {
+            const i = indexOf(c);
+            const left = failures.get(i) ?? 0;
+            if (left > 0) {
+              failures.set(i, left - 1);
+              return new FakeRpcError(code, message);
+            }
+            return `0x${i}`;
+          },
+        },
+        { askAgain: true }
+      );
+      expect(await Promise.all([1, 2, 3].map((i) => l.request("eth_call", call(i))))).toEqual([
+        "0x1",
+        "0x2",
+        "0x3",
+      ]);
+      // The batch, then the failed entry alone.
+      expect(fake.sizes()).toEqual([3, 1]);
+      expect(l.stats()).toMatchObject({ batch: 25, inFlightLimit: 8, retries: 1, errors: 0 });
+    }
+  );
+
+  it("with askAgain, fails with the node's own error once the retries are spent", async () => {
+    const { lane: l, fake } = lane(
+      { handle: () => new FakeRpcError(-32603, "Internal error") },
+      { askAgain: true }
+    );
+    const error = await l.request("eth_getCode", ["0x00", "0x10"]).catch((e) => e);
+    expect(error).toBeInstanceOf(RpcError);
+    expect(error).toMatchObject({ code: -32603, message: "Internal error" });
+    expect(fake.posts).toHaveLength(3);
+  });
+
+  it.each([
+    ["without askAgain", "eth_call", {}, -32603, "Internal error"],
+    [
+      "eth_getLogs (the index retries ranges)",
+      "eth_getLogs",
+      { askAgain: true },
+      -32603,
+      "Internal error",
+    ],
+    [
+      "a -32603 that names a revert (Hardhat)",
+      "eth_call",
+      { askAgain: true },
+      -32603,
+      "Error: VM Exception while processing transaction: reverted with reason string 'x'",
+    ],
+    [
+      "a -32603 with more to say",
+      "eth_call",
+      { askAgain: true },
+      -32603,
+      "internal error at the gateway",
+    ],
+    ["a definite revert", "eth_call", { askAgain: true }, 3, "execution reverted"],
+    ["an unknown block", "eth_call", { askAgain: true }, -32000, "header not found"],
+  ] as const)("never asks again %s", async (_name, method, options, code, message) => {
+    const { lane: l, fake } = lane({ handle: () => new FakeRpcError(code, message) }, options);
+    const params = method === "eth_getLogs" ? getLogs(1) : [{ to: "0x00", data: "0x00" }, "0x10"];
+    const error = await l.request(method, params).catch((e) => e);
+    expect(error).toBeInstanceOf(RpcError);
+    expect(error).toMatchObject({ code, message });
+    expect(fake.posts).toHaveLength(1);
+  });
+
   it.each([
     ["a null id", { jsonrpc: "2.0", id: null, result: "0x" }],
     ["no id", { result: "0x" }],

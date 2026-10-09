@@ -19,17 +19,22 @@ import {
   type SyncEngineOptions,
   type Tick,
   type TickStep,
-  countsAsVisit,
   governanceDue,
   liveSteps,
+  noteRequest,
   startSync,
   stopSync,
   syncEngineStatus,
-  touchSync,
 } from "@/.server/sync/engine";
+import { type RequestInfo, presence, resetPresence } from "@/.server/sync/presence";
 import { listSafeMessages, safeStoreStatus } from "@/.server/safe/store";
 import type { SafeMessage } from "@/.server/safe-api";
-import { signatureSetsStatus, verifySignatureSet } from "@/.server/signatures";
+import {
+  type SignatureSetParams,
+  signatureSetsStatus,
+  verifySignatureSet,
+  watchSignatureSet,
+} from "@/.server/signatures";
 import { currentUpgradeStatus, upgradeStatusKey } from "@/.server/upgrade-status";
 import { type UpgradeProposal, encodeUpgradeProposal, upgradeProposalId } from "@/common/proposal";
 import { safeMessageHashes } from "@/common/safe";
@@ -56,10 +61,28 @@ import {
 const NOW = 1_800_000_000_000;
 const SLOT = 12_000;
 
+beforeEach(() => {
+  resetPresence({ keepWarmMs: 600_000 });
+});
+
 afterEach(() => {
   stopSync();
+  resetPresence();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+/** A page load (presence.ts): someone uses the app from now, and the engine wakes for it. */
+function touch(engine: SyncEngine) {
+  presence().load();
+  engine.resume();
+}
+
+/** What the server shows the engine about a request (server/index.ts). */
+const request = (path: string, headers: Record<string, string> = {}): RequestInfo => ({
+  method: "GET",
+  path,
+  header: (name) => headers[name],
 });
 
 // ---- schedule and lifecycle, with stub dependencies ----
@@ -117,11 +140,16 @@ function stubChain(
 
 function stubEngine(
   pollHeadFn: SyncEngineOptions["pollHead"],
-  options: Partial<SyncEngineOptions> & { currentGeneration?: () => number } = {}
+  {
+    keepWarmMs,
+    ...options
+  }: Partial<SyncEngineOptions> & { currentGeneration?: () => number; keepWarmMs?: number } = {}
 ) {
+  // SYNC_KEEPWARM_MS for this test.
+  if (keepWarmMs !== undefined) resetPresence({ keepWarmMs });
   return new SyncEngine({
     mode: "window",
-    keepWarmMs: 600_000,
+    inUse: () => presence().inUse(),
     generation: 1,
     currentGeneration: () => 1,
     network: async () => ({ isDevNode: false, name: "mainnet", blockTimeSeconds: 12 }),
@@ -147,7 +175,7 @@ async function bootBeforeSlot(
 ): Promise<number> {
   const T = Date.now() + 6_000;
   chain.head = { number: n - 1n, hash: blockHash(n - 1n), timestamp: BigInt((T - SLOT) / 1000) };
-  engine.touch();
+  touch(engine);
   await vi.advanceTimersByTimeAsync(T + 500 - Date.now());
   chain.head = { number: n, hash: blockHash(n), timestamp: BigInt(T / 1000) };
   await vi.advanceTimersByTimeAsync(T + 1_000 - Date.now());
@@ -173,7 +201,7 @@ describe("activity window", () => {
   it("starts on a request, stops once idle for SYNC_KEEPWARM_MS, and starts again on the next", async () => {
     const { chain, pollHead } = stubChain({ timestamp: nowSeconds() - 1n });
     const engine = stubEngine(pollHead, { keepWarmMs: 30_000 });
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(0);
     expect(chain.polls).toHaveLength(1);
     expect(engine.status().active).toBe(true);
@@ -188,10 +216,68 @@ describe("activity window", () => {
     expect(chain.polls).toHaveLength(idle);
 
     // The next request starts it again (that request itself reads on demand).
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(0);
     expect(chain.polls).toHaveLength(idle + 1);
     expect(engine.status().active).toBe(true);
+  });
+
+  it("I-5: a poll answered after use ended starts no tick, and nothing is asked after it", async () => {
+    // Polls take 4 s; the app counts as in use for 3 s after the page load.
+    const { chain, pollHead } = stubChain({ timestamp: nowSeconds() - 1n }, { pollMs: 4_000 });
+    const ran: bigint[] = [];
+    const engine = stubEngine(pollHead, {
+      keepWarmMs: 3_000,
+      steps: [
+        {
+          name: "probe",
+          beforePublish: true,
+          run: async (tick) => void ran.push(tick.head.number),
+        },
+      ],
+    });
+    touch(engine);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(chain.polls).toHaveLength(1);
+    // Use ends while the poll is out; its answer comes a second later.
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(ran).toEqual([]);
+    expect(engine.status()).toMatchObject({ active: false, ticks: 0, head: null });
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(chain.polls).toHaveLength(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("a step waiting for an older head's run does not start once use ended", async () => {
+    let release: () => void = () => {};
+    const ran: bigint[] = [];
+    const { chain, pollHead } = stubChain({ timestamp: nowSeconds() - 1n });
+    const engine = stubEngine(pollHead, {
+      keepWarmMs: 20_000,
+      steps: [
+        {
+          name: "slow",
+          run: async (tick) => {
+            ran.push(tick.head.number);
+            await new Promise<void>((resolve) => {
+              release = resolve;
+            });
+          },
+        },
+      ],
+    });
+    touch(engine);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(ran).toEqual([100n]);
+    // A newer head while the step is still busy with the first: it waits for its turn.
+    chain.head = { number: 101n, hash: blockHash(101n), timestamp: nowSeconds() };
+    await vi.advanceTimersByTimeAsync(3_000);
+    // Use ends; then the first run finishes: the waiting run never starts.
+    await vi.advanceTimersByTimeAsync(20_000);
+    release();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(ran).toEqual([100n]);
+    expect(engine.status().active).toBe(false);
   });
 
   it("keeps running without requests in SYNC_MODE=always", async () => {
@@ -206,7 +292,7 @@ describe("activity window", () => {
   it("does nothing in SYNC_MODE=off", async () => {
     const { chain, pollHead } = stubChain({ timestamp: nowSeconds() });
     const engine = stubEngine(pollHead, { mode: "off" });
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(chain.polls).toHaveLength(0);
     expect(engine.status()).toMatchObject({ mode: "off", reason: "SYNC_MODE=off", active: false });
@@ -250,7 +336,7 @@ describe("activity window", () => {
     expect(seen.every((s) => !s.viewing)).toBe(true);
 
     // A request: viewing for SYNC_KEEPWARM_MS, then idle again, still following the head.
-    engine.touch();
+    touch(engine);
     expect(engine.status().cost.mode).toBe("viewing");
     const from = seen.length;
     await vi.advanceTimersByTimeAsync(20_000);
@@ -269,12 +355,12 @@ describe("activity window", () => {
     const engine = stubEngine(pollHead, {
       network: async () => ({ isDevNode: true, name: "local", blockTimeSeconds: 12 }),
     });
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(chain.polls).toHaveLength(0);
     expect(vi.getTimerCount()).toBe(0);
     expect(engine.status()).toMatchObject({ mode: "off", reason: "dev node", active: false });
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(chain.polls).toHaveLength(0);
   });
@@ -295,7 +381,7 @@ describe("head follower", () => {
     const T = NOW - 1_000;
     const { chain, pollHead } = stubChain({ number: 500n, timestamp: BigInt(T / 1000) });
     const engine = stubEngine(pollHead);
-    engine.touch();
+    touch(engine);
     // Nothing shows yet that the local clock is not behind the chain's: the node is asked every
     // 2 s, the last time exactly when the next slot begins (T + 12 s), then every second.
     await vi.advanceTimersByTimeAsync(T + 14_500 - Date.now());
@@ -333,7 +419,7 @@ describe("head follower", () => {
   ])("polls every 2 s when %s", async (_, offset) => {
     const { chain, pollHead } = stubChain({ timestamp: BigInt((NOW + offset) / 1000) });
     const engine = stubEngine(pollHead);
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(10_000);
     expect(sinceSlot(chain.polls, NOW)).toEqual([0, 2_000, 4_000, 6_000, 8_000, 10_000]);
     expect(chain.confirms).toEqual([]);
@@ -344,7 +430,7 @@ describe("head follower", () => {
     const engine = stubEngine(pollHead, {
       network: async () => ({ isDevNode: false, name: "local", blockTimeSeconds: 12 }),
     });
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(6_000);
     expect(sinceSlot(chain.polls, NOW)).toEqual([0, 2_000, 4_000, 6_000]);
   });
@@ -352,7 +438,7 @@ describe("head follower", () => {
   it("never stacks a slow poll: the next one starts after it answers", async () => {
     const { chain, pollHead } = stubChain({ timestamp: nowSeconds() - 30n }, { pollMs: 5_000 });
     const engine = stubEngine(pollHead);
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(30_000);
     expect(chain.peak).toBe(1);
     // 5 s per poll, then 2 s until the next.
@@ -363,7 +449,7 @@ describe("head follower", () => {
   it("asks for 'finalized' every 32 blocks, or whenever the tail above it would pass 128", async () => {
     const { chain, pollHead } = stubChain({ number: 1_000n, timestamp: nowSeconds() - 30n });
     const engine = stubEngine(pollHead);
-    engine.touch();
+    touch(engine);
     // A new block for every poll (every 2 s here). From the 40th block on, finality stalls: the
     // next answer (at the 32-block mark) is 200 blocks behind, so every poll after it asks again.
     for (let i = 1; i <= 70; i++) {
@@ -389,7 +475,7 @@ describe("head follower", () => {
       }
       return pollHead(options);
     });
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(4_000);
     expect(sinceSlot(chain.polls, NOW)).toEqual([0, 2_000, 4_000]);
     expect(engine.status().head).toBeNull();
@@ -412,7 +498,7 @@ describe("head follower", () => {
         },
       ],
     });
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(0);
     chain.head = { ...chain.head, number: 11n, hash: blockHash(11n) };
     await vi.advanceTimersByTimeAsync(2_000);
@@ -609,7 +695,7 @@ describe("head follower vs the local clock", () => {
       const polls = engine.status().polls;
       const confirms = sim.confirms;
       for (let i = 0; i < 10; i++) {
-        engine.touch();
+        touch(engine);
         await vi.advanceTimersByTimeAsync(30_000);
       }
       return { polls: engine.status().polls - polls, confirms: sim.confirms - confirms };
@@ -689,7 +775,7 @@ describe("ticks", () => {
         }),
       ],
     });
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(500);
     await engine.settled();
     expect(done).toEqual(["status@7"]);
@@ -775,7 +861,7 @@ describe("ticks", () => {
       },
       { steps: [{ name: "status", beforePublish: true, run: () => new Promise(() => {}) }] }
     );
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(0);
     // The node stops answering right after it named head 7.
     failing = true;
@@ -803,7 +889,7 @@ describe("ticks", () => {
         },
       ],
     });
-    engine.touch();
+    touch(engine);
     // Polls every 2 s; heads 11, 12, 13 arrive while the slow step runs for 10.
     for (const n of [11n, 12n, 13n]) {
       await vi.advanceTimersByTimeAsync(2_000);
@@ -842,7 +928,7 @@ describe("ticks", () => {
         }),
       ],
     });
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(0);
     chain.generation = 2;
     release();
@@ -952,7 +1038,7 @@ async function until(done: () => boolean, maxMs = 5_000) {
 function liveEngine(options: Partial<SyncEngineOptions> = {}) {
   return new SyncEngine({
     mode: "window",
-    keepWarmMs: 600_000,
+    inUse: () => presence().inUse(),
     generation: rpcGeneration(),
     currentGeneration: rpcGeneration,
     network,
@@ -970,7 +1056,7 @@ async function backfilled() {
 }
 
 async function firstTick(engine: SyncEngine, ticks = 1) {
-  engine.touch();
+  touch(engine);
   await until(() => engine.status().ticks >= ticks);
   await engine.settled();
 }
@@ -998,6 +1084,14 @@ async function safeService(fake: ReturnType<typeof fakeL1>, signatures: Set<stri
     id: ACTIVE_ID,
   });
   const { digest } = governanceHashes(typedData);
+  const params: SignatureSetParams = {
+    action: "ApproveUpgradeSecurityCouncil",
+    signerGroup: "securityCouncil",
+    typedData,
+    members: [...gov.securityCouncil.members],
+    threshold: gov.securityCouncil.thresholds.approveUpgrade,
+    check: { kind: "multisig", contract: gov.securityCouncil.address },
+  };
   const listings = new Map<string, SafeMessage[]>();
   const requests: string[] = [];
   vi.stubGlobal("fetch", async (input: unknown, init?: RequestInit) => {
@@ -1029,20 +1123,43 @@ async function safeService(fake: ReturnType<typeof fakeL1>, signatures: Set<stri
       ]);
       signatures.add(`${member}:0x01`.toLowerCase());
     },
-    view: () =>
-      verifySignatureSet({
-        action: "ApproveUpgradeSecurityCouncil",
-        signerGroup: "securityCouncil",
-        typedData,
-        members: [...gov.securityCouncil.members],
-        threshold: gov.securityCouncil.thresholds.approveUpgrade,
-        check: { kind: "multisig", contract: gov.securityCouncil.address },
-      }),
+    params,
+    /** A page shows the set in a visible tab: on screen for the engine. */
+    show: () => showOnScreen([params]),
+    view: () => verifySignatureSet(params),
   };
 }
 
+/** A visible tab shows these sets (pages registered each; the tab beats their keys). */
+function showOnScreen(sets: SignatureSetParams[], tab = "tab-under-test") {
+  presence().beat({ tab, reason: "interval", items: sets.map((set) => watchSignatureSet(set)) });
+}
+
+/** A set of `members` on screen, as a page that shows it registers it. */
+const setOf = (
+  signerGroup: SignatureSetParams["signerGroup"],
+  members: readonly Hex[],
+  contract: Hex
+): SignatureSetParams => ({
+  action: "ApproveUpgradeSecurityCouncil",
+  signerGroup,
+  typedData: buildTypedData(
+    "ApproveUpgradeSecurityCouncil",
+    { name: "SecurityCouncil", version: "1", chainId: 1, verifyingContract: L1.securityCouncil },
+    { id: ACTIVE_ID }
+  ),
+  members: [...members],
+  threshold: 1,
+  check: { kind: "multisig", contract },
+});
+
+// Upgrade state reads at a block (governance's reads are pinned to the head's number too).
 const statusCalls = (fake: ReturnType<typeof fakeL1>, block: bigint) =>
-  fake.calls.filter((c) => c.block === numberToHex(block));
+  fake.calls.filter(
+    (c) =>
+      c.block === numberToHex(block) &&
+      (c.functionName === "upgradeState" || c.functionName === "upgradeStatus")
+  );
 
 describe("live engine", () => {
   beforeEach(() => {
@@ -1052,9 +1169,15 @@ describe("live engine", () => {
     resetRpcClients();
   });
 
-  it("seeds head, governance, upgrade states and Safe info: 100 request-path rounds ask nothing upstream", async () => {
+  it("seeds head, governance, upgrade states and the on-screen sets' Safe info: 100 request-path rounds ask nothing upstream", async () => {
     const { fake, ids } = liveChain();
     await backfilled();
+    // The council's, the Guardians' and the ZK Foundation's sets on screen.
+    showOnScreen([
+      setOf("securityCouncil", SC_MEMBERS, L1.securityCouncil),
+      setOf("guardians", G_MEMBERS, L1.guardians),
+      setOf("zkFoundation", [L1.zkFoundation], L1.zkFoundation),
+    ]);
     const engine = liveEngine();
     await firstTick(engine);
     expect(engine.status()).toMatchObject({
@@ -1065,7 +1188,7 @@ describe("live engine", () => {
       ticks: 1,
     });
     // Every id's state and status went out in ONE Multicall3 call pinned to the head.
-    expect(fake.multicalls.filter((b) => b === numberToHex(HEAD))).toHaveLength(1);
+    expect(fake.stateAggregates(numberToHex(HEAD))).toHaveLength(1);
     expect(statusCalls(fake, HEAD)).toHaveLength(2 * ids.length);
     expect(statusCalls(fake, HEAD).every((c) => c.viaMulticall)).toBe(true);
 
@@ -1203,7 +1326,7 @@ describe("live engine", () => {
       upgradeStatusKey(1, ACTIVE_ID, { hash: HASH_B })
     );
     // Read again at the same height: one Multicall3 call per hash.
-    expect(fake.multicalls.filter((b) => b === numberToHex(HEAD))).toHaveLength(2);
+    expect(fake.stateAggregates(numberToHex(HEAD))).toHaveLength(2);
     const before = fake.posts.length;
     expect((await latestBlock()).hash).toBe(HASH_B);
     expect((await currentUpgradeStatus(ACTIVE_ID)).state).toBe(UPGRADE_STATES.ExecutionPending);
@@ -1227,7 +1350,7 @@ describe("live engine", () => {
     };
     fake.chain.options.finalized = finalized;
     // Someone is using the app then.
-    engine.touch();
+    touch(engine);
     await until(() => engine.status().ticks >= ticks);
     await engine.settled();
   }
@@ -1304,7 +1427,7 @@ describe("live engine", () => {
     });
     // A is seen 13 s after its timestamp (its successor's slot has begun): polls every second.
     fake.chain.options.head = { number: HEAD, hash: HASH_A, timestamp: HEAD_TIME - 12n };
-    engine.touch();
+    touch(engine);
     await until(() => engine.status().head?.hash === HASH_A);
     // A is replaced at the same height by B: the next poll sees it, and its deadline serves it.
     fake.chain.options.head = { number: HEAD, hash: HASH_B, timestamp: HEAD_TIME };
@@ -1385,7 +1508,7 @@ describe("live engine", () => {
     const boundary = HEAD + 20n;
     await advanceChain(engine, fake, later, boundary, 2);
     expect(statusCalls(fake, boundary)).toHaveLength(2 * (ids.length - 1));
-    expect(fake.multicalls.filter((b) => b === numberToHex(boundary))).toHaveLength(1);
+    expect(fake.stateAggregates(numberToHex(boundary))).toHaveLength(1);
     expect(statusCalls(fake, later).map((c) => [c.functionName, c.args[0]])).toEqual([
       ["upgradeState", ACTIVE_ID],
       ["upgradeStatus", ACTIVE_ID],
@@ -1468,7 +1591,7 @@ describe("live engine", () => {
     await advanceChain(engine, fake, later + 1n, HEAD + 21n, 3);
     expect(refused).toBe(1);
     expect(statusCalls(fake, later + 1n)).toHaveLength(2 * ids.length);
-    expect(fake.multicalls.filter((b) => b === numberToHex(later + 1n))).toHaveLength(1);
+    expect(fake.stateAggregates(numberToHex(later + 1n))).toHaveLength(1);
     expect(engine.status().lastTick?.failedSteps).toEqual([]);
 
     // 32 blocks on, the boundary is within reach again: confirmed there, carried forward after.
@@ -1491,7 +1614,8 @@ describe("live engine", () => {
     await firstTick(engine);
     const safe = await safeService(fake, signatures);
     for (const member of SC_MEMBERS.slice(0, 2)) safe.sign(member);
-    // A page views the set.
+    // A page shows the set.
+    safe.show();
     const viewed = await settle(safe.view());
     expect(viewed.members.map((m) => m.status)).toEqual(["valid", "valid", "missing"]);
     expect(safe.requests).toHaveLength(SC_MEMBERS.length);
@@ -1547,6 +1671,7 @@ describe("live engine", () => {
     await firstTick(engine);
     const safe = await safeService(fake, signatures);
     for (const member of SC_MEMBERS.slice(0, 2)) safe.sign(member);
+    safe.show();
     expect((await settle(safe.view())).thresholdCheck.status).toBe("met");
     /** The set as a request gets it now, if it is answered from memory: in this turn, no timer. */
     const fromMemory = async () => {
@@ -1587,14 +1712,65 @@ describe("live engine", () => {
     expect(safe.requests).toHaveLength(SC_MEMBERS.length);
   });
 
-  it("the server's engine verifies a watched set again at the served head when a member Safe's listing changes", async () => {
+  it("starts no more sets once use ended during a precompute: only those already under way finish", async () => {
+    // Every on-chain approval read (signedMessages) at the next block waits until released.
+    const next = numberToHex(HEAD + 1n);
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const signatures = new Set<string>();
+    const { fake } = liveChain({
+      signatures,
+      gate: (call) =>
+        call.block === next && call.functionName === "signedMessages" ? held : undefined,
+    });
+    await backfilled();
+    // In use through a tab's beats alone (no page load's grace): its leave ends the use.
+    const engine = liveEngine();
+    showOnScreen([]);
+    engine.resume();
+    await until(() => engine.status().ticks >= 1);
+    await engine.settled();
+    const safe = await safeService(fake, signatures);
+    const gov = await governance();
+    // Six sets on screen (the precompute verifies four at a time), nobody signed in Safe: each
+    // set reads every member's on-chain approval.
+    const sets = Array.from({ length: 6 }, (_, i) => ({
+      ...safe.params,
+      typedData: buildTypedData("ApproveUpgradeSecurityCouncil", gov.securityCouncil.domain, {
+        id: pad(numberToHex(0x5e7 + i), { size: 32 }) as Hex,
+      }),
+    }));
+    showOnScreen(sets);
+    for (const set of sets) await settle(verifySignatureSet(set));
+    const approvalsAt = () =>
+      fake.calls.filter((c) => c.functionName === "signedMessages" && c.block === next).length;
+
+    // The next block: the first four sets' reads are out (and held) when the tab leaves.
+    fake.chain.options.head = {
+      number: HEAD + 1n,
+      hash: blockHash(HEAD + 1n),
+      timestamp: HEAD_TIME + 12n,
+    };
+    const perSet = gov.securityCouncil.members.length;
+    await until(() => approvalsAt() === 4 * perSet, 15_000);
+    presence().beat({ tab: "tab-under-test", reason: "leave", items: [] });
+    release();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(approvalsAt()).toBe(4 * perSet);
+    engine.stop();
+  });
+
+  it("the server's engine verifies a set on screen again at the served head when a member Safe's listing changes", async () => {
     const signatures = new Set<string>();
     const { fake } = liveChain({ signatures });
     await backfilled();
-    touchSync();
+    noteRequest(request("/app/proposals"));
     await until(() => syncEngineStatus().ticks >= 1);
     const safe = await safeService(fake, signatures);
     for (const member of SC_MEMBERS.slice(0, 2)) safe.sign(member);
+    safe.show();
     expect((await settle(safe.view())).members[2]?.status).toBe("missing");
     // The listings the page read were new to the store: the set they were read for already has
     // its result at this head.
@@ -1643,7 +1819,7 @@ describe("live engine", () => {
     });
     await backfilled();
     const engine = liveEngine();
-    engine.touch();
+    touch(engine);
     await until(() => holding);
     // The settings change (as updateSettings does) while governance is being read.
     clearCache();
@@ -1660,35 +1836,35 @@ describe("live engine", () => {
   it("stays off on a dev node: no head polls, nothing seeded", async () => {
     const { fake } = liveChain({ clientVersion: "anvil/v1.0.0" });
     const engine = liveEngine();
-    engine.touch();
+    touch(engine);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(engine.status()).toMatchObject({ mode: "off", reason: "dev node", active: false });
     expect(fake.requests("eth_getBlockByNumber")).toHaveLength(0);
     expect(fake.requests("eth_call")).toHaveLength(0);
   });
 
-  it("the server's engine: a request starts it, /api/status reports it, a settings change replaces it", async () => {
+  it("the server's engine: a page load starts it, /api/status reports it, a settings change replaces it", async () => {
     liveChain();
     await backfilled();
-    // SYNC_MODE defaults to "always".
-    expect(syncEngineStatus()).toMatchObject({ mode: "always", active: false, polls: 0 });
+    // SYNC_MODE defaults to "window": nothing follows the chain before someone uses the app.
+    expect(syncEngineStatus()).toMatchObject({ mode: "window", active: false, polls: 0 });
     expect(safeStoreStatus()).toMatchObject({ sweeping: false, paused: "idle" });
-    touchSync();
+    noteRequest(request("/app/proposals"));
     await until(() => syncEngineStatus().ticks >= 1);
     const status = syncEngineStatus();
     expect(status).toMatchObject({ active: true, head: { number: HEAD.toString() } });
     // JSON-safe as served.
     expect(JSON.parse(JSON.stringify(status))).toEqual(status);
-    // The request also started the Safe store's sweep, which runs while the engine does: on the
-    // public Safe service without a key it never reads in the background; with one, it has
-    // nothing to do yet (no page asked for a Safe).
+    // The page load also started the Safe store's sweep, which runs while the engine does: on
+    // the public Safe service without a key it never reads in the background; with one, it has
+    // nothing to do yet (no set on screen).
     expect(safeStoreStatus()).toMatchObject({
       sweeping: false,
       paused: process.env.SAFE_API_KEY ? null : "keyless-public-service",
     });
 
-    // Settings change: the old engine retires at its next wake and the new one starts (the
-    // change was a request), reading through the new settings.
+    // Settings change: the old engine retires at its next wake and the new one starts (the app is
+    // still in use), reading through the new settings.
     clearCache();
     resetRpcClients();
     expect(syncEngineStatus()).toMatchObject({ active: false, polls: 0, ticks: 0 });
@@ -1766,7 +1942,7 @@ describe("live engine, idle profile (SYNC_MODE=always, nobody viewing)", () => {
       clearInterval(sample);
     }
     // While viewing: every block (and the keep-alive stops once a tick has read it).
-    engine.touch();
+    touch(engine);
     await produce(engine, fake, HEAD + 16n);
     const before = governanceReads(fake);
     await produce(engine, fake, HEAD + 17n);
@@ -1776,7 +1952,7 @@ describe("live engine, idle profile (SYNC_MODE=always, nobody viewing)", () => {
     engine.stop();
   });
 
-  it("verifies only the open signature sets at each new head while idle, every viewed one while in use", async () => {
+  it("verifies only the signature sets on screen at each new head: none while nobody uses the app", async () => {
     const signatures = new Set<string>();
     const { fake } = liveChain({ signatures });
     await backfilled();
@@ -1787,33 +1963,37 @@ describe("live engine, idle profile (SYNC_MODE=always, nobody viewing)", () => {
     const safe = await safeService(fake, signatures);
     for (const member of SC_MEMBERS.slice(0, 2)) safe.sign(member);
     const gov = await governance();
-    const set = (id: Hex, open: boolean) =>
-      verifySignatureSet({
-        action: "ApproveUpgradeSecurityCouncil",
-        signerGroup: "securityCouncil",
-        typedData: buildTypedData("ApproveUpgradeSecurityCouncil", gov.securityCouncil.domain, {
-          id,
-        }),
-        members: [...gov.securityCouncil.members],
-        threshold: gov.securityCouncil.thresholds.approveUpgrade,
-        check: { kind: "multisig", contract: gov.securityCouncil.address },
-        open,
-      });
-    // The active upgrade's approval is open; another (executed) upgrade's is done.
-    await settle(set(ACTIVE_ID, true));
-    await settle(set(`0x${"de".repeat(32)}`, false));
-    expect(signatureSetsStatus()).toMatchObject({ watched: 2, open: 1 });
+    const set = (id: Hex, open: boolean): SignatureSetParams => ({
+      action: "ApproveUpgradeSecurityCouncil",
+      signerGroup: "securityCouncil",
+      typedData: buildTypedData("ApproveUpgradeSecurityCouncil", gov.securityCouncil.domain, {
+        id,
+      }),
+      members: [...gov.securityCouncil.members],
+      threshold: gov.securityCouncil.thresholds.approveUpgrade,
+      check: { kind: "multisig", contract: gov.securityCouncil.address },
+      open,
+    });
+    // The active upgrade's approval is open; another (executed) upgrade's is done. Pages showed
+    // both, then their tab was closed.
+    const open = set(ACTIVE_ID, true);
+    const done = set(`0x${"de".repeat(32)}`, false);
+    showOnScreen([open, done]);
+    await settle(verifySignatureSet(open));
+    await settle(verifySignatureSet(done));
+    presence().beat({ tab: "tab-under-test", reason: "leave", items: [] });
+    expect(signatureSetsStatus()).toMatchObject({ watched: 2, onScreen: 0 });
 
+    // Nobody uses the app: neither is verified again, open or not.
     await produce(engine, fake, HEAD + 1n);
     expect(signatureSetsStatus().lastRun).toMatchObject({
       block: (HEAD + 1n).toString(),
       trigger: "head",
       profile: "idle",
-      sets: 1,
-      verified: 1,
+      sets: 0,
     });
-    // Someone views the app: both.
-    engine.touch();
+    // A tab shows both: both.
+    showOnScreen([open, done]);
     await produce(engine, fake, HEAD + 2n);
     expect(signatureSetsStatus().lastRun).toMatchObject({
       block: (HEAD + 2n).toString(),
@@ -1851,64 +2031,16 @@ describe("live engine, idle profile (SYNC_MODE=always, nobody viewing)", () => {
     engine.stop();
   });
 
-  it("the server's engine starts without counting the start as a visit; a request does", async () => {
-    liveChain();
-    await backfilled();
-    startSync();
-    await until(() => syncEngineStatus().ticks >= 1);
-    expect(syncEngineStatus()).toMatchObject({
-      mode: "always",
-      active: true,
-      cost: { mode: "idle" },
-    });
-    touchSync();
-    expect(syncEngineStatus().cost.mode).toBe("viewing");
-  });
-
-  it("the server's engine: reading /api/status is not a visit, so the status can report idle and its ticks stay idle", async () => {
+  it("the server's engine in SYNC_MODE=window: the start follows nothing; a page load does", async () => {
     const { fake } = liveChain();
     await backfilled();
+    const before = fake.posts.length;
     startSync();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(syncEngineStatus()).toMatchObject({ mode: "window", active: false, polls: 0 });
+    expect(fake.posts.length).toBe(before);
+    noteRequest(request("/app/proposals"));
     await until(() => syncEngineStatus().ticks >= 1);
-    await vi.advanceTimersByTimeAsync(100);
-    expect(governanceReads(fake)).toBe(1);
-
-    // An agent polling the status, as AGENTS.md's first command does, any spelling the router
-    // matches: still idle.
-    for (const path of ["/api/status", "/API/Status", "/api/status/"]) touchSync(path);
-    expect(syncEngineStatus()).toMatchObject({ active: true, cost: { mode: "idle" } });
-    // The next block keeps the idle profile: governance, read at the block before and still
-    // served, is not read again (the full profile reads it at every block).
-    const timestamp = HEAD_TIME + 12n;
-    await vi.advanceTimersByTimeAsync(Number(timestamp) * 1000 + 500 - Date.now());
-    touchSync("/api/status");
-    fake.chain.options.head = { number: HEAD + 1n, hash: blockHash(HEAD + 1n), timestamp };
-    await until(() => syncEngineStatus().ticks >= 2);
-    await vi.advanceTimersByTimeAsync(100);
-    expect(syncEngineStatus()).toMatchObject({
-      lastTick: { block: (HEAD + 1n).toString() },
-      cost: { mode: "idle" },
-    });
-    expect(governanceReads(fake)).toBe(1);
-
-    // Any other request is a visit: a page, its JSON twin.
-    touchSync("/api/upgrades");
-    expect(syncEngineStatus().cost.mode).toBe("viewing");
-  });
-});
-
-describe("countsAsVisit", () => {
-  it.each([
-    ["/api/status", false],
-    ["/API/STATUS", false],
-    ["/api/status/", false],
-    ["/", true],
-    ["/app/proposals", true],
-    ["/api/upgrades", true],
-    ["/api/status/extra", true],
-    ["/api/statuses", true],
-    ["/resources/refresh", true],
-  ])("%s → %s", (path, visit) => {
-    expect(countsAsVisit(path)).toBe(visit);
+    expect(syncEngineStatus()).toMatchObject({ active: true, cost: { mode: "viewing" } });
   });
 });

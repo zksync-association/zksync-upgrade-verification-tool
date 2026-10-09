@@ -1,3 +1,4 @@
+import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import { type FreezeList, type FreezeSummary, loadFreezeList } from "@/.server/flows/freeze";
 import type { FreezeAction } from "@/common/execution";
@@ -23,18 +24,19 @@ import { UntilFresh } from "@/components/verification/until-fresh";
 import { cn } from "@/utils/cn";
 import { formatTime, relativeTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
-import { type SerializeFrom, defer } from "@remix-run/node";
+import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
 import { Await, Link, useLoaderData, useNavigate } from "@remix-run/react";
 import { ArrowRight, Plus } from "lucide-react";
 import { Suspense, useState } from "react";
 
 export const meta = Meta["/app/freeze"];
 
-export function loader() {
+export function loader({ request }: LoaderFunctionArgs) {
   // Requests come from Security Council members' Safe messages: the page lists them at once from
   // the copies held (labelled with their age when older than 60 s) and the fresh list after it.
   const loading = loadFreezeList({ freshness: "page" });
   return defer({
+    watch: watchItems(request, [watchKeys.freezes]),
     list: loading.first,
     freshList: freshAfter(loading.first, loading.fresh, (list) => list.stale),
   });

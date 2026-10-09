@@ -1,3 +1,4 @@
+import { pageLoad, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import { type VetoDetail, loadL2Veto } from "@/.server/flows/l2-veto";
 import { parseVetoParams } from "@/.server/params";
@@ -23,9 +24,14 @@ export const meta = Meta["/app/l2-cancellations/:id"];
 export function loader({ params, request }: LoaderFunctionArgs) {
   const veto = parseVetoParams(params.id, new URL(request.url));
   // The signatures' first answer at once (possibly from an older block or older Safe copies,
-  // labelled), and the strict result after it in the same response.
-  const loading = loadL2Veto(veto, { supplied: suppliedSignatures(request), freshness: "page" });
+  // labelled), and the strict result after it in the same response. The set's key joins the page
+  // load's grace once it is found.
+  const page = pageLoad(request, [watchKeys.l2(veto.l2GovernorAddress, veto.l2ProposalId)]);
+  const loading = page.run(() =>
+    loadL2Veto(veto, { supplied: suppliedSignatures(request), freshness: "page" })
+  );
   return defer({
+    watch: page.watch,
     veto,
     detail: loading.first,
     fresh: freshAfter(loading.first, loading.fresh, (d) => d.set.stale === true),

@@ -9,6 +9,7 @@ import { type SafeStoreStatus, safeStoreStatus } from "./safe/store";
 import { quota } from "./safe-api";
 import { type SignatureSetsStatus, signatureSetsStatus } from "./signatures";
 import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
+import { type PresenceStatus, presence } from "./sync/presence";
 
 // What the header, footer and every page's trust panel show: which chain the RPC is on, the
 // pinned trust anchor, everything derived from it, and anything that should worry a signer.
@@ -16,16 +17,18 @@ import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
 /**
  * Background reads, for information: `index` is the ProtocolUpgradeHandler log index (deployment
  * to head). Lists wait for it, for a bounded time, or fail; they never answer from part of it.
- * `engine` is the sync engine, which follows the head and refreshes what requests read ahead of
- * them (never a source of answers of its own): with SYNC_MODE=always for as long as the server
- * runs, doing less while nobody visits (`engine.cost.mode` "idle"; reads of this status are not
- * visits), with "window" only while the app is in use. `safe` is the Safe listing store's
- * background sweep, which keeps the listings of the signer groups pages asked for under 60 s old
- * while the app is in use and, with SYNC_MODE=always, checks every member Safe at a quota-paced
- * interval (listings are never served older than 60 s, sweep or not). `signatures` is the engine's
- * precompute, at each new head, of the signature sets pages viewed in the last 10 minutes and of
- * those still open when last viewed (only the open ones while idle); results are the on-chain
- * verdicts at that head, from Safe listings at most 60 s old. `l2Index` is the ZKsync
+ * `presence` says whether someone is using the app (a visible tab's beat, or a page load, within
+ * SYNC_KEEPWARM_MS; JSON and this status never count) and how many keys are on screen. `engine`
+ * is the sync engine, which follows the head and refreshes what requests read ahead of them (never
+ * a source of answers of its own): with SYNC_MODE=window (the default) only while the app is in
+ * use, so `engine.active` is false in a session that only reads JSON; with "always" for as long as
+ * the server runs, doing less while nobody uses the app (`engine.cost.mode` "idle"). `safe` is the
+ * Safe listing store's background sweep, which keeps the listings of the member Safes of the sets
+ * on screen under 60 s old while the app is in use and, with SYNC_MODE=always, checks every member
+ * Safe at a quota-paced interval (listings are never served older than 60 s, sweep or not).
+ * `signatures` is the engine's precompute, at each new head, of the signature sets on screen;
+ * results are the on-chain verdicts at that head, from Safe listings at most 60 s old. `l2Index`
+ * is the ZKsync
  * Era governors' log index (ProposalCreated/Executed/Canceled of the pinned governors), which the
  * vetoable list, veto pages and startable upgrades read; idle with no governors when none is
  * indexed (no L2 RPC, or every governor replaced through env). `cache` is the local cache of
@@ -35,6 +38,7 @@ import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
 export type SyncStatus = {
   index: PuhIndexStatus;
   l2Index: L2IndexStatus;
+  presence: PresenceStatus;
   engine: SyncEngineStatus;
   safe: SafeStoreStatus;
   signatures: SignatureSetsStatus;
@@ -89,6 +93,7 @@ export async function appStatus(): Promise<AppStatus> {
       sync: {
         index: puhIndex().status(),
         l2Index: l2GovernorIndex().status(),
+        presence: presence().status(),
         engine: syncEngineStatus(),
         safe: safeStoreStatus(),
         signatures: signatureSetsStatus(),

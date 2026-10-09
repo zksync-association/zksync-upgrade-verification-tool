@@ -4,6 +4,7 @@ import { AddressLink, CopyButton, ExternalAnchor, Hash, TxLink } from "@/compone
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/utils/cn";
+import { useWatchKey } from "@/components/presence";
 import { formatNumber } from "@/utils/format";
 import type { SerializeFrom } from "@remix-run/node";
 import { AlertTriangle, CheckCircle2, ChevronDown, ShieldCheck, XCircle } from "lucide-react";
@@ -41,6 +42,8 @@ export function SignatureSetCard({
   /** For a stale first answer (`set.stale`): where the fresh result is (see UntilFresh). */
   refresh?: Refresh;
 }) {
+  // On screen while shown: the engine verifies the set again at each new block.
+  useWatchKey(set.watch?.key);
   const valid = set.valid.length;
   const met = set.thresholdCheck.status === "met";
   // A page's first answer from an older block or old Safe copies: every verdict is shown as of its

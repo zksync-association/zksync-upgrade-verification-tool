@@ -2,6 +2,7 @@ import type { MemberResult } from "@/.server/signatures";
 import { type GovernanceTypedData, type SignerGroup, toSignable } from "@/common/typed-data";
 import { GROUP_LABEL, useConnectedGroups, useOfferWallet } from "@/components/connect-button";
 import { Hash } from "@/components/hex";
+import { usePresence } from "@/components/presence";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -41,6 +42,7 @@ export function SignButton({
   const [open, setOpen] = useState(false);
   const revalidator = useRevalidator();
   const { signTypedData, isPending } = useSignTypedData();
+  const presence = usePresence();
 
   const member = address
     ? members.find((m) => isAddressEqual(m.member as `0x${string}`, address))
@@ -75,6 +77,8 @@ export function SignButton({
           id: "sign",
         });
         setOpen(false);
+        // The server checks the Safe's listing soon (sync/presence.ts).
+        if (address) presence.signed(address);
         // Also reads the root status again (revalidation.ts).
         requestStatusRevalidation();
         revalidator.revalidate();

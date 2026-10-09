@@ -29,11 +29,12 @@ import {
 //
 // While the sync engine runs, a background sweep checks member Safes' listings: it asks Safe for
 // the Safe's most recently modified message (one small request) and re-reads the listing only
-// when that changed. While the app is in use, the listings of the signer groups pages asked for in
-// the last SYNC_SAFE_ACTIVE_MS are kept from turning 60 s old (checked at 50-57 s, later when there
-// are more Safes, so that the checks fit the budget). With SYNC_MODE=always every governance member
-// Safe is also checked, in use or idle, at an interval paced by the quota Safe reports as left
-// for its period (see idleSweepIntervalMs): about every 10-20 minutes with a key. Sweeps run only
+// when that changed. While the app is in use, the listings of the member Safes of the signature
+// sets on screen are kept from turning 60 s old (checked at 50-57 s, later when there are more
+// Safes, so that the checks fit the budget); nothing else is, and nothing at all once nobody uses
+// the app. With SYNC_MODE=always every governance member Safe is also checked, in use or idle, at
+// an interval paced by the quota Safe reports as left for its period (see idleSweepIntervalMs):
+// about every 10-20 minutes with a key. Sweeps run only
 // with SAFE_API_KEY or a self-hosted service, spend at most SYNC_SAFE_HOURLY_BUDGET requests an
 // hour, pause while the service's quota is below 10 %, and stop during a rate-limit cooldown. A
 // Safe whose reads keep failing is retried less and less often. Requests read on demand as without
@@ -103,7 +104,6 @@ type Failure = {
 
 const held = new Map<string, Held>();
 const reads = new Map<string, Read>();
-const demandedAt = new Map<string, number>();
 const failures = new Map<string, Failure>();
 let generation = safeClientGeneration();
 let versions = 0;
@@ -153,8 +153,7 @@ export type SafeReadOptions = {
   /**
    * For reads nobody waits on (the boot warm-up, precomputing): queued behind every request's
    * reads, within the hourly background budget (they fail while sweeps are paused, and on the
-   * public service without a key), and not a page's interest in the Safe: the sweep keeps fresh
-   * only the groups that pages ask for.
+   * public service without a key).
    */
   background?: boolean;
 };
@@ -166,7 +165,6 @@ export function listSafeMessages(
 ): Promise<SafeSnapshot> {
   sync();
   const key = safe.toLowerCase();
-  if (!background) demandedAt.set(key, Date.now());
   const snapshot = servable(key);
   return snapshot ? Promise.resolve(snapshot) : readSafe(safe, background ? "low" : "high");
 }
@@ -213,9 +211,8 @@ export async function lookupSafeMessage(
 }
 
 /**
- * The same lookup from the listing held now, without asking Safe or marking the Safe as wanted by
- * a page: null when there is no listing at most 60 s old, or it cannot tell (the message may be
- * past its last page). For precomputing.
+ * The same lookup from the listing held now, without asking Safe: null when there is no listing at
+ * most 60 s old, or it cannot tell (the message may be past its last page). For precomputing.
  */
 export function peekSafeMessage(safe: Address, messageHash: Hex): SafeMessageLookup | null {
   sync();
@@ -224,8 +221,8 @@ export function peekSafeMessage(safe: Address, messageHash: Hex): SafeMessageLoo
 }
 
 /**
- * The listing held for this Safe whatever its age (older than 60 s included), without asking Safe
- * or marking the Safe as wanted by a page; null when none is held. Only for a page's first answer,
+ * The listing held for this Safe whatever its age (older than 60 s included), without asking Safe;
+ * null when none is held. Only for a page's first answer,
  * labelled with the listing's fetchedAt while a fresh one is read (never for JSON, never for a
  * verdict that is kept): Safe data is candidate input only, so an old copy can only show fewer
  * signatures than there are, never make one count.
@@ -261,15 +258,6 @@ function answerFrom(listing: SafeSnapshot, messageHash: Hex): SafeMessageLookup 
 export function freshListingVersion(safe: Address): number | null {
   sync();
   return servable(safe.toLowerCase())?.version ?? null;
-}
-
-/**
- * Marks Safes as wanted by a page, as listSafeMessages does, for a page answered from a result
- * computed earlier from their listings: the sweep keeps their group fresh.
- */
-export function markSafeDemand(safes: Iterable<string>) {
-  const now = Date.now();
-  for (const safe of safes) demandedAt.set(safe.toLowerCase(), now);
 }
 
 type ListingListener = (safe: Address) => void;
@@ -310,7 +298,16 @@ export function safeListingVersion(safe: Address): number | null {
   return held.get(safe.toLowerCase())?.snapshot.version ?? null;
 }
 
-function readSafe(safe: Address, priority: SafeTicket["priority"]): Promise<SafeSnapshot> {
+/**
+ * Reads the Safe's listing. A background ("low") read is sent only while `wanted()` still holds
+ * as each of its requests goes out (the sweep's: someone uses the app and the Safe is on screen);
+ * otherwise it stops there (SweepPaused), as for the budget. A request waiting on it lifts that.
+ */
+function readSafe(
+  safe: Address,
+  priority: SafeTicket["priority"],
+  wanted: () => boolean = () => true
+): Promise<SafeSnapshot> {
   const key = safe.toLowerCase();
   const running = reads.get(key);
   if (running) {
@@ -326,7 +323,7 @@ function readSafe(safe: Address, priority: SafeTicket["priority"]): Promise<Safe
   }
   const ticket: SafeTicket = { priority };
   const launched = safeClientGeneration();
-  const read: Read = { ticket, promise: runRead(safe, key, ticket) };
+  const read: Read = { ticket, promise: runRead(safe, key, ticket, wanted) };
   reads.set(key, read);
   const current = () => reads.get(key) === read && launched === safeClientGeneration();
   const settle = () => {
@@ -358,18 +355,25 @@ function noteFailure(key: string, error: unknown) {
   });
 }
 
-async function runRead(safe: Address, key: string, ticket: SafeTicket): Promise<SafeSnapshot> {
+async function runRead(
+  safe: Address,
+  key: string,
+  ticket: SafeTicket,
+  wanted: () => boolean
+): Promise<SafeSnapshot> {
   const startGeneration = safeClientGeneration();
   const previous = held.get(key);
   // Background requests (only while nobody waits on them) wait while sweeps are paused, without
-  // taking a start slot, and count against the budget as they are sent.
+  // taking a start slot, and count against the budget as they are sent. One that is no longer
+  // wanted (its Safe left the screen, or nobody uses the app now) is not sent at all: a read the
+  // sweep queued just before use ended sends nothing after it.
   const options = {
     ticket,
     beforeQueue: () => {
-      if (ticket.priority === "low") checkBackgroundRequest();
+      if (ticket.priority === "low") checkBackgroundRequest(wanted);
     },
     beforeRequest: () => {
-      if (ticket.priority === "low") spendBackgroundRequest();
+      if (ticket.priority === "low") spendBackgroundRequest(wanted);
     },
   };
   if (ticket.priority === "low") {
@@ -611,13 +615,13 @@ export function idleSweepIntervalMs(
     : IDLE_DEFAULT_INTERVAL_MS;
 }
 
-function checkBackgroundRequest() {
-  const reason = pauseReason(Date.now());
+function checkBackgroundRequest(wanted: () => boolean) {
+  const reason = pauseReason(Date.now()) ?? (wanted() ? null : "not-wanted");
   if (reason) throw new SweepPaused(reason);
 }
 
-function spendBackgroundRequest() {
-  checkBackgroundRequest();
+function spendBackgroundRequest(wanted: () => boolean) {
+  checkBackgroundRequest(wanted);
   spent.push(Date.now());
 }
 
@@ -647,10 +651,12 @@ export type SafeSweepDriver = {
   /** Whether the sync engine is following the chain. */
   active: () => boolean;
   /**
-   * Someone is using the app (a request within SYNC_KEEPWARM_MS): the groups pages asked for are
-   * kept under 60 s old. Default true.
+   * Someone is using the app (sync/presence.ts): the member Safes of the sets on screen are kept
+   * under 60 s old. Default true.
    */
   viewing?: () => boolean;
+  /** The signature sets on screen: each one's signer group and member Safes. Default none. */
+  onScreen?: () => readonly { group: SignerGroupName; members: readonly Address[] }[];
   /**
    * Every governance member Safe is also checked at the quota-paced interval, in use or idle
    * (SYNC_MODE=always). Default false.
@@ -670,7 +676,7 @@ const sweep = {
   running: false,
   /** Why sweeps cannot run at all here (dev node, keyless public service), or null. */
   blocked: null as string | null,
-  /** Groups kept under 60 s old (a page asked for them while the app is in use). */
+  /** Groups kept under 60 s old (a set of theirs is on screen while the app is in use). */
   groups: [] as SignerGroupName[],
   /** Every Safe swept, either way. */
   safes: [] as string[],
@@ -745,10 +751,9 @@ async function sweepOnce(current: SafeSweepDriver): Promise<number> {
         : null;
   const viewing = current.viewing?.() ?? true;
   const baseline = current.baseline?.() ?? false;
-  const asked =
-    viewing && [...demandedAt.values()].some((at) => Date.now() - at <= env.SYNC_SAFE_ACTIVE_MS);
+  const shown = viewing ? current.onScreen?.() ?? [] : [];
   // Blocked, or nothing to keep fresh: no need to know the groups (governance) at all.
-  if (sweep.blocked !== null || (!asked && !baseline)) {
+  if (sweep.blocked !== null || (shown.length === 0 && !baseline)) {
     sweep.groups = [];
     sweep.safes = [];
     sweep.fresh = [];
@@ -756,11 +761,13 @@ async function sweepOnce(current: SafeSweepDriver): Promise<number> {
     sweep.error = null;
     return SWEEP_RECHECK_MS;
   }
-  const groups = await current.groups();
+  // The groups (governance) only for the quota-paced check of every member Safe: the sets on
+  // screen carry their own members.
+  const groups = baseline ? await current.groups() : null;
   sweep.error = null;
   const now = Date.now();
-  const { names, safes: fast } = asked ? demanded(groups, now) : { names: [], safes: [] };
-  const all = baseline ? everySafe(groups) : [];
+  const { names, safes: fast } = onScreen(shown);
+  const all = groups ? everySafe(groups) : [];
   const swept = new Map<string, Address>();
   for (const safe of [...fast, ...all]) swept.set(safe.toLowerCase(), safe);
   const fastKeys = new Set(fast.map((safe) => safe.toLowerCase()));
@@ -790,8 +797,26 @@ async function sweepOnce(current: SafeSweepDriver): Promise<number> {
   // at least one more request). Failures are noted by readSafe.
   due.sort((a, b) => a.at - b.at);
   const room = env.SYNC_SAFE_HOURLY_BUDGET - budgetUsed(now) - backgroundReads();
-  for (const { safe } of due.slice(0, Math.max(0, room))) void readSafe(safe, "low");
+  for (const { safe } of due.slice(0, Math.max(0, room)))
+    void readSafe(safe, "low", () => sweepWants(safe.toLowerCase()));
   return Math.max(SWEEP_MIN_DELAY_MS, next);
+}
+
+/**
+ * The sweep still wants this Safe read, as one of its requests goes out: the engine is following
+ * the chain, and the Safe belongs to a set on screen while someone uses the app, or to the
+ * SYNC_MODE=always baseline. Asked again for each request (a read the sweep started before the
+ * last tab left, or before its set left the screen, sends nothing more).
+ */
+function sweepWants(key: string): boolean {
+  const current = driver;
+  if (!current?.active()) return false;
+  if (sweep.baseline !== null && (current.baseline?.() ?? false) && sweep.safes.includes(key))
+    return true;
+  if (!(current.viewing?.() ?? true)) return false;
+  return (current.onScreen?.() ?? []).some((set) =>
+    set.members.some((member) => member.toLowerCase() === key)
+  );
 }
 
 /** Every member Safe of the signer groups, each once. */
@@ -803,20 +828,17 @@ function everySafe(groups: SafeGroups): Address[] {
   return [...safes.values()];
 }
 
-/** The groups with a member Safe a page asked for within SYNC_SAFE_ACTIVE_MS, and their Safes. */
-function demanded(groups: SafeGroups, now: number) {
-  const recent = (safe: Address) => {
-    const at = demandedAt.get(safe.toLowerCase());
-    return at !== undefined && now - at <= env.SYNC_SAFE_ACTIVE_MS;
-  };
+/** The groups of the sets on screen, and their member Safes, each once. */
+function onScreen(sets: readonly { group: SignerGroupName; members: readonly Address[] }[]) {
   const names: SignerGroupName[] = [];
   const safes = new Map<string, Address>();
   for (const name of GROUPS) {
-    const members = groups[name];
-    if (!members.some(recent)) continue;
+    const ofGroup = sets.filter((set) => set.group === name);
+    if (ofGroup.length === 0) continue;
     names.push(name);
-    for (const safe of members)
-      if (!safes.has(safe.toLowerCase())) safes.set(safe.toLowerCase(), safe);
+    for (const set of ofGroup)
+      for (const safe of set.members)
+        if (!safes.has(safe.toLowerCase())) safes.set(safe.toLowerCase(), safe);
   }
   return { names, safes: [...safes.values()] };
 }
@@ -835,10 +857,7 @@ export type SafeStoreStatus = {
    * that listings are under 60 s old: `groups` and `oldestFetchedAt` tell which are.
    */
   sweeping: boolean;
-  /**
-   * Signer groups a page asked for within SYNC_SAFE_ACTIVE_MS while the app is in use: kept under
-   * 60 s old.
-   */
+  /** Signer groups with a set on screen while the app is in use: their Safes kept under 60 s old. */
   groups: SignerGroupName[];
   /**
    * SYNC_MODE=always: every governance member Safe is also checked, in use or idle, this often

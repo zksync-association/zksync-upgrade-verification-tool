@@ -1,3 +1,4 @@
+import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { type UpgradeSummary, listStandardUpgrades } from "@/.server/flows/standard";
 import { isUpgradeActive } from "@/common/upgrade-states";
 import { HistoryToggle, PendingRegion, useNavigatingTo } from "@/components/history-toggle";
@@ -29,7 +30,12 @@ export function loader({ request }: LoaderFunctionArgs) {
     first.fromLastRun ? listStandardUpgrades({ allHistory }) : null
   );
   void freshList.catch(() => {});
-  return defer({ allHistory, list, freshList });
+  return defer({
+    watch: watchItems(request, [watchKeys.upgrades(allHistory)]),
+    allHistory,
+    list,
+    freshList,
+  });
 }
 
 export default function Upgrades() {

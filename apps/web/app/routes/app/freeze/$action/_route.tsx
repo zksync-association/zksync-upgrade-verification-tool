@@ -2,6 +2,7 @@ import { freshAfter } from "@/.server/flows/common";
 import { type FreezeDetail, loadFreezeRequest } from "@/.server/flows/freeze";
 import { parseFreezeParams } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
+import { pageLoad } from "@/.server/sync/presence";
 import { FREEZE_LABELS } from "@/common/freeze";
 import { FREEZE_STATUS_LABELS } from "@/common/upgrade-states";
 import { useStatus } from "@/components/app-shell";
@@ -21,11 +22,11 @@ export const meta = Meta["/app/freeze/:action"];
 export function loader({ params, request }: LoaderFunctionArgs) {
   const freeze = parseFreezeParams(params.action, new URL(request.url));
   // The signatures' first answer at once (possibly from an older block or older Safe copies,
-  // labelled), and the strict result after it in the same response.
-  const loading = loadFreezeRequest(freeze, {
-    supplied: suppliedSignatures(request),
-    freshness: "page",
-  });
+  // labelled), and the strict result after it in the same response. The set's key joins the page
+  // load's grace once it is found.
+  const loading = pageLoad(request).run(() =>
+    loadFreezeRequest(freeze, { supplied: suppliedSignatures(request), freshness: "page" })
+  );
   return defer({
     freeze,
     detail: loading.first,

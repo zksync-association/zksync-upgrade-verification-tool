@@ -158,6 +158,41 @@ describe("IndexProgressProvider polling", () => {
   const answer = (body: unknown) => Promise.resolve({ json: () => Promise.resolve(body) });
   const pollOnce = () => act(() => vi.advanceTimersByTimeAsync(2_000));
 
+  it("never polls while the tab is hidden, and goes on once it is visible again", async () => {
+    let visibility: DocumentVisibilityState = "visible";
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => visibility,
+    });
+    try {
+      fetch.mockImplementation(() =>
+        answer(okStatus(index({ chunks: { done: 200, total: 435 } })))
+      );
+      render(
+        <IndexProgressProvider initial={index({ chunks: { done: 40, total: 435 } })}>
+          <IndexingPill />
+        </IndexProgressProvider>
+      );
+      await pollOnce();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      // Hidden: each read of the status can reach the RPC, so none is made.
+      await act(async () => {
+        visibility = "hidden";
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await act(() => vi.advanceTimersByTimeAsync(5 * 60_000));
+      expect(fetch).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        visibility = "visible";
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await pollOnce();
+      expect(fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      visibility = "visible";
+    }
+  });
+
   it("polls /api/status while backfilling, and stops once ready", async () => {
     fetch
       .mockReturnValueOnce(answer(okStatus(index({ chunks: { done: 200, total: 435 } }))))

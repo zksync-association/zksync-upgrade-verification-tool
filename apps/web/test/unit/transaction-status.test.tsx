@@ -135,6 +135,44 @@ describe("the transaction page and the root status", () => {
     expect(shouldRevalidateRoot(toggle)).toBe(false);
   });
 
+  it("polls only while the tab is visible", async () => {
+    let visibility: DocumentVisibilityState = "visible";
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => visibility,
+    });
+    try {
+      view("100");
+      await act(() => vi.advanceTimersByTimeAsync(8_000));
+      expect(revalidate()).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        visibility = "hidden";
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await act(() => vi.advanceTimersByTimeAsync(10 * 60_000));
+      expect(revalidate()).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        visibility = "visible";
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await act(() => vi.advanceTimersByTimeAsync(4_000));
+      expect(revalidate()).toHaveBeenCalledTimes(3);
+    } finally {
+      visibility = "visible";
+    }
+  });
+
+  it("stops after 30 minutes without a receipt, and says so", async () => {
+    view("100");
+    await act(() => vi.advanceTimersByTimeAsync(30 * 60_000));
+    const polls = revalidate().mock.calls.length;
+    expect(polls).toBeGreaterThanOrEqual(449);
+    expect(polls).toBeLessThanOrEqual(450);
+    await act(() => vi.advanceTimersByTimeAsync(60 * 60_000));
+    expect(revalidate()).toHaveBeenCalledTimes(polls);
+    expect(document.body.textContent).toContain("Stopped checking after 30 minutes");
+  });
+
   it("reads it right away when the transaction was already mined on arrival (a fast chain)", async () => {
     page.data = { ...page.data, receipt: mined("101") };
     view("100");

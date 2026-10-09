@@ -1,3 +1,4 @@
+import { watchItems, watchKeys } from "@/.server/sync/presence";
 import {
   type ExecutedFirst,
   type PendingEmergencies,
@@ -18,7 +19,13 @@ import { indexingLabel, useIndexProgress } from "@/components/sync-state";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { Input } from "@/components/ui/input";
 import { Meta } from "@/utils/meta";
-import { type ActionFunctionArgs, defer, json, redirect } from "@remix-run/node";
+import {
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
+  defer,
+  json,
+  redirect,
+} from "@remix-run/node";
 import { Await, Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { ArrowRight, Ban, Rocket, ShieldAlert, Snowflake } from "lucide-react";
 import { type ReactNode, Suspense } from "react";
@@ -73,7 +80,7 @@ function counted<T extends { source: SummarySource }>(first: Promise<T>, fresh: 
   return { first, fresh: after };
 }
 
-export function loader() {
+export function loader({ request }: LoaderFunctionArgs) {
   const upgrades = listStandardUpgrades({ allHistory: false, freshness: "page" });
   const emergency = loadEmergencyList({ freshness: "page" });
   const freeze = loadFreezeList({ freshness: "page" });
@@ -96,6 +103,12 @@ export function loader() {
     ),
   };
   return defer({
+    watch: watchItems(request, [
+      watchKeys.upgrades(false),
+      watchKeys.emergencies(false),
+      watchKeys.freezes,
+      watchKeys.vetoes,
+    ]),
     upgrades: counts.upgrades.first,
     upgradesFresh: counts.upgrades.fresh,
     emergency: counts.emergency.first,

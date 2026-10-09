@@ -30,18 +30,22 @@ const baseEnv = createEnv({
     ZK_PROTOCOL_GOVERNOR_ADDRESS: addressSchema.optional(),
     ZK_TOKEN_GOVERNOR_ADDRESS: addressSchema.optional(),
     ZK_GOV_OPS_GOVERNOR_ADDRESS: addressSchema.optional(),
-    // The sync engine follows the chain head and refreshes shared reads ahead of requests:
-    // "always" (for as long as the server runs; less while nobody uses the app), "window" (only
-    // while the app is in use), or "off" (every request reads on demand). The app is in use while
-    // a request was made within SYNC_KEEPWARM_MS. Dev nodes (anvil, hardhat) always read on demand.
-    SYNC_MODE: z.enum(["window", "always", "off"]).default("always"),
-    SYNC_KEEPWARM_MS: z.coerce.number().int().min(0).default(600_000),
-    // While the engine runs, member Safes' message listings are re-checked before they turn 60 s
-    // old, for the signer groups (Security Council, Guardians, ZK Foundation) a page asked for in
-    // the last SYNC_SAFE_ACTIVE_MS while the app is in use; with SYNC_MODE=always every member
-    // Safe is also checked at an interval paced by the Safe quota left (10-20 minutes with a key).
-    // Only with SAFE_API_KEY or a self-hosted Safe service, and at most SYNC_SAFE_HOURLY_BUDGET
-    // background requests an hour.
+    // The sync engine follows the chain head and refreshes, ahead of requests, what is on screen:
+    // "window" (only while the app is in use: nothing is sent upstream while nobody uses it),
+    // "always" (follows the head for as long as the server runs; what is on screen still only
+    // while in use), or "off" (every request reads on demand). The app is in use while a visible
+    // tab beat, or a page loaded, within SYNC_KEEPWARM_MS (sync/presence.ts); JSON (/api/*) never
+    // counts. A visible tab nobody touched for SYNC_AWAY_MS stops counting (0: never). Dev nodes
+    // (anvil, hardhat) always read on demand.
+    SYNC_MODE: z.enum(["window", "always", "off"]).default("window"),
+    SYNC_KEEPWARM_MS: z.coerce.number().int().min(0).default(30_000),
+    SYNC_AWAY_MS: z.coerce.number().int().min(0).default(1_800_000),
+    // While the engine runs, the member Safes of the signature sets on screen have their message
+    // listings re-checked before they turn 60 s old; with SYNC_MODE=always every member Safe is
+    // also checked at an interval paced by the Safe quota left (10-20 minutes with a key). Only
+    // with SAFE_API_KEY or a self-hosted Safe service, and at most SYNC_SAFE_HOURLY_BUDGET
+    // background requests an hour. SYNC_SAFE_ACTIVE_MS is no longer used (what is on screen
+    // decides).
     SYNC_SAFE_ACTIVE_MS: z.coerce.number().int().min(0).default(300_000),
     SYNC_SAFE_HOURLY_BUDGET: z.coerce.number().int().min(0).default(1_200),
     ALLOW_INDEXING: z.coerce.boolean().default(false),

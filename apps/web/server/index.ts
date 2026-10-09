@@ -86,7 +86,11 @@ type AppEntry = {
   readNetwork?: () => Promise<void>;
   prewarm?: (reason: "boot") => Promise<void>;
   startSync?: () => void;
-  touchSync?: (path?: string) => void;
+  noteRequest?: (info: {
+    method: string;
+    path: string;
+    header: (name: string) => string | undefined;
+  }) => void;
   loadChainCache?: () => Promise<void>;
   saveChainCache?: () => Promise<boolean>;
 };
@@ -111,14 +115,15 @@ function appEntry(): Promise<AppEntry> {
   return loading;
 }
 
-// Every request that reaches the app (pages, /api/*, resources; not static files) is a visit for
-// the sync engine, except reads of /api/status (the build's countsAsVisit decides). With
-// SYNC_MODE=always (the default) the engine follows the chain for as long as the server runs and
-// does less while nobody visits; with "window" it follows it only within SYNC_KEEPWARM_MS of a
-// visit. The request itself never waits on it.
+// Every request that reaches the app (pages, /api/*, resources; not static files) is shown to the
+// sync engine, which counts a page load as use (the build's sync/presence.ts decides: never
+// /api/*, a prefetch or a cross-site request; open tabs beat on their own). With SYNC_MODE=window
+// (the default) the engine follows the chain only while someone uses the app. The request itself
+// never waits on it.
 app.use((req, _res, next) => {
+  const info = { method: req.method, path: req.path, header: (name: string) => req.get(name) };
   appEntry().then(
-    (entry) => entry.touchSync?.(req.path),
+    (entry) => entry.noteRequest?.(info),
     () => {}
   );
   next();

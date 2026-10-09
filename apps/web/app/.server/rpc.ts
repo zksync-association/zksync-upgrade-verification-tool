@@ -330,24 +330,71 @@ function noteHead(block: BlockRef, readGeneration: number, read: number) {
   newestHead = withHead(newestHead, block, readGeneration, read);
 }
 
+/** One read of the head (and 'finalized', when it asked) sent to the node. */
+type HeadRead = {
+  generation: number;
+  /** Its number among head reads. */
+  read: number;
+  /** When it was sent (ms since the epoch). */
+  sentAt: number;
+  /** It asked for 'finalized' (else the last real answer stands in, see readHeads). */
+  asksFinalized: boolean;
+  answer: Promise<{ heads: Heads; answeredAt: number }>;
+};
+
+// The head read in flight: a request's (heads()) and the sync engine's poll share it, so the
+// first request after a pause and the engine waking for it ask the node once, not twice.
+let headInFlight: HeadRead | null = null;
+
+/**
+ * Asks the node for its head, in one JSON-RPC batch with 'finalized' when `finalized` (or nothing
+ * is known about it yet); otherwise the last real 'finalized' answer stands in, which is never
+ * newer than the true boundary. Joins the read in flight under these settings instead when it
+ * asked for 'finalized', or when `joinWithout` accepts one that did not (its stand-in).
+ */
+function readHeads(finalized: boolean, joinWithout: boolean): HeadRead {
+  const flight = headInFlight;
+  if (flight?.generation === generation && (flight.asksFinalized || joinWithout)) return flight;
+  const readGeneration = generation;
+  const read = ++headReads;
+  const known: FinalizedRead | null =
+    knownFinalized?.generation === generation
+      ? { block: knownFinalized.block }
+      : tagUnsupported?.generation === generation
+        ? { unsupported: true }
+        : null;
+  const ask = finalized || known === null;
+  const sentAt = Date.now();
+  const answer = Promise.all([
+    lanes().head.request<unknown>("eth_getBlockByNumber", ["latest", false]),
+    ask ? readFinalizedTag(readGeneration) : (known as FinalizedRead),
+  ]).then(([latest, final]) => {
+    const head = toBlockRef(latest);
+    if (!head) throw new Error("The RPC returned no latest block");
+    return { heads: { latest: head, finalized: final }, answeredAt: Date.now() };
+  });
+  const next: HeadRead = { generation: readGeneration, read, sentAt, asksFinalized: ask, answer };
+  headInFlight = next;
+  const done = () => {
+    if (headInFlight === next) headInFlight = null;
+  };
+  answer.then(done, done);
+  return next;
+}
+
 /**
  * The head and the 'finalized' block, read in one JSON-RPC batch so both describe the same moment.
  * Only the head can fail this read: whatever happens to 'finalized' is kept beside it, so the head
  * never waits on or fails with the finality boundary. The sync engine keeps this entry fresh with
- * its own polls (pollHead).
+ * its own polls (pollHead); a poll in flight when this needs a read is joined (its 'finalized' is
+ * the one it asked for, or the last real answer: never newer than the true boundary).
  */
 function heads(): Promise<Heads> {
   return cached(HEAD_KEY, HEAD_TTL_MS, async () => {
-    const readGeneration = generation;
-    const read = ++headReads;
-    const [latest, finalized] = await Promise.all([
-      lanes().head.request<unknown>("eth_getBlockByNumber", ["latest", false]),
-      readFinalizedTag(readGeneration),
-    ]);
-    const head = toBlockRef(latest);
-    if (!head) throw new Error("The RPC returned no latest block");
-    noteHead(head, readGeneration, read);
-    return { latest: head, finalized };
+    const flight = readHeads(true, true);
+    const { heads: read } = await flight.answer;
+    noteHead(read.latest, flight.generation, flight.read);
+    return read;
   });
 }
 
@@ -362,6 +409,11 @@ export type PolledHead = {
   generation: number;
   /** When the node's answer arrived (ms since the epoch). */
   answeredAt: number;
+  /**
+   * When the read was sent (ms since the epoch): earlier than the poll when it joined a request's
+   * read already in flight.
+   */
+  sentAt?: number;
   /** The finality boundary F at this head, as chainHead() computes it (and rejects). */
   boundary(): Promise<bigint>;
   /**
@@ -394,28 +446,18 @@ function publishHeads(heads: Heads, readGeneration: number, read: number, ttlMs:
 /**
  * For the sync engine: asks the node for its head now. 'finalized' is asked in the same JSON-RPC
  * batch when `withFinalized` (or nothing is known about it yet); otherwise the last real answer
- * stands in, which is never newer than the true boundary. Nothing is served until the caller
- * publishes the answer (after reading what requests at that head need). Rejects when the head
- * cannot be read.
+ * stands in, which is never newer than the true boundary. A head read already in flight (a
+ * request's) is joined instead when it serves (see readHeads; `sentAt` then says when it was
+ * sent). Nothing is served until the caller publishes the answer (after reading what requests at
+ * that head need). Rejects when the head cannot be read.
  */
 export async function pollHead({ withFinalized }: { withFinalized: boolean }): Promise<PolledHead> {
-  const readGeneration = generation;
-  const read = ++headReads;
-  const known: FinalizedRead | null =
-    knownFinalized?.generation === generation
-      ? { block: knownFinalized.block }
-      : tagUnsupported?.generation === generation
-        ? { unsupported: true }
-        : null;
-  const ask = withFinalized || known === null;
-  const [latest, finalized] = await Promise.all([
-    lanes().head.request<unknown>("eth_getBlockByNumber", ["latest", false]),
-    ask ? readFinalizedTag(readGeneration) : (known as FinalizedRead),
-  ]);
-  const answeredAt = Date.now();
-  const head = toBlockRef(latest);
-  if (!head) throw new Error("The RPC returned no latest block");
-  const polled: Heads = { latest: head, finalized };
+  const flight = readHeads(withFinalized, !withFinalized);
+  const { generation: readGeneration, read, sentAt } = flight;
+  const ask = flight.asksFinalized;
+  const { heads: polled, answeredAt } = await flight.answer;
+  const head = polled.latest;
+  const { finalized } = polled;
   let boundary: Promise<bigint> | undefined;
   const newest = () => (newestHead?.generation === generation ? newestHead.block : null);
   return {
@@ -429,6 +471,7 @@ export async function pollHead({ withFinalized }: { withFinalized: boolean }): P
           : undefined,
     generation: readGeneration,
     answeredAt,
+    sentAt,
     boundary: () => {
       boundary ??= network().then((net) => boundaryOf(net, polled));
       return boundary;
@@ -654,6 +697,7 @@ export async function pageBlockTimestamps(
  */
 export function chainIdentity(): Promise<{ chainId: number; genesisHash: Hex }> {
   return cached(`chain-identity:${generation}`, FOREVER, async () => {
+    const readGeneration = generation;
     const call = lanes().call;
     const [chainId, genesis] = await Promise.all([
       call.request<unknown>("eth_chainId", []),
@@ -662,8 +706,21 @@ export function chainIdentity(): Promise<{ chainId: number; genesisHash: Hex }> 
     const block = toBlockRef(genesis);
     if (!isHex(chainId) || !block || block.number !== 0n)
       throw new Error("The RPC returned no chain id or genesis block");
-    return { chainId: Number(hexToBigInt(chainId)), genesisHash: block.hash.toLowerCase() as Hex };
+    const identity = {
+      chainId: Number(hexToBigInt(chainId)),
+      genesisHash: block.hash.toLowerCase() as Hex,
+    };
+    if (readGeneration === generation) knownIdentity = { generation, identity };
+    return identity;
   });
+}
+
+let knownIdentity: { generation: number; identity: { chainId: number; genesisHash: Hex } } | null =
+  null;
+
+/** chainIdentity()'s answer once it has been read under the current settings; never reads. */
+export function knownChainIdentity(): { chainId: number; genesisHash: Hex } | null {
+  return knownIdentity?.generation === generation ? knownIdentity.identity : null;
 }
 
 /** ZKsync Era's chain id, from the L2 RPC (kept for the settings generation); null without one. */
@@ -671,10 +728,20 @@ export async function l2ChainId(): Promise<number | null> {
   const lane = await l2HeadLane();
   if (!lane) return null;
   return cached(`l2-chain-id:${generation}`, FOREVER, async () => {
+    const readGeneration = generation;
     const id = await lane.request<unknown>("eth_chainId", []);
     if (!isHex(id)) throw new Error("The ZKsync Era RPC returned no chain id");
-    return Number(hexToBigInt(id));
+    const chainId = Number(hexToBigInt(id));
+    if (readGeneration === generation) knownL2Id = { generation, chainId };
+    return chainId;
   });
+}
+
+let knownL2Id: { generation: number; chainId: number } | null = null;
+
+/** l2ChainId()'s answer once it has been read under the current settings (null: not yet); never reads. */
+export function knownL2ChainId(): number | null {
+  return knownL2Id?.generation === generation ? knownL2Id.chainId : null;
 }
 
 // Raw JSON-RPC lanes (chain/jsonrpc.ts). `history` carries eth_getLogs backfills, `call` the
@@ -691,11 +758,15 @@ let generation = 0;
 /** L1 lanes for the current data source settings. */
 export function lanes(): L1Lanes {
   if (l1Lanes) return l1Lanes;
+  // The call and head lanes ask a read again when the node failed to answer it (an internal
+  // error): Infura answers reads pinned to a block it just named that way for up to about a
+  // second, and one failed read fails a whole JSON answer.
   const call = createLane({
     url: env.L1_RPC_URL,
     label: "l1-call",
     maxBatch: 20,
     maxInFlight: 8,
+    askAgain: true,
     onSend: countL1,
   });
   // One head read ('latest' with 'finalized') per POST.
@@ -704,6 +775,7 @@ export function lanes(): L1Lanes {
     label: "l1-head",
     maxBatch: 2,
     maxInFlight: 4,
+    askAgain: true,
     onSend: countL1,
   });
   const history = createLane({
@@ -879,6 +951,7 @@ export function resetRpcClients() {
   tagUnsupported = null;
   newestHead = null;
   rereading = null;
+  headInFlight = null;
   transport = limitedHttp(env.L1_RPC_URL, L1_TRANSPORT);
   direct = createPublicClient({ transport });
   batched = makeBatched(transport);
