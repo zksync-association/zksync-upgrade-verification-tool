@@ -1,4 +1,5 @@
-import { type VetoDetail, getL2Veto } from "@/.server/flows/l2-veto";
+import { freshAfter } from "@/.server/flows/common";
+import { type VetoDetail, loadL2Veto } from "@/.server/flows/l2-veto";
 import { parseVetoParams } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
 import { decodeCall } from "@/common/proposal";
@@ -9,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { CallList } from "@/components/verification/calls";
 import { SetStateBadge } from "@/components/verification/badges";
 import { SignatureSetCard } from "@/components/verification/signature-set";
+import { UntilFresh } from "@/components/verification/until-fresh";
 import { formatEth, formatTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
@@ -20,7 +22,14 @@ export const meta = Meta["/app/l2-cancellations/:id"];
 
 export function loader({ params, request }: LoaderFunctionArgs) {
   const veto = parseVetoParams(params.id, new URL(request.url));
-  return defer({ veto, detail: getL2Veto(veto, { supplied: suppliedSignatures(request) }) });
+  // The signatures' first answer at once (possibly from an older block or older Safe copies,
+  // labelled), and the strict result after it in the same response.
+  const loading = loadL2Veto(veto, { supplied: suppliedSignatures(request), freshness: "page" });
+  return defer({
+    veto,
+    detail: loading.first,
+    fresh: freshAfter(loading.first, loading.fresh, (d) => d.set.stale === true),
+  });
 }
 
 export default function VetoPage() {
@@ -46,6 +55,7 @@ export default function VetoPage() {
 
 function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
   const { governance } = useStatus();
+  const { fresh } = useLoaderData<typeof loader>();
   const p = d.params;
   const l2 = d.l2Proposal;
   return (
@@ -149,14 +159,22 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
           </EmptyState>
         )}
       </Section>
-      <SignatureSetCard
-        testId="set-veto"
-        title="Guardian signatures"
-        set={d.set}
-        state={d.state}
-        execution={d.execution}
-        executionToLabel="Guardians"
-      />
+      <UntilFresh stale={d.set.stale === true} fresh={fresh}>
+        {(current, refresh) => {
+          const v = current ?? d;
+          return (
+            <SignatureSetCard
+              testId="set-veto"
+              title="Guardian signatures"
+              set={v.set}
+              state={v.state}
+              execution={v.execution}
+              executionToLabel="Guardians"
+              refresh={current ? null : refresh}
+            />
+          );
+        }}
+      </UntilFresh>
     </div>
   );
 }

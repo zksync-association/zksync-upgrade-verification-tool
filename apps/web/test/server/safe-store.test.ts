@@ -229,9 +229,11 @@ describe("listings on the request path", () => {
     expect(store.peekSafeMessage(A, messageHash(2))).toEqual({
       message: null,
       version: listing.version,
+      fetchedAt: listing.fetchedAt,
     });
     expect(await store.lookupSafeMessage(A, messageHash(1))).toMatchObject({
       version: listing.version,
+      fetchedAt: listing.fetchedAt,
     });
     expect(safe.sent).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(60_001);
@@ -241,6 +243,42 @@ describe("listings on the request path", () => {
     expect(safe.sent).toHaveLength(1);
   });
 
+  it("hands a page the listing it holds whatever its age, with its arrival time, without asking Safe or keeping it fresh", async () => {
+    await load();
+    const safe = fakeSafe();
+    safe.add(A, 1);
+    expect(store.heldSafeListing(A)).toBeNull();
+    expect(store.peekHeldSafeMessage(A, messageHash(1))).toBeNull();
+    const listing = await store.listSafeMessages(A);
+    // Ten minutes later: no longer served to a request, still held for a page's first answer.
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(store.freshListingVersion(A)).toBeNull();
+    expect(store.heldSafeListing(A)).toMatchObject({
+      version: listing.version,
+      fetchedAt: listing.fetchedAt,
+    });
+    expect(Date.now() - (store.heldSafeListing(A)?.fetchedAt ?? 0)).toBe(600_000);
+    expect(store.peekHeldSafeMessage(A, messageHash(1))).toMatchObject({
+      message: { messageHash: messageHash(1) },
+      version: listing.version,
+      fetchedAt: listing.fetchedAt,
+    });
+    expect(store.peekHeldSafeMessage(A, messageHash(2))).toEqual({
+      message: null,
+      version: listing.version,
+      fetchedAt: listing.fetchedAt,
+    });
+    // Never a read, and never a page's interest: the sweep is not asked to keep it fresh.
+    expect(safe.sent).toHaveLength(1);
+    store.startSafeSweep(driver({ securityCouncil: [A], guardians: [], zkFoundation: [] }));
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(store.safeStoreStatus().groups).toEqual([]);
+    store.stopSafeSweep();
+    // A refresh drops it like any other listing.
+    cache.invalidate("safe:");
+    expect(store.heldSafeListing(A)).toBeNull();
+  });
+
   it("cannot tell from a listing that stops before its last page: a lookup asks by hash, a peek says nothing", async () => {
     await load();
     const safe = fakeSafe();
@@ -248,7 +286,11 @@ describe("listings on the request path", () => {
     await within(5_000, store.listSafeMessages(A));
     expect(store.peekSafeMessage(A, messageHash(1))).toBeNull();
     const byHash = await within(1_000, store.lookupSafeMessage(A, messageHash(1)));
-    expect(byHash).toMatchObject({ message: { messageHash: messageHash(1) }, version: null });
+    expect(byHash).toMatchObject({
+      message: { messageHash: messageHash(1) },
+      version: null,
+      fetchedAt: null,
+    });
   });
 
   it("tells listeners when a listing is stored with a new version, not when it is read again unchanged", async () => {

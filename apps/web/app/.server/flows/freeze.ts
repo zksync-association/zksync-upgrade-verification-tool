@@ -3,8 +3,14 @@ import { FREEZE_ACTIONS } from "@/common/freeze";
 import { buildTypedData } from "@/common/typed-data";
 import { FREEZE_STATUS_LABELS } from "@/common/upgrade-states";
 import { type Governance, governance } from "../governance";
-import { type SignatureSet, verifySignatureSet } from "../signatures";
-import { type ExecutionView, type SetState, executionFor } from "./common";
+import type { Freshness, SignatureSet } from "../signatures";
+import {
+  type ExecutionView,
+  type SetState,
+  executionFor,
+  firstOrFresh,
+  streamSignatureSet,
+} from "./common";
 import { collectMessages } from "./messages";
 
 // Freeze requests live only as Security Council members' Safe messages. Their typed data holds
@@ -115,31 +121,66 @@ export type FreezeDetail = {
   governance: Governance;
 };
 
-export async function getFreezeRequest(
+/** The strict result (JSON). */
+export function getFreezeRequest(
   params: FreezeParams,
   { supplied = [] }: { supplied?: MemberSignature[] } = {}
 ): Promise<FreezeDetail> {
-  const gov = await governance();
-  const message: Record<string, string> = { nonce: params.nonce, validUntil: params.validUntil };
-  if (params.action === "SetSoftFreezeThreshold") message.threshold = params.threshold ?? "0";
-  const state = freezeState(gov, params);
-  const set = await verifySignatureSet({
-    action: params.action,
-    signerGroup: "securityCouncil",
-    typedData: buildTypedData(params.action, gov.securityCouncil.domain, message),
-    members: gov.securityCouncil.members,
-    threshold: thresholdFor(gov, params.action),
-    check: { kind: "multisig", contract: gov.securityCouncil.address },
-    supplied,
-    open: state.status === "open",
+  return loadFreezeRequest(params, { supplied }).fresh;
+}
+
+/**
+ * The request's signatures: `fresh` is the strict result; with `freshness: "page"`, `first` is the
+ * page's first answer (a labelled stale set without an execution, or the strict result, see
+ * firstSignatureSet). Otherwise `first` is `fresh`.
+ */
+export function loadFreezeRequest(
+  params: FreezeParams,
+  {
+    supplied = [],
+    freshness = "strict",
+  }: { supplied?: MemberSignature[]; freshness?: Freshness } = {}
+): { first: Promise<FreezeDetail>; fresh: Promise<FreezeDetail> } {
+  const started = governance().then((gov) => {
+    const message: Record<string, string> = { nonce: params.nonce, validUntil: params.validUntil };
+    if (params.action === "SetSoftFreezeThreshold") message.threshold = params.threshold ?? "0";
+    const state = freezeState(gov, params);
+    const streamed = streamSignatureSet(
+      {
+        action: params.action,
+        signerGroup: "securityCouncil",
+        typedData: buildTypedData(params.action, gov.securityCouncil.domain, message),
+        members: gov.securityCouncil.members,
+        threshold: thresholdFor(gov, params.action),
+        check: { kind: "multisig", contract: gov.securityCouncil.address },
+        supplied,
+        open: state.status === "open",
+      },
+      freshness
+    );
+    return { gov, state, streamed };
   });
-  const execution = await executionFor(set, state, (valid) =>
-    freezeExecution(
-      params.action,
-      gov.securityCouncil.address,
-      { validUntil: params.validUntil, threshold: params.threshold },
-      valid
-    )
+  const fresh = started.then(async ({ gov, state, streamed }): Promise<FreezeDetail> => {
+    const set = await streamed.fresh;
+    const execution = await executionFor(set, state, (valid) =>
+      freezeExecution(
+        params.action,
+        gov.securityCouncil.address,
+        { validUntil: params.validUntil, threshold: params.threshold },
+        valid
+      )
+    );
+    return { params, set, state, execution, governance: gov };
+  });
+  const first = started.then(({ gov, state, streamed }) =>
+    firstOrFresh([streamed], fresh, ([set]) => ({
+      params,
+      set: set as SignatureSet,
+      state,
+      execution: null,
+      governance: gov,
+    }))
   );
-  return { params, set, state, execution, governance: gov };
+  for (const pending of [first, fresh]) void pending.catch(() => {});
+  return { first, fresh };
 }

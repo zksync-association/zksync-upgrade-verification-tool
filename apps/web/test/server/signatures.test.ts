@@ -124,8 +124,13 @@ vi.mock("@/.server/safe/store", async () => {
   const answer = (hash: string) => ({
     message: state.safeMessages.get(hash) ?? null,
     version: state.byHash ? null : state.listingVersion,
+    // Read just now (a listing at most 60 s old, or a lookup by hash).
+    fetchedAt: state.byHash ? null : Date.now(),
   });
   return {
+    SAFE_LISTING_MAX_AGE_MS: 60_000,
+    // A page's first answer is not under test here: no listing is held.
+    peekHeldSafeMessage: () => null,
     lookupSafeMessage: async (_safe: string, hash: string) => {
       state.lookups++;
       if (state.safeApiDown) throw new SafeApiError("Safe Transaction Service returned HTTP 503");

@@ -29,11 +29,11 @@ import {
   safeBlockNumber,
 } from "../rpc";
 import {
+  type Freshness,
   type SignatureSet,
   prefetchSafeListings,
   simulate,
   simulateCall,
-  verifySignatureSet,
 } from "../signatures";
 import {
   type ExecutionView,
@@ -45,6 +45,7 @@ import {
   eventsWithId,
   executionFor,
   hasArchiveState,
+  streamSignatureSet,
   topicOf,
 } from "./common";
 import { type Located, indexCannotAnswer, locateEvent } from "./indexed";
@@ -305,10 +306,17 @@ export type StandardUpgradeCore = Omit<
  * are the current signatures alone (no recorded transaction, `used` or `historical` yet), so they
  * never wait on the recorded approvals' re-checks; `setEvidence` adds those to each set once both
  * are in.
+ *
+ * With `freshness: "page"`, `sets` is the page's first answer (each set the strict result, or a
+ * labelled stale one without an execution, see firstSignatureSet) and `freshSets` the strict
+ * result. Otherwise (JSON) both are the strict result.
  */
 export async function loadStandardUpgrade(
   id: Hex,
-  { supplied = [] }: { supplied?: MemberSignature[] } = {}
+  {
+    supplied = [],
+    freshness = "strict",
+  }: { supplied?: MemberSignature[]; freshness?: Freshness } = {}
 ) {
   // The sets read the members' Safe listings: those reads start as soon as the upgrade is known
   // to exist, while its proposal is looked up in the log index (a fresh process waits for the
@@ -318,10 +326,10 @@ export async function loadStandardUpgrade(
       prefetchSafeListings([...gov.securityCouncil.members, ...gov.guardians.members]),
   });
   const evidence = timedRead(id, "recorded-approvals", () => getRecordedApprovals(overview));
-  const sets = timedRead(id, "current-signatures", () =>
-    getStandardUpgradeSets(overview, supplied)
-  );
-  const setEvidence = Promise.all([sets, evidence]).then(([verified, records]) =>
+  const streamed = streamStandardUpgradeSets(overview, supplied, freshness);
+  const freshSets = timedRead(id, "current-signatures", () => streamed.fresh);
+  const sets = streamed.immediate;
+  const setEvidence = Promise.all([freshSets, evidence]).then(([verified, records]) =>
     verified.map((set) => evidenceFor(set, records))
   );
   const execution = timedRead(id, "execution", () => getUpgradeExecution(overview));
@@ -330,9 +338,9 @@ export async function loadStandardUpgrade(
       startedTxHash: overview.started.txHash,
     })
   );
-  for (const pending of [evidence, sets, setEvidence, execution, l2Proposal])
+  for (const pending of [evidence, sets, freshSets, setEvidence, execution, l2Proposal])
     void pending.catch(() => {});
-  return { overview, evidence, sets, setEvidence, execution, l2Proposal };
+  return { overview, evidence, sets, freshSets, setEvidence, execution, l2Proposal };
 }
 
 /** JSON waits for the same engine's complete result; the page streams each section separately. */
@@ -340,9 +348,9 @@ export async function getStandardUpgrade(
   id: Hex,
   options: { supplied?: MemberSignature[] } = {}
 ): Promise<StandardUpgradeDetail> {
-  const loading = await loadStandardUpgrade(id, options);
+  const loading = await loadStandardUpgrade(id, { ...options, freshness: "strict" });
   const [sets, evidence, execution, l2Proposal] = await Promise.all([
-    loading.sets,
+    loading.freshSets,
     loading.setEvidence,
     loading.execution,
     loading.l2Proposal.catch(() => null),
@@ -567,17 +575,21 @@ async function getRecordedApprovals(d: StandardUpgradeCore): Promise<RecordedApp
   );
 }
 
-/** The current signatures of each set. The recorded approvals are merged in by withEvidence. */
-async function getStandardUpgradeSets(
+/**
+ * The current signatures of each set (the recorded approvals are merged in by withEvidence): the
+ * strict result, and the page's first answer (see loadStandardUpgrade). A stale first answer has
+ * no execution: nothing is offered to send from it.
+ */
+function streamStandardUpgradeSets(
   d: StandardUpgradeCore,
-  supplied: MemberSignature[]
-): Promise<ApprovalSet[]> {
+  supplied: MemberSignature[],
+  freshness: Freshness
+): { immediate: Promise<ApprovalSet[]>; fresh: Promise<ApprovalSet[]> } {
   const { governance: gov, id } = d;
-  const specs = approvalSpecs(d);
-  return Promise.all(
-    specs.map(async (spec): Promise<ApprovalSet> => {
-      const contract = spec.group === "securityCouncil" ? gov.securityCouncil : gov.guardians;
-      const set = await verifySignatureSet({
+  const each = approvalSpecs(d).map((spec) => {
+    const contract = spec.group === "securityCouncil" ? gov.securityCouncil : gov.guardians;
+    const streamed = streamSignatureSet(
+      {
         action: spec.action,
         signerGroup: spec.group,
         typedData: buildTypedData(spec.action, contract.domain, { id }),
@@ -586,21 +598,36 @@ async function getStandardUpgradeSets(
         check: { kind: "multisig", contract: contract.address },
         supplied,
         open: spec.state.status === "open",
-      });
-      const execution = await executionFor(set, spec.state, (valid) =>
-        approvalExecution(spec.action, contract.address, id, valid)
-      );
-      return {
-        key: spec.key,
-        title: spec.title,
+      },
+      freshness
+    );
+    const approval = (set: SignatureSet, execution: ExecutionView | null): ApprovalSet => ({
+      key: spec.key,
+      title: spec.title,
+      set,
+      state: spec.state,
+      execution,
+      used: null,
+      historical: null,
+    });
+    const fresh = streamed.fresh.then(async (set) =>
+      approval(
         set,
-        state: spec.state,
-        execution,
-        used: null,
-        historical: null,
-      };
-    })
-  );
+        await executionFor(set, spec.state, (valid) =>
+          approvalExecution(spec.action, contract.address, id, valid)
+        )
+      )
+    );
+    const immediate =
+      streamed.immediate === streamed.fresh
+        ? fresh
+        : streamed.immediate.then((set) => (set.stale ? approval(set, null) : fresh));
+    return { immediate, fresh };
+  });
+  const immediate = Promise.all(each.map((e) => e.immediate));
+  const fresh = Promise.all(each.map((e) => e.fresh));
+  for (const pending of [immediate, fresh]) void pending.catch(() => {});
+  return { immediate, fresh };
 }
 
 async function recheckAt(

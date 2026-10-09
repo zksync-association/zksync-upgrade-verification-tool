@@ -114,19 +114,33 @@ const gov = {
   },
 };
 vi.mock("@/.server/governance", () => ({ governance: async () => gov }));
+const sets = vi.hoisted(() => ({ firstStale: false }));
 vi.mock("@/.server/signatures", () => ({
   verifySignatureSet: async () => ({
     thresholdCheck: { status: "met" },
     valid: [{ signer: SIGNER, signature: "0xaa" }],
     members: [],
+    stale: false,
   }),
+  // A page's first answer: met at an older block (stale), or the fresh result.
+  firstSignatureSet: async (_params: unknown, fresh: Promise<unknown>) =>
+    sets.firstStale
+      ? {
+          thresholdCheck: { status: "met" },
+          valid: [{ signer: SIGNER, signature: "0xaa" }],
+          members: [],
+          verifiedAtBlock: "90",
+          stale: true,
+        }
+      : fresh,
   simulate: async () => ({ status: "ok" }),
 }));
 vi.mock("@/.server/flows/messages", () => ({
   collectMessages: async () => ({ groups: [], errors: [], anomalies: 0 }),
 }));
 
-const { getL2Veto, listL2Vetoes } = await import("@/.server/flows/l2-veto");
+const { getL2Veto, listL2Vetoes, loadL2Veto } = await import("@/.server/flows/l2-veto");
+const { loadFreezeRequest } = await import("@/.server/flows/freeze");
 
 const params = {
   l2ProposalId: vetoed.id.toString(),
@@ -156,6 +170,7 @@ const internalError = () =>
 
 beforeEach(() => {
   clearCache();
+  sets.firstStale = false;
   state.l2Configured = true;
   state.l2State = 1;
   state.otherState = 1;
@@ -241,5 +256,61 @@ describe("listL2Vetoes", () => {
     expect(result.vetoable).toEqual([]);
     expect(result.l2Error).toContain("fetch failed");
     expect(result.l2Error).not.toContain("secret-host");
+  });
+});
+
+describe("a page's first answer for a veto or a freeze request", () => {
+  it("is a stale set with nothing to send, before the strict result with its execution", async () => {
+    sets.firstStale = true;
+    const veto = loadL2Veto(params, { freshness: "page" });
+    const first = await veto.first;
+    expect(first.set).toMatchObject({ stale: true, verifiedAtBlock: "90" });
+    expect(first.execution).toBeNull();
+    expect(first.state).toEqual({ status: "open" });
+    expect(first.l2Proposal).toMatchObject({ state: "Active" });
+    const fresh = await veto.fresh;
+    expect(fresh.set.stale).toBe(false);
+    expect(fresh.execution?.to).toBe(GUARDIANS);
+    // JSON never gets the stale one.
+    expect((await getL2Veto(params)).set.stale).toBe(false);
+  });
+
+  it("is the strict result itself when nothing older is shown", async () => {
+    const veto = loadL2Veto(params, { freshness: "page" });
+    expect(await veto.first).toBe(await veto.fresh);
+    const strict = loadL2Veto(params);
+    expect(await strict.first).toBe(await strict.fresh);
+  });
+
+  it("freeze requests stream the same way", async () => {
+    const { governance } = await import("@/.server/governance");
+    const council = {
+      address: GUARDIANS,
+      members: [SIGNER],
+      nonces: { softFreeze: "0", hardFreeze: "0", unfreeze: "0", setSoftFreezeThreshold: "0" },
+      thresholds: { softFreeze: 1, hardFreeze: 1, unfreeze: 1, softFreezeConservative: 1 },
+      domain: { name: "SecurityCouncil", version: "1", chainId: 1, verifyingContract: GUARDIANS },
+    };
+    // The governance this file serves, with a Security Council for the duration of the test.
+    const served = (await governance()) as unknown as Record<string, unknown>;
+    const extra = {
+      securityCouncil: council,
+      latestBlock: { timestamp: "100" },
+      freeze: { lastFreezeStatus: 0 },
+    };
+    Object.assign(served, extra);
+    try {
+      sets.firstStale = true;
+      const request = { action: "SoftFreeze" as const, nonce: "0", validUntil: "1000" };
+      const freeze = loadFreezeRequest(request, { freshness: "page" });
+      const first = await freeze.first;
+      expect(first.set.stale).toBe(true);
+      expect(first.execution).toBeNull();
+      const fresh = await freeze.fresh;
+      expect(fresh.set.stale).toBe(false);
+      expect(fresh.execution?.to).toBe(GUARDIANS);
+    } finally {
+      for (const key of Object.keys(extra)) delete served[key];
+    }
   });
 });

@@ -34,14 +34,16 @@ import {
   requireCode,
 } from "./chain/call";
 import { type SafeInfo, safeInfo, safeInfoKey } from "./governance";
-import { type BlockRef, latestBlock, network, rpcGeneration } from "./rpc";
+import { type BlockRef, latestBlock, network, rpcGeneration, servedHead } from "./rpc";
 import {
+  SAFE_LISTING_MAX_AGE_MS,
   type SafeMessageLookup,
   freshListingVersion,
   listSafeMessages,
   lookupSafeMessage,
   markSafeDemand,
   onSafeListingChange,
+  peekHeldSafeMessage,
   peekSafeMessage,
 } from "./safe/store";
 import { SafeApiError, safeWalletUrl } from "./safe-api";
@@ -67,6 +69,13 @@ import { SafeApiError, safeWalletUrl } from "./safe-api";
 // before the next request asks (see precomputeSignatureSets): while the app is in use, those
 // viewed in the last 10 minutes and those that were open (still signable) when last viewed; while
 // it is idle, only the open ones. Nothing involving a signature the viewer supplied (?sig=) is kept.
+//
+// Pages may show a first answer before that result (see firstSignatureSet): the set's last result,
+// labelled with the block it was verified at, or a verification at the head from Safe listings
+// older than 60 s, labelled with their age (`stale: true` either way). The strict result always
+// follows in the same response and replaces it. JSON only ever gets the strict result. Safe data
+// is candidate input only, so old copies can only show fewer signatures than there are, never
+// make one count; an old verdict is shown as of its block, never as current.
 
 export type SignatureCheck =
   // SecurityCouncil / Guardians actions: checkSignatures(digest, signers, signatures, threshold)
@@ -110,6 +119,40 @@ export type SignatureSet = {
   valid: MemberSignature[];
   thresholdCheck: ThresholdCheck;
   safeApiError: string | null;
+  /**
+   * The block the verdicts were read at (decimal): the head, or the past block asked for. null at
+   * 'latest' (dev nodes).
+   */
+  verifiedAtBlock?: string | null;
+  /**
+   * When the oldest Safe copy the members' messages came from was read (ISO time): a listing's
+   * arrival, or now for a message Safe was asked for by its hash. null when none was read (no
+   * member is a Safe, or Safe could not be read).
+   */
+  safeFetchedAt?: string | null;
+  /**
+   * true only on a page's first answer that is not the strict result: verified at an older block
+   * than the head, and/or from Safe copies older than 60 s (see firstSignatureSet). The strict
+   * result follows in the same page. JSON is always strict (false).
+   */
+  stale?: boolean;
+  /** On a stale first answer: the head the strict result is being verified at, when known. */
+  reverifyingAt?: string | null;
+};
+
+/**
+ * How fresh a flow's answer must be. "strict" (JSON, /api/*): Safe listings at most 60 s old and
+ * verdicts at the head, waited for. "page": a page shows a first answer at once (see
+ * firstSignatureSet) and the strict result streams in after it.
+ */
+export type Freshness = "strict" | "page";
+
+/** A set as a page streams it: the first answer, and the strict result after it. */
+export type StreamedSet = {
+  /** Resolves to a set with `stale: true`, or to the strict result. */
+  immediate: Promise<SignatureSet>;
+  /** The strict result (what JSON returns); the same promise as `immediate` when that is it. */
+  fresh: Promise<SignatureSet>;
 };
 
 /**
@@ -322,6 +365,13 @@ const fromStore: SafeSource = async (member, hash) => {
   return found;
 };
 
+/** A page's first answer: the listing held, whatever its age (never asks Safe). */
+const fromHeld: SafeSource = async (member, hash) => {
+  const found = peekHeldSafeMessage(member, hash);
+  if (!found) throw new NeedsSafeRead(`No listing held answers for ${member}`);
+  return found;
+};
+
 type Computed = {
   set: SignatureSet;
   /** The listing version each member Safe's message came from (lower-case address). */
@@ -330,6 +380,8 @@ type Computed = {
   byHash: boolean;
   /** The cached Safe info read for each member: its cache key, and the entry's own promise. */
   infos: Map<string, Promise<SafeInfo>>;
+  /** Some message came from a listing older than 60 s when it was used (only fromHeld's). */
+  staleCopies: boolean;
 };
 
 export async function verifySignatureSet(params: SignatureSetParams): Promise<SignatureSet> {
@@ -375,6 +427,9 @@ async function computeSet(
   const listings = new Map<string, number>();
   let byHash = false;
   const infos = new Map<string, Promise<SafeInfo>>();
+  // The oldest Safe copy used, and whether one was older than 60 s when it was used.
+  let oldestCopy: number | null = null;
+  let staleCopies = false;
 
   const members = await Promise.all(
     params.members.map(async (member): Promise<MemberResult> => {
@@ -393,9 +448,14 @@ async function computeSet(
       let apiUnavailable = false;
       if (memberHashes) {
         try {
-          const { message, version } = await source(member, memberHashes.safeMessageHash);
+          const lookup = await source(member, memberHashes.safeMessageHash);
+          const { message, version } = lookup;
           if (version === null) byHash = true;
           else listings.set(member.toLowerCase(), version);
+          // A message Safe was asked for by its hash was read just now.
+          const copiedAt = lookup.fetchedAt ?? Date.now();
+          if (oldestCopy === null || copiedAt < oldestCopy) oldestCopy = copiedAt;
+          if (Date.now() - copiedAt > SAFE_LISTING_MAX_AGE_MS) staleCopies = true;
           if (message?.preparedSignature) {
             candidates.push({
               source: "safe",
@@ -542,10 +602,14 @@ async function computeSet(
       valid,
       thresholdCheck,
       safeApiError,
+      verifiedAtBlock: blockOf(pin)?.toString() ?? null,
+      safeFetchedAt: oldestCopy === null ? null : new Date(oldestCopy).toISOString(),
+      stale: false,
     },
     listings,
     byHash,
     infos,
+    staleCopies,
   };
 }
 
@@ -661,6 +725,7 @@ function compute(
     (result) => {
       // Dropped meanwhile (settings change, refresh): never put back.
       if (memo.get(key) !== entry) return;
+      remember(spec, head, result);
       // Kept only when every message came from a listing version (a lookup by hash or a Safe
       // failure has no version to tell when it no longer stands).
       if (result.byHash || result.set.safeApiError !== null) {
@@ -675,6 +740,96 @@ function compute(
     }
   );
   return computed;
+}
+
+// ---- a page's first answer ----
+
+// The last strict result of each set (a request's or a precompute's, never one with a supplied
+// signature: those are never computed through the memo), for a page's first answer while the set
+// is verified again. At most 256 sets, each for 24 hours, most recently stored last.
+const LAST_RESULTS_LIMIT = 256;
+const LAST_RESULT_FOR_MS = 24 * 60 * 60_000;
+type LastResult = { set: SignatureSet; block: bigint; storedAt: number };
+const lastResults = new Map<string, LastResult>();
+
+function remember(spec: SetSpec, head: BlockRef, computed: Computed) {
+  // A result Safe could not answer for leaves the last one it did answer for.
+  if (computed.set.safeApiError !== null) return;
+  // Never replaced by one verified at an older block (computations can end out of order).
+  const previous = lastResults.get(spec.key);
+  if (previous && previous.block > head.number) return;
+  lastResults.delete(spec.key);
+  lastResults.set(spec.key, { set: computed.set, block: head.number, storedAt: Date.now() });
+  while (lastResults.size > LAST_RESULTS_LIMIT)
+    lastResults.delete(lastResults.keys().next().value as string);
+}
+
+function lastResult(key: string): LastResult | null {
+  const found = lastResults.get(key);
+  if (!found) return null;
+  if (Date.now() - found.storedAt <= LAST_RESULT_FOR_MS) return found;
+  lastResults.delete(key);
+  return null;
+}
+
+/**
+ * A page's first answer for a set (`freshness: "page"`), while `fresh` (verifySignatureSet's strict
+ * result for the same params) is computed. It never waits on Safe:
+ * - the result kept at the head served now, while it still stands: that IS the fresh result, so
+ *   `fresh` itself is the answer;
+ * - else the set's last strict result, at the block it was verified at;
+ * - else a verification at the head from the Safe listings held, whatever their age.
+ * The last two are labelled (`stale: true`, `verifiedAtBlock`, `safeFetchedAt`, `reverifyingAt`)
+ * and copied: the kept objects are the ones JSON answers with. When none of them can answer
+ * without Safe (a member Safe has no listing held, or one that cannot tell), the listings held are
+ * all at most 60 s old (the result would be the fresh one), or `fresh` is in first, the answer is
+ * `fresh`. So this resolves either to a set with `stale: true`, or to the fresh result. Supplied
+ * signatures (?sig=), a past block and dev nodes always get `fresh`. Nothing computed here is kept.
+ */
+export async function firstSignatureSet(
+  params: SignatureSetParams,
+  fresh: Promise<SignatureSet>
+): Promise<SignatureSet> {
+  if ((params.supplied?.length ?? 0) > 0 || params.blockNumber !== undefined) return fresh;
+  let freshIn = false;
+  fresh.then(
+    () => {
+      freshIn = true;
+    },
+    () => {}
+  );
+  let early: SignatureSet | null = null;
+  try {
+    early = await earlyAnswer(specOf(params));
+  } catch {
+    // A read it needed failed (the head, a verdict): the fresh result answers, or says why not.
+  }
+  return early === null || freshIn ? fresh : early;
+}
+
+/** firstSignatureSet's stale answer, or null when the answer is the fresh result. */
+async function earlyAnswer(spec: SetSpec): Promise<SignatureSet | null> {
+  if ((await network()).isDevNode) return null;
+  // The head served now, without asking the node (a read of it in flight is waited for).
+  const served = servedHead();
+  let head = served ? await served.catch(() => null) : null;
+  if (head && holds(memo.get(memoKey(spec, head)))) return null;
+  const last = lastResult(spec.key);
+  if (last) return asFirstAnswer(last.set, head);
+  head ??= await latestBlock();
+  if (holds(memo.get(memoKey(spec, head)))) return null;
+  let computed: Computed;
+  try {
+    computed = await computeSet(spec, [], { kind: "head", head }, fromHeld);
+  } catch (error) {
+    if (error instanceof NeedsSafeRead) return null;
+    throw error;
+  }
+  return computed.staleCopies ? asFirstAnswer(computed.set, head) : null;
+}
+
+function asFirstAnswer(set: SignatureSet, head: BlockRef | null): SignatureSet {
+  return { ...set, stale: true, reverifyingAt: head ? head.number.toString() : null };
 }
 
 // The sets pages verified (without supplied signatures) in the last 24 hours, at most 256, most
@@ -755,10 +910,11 @@ export type PrecomputeRun = {
 
 let lastRun: PrecomputeRun | null = null;
 
-// settings changes and dev-node refreshes (clearCache) drop kept results and watched sets alike;
-// an invalidate() covering "verify:" drops the results.
+// settings changes and dev-node refreshes (clearCache) drop kept results, the sets' last results
+// and watched sets alike; an invalidate() covering "verify:" drops the results.
 linkStore("verify:", (prefix) => {
   memo.clear();
+  lastResults.clear();
   if (prefix === null) {
     watched.clear();
     lastRun = null;

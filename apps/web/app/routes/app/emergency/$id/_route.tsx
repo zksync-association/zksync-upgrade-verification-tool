@@ -1,3 +1,4 @@
+import { freshAfter } from "@/.server/flows/common";
 import {
   type EmergencyDetail,
   type EmergencyExecution,
@@ -21,7 +22,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CallList } from "@/components/verification/calls";
 import { ExecutionPanel, SimulationResult } from "@/components/verification/execution-panel";
+import type { Refresh } from "@/components/verification/freshness";
 import { SignatureSetCard } from "@/components/verification/signature-set";
+import { UntilFresh } from "@/components/verification/until-fresh";
 import { UpgradeFile } from "@/components/verification/upgrade-file";
 import { badRequest } from "@/utils/http";
 import { Meta } from "@/utils/meta";
@@ -44,12 +47,20 @@ export const meta = Meta["/app/emergency/:id"];
 
 export function loader({ params, request }: LoaderFunctionArgs) {
   const id = parseId(params.id);
-  const loading = loadEmergencyUpgrade(id, { supplied: suppliedSignatures(request) });
+  // The page shows the signatures' first answer at once (possibly from an older block or older
+  // Safe copies, labelled) and the strict result after it in the same response.
+  const loading = loadEmergencyUpgrade(id, {
+    supplied: suppliedSignatures(request),
+    freshness: "page",
+  });
   return defer({
     id,
     detail: loading.then((d) => d.overview),
     executed: loading.then((d) => d.executed),
-    verified: loading.then((d) => d.detail),
+    verified: loading.then((d) => d.first),
+    verifiedFresh: loading.then((d) =>
+      freshAfter(d.first, d.detail, (first) => first.roles.some((r) => r.set.stale === true))
+    ),
   });
 }
 
@@ -98,7 +109,7 @@ export default function EmergencyPage() {
 }
 
 function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
-  const { executed: execution, verified } = useLoaderData<typeof loader>();
+  const { executed: execution, verified, verifiedFresh } = useLoaderData<typeof loader>();
   const { governance } = useStatus();
   const board = governance.emergencyUpgradeBoard.address;
   const executed = d.state === UPGRADE_STATES.Done;
@@ -170,7 +181,19 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
             <EmptyState>Signature verification unavailable. Refresh to retry.</EmptyState>
           }
         >
-          {(detail) => <SignatureSections detail={detail} board={board} check={check} />}
+          {(first) => (
+            // A stale first answer shows until the strict result streams in.
+            <UntilFresh stale={first.roles.some((r) => r.set.stale === true)} fresh={verifiedFresh}>
+              {(fresh, refresh) => (
+                <SignatureSections
+                  detail={fresh ?? first}
+                  board={board}
+                  check={check}
+                  refresh={fresh ? null : refresh}
+                />
+              )}
+            </UntilFresh>
+          )}
         </Await>
       </Suspense>
     </div>
@@ -230,9 +253,18 @@ function SignatureSections({
   detail: d,
   board,
   check,
-}: { detail: SerializeFrom<EmergencyDetail>; board: string; check: PayloadCheck | null }) {
+  refresh,
+}: {
+  detail: SerializeFrom<EmergencyDetail>;
+  board: string;
+  check: PayloadCheck | null;
+  refresh: Refresh;
+}) {
   const executed = d.state === UPGRADE_STATES.Done;
-  const allMet = d.roles.every((r) => r.set.thresholdCheck.status === "met");
+  // A stale first answer (an older block, or old Safe copies) never makes a transaction to send.
+  const metNow = (r: (typeof d.roles)[number]) =>
+    r.set.thresholdCheck.status === "met" && r.set.stale !== true;
+  const allMet = d.roles.every(metNow);
   const zkf = d.roles.find((r) => r.key === "zkFoundation");
   const execution = useMemo(() => {
     if (executed || !check?.ok || !allMet || !zkf?.set.valid[0]) return null;
@@ -270,6 +302,7 @@ function SignatureSections({
                   : { status: "open" }
               }
               used={r.used}
+              refresh={refresh}
             />
           ))}
         </div>
@@ -291,8 +324,10 @@ function SignatureSections({
                 </li>
                 {d.roles.map((r) => (
                   <li key={r.key}>
-                    <Check ok={r.set.thresholdCheck.status === "met" ? true : null}>
+                    <Check ok={metNow(r) ? true : null}>
                       {r.title}: {r.set.valid.length} of {r.set.threshold}
+                      {r.set.stale &&
+                        ` (at block #${r.set.verifiedAtBlock ?? "?"}, checking again)`}
                     </Check>
                   </li>
                 ))}

@@ -5,12 +5,14 @@ import { AddressLink, CopyButton, ExternalAnchor, Hash, TxLink } from "@/compone
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/utils/cn";
+import { formatNumber } from "@/utils/format";
 import type { SerializeFrom } from "@remix-run/node";
 import { AlertTriangle, CheckCircle2, ChevronDown, ShieldCheck, XCircle } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { isAddressEqual } from "viem";
 import { MemberStatusBadge, SetStateBadge } from "./badges";
 import { ExecutionPanel } from "./execution-panel";
+import { FreshnessNote, type Refresh } from "./freshness";
 import { SignButton } from "./sign-button";
 
 type Serialized<T> = SerializeFrom<T>;
@@ -25,6 +27,7 @@ export function SignatureSetCard({
   historical,
   footer,
   testId,
+  refresh = null,
 }: {
   title: string;
   set: Serialized<SignatureSet>;
@@ -35,14 +38,23 @@ export function SignatureSetCard({
   historical?: { block: string; accepted: boolean | null; error: string | null } | null;
   footer?: ReactNode;
   testId?: string;
+  /** For a stale first answer (`set.stale`): where the fresh result is (see UntilFresh). */
+  refresh?: Refresh;
 }) {
   const valid = set.valid.length;
   const met = set.thresholdCheck.status === "met";
+  // A page's first answer from an older block or old Safe copies: every verdict is shown as of its
+  // block, nothing in a passing colour, and nothing to sign or send from it.
+  const staleAt = set.stale ? set.verifiedAtBlock ?? "?" : null;
   const unavailable = set.members.filter((m) => m.status === "unavailable").length;
   const incomplete =
     set.thresholdCheck.status === "below" && (unavailable > 0 || !!set.safeApiError);
   return (
-    <Card data-testid={testId} className="overflow-hidden">
+    <Card
+      data-testid={testId}
+      data-stale={staleAt === null ? undefined : "true"}
+      className="overflow-hidden"
+    >
       <div className="space-y-3 border-slate-200 border-b bg-slate-50 px-4 py-5 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 space-y-1.5">
@@ -70,9 +82,11 @@ export function SignatureSetCard({
                   <span className="font-normal text-slate-700 text-xl"> / {set.threshold}</span>
                 </p>
                 <p className="text-slate-600 text-xs">
-                  {state.status === "open"
-                    ? "verified signatures / required"
-                    : "verified today / current threshold"}
+                  {staleAt !== null
+                    ? `verified at block #${formatNumber(staleAt)} / required`
+                    : state.status === "open"
+                      ? "verified signatures / required"
+                      : "verified today / current threshold"}
                 </p>
               </>
             )}
@@ -81,14 +95,20 @@ export function SignatureSetCard({
         {state.status === "open" && !incomplete && (
           <Progress
             value={(valid / Math.max(set.threshold, 1)) * 100}
-            indicatorClassName={cn(met && "bg-green-700")}
+            indicatorClassName={cn(met && staleAt === null && "bg-green-700")}
             aria-label="Verified signatures toward the contract threshold"
           />
         )}
         {state.status === "done" && (
           <DoneSummary state={state} used={used} historical={historical} />
         )}
-        <ThresholdLine set={set} state={state} incomplete={incomplete} />
+        <FreshnessNote
+          set={set}
+          // Only a stale set is being checked again; a fresh one beside it is not.
+          refresh={staleAt === null ? null : refresh}
+          what="The statuses and counts on this card"
+        />
+        <ThresholdLine set={set} state={state} incomplete={incomplete} staleAt={staleAt} />
         {set.safeApiError && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 text-sm">
             Safe Transaction Service: {set.safeApiError}. On-chain approvals are still checked.
@@ -104,13 +124,13 @@ export function SignatureSetCard({
             className="h-4 w-4 shrink-0 transition-transform group-open/members:rotate-180"
           />
         </summary>
-        <MemberList set={set} />
+        <MemberList set={set} staleAt={staleAt} />
       </details>
 
       <div className="space-y-4 border-slate-200 border-t px-4 py-5 sm:px-6">
         {execution && <ExecutionPanel execution={execution} toLabel={executionToLabel} />}
         <SignedData set={set} />
-        {state.status === "open" && (
+        {state.status === "open" && staleAt === null && (
           <div className="flex flex-wrap items-center gap-3">
             <SignButton
               typedData={set.typedData}
@@ -130,8 +150,40 @@ function ThresholdLine({
   set,
   state,
   incomplete,
-}: { set: Serialized<SignatureSet>; state: Serialized<SetState>; incomplete: boolean }) {
+  staleAt,
+}: {
+  set: Serialized<SignatureSet>;
+  state: Serialized<SetState>;
+  incomplete: boolean;
+  staleAt: string | null;
+}) {
   const check = set.thresholdCheck;
+  if (staleAt !== null && check.status !== "below") {
+    // An older block's verdict: stated as of that block, in no passing (or failing) colour.
+    return (
+      <p
+        className="flex items-start gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 text-sm"
+        data-testid="threshold-stale"
+      >
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+        <span>
+          At block #{formatNumber(staleAt)}{" "}
+          {check.status === "met" ? (
+            <>
+              the threshold was met: accepted by{" "}
+              <span className="mono break-all">{check.checkedWith}</span>
+            </>
+          ) : (
+            <>
+              the contract rejected the combined signatures:{" "}
+              <span className="mono">{check.error}</span>
+            </>
+          )}
+          . Not yet confirmed at the current head.
+        </span>
+      </p>
+    );
+  }
   if (check.status === "met") {
     return (
       <p
@@ -191,12 +243,13 @@ function ThresholdLine({
       data-testid="threshold-below"
     >
       {check.threshold - check.valid} more valid signature
-      {check.threshold - check.valid === 1 ? "" : "s"} needed.
+      {check.threshold - check.valid === 1 ? "" : "s"} needed
+      {staleAt !== null && ` as of block #${formatNumber(staleAt)}`}.
     </p>
   );
 }
 
-function MemberList({ set }: { set: Serialized<SignatureSet> }) {
+function MemberList({ set, staleAt }: { set: Serialized<SignatureSet>; staleAt: string | null }) {
   const { address } = useConnectedGroups();
   const [open, setOpen] = useState<string | null>(null);
   return (
@@ -209,8 +262,8 @@ function MemberList({ set }: { set: Serialized<SignatureSet> }) {
             key={m.member}
             className={cn(
               "border-slate-200 border-b last:border-b-0",
-              m.status === "valid" && "bg-green-50/40",
-              m.status === "invalid" && "bg-red-50/40"
+              staleAt === null && m.status === "valid" && "bg-green-50/40",
+              staleAt === null && m.status === "invalid" && "bg-red-50/40"
             )}
             data-testid="member-row"
             data-status={m.status}
@@ -244,6 +297,7 @@ function MemberList({ set }: { set: Serialized<SignatureSet> }) {
                     source={m.source}
                     confirmations={m.confirmations}
                     safeThreshold={m.safe.threshold}
+                    staleAt={staleAt}
                   />
                 </span>
               </span>

@@ -1,4 +1,9 @@
-import { type EmergencySummary, loadEmergencyList } from "@/.server/flows/emergency";
+import { freshAfter } from "@/.server/flows/common";
+import {
+  type EmergencySummary,
+  type PendingEmergencies,
+  loadEmergencyList,
+} from "@/.server/flows/emergency";
 import { EMERGENCY_RECENT_DAYS } from "@/common/emergency";
 import { useStatus } from "@/components/app-shell";
 import { HistoryToggle, PendingRegion, useNavigatingTo } from "@/components/history-toggle";
@@ -8,6 +13,8 @@ import { IndexedLoadingCard } from "@/components/sync-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { FreshnessNote, type Refresh } from "@/components/verification/freshness";
+import { UntilFresh } from "@/components/verification/until-fresh";
 import { formatDay, formatNumber } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
@@ -20,16 +27,19 @@ export const meta = Meta["/app/emergency"];
 
 export function loader({ request }: LoaderFunctionArgs) {
   const allHistory = new URL(request.url).searchParams.get("history") === "all";
-  const loading = loadEmergencyList({ allHistory });
+  // Pending ids come from members' Safe messages: the page lists them at once from the copies held
+  // (labelled with their age when older than 60 s) and the fresh list after it.
+  const loading = loadEmergencyList({ allHistory, freshness: "page" });
   return defer({
     allHistory,
     pending: loading.then((d) => d.pending),
+    freshPending: loading.then((d) => freshAfter(d.pending, d.freshPending, (p) => p.stale)),
     executed: loading.then((d) => d.executed),
   });
 }
 
 export default function EmergencyList() {
-  const { pending, executed, allHistory } = useLoaderData<typeof loader>();
+  const { pending, freshPending, executed, allHistory } = useLoaderData<typeof loader>();
   const { governance } = useStatus();
   const toggle = allHistory ? $path("/app/emergency") : `${$path("/app/emergency")}?history=all`;
   const switching = useNavigatingTo(toggle);
@@ -66,7 +76,13 @@ export default function EmergencyList() {
                 <EmptyState>Pending upgrades could not be checked. Refresh to retry.</EmptyState>
               }
             >
-              {(result) => <PendingList result={result} />}
+              {(first) => (
+                <UntilFresh stale={first.stale} fresh={freshPending}>
+                  {(fresh, refresh) => (
+                    <PendingList result={fresh ?? first} refresh={fresh ? null : refresh} />
+                  )}
+                </UntilFresh>
+              )}
             </Await>
           </Suspense>
         </section>
@@ -130,9 +146,11 @@ export default function EmergencyList() {
 
 function PendingList({
   result,
-}: { result: SerializeFrom<Awaited<Awaited<ReturnType<typeof loadEmergencyList>>["pending"]>> }) {
+  refresh,
+}: { result: SerializeFrom<PendingEmergencies>; refresh: Refresh }) {
   return (
     <div className="space-y-8">
+      <FreshnessNote set={result} refresh={refresh} what="The ids and counts below" />
       {(result.errors.length > 0 || result.anomalies > 0) && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-sm">
           The pending list may be incomplete. {result.errors.join("; ")}

@@ -22,6 +22,10 @@ const state = vi.hoisted(() => ({
   verified: 0,
   history: Promise.resolve() as Promise<void>,
   messages: Promise.resolve({ groups: [], errors: [], anomalies: 0 }) as Promise<Collected>,
+  // The listings held for a page's first answer (null: a Safe has none).
+  held: null as Collected | null,
+  // A page's first answer for each set: stale (from older copies) or the fresh result.
+  firstStale: false,
   discovery: vi.fn(),
   // What the historical isValidSignature reads answer instead of the magic value.
   historical: null as Error | null,
@@ -139,7 +143,10 @@ vi.mock("@/.server/flows/common", async (original) => ({
   ...(await original<typeof import("@/.server/flows/common")>()),
   hasArchiveState: () => state.archive(),
 }));
-vi.mock("@/.server/flows/messages", () => ({ collectMessages: async () => state.messages }));
+vi.mock("@/.server/flows/messages", () => ({
+  collectMessages: async () => state.messages,
+  collectHeldMessages: async () => state.held,
+}));
 vi.mock("@/.server/logs", () => ({
   findBlockByTimestamp: async () => {
     throw new Error("no timestamp search with the log index");
@@ -169,6 +176,31 @@ vi.mock("@/.server/signatures", async (original) => ({
       valid: [],
       thresholdCheck: { status: "below", threshold: params.threshold, valid: 0 },
       safeApiError: null,
+      verifiedAtBlock: HEAD.number.toString(),
+      stale: false,
+    };
+  },
+  // A stale first answer comes at once (the fresh one waits for `state.signatures`).
+  firstSignatureSet: async (
+    params: { action: string; typedData: ReturnType<typeof buildTypedData>; threshold: number },
+    fresh: Promise<unknown>
+  ) => {
+    if (!state.firstStale) return fresh;
+    const members = messagesFor(params.action, EMERGENCY_ID).map((message) => ({
+      member: message.safe,
+      source: "safe",
+      signature: message.preparedSignature,
+    }));
+    return {
+      ...params,
+      hashes: governanceHashes(params.typedData),
+      members,
+      valid: [],
+      thresholdCheck: { status: "below", threshold: params.threshold, valid: 0 },
+      safeApiError: null,
+      verifiedAtBlock: (HEAD.number - 50n).toString(),
+      safeFetchedAt: "2026-10-06T07:50:00.000Z",
+      stale: true,
     };
   },
 }));
@@ -189,6 +221,8 @@ beforeEach(() => {
   state.times.mockClear();
   state.history = Promise.resolve();
   state.messages = Promise.resolve({ groups: [], errors: [], anomalies: 0 });
+  state.held = null;
+  state.firstStale = false;
   state.signatures = new Promise((resolve) => {
     release = resolve;
   });
@@ -372,5 +406,92 @@ it("shows a failed archive-state probe as checks not done, with the RPC error, a
     historical: null,
     historicalUnavailable: "RPC has no archive state for the execution block",
   });
+  release();
+});
+
+it("pages show the signatures' stale first answer at once and the strict roles after; JSON waits", async () => {
+  state.firstStale = true;
+  const loading = await loadEmergencyUpgrade(EMERGENCY_ID, { freshness: "page" });
+  let complete = false;
+  const full = loading.detail.then((d) => {
+    complete = true;
+    return d;
+  });
+  const first = await loading.first;
+  expect(complete).toBe(false);
+  expect(first.roles.map((r) => [r.key, r.set.stale, r.set.verifiedAtBlock])).toEqual(
+    ["securityCouncil", "guardians", "zkFoundation"].map((key) => [
+      key,
+      true,
+      (HEAD.number - 50n).toString(),
+    ])
+  );
+  // Compared with the copies it came from, like the fresh roles.
+  expect(first.roles.every((r) => r.used?.every((u) => u.matchesSafe === true))).toBe(true);
+  expect(first.executed?.idMatches).toBe(true);
+  release();
+  const detail = await full;
+  expect(detail.roles.every((r) => r.set.stale === false)).toBe(true);
+  // JSON is the strict result only.
+  state.firstStale = true;
+  const json = await getEmergencyUpgrade(EMERGENCY_ID);
+  expect(json.roles.every((r) => r.set.stale === false)).toBe(true);
+});
+
+it("a page's first answer that already is the strict result is the same detail", async () => {
+  const loading = await loadEmergencyUpgrade(EMERGENCY_ID, { freshness: "page" });
+  release();
+  expect(await loading.first).toBe(await loading.detail);
+});
+
+it("pages list pending ids from Safe copies held at once, labelled, and the fresh list after", async () => {
+  const { buildTypedData } = await import("@/common/typed-data");
+  const groups = (ids: `0x${string}`[]) =>
+    ids.map((id) => ({
+      digest: id,
+      typedData: buildTypedData("ExecuteEmergencyUpgradeSecurityCouncil", boardDomain, { id }),
+      reportedSigners: [MAINNET.securityCouncil],
+      firstSeen: "2026-10-01",
+      lastSeen: "2026-10-01",
+    }));
+  const OTHER = `0x${"0f".repeat(32)}` as const;
+  state.held = {
+    groups: groups([UPGRADE_ID]),
+    errors: [],
+    anomalies: 0,
+    safeFetchedAt: "2026-10-06T07:50:00.000Z",
+    stale: true,
+  };
+  let resolveFresh!: (collected: Collected) => void;
+  state.messages = new Promise((resolve) => {
+    resolveFresh = resolve;
+  });
+  const loading = await loadEmergencyList({ freshness: "page" });
+  const first = await loading.pending;
+  expect(first).toMatchObject({ stale: true, safeFetchedAt: "2026-10-06T07:50:00.000Z" });
+  expect(first.pending.map((p) => p.id)).toEqual([UPGRADE_ID]);
+  resolveFresh({
+    groups: groups([UPGRADE_ID, OTHER]),
+    errors: [],
+    anomalies: 0,
+    safeFetchedAt: "2026-10-06T08:00:00.000Z",
+    stale: false,
+  });
+  const fresh = await loading.freshPending;
+  expect(fresh).toMatchObject({ stale: false, safeFetchedAt: "2026-10-06T08:00:00.000Z" });
+  expect(fresh.pending.map((p) => p.id).sort()).toEqual([UPGRADE_ID, OTHER].sort());
+
+  // Copies at most 60 s old, or a Safe without one: the first answer is the fresh list.
+  for (const held of [{ ...state.held, stale: false }, null]) {
+    state.held = held;
+    state.messages = Promise.resolve({ groups: groups([OTHER]), errors: [], anomalies: 0 });
+    const again = await loadEmergencyList({ freshness: "page" });
+    expect(await again.pending).toBe(await again.freshPending);
+  }
+  // The strict list never reads the copies held.
+  state.held = { groups: groups([UPGRADE_ID]), errors: [], anomalies: 0, stale: true };
+  const strict = await loadEmergencyList();
+  expect(strict.pending).toBe(strict.freshPending);
+  expect((await strict.pending).pending.map((p) => p.id)).toEqual([OTHER]);
   release();
 });

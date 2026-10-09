@@ -21,15 +21,17 @@ import { type PuhEvent, puhIndex } from "../chain/puh-index";
 import { type Governance, governance } from "../governance";
 import { findBlockByTimestamp, getLogs } from "../logs";
 import { type Network, blockTimestamps, l1, latestBlock, network } from "../rpc";
-import { type SignatureSet, verifySignatureSet } from "../signatures";
+import type { Freshness, SignatureSet } from "../signatures";
 import {
   type UsedSignature,
   callTo,
   compareUsedSignatures,
+  firstOrFresh,
   hasArchiveState,
+  streamSignatureSet,
   topicOf,
 } from "./common";
-import { collectMessages } from "./messages";
+import { type Collected, collectHeldMessages, collectMessages } from "./messages";
 import { findEmergencyEvent } from "./emergency-event";
 import { currentUpgradeStatus } from "../upgrade-status";
 
@@ -129,45 +131,93 @@ const summary = (id: Hex): EmergencySummary => ({
   firstSeen: null,
 });
 
-/** Pending Safe messages and executed events do not wait for one another. */
-export async function loadEmergencyList({ allHistory = false } = {}) {
+export type PendingEmergencies = {
+  pending: EmergencySummary[];
+  errors: string[];
+  anomalies: number;
+  /** When the oldest Safe listing the ids came from was read (ISO time), or null. */
+  safeFetchedAt: string | null;
+  /**
+   * A page's first answer from Safe listings older than 60 s (see loadEmergencyList); the fresh
+   * list follows. Always false for the fresh list.
+   */
+  stale: boolean;
+};
+
+/** The ids members signed in their Safes that the handler has not executed (at the head). */
+async function pendingFrom(collected: Collected): Promise<PendingEmergencies> {
+  const byId = new Map<string, EmergencySummary>();
+  for (const group of collected.groups) {
+    const id = group.typedData.message.id as Hex;
+    const key = id.toLowerCase();
+    const entry = byId.get(key) ?? summary(id);
+    byId.set(key, entry);
+    const n = group.reportedSigners.length;
+    if (group.typedData.primaryType === "ExecuteEmergencyUpgradeSecurityCouncil")
+      entry.reported.securityCouncil = n;
+    if (group.typedData.primaryType === "ExecuteEmergencyUpgradeGuardians")
+      entry.reported.guardians = n;
+    if (group.typedData.primaryType === "ExecuteEmergencyUpgradeZKFoundation")
+      entry.reported.zkFoundation = n > 0;
+    if (!entry.firstSeen || group.firstSeen < entry.firstSeen) entry.firstSeen = group.firstSeen;
+  }
+  // Concurrent current-state calls are batched by the RPC client. No archive or log scan needed.
+  const entries = await Promise.all(
+    [...byId.values()].map(async (entry) => {
+      const { status } = await currentUpgradeStatus(entry.id);
+      return status.executed ? null : entry;
+    })
+  );
+  return {
+    pending: entries
+      .filter((entry): entry is EmergencySummary => entry !== null)
+      .sort((a, b) => ((a.firstSeen ?? "") < (b.firstSeen ?? "") ? 1 : -1)),
+    errors: collected.errors,
+    anomalies: collected.anomalies,
+    safeFetchedAt: collected.safeFetchedAt ?? null,
+    stale: collected.stale === true,
+  };
+}
+
+/**
+ * A page's first pending list: from the Safe listings held, whatever their age, when one is older
+ * than 60 s (labelled `stale`); otherwise, or when a Safe has no listing held, or the fresh list is
+ * in first, the fresh list itself.
+ */
+async function firstPending(
+  held: Promise<Collected | null>,
+  fresh: Promise<PendingEmergencies>
+): Promise<PendingEmergencies> {
+  let freshIn = false;
+  fresh.then(
+    () => {
+      freshIn = true;
+    },
+    () => {}
+  );
+  const collected = await held.catch(() => null);
+  if (!collected?.stale || freshIn) return fresh;
+  const early = await pendingFrom(collected).catch(() => null);
+  return early === null || freshIn ? fresh : early;
+}
+
+/**
+ * Pending Safe messages and executed events do not wait for one another. With `freshness:
+ * "page"`, `pending` is the page's first answer (see firstPending) and `freshPending` the list from
+ * listings at most 60 s old; otherwise both are the latter.
+ */
+export async function loadEmergencyList({
+  allHistory = false,
+  freshness = "strict",
+}: { allHistory?: boolean; freshness?: Freshness } = {}) {
   const gov = await governance();
   const board = gov.emergencyUpgradeBoard;
-  const pending = collectMessages(
-    [...gov.securityCouncil.members, ...gov.guardians.members, board.zkFoundation],
-    EMERGENCY_ACTIONS,
-    board.domain
-  ).then(async (collected) => {
-    const byId = new Map<string, EmergencySummary>();
-    for (const group of collected.groups) {
-      const id = group.typedData.message.id as Hex;
-      const key = id.toLowerCase();
-      const entry = byId.get(key) ?? summary(id);
-      byId.set(key, entry);
-      const n = group.reportedSigners.length;
-      if (group.typedData.primaryType === "ExecuteEmergencyUpgradeSecurityCouncil")
-        entry.reported.securityCouncil = n;
-      if (group.typedData.primaryType === "ExecuteEmergencyUpgradeGuardians")
-        entry.reported.guardians = n;
-      if (group.typedData.primaryType === "ExecuteEmergencyUpgradeZKFoundation")
-        entry.reported.zkFoundation = n > 0;
-      if (!entry.firstSeen || group.firstSeen < entry.firstSeen) entry.firstSeen = group.firstSeen;
-    }
-    // Concurrent current-state calls are batched by the RPC client. No archive or log scan needed.
-    const entries = await Promise.all(
-      [...byId.values()].map(async (entry) => {
-        const { status } = await currentUpgradeStatus(entry.id);
-        return status.executed ? null : entry;
-      })
-    );
-    return {
-      pending: entries
-        .filter((entry): entry is EmergencySummary => entry !== null)
-        .sort((a, b) => ((a.firstSeen ?? "") < (b.firstSeen ?? "") ? 1 : -1)),
-      errors: collected.errors,
-      anomalies: collected.anomalies,
-    };
-  });
+  const safes = [...gov.securityCouncil.members, ...gov.guardians.members, board.zkFoundation];
+  const freshPending = collectMessages(safes, EMERGENCY_ACTIONS, board.domain).then(pendingFrom);
+  const pending =
+    freshness === "page"
+      ? firstPending(collectHeldMessages(safes, EMERGENCY_ACTIONS, board.domain), freshPending)
+      : freshPending;
   const executed = executedEmergencies({ allHistory }).then((events) =>
     events
       .map((event) => ({
@@ -176,8 +226,8 @@ export async function loadEmergencyList({ allHistory = false } = {}) {
       }))
       .reverse()
   );
-  for (const promise of [pending, executed]) void promise.catch(() => {});
-  return { pending, executed };
+  for (const promise of [pending, freshPending, executed]) void promise.catch(() => {});
+  return { pending, freshPending, executed };
 }
 
 export async function listRecentEmergencyUpgrades() {
@@ -274,10 +324,18 @@ export type EmergencyDetail = {
 
 export type EmergencyOverview = Pick<EmergencyDetail, "id" | "state" | "governance">;
 
-/** Start execution discovery and current Safe verification independently. */
+/**
+ * Start execution discovery and current Safe verification independently. With `freshness:
+ * "page"`, `first` is the page's first answer (roles from first answers, see firstSignatureSet:
+ * the strict result, or labelled stale sets) and `detail` the strict result; otherwise (JSON) both
+ * are the strict result.
+ */
 export async function loadEmergencyUpgrade(
   id: Hex,
-  { supplied = [] }: { supplied?: MemberSignature[] } = {}
+  {
+    supplied = [],
+    freshness = "strict",
+  }: { supplied?: MemberSignature[]; freshness?: Freshness } = {}
 ) {
   const gov = await governance();
   const board = gov.emergencyUpgradeBoard;
@@ -310,9 +368,9 @@ export async function loadEmergencyUpgrade(
     },
   ] as const;
 
-  const sets = Promise.all(
-    specs.map((spec) =>
-      verifySignatureSet({
+  const streamed = specs.map((spec) =>
+    streamSignatureSet(
+      {
         action: spec.action,
         signerGroup: spec.key,
         typedData: buildTypedData(spec.action, board.domain, { id }),
@@ -322,9 +380,11 @@ export async function loadEmergencyUpgrade(
         supplied,
         // Signable until the upgrade is executed.
         open: state !== UPGRADE_STATES.Done,
-      })
+      },
+      freshness
     )
   );
+  const sets = Promise.all(streamed.map((s) => s.fresh));
 
   const executed = (async (): Promise<EmergencyExecution | null> => {
     if (state !== UPGRADE_STATES.Done) return null;
@@ -402,7 +462,10 @@ export async function loadEmergencyUpgrade(
   })();
 
   const overview: EmergencyOverview = { id, state, governance: gov };
-  const detail = Promise.all([sets, executed]).then(async ([sets, execution]) => {
+  const withRoles = async (
+    sets: SignatureSet[],
+    execution: EmergencyExecution | null
+  ): Promise<EmergencyDetail> => {
     const decoded = execution ? await decodeExecution(execution.txHash, board.address) : null;
     const used = decoded
       ? [
@@ -421,10 +484,17 @@ export async function loadEmergencyUpgrade(
       used: used[i] ? compareUsedSignatures(used[i] as Blob, sets[i] as SignatureSet) : null,
     }));
     return { ...overview, roles, executed: execution } satisfies EmergencyDetail;
-  });
+  };
+  const detail = Promise.all([sets, executed]).then(([sets, execution]) =>
+    withRoles(sets, execution)
+  );
+  // The page's first answer: stale roles are compared with the Safe copies they came from.
+  const first = firstOrFresh(streamed, detail, async (immediate) =>
+    withRoles(immediate, await executed)
+  );
   // Deferred loaders attach their own error handlers after this function returns.
-  for (const pending of [sets, executed, detail]) void pending.catch(() => {});
-  return { overview, executed, detail };
+  for (const pending of [sets, executed, detail, first]) void pending.catch(() => {});
+  return { overview, executed, detail, first };
 }
 
 /** JSON retains the complete verification result, including comparisons with Safe's copies. */

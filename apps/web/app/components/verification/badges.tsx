@@ -2,6 +2,7 @@ import type { SetState } from "@/.server/flows/common";
 import type { MemberStatus, SignatureSource } from "@/.server/signatures";
 import { UPGRADE_STATE_LABELS, type UpgradeState } from "@/common/upgrade-states";
 import { Badge } from "@/components/ui/badge";
+import { formatNumber } from "@/utils/format";
 import { CheckCircle2, CircleDashed, CircleSlash, Clock, XCircle } from "lucide-react";
 
 export function UpgradeStateBadge({ state }: { state: UpgradeState }) {
@@ -55,12 +56,36 @@ export function MemberStatusBadge({
   source,
   confirmations,
   safeThreshold,
+  staleAt = null,
 }: {
   status: MemberStatus;
   source: SignatureSource | null;
   confirmations: number | null;
   safeThreshold: number | null;
+  /**
+   * The block a page's stale first answer was verified at: a verdict is then said as of that
+   * block, in a neutral colour (never a current pass or rejection).
+   */
+  staleAt?: string | null;
 }) {
+  if (staleAt !== null && (status === "valid" || status === "invalid")) {
+    const block = formatNumber(staleAt);
+    return status === "valid" ? (
+      <Badge
+        variant="neutral"
+        title={`Accepted by the governance contract at block ${block}; not yet checked at the current head`}
+      >
+        <CheckCircle2 /> Valid at #{block}
+      </Badge>
+    ) : (
+      <Badge
+        variant="neutral"
+        title={`Rejected by the governance contract at block ${block}; not yet checked at the current head`}
+      >
+        <XCircle /> Rejected at #{block}
+      </Badge>
+    );
+  }
   switch (status) {
     case "valid":
       return (

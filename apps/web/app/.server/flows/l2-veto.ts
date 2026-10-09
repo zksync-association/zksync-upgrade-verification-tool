@@ -4,8 +4,14 @@ import { type Address, getAddress, isAddressEqual } from "viem";
 import { scrubText, secretsOf } from "../chain/jsonrpc";
 import { type Governance, governance } from "../governance";
 import { l2, network } from "../rpc";
-import { type SignatureSet, verifySignatureSet } from "../signatures";
-import { type ExecutionView, type SetState, executionFor } from "./common";
+import type { Freshness, SignatureSet } from "../signatures";
+import {
+  type ExecutionView,
+  type SetState,
+  executionFor,
+  firstOrFresh,
+  streamSignatureSet,
+} from "./common";
 import { type L2ProposalView, activeL2Proposals, getL2Proposal, knownGovernors } from "./l2";
 import { collectMessages } from "./messages";
 
@@ -133,52 +139,88 @@ async function l2ErrorText(error: unknown): Promise<string> {
   return scrubText(raw.replace(/\s*\n\s*/g, " ").trim(), url ? secretsOf(url) : []);
 }
 
-export async function getL2Veto(
+/** The strict result (JSON). */
+export function getL2Veto(
   params: VetoParams,
   { supplied = [] }: { supplied?: MemberSignature[] } = {}
 ): Promise<VetoDetail> {
-  const gov = await governance();
-  const [{ l2Proposal, l2Error }, governors] = await Promise.all([
-    readL2Proposal(params),
-    knownGovernors(),
-  ]);
-  const state = vetoState(gov, params, l2Proposal);
-  const set = await verifySignatureSet({
-    action: "CancelL2GovernorProposal",
-    signerGroup: "guardians",
-    typedData: buildTypedData("CancelL2GovernorProposal", gov.guardians.domain, { ...params }),
-    members: gov.guardians.members,
-    threshold: gov.guardians.thresholds.cancelL2Proposal,
-    check: { kind: "multisig", contract: gov.guardians.address },
-    supplied,
-    open: state.status === "open",
+  return loadL2Veto(params, { supplied }).fresh;
+}
+
+/**
+ * The veto's signatures: `fresh` is the strict result; with `freshness: "page"`, `first` is the
+ * page's first answer (a labelled stale set without an execution, or the strict result, see
+ * firstSignatureSet). Otherwise `first` is `fresh`.
+ */
+export function loadL2Veto(
+  params: VetoParams,
+  {
+    supplied = [],
+    freshness = "strict",
+  }: { supplied?: MemberSignature[]; freshness?: Freshness } = {}
+): { first: Promise<VetoDetail>; fresh: Promise<VetoDetail> } {
+  const started = (async () => {
+    const gov = await governance();
+    const [{ l2Proposal, l2Error }, governors] = await Promise.all([
+      readL2Proposal(params),
+      knownGovernors(),
+    ]);
+    const state = vetoState(gov, params, l2Proposal);
+    const streamed = streamSignatureSet(
+      {
+        action: "CancelL2GovernorProposal",
+        signerGroup: "guardians",
+        typedData: buildTypedData("CancelL2GovernorProposal", gov.guardians.domain, {
+          ...params,
+        }),
+        members: gov.guardians.members,
+        threshold: gov.guardians.thresholds.cancelL2Proposal,
+        check: { kind: "multisig", contract: gov.guardians.address },
+        supplied,
+        open: state.status === "open",
+      },
+      freshness
+    );
+    const base = {
+      params,
+      state,
+      l2Proposal,
+      l2Error,
+      governorKnown: governors.some(
+        (g) => g.kind !== "protocol" && isAddressEqual(g.address, params.l2GovernorAddress)
+      ),
+      governance: gov,
+    };
+    return { gov, base, streamed };
+  })();
+  const fresh = started.then(async ({ gov, base, streamed }): Promise<VetoDetail> => {
+    const set = await streamed.fresh;
+    const { l2Proposal, state } = base;
+    const execution = await executionFor(set, state, (valid) =>
+      l2Proposal?.idMatchesLocal
+        ? cancelL2Execution(
+            gov.guardians.address,
+            l2Proposal,
+            {
+              to: params.l2GovernorAddress,
+              l2GasLimit: params.l2GasLimit,
+              l2GasPerPubdataByteLimit: params.l2GasPerPubdataByteLimit,
+              refundRecipient: params.refundRecipient,
+              txMintValue: params.txMintValue,
+            },
+            valid
+          )
+        : null
+    );
+    return { ...base, set, execution };
   });
-  const execution = await executionFor(set, state, (valid) =>
-    l2Proposal?.idMatchesLocal
-      ? cancelL2Execution(
-          gov.guardians.address,
-          l2Proposal,
-          {
-            to: params.l2GovernorAddress,
-            l2GasLimit: params.l2GasLimit,
-            l2GasPerPubdataByteLimit: params.l2GasPerPubdataByteLimit,
-            refundRecipient: params.refundRecipient,
-            txMintValue: params.txMintValue,
-          },
-          valid
-        )
-      : null
+  const first = started.then(({ base, streamed }) =>
+    firstOrFresh([streamed], fresh, ([set]) => ({
+      ...base,
+      set: set as SignatureSet,
+      execution: null,
+    }))
   );
-  return {
-    params,
-    set,
-    state,
-    execution,
-    l2Proposal,
-    l2Error,
-    governorKnown: governors.some(
-      (g) => g.kind !== "protocol" && isAddressEqual(g.address, params.l2GovernorAddress)
-    ),
-    governance: gov,
-  };
+  for (const pending of [first, fresh]) void pending.catch(() => {});
+  return { first, fresh };
 }

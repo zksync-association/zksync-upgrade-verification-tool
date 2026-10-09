@@ -1,4 +1,5 @@
-import { type FreezeDetail, getFreezeRequest } from "@/.server/flows/freeze";
+import { freshAfter } from "@/.server/flows/common";
+import { type FreezeDetail, loadFreezeRequest } from "@/.server/flows/freeze";
 import { parseFreezeParams } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
 import { FREEZE_LABELS } from "@/common/freeze";
@@ -7,6 +8,7 @@ import { useStatus } from "@/components/app-shell";
 import { Facts, LoadingCard, PageHeader } from "@/components/page";
 import { SetStateBadge } from "@/components/verification/badges";
 import { SignatureSetCard } from "@/components/verification/signature-set";
+import { UntilFresh } from "@/components/verification/until-fresh";
 import { formatTime, relativeTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
@@ -18,9 +20,16 @@ export const meta = Meta["/app/freeze/:action"];
 
 export function loader({ params, request }: LoaderFunctionArgs) {
   const freeze = parseFreezeParams(params.action, new URL(request.url));
+  // The signatures' first answer at once (possibly from an older block or older Safe copies,
+  // labelled), and the strict result after it in the same response.
+  const loading = loadFreezeRequest(freeze, {
+    supplied: suppliedSignatures(request),
+    freshness: "page",
+  });
   return defer({
     freeze,
-    detail: getFreezeRequest(freeze, { supplied: suppliedSignatures(request) }),
+    detail: loading.first,
+    fresh: freshAfter(loading.first, loading.fresh, (d) => d.set.stale === true),
   });
 }
 
@@ -46,6 +55,7 @@ export default function FreezePage() {
 
 function Detail({ detail: d }: { detail: SerializeFrom<FreezeDetail> }) {
   const { governance } = useStatus();
+  const { fresh } = useLoaderData<typeof loader>();
   const sc = governance.securityCouncil;
   const p = d.params;
   const currentNonce = {
@@ -86,14 +96,22 @@ function Detail({ detail: d }: { detail: SerializeFrom<FreezeDetail> }) {
           },
         ]}
       />
-      <SignatureSetCard
-        testId="set-freeze"
-        title="Security Council signatures"
-        set={d.set}
-        state={d.state}
-        execution={d.execution}
-        executionToLabel="SecurityCouncil"
-      />
+      <UntilFresh stale={d.set.stale === true} fresh={fresh}>
+        {(current, refresh) => {
+          const v = current ?? d;
+          return (
+            <SignatureSetCard
+              testId="set-freeze"
+              title="Security Council signatures"
+              set={v.set}
+              state={v.state}
+              execution={v.execution}
+              executionToLabel="SecurityCouncil"
+              refresh={current ? null : refresh}
+            />
+          );
+        }}
+      </UntilFresh>
     </div>
   );
 }

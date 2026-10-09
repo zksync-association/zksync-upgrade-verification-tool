@@ -1,3 +1,4 @@
+import { freshAfter } from "@/.server/flows/common";
 import { type StandardUpgradeCore, loadStandardUpgrade } from "@/.server/flows/standard";
 import { parseId } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
@@ -10,12 +11,13 @@ import { ExecutionPanel } from "@/components/verification/execution-panel";
 import { SignatureSetCard } from "@/components/verification/signature-set";
 import { UpgradeStateBadge } from "@/components/verification/badges";
 import { Timeline } from "@/components/verification/timeline";
+import { UntilFresh } from "@/components/verification/until-fresh";
 import { UpgradeFile } from "@/components/verification/upgrade-file";
 import { formatTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
 import { Await, Link, useAsyncError, useLoaderData } from "@remix-run/react";
-import { Fragment, Suspense } from "react";
+import { Suspense } from "react";
 import { $path } from "remix-routes";
 import { zeroAddress } from "viem";
 
@@ -23,12 +25,20 @@ export const meta = Meta["/app/proposals/:id"];
 
 export function loader({ params, request }: LoaderFunctionArgs) {
   const id = parseId(params.id);
-  const loading = loadStandardUpgrade(id, { supplied: suppliedSignatures(request) });
+  // The page shows each set's first answer at once (possibly from an older block or older Safe
+  // copies, labelled) and the strict result after it in the same response.
+  const loading = loadStandardUpgrade(id, {
+    supplied: suppliedSignatures(request),
+    freshness: "page",
+  });
   return defer({
     id,
     detail: loading.then((d) => d.overview),
     evidence: loading.then((d) => d.evidence),
     sets: loading.then((d) => d.sets),
+    freshSets: loading.then((d) =>
+      freshAfter(d.sets, d.freshSets, (sets) => sets.some((s) => s.set.stale === true))
+    ),
     setEvidence: loading.then((d) => d.setEvidence),
     execution: loading.then((d) => d.execution),
     l2Proposal: loading.then((d) => d.l2Proposal),
@@ -92,7 +102,8 @@ function DetailError({ id }: { id: string }) {
 }
 
 function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeCore> }) {
-  const { sets, evidence, setEvidence, execution, l2Proposal } = useLoaderData<typeof loader>();
+  const { sets, freshSets, evidence, setEvidence, execution, l2Proposal } =
+    useLoaderData<typeof loader>();
   const { governance } = useStatus();
   const labels = {
     [governance.upgradeHandler.toLowerCase()]: "ProtocolUpgradeHandler",
@@ -349,32 +360,42 @@ function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeCore> }) {
           >
             {(verified) => (
               <div className="space-y-6">
-                {verified.map((s) => {
-                  // A completed set shows its recorded transaction, the signatures it used and
-                  // their re-check once those are in; the current signatures do not wait.
-                  const card = (recorded: Pick<typeof s, "state" | "used" | "historical"> = s) => (
-                    <SignatureSetCard
-                      testId={`set-${s.key}`}
-                      title={s.title}
-                      set={s.set}
-                      state={recorded.state}
-                      execution={s.execution}
-                      executionToLabel={
-                        s.key === "securityCouncil" ? "SecurityCouncil" : "Guardians"
-                      }
-                      used={recorded.used}
-                      historical={recorded.historical}
-                    />
-                  );
-                  if (s.state.status !== "done") return <Fragment key={s.key}>{card()}</Fragment>;
-                  return (
-                    <Suspense key={s.key} fallback={card()}>
-                      <Await resolve={setEvidence} errorElement={card()}>
-                        {(merged) => card(merged.find((e) => e.key === s.key) ?? s)}
-                      </Await>
-                    </Suspense>
-                  );
-                })}
+                {verified.map((first) => (
+                  // A stale first answer shows until the strict result streams in.
+                  <UntilFresh key={first.key} stale={first.set.stale === true} fresh={freshSets}>
+                    {(fresh, refresh) => {
+                      const s = fresh?.find((f) => f.key === first.key) ?? first;
+                      // A completed set shows its recorded transaction, the signatures it used
+                      // and their re-check once those are in; the current signatures do not wait.
+                      const card = (
+                        recorded: Pick<typeof s, "state" | "used" | "historical"> = s
+                      ) => (
+                        <SignatureSetCard
+                          testId={`set-${s.key}`}
+                          title={s.title}
+                          set={s.set}
+                          state={recorded.state}
+                          execution={s.execution}
+                          executionToLabel={
+                            s.key === "securityCouncil" ? "SecurityCouncil" : "Guardians"
+                          }
+                          used={recorded.used}
+                          historical={recorded.historical}
+                          refresh={s === first ? refresh : null}
+                        />
+                      );
+                      // The recorded evidence is compared with the strict result's Safe copies.
+                      if (s.state.status !== "done" || s.set.stale) return card();
+                      return (
+                        <Suspense fallback={card()}>
+                          <Await resolve={setEvidence} errorElement={card()}>
+                            {(merged) => card(merged.find((e) => e.key === s.key) ?? s)}
+                          </Await>
+                        </Suspense>
+                      );
+                    }}
+                  </UntilFresh>
+                ))}
               </div>
             )}
           </Await>

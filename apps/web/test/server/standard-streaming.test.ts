@@ -18,6 +18,8 @@ const state = vi.hoisted(() => ({
   devNode: true,
   // What the archive-state probe answers (or throws).
   archive: (async () => true) as () => Promise<boolean>,
+  // A page's first answer for each set: stale (an older block's result) or the fresh result.
+  firstStale: false,
 }));
 
 // The upgrade's start, Security Council approval (block 201, APPROVAL_TX) and execution come
@@ -121,8 +123,29 @@ vi.mock("@/.server/signatures", async (original) => ({
       valid: [],
       thresholdCheck: { status: "below", threshold: params.threshold, valid: 0 },
       safeApiError: null,
+      verifiedAtBlock: "1000",
+      stale: false,
     };
   },
+  // A stale first answer comes at once (the fresh one waits for `state.signatures`); met at its
+  // older block, so a page could be tempted to offer an execution from it.
+  firstSignatureSet: async (
+    params: { typedData: ReturnType<typeof buildTypedData>; threshold: number },
+    fresh: Promise<unknown>
+  ) =>
+    state.firstStale
+      ? {
+          ...params,
+          hashes: governanceHashes(params.typedData),
+          members: [],
+          valid: [],
+          thresholdCheck: { status: "met", checkedWith: "checkSignatures" },
+          safeApiError: null,
+          verifiedAtBlock: "990",
+          reverifyingAt: "1000",
+          stale: true,
+        }
+      : fresh,
 }));
 
 const { getStandardUpgradeOverview, loadStandardUpgrade, getStandardUpgrade } = await import(
@@ -139,6 +162,7 @@ beforeEach(() => {
   state.recheck = null;
   state.devNode = true;
   state.archive = async () => true;
+  state.firstStale = false;
   state.signatures = new Promise<void>((resolve) => {
     release = resolve;
   });
@@ -352,4 +376,39 @@ it("shows a failed archive-state probe as not re-checked, with the RPC error, an
     error: "RPC has no archive state for this block",
   });
   release();
+});
+
+it("pages get each set's stale first answer at once, without an execution, and the strict sets after", async () => {
+  state.firstStale = true;
+  const loading = await loadStandardUpgrade(ID, { freshness: "page" });
+  let freshIn = false;
+  void loading.freshSets.then(() => {
+    freshIn = true;
+  });
+  const first = await loading.sets;
+  expect(first.map((s) => [s.key, s.set.stale, s.set.verifiedAtBlock, s.execution])).toEqual([
+    ["securityCouncil", true, "990", null],
+    ["guardians", true, "990", null],
+    ["legalVeto", true, "990", null],
+  ]);
+  expect(freshIn).toBe(false);
+  release();
+  const fresh = await loading.freshSets;
+  expect(fresh.map((s) => s.set.stale)).toEqual([false, false, false]);
+  // The recorded evidence is merged with the strict sets.
+  expect((await loading.setEvidence).map((e) => e.key)).toEqual([
+    "securityCouncil",
+    "guardians",
+    "legalVeto",
+  ]);
+  // JSON is the strict result only, whatever a page would show first.
+  const json = await getStandardUpgrade(ID);
+  expect(json.sets.map((s) => s.set.stale)).toEqual([false, false, false]);
+});
+
+it("a page's first answer that already is the strict result is the same set", async () => {
+  release();
+  const loading = await loadStandardUpgrade(ID, { freshness: "page" });
+  const [first, fresh] = await Promise.all([loading.sets, loading.freshSets]);
+  first.forEach((set, i) => expect(set).toBe(fresh[i]));
 });

@@ -16,7 +16,16 @@ import { UpstreamError, isFinalBlock } from "../chain/call";
 import { RpcError } from "../chain/jsonrpc";
 import { getLogs } from "../logs";
 import { l1, lanes } from "../rpc";
-import { type SignatureSet, type Simulation, simulate } from "../signatures";
+import {
+  type Freshness,
+  type SignatureSet,
+  type SignatureSetParams,
+  type Simulation,
+  type StreamedSet,
+  firstSignatureSet,
+  simulate,
+  verifySignatureSet,
+} from "../signatures";
 
 export type SetState =
   | { status: "open" }
@@ -24,6 +33,48 @@ export type SetState =
   | { status: "closed"; detail: string };
 
 export type ExecutionView = Execution & { simulation: Simulation };
+
+/**
+ * A signature set for a flow. "strict" (JSON): the strict result, once (`immediate` is `fresh`).
+ * "page": the strict result is started first, and the page's first answer beside it (see
+ * firstSignatureSet: a labelled stale set, or the strict result).
+ */
+export function streamSignatureSet(params: SignatureSetParams, freshness: Freshness): StreamedSet {
+  const fresh = verifySignatureSet(params);
+  if (freshness !== "page") return { immediate: fresh, fresh };
+  const immediate = firstSignatureSet(params, fresh);
+  // Callers attach their handlers to what they use; neither may go unhandled meanwhile.
+  void immediate.catch(() => {});
+  void fresh.catch(() => {});
+  return { immediate, fresh };
+}
+
+/**
+ * What a page shows first for something built from signature sets: the fresh value when every
+ * first answer already is the strict result, else `stale()` (built from the first answers, with
+ * nothing that would act on them, e.g. no execution).
+ */
+export async function firstOrFresh<T>(
+  streamed: readonly StreamedSet[],
+  fresh: Promise<T>,
+  stale: (sets: SignatureSet[]) => T | Promise<T>
+): Promise<T> {
+  if (streamed.every((s) => s.immediate === s.fresh)) return fresh;
+  const sets = await Promise.all(streamed.map((s) => s.immediate));
+  return sets.some((set) => set.stale) ? stale(sets) : fresh;
+}
+
+/**
+ * For a page loader: the fresh value to stream after a first answer that `isStale` says is stale;
+ * null (nothing to send twice) when the first answer already is the fresh one.
+ */
+export async function freshAfter<T>(
+  first: Promise<T>,
+  fresh: Promise<T>,
+  isStale: (first: T) => boolean
+): Promise<T | null> {
+  return isStale(await first) ? fresh : null;
+}
 
 /**
  * What the signature set adds up to on-chain right now: a ready transaction or why not. Its

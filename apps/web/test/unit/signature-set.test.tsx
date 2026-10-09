@@ -1,4 +1,5 @@
 import type { SignatureSet } from "@/.server/signatures";
+import { freshnessLabels } from "@/components/verification/freshness";
 import { SignatureSetCard } from "@/components/verification/signature-set";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -279,5 +280,168 @@ describe("SignatureSetCard", () => {
       />
     );
     expect(screen.getByTestId("done-summary")).toHaveTextContent("rejected (InvalidSignature)");
+  });
+});
+
+describe("freshness labels", () => {
+  const now = Date.parse("2026-10-06T08:00:00Z") / 1000;
+  const ago = (seconds: number) => new Date((now - seconds) * 1000).toISOString();
+
+  it("says the block a fresh set was verified at and how old its Safe copies are", () => {
+    expect(
+      freshnessLabels(
+        { verifiedAtBlock: "21000000", safeFetchedAt: ago(12), stale: false },
+        null,
+        now
+      )
+    ).toEqual({
+      verified: "Verified at block #21,000,000",
+      copies: "Safe copies from 12s ago",
+      failed: null,
+    });
+  });
+
+  it("says a stale set is being verified again at the head, and its copies refreshed", () => {
+    const stale = {
+      verifiedAtBlock: "21000000",
+      safeFetchedAt: ago(600),
+      stale: true,
+      reverifyingAt: "21000005",
+    };
+    expect(freshnessLabels(stale, "pending", now)).toEqual({
+      verified: "Verified at block #21,000,000 · re-verifying at #21,000,005",
+      copies: "Safe copies from 10m ago · refreshing",
+      failed: null,
+    });
+    // Old copies at the current head: re-verified there, no other block to name.
+    expect(freshnessLabels({ ...stale, reverifyingAt: "21000000" }, "pending", now).verified).toBe(
+      "Verified at block #21,000,000 · re-verifying"
+    );
+    expect(freshnessLabels({ ...stale, reverifyingAt: null }, "pending", now).verified).toBe(
+      "Verified at block #21,000,000 · re-verifying"
+    );
+    expect(freshnessLabels(stale, "failed", now)).toMatchObject({
+      verified: "Verified at block #21,000,000",
+      copies: "Safe copies from 10m ago",
+      failed: expect.stringContaining("did not complete"),
+    });
+  });
+
+  it("names the copies' time until this browser's clock is known (server render, hydration)", () => {
+    expect(freshnessLabels({ safeFetchedAt: "2026-10-06T07:50:00.000Z" }, null, null).copies).toBe(
+      "Safe copies from Oct 6, 2026, 07:50 UTC"
+    );
+  });
+
+  it("has nothing to say for what a set does not carry (a dev node's 'latest', no Safe read)", () => {
+    expect(freshnessLabels({ verifiedAtBlock: null, safeFetchedAt: null }, null, now)).toEqual({
+      verified: null,
+      copies: null,
+      failed: null,
+    });
+  });
+});
+
+describe("SignatureSetCard with a stale first answer", () => {
+  // Whole seconds ago by the browser clock the card reads (it counts whole seconds).
+  const secondsAgo = (n: number) =>
+    new Date((Math.floor(Date.now() / 1000) - n) * 1000).toISOString();
+  const staleMet = {
+    ...(set as SignatureSet),
+    valid: [
+      { signer: MEMBER_A, signature: "0xaa" },
+      { signer: MEMBER_B, signature: "0xbb" },
+    ],
+    members: [member(MEMBER_A, "valid"), member(MEMBER_B, "valid"), member(MEMBER_C, "invalid")],
+    thresholdCheck: { status: "met", checkedWith: "checkSignatures" },
+    verifiedAtBlock: "1000",
+    reverifyingAt: "1005",
+    safeFetchedAt: secondsAgo(600),
+    stale: true,
+  } as never;
+
+  it("names its block first and shows no verdict as a current pass, and nothing to sign", () => {
+    render(
+      <SignatureSetCard
+        title="Council"
+        set={staleMet}
+        state={{ status: "open" }}
+        refresh="pending"
+      />
+    );
+    expect(screen.getByTestId("set-stale")).toHaveTextContent(
+      "Verified at block #1,000 · re-verifying at #1,005"
+    );
+    expect(screen.getByTestId("set-stale")).toHaveTextContent(
+      "Safe copies from 10m ago · refreshing"
+    );
+    // Met at that block, not "Threshold met" now.
+    expect(screen.queryByTestId("threshold-met")).not.toBeInTheDocument();
+    expect(screen.getByTestId("threshold-stale")).toHaveTextContent(
+      "At block #1,000 the threshold was met"
+    );
+    expect(screen.getByText("verified at block #1,000 / required")).toBeInTheDocument();
+    const rows = screen.getAllByTestId("member-row");
+    expect(within(rows[0] as HTMLElement).getByText(/Valid at #1,000/)).toBeInTheDocument();
+    expect(within(rows[0] as HTMLElement).queryByText(/Verified/)).not.toBeInTheDocument();
+    expect(within(rows[2] as HTMLElement).getByText(/Rejected at #1,000/)).toBeInTheDocument();
+    for (const row of rows) expect(row.className).not.toMatch(/bg-(green|red)-50/);
+    expect(screen.getByTestId("set-stale").closest("[data-stale]")).toHaveAttribute(
+      "data-stale",
+      "true"
+    );
+    expect(screen.queryByTestId("sign-button")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Connect your Safe to sign/ })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("progressbar").innerHTML).not.toContain("bg-green-700");
+  });
+
+  it("says when checking again did not complete, and keeps the old block named", () => {
+    render(
+      <SignatureSetCard
+        title="Council"
+        set={staleMet}
+        state={{ status: "open" }}
+        refresh="failed"
+      />
+    );
+    expect(screen.getByTestId("set-stale")).toHaveTextContent("Verified at block #1,000");
+    expect(screen.getByTestId("set-stale")).not.toHaveTextContent("re-verifying");
+    expect(screen.getByTestId("set-stale")).toHaveTextContent("did not complete");
+  });
+
+  it("never says a fresh set beside a stale one is being checked again", () => {
+    const fresh = {
+      ...(staleMet as unknown as Record<string, unknown>),
+      stale: false,
+      reverifyingAt: undefined,
+      verifiedAtBlock: "1005",
+    } as never;
+    render(
+      <SignatureSetCard title="Council" set={fresh} state={{ status: "open" }} refresh="pending" />
+    );
+    expect(screen.getByTestId("set-freshness")).toHaveTextContent("Verified at block #1,005");
+    expect(screen.getByTestId("set-freshness")).not.toHaveTextContent(/re-verifying|refreshing/);
+  });
+
+  it("labels a fresh set quietly and shows its verdicts as current", () => {
+    const fresh = {
+      ...(staleMet as unknown as Record<string, unknown>),
+      stale: false,
+      reverifyingAt: undefined,
+      verifiedAtBlock: "1005",
+      safeFetchedAt: secondsAgo(5),
+    } as never;
+    render(<SignatureSetCard title="Council" set={fresh} state={{ status: "open" }} />);
+    expect(screen.getByTestId("set-freshness")).toHaveTextContent(
+      /^Verified at block #1,005 · Safe copies from [56]s ago$/
+    );
+    expect(screen.queryByTestId("set-stale")).not.toBeInTheDocument();
+    expect(screen.getByTestId("threshold-met")).toBeInTheDocument();
+    const rows = screen.getAllByTestId("member-row");
+    expect(within(rows[0] as HTMLElement).getByText(/Verified/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Connect your Safe to sign/ })).toBeInTheDocument();
+    expect(screen.getByRole("progressbar").innerHTML).toContain("bg-green-700");
   });
 });

@@ -24,7 +24,8 @@ import {
 // A listing is served while it is at most 60 s old, counted from when Safe's answer arrived. An
 // older one is read again for the request that needs it, ahead of any background read (and a
 // background read of that Safe already under way is promoted and shared). Callers waiting on the
-// same Safe share one read.
+// same Safe share one read. A page (never JSON) may show a held listing of any age first,
+// labelled with its age, while that read runs (heldSafeListing); the fresh answer then replaces it.
 //
 // While the sync engine runs, a background sweep checks member Safes' listings: it asks Safe for
 // the Safe's most recently modified message (one small request) and re-reads the listing only
@@ -181,6 +182,11 @@ export type SafeMessageLookup = {
    * and Safe was asked for the message by its hash.
    */
   version: number | null;
+  /**
+   * When the listing that answered arrived (ms since the epoch, see SafeSnapshot.fetchedAt); null
+   * when Safe was asked for the message by its hash (an answer read just now).
+   */
+  fetchedAt: number | null;
 };
 
 /** findSafeMessage, with the listing version the answer came from. */
@@ -193,7 +199,7 @@ export async function lookupSafeMessage(
   const answer = answerFrom(listing, messageHash);
   if (answer) return answer;
   if (options.background) throw new SweepPaused("lookup by hash");
-  return { message: await getSafeMessage(messageHash), version: null };
+  return { message: await getSafeMessage(messageHash), version: null, fetchedAt: null };
 }
 
 /**
@@ -207,12 +213,34 @@ export function peekSafeMessage(safe: Address, messageHash: Hex): SafeMessageLoo
   return listing ? answerFrom(listing, messageHash) : null;
 }
 
+/**
+ * The listing held for this Safe whatever its age (older than 60 s included), without asking Safe
+ * or marking the Safe as wanted by a page; null when none is held. Only for a page's first answer,
+ * labelled with the listing's fetchedAt while a fresh one is read (never for JSON, never for a
+ * verdict that is kept): Safe data is candidate input only, so an old copy can only show fewer
+ * signatures than there are, never make one count.
+ */
+export function heldSafeListing(safe: Address): SafeSnapshot | null {
+  sync();
+  return held.get(safe.toLowerCase())?.snapshot ?? null;
+}
+
+/**
+ * peekSafeMessage from the listing held whatever its age (see heldSafeListing): null when none is
+ * held or it cannot tell.
+ */
+export function peekHeldSafeMessage(safe: Address, messageHash: Hex): SafeMessageLookup | null {
+  const listing = heldSafeListing(safe);
+  return listing ? answerFrom(listing, messageHash) : null;
+}
+
 function answerFrom(listing: SafeSnapshot, messageHash: Hex): SafeMessageLookup | null {
   const hit = listing.messages.find(
     (m) => m.messageHash.toLowerCase() === messageHash.toLowerCase()
   );
-  if (hit) return { message: hit, version: listing.version };
-  return listing.complete ? { message: null, version: listing.version } : null;
+  const { version, fetchedAt } = listing;
+  if (hit) return { message: hit, version, fetchedAt };
+  return listing.complete ? { message: null, version, fetchedAt } : null;
 }
 
 /**
