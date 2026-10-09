@@ -85,7 +85,6 @@ function wrap(children: ReactNode) {
   );
 }
 
-/** What the page's first flush holds. */
 function firstFlush(Page: () => ReactNode, data: Record<string, unknown>) {
   page.data = data;
   return renderToString(wrap(<Page />)).replaceAll("<!-- -->", "");

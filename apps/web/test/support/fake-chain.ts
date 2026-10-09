@@ -1,7 +1,5 @@
-// A fake chain behind fakeJsonRpc, for log index tests: eth_getLogs over an in-memory log list
-// (with an optional Infura-like block range cap; one address or an OR-list of them), and
-// eth_getBlockByNumber / eth_getBlockByHash for the head, the 'finalized' tag and any block. Every
-// eth_getLogs query is recorded.
+// A fake chain behind fakeJsonRpc for log index tests: eth_getLogs over in-memory logs (with an
+// optional Infura-like range cap) and blocks by number, hash or tag. Every query is recorded.
 
 import { type UpgradeProposal, encodeUpgradeProposal, upgradeProposalId } from "@/common/proposal";
 import { type Address, type Hex, hexToBigInt, numberToHex, pad, toEventSelector } from "viem";

@@ -65,13 +65,11 @@ export const meta = Meta["/app/emergency/:id"];
 
 export function loader({ params, request }: LoaderFunctionArgs) {
   const id = parseId(params.id);
-  // After a pause (no head in memory), the upgrade and its execution as this app last showed
-  // them come first, as of their block, until the current ones replace them (sync/last-shown.ts).
+  // After a pause, the upgrade and its execution as last shown come first, as of their block.
   const shown = lastShown();
   const supplied = suppliedSignatures(request);
-  // The page shows the signatures' first answer at once (possibly from an older block or older
-  // Safe copies, labelled) and the strict result after it in the same response. Its sets' keys
-  // join the page load's grace as they are found.
+  // Each set's first answer at once (possibly an older block or older Safe copies, labelled), then
+  // the strict result in the same response; the sets' keys join the page load's grace.
   const page = pageLoad(request, [watchKeys.emergency(id)]);
   const loading = page.run(() => loadEmergencyUpgrade(id, { supplied, freshness: "page" }));
   const key = `emergency:${id.toLowerCase()}`;
@@ -103,7 +101,6 @@ export function loader({ params, request }: LoaderFunctionArgs) {
     );
   return defer({
     watch: page.watch,
-    // The upgrade's state and status, for its revision (its sets carry their own).
     revs: loaderRevs([[watchKeys.emergency(id), loading.then((d) => d.status).then(idContent)]]),
     id,
     lastShown: shown.held<LastShownEmergency>(key),
@@ -120,9 +117,6 @@ export function loader({ params, request }: LoaderFunctionArgs) {
           )
         : Promise.resolve(null),
     detail: loading.then((d) => d.overview),
-    // While this run's index reads the history, the execution may come first from the history
-    // the last run saved, or be located directly (labelled); executedCheck confirms it against the
-    // index.
     executed: loading.then((d) => d.executedFirst),
     executedCheck: loading.then((d) => d.executedCheck),
     // The board's re-checks at the block before the execution shown (archive reads): its calls
@@ -135,13 +129,11 @@ export function loader({ params, request }: LoaderFunctionArgs) {
   });
 }
 
-/** What the page keeps of an emergency upgrade, to show first after a pause (see the loader). */
 type LastShownEmergency = {
   overview: EmergencyOverview;
   execution: EmergencyExecutionFirst | null;
 };
 
-/** What the page keeps of its signatures (the current result of each role), likewise. */
 type LastShownRoles = { roles: EmergencyRole[]; executed: boolean };
 
 // Opt-in simulation of the execution transaction. Only calls to the Emergency Upgrade Board are
@@ -214,9 +206,8 @@ function Rethrow(): null {
 }
 
 /**
- * The upgrade and its execution as this app last showed them, read at an older block (after a
- * pause): under a notice, in no colour, with nothing that waits on the current reads (the
- * signatures) and nothing to act on, until the current upgrade replaces it.
+ * The upgrade and its execution as last shown, read at an older block (after a pause): under a
+ * notice, in no colour, with nothing that waits on the current reads and nothing to act on.
  */
 function HeldDetail({
   held,
@@ -301,7 +292,6 @@ function HeldDetail({
   );
 }
 
-/** The signatures' pending state, as of an older block with nothing kept for them. */
 function SignaturesPending() {
   return (
     <LoadingCard label="Checking Security Council, Guardian and Foundation signatures at the newest block…" />
@@ -405,7 +395,6 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
           }
         >
           {(first) => (
-            // A stale first answer shows until the strict result streams in.
             <UntilFresh stale={first.roles.some((r) => r.set.stale === true)} fresh={verifiedFresh}>
               {(fresh, refresh) => (
                 <SignatureSections
@@ -428,7 +417,6 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
   );
 }
 
-/** Where the execution's calls came from, while this run's log index has not confirmed it yet. */
 const EXECUTION_SOURCE: Record<Provenance, { pending: string; failed: string }> = {
   "last-run": {
     pending:
@@ -455,7 +443,6 @@ function ExecutedContent({
   id: string;
   /** For an execution from the last run's history or located directly: its confirmation. */
   check: Promise<unknown>;
-  /** The board's checks re-run at the block before this execution. */
   historical: Promise<SerializeFrom<EmergencyHistorical> | null>;
   /**
    * Offer the upgrade file (to copy or download); never from the view held after a pause (as of
@@ -520,11 +507,7 @@ function ExecutedContent({
   );
 }
 
-/**
- * The board's three checks re-run at the block before the execution (archive reads), streamed
- * after its calls. For an execution this run's index has not confirmed yet (`check` pending), they
- * are the checks of that unconfirmed transaction, and say so until it is confirmed.
- */
+/** For an execution this run's index has not confirmed yet, the checks say so until it is. */
 function BoardChecks({
   historical,
   block,

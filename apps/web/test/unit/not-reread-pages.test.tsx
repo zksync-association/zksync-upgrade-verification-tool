@@ -5,10 +5,8 @@ import type { ReactNode } from "react";
 import "@testing-library/jest-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// Pages whose own item (a transaction's receipt, an emergency upgrade's state) was not read again
-// at the head the app serves now: the beats name it at an older block (notedAt). The page says
-// "As of block #N · not re-read at #M", shows it in no passing colour, and offers nothing to
-// download from it, until it is read again (verification/content-currency.tsx).
+// A page's own item that the beats name at an older block than the served head (notedAt) is
+// labelled as of that block, in no passing colour, with nothing to download, until read again.
 
 const page = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("@remix-run/react", async (importOriginal) => ({

@@ -23,10 +23,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FAKE_PINS, L1 } from "../support/fake-l1";
 import { HEAD, NOW, SLOT_MS, backfilled, liveWorld, settle } from "../support/live-world";
 
-// After a pause the upgrade and emergency upgrade pages send, in their first flush, the signature
-// sets (and recorded approvals) they last showed with the upgrade, not only the upgrade: each set
-// labelled as of the block it was verified at, nothing to sign or send from it; and no set whose
-// Safe copies the current answer keeps (an executed upgrade's) is said to have them refreshed.
+// After a pause both upgrade pages' first flush carries the sets and recorded approvals last shown,
+// each labelled as of its block, nothing to sign or send from it; and no set whose Safe copies the
+// current answer keeps (an executed upgrade's) is said to have them refreshed.
 
 type Loader = (args: {
   request: Request;
@@ -144,7 +143,6 @@ describe("the upgrade page after a pause", () => {
     expect(held.sets.map((s) => s.key)).toEqual(current.map((s) => s.key));
     for (const [i, s] of held.sets.entries()) {
       const shown = current[i] as HeldSet;
-      // The verdicts as shown, as of the block they were verified at.
       expect(s.set.members.map((m) => m.status)).toEqual(shown.set.members.map((m) => m.status));
       expect(s.set).toMatchObject({
         stale: true,
@@ -159,7 +157,6 @@ describe("the upgrade page after a pause", () => {
       expect(s.execution).toBeNull();
       expect(s.state.status).not.toBe("open");
     }
-    // The current answers follow in the same response, at the newest block.
     const fresh = (await settle(after.freshSets as Promise<unknown>)) as HeldSet[] | null;
     const first = (await settle(after.sets as Promise<unknown>)) as HeldSet[];
     for (const s of fresh ?? first) expect(s.set.verifiedAtBlock).toBe((HEAD + 6n).toString());

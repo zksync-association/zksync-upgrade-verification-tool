@@ -97,11 +97,9 @@ type AppEntry = {
 
 let productionEntry: Promise<AppEntry> | undefined;
 
-/** The app build's entry module: one for the process in production; Vite's current one in dev. */
 function appEntry(): Promise<AppEntry> {
   if (productionEntry) return productionEntry;
   const loading = (async () => {
-    // A module in production; in development a function that loads it from Vite.
     const build = (await getBuild()) as ServerBuild | (() => Promise<ServerBuild>);
     const { entry } = typeof build === "function" ? await build() : build;
     return entry.module as AppEntry;
@@ -115,11 +113,8 @@ function appEntry(): Promise<AppEntry> {
   return loading;
 }
 
-// Every request that reaches the app (pages, /api/*, resources; not static files) is shown to the
-// sync engine, which counts a page load as use (the build's sync/presence.ts decides: never
-// /api/*, a prefetch or a cross-site request; open tabs beat on their own). With SYNC_MODE=window
-// (the default) the engine follows the chain only while someone uses the app. The request itself
-// never waits on it.
+// Every request that reaches the app is shown to the sync engine, which counts a page load as use
+// (sync/presence.ts decides). The request never waits on it.
 app.use((req, _res, next) => {
   const info = { method: req.method, path: req.path, header: (name: string) => req.get(name) };
   appEntry().then(
@@ -172,20 +167,11 @@ async function checkRpc() {
   return known ?? `chain ${chainId}`;
 }
 
-// How long the start waits for the chain cache to be checked before it listens anyway (it is still
-// seeded when the check completes later; a page that may answer from it waits for it meanwhile).
-// Also the bound on saving it at shutdown.
+// How long the start waits for the chain cache before it listens; also the bound on saving it.
 const CHAIN_CACHE_LOAD_WAIT_MS = 3_000;
 
-// How long the start waits for the app to read which chain the RPC is on before it listens anyway
-// (the first page's shell then waits for that read instead).
 const NETWORK_READ_WAIT_MS = 3_000;
 
-// Before the server listens, through the app build's own modules and together: the chain the RPC
-// is on (the first page's app shell and its wallet never wait for it), and the chain cache kept
-// from the last run (public chain and Safe data, re-verified against the chain; CHAIN_CACHE=0
-// turns it off), so a page opened at liftoff answers from it at once. Bounded; never stops the
-// server.
 async function prepareBeforeListening() {
   try {
     await beforeListening(await appEntry(), {
@@ -197,10 +183,7 @@ async function prepareBeforeListening() {
   }
 }
 
-// Warms the caches a first page needs (network, governance, the handler's log index, Safe
-// listings) through the app build's own modules, so requests share them, and starts the sync
-// engine. PREWARM=0 turns the warm-up off (the build's prewarm() checks), SYNC_MODE=off the
-// engine. Logs step names and timings only, and never stops the server.
+// Warms the caches a first page needs and starts the sync engine; never stops the server.
 async function prewarmApp() {
   try {
     const { prewarm, startSync } = await appEntry();

@@ -358,22 +358,17 @@ describe("parseLogs", () => {
     expect(parsed.map((l) => l.blockNumber)).toEqual([DEPLOY + 5n, DEPLOY + 9n]);
   });
 
-  it.each([
+  it.each<[string, unknown, Hex[]?]>([
     ["not a list", {}],
     ["a removed log", [{ ...raw(log), removed: true }]],
     ["another address", [{ ...raw(log), address: "0x0000000000000000000000000000000000000bad" }]],
     ["a log outside the range", [raw({ ...log, blockNumber: SAVED + 1n })]],
     ["the same log twice", [raw(log), raw(log)]],
     ["a log without its hash", [{ ...raw(log), transactionHash: null }]],
-  ])("rejects %s", (_, input) => {
-    expect(() => parseLogs(input, { addresses: [ADDRESS] }, DEPLOY, SAVED)).toThrow(
+    ["a topic0 the filter does not keep", [raw(log)], [word(2)]],
+  ])("rejects %s", (_, input, topic0) => {
+    expect(() => parseLogs(input, { addresses: [ADDRESS], topic0 }, DEPLOY, SAVED)).toThrow(
       InvalidLogsAnswer
     );
-  });
-
-  it("rejects a topic0 the filter does not keep", () => {
-    expect(() =>
-      parseLogs([raw(log)], { addresses: [ADDRESS], topic0: [word(2)] }, DEPLOY, SAVED)
-    ).toThrow(InvalidLogsAnswer);
   });
 });

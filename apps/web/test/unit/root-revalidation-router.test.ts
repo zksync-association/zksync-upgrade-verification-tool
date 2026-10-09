@@ -9,11 +9,9 @@ import {
 import type { ShouldRevalidateFunctionArgs } from "@remix-run/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The root's shouldRevalidate driven by the router Remix runs in the browser (@remix-run/router,
-// the version @remix-run/react depends on), on a route tree shaped like the app's: which
-// formAction and defaultShouldRevalidate it really passes, and what a navigation does to a
-// reload still in flight. The app shell notes each root status that lands; here a subscriber
-// does.
+// The root's shouldRevalidate under the router Remix runs in the browser (@remix-run/router, the
+// version @remix-run/react depends on), on a route tree shaped like the app's: which formAction
+// and defaultShouldRevalidate it really passes, and what a navigation does to a reload in flight.
 
 type Args = { request: Request };
 type Route = {

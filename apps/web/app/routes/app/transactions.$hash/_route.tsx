@@ -24,13 +24,10 @@ import type { Hex } from "viem";
 
 export const meta = Meta["/app/transactions/:hash"];
 
-// Receipt read on the server through the app's RPC. While the page is on screen and the
-// transaction is not mined (or mined in a block that is not final yet), the sync engine reads the
-// receipt once per new block, and the page reloads (from memory) when it changed: the page itself
-// polls nothing. A receipt found in a final block is kept (sync/receipt.ts); a later read that
-// fails never turns the page back into "waiting", a read that fails is said as such, and one that
-// no longer finds a receipt found before (a reorg) says it could not be read, never "not mined".
-// Deferred: the page is sent before the RPC answers.
+// Receipt read on the server through the app's RPC. While the page is on screen and the receipt
+// is not in a final block, the sync engine reads it again at each new block and the page reloads
+// when it changed (it polls nothing). A failed read, or a receipt found before and no longer found
+// (a reorg), says it could not be read, never "not mined". Deferred: sent before the RPC answers.
 export function loader({ params, request }: LoaderFunctionArgs) {
   const hash = params.hash ?? "";
   if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) throw notFound();
@@ -40,8 +37,6 @@ export function loader({ params, request }: LoaderFunctionArgs) {
     revs: loaderRevs([[watchKeys.tx(hash), receipt.then(receiptContent)]]),
     hash,
     receipt,
-    // Read again at each new block while the page is open (not on a dev node, not when the app
-    // does not follow the chain): the waiting text says which.
     followed: receiptFollowed(),
   });
 }
@@ -61,7 +56,6 @@ export default function Transaction() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Transaction" title="Transaction" id={hash} />
-      {/* A receipt not read again at the head served now: as of its block. */}
       <NotReReadNote watchKey={`tx:${hash.toLowerCase()}`} what="The receipt's status below" />
       <Suspense
         fallback={
@@ -103,9 +97,8 @@ function TransactionStatus({
   const { governance } = useStatus();
   const revalidator = useRevalidator();
 
-  // Once mined, the app status other pages read (freeze state and nonces, members, thresholds)
-  // predates the transaction until it is read at or after its block: read it again, right away
-  // and then every poll interval while it still is, a few times at most.
+  // Once mined, the app status other pages read predates the transaction until it is read at or
+  // after its block: read it again, right away and then every poll interval, a few times at most.
   const statusBehind =
     receipt !== null && BigInt(receipt.blockNumber) > BigInt(governance.latestBlock.number);
   const statusReads = useRef({ hash, count: 0 });

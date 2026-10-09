@@ -62,19 +62,11 @@ type Executed = { id: Hex; txHash: Hex; blockNumber: bigint };
 // Headers read per round when cutting the recent window by timestamp (one JSON-RPC batch).
 const TIMESTAMP_BATCH = 20;
 
-/**
- * Executed emergency upgrades, oldest first, from the handler's log index (complete from the
- * deployment to the head, or an error). Full history is opt-in for pages; the JSON list retains
- * it by default.
- */
+/** Full history is opt-in for pages; the JSON list retains it by default. */
 async function executedEmergencies({ allHistory = true } = {}): Promise<Executed[]> {
   return (await readExecuted({ allHistory, provisional: false })).executed;
 }
 
-/**
- * executedEmergencies, for a page when `provisional`: the history and the timestamps the last run
- * read stand in for what this run has not read yet; `provisional` in the answer says they did.
- */
 async function readExecuted({
   allHistory,
   provisional: allowed,
@@ -109,10 +101,8 @@ async function readExecuted({
     const answer = await read();
     return { executed: answer.events.map(toExecuted), provisional: answer.provisional };
   }
-  // The recent window: executed in a block with timestamp >= head − 7 days. A slot holds at most
-  // one block, so those blocks are within the last 7 days / block time; twice that is asked of
-  // the index, so the window needs only recent coverage (not the whole backfill). The cut itself
-  // is by timestamp: the newest executions are read first, a batch at a time, until one is older.
+  // A slot holds at most one block, so the last 7 days are within 7 days / block time; twice that
+  // is asked of the index. The cut itself is by timestamp, newest executions first.
   const head = await latestBlock();
   const recentSeconds = BigInt(EMERGENCY_RECENT_DAYS * 24 * 60 * 60);
   const cutoff = head.timestamp - recentSeconds;
@@ -186,16 +176,11 @@ export type PendingEmergencies = {
   pending: EmergencySummary[];
   errors: string[];
   anomalies: number;
-  /** When the oldest Safe listing the ids came from was read (ISO time), or null. */
   safeFetchedAt: string | null;
-  /**
-   * A page's first answer from Safe listings older than 60 s (see loadEmergencyList); the fresh
-   * list follows. Always false for the fresh list.
-   */
+  /** A page's first answer from Safe listings older than 60 s; always false for the fresh list. */
   stale: boolean;
 };
 
-/** The ids members signed in their Safes that the handler has not executed (at the head). */
 async function pendingFrom(collected: Collected): Promise<PendingEmergencies> {
   const byId = new Map<string, EmergencySummary>();
   for (const group of collected.groups) {
@@ -212,8 +197,8 @@ async function pendingFrom(collected: Collected): Promise<PendingEmergencies> {
       entry.reported.zkFoundation = n > 0;
     if (!entry.firstSeen || group.firstSeen < entry.firstSeen) entry.firstSeen = group.firstSeen;
   }
-  // While a list of them is on screen, the engine reads these ids' states in each head's snapshot
-  // (sync/listed-ids.ts), so the reads below find them at the head.
+  // While a list of them is on screen, the engine reads these ids' states in each head's snapshot,
+  // so the reads below find them at the head.
   noteListedEmergencyIds([...byId.values()].map((entry) => entry.id));
   // Concurrent current-state calls are batched by the RPC client. No archive or log scan needed.
   const entries = await Promise.all(
@@ -233,24 +218,13 @@ async function pendingFrom(collected: Collected): Promise<PendingEmergencies> {
   };
 }
 
-/** A page's first list of executed emergency upgrades (see loadEmergencyList). */
 export type ExecutedFirst = {
   items: EmergencySummary[];
-  /**
-   * Listed from the history (or block timestamps) the last run read, while this run re-reads
-   * them; the verified list (`executed`) follows.
-   */
+  /** Listed from the history (or block timestamps) the last run read; the verified list follows. */
   fromLastRun: boolean;
 };
 
-/**
- * Pending Safe messages and executed events do not wait for one another, and the executions
- * (from the handler's log index alone) do not wait for governance either. With `freshness:
- * "page"`, `pending` is the page's first answer (see firstFromHeld) and `freshPending` the list from
- * listings at most 60 s old; otherwise both are the latter. Likewise `executedFirst` is the
- * page's first list of executions (possibly from the last run's history, `fromLastRun`) and
- * `executed` the list from this run's history; without "page" both are the latter.
- */
+/** Pending Safe messages and executed events do not wait for one another. */
 export function loadEmergencyList({
   allHistory = false,
   freshness = "strict",
@@ -269,7 +243,6 @@ export function loadEmergencyList({
   const executed = executedFirst.then((first) =>
     first.fromLastRun ? executedEmergencies({ allHistory }).then(summaries) : first.items
   );
-  // The members' Safes come from governance (a page's at the head, governance.ts pageGovernance).
   const signers = governanceFor(freshness).then((gov) => ({
     domain: gov.emergencyUpgradeBoard.domain,
     safes: [
@@ -299,10 +272,8 @@ export function loadEmergencyList({
 }
 
 /**
- * For the sync engine: the emergency list as a page shows it, from the Safe copies held under the
- * page rule (never asking Safe), governance at the head pages read (`governance`: the member Safes
- * collected from, read at its `latestBlock`) and this run's log index; null when a member Safe's
- * copy is not one a page would use as current.
+ * For the sync engine: the list as a page shows it, from the Safe copies held (never asking Safe);
+ * null when a member Safe's copy is not one a page would use as current.
  */
 export async function heldEmergencyList({
   allHistory = false,
@@ -336,12 +307,6 @@ export async function heldEmergencyList({
       .reverse(),
     governance: gov,
   };
-}
-
-export async function listRecentEmergencyUpgrades() {
-  const loading = await loadEmergencyList();
-  const [pending, executed] = await Promise.all([loading.pending, loading.executed]);
-  return { ...pending, executed };
 }
 
 export async function listEmergencyUpgrades() {
@@ -420,16 +385,9 @@ export type EmergencyExecution = {
     checks: { role: string; accepted: boolean | null; error: string | null }[];
   } | null;
   historicalUnavailable: string | null;
-  /**
-   * Pages only: the execution event was located directly (archive state and that block's log)
-   * while this run's log index was still reading the history, and is not checked against it yet.
-   * Never set in JSON.
-   */
+  /** Pages only, never in JSON: located directly while the log index still read the history. */
   locatedDirectly?: true;
-  /**
-   * Pages only: the execution event came from the history the last run saved, not read again in
-   * this run yet. Never set in JSON.
-   */
+  /** Pages only, never in JSON: from the history the last run saved, not read again yet. */
   fromLastRun?: true;
 };
 
@@ -443,30 +401,16 @@ export type EmergencyDetail = {
 
 export type EmergencyOverview = Pick<EmergencyDetail, "id" | "state" | "governance">;
 
-/** What a page shows of an execution first: its calls, rebuilt from its calldata. */
 export type EmergencyExecutionFirst = Omit<
   EmergencyExecution,
   "historical" | "historicalUnavailable"
 >;
 
-/** The board's three checks of an execution, re-run at the block before it (see EmergencyExecution). */
 export type EmergencyHistorical = Pick<EmergencyExecution, "historical" | "historicalUnavailable">;
 
 /**
- * Start execution discovery and current Safe verification independently. With `freshness:
- * "page"`, `first` is the page's first answer (roles from first answers, see firstSignatureSet:
- * the strict result, or labelled stale sets) and `detail` the strict result; otherwise (JSON) both
- * are the strict result.
- *
- * `executed` is the execution from this run's log index. `executedFirst` is what a page shows
- * first: with "page", the calls of the execution from the history the last run saved
- * (`fromLastRun`) while this run re-reads it, or, while the index is still reading the history
- * (and has nothing from the last run), of the one located directly if that comes first
- * (`locatedDirectly`); `executedCheck` then checks either against the index's (an integrity error
- * when they differ; null when there is nothing to check). Such an event stands in for the index's
- * only when it shows an execution of this id: anything else is the index's to answer. The board's
- * re-checks of the execution shown follow in `executedHistorical`, so its calls never wait on
- * archive reads. Without "page", `executedFirst` is `executed`.
+ * Start execution discovery and current Safe verification independently. With `freshness: "page"`,
+ * `first` and `executedFirst` are the page's first answers; otherwise (JSON) the strict results.
  */
 export async function loadEmergencyUpgrade(
   id: Hex,
@@ -475,9 +419,8 @@ export async function loadEmergencyUpgrade(
     freshness = "strict",
   }: { supplied?: MemberSignature[]; freshness?: Freshness } = {}
 ) {
-  // The upgrade's state, governance and, for an executed upgrade, its execution's event are read
-  // together (none waits on another), and the event's transaction as soon as the event is known:
-  // only telling the board's call apart in it needs governance (the board's address).
+  // State, governance and the execution event are read together, and the event's transaction as
+  // soon as the event is known: only telling the board's call apart in it needs governance.
   const status = currentUpgradeStatus(id);
   const executedState = status.then(({ state }) => state === UPGRADE_STATES.Done);
   const indexedRead = executedState.then((done) => (done ? findEmergencyEvent(id) : null));
@@ -534,7 +477,6 @@ export async function loadEmergencyUpgrade(
         threshold: spec.threshold,
         check: spec.check,
         supplied,
-        // Signable until the upgrade is executed.
         open: state !== UPGRADE_STATES.Done,
       },
       freshness
@@ -542,10 +484,8 @@ export async function loadEmergencyUpgrade(
   );
   const sets = Promise.all(streamed.map((s) => s.fresh));
 
-  /** An execution event's transaction, decoded; null when it is not an execution sent to the board. */
   const decodedOf = (event: EmergencyEvent) => decodeExecution(event.txHash, board.address);
 
-  /** What an execution event shows first: the calls rebuilt from its calldata. */
   const callsFrom = (event: EmergencyEvent, decoded: Decoded): EmergencyExecutionFirst => ({
     txHash: event.txHash,
     blockNumber: event.blockNumber.toString(),
@@ -554,7 +494,6 @@ export async function loadEmergencyUpgrade(
     idMatches: upgradeProposalId(decoded.proposal).toLowerCase() === id.toLowerCase(),
   });
 
-  /** The board's three checks of an execution, re-run at the block before it. */
   const historicalFrom = async (
     event: EmergencyEvent,
     { guardians, securityCouncil, zkFoundation }: Decoded
@@ -592,7 +531,6 @@ export async function loadEmergencyUpgrade(
             block
           ),
         ]);
-        // Kept for good only when every answer is definite and the block is final.
         const definite = checks.every((check) => check.accepted !== null);
         return { value: checks, ttlMs: final && definite ? FOREVER : 0 };
       });
@@ -616,7 +554,6 @@ export async function loadEmergencyUpgrade(
     return { historical, historicalUnavailable };
   };
 
-  /** What an execution event shows: the calls rebuilt from its calldata, and their re-check. */
   const executionOf = async (event: EmergencyEvent): Promise<EmergencyExecution | null> => {
     const decoded = await decodedOf(event);
     if (!decoded) return null;
@@ -635,12 +572,10 @@ export async function loadEmergencyUpgrade(
       historicalUnavailable: execution.historicalUnavailable,
     };
 
-  // A page's first execution: the event (see pageEvent) and the calls it shows. One from the
-  // history the last run saved, or located directly, is labelled and checked against the index's;
-  // it stands in for the index's only when its transaction is an execution of this id sent to the
-  // board. One whose transaction is not, whose calls do not hash to the id, or whose read fails is
-  // the index's to answer: a page never shows a negative, or an error, from an event the index has
-  // not confirmed.
+  // A page's first execution. One from the last run's history, or located directly, is labelled,
+  // checked against the index's, and stands in only as an execution sent to the board whose calls
+  // hash to the id: a page never shows a negative, or an error, from an event the index has not
+  // confirmed.
   const located =
     indexedEvent && locatedRead
       ? locatedRead.then(
@@ -675,7 +610,6 @@ export async function loadEmergencyUpgrade(
   const executedFirst: Promise<EmergencyExecutionFirst | null> = shown
     ? shown.then((s) => s?.execution ?? null)
     : executed;
-  // The board's re-checks of the execution shown first (the index's own: those of `executed`).
   const executedHistorical: Promise<EmergencyHistorical | null> = shown
     ? shown.then((s) =>
         !s
@@ -734,7 +668,6 @@ export async function loadEmergencyUpgrade(
   const detail = Promise.all([sets, executed]).then(([sets, execution]) =>
     withRoles(sets, execution)
   );
-  // The page's first answer: stale roles are compared with the Safe copies they came from.
   const first = firstOrFresh(streamed, detail, async (immediate) =>
     withRoles(immediate, await executed)
   );
@@ -758,7 +691,6 @@ export async function loadEmergencyUpgrade(
     executedCheck,
     detail,
     first,
-    // The upgrade's state and status at the head, as read for this answer (a page's revision).
     status,
   };
 }
@@ -771,17 +703,12 @@ export async function getEmergencyUpgrade(
   return (await loadEmergencyUpgrade(id, options)).detail;
 }
 
-/**
- * Where a page's execution event came from (see pageEvent): this run's index ("index"), this
- * run's own reads above the history the last run saved ("run"), that history ("last-run"), or a
- * direct lookup ("direct").
- */
+/** "run": read by this run above the history the last run saved; "last-run": from that history. */
 type LocatedEvent = {
   event: EmergencyEvent | null;
   source: "index" | "run" | "last-run" | "direct";
 };
 
-/** A page's first execution: its event, where that came from, and the calls it shows. */
 type Shown = {
   event: EmergencyEvent;
   decoded: Decoded;
@@ -790,12 +717,9 @@ type Shown = {
 };
 
 /**
- * A page's execution event of an executed emergency upgrade: from the history the last run saved
- * while this run's backfill has not re-read it ("last-run"; an event this run has read itself,
- * above that history, is "run", as a start is in standard.ts pageStart), else this run's index
- * ("index", `indexed`), or, while the index is still reading the history and has nothing from the
- * last run, the event located directly when that comes first ("direct"). Anything the last run's
- * history cannot answer, and any failure there, is the index's to answer.
+ * A page's execution event: from the last run's history while this run has not re-read it, else
+ * the index's, or the one located directly when that comes first. Anything that history cannot
+ * answer, and any failure there, is the index's to answer.
  */
 function pageEvent(
   id: Hex,
@@ -830,7 +754,6 @@ function pageEvent(
 
 type Blob = { signers: readonly Address[]; signatures: readonly Hex[] };
 
-/** An executeEmergencyUpgrade transaction, decoded (see decodeExecution). */
 type Decoded = NonNullable<Awaited<ReturnType<typeof decodeExecution>>>;
 
 /** calls, salt and the three signature blobs from an executeEmergencyUpgrade transaction. */

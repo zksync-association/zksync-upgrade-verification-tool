@@ -1,8 +1,6 @@
-// A mainnet-like world for the per-block tests (Phase D2): the fake L1 node with the handler's
-// history, an executed standard upgrade and an executed emergency upgrade whose signature sets a
-// page shows, members who signed in Safe with ECDSA signatures (65-byte segments, v 27), the Safe
-// Transaction Service in front of it, and helpers to run the live engine block by block. Nothing
-// here touches the network.
+// A mainnet-like world for the per-block tests: the fake L1 node with the handler's history, an
+// executed upgrade and emergency upgrade whose signature sets a page shows, members' ECDSA
+// signatures in a fake Safe Transaction Service, and the live engine run block by block.
 
 import { puhIndex } from "@/.server/chain/puh-index";
 import { network, pollHead, rpcGeneration } from "@/.server/rpc";
@@ -103,9 +101,8 @@ type SetSpec = {
 export type LiveWorld = ReturnType<typeof liveWorld>;
 
 /**
- * The world. `upgradeId`/`emergencyId` are an executed upgrade and an executed emergency upgrade
- * of the history; `sets` the six signature sets their pages show (all done). `nextBlock()` makes a
- * new head 12 s after the last (and moves 'finalized' with it).
+ * The world: `upgradeId`/`emergencyId` are executed, `sets` the six signature sets their pages
+ * show (all done), and `nextBlock()` makes a new head 12 s after the last, 'finalized' with it.
  */
 export function liveWorld(options: Omit<FakeL1Options, "head" | "logs" | "upgrades"> = {}) {
   const head = { number: HEAD, timestamp: HEAD_TIME };
@@ -236,10 +233,8 @@ export function liveWorld(options: Omit<FakeL1Options, "head" | "logs" | "upgrad
   /** While `exhausted`, Safe answers every request 429: this IP's monthly quota is used up. */
   const safeQuota = { exhausted: false };
   /**
-   * `member` signs the typed data in its Safe with `signature` (ECDSA, accepted by the contracts):
-   * Safe's listing for it gets the message, with `modified` now. With `listed`, the message carries
-   * its typed data as Safe files it, so the lists built from Safe messages (pending emergency
-   * upgrades, freeze requests, vetoes) find it.
+   * `member` signs the typed data in its Safe with `signature` (accepted by the contracts), now.
+   * With `listed`, the message carries its typed data, so lists built from Safe messages find it.
    */
   const signInSafe = (
     member: Address,
@@ -298,10 +293,7 @@ export function liveWorld(options: Omit<FakeL1Options, "head" | "logs" | "upgrad
     safeFailing,
     safeQuota,
     signInSafe,
-    /**
-     * A new head, timestamped a second before now (call it every 12 s of the fake clock), with
-     * 'finalized' FINAL_LAG behind it.
-     */
+    /** A new head a second before now (every 12 s of fake time), 'finalized' FINAL_LAG behind. */
     nextBlock() {
       const current = fake.chain.options.head as { number: bigint };
       const number = current.number + 1n;

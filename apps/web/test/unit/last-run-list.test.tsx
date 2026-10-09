@@ -3,10 +3,6 @@ import type { ReactNode } from "react";
 import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The upgrade list page while the app answers from the history its last run saved: the list is
-// shown at once with the "History from last run · re-verifying" notice, and this run's list
-// replaces it (without the notice) when it streams in.
-
 const data = vi.hoisted(() => ({
   list: Promise.resolve() as Promise<unknown>,
   freshList: Promise.resolve(null) as Promise<unknown>,

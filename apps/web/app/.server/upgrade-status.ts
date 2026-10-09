@@ -6,14 +6,9 @@ import { aggregateAllAt } from "./chain/aggregate";
 import { isUnknownBlock } from "./chain/call";
 import { type BlockRef, type Network, l1State, latestBlock, network } from "./rpc";
 
-// upgradeState and upgradeStatus of one id, as the ProtocolUpgradeHandler answers them at one
-// block. On a live chain both are read at the head and kept per head, keyed by the head's HASH (a
-// reorg at the same height is another entry): every reader at that head shares one read, and the
-// sync engine reads the known ids ahead of requests under the same keys (its per-block snapshot).
-// A read at a head goes out in the head's aggregate3 (chain/aggregate.ts, with whatever else is
-// read there); when that cannot answer (a failed sub-call, an answer from another block, a failed
-// call), it is read on its own as before. Dev nodes, which can be rewound or changed in place,
-// read at 'latest' every time.
+// upgradeState and upgradeStatus of one id at one block. On a live chain both are read at the head,
+// keyed by its HASH (a reorg at the same height is another entry), in the head's aggregate3, else
+// on their own. Dev nodes, which can be rewound or changed in place, read at 'latest' every time.
 
 export type UpgradeStatus = {
   creationTimestamp: number;
@@ -25,8 +20,7 @@ export type UpgradeStatus = {
 
 export type UpgradeStatusRead = { state: UpgradeState; status: UpgradeStatus };
 
-// An entry describes one block; requests move on to the next key with the head. The TTL only
-// bounds how long an entry nobody asks for any more stays in memory.
+// Keyed per block; the TTL only bounds how long an entry nobody asks for stays in memory.
 const STATUS_TTL_MS = 60_000;
 
 // A load-balanced RPC can name a head one of its backends does not have yet (isUnknownBlock).
@@ -41,26 +35,20 @@ export const upgradeStatusKey = (chainId: number, id: Hex, head: Pick<BlockRef, 
 export const isTerminalState = (state: UpgradeState) =>
   state === UPGRADE_STATES.Done || state === UPGRADE_STATES.Expired;
 
-/** The id's state and status at the current head (dev nodes: at 'latest', read every time). */
 export async function currentUpgradeStatus(id: Hex): Promise<UpgradeStatusRead> {
   const net = await network();
   if (net.isDevNode) return readUpgradeStatus(net.upgradeHandler, id);
   return upgradeStatusAt(net, id, await latestBlock());
 }
 
-/** The id's state and status at `head`, read at that block and shared by every reader of it. */
-export function upgradeStatusAt(net: Handler, id: Hex, head: BlockRef): Promise<UpgradeStatusRead> {
+function upgradeStatusAt(net: Handler, id: Hex, head: BlockRef): Promise<UpgradeStatusRead> {
   return cached(upgradeStatusKey(net.chainId, id, head), STATUS_TTL_MS, async () => {
     const aggregated = await aggregatedStatus(net.upgradeHandler, id, head);
     return aggregated ?? readUpgradeStatus(net.upgradeHandler, id, head.number);
   });
 }
 
-/**
- * For the sync engine's snapshot: the id's state and status at `head` from the head's aggregate3,
- * stored where requests at that head look (unless one already read it there), or null when it is
- * unknown at the head (nothing stored: requests then read it themselves). Never rejects.
- */
+/** The status at `head` from its aggregate3, stored where requests look; null when unknown. */
 export async function snapshotUpgradeStatus(
   net: Handler,
   id: Hex,
@@ -120,10 +108,7 @@ function shapeStatus(
   };
 }
 
-/**
- * Stores a status known for `head` without reading it (a terminal state read at a final block,
- * which no later block can change). Never replaces an entry already there.
- */
+/** Stores a status known for `head` (a terminal state read at a final block); never replaces. */
 export function seedUpgradeStatus(net: Handler, id: Hex, head: BlockRef, value: UpgradeStatusRead) {
   seed(upgradeStatusKey(net.chainId, id, head), value, STATUS_TTL_MS);
 }
@@ -158,7 +143,6 @@ export async function readUpgradeStatus(
     answer = await read();
   } catch (error) {
     if (blockNumber === undefined || !isUnknownBlock(error)) throw error;
-    // Once, after a moment: the backend that answers next has usually caught up.
     await new Promise((resolve) => setTimeout(resolve, UNKNOWN_BLOCK_RETRY_MS));
     answer = await read();
   }

@@ -190,16 +190,6 @@ describe("getLogs", () => {
     expect(logs.map((l) => l.blockNumber)).toEqual([50n, 650n]);
   });
 
-  it("does not cache anything on dev nodes (safe head -1)", async () => {
-    const { client, calls } = fakeLogsClient({ logBlocks: [5n], maxRange: 1_000_000n });
-    await getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 0n, 10n, { safeHead: -1n });
-    await getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 0n, 10n, { safeHead: -1n });
-    expect(calls).toEqual([
-      [0n, 10n],
-      [0n, 10n],
-    ]);
-  });
-
   it("gives up with the RPC's own message when it refuses logs outright", async () => {
     const { client } = fakeLogsClient({ logBlocks: [], maxRange: null });
     const promise = getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 0n, 50_000n, {

@@ -32,13 +32,11 @@ import { $path } from "remix-routes";
 export const meta = Meta["/app/l2-cancellations"];
 
 export function loader({ request }: LoaderFunctionArgs) {
-  // Each list streams on its own: the vetoes from the Guardians' Safe copies held (labelled with
-  // their age when older than 60 s and not kept by the watcher for the screen), the vetoable
-  // proposals from the governors' history the last run saved while this run reads it again
-  // (labelled); the fresh lists follow in the response. ZKsync Era is read at the Era head pages
-  // read (the Era timer's, at most a minute old, labelled).
-  // After a pause (no head in memory), the signed vetoes as this app last showed them come first,
-  // as of their block, until the current list replaces them (sync/last-shown.ts).
+  // Each list streams on its own: the vetoes from the Guardians' Safe copies held (labelled when
+  // older than 60 s and not kept by the watcher for the screen), the vetoable proposals from the
+  // last run's history (labelled); the fresh lists follow in the response. ZKsync Era is read at
+  // the Era timer's head (at most a minute old, labelled). After a pause, the signed vetoes as
+  // last shown come first, as of their block.
   const shown = lastShown();
   const loading = loadL2VetoList({ freshness: "page" });
   const signed = loading.signed.then((s) => (s.stale ? loading.freshSigned : s));
@@ -151,7 +149,6 @@ function SignedList({
   refresh,
 }: {
   result: SerializeFrom<SignedVetoes> & {
-    /** The list as this app last showed it, read at an older block (after a pause). */
     asOf?: AsOfBlock;
   };
   refresh: Refresh;
@@ -260,7 +257,6 @@ function Vetoable({ proposals }: { proposals: SerializeFrom<L2ProposalView>[] })
             </span>
             <span className="text-slate-600 text-xs">
               {p.governorName} · {p.state ?? "state unknown"} · voting ends {formatTime(p.voteEnd)}
-              {/* How far off, by the head the root status was read at: once it is. */}
               <WithStatus fallback={null}>
                 {({ governance }) =>
                   ` (${relativeTime(p.voteEnd, governance.latestBlock.timestamp)})`

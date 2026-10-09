@@ -1,12 +1,11 @@
 import { defaultLogger } from "@config/log.server";
 
-// Raw JSON-RPC lanes. A lane is one upstream URL with its own queue, batch size and in-flight
-// limit. Requests made within a short window go out together as one JSON-RPC batch; every entry
-// keeps its own outcome. Lanes only ever send the read-only methods below, and nothing they throw
-// or log contains the URL (RPC URLs often carry an API key in the path or query).
+// Raw JSON-RPC lanes: one upstream URL each, with its own queue, batch size and in-flight limit.
+// Requests made within a short window share one JSON-RPC batch. Lanes send only the read-only
+// methods below, and nothing they throw or log contains the URL (it often carries an API key).
 
 /** The only methods a lane sends. Each one reads chain state: nothing signs or sends. */
-export const ALLOWED_METHODS = [
+const ALLOWED_METHODS = [
   "eth_chainId",
   "net_version",
   "web3_clientVersion",
@@ -23,12 +22,12 @@ export const ALLOWED_METHODS = [
   "anvil_nodeInfo",
   "hardhat_metadata",
 ] as const;
-export type AllowedMethod = (typeof ALLOWED_METHODS)[number];
+type AllowedMethod = (typeof ALLOWED_METHODS)[number];
 const allowedMethods: ReadonlySet<string> = new Set(ALLOWED_METHODS);
 
-export const MAX_BATCH = 50;
+const MAX_BATCH = 50;
 
-export type LaneErrorKind =
+type LaneErrorKind =
   | "method-not-allowed"
   | "timeout"
   | "network"
@@ -51,7 +50,6 @@ export class LaneError extends Error {
   }
 }
 
-/** The node answered this request with a JSON-RPC error object. */
 export class RpcError extends Error {
   override name = "RpcError";
   constructor(
@@ -69,57 +67,30 @@ export type LaneOptions = {
   url: string;
   /** Shown in errors and logs instead of the URL, e.g. "l1-history". */
   label: string;
-  /** Largest JSON-RPC batch (capped at 50). */
   maxBatch: number;
-  /** Largest number of concurrent POSTs. */
   maxInFlight: number;
-  /** Micro-batching window. Requests made within it share a POST. */
   waitMs?: number;
-  /** Per-POST timeout. */
   timeoutMs?: number;
   /** Retries after a timeout, network error, 5xx, a missing reply entry (or see askAgain). */
   retries?: number;
-  /**
-   * Also retry (within `retries`) a request the node failed to answer: an internal error with
-   * nothing more to say, or "temporarily unavailable" (NODE_FAILURE). For lanes whose reads
-   * fail a whole answer when one fails (eth_call, eth_getCode, the head). Never eth_getLogs: the
-   * log index retries each range itself, with its own backoff.
-   */
+  /** Also retry a request the node failed to answer (NODE_FAILURE); never eth_getLogs (askable). */
   askAgain?: boolean;
-  /** Base delay before a transient retry, and the rate-limit backoff without Retry-After. */
   backoffMs?: number;
-  /** Retries of one request after rate limiting, before it fails. */
   rateLimitRetries?: number;
-  /**
-   * Called as each POST is sent, with the number of JSON-RPC requests in it and their methods
-   * (cost counting).
-   */
   onSend?: (requests: number, methods: readonly string[]) => void;
-  /**
-   * Asked as a request is made: a promise to wait for before it joins the queue (the sync
-   * engine's credit pacer, for the engine's own requests), or null to queue it at once. A wait
-   * that rejects drops the request unsent ("aborted").
-   */
   pace?: (method: string) => Promise<void> | null;
-  /**
-   * While this says true (another lane on the same provider is under pressure, see Lane.busy),
-   * this lane keeps at most one POST in flight, so it cannot take the provider's capacity from
-   * that lane (a backfill's eth_getLogs from a page's eth_calls).
-   */
+  /** While true (another lane on the provider is busy), at most one POST in flight here. */
   yieldTo?: () => boolean;
   fetch?: typeof fetch;
 };
 
-export type LaneStats = {
+type LaneStats = {
   label: string;
-  /** Current batch size (adaptive). */
   batch: number;
   maxBatch: number;
   /** Batch cap learned from the provider (Era's "too many RPC calls in batch"). */
   batchCap: number;
-  /** POSTs in flight now. */
   inFlight: number;
-  /** Current in-flight limit (adaptive). */
   inFlightLimit: number;
   maxInFlight: number;
   peakInFlight: number;
@@ -129,7 +100,6 @@ export type LaneStats = {
   errors: number;
   rateLimited: number;
   retries: number;
-  /** undefined until the provider has answered a batch; false once the lane sends singles. */
   acceptsBatch: boolean | undefined;
   pausedMs: number;
 };
@@ -138,10 +108,7 @@ export interface Lane {
   readonly label: string;
   request<T = unknown>(method: AllowedMethod, params?: readonly unknown[]): Promise<T>;
   stats(): LaneStats;
-  /**
-   * Under pressure: paused after a rate limit, or requests are waiting for a free POST slot.
-   * Lanes sharing a provider yield to a busy one (LaneOptions.yieldTo).
-   */
+  /** Paused after a rate limit, or requests wait for a POST slot (see LaneOptions.yieldTo). */
   busy(): boolean;
   /** Fails queued and in-flight requests with an "aborted" LaneError; later requests fail too. */
   close(): void;
@@ -170,7 +137,6 @@ const CEILING_MS = 60_000; // how long a batch size that was rate limited is not
 const MAX_PAUSE_MS = 15_000; // longest pause after one rate-limited reply
 const MAX_BACKOFF_MS = 4_000;
 const SLOW_POST_MS = 5_000;
-// How often a lane that yields to another looks again whether it still has to.
 const YIELD_RECHECK_MS = 25;
 
 let nextId = 1;
@@ -247,7 +213,6 @@ export function createLane(options: LaneOptions): Lane {
       return;
     }
     while (active < inFlightLimit && queue.length > 0) {
-      // Another lane on this provider is under pressure: one POST at a time until it is not.
       if (active >= 1 && yielding()) {
         schedule(YIELD_RECHECK_MS);
         return;
@@ -456,12 +421,8 @@ export function createLane(options: LaneOptions): Lane {
     if (limited.length === 0 && missing.length === 0) recover(group.length);
   }
 
-  /**
-   * The node failed these requests without saying anything about them (askable). Every method a
-   * lane sends is a read, so each is asked again after a moment (backoffMs, then 3x that), within
-   * the same `retries` as a timeout; the last failure is the node's own error, which no caller
-   * reads as an answer (call.ts classify). Not a sign of load: batch size and in-flight stay.
-   */
+  // Reads the node failed to answer (askable): asked again after backoffMs, then 3x that, within
+  // `retries`. Not a sign of load: batch size and in-flight stay.
   function askAgain(entries: Entry[]) {
     let attempt = 0;
     for (const entry of entries) {
@@ -502,9 +463,8 @@ export function createLane(options: LaneOptions): Lane {
       const size = acceptsBatch === false ? 1 : Math.min(batch, batchCap);
       if (sentSize > 1 && sentSize >= size && goodSinceShrink < sentSize) {
         // A full POST larger than anything that worked since the last shrink: the size is the
-        // likely cause. Halve, but never below a smaller size that worked, so a recovery probe
-        // that fails goes back one step (Tenderly: 25 -> 12 -> 6, a probe at 7 -> 6), and do not
-        // try the refused size again for a while.
+        // likely cause. Halve, never below a smaller size that worked (Tenderly: 25 -> 12 -> 6, a
+        // probe at 7 -> 6), and do not try the refused size again for a while.
         batch = Math.max(1, Math.floor(size / 2), Math.min(goodSinceShrink, size));
         ceiling = {
           size: Math.min(ceiling.until > now ? ceiling.size : Number.POSITIVE_INFINITY, sentSize),
@@ -638,8 +598,6 @@ export function createLane(options: LaneOptions): Lane {
       } catch {
         // Pacing never fails a request.
       }
-      // A wait that rejects: the request is dropped unsent (the sync engine's work once it may no
-      // longer send, sync/pacer.ts), an "aborted" LaneError like a reset's.
       return wait
         ? wait.then(
             () => enqueue<T>(method, params),
@@ -706,7 +664,6 @@ function toErrorObject(source: Record<string, unknown>): ErrorObject | undefined
   };
 }
 
-/** A reply's JSON-RPC error object, `{error: {code, message, data?}}`. */
 function errorOf(value: unknown): ErrorObject | undefined {
   return isReply(value) && isReply(value.error) ? toErrorObject(value.error) : undefined;
 }
@@ -732,29 +689,20 @@ function answers(reply: unknown, id: number): reply is Record<string, unknown> {
 const RANGE_ANSWER =
   /block range|\brange\b.*\b(?:exceed|limit|too (?:large|wide|big))|exceed\w*\b.*\brange\b|more than [\d,]+ (?:results|logs)|max(?:imum)? (?:results|logs)|too many (?:results|logs)|response size|query timeout|query (?:returned|exceeds)/i;
 
-/**
- * A provider rate limit, as opposed to an answer. -32005 is also how some nodes answer an
- * eth_getLogs query that is too big; that is an answer about the range, for the caller to handle,
- * not a reason to back off. Every other -32005 ("Too many requests for eth_getLogs", "Request rate
- * exceeded. Blocked for 10 seconds") is a rate limit.
- */
+// A provider rate limit, as opposed to an answer. -32005 is also how some nodes answer an
+// eth_getLogs query that is too big: an answer about the range, not a reason to back off.
 function isRateLimit({ code, message }: ErrorObject) {
   if (code === 429) return true;
   return code === -32005 && !RANGE_ANSWER.test(message);
 }
 
-// JSON-RPC's internal error with nothing more to say, or a service that is "temporarily
-// unavailable": the node failed to answer, it said nothing about the request. Infura answers a
-// read pinned to a block it just named "Internal error" for up to about a second (a backend that
-// does not have the block yet), and an eth_getLogs "service temporarily unavailable". Never a
-// dev node's revert: Hardhat sends reverts as -32603 too, but its message names the revert.
+// The node failed to answer: a bare "Internal error", or "temporarily unavailable" (Infura, for up
+// to a second, on a read pinned to a block it just named). Never a dev node's revert: Hardhat
+// sends reverts as -32603 too, but its message names the revert.
 const NODE_FAILURE =
   /^\s*(?:internal error[\s.!]*)?$|temporar(?:il)?y unavailable|service unavailable/i;
 
-/**
- * The node failed to answer this request (NODE_FAILURE), and it is one a lane asks again
- * (LaneOptions.askAgain): never eth_getLogs, whose ranges the log index retries itself.
- */
+/** A NODE_FAILURE a lane asks again: never eth_getLogs, whose ranges the log index retries. */
 function askable(entry: Entry, { code, message }: ErrorObject) {
   return entry.method !== "eth_getLogs" && code === -32603 && NODE_FAILURE.test(message);
 }
@@ -827,13 +775,11 @@ export function secretsOf(url: string): string[] {
   return [...parts].filter((part) => part.length >= 4).sort((a, b) => b.length - a.length);
 }
 
-export type Scrubber = { text(text: string): string; data(data: unknown): unknown };
+type Scrubber = { text(text: string): string; data(data: unknown): unknown };
 
-/**
- * Removes `secrets` (case-insensitively: hosts are) and any URL from text, and from error data.
- * In data, strings that are pure 0x-hex (revert bytes) only lose long secrets, so they stay hex.
- */
-export function scrubber(secrets: readonly string[]): Scrubber {
+// Removes `secrets` (case-insensitively: hosts are) and any URL from text, and from error data.
+// In data, strings that are pure 0x-hex (revert bytes) only lose long secrets, so they stay hex.
+function scrubber(secrets: readonly string[]): Scrubber {
   const pattern = (parts: readonly string[]) =>
     parts.length > 0
       ? new RegExp(

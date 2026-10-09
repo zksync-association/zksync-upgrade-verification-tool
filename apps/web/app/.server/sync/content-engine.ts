@@ -29,22 +29,16 @@ import { ReceiptLost, receiptContent, receiptView, resetReceipts } from "./recei
 import { type WatchItem, isL2Key } from "./presence";
 import { currentRev, noteContent } from "./revs";
 
-// The sync engine's passes over what is on screen (sync/content.ts says what each key's revision
-// is a digest of): at each served head, from memory, and for ZKsync Era on its timer.
+// The sync engine's passes over what is on screen: at each served head, from memory, and for
+// ZKsync Era on its timer.
 
 const ID = /^(upgrade|emergency):(0x[0-9a-f]{64})$/;
 const L2 = /^l2:(0x[0-9a-f]{40}):(\d+)$/;
 const TX = /^tx:(0x[0-9a-f]{64})$/;
 
-/**
- * The engine's pass at a served head: notes the content of every key on screen it can assemble
- * from memory (the head's snapshot, governance at it, the log indexes, the Safe copies held under
- * the page rule), so a tab whose content changed learns it from its next beat. A key whose content
- * is not in memory at the head (an unknown value, a Safe copy a page would read again) keeps its
- * revision: nothing is noted from an unknown value. Era keys are the Era timer's (noteEraContent);
- * signature sets are noted where they are verified. Transaction receipts are read here, once per
- * head while their page is on screen, until found (sync/receipt.ts keeps them). Never rejects.
- */
+// Notes what memory holds at the served head for each key on screen; a key whose content is not in
+// memory keeps its revision (nothing is noted from an unknown value). Transaction receipts are read
+// here, once per head while their page is on screen, until found. Never rejects.
 export async function noteOnScreenContent(
   head: BlockRef,
   keys: Iterable<string>,
@@ -116,10 +110,8 @@ async function noteKey(
   if (key === "list:vetoes") return noteVetoList(at, current);
   const tx = TX.exec(key);
   if (tx) {
-    // A receipt found before in a final block is not read again; one above it is, at each head.
-    // A read that fails notes nothing (the page keeps what it shows: never "not mined" from a
-    // failure); one that no longer finds a receipt found before notes it as unread, so the page
-    // reloads and says so (never the old receipt as current, never "not mined").
+    // A failed read notes nothing (never "not mined" from a failure); a receipt found before but
+    // not now is noted as unread: the page reloads and says so (never the old one as current).
     const receipt = await receiptView(tx[1] as Hex).then(
       (receipt) => ({ receipt, unread: false }),
       (error: unknown) => {
@@ -134,12 +126,8 @@ async function noteKey(
   return false;
 }
 
-/**
- * Where a list built on governance was read: at the head, or at the older block its governance
- * was read at (a full read kept up to 30 s, or one the engine could not read again at this head),
- * as the status is noted. Its requests' states (nonces, the freeze status) and the member Safes
- * collected from are governance's: never noted at a head they were not read at.
- */
+// A list built on governance is noted at the block its governance was read at when that is older
+// than the head: never at a head it was not read at.
 export function readAt(at: { head: bigint }, gov: { latestBlock: { number: string } }) {
   const read = BigInt(gov.latestBlock.number);
   return { head: read < at.head ? read : at.head };
@@ -157,9 +145,8 @@ async function noteVetoList(at: { head: bigint }, current: () => boolean): Promi
   return true;
 }
 
-// For each Era key, the Era head its content was last assembled at (and the revision it was
-// noted under): a page's "ZKsync Era block #E · read Xs ago" names only a head the content it
-// shows was read at, never a newer one whose read failed (see eraHeadsFor).
+// For each Era key, the Era head its content was last assembled at: a page names only a head the
+// content it shows was read at, never a newer one whose read failed.
 type EraNote = { rev: string; era: { number: string; readAt: string } };
 const eraNotes = new Map<string, EraNote>();
 const ERA_NOTES_LIMIT = 64;
@@ -174,10 +161,6 @@ function noteEraHead(item: WatchItem, era: { number: string; readAt: string } | 
   while (eraNotes.size > ERA_NOTES_LIMIT) eraNotes.delete(eraNotes.keys().next().value as string);
 }
 
-/**
- * For a tab's beat: of its Era items whose content is the current one (their revision), the Era
- * head that content was last read at.
- */
 export function eraHeadsFor(
   items: readonly WatchItem[]
 ): Record<string, { number: string; readAt: string }> {
@@ -190,11 +173,8 @@ export function eraHeadsFor(
   return heads;
 }
 
-/**
- * The Era timer's pass (sync/era.ts): notes the content of the Era keys on screen at the Era head
- * pages read now (the vetoable list, a veto's L2 proposal, the upgrades that can start). Returns
- * the proposals they show, for the boundary timers. Never rejects.
- */
+// The Era timer's pass over the Era keys on screen; returns the proposals they show, for the
+// boundary timers. Never rejects.
 export async function noteEraContent(
   keys: Iterable<string>,
   current: () => boolean = () => true
@@ -206,11 +186,9 @@ export async function noteEraContent(
     [...keys].filter(isL2Key).map(async (key) => {
       try {
         if (key === "list:vetoes") {
-          // Era first (the states pages show), whatever the Safe copies held: then the whole list,
-          // when the copies are ones a page would use, for its revision.
+          // Era first (the states pages show), whatever the Safe copies held; then the whole list.
           const vetoable = await activeL2ProposalsAnswer({ gov, page: true });
           proposals.push(...vetoable.proposals);
-          // Noted with the L1 head the page's governance was read at.
           const head = BigInt((await pageGovernance()).latestBlock.number);
           if (await noteVetoList({ head }, current)) noted++;
           return;
@@ -243,7 +221,6 @@ export async function noteEraContent(
   return { proposals, noted };
 }
 
-/** Forgets the receipts found and the Era heads noted (tests). */
 export function resetContent() {
   resetReceipts();
   eraNotes.clear();

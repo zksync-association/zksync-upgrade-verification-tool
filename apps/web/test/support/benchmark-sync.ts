@@ -1,64 +1,32 @@
-// Read-only benchmark of the request system (docs/performance-improvements.md, October 8): what
-// the app sends upstream (L1 and ZKsync Era JSON-RPC, Safe) while pages are on screen, while
-// nobody uses it, and in JSON-only use, by method and by step, per block and per hour; and how
-// long JSON and pages take after a pause, warm and right after a new block. Each condition runs
-// on a production server of its own; a browser (Playwright, from packages/e2e) keeps the pages on
-// screen exactly as a viewer's tab does (it beats while visible, says when it is hidden or closed).
-//
-//   json     an AGENTS.md session that only reads JSON (curl): the follower never starts
-//            (`sync.engine.active` false) and the requests are the reads its answers need; then
-//            10 quiet minutes (nothing upstream); then the same JSON 1 h after the session, then warm
+// Read-only benchmark of the request system (docs/performance-improvements.md): what the app sends
+// upstream (L1 and ZKsync Era JSON-RPC, Safe) by method and step, per block and per hour, and how
+// long JSON and pages take after a pause, warm and right after a new block. Each condition runs on
+// a production server of its own, traced by upstream-trace.mjs, with pages kept on screen by a
+// Playwright browser (packages/e2e) whose tabs beat as a viewer's do:
+//   json     an AGENTS.md JSON session, 10 quiet minutes, and the JSON again 1 h later, then warm
 //   upgrade  the upgrade page 0x77d5… visible for 20 minutes
-//   idle     the six pages shown once, then after that tab closed, 60 minutes with nobody using
-//            the app (windows 0–10, 10–30 and 30–60 minutes: nothing upstream, the chain cache
-//            on); then each of the six pages after the hour: first bytes and what the first flush
-//            shows (acceptance target 5: the page's data, current or as last shown and labelled)
-//   pages    run A's two detail pages (the upgrade and the emergency upgrade 0xb166…) for 15 minutes
-//   hidden   those two tabs hidden for 3 minutes (nothing after the keep-warm window), then visible
-//            again for 2 minutes; and a tab hidden from its load, for 3 minutes
-//   resume   the six pages shown once; after the use ended, 90 s and 10 minutes without use, then
-//            /api/status, /api/upgrades and ?history=all and each of the six pages (each JSON
-//            after a pause of its own; the pages after 90 s each after a pause of its own, after
-//            10 minutes one after another after one pause, so only the first of them is a first
-//            request), each JSON followed by the same request warm
-//   home     `/` visible for 10 minutes
-//   veto     the veto list visible for 10 minutes (ZKsync Era)
-//   open     an open signature set's page (a pending emergency upgrade, --open) visible for 10
-//            minutes: the Safe watcher, per Safe; then "Fetch signatures"
-//   keyless  the same without a Safe API key (Safe's public service)
-//   always   SYNC_MODE=always with no page open, for 15 minutes
-//   late     the upgrade page for 20 minutes with SYNC_HEAD_POLL=late (the "upgrade" condition
-//            polls with the default, "slot")
-//   warm     a page visible (the engine follows the head), every path read once before
-//   head     right after a new block: each path as soon as the engine serves a new head, and the
-//            JSON detail endpoints also at set times after it first saw one (HEAD_OFFSETS_MS)
-//   restart  a new process with the chain cache the idle condition's server saved: the six pages
-//            at once at liftoff, then the JSON
-//   fresh    (not in the default run) one fresh server per path, the request at liftoff
-//   cache    (not in the default run) the same with the chain cache
+//   idle     60 minutes unused after the six pages were shown (chain cache on), then the six pages
+//   pages    the upgrade and emergency upgrade 0xb166… pages for 15 minutes (hidden: those tabs
+//            hidden for 3 minutes, then visible for 2; and a tab hidden from its load)
+//   resume   after use ends, the chain-only JSON and the six pages after 90 s and after 10 minutes
+//   home     `/` visible for 10 minutes (veto: the veto list, ZKsync Era)
+//   open     an open signature set's page (--open) for 10 minutes, then "Fetch signatures"
+//            (keyless: the same without a Safe API key)
+//   warm     every path while a page is visible (head: right after new heads, at HEAD_OFFSETS_MS)
+//   restart  a new process with the idle server's chain cache: the six pages at liftoff, then JSON
+//   fresh    (not by default) one fresh server per path (cache: with the chain cache)
+// It only GETs from its own servers (--port and the five above; never 3000 or 3001) and prints
+// timings, counts and states: never an RPC URL, key or server log (.cache/local/benchmark-sync/).
+// It stops when /api/status reports governance warnings, network overrides, a log history that is
+// not "ok" or a chain cache mismatch, checked at each server's start, after each window in use,
+// after the first request of each JSON pair and at each condition's end (never in idle windows,
+// where the read would itself go upstream). An HTTP error status is a failure, never a timing.
 //
-// It starts the production build (run `corepack pnpm --filter web build` first) on its own ports
-// (--port and the five above it; never 3000 or 3001), with the settings `npm start` reads (environment,
-// .env, saved settings), and only ever GETs pages and /api/* from them and loads the pages in a
-// local browser (PW_CHANNEL=chrome uses an installed Chrome, as the Playwright suite does). Each
-// server is started with test/support/upstream-trace.mjs, which records what it sends upstream
-// (methods, block tags, selectors, Safe request kinds; never a URL, host, query or key). It prints
-// paths, timings, counts and status fields: never an RPC URL, a key, or the servers' logs (they go
-// to .cache/local/benchmark-sync/ at the repository's root). It stops when /api/status reports
-// governance warnings, network overrides, a log history that is not "ok", or a chain cache
-// mismatch, or when a server's log indexes do not finish reading their history within 2 minutes.
-// That check runs when each server starts, after each window in use, after the first request of
-// each JSON pair (first, then warm), and at the end of each condition; never during the idle
-// windows or between the pages after a pause, where reading /api/status would itself read the head
-// and governance upstream. An answer with an
-// HTTP error status is reported as a failure, not as a timing. Conditions run side by side, one
-// server each, the servers started one after another (each reads the whole history at its start).
-//
-// From apps/web:
-//   PW_CHANNEL=chrome corepack pnpm exec tsx test/support/benchmark-sync.ts [--only=json,upgrade,...]
-//     [--port=3105] [--scale=0.1] [--open=/app/emergency/0x…]
-// --scale multiplies every window and pause (0.1 for a trial run). Results:
-// .cache/local/benchmark-sync.json at the repository's root. A full run takes about 85 minutes.
+// From apps/web, after `corepack pnpm --filter web build`:
+//   PW_CHANNEL=chrome corepack pnpm exec tsx test/support/benchmark-sync.ts
+//     [--only=json,upgrade,...] [--port=3105] [--scale=0.1] [--open=/app/emergency/0x…]
+// --scale multiplies every window and pause. Results: .cache/local/benchmark-sync.json at the
+// repository's root. A full run takes about 85 minutes.
 import { type ChildProcess, spawn } from "node:child_process";
 import {
   closeSync,
@@ -78,24 +46,27 @@ import { toFunctionSelector } from "viem";
 import { creditsOf } from "../../app/.server/sync/pacer";
 import { EMERGENCY_ID, UPGRADE_ID } from "./fixtures";
 
-const WEB = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const HERE = dirname(fileURLToPath(import.meta.url));
+const WEB = resolve(HERE, "../..");
 const OUT = resolve(WEB, "../../.cache/local");
 const LOGS = join(OUT, "benchmark-sync");
-const TRACER = join(dirname(fileURLToPath(import.meta.url)), "upstream-trace.mjs");
+const TRACER = join(HERE, "upstream-trace.mjs");
 const HOUR_MS = 3_600_000;
 const MINUTE = 60_000;
-// Pages are server-rendered in full for bots; a browser's user agent gets the streamed page.
+// Bots get pages rendered in full; a browser's user agent gets the streamed page.
 const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36";
-/** The app counts a page load or beat as use for this long (SYNC_KEEPWARM_MS's default), plus a wake. */
+/** How long the app counts a page load or beat as use (SYNC_KEEPWARM_MS's default), plus a wake. */
 const KEEPWARM_MS = 30_000 + 5_000;
 /** A pending emergency upgrade on mainnet on October 8 (open signature sets). */
-export const OPEN_PATH =
+const OPEN_PATH =
   "/app/emergency/0x4fa238865a64c1ccc992bfc0a4e984d13443e0e87c67feddb3cedc6f20f59f59";
-/** When the JSON detail endpoints are also measured after the engine first saw a new head. */
 export const HEAD_OFFSETS_MS = [0, 250, 500, 750, 1_000, 1_500] as const;
-// Background sleeps end when the benchmark stops.
 const stopping = new AbortController();
+
+class StopError extends Error {
+  override name = "StopError";
+}
 
 export const CONDITIONS = [
   "json",
@@ -108,8 +79,6 @@ export const CONDITIONS = [
   "veto",
   "open",
   "keyless",
-  "always",
-  "late",
   "warm",
   "head",
   "restart",
@@ -117,15 +86,16 @@ export const CONDITIONS = [
   "cache",
 ] as const;
 export type Condition = (typeof CONDITIONS)[number];
-/** What runs without --only: everything but one fresh server per path (28 history reads). */
 export const DEFAULT_CONDITIONS: readonly Condition[] = CONDITIONS.filter(
   (c) => c !== "fresh" && c !== "cache"
 );
 
 export type Target = { path: string; page: boolean };
+const jsonTargets = (...paths: string[]): readonly Target[] =>
+  paths.map((path) => ({ path, page: false }));
 
 export const TARGETS: readonly Target[] = [
-  ...[
+  ...jsonTargets(
     "/api/status",
     "/api/upgrades",
     "/api/upgrades?history=all",
@@ -133,50 +103,34 @@ export const TARGETS: readonly Target[] = [
     "/api/emergency",
     `/api/emergency/${EMERGENCY_ID}`,
     "/api/vetoes",
-    "/api/freeze",
-  ].map((path) => ({ path, page: false })),
-  ...PAGE_PATHS().map((path) => ({ path, page: true })),
-];
-
-function PAGE_PATHS(): string[] {
-  return [
+    "/api/freeze"
+  ),
+  ...[
     "/",
     "/app/proposals",
     `/app/proposals/${UPGRADE_ID}`,
     "/app/emergency",
     `/app/emergency/${EMERGENCY_ID}`,
     "/app/l2-cancellations",
-  ];
-}
-
-/** The JSON a resume is measured on: chain-only endpoints (no Safe), acceptance target 4. */
-export const RESUME_JSON: readonly Target[] = [
-  "/api/status",
-  "/api/upgrades",
-  "/api/upgrades?history=all",
-].map((path) => ({ path, page: false }));
+  ].map((path) => ({ path, page: true })),
+];
 export const PAGES: readonly Target[] = TARGETS.filter((t) => t.page);
-
-/** What an AGENTS.md session reads, in order (its `curl … | jq` lines). */
-export const AGENT_SESSION: readonly Target[] = [
+/** The JSON a resume is measured on: chain-only endpoints (no Safe), acceptance target 4. */
+export const RESUME_JSON = jsonTargets("/api/status", "/api/upgrades", "/api/upgrades?history=all");
+export const AGENT_SESSION = jsonTargets(
   "/api/status",
   "/api/upgrades",
   `/api/upgrades/${UPGRADE_ID}`,
   `/api/emergency/${EMERGENCY_ID}`,
-  "/api/status",
-].map((path) => ({ path, page: false }));
+  "/api/status"
+);
 
 // ---- pages: what the streamed HTML shows, and when ----
 
-/** Named things a page shows: each is seen at the first appearance of any of its strings. */
 export type Markers = Record<string, readonly string[]>;
 
 const SHELL = ['aria-label="Governance navigation"'];
-// Something shown before it is current, with its label: a set's verdict at an older block or from
-// Safe copies older than 60 s, a count or list from such copies, history from the last run, an
-// item located directly while the history is read, or, after a pause, what a page last showed, as
-// of its block (.server/signatures.ts firstSignatureSet, .server/sync/last-shown.ts,
-// components/verification/freshness.tsx, last-run.tsx and as-of.tsx).
+// Shown before it is current, labelled as older or unconfirmed (components/verification/*).
 const LABELLED = [
   'data-stale="true"',
   'data-testid="set-stale"',
@@ -186,13 +140,7 @@ const LABELLED = [
   'data-testid="as-of"',
 ];
 
-/**
- * What to look for in a page's streamed HTML: `shell` (the app shell and navigation), `core` (the
- * page's main section: its heading, its pending state or its data), `data` (its main data, stale
- * or fresh), per page what follows (signature sets, pending ids, vetoable proposals), and
- * `labelled`: the first thing shown labelled as older or unconfirmed (absent when everything the
- * page showed was current).
- */
+/** The markers of a page's streamed HTML: shell, core (main section), data, its own, labelled. */
 export function pageMarkers(path: string): Markers {
   const route = path.split("?")[0] ?? path;
   return { shell: SHELL, ...routeMarkers(route), labelled: LABELLED };
@@ -252,26 +200,18 @@ export function markSeen(
 
 // ---- one request ----
 
-/**
- * A page's first flush: what the server sent before waiting on anything, seen as what arrived
- * within this long of the first bytes (one flush can reach the client in several reads).
- * Acceptance target 5 (plan-d) wants the first bytes under this long too.
- */
+/** A page's first flush: what arrived within this long of its first bytes (acceptance target 5). */
 export const FIRST_FLUSH_MS = 50;
 
 export type Measurement = {
   path: string;
   status: number;
-  /** Response headers received. */
   ttfbMs: number;
-  /** The whole body received (a page: everything streamed, fresh results included). */
   completeMs: number;
   bytes: number;
-  /** Pages: when each marker (pageMarkers) first appeared. */
   marks?: Record<string, number>;
-  /** Pages: the markers the first flush showed (see firstFlushOf). */
   firstFlush?: FirstFlush;
-  /** Why the request failed (an error class name, or "HTTP <status>"), if it did. */
+  /** An error class name, or "HTTP <status>". */
   error?: string;
 };
 
@@ -289,18 +229,13 @@ export function firstFlushOf(ttfbMs: number, marks: Record<string, number>): Fir
   };
 }
 
-/**
- * Acceptance target 5, for one page after a pause: its first bytes within FIRST_FLUSH_MS, and its
- * main data in the first flush, current or older and labelled (`data`, or `labelled`: the marker
- * of something shown as older or unconfirmed). Frame and pending sections alone do not count.
- */
+/** Acceptance target 5: first bytes in time, and the main data, or a label, in the first flush. */
 export function dataInFirstFlush(m: Measurement): boolean {
   if (m.error || m.ttfbMs < 0 || m.ttfbMs >= FIRST_FLUSH_MS) return false;
   const shown = (m.firstFlush ?? firstFlushOf(m.ttfbMs, m.marks ?? {})).marks;
   return shown.includes("data") || shown.includes("labelled");
 }
 
-/** An answer that is not a result: an HTTP error status. */
 export function httpFailure(status: number): string | undefined {
   return status >= 400 ? `HTTP ${status}` : undefined;
 }
@@ -311,7 +246,7 @@ function errorKind(error: unknown): string {
   return /^[A-Za-z]\w{0,63}$/.test(name) ? name : "Error";
 }
 
-async function measure(port: number, target: Target, timeoutMs = 120_000): Promise<Measurement> {
+async function measure(port: number, target: Target): Promise<Measurement> {
   const markers = target.page ? pageMarkers(target.path) : null;
   const t0 = performance.now();
   const ms = () => Math.round(performance.now() - t0);
@@ -321,16 +256,15 @@ async function measure(port: number, target: Target, timeoutMs = 120_000): Promi
         "user-agent": BROWSER_UA,
         accept: target.page ? "text/html" : "application/json",
       },
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: AbortSignal.timeout(120_000),
     });
     const ttfbMs = ms();
     const seen: Record<string, number> = {};
     const decoder = new TextDecoder();
+    const reader = res.body?.getReader();
     let html = "";
     let bytes = 0;
-    const reader = res.body?.getReader();
-    for (;;) {
-      if (!reader) break;
+    while (reader) {
       const { done, value } = await reader.read();
       if (done) break;
       bytes += value.byteLength;
@@ -371,10 +305,10 @@ export type Cost = {
   infuraCreditsPerHour?: number;
   windowMs: number;
   mode?: string;
-  pacer?: { creditsPerSecond?: number; peakPerSecond?: number; waited?: number };
+  pacer?: { peakPerSecond?: number; waited?: number };
 };
 
-/** The parts of /api/status read here (everything optional: it is another process's answer). */
+/** The parts of /api/status read here (all optional: another process's answer). */
 export type StatusLike = {
   ok?: boolean;
   governance?: { warnings?: unknown[]; network?: { label?: string; overrides?: unknown[] } };
@@ -384,17 +318,15 @@ export type StatusLike = {
     index?: { state?: string };
     l2Index?: { state?: string; governors?: unknown[] };
     cache?: { state?: string; file?: string | null; savedAt?: string | null; sizeBytes?: number };
-    presence?: { inUse?: boolean; reason?: string | null; tabs?: number; keys?: number };
+    presence?: { inUse?: boolean; tabs?: number; keys?: number };
     engine?: {
       mode?: string;
       active?: boolean;
       head?: { number?: string; observedAt?: string; servedAt?: string | null } | null;
-      lastTick?: { block?: string; ms?: number; failedSteps?: string[] } | null;
+      lastTick?: { failedSteps?: string[] } | null;
       cost?: Cost;
       clock?: {
-        headPoll?: string;
         recent?: {
-          blocks?: number;
           pollsPerBlock?: number | null;
           servedDelayMs?: { p50: number; p80: number; max: number } | null;
         };
@@ -402,9 +334,7 @@ export type StatusLike = {
     };
     safe?: {
       paused?: string | null;
-      groups?: string[];
       budgetUsedThisHour?: number;
-      baseline?: unknown;
       watched?: {
         safes?: number;
         lists?: number;
@@ -413,16 +343,12 @@ export type StatusLike = {
         allowancePerHour?: number;
       } | null;
     };
-    signatures?: { onScreen?: number; open?: number; perBlock?: unknown };
+    signatures?: { onScreen?: number; open?: number };
     l2?: { onScreen?: number; eraBlock?: string | null };
   };
 };
 
-/**
- * Why the numbers must not be taken (AGENTS.md: stop and report): the status is not ok, the
- * contracts disagree, a trust anchor was replaced, proposal lists may be incomplete, or the log
- * history differs from the one the last run saved. Counts and states only.
- */
+/** AGENTS.md's stop-and-report conditions, as counts and states. */
 export function trustProblems(status: StatusLike): string[] {
   if (status.ok !== true) return ["/api/status is not ok"];
   const problems: string[] = [];
@@ -517,10 +443,7 @@ export function indexesSettled(status: StatusLike): boolean {
   return status.sync?.index?.state === "ready" && l2Settled;
 }
 
-/**
- * The engine's newest head when it is another than `previous`: its number, when the engine first
- * saw it and when it served it (null while not served yet), in ms since the epoch. null otherwise.
- */
+/** The engine's head unless it is `previous`: its number, when it was seen and served (or null). */
 export function newHead(
   status: StatusLike,
   previous: string | null
@@ -533,11 +456,7 @@ export function newHead(
   return { number: head.number, observedAt, servedAt: Number.isNaN(servedAt) ? null : servedAt };
 }
 
-/**
- * Whether a request sent at `sentAt` for head `number` went out before the engine served that
- * head, from the engine's head read right after the answer (`after`): true when it was still not
- * served then, null when a newer head had already replaced it (unknown).
- */
+/** Whether a request sent at `sentAt` preceded the head's serving (null: a newer head came). */
 export function servedState(
   after: ReturnType<typeof newHead>,
   number: string,
@@ -581,12 +500,10 @@ export function pickCost(cost: Cost | undefined): Cost | null {
 
 // ---- what a server sent upstream (upstream-trace.mjs) ----
 
-/** One JSON-RPC entry as the tracer records it. */
 export type TraceCall = {
   m: string;
-  /** eth_call: the 4-byte selector (not for aggregate3). */
+  /** eth_call: the 4-byte selector, or for Multicall3's aggregate3 its number of sub-calls. */
   sel?: string;
-  /** eth_call to Multicall3's aggregate3: its sub-calls. */
   mc?: number;
   /** A block number, "latest", "finalized", "hash", … */
   tag?: string | number | null;
@@ -594,15 +511,14 @@ export type TraceCall = {
   span?: number;
 };
 
-// A request is recorded when it is sent, in the dump of the window it went out in; one not
-// answered yet when that window was dumped says so (`inFlight`, without its answer's status).
+// A request is in the window it was sent in (`inFlight`: unanswered at its dump); an `answer`
+// came for one in a later window: counted with that window's errors, never as a request.
 export type TraceEvent =
   | {
       kind: "rpc";
       at: number;
       ms?: number;
       host: string;
-      /** The tracer saw a ZKsync Era host name (never kept). */
       hint?: "era";
       calls: TraceCall[];
       status?: number;
@@ -623,11 +539,6 @@ export type TraceEvent =
   | { kind: "head"; at: number; host: string; number: number }
   | { kind: "other"; at: number; inFlight?: true }
   | {
-      /**
-       * What came for a request after the window it was sent in was dumped (its status or
-       * failure, its entries' error codes): counted with the errors of the window it came in,
-       * never as a request.
-       */
       kind: "answer";
       at: number;
       of: "rpc" | "safe" | "other";
@@ -644,11 +555,7 @@ export type Trace = { dumpedAt?: number; chains: Record<string, number>; events:
 // ZKsync Era mainnet, Era Sepolia, and local Era nodes.
 const ERA_CHAINS = new Set([324, 300, 260, 270]);
 
-/**
- * Which RPC a host is: by the chain id it answered; else ZKsync Era when the tracer saw an Era
- * host name, or when the trace knows the L1 host and this is another (the app talks to two RPCs,
- * and asks the L1 one its chain id at its start, but not always the Era one); else unknown.
- */
+/** A host's RPC: by its chain id; else Era if named so or another host is L1; else unknown. */
 export function chainOf(
   trace: Pick<Trace, "chains">,
   host: string,
@@ -669,21 +576,12 @@ const VERDICT_SELECTORS = new Set<string>(
     "signedMessages(bytes32)",
   ].map((signature) => toFunctionSelector(signature))
 );
-// Governance's member lists end where members(i) reverts: read directly (governance.ts).
+// Governance's member lists end where members(i) reverts, read directly.
 const MEMBERS_SELECTOR: string = toFunctionSelector("members(uint256)");
-
-// eth_getLogs spans: the history's backfill reads ranges this long or longer (Infura's cap is
-// 10,000 blocks; a provider without one answers the whole history in one).
+// The backfill reads ranges this long or longer (Infura's eth_getLogs cap).
 const BACKFILL_SPAN = 10_000;
 
-/**
- * What a JSON-RPC entry is for, by method, block tag and selector (the engine's steps and the
- * request path's reads look the same upstream): on L1 "head poll", "head poll (finalized)",
- * "index tail", "log-history canary", "history backfill", "aggregate3" (the head's snapshot, the
- * sets' verdicts, Safe info, governance), "verdict (direct)", "governance members (direct)" (the
- * member lists' end), "eth_call (direct)" (simulations and other single reads), "code", "network", "transaction", "block by number"; on Era "Era head",
- * "Era index tail", "Era calls", "Era batch".
- */
+/** What a JSON-RPC entry is for, by method, block tag and selector. */
 export function stepOf(chain: "l1" | "era" | "unknown", call: TraceCall): string {
   const { m } = call;
   if (chain === "era") {
@@ -746,14 +644,13 @@ export function peakCreditsPerSecond(sent: readonly { at: number; credits: numbe
 export type Count = { n: number; perBlock: number | null; perHour: number };
 
 export type ChainSummary = {
-  /** HTTP POSTs (a batch is one). */
+  /** HTTP POSTs; `requests` counts each batch entry, as providers bill them. */
   posts: number;
-  /** JSON-RPC requests (a batch entry counts one, as providers bill them). */
   requests: number;
   perBlock: number | null;
   perHour: number;
   perMinute: number;
-  /** Infura's credit weights (an estimate for other providers). */
+  /** At Infura's credit weights (an estimate for other providers). */
   credits: number;
   creditsPerBlock: number | null;
   creditsPerHour: number;
@@ -761,7 +658,7 @@ export type ChainSummary = {
   byMethod: Record<string, Count>;
   byStep: Record<string, Count>;
   aggregate3SubCalls: { min: number; max: number } | null;
-  /** JSON-RPC error codes of failed entries, and HTTP statuses other than 200 or failed POSTs. */
+  /** JSON-RPC error codes of failed entries; HTTP statuses other than 200 and failed POSTs. */
   errors: Record<string, number>;
   httpErrors: Record<string, number>;
 };
@@ -785,29 +682,35 @@ export type WindowSummary = {
   unknownRpc: number;
   safe: SafeSummary;
   other: number;
-  /** Requests (POSTs, Safe and other) sent in the window and not answered when it ended. */
+  /** Requests sent in the window and not answered when it ended. */
   inFlight: number;
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+const perHourOf = (n: number, windowMs: number) =>
+  windowMs > 0 ? Math.round(n / (windowMs / HOUR_MS)) : 0;
+const bump = (counts: Record<string, number>, key: string, n = 1) => {
+  counts[key] = (counts[key] ?? 0) + n;
+};
+const ofKind = <K extends TraceEvent["kind"]>(events: readonly TraceEvent[], kind: K) =>
+  events.filter((e): e is Extract<TraceEvent, { kind: K }> => e.kind === kind);
 
-/** An answer's HTTP failure (a failed POST, a status other than 200), or null. */
-const httpFailureOf = (event: { failed?: string; status?: number }) =>
+/** An upstream answer's HTTP failure (a failed POST, a status other than 200), or null. */
+const upstreamFailure = (event: { failed?: string; status?: number }) =>
   event.failed ??
   (event.status !== undefined && event.status !== 200 ? String(event.status) : null);
 
 function chainSummary(
   events: readonly Extract<TraceEvent, { kind: "rpc" }>[],
+  late: readonly Extract<TraceEvent, { kind: "answer" }>[],
   chain: "l1" | "era",
   windowMs: number,
-  blocks: number | null,
-  late: readonly Extract<TraceEvent, { kind: "answer" }>[] = []
+  blocks: number | null
 ): ChainSummary {
-  const hours = windowMs / HOUR_MS;
   const count = (n: number): Count => ({
     n,
     perBlock: blocks ? round2(n / blocks) : null,
-    perHour: hours > 0 ? Math.round(n / hours) : 0,
+    perHour: perHourOf(n, windowMs),
   });
   const methods: Record<string, number> = {};
   const steps: Record<string, number> = {};
@@ -821,26 +724,19 @@ function chainSummary(
     let eventCredits = 0;
     for (const call of event.calls) {
       requests++;
-      const weight = creditsOf(call.m);
-      eventCredits += weight;
-      methods[methodOf(call)] = (methods[methodOf(call)] ?? 0) + 1;
-      const step = stepOf(chain, call);
-      steps[step] = (steps[step] ?? 0) + 1;
+      eventCredits += creditsOf(call.m);
+      bump(methods, methodOf(call));
+      bump(steps, stepOf(chain, call));
       if (call.mc !== undefined) sizes.push(call.mc);
     }
     credits += eventCredits;
     sent.push({ at: event.at, credits: eventCredits });
-    for (const [code, n] of Object.entries(event.errors ?? {}))
-      errors[code] = (errors[code] ?? 0) + n;
-    const http = httpFailureOf(event);
-    if (http) httpErrors[http] = (httpErrors[http] ?? 0) + 1;
   }
-  // Answers to requests of an earlier window: their errors, never their requests.
-  for (const answer of late) {
-    for (const [code, n] of Object.entries(answer.errors ?? {}))
-      errors[code] = (errors[code] ?? 0) + n;
-    const http = httpFailureOf(answer);
-    if (http) httpErrors[http] = (httpErrors[http] ?? 0) + 1;
+  // Answers to requests of an earlier window add their errors, never requests.
+  for (const answered of [...events, ...late]) {
+    for (const [code, n] of Object.entries(answered.errors ?? {})) bump(errors, code, n);
+    const http = upstreamFailure(answered);
+    if (http) bump(httpErrors, http);
   }
   const map = (counts: Record<string, number>) =>
     Object.fromEntries(
@@ -852,11 +748,11 @@ function chainSummary(
     posts: events.length,
     requests,
     perBlock: blocks ? round2(requests / blocks) : null,
-    perHour: hours > 0 ? Math.round(requests / hours) : 0,
+    perHour: perHourOf(requests, windowMs),
     perMinute: windowMs > 0 ? round2(requests / (windowMs / MINUTE)) : 0,
     credits,
     creditsPerBlock: blocks ? Math.round(credits / blocks) : null,
-    creditsPerHour: hours > 0 ? Math.round(credits / hours) : 0,
+    creditsPerHour: perHourOf(credits, windowMs),
     peakCreditsPerSecond: peakCreditsPerSecond(sent),
     byMethod: map(methods),
     byStep: map(steps),
@@ -869,48 +765,36 @@ function chainSummary(
 
 /** What one window of a trace sent upstream, per chain, per block and per hour. */
 export function summarizeTrace(trace: Trace, windowMs: number): WindowSummary {
-  const rpc = trace.events.filter(
-    (e): e is Extract<TraceEvent, { kind: "rpc" }> => e.kind === "rpc"
-  );
+  const rpc = ofKind(trace.events, "rpc");
   const hints = new Map(rpc.filter((e) => e.hint).map((e) => [e.host, e.hint]));
-  const l1Heads = trace.events
-    .filter((e): e is Extract<TraceEvent, { kind: "head" }> => e.kind === "head")
-    .filter((e) => chainOf(trace, e.host, hints.get(e.host)) === "l1")
+  const chainOfHost = (host: string) => chainOf(trace, host, hints.get(host));
+  const l1Heads = ofKind(trace.events, "head")
+    .filter((e) => chainOfHost(e.host) === "l1")
     .map((e) => e.number);
   const blocks = l1Heads.length > 1 ? Math.max(...l1Heads) - Math.min(...l1Heads) : 0;
-  const answers = trace.events.filter(
-    (e): e is Extract<TraceEvent, { kind: "answer" }> => e.kind === "answer"
-  );
+  const answers = ofKind(trace.events, "answer");
   const perChain = (chain: "l1" | "era") =>
     chainSummary(
       rpc.filter((e) => chainOf(trace, e.host, e.hint) === chain),
+      answers.filter(
+        (a) => a.of === "rpc" && a.host !== undefined && chainOfHost(a.host) === chain
+      ),
       chain,
       windowMs,
-      blocks > 0 ? blocks : null,
-      answers.filter(
-        (a) =>
-          a.of === "rpc" &&
-          a.host !== undefined &&
-          chainOf(trace, a.host, hints.get(a.host)) === chain
-      )
+      blocks > 0 ? blocks : null
     );
-  const safeEvents = trace.events.filter(
-    (e): e is Extract<TraceEvent, { kind: "safe" }> => e.kind === "safe"
-  );
+  const safeEvents = ofKind(trace.events, "safe");
   const byKind: Record<string, number> = {};
   const httpErrors: Record<string, number> = {};
   const bySafe: Record<string, { at: number; what: string }[]> = {};
-  for (const answer of answers.filter((a) => a.of === "safe")) {
-    const http = httpFailureOf(answer);
-    if (http) httpErrors[http] = (httpErrors[http] ?? 0) + 1;
+  for (const answered of [...answers.filter((a) => a.of === "safe"), ...safeEvents]) {
+    const http = upstreamFailure(answered);
+    if (http) bump(httpErrors, http);
   }
   for (const event of safeEvents) {
-    byKind[event.what] = (byKind[event.what] ?? 0) + 1;
-    const http = httpFailureOf(event);
-    if (http) httpErrors[http] = (httpErrors[http] ?? 0) + 1;
-    const list = bySafe[event.safe ?? "?"] ?? [];
-    list.push({ at: event.at, what: event.what });
-    bySafe[event.safe ?? "?"] = list;
+    bump(byKind, event.what);
+    const safe = event.safe ?? "?";
+    bySafe[safe] = [...(bySafe[safe] ?? []), { at: event.at, what: event.what }];
   }
   const perSafe = Object.fromEntries(
     Object.entries(bySafe).map(([safe, list]) => {
@@ -927,7 +811,6 @@ export function summarizeTrace(trace: Trace, windowMs: number): WindowSummary {
       ];
     })
   );
-  const hours = windowMs / HOUR_MS;
   return {
     seconds: Math.round(windowMs / 1_000),
     blocks: blocks > 0 ? blocks : null,
@@ -938,7 +821,7 @@ export function summarizeTrace(trace: Trace, windowMs: number): WindowSummary {
       .reduce((n, e) => n + e.calls.length, 0),
     safe: {
       requests: safeEvents.length,
-      perHour: hours > 0 ? Math.round(safeEvents.length / hours) : 0,
+      perHour: perHourOf(safeEvents.length, windowMs),
       byKind,
       perSafe,
       httpErrors,
@@ -948,7 +831,6 @@ export function summarizeTrace(trace: Trace, windowMs: number): WindowSummary {
   };
 }
 
-/** Nothing at all went upstream. */
 export function silent(w: WindowSummary): boolean {
   return (
     w.l1.requests === 0 &&
@@ -961,7 +843,6 @@ export function silent(w: WindowSummary): boolean {
 
 // ---- printing ----
 
-/** A path as printed: a 32-byte id shortened to its first bytes. */
 export function shortPath(path: string): string {
   return path.replace(/0x[0-9a-fA-F]{64}/g, (id) => `${id.slice(0, 6)}…`);
 }
@@ -1018,10 +899,7 @@ export function formatWindow(label: string, w: WindowSummary): string {
 type PwRequest = { url(): string };
 type PwResponse = { url(): string; status(): number; json(): Promise<unknown> };
 type PwPage = {
-  goto(
-    url: string,
-    options?: { waitUntil?: "load" | "domcontentloaded" | "commit"; timeout?: number }
-  ): Promise<unknown>;
+  goto(url: string, options: { waitUntil: "load"; timeout: number }): Promise<unknown>;
   // Strings only: tsx rewrites functions in ways a browser cannot run.
   evaluate<R>(expression: string): Promise<R>;
   addInitScript(script: { content: string }): Promise<void>;
@@ -1042,7 +920,7 @@ type PwBrowser = {
   close(): Promise<void>;
 };
 
-// The page sees itself hidden or visible as when its tab is switched (it then beats, or leaves).
+// The page sees itself hidden or visible as when its tab is switched.
 const visibility = (state: "hidden" | "visible") => `(() => {
   Object.defineProperty(document, "visibilityState", { value: "${state}", configurable: true });
   Object.defineProperty(document, "hidden", { value: ${state === "hidden"}, configurable: true });
@@ -1052,7 +930,7 @@ const HIDDEN_FROM_LOAD = `
   Object.defineProperty(Document.prototype, "visibilityState", { get: () => "hidden", configurable: true });
   Object.defineProperty(Document.prototype, "hidden", { get: () => true, configurable: true });
 `;
-// An input (the viewer is there): the tab keeps beating past SYNC_AWAY_MS.
+// An input: the viewer is there, so the tab keeps beating past SYNC_AWAY_MS.
 const INPUT = `document.dispatchEvent(new WheelEvent("wheel", { bubbles: true }))`;
 
 let browserPromise: Promise<PwBrowser> | null = null;
@@ -1074,7 +952,6 @@ function browser(): Promise<PwBrowser> {
   return browserPromise;
 }
 
-/** A browser tab on one of the servers: it beats while visible, as a viewer's does. */
 class Tab {
   beats = 0;
   dataLoads = 0;
@@ -1088,7 +965,6 @@ class Tab {
     readonly options: { hidden?: boolean } = {}
   ) {}
 
-  /** Opens the page and waits for its load (and, when visible, its first content). */
   async open(): Promise<number> {
     const started = performance.now();
     this.#context = await (await browser()).newContext({ userAgent: BROWSER_UA });
@@ -1104,14 +980,10 @@ class Tab {
       waitUntil: "load",
       timeout: 120_000,
     });
-    // Input every 5 minutes: windows longer than SYNC_AWAY_MS would otherwise pause the tab.
-    this.#touch = setInterval(() => void this.input(), 5 * MINUTE);
+    // Windows longer than SYNC_AWAY_MS would otherwise pause the tab.
+    this.#touch = setInterval(() => void this.#page?.evaluate(INPUT).catch(() => {}), 5 * MINUTE);
     this.#touch.unref();
     return Math.round(performance.now() - started);
-  }
-
-  async input(): Promise<void> {
-    await this.#page?.evaluate(INPUT).catch(() => {});
   }
 
   async hide(): Promise<void> {
@@ -1140,14 +1012,9 @@ class Tab {
 
 // ---- servers ----
 
-class StopError extends Error {
-  override name = "StopError";
-}
-
-/** The preview's ports (3000, and 3001 beside it): never started on, never stopped. */
+/** The preview's ports: never started on, never stopped. */
 const RESERVED_PORTS = [3000, 3001] as const;
 
-/** Whether the ports from `first` to `last` include one of RESERVED_PORTS. */
 export function overlapsReserved(first: number, last: number): boolean {
   return RESERVED_PORTS.some((port) => first <= port && port <= last);
 }
@@ -1165,7 +1032,7 @@ async function answers(port: number): Promise<boolean> {
   }
 }
 
-/** One production server process on its own port, logging to its own file, its upstream traced. */
+/** One production server on its own port, logging to its own file, its upstream traced. */
 class Server {
   readonly log: string;
   readonly #trace: string;
@@ -1184,7 +1051,6 @@ class Server {
     this.#trace = join(LOGS, `${name}.trace`);
   }
 
-  /** Starts it and resolves once it answers, with the time that took. */
   async start(): Promise<number> {
     if (overlapsReserved(this.port, this.port))
       throw new StopError(`Port ${this.port} is the preview's; use another --port.`);
@@ -1273,35 +1139,27 @@ class Server {
     return m;
   }
 
-  /**
-   * Waits (bounded) until both log indexes have read their history, and stops the benchmark when
-   * they have not: the numbers would then be taken from a server still reading it.
-   */
-  async settled(timeoutMs = 120_000): Promise<void> {
-    const until = Date.now() + timeoutMs;
+  /** Stops the benchmark unless both log indexes read their history within 2 minutes. */
+  async settled(): Promise<void> {
+    const until = Date.now() + 120_000;
     while (Date.now() < until) {
       if (indexesSettled(await this.status())) return;
       await sleep(500);
     }
     throw new StopError(
-      `Stopped: the ${this.name} server's log indexes did not finish reading their history within ${timeoutMs / 1000} s.`
+      `Stopped: the ${this.name} server's log indexes did not finish reading their history within 120 s.`
     );
   }
 
   /** Waits (bounded) until its start's warm-up (prewarm.ts) has finished. */
-  async warmedUp(timeoutMs = 180_000): Promise<void> {
-    const until = Date.now() + timeoutMs;
+  async warmedUp(): Promise<void> {
+    const until = Date.now() + 180_000;
     while (Date.now() < until) {
-      // Its own log: only searched for the step's name, never printed.
+      // Its own log: searched for the step's name, never printed.
       if (readFileSync(this.log, "utf8").includes("prewarm finished")) return;
       await sleep(250);
     }
     throw new StopError(`Stopped: the ${this.name} server's warm-up did not finish.`);
-  }
-
-  /** Reads every path once, to completion (pages: as a browser would, the whole stream). */
-  async visitAll(): Promise<void> {
-    for (const target of TARGETS) await this.request(target);
   }
 }
 
@@ -1313,8 +1171,8 @@ async function stopAll() {
   await (await browserPromise?.catch(() => null))?.close().catch(() => {});
 }
 
-// Servers start one at a time: each reads the handler's whole history at its start (about 435
-// requests on Infura), which several at once would turn into the provider's rate limits.
+// One server starts at a time: each reads the handler's whole history at its start, which several
+// at once would turn into the provider's rate limits.
 let bootQueue: Promise<unknown> = Promise.resolve();
 
 /** Starts `server` once the servers before it have read their history, and waits until it has. */
@@ -1343,7 +1201,6 @@ export type WindowRow = {
 /** `ok` null: not evaluated (what it checks could not happen in the run; `detail` says why). */
 type Check = { condition: Condition; what: string; ok: boolean | null; detail?: unknown };
 
-/** How a check is printed: "ok", "FAIL", or "n/a" when it could not be evaluated. */
 export function checkMark(ok: boolean | null): string {
   return ok === null ? "n/a " : ok ? "ok  " : "FAIL";
 }
@@ -1371,21 +1228,12 @@ class Results {
   }
 }
 
-type Run = {
-  conditions: ReadonlySet<Condition>;
-  port: number;
-  scale: number;
-  openPath: string;
-  results: Results;
-};
+type Run = Options & { results: Results };
 
 const scaled = (run: Pick<Run, "scale">, ms: number) => Math.max(1_000, Math.round(ms * run.scale));
 const pause = (ms: number) => sleep(ms, undefined, { signal: stopping.signal });
 
-/**
- * A sleep that `signal` ends (rejecting, for whoever awaits it), and whose end is no unhandled
- * rejection when nobody awaits it.
- */
+/** A sleep that `signal` ends: a rejection for whoever awaits it, never an unhandled one. */
 export function stoppableSleep(ms: number, signal: AbortSignal): Promise<void> {
   const slept = sleep(ms, undefined, { signal });
   slept.catch(() => {});
@@ -1393,23 +1241,22 @@ export function stoppableSleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /**
- * One window: what `server` sent upstream during `ms` (what ran before it is dropped), then the
- * engine's own report and the trust check.
+ * One window: what `server` sent upstream during a pause of `during` ms, or while `during` runs
+ * (what it sent before is dropped); then, unless `trust` is false, its report and the trust check.
  */
 async function costWindow(
   run: Run,
   server: Server,
   condition: Condition,
   label: string,
-  ms: number,
-  context?: Record<string, unknown>
+  during: number | (() => Promise<void>),
+  { context, trust = true }: { context?: Record<string, unknown>; trust?: boolean } = {}
 ): Promise<WindowRow> {
   await server.dump();
   const started = Date.now();
-  await pause(ms);
-  const trace = await server.dump();
-  const summary = summarizeTrace(trace, Date.now() - started);
-  const status = await server.trusted();
+  await (typeof during === "number" ? pause(during) : during());
+  const summary = summarizeTrace(await server.dump(), Date.now() - started);
+  const status = trust ? await server.trusted() : {};
   const row: WindowRow = {
     condition,
     label,
@@ -1421,7 +1268,7 @@ async function costWindow(
   return row;
 }
 
-/** Measures `target` and the same request again right after (warm). */
+/** Measures `target`, checks the status, and measures the same request again (warm). */
 async function withWarm(
   run: Run,
   server: Server,
@@ -1430,12 +1277,10 @@ async function withWarm(
   target: Target,
   context?: Record<string, unknown>
 ) {
-  const first = await server.request(target);
-  run.results.add(condition, first, context, label);
+  run.results.add(condition, await server.request(target), context, label);
   await server.trusted();
-  const warm = await server.request(target);
-  run.results.add(condition, warm, { ...context, warm: true }, `${label} warm`);
-  return { first, warm };
+  const warm = { ...context, warm: true };
+  run.results.add(condition, await server.request(target), warm, `${label} warm`);
 }
 
 /** Waits until the app has not been used for `ms` (the keep-warm window, then `ms`). */
@@ -1443,35 +1288,22 @@ async function idleFor(lastUseAt: number, ms: number) {
   await pause(Math.max(0, lastUseAt + KEEPWARM_MS + ms - Date.now()));
 }
 
-// -- json: an AGENTS.md session, then quiet, then the same JSON after an hour --
 async function jsonSession(run: Run, port: number) {
   const server = new Server("json", port);
   await boot(server);
-  await server.dump();
-  const started = Date.now();
   const active: (boolean | null)[] = [];
-  for (const target of AGENT_SESSION) {
-    const m = await server.request(target);
-    run.results.add("json", m, undefined, "json session");
-    if (target.path === "/api/status") {
-      const status = (await server.status()) as StatusLike;
-      active.push(status.sync?.engine?.active ?? null);
+  const session = await costWindow(run, server, "json", "json session", async () => {
+    for (const target of AGENT_SESSION) {
+      run.results.add("json", await server.request(target), undefined, "json session");
+      if (target.path === "/api/status")
+        active.push((await server.status()).sync?.engine?.active ?? null);
     }
-  }
-  const trace = await server.dump();
-  const session = summarizeTrace(trace, Date.now() - started);
-  const status = await server.trusted();
-  run.results.window({
-    condition: "json",
-    label: "json session",
-    summary: session,
-    engine: engineSummary(status),
   });
   run.results.check(
     "json",
     "a JSON-only session never starts the follower (sync.engine.active false)",
-    active.every((a) => a === false) && status.sync?.engine?.active === false,
-    { active, after: status.sync?.engine?.active ?? null }
+    active.every((a) => a === false) && session.engine.active === false,
+    { active, after: session.engine.active }
   );
   const quiet = await costWindow(run, server, "json", "json quiet", scaled(run, 10 * MINUTE));
   run.results.check(
@@ -1479,8 +1311,7 @@ async function jsonSession(run: Run, port: number) {
     "nothing upstream in the quiet minutes after it",
     silent(quiet.summary)
   );
-  // 1 h after the last request (the quiet window's status read). Only the first is a first
-  // request: the others find the head and governance it read.
+  // 1 h after the quiet window's status read: only the first is a first request.
   await pause(scaled(run, HOUR_MS));
   for (const [i, target] of RESUME_JSON.entries())
     await withWarm(run, server, "json", "json after 1h", target, {
@@ -1497,11 +1328,11 @@ async function upgradeIdle(run: Run, port: number, done: () => void) {
   try {
     await boot(server);
     const tab = new Tab(server, `/app/proposals/${UPGRADE_ID}`);
+    const loadMs = await tab.open();
+    await pause(60_000);
     if (run.conditions.has("upgrade")) {
-      const loadMs = await tab.open();
-      await pause(60_000);
       const w = await costWindow(run, server, "upgrade", "upgrade", scaled(run, 20 * MINUTE), {
-        loadMs,
+        context: { loadMs },
       });
       run.results.check(
         "upgrade",
@@ -1525,30 +1356,21 @@ async function upgradeIdle(run: Run, port: number, done: () => void) {
         }
       );
       run.results.notes.upgradeBeats = { beats: tab.beats, dataLoads: tab.dataLoads };
-    } else {
-      await tab.open();
-      await pause(60_000);
     }
-    // In use, the six pages once: what the app last showed of each, for the pages after the hour.
     if (run.conditions.has("idle")) await showPages(server);
     await tab.close();
     const closedAt = Math.max(Date.now(), server.lastVisitAt);
     if (run.conditions.has("idle") || run.conditions.has("resume")) {
       await idleFor(closedAt, 0);
-      const spans: [string, number][] = [
+      // No status read in between: /api/status reads governance itself.
+      let all = true;
+      for (const [label, ms] of [
         ["idle 0-10m", 10 * MINUTE],
         ["idle 10-30m", 20 * MINUTE],
         ["idle 30-60m", 30 * MINUTE],
-      ];
-      // No status read in between: /api/status reads governance itself.
-      let all = true;
-      for (const [label, ms] of spans) {
-        await server.dump();
-        const started = Date.now();
-        await pause(scaled(run, ms));
-        const summary = summarizeTrace(await server.dump(), Date.now() - started);
-        run.results.window({ condition: "idle", label, summary, engine: engineSummary({}) });
-        all &&= silent(summary);
+      ] as const) {
+        const w = await costWindow(run, server, "idle", label, scaled(run, ms), { trust: false });
+        all &&= silent(w.summary);
       }
       run.results.check(
         "idle",
@@ -1565,11 +1387,7 @@ async function upgradeIdle(run: Run, port: number, done: () => void) {
   }
 }
 
-/**
- * The six pages after a pause (`rows`, one each), checked two ways: their first bytes within
- * FIRST_FLUSH_MS (that alone), and acceptance target 5: each page's data, current or older and
- * labelled, in its first flush (dataInFirstFlush). Frame and pending sections do not count.
- */
+/** The six pages after a pause: first bytes within FIRST_FLUSH_MS, and acceptance target 5. */
 export function pagesAfterPauseChecks(
   label: string,
   rows: readonly (Measurement & { context?: Record<string, unknown> })[]
@@ -1609,11 +1427,7 @@ function checkPagesAfterPause(run: Run, condition: Condition, label: string) {
     run.results.check(condition, what, ok, detail);
 }
 
-/**
- * The six pages once, one after another, while the app is in use (not measured): a page after a
- * pause shows what the app last showed of it (acceptance target 5's "last-known data"), which a
- * page never shown since the server started does not have.
- */
+/** The six pages once in use (not measured): after a pause, each first shows what it last did. */
 async function showPages(server: Server) {
   for (const target of PAGES) {
     const m = await server.request(target);
@@ -1630,9 +1444,8 @@ async function pagesAfterPause(
   pauseMs: number
 ) {
   for (const [i, target] of PAGES.entries()) {
-    const m = await server.request(target);
     // Only the first comes after the pause: the others find what it read.
-    run.results.add(condition, m, { pauseMs, ownPause: i === 0 }, label);
+    run.results.add(condition, await server.request(target), { pauseMs, ownPause: i === 0 }, label);
   }
   checkPagesAfterPause(run, condition, label);
 }
@@ -1651,8 +1464,7 @@ async function pagesHiddenResume(run: Run, port: number) {
     await costWindow(run, server, "pages", "pages", scaled(run, 15 * MINUTE));
   if (run.conditions.has("hidden")) {
     for (const tab of tabs) await tab.hide();
-    const hiddenAt = Date.now();
-    await idleFor(hiddenAt, 0);
+    await idleFor(Date.now(), 0);
     const hidden = await costWindow(run, server, "hidden", "hidden", scaled(run, 3 * MINUTE));
     run.results.check(
       "hidden",
@@ -1662,14 +1474,10 @@ async function pagesHiddenResume(run: Run, port: number) {
     for (const tab of tabs) await tab.show();
     await costWindow(run, server, "hidden", "visible again", scaled(run, 2 * MINUTE));
   }
-  if (!run.conditions.has("resume")) {
-    for (const tab of tabs) await tab.close();
-    await server.stop();
-    return;
-  }
-  // In use, the six pages once: what the app last showed of each, for the pages after a pause.
-  await showPages(server);
+  const resume = run.conditions.has("resume");
+  if (resume) await showPages(server);
   for (const tab of tabs) await tab.close();
+  if (!resume) return server.stop();
   let lastUse = Math.max(Date.now(), server.lastVisitAt);
   // After 90 s: each request after a pause of its own.
   for (const target of [...RESUME_JSON, ...PAGES]) {
@@ -1681,8 +1489,7 @@ async function pagesHiddenResume(run: Run, port: number) {
     lastUse = server.lastVisitAt;
   }
   checkPagesAfterPause(run, "resume", "pages after 90s");
-  // After 10 minutes: each JSON after a pause of its own (its first request, then warm), the pages
-  // after another (one after another: only the first of them is a first request).
+  // After 10 minutes: each JSON after a pause of its own, then the pages after one pause.
   for (const target of RESUME_JSON) {
     await idleFor(lastUse, scaled(run, 10 * MINUTE));
     await withWarm(run, server, "resume", "json after 10m", target, {
@@ -1698,10 +1505,8 @@ async function pagesHiddenResume(run: Run, port: number) {
 }
 
 /**
- * Acceptance 4: the first JSON after a pause within about 1 s of the same request warm. Only a
- * request that came after a pause of its own (`context.ownPause`) is a first request; one that
- * followed another right after the pause found what that one read, and is listed apart
- * (`followed`), never counted. Not evaluated (null) without any first request.
+ * Acceptance 4: the first JSON after a pause within about 1 s of warm. Only a request after a pause
+ * of its own (`context.ownPause`) is a first request; null without any.
  */
 export function jsonResumeResult(
   rows: readonly (Measurement & { label: string; context?: Record<string, unknown> })[]
@@ -1731,16 +1536,6 @@ export function jsonResumeResult(
           ),
     detail: { firsts: detail, followed },
   };
-}
-
-function jsonResumeCheck(run: Run) {
-  const { ok, detail } = jsonResumeResult(run.results.rows);
-  run.results.check(
-    "resume",
-    "first JSON after a pause within ~1 s of warm (status, lists; requests after a pause of their own)",
-    ok,
-    detail
-  );
 }
 
 // -- home, veto list, a tab hidden from its load, then warm and new-block tables --
@@ -1790,21 +1585,17 @@ async function homeVetoWarm(run: Run, port: number) {
   await server.stop();
 }
 
-// The JSON detail endpoints: those a new block can make slow (their signature sets are verified
-// again at it).
+// The JSON detail endpoints: a new block can make them slow (their sets are verified again).
 const HEAD_SWEEP: readonly Target[] = TARGETS.filter(
   (t) => !t.page && /0x[0-9a-fA-F]{64}$/.test(t.path)
 );
 
-/**
- * A page visible (the engine follows the head): every path read once, then each again; then right
- * after new blocks (see "head" above). Every measurement is followed by a trust check.
- */
+/** A page visible: every path read once, then warm; then right after new blocks, trust-checked. */
 async function warmAndHead(run: Run, server: Server): Promise<void> {
   const tab = new Tab(server, `/app/proposals/${UPGRADE_ID}`);
   await tab.open();
   await pause(30_000);
-  await server.visitAll();
+  for (const target of TARGETS) await server.request(target);
   await sleep(2_000);
   if (run.conditions.has("warm"))
     for (const target of TARGETS) {
@@ -1856,17 +1647,13 @@ async function warmAndHead(run: Run, server: Server): Promise<void> {
   await tab.close();
 }
 
-/**
- * Waits for the engine to see a head other than `previous` (with `served`: and to serve it), and
- * returns it. Stops the benchmark when none comes within a minute.
- */
+/** The engine's first head other than `previous` (with `served`: once served), within a minute. */
 async function waitForHead(
   server: Server,
   previous: string | null,
-  served: boolean,
-  timeoutMs = 60_000
+  served: boolean
 ): Promise<{ number: string; observedAt: number; servedAt: number | null }> {
-  const until = Date.now() + timeoutMs;
+  const until = Date.now() + 60_000;
   while (Date.now() < until) {
     const head = newHead(await server.status(), previous);
     if (head && (!served || head.servedAt !== null)) return head;
@@ -1878,11 +1665,8 @@ async function waitForHead(
 }
 
 /**
- * An open set's Safe watcher against its hourly bound. Whatever it sent is held to the bound,
- * paused or not: the watcher reaches its own pauses ("budget", "quota") by sending, so a pause
- * after sending too much is a failure, never "not evaluated". Only a watcher that was paused at
- * the window's end and sent nothing in it is not evaluated (null): it says nothing about its
- * cadence then (a 429 cooldown, Safe's quota used up).
+ * An open set's Safe watcher against its hourly bound, paused or not: it reaches its own pauses
+ * (budget, quota) by sending. Not evaluated (null) only when it was paused and sent nothing.
  */
 export function watcherResult(
   w: Pick<WindowRow, "summary" | "engine">,
@@ -1906,18 +1690,19 @@ export function watcherResult(
   };
 }
 
-// -- an open signature set: the Safe watcher, then "Fetch signatures" --
 async function openSet(run: Run, port: number, condition: "open" | "keyless") {
-  const env: Record<string, string> = { CHAIN_CACHE: "0" };
-  // Safe's public service: no key from the environment, .env or the saved settings.
-  if (condition === "keyless")
-    Object.assign(env, {
-      SAFE_API_KEY: "",
-      LOCAL_SETTINGS_IGNORE: [process.env.LOCAL_SETTINGS_IGNORE, "SAFE_API_KEY"]
-        .filter(Boolean)
-        .join(","),
-    });
-  const server = new Server(condition, port, env);
+  const server = new Server(condition, port, {
+    CHAIN_CACHE: "0",
+    // Safe's public service: no key from the environment, .env or the saved settings.
+    ...(condition === "keyless"
+      ? {
+          SAFE_API_KEY: "",
+          LOCAL_SETTINGS_IGNORE: [process.env.LOCAL_SETTINGS_IGNORE, "SAFE_API_KEY"]
+            .filter(Boolean)
+            .join(","),
+        }
+      : {}),
+  });
   await boot(server);
   const tab = new Tab(server, run.openPath);
   await tab.open();
@@ -1942,13 +1727,10 @@ async function openSet(run: Run, port: number, condition: "open" | "keyless") {
     condition,
     condition === "open" ? "open set" : "open keyless",
     scaled(run, 10 * MINUTE),
-    {
-      watched,
-    }
+    { context: { watched } }
   );
   const safes = watched?.safes ?? 0;
-  const perHourBound = condition === "open" ? safes * 60 : safes * 12;
-  const result = watcherResult(w, safes, perHourBound);
+  const result = watcherResult(w, safes, condition === "open" ? safes * 60 : safes * 12);
   run.results.check(
     condition,
     condition === "open"
@@ -2009,60 +1791,11 @@ async function openSet(run: Run, port: number, condition: "open" | "keyless") {
   await server.stop();
 }
 
-// -- the upgrade page with the head polled late in each slot --
-async function late(run: Run, port: number) {
-  const server = new Server("late", port, { CHAIN_CACHE: "0", SYNC_HEAD_POLL: "late" });
-  await boot(server);
-  const tab = new Tab(server, `/app/proposals/${UPGRADE_ID}`);
-  await tab.open();
-  await pause(60_000);
-  const w = await costWindow(run, server, "late", "upgrade late", scaled(run, 20 * MINUTE));
-  // `slot` as this run measured it (the upgrade condition, at other heads), else October 8's.
-  const slot = run.results.windows.find((r) => r.condition === "upgrade" && r.label === "upgrade");
-  const slotPolls = slot?.summary.l1.byStep["head poll"]?.perBlock ?? 3.3;
-  run.results.check(
-    "late",
-    "SYNC_HEAD_POLL=late: fewer head polls a block than slot, served within 2 s (not compared head by head with slot)",
-    (w.summary.l1.byStep["head poll"]?.perBlock ?? 99) < slotPolls &&
-      (w.engine.servedDelayMs?.max ?? 99_999) <= 2_000,
-    {
-      headPollsPerBlock: w.summary.l1.byStep["head poll"]?.perBlock ?? null,
-      servedDelayMs: w.engine.servedDelayMs,
-      slot: {
-        from: slot ? "this run's upgrade window (other heads)" : "October 8's upgrade window",
-        headPollsPerBlock: slotPolls,
-        servedDelayMs: slot?.engine.servedDelayMs ?? null,
-      },
-    }
-  );
-  await tab.close();
-  await server.stop();
-}
-
-// -- always, with nothing on screen --
-async function always(run: Run, port: number) {
-  const server = new Server("always", port, { CHAIN_CACHE: "0", SYNC_MODE: "always" });
-  await boot(server);
-  await pause(60_000);
-  const w = await costWindow(run, server, "always", "always idle", scaled(run, 15 * MINUTE));
-  run.results.check(
-    "always",
-    "SYNC_MODE=always with nothing on screen: Era 0, Safe 0",
-    w.summary.era.requests === 0 && w.summary.safe.requests === 0
-  );
-  await server.stop();
-}
-
-/**
- * A new process's chain cache: loaded at its start (provisional, or verified already when the
- * history was read before the first status read) and verified once the history was read again.
- * Both must hold: a cache that stayed provisional, or was absent, does not pass.
- */
+/** A restart's chain cache: loaded at its start (provisional or verified), then verified. */
 export function cacheReloaded(atStart: string | null, after: string | null): boolean {
   return (atStart === "provisional" || atStart === "verified") && after === "verified";
 }
 
-// -- a new process with the chain cache --
 async function restart(run: Run, port: number) {
   const server = new Server("restart", port);
   const bootMs = await server.start();
@@ -2101,8 +1834,7 @@ async function freshProcesses(condition: "fresh" | "cache", run: Run, port: numb
     const m = await server.request(target);
     const status = await server.trusted();
     run.results.add(condition, m, { bootMs, cache: status.sync?.cache?.state ?? null });
-    // With the cache: let the history be read in full first, so that the shutdown save keeps
-    // all of it for the next process.
+    // With the cache: the whole history read first, so that the shutdown save keeps it all.
     if (condition === "cache") await server.settled();
     await server.stop();
   }
@@ -2164,13 +1896,12 @@ async function main() {
   console.log(`status ${JSON.stringify(results.notes.status)}`);
   await gate.stop();
 
-  // Side by side, one server each (the second wave once the first's windows in use are over).
+  // Side by side, one server each; the second wave once the first's windows in use are over.
   let upgradeDone: () => void = () => {};
   const upgradeFinished = new Promise<void>((resolve) => {
     upgradeDone = resolve;
   });
-  // The first wave's windows in use (upgrade, pages, home and veto) end after about 22 minutes.
-  // Only some conditions wait for it: when none runs, its end at the stop is nobody's error.
+  // The first wave's windows in use end after about 22 minutes; when none runs, nobody waits.
   const firstWave = any(run, "upgrade", "pages", "hidden", "home", "veto")
     ? stoppableSleep(scaled(run, 22 * MINUTE), stopping.signal)
     : Promise.resolve();
@@ -2180,14 +1911,7 @@ async function main() {
   else upgradeDone();
   if (any(run, "pages", "hidden", "resume")) tasks.push(pagesHiddenResume(run, port + 2));
   if (any(run, "home", "veto", "hidden", "warm", "head")) tasks.push(homeVetoWarm(run, port + 3));
-  tasks.push(
-    (async () => {
-      if (any(run, "always", "open", "late")) await firstWave;
-      if (any(run, "always")) await always(run, port + 4);
-      if (any(run, "open")) await openSet(run, port + 4, "open");
-      if (any(run, "late")) await late(run, port + 4);
-    })()
-  );
+  if (any(run, "open")) tasks.push(firstWave.then(() => openSet(run, port + 4, "open")));
   tasks.push(
     (async () => {
       if (any(run, "keyless")) {
@@ -2204,7 +1928,15 @@ async function main() {
   );
   try {
     await Promise.all(tasks);
-    if (any(run, "json", "resume")) jsonResumeCheck(run);
+    if (any(run, "json", "resume")) {
+      const { ok, detail } = jsonResumeResult(results.rows);
+      results.check(
+        "resume",
+        "first JSON after a pause within ~1 s of warm (status, lists; requests after a pause of their own)",
+        ok,
+        detail
+      );
+    }
   } finally {
     const file = join(OUT, "benchmark-sync.json");
     await writeFile(

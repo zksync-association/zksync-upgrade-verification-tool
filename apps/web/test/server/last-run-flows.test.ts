@@ -248,25 +248,23 @@ describe("a last run's history this run's would not hold", () => {
     await vi.waitFor(() => expect(outcomes).toEqual(["mismatch"]));
   });
 
-  it("with a start whose data does not decode: the page's list comes from this run's history", async () => {
-    const { history, release } = upstream((logs) =>
-      logs.map((log) =>
-        log.topics[0] === PUH_TOPICS.UpgradeStarted ? { ...log, data: "0x" as Hex } : log
-      )
-    );
-    const listing = listStandardUpgrades({ allHistory: true, freshness: "page" });
-    expect(await settles(listing)).toBe(false);
-    release();
-    const page = await listing;
-    expect(page.fromLastRun).toBeUndefined();
-    expect(page.upgrades.map((u) => u.id)).toEqual(history.upgrades.map((u) => u.id).reverse());
-  });
-
-  it("listing an upgrade twice: the page's list comes from this run's history", async () => {
-    const { history, release } = upstream((logs) => {
-      const started = logs.find((l) => l.topics[0] === PUH_TOPICS.UpgradeStarted) as ChainLog;
-      return [...logs, { ...started, blockNumber: started.blockNumber + 3n }].sort(byBlock);
-    });
+  it.each([
+    [
+      "with a start whose data does not decode",
+      (logs: ChainLog[]) =>
+        logs.map((log) =>
+          log.topics[0] === PUH_TOPICS.UpgradeStarted ? { ...log, data: "0x" as Hex } : log
+        ),
+    ],
+    [
+      "listing an upgrade twice",
+      (logs: ChainLog[]) => {
+        const started = logs.find((l) => l.topics[0] === PUH_TOPICS.UpgradeStarted) as ChainLog;
+        return [...logs, { ...started, blockNumber: started.blockNumber + 3n }].sort(byBlock);
+      },
+    ],
+  ])("%s: the page's list comes from this run's history", async (_, change) => {
+    const { history, release } = upstream(change);
     const listing = listStandardUpgrades({ allHistory: true, freshness: "page" });
     expect(await settles(listing)).toBe(false);
     release();

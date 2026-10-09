@@ -3,13 +3,9 @@ import type { SafeWatchDriver } from "@/.server/safe/store";
 import { type Address, type Hex, getAddress } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The Safe snapshot store: listings served while at most 60 s old (from the answer's arrival),
-// older ones read again for the request ahead of background work, and the watcher that asks Safe
-// about the member Safes the screen depends on (an open set's members not valid yet every minute,
-// a list's sources every 5 minutes), one small change check per Safe, one Safe at a time, within
-// its hourly budget and the quota Safe reports, slower without a key, never during a cooldown and
-// never while nobody uses the app; the viewer's own Safe read after they sign; "Fetch signatures";
-// and the copies a page may use. Driven by a fake Safe Transaction Service and fake timers.
+// The Safe snapshot store: listings served while at most 60 s old, the watcher (open sets' members
+// every minute, lists' Safes every 5 minutes, within the budget and Safe's quota), the viewer's own
+// Safe after they sign, "Fetch signatures" and the page rule, against a fake Safe service.
 
 const net = vi.hoisted(() => ({
   chainId: 1,
@@ -157,10 +153,7 @@ async function load({
   store = await import("@/.server/safe/store");
 }
 
-/**
- * The engine's side of the watcher: in use while `activity.on`; `screen.set` are members of open
- * sets on screen not valid yet, `screen.list` the Safes lists on screen collect from.
- */
+/** The engine's side of the watcher: in use while `activity.on`, with the Safes on screen. */
 function watcher(
   screen: { set?: readonly Address[]; list?: readonly Address[] },
   activity = { on: true }
@@ -931,7 +924,7 @@ describe("the watcher", () => {
     const status = store.safeStoreStatus();
     expect(JSON.parse(JSON.stringify(status))).toEqual(status);
     expect(JSON.stringify(status)).not.toContain("safe.global");
-    expect(status).toMatchObject({ groups: [], baseline: null, watched: { safes: 1, lists: 1 } });
+    expect(status).toMatchObject({ watched: { safes: 1, lists: 1 } });
   });
 });
 
@@ -1025,9 +1018,8 @@ describe("the copies a page may use (the page rule)", () => {
         expect(store.pageSafeListing(member, "set")).not.toBeNull();
       }
     }
-    // Within the cadence and the 10 s a copy confirmed while watched may run over (a check's
-    // answer); at the cadence's pace, about one check each a minute (the first round a little
-    // sooner than due), one small request each.
+    // Within the cadence, plus the 10 s a copy confirmed while watched may run over: about one
+    // small check each a minute.
     expect(worst).toBeLessThanOrEqual(60_000 + 10_000);
     const checks = safe.sent.slice(from);
     expect(checks.every((s) => s.kind === "newest")).toBe(true);
@@ -1035,9 +1027,8 @@ describe("the copies a page may use (the page rule)", () => {
     expect(checks.length).toBeLessThanOrEqual(16 * 11);
   });
 
-  // An open set's members and the Safes behind a list on screen at once (the set's page and the
-  // emergency list in two tabs), every copy read together by the pages: the list's Safes come due
-  // together, and must not hold the set's members (60 s) past their bound, nor the other way round.
+  // An open set's members and a list's Safes at once, every copy read together: neither kind may
+  // hold the other's checks past its bound.
   const MIXED = [
     { name: "no quota headers (the budget alone)", sets: 5, lists: 17, headers: {} },
     { name: "Safe's quota early in its period", sets: 5, lists: 17, headers: QUOTA_HEADERS },
@@ -1052,9 +1043,8 @@ describe("the copies a page may use (the page rule)", () => {
       },
     },
     { name: "16 set and 17 list Safes, quota early", sets: 16, lists: 17, headers: QUOTA_HEADERS },
-    // A Safe whose reads keep failing is retried sooner than its cadence at first (15 s, 30 s, ...
-    // at most 5 min), which the plan does not count: its retries take only starts no kept copy
-    // needs, so the healthy copies stay within their bound.
+    // A Safe whose reads keep failing is retried sooner than its cadence at first, but only in
+    // starts no kept copy needs.
     {
       name: "two list Safes failing, quota early",
       sets: 5,

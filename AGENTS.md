@@ -73,8 +73,8 @@ saw it; until then they read the block before.
 `sync.cache.state` of `"mismatch"`, see Rules):
 
 - `sync.presence`: `inUse`, `reason` (`tab` or `page-load`), `tabs`, and `keys` (items on screen).
-- `sync.engine`: `mode` (`window` by default, `always`, `off`; `off` on anvil/hardhat), `active` (following the head
-  now), the `head` it follows (`servedAt`: when requests started to read it), `lastTick` (`failedSteps`: steps that
+- `sync.engine`: `mode` (`window` by default, or `off`; `off` on anvil/hardhat), `active` (following the head now),
+  the `head` it follows (`servedAt`: when requests started to read it), `lastTick` (`failedSteps`: steps that
   failed at that block), `cost` (the JSON-RPC and Safe requests the app sent in the last hour;
   `infuraCreditsPerHour` is an estimate at Infura's credit weights; `mode` is `viewing` or `idle`; `pacer` is the
   follower's own pace, at most `SYNC_CREDITS_PER_SECOND`), and `clock` (how it polls for the next block, polls per

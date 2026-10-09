@@ -11,12 +11,7 @@ import { expectedEvent, indexCannotAnswer } from "./indexed";
 
 export type EmergencyEvent = { id: Hex; txHash: Hex; blockNumber: bigint };
 
-/**
- * State narrows discovery; the indexed event, never the flag alone, establishes an emergency.
- * Called once the state says executed, so the index is asked again at the newest head before it
- * answers null. From the handler's log index; the archive bisection only when the index cannot
- * answer. Kept for good once the event is final; null is never kept.
- */
+/** State narrows discovery; the indexed event, never the flag alone, establishes an emergency. */
 export async function findEmergencyEvent(id: Hex): Promise<EmergencyEvent | null> {
   const net = await network();
   return cachedUntil(`emergency-event:${id.toLowerCase()}`, async () => {
@@ -25,7 +20,6 @@ export async function findEmergencyEvent(id: Hex): Promise<EmergencyEvent | null
       if (!found) return { value: null, ttlMs: 0 };
       return {
         value: { id, txHash: found.log.transactionHash, blockNumber: found.log.blockNumber },
-        // Final only if the index answered it from its final range, never from its tail.
         ttlMs: !net.isDevNode && found.final ? FOREVER : 0,
       };
     } catch (error) {
@@ -40,10 +34,8 @@ export async function findEmergencyEvent(id: Hex): Promise<EmergencyEvent | null
 }
 
 /**
- * Without the index: bisect upgradeStatus over archive state, then read that one block's log.
- * Each read is a direct eth_call that either decodes or throws, so a failed read never counts as
- * "not executed yet"; any failure of the bisection falls back to the complete log scan, or (with
- * `scan: false`, a page's direct lookup beside the index) gives up with null.
+ * Without the index: bisect upgradeStatus over archive state, then read that block's log. A failed
+ * read never counts as "not executed yet": it falls back to the log scan (null without `scan`).
  */
 export async function archiveEmergencyEvent(
   id: Hex,

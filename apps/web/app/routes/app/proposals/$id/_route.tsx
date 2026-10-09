@@ -45,13 +45,11 @@ export const meta = Meta["/app/proposals/:id"];
 
 export function loader({ params, request }: LoaderFunctionArgs) {
   const id = parseId(params.id);
-  // After a pause (no head in memory), the upgrade as this app last showed it comes first, as of
-  // its block, until the current one replaces it (sync/last-shown.ts).
+  // After a pause, the upgrade as last shown comes first, as of its block.
   const shown = lastShown();
   const supplied = suppliedSignatures(request);
-  // The page shows each set's first answer at once (possibly from an older block or older Safe
-  // copies, labelled) and the strict result after it in the same response. Its sets' keys join
-  // the page load's grace as they are found.
+  // Each set's first answer at once (possibly an older block or older Safe copies, labelled), then
+  // the strict result in the same response; the sets' keys join the page load's grace.
   const page = pageLoad(request, [watchKeys.upgrade(id)]);
   const loading = page.run(() => loadStandardUpgrade(id, { supplied, freshness: "page" }));
   // Only a start this run's index found is kept: never one from the last run or located directly.
@@ -61,21 +59,17 @@ export function loader({ params, request }: LoaderFunctionArgs) {
     Promise.resolve(null),
     { current: (o) => !o.started.fromLastRun && !o.started.locatedDirectly }
   );
-  // With it, its approvals as last shown (the sets, with the recorded transactions of those done,
-  // and the recorded approvals): in the first flush too, never waiting on the newest block. Never
+  // Its approvals as last shown, in the first flush too, never waiting on the newest block. Never
   // for a page with a signature from its URL (its sets are verified with it).
   const approvalsKey = `upgrade:${id.toLowerCase()}:approvals`;
   if (supplied.length === 0)
     shown.keep(approvalsKey, shownApprovals(loading), (a) => a.sets.every((s) => !s.set.stale));
   return defer({
     watch: page.watch,
-    // The upgrade's state and status, for its revision (its sets carry their own).
     revs: loaderRevs([[watchKeys.upgrade(id), loading.then((d) => idContent(d.overview))]]),
     id,
     detail: detail.first,
     freshDetail: detail.fresh,
-    // A start found in the history the last run saved, or located directly while this run's
-    // index reads the history (labelled), is confirmed against this run's index.
     startedCheck: loading.then((d) => d.startedCheck),
     evidence: loading.then((d) => d.evidence),
     // The approvals as last shown, after a pause (null otherwise): each set as of the block it was
@@ -101,15 +95,11 @@ export function loader({ params, request }: LoaderFunctionArgs) {
   });
 }
 
-/** What the page keeps of an upgrade's approvals, to show first after a pause (see the loader). */
 type HeldApprovals = {
-  /** The sets as the page showed them (with their recorded evidence, for those done). */
   sets: ApprovalSet[];
-  /** The recorded approvals, or null when they could not be read. */
   evidence: RecordedApproval[] | null;
 };
 
-/** The approvals the page shows once its current reads are in (each set's current result). */
 async function shownApprovals(
   loading: ReturnType<typeof loadStandardUpgrade>
 ): Promise<HeldApprovals> {
@@ -129,7 +119,6 @@ async function shownApprovals(
   };
 }
 
-/** The approvals as last shown, labelled as the page shows them first (see heldSet). */
 function heldApprovalsOf(held: HeldApprovals & { asOf: { block: string; timestamp: string } }) {
   return {
     ...held,
@@ -156,8 +145,6 @@ export default function UpgradePage() {
       >
         <Await resolve={detail} errorElement={<DetailError id={id} />}>
           {(first) => (
-            // After a pause, the upgrade as last shown (as of its block) until the current one
-            // replaces it.
             <UntilFresh
               stale={first.asOf !== undefined}
               fresh={freshDetail}
@@ -180,7 +167,6 @@ export default function UpgradePage() {
   );
 }
 
-/** Where the calls came from, while this run's log index has not confirmed their start yet. */
 const CALLS_SOURCE: Record<Provenance, { pending: string; failed: string }> = {
   "last-run": {
     pending:
@@ -234,12 +220,10 @@ function Detail({
 }: {
   detail: SerializeFrom<StandardUpgradeCore>;
   /**
-   * The upgrade as this app last showed it, read at an older block (after a pause): shown in no
-   * colour under a notice, with nothing that waits on the current reads (signatures, recorded
-   * approvals, the execution) and nothing to act on, until the current one replaces it.
+   * The upgrade as last shown, read at an older block (after a pause): in no colour under a
+   * notice, with nothing that waits on the current reads and nothing to act on.
    */
   asOf?: AsOfBlock | null;
-  /** For `asOf`: where the current upgrade is (see UntilFresh). */
   refresh?: Refresh;
 }) {
   const {
@@ -252,8 +236,7 @@ function Detail({
     startedCheck,
     heldApprovals,
   } = useLoaderData<typeof loader>();
-  // The governance the upgrade was read with (the same reads as the app status): the page
-  // never waits on the root status for it.
+  // The governance the upgrade was read with: the page never waits on the root status for it.
   const governance = d.governance;
   const provenance = provenanceOf(d.started);
   const labels = {
@@ -452,8 +435,6 @@ function Detail({
         </Section>
       </AsOfContent>
 
-      {/* What follows waits on the current reads: as of an older block, the approvals as last
-          shown with it (each set as of its block), else only their pending state. */}
       {asOf ? (
         <Suspense fallback={<ApprovalsPending />}>
           <Await resolve={heldApprovals ?? null} errorElement={<ApprovalsPending />}>
@@ -515,7 +496,6 @@ function Detail({
                 {(verified) => (
                   <div className="space-y-6">
                     {verified.map((first) => (
-                      // A stale first answer shows until the strict result streams in.
                       <UntilFresh
                         key={first.key}
                         stale={first.set.stale === true}
@@ -523,8 +503,6 @@ function Detail({
                       >
                         {(fresh, refresh) => {
                           const s = fresh?.find((f) => f.key === first.key) ?? first;
-                          // A completed set shows its recorded transaction, the signatures it used
-                          // and their re-check once those are in; the current signatures do not wait.
                           const card = (
                             recorded: Pick<typeof s, "state" | "used" | "historical"> = s
                           ) => (
@@ -610,12 +588,10 @@ function Detail({
   );
 }
 
-/** The approvals' pending state, as of an older block with nothing kept for them. */
 function ApprovalsPending() {
   return <LoadingCard label="Checking the approvals and member signatures at the newest block…" />;
 }
 
-/** The recorded approvals: each one's transaction, the signatures it carried and their re-check. */
 function RecordedApprovalList({
   records,
 }: {
@@ -669,9 +645,8 @@ function RecordedApprovalList({
 }
 
 /**
- * The approvals as this app last showed them with the upgrade above (after a pause), until the
- * current ones replace them: in no colour, each set under its own notice naming the block it was
- * verified at, with nothing to sign, fetch or send (its card offers none of it for a stale set).
+ * The approvals as last shown with the upgrade above (after a pause): in no colour, each set under
+ * its own notice naming its block, nothing to sign, fetch or send (a stale set's card offers none).
  */
 function HeldApprovalsView({
   held,

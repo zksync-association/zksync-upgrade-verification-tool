@@ -30,7 +30,6 @@ vi.mock("@/components/governance-context", async (importOriginal) => {
   };
 });
 vi.mock("@remix-run/react", () => ({
-  useRouteLoaderData: () => ({ status: { ok: true } }),
   useNavigate: () => vi.fn(),
   useRevalidator: () => ({ revalidate: vi.fn(), state: "idle" }),
   Link: ({ children }: { children: React.ReactNode }) => <a href="/">{children}</a>,

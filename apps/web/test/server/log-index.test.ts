@@ -195,12 +195,33 @@ describe("backfill", () => {
     });
   });
 
-  it("is unavailable only after the full-range request failed 1 + 3 times", async () => {
-    const ctx = setup({ override: () => new FakeRpcError(-32603, "internal error") });
-    await ctx.index.startBackfill();
-    expect(ctx.chain.ranges()).toEqual(Array(4).fill([DEPLOY, FINAL]));
-    expect(ctx.index.status()).toMatchObject({ state: "unavailable", error: "internal error" });
-  });
+  it.each([
+    ["an internal error", -32603, "internal error", "internal error"],
+    [
+      "a refusal of history",
+      -32000,
+      `archive requests need a paid plan (see ${URL_})`,
+      "paid plan",
+    ],
+  ])(
+    "is unavailable after %s on the full-range request 1 + 3 times, with the RPC's message and no URL",
+    async (_, code, message, shown) => {
+      const ctx = setup({ override: () => new FakeRpcError(code, message) });
+      await ctx.index.startBackfill();
+      const status = ctx.index.status();
+      expect(status.state).toBe("unavailable");
+      expect(status.error).toContain(shown);
+      // The full-range request, retried like any chunk (1 try + 3 retries), never split.
+      expect(ctx.chain.ranges()).toEqual(Array(4).fill([DEPLOY, FINAL]));
+      const error = await ctx.index.logs().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(IndexUnavailable);
+      expect(error).toBeInstanceOf(LogsUnavailableError);
+      const text = `${(error as Error).message} ${status.error}`;
+      expect(text).toContain(shown);
+      expect(text).not.toContain("rpc.example.invalid");
+      expect(text).not.toContain("0123456789abcdef0123456789abcdef");
+    }
+  );
 
   it("halves with one sequential probe when the range error names no cap", async () => {
     const ctx = setup({
@@ -279,25 +300,6 @@ describe("backfill", () => {
     expect(await ctx.index.logs()).toHaveLength(98);
   });
 
-  it("is unavailable, with the RPC's message and no URL, when the RPC refuses history", async () => {
-    const ctx = setup({
-      override: () => new FakeRpcError(-32000, `archive requests need a paid plan (see ${URL_})`),
-    });
-    await ctx.index.startBackfill();
-    const status = ctx.index.status();
-    expect(status.state).toBe("unavailable");
-    expect(status.error).toContain("paid plan");
-    // The full-range request, retried like any chunk (1 try + 3 retries), never split.
-    expect(ctx.chain.ranges()).toEqual(Array(4).fill([DEPLOY, FINAL]));
-    const error = await ctx.index.logs().catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(IndexUnavailable);
-    expect(error).toBeInstanceOf(LogsUnavailableError);
-    const text = `${(error as Error).message} ${status.error}`;
-    expect(text).toContain("paid plan");
-    expect(text).not.toContain("rpc.example.invalid");
-    expect(text).not.toContain("0123456789abcdef0123456789abcdef");
-  });
-
   it("waits for coverage up to the bound, then throws IndexIncomplete", async () => {
     const slowBelow = FINAL - 1_000_000n;
     const ctx = setup(
@@ -365,8 +367,7 @@ describe("backfill", () => {
     const ctx = setup({ cap: 10_000n }, { hedgeMs: 30 }, { delayMs: 60 });
     await ctx.index.startBackfill();
     expect(ctx.index.status()).toMatchObject({ state: "ready", logs: 98 });
-    // The full-range attempt and 435 chunks, and few re-sent (before: 836 requests, nearly every
-    // chunk twice).
+    // The full-range attempt and 435 chunks, and few re-sent.
     expect(ctx.chain.ranges().length).toBeLessThanOrEqual(436 + 50);
   });
 });
@@ -466,8 +467,8 @@ describe("range limits", () => {
     while (Date.now() - opened < 200) await new Promise((r) => setTimeout(r, 10));
     await ctx.index.startBackfill();
     expect(ctx.index.status()).toMatchObject({ state: "ready", span: "10000", logs: 98 });
-    // Before: the burst halved the index-wide span to 9 blocks, 260,272 chunks. Now the chunks
-    // in flight (25 x 8) are each tried at most 4 times, plus a few split at the burst's edges.
+    // The chunks in flight (25 x 8) are each tried at most 4 times, plus a few split at the
+    // burst's edges.
     expect(ctx.index.status().chunks.total).toBeLessThan(600);
     expect(sent(ctx) - 436).toBeLessThanOrEqual(200 * 4 + 200);
   });

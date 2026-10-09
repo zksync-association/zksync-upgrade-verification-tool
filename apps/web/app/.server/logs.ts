@@ -15,8 +15,7 @@ import { historyLaneOf, latestBlock, network, safeBlockNumber } from "./rpc";
 
 // eth_getLogs without a database. Public RPCs cap block ranges (or refuse history), so ranges are
 // split adaptively, and every range below the "safe" head is cached forever per filter. Only the
-// newest ~64 blocks are fetched again on later requests. Scans on the app's own clients go
-// through their history lane (chain/jsonrpc.ts), which batches chunks and adapts to rate limits.
+// newest ~64 blocks are fetched again; the app's own clients scan through their history lane.
 
 export class LogsUnavailableError extends Error {
   constructor(
@@ -39,14 +38,10 @@ type FilterCache = {
   pendingTail: Map<string, Promise<Log[]>>;
 };
 
-/**
- * Where eth_getLogs goes: a history lane, or (any other client) the client itself behind a small
- * shared pool. `key` identifies the source for the cache and the learned span.
- */
+/** Where eth_getLogs goes: a history lane, or the client itself behind a small shared pool. */
 type Source = {
   key: object;
   request: (filter: Filter, from: bigint, to: bigint) => Promise<Log[]>;
-  /** Chunks of one scan that may be outstanding at once. */
   limit: () => <T>(task: () => Promise<T>) => Promise<T>;
 };
 
@@ -57,10 +52,7 @@ let caches = new WeakMap<object, Map<string, FilterCache>>();
 // Largest span each source has accepted so far; starts unbounded and only shrinks.
 let learnedSpan = new WeakMap<object, bigint>();
 
-/**
- * Starts `lane`'s scans at `span` blocks: a cap the provider named elsewhere (the log index), so
- * the first scan here does not have to find it again.
- */
+/** Starts `lane`'s scans at a cap the provider named elsewhere (the log index). */
 export function seedLogSpan(lane: Lane, span: bigint) {
   const learned = learnedSpan.get(lane);
   if (span > 0n && (learned === undefined || span < learned)) learnedSpan.set(lane, span);
@@ -358,8 +350,7 @@ function transientCode(code: number, message: string) {
 /**
  * Asks the RPC for a log that must exist (the handler's own deployment event). Some RPCs return
  * an empty array for old blocks instead of an error; without this check an incomplete list would
- * look exactly like a quiet governance week. A transient failure is retried (3 attempts, with
- * backoff) before it reads as "error", and that "error" is kept for 30 s, not ten minutes.
+ * look exactly like a quiet governance week. A transient failure is retried first.
  */
 export function checkLogHistory(client: PublicClient): Promise<LogHistoryStatus> {
   return cachedUntil<LogHistoryStatus>("log-canary", async () => {

@@ -5,10 +5,8 @@ import type { ReactNode } from "react";
 import "@testing-library/jest-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// An executed emergency upgrade's page while this run's log index has not confirmed the execution
-// it shows (taken from the last run's history, or located directly): the calls appear at once,
-// every part built from that transaction says where it came from until the index confirms it, and
-// the board's re-checks (archive reads) stream in after the calls.
+// Until this run's index confirms the execution shown, every part built from that transaction says
+// where it came from; the calls appear at once and the board's re-checks stream in after them.
 
 const page = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("@remix-run/react", async (importOriginal) => ({

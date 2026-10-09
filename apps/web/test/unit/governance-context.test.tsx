@@ -17,6 +17,15 @@ function StatusConsumer() {
   return <p>{status.governance.network.label}</p>;
 }
 
+function deferred() {
+  let resolve!: (value: RootStatus) => void;
+  const promise = new Promise<RootStatus>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+const ok = { ok: true, governance: { network: { label: "Read network" } } } as OkStatus;
+
 it("never turns absent/pending governance into a usable status", () => {
   const error = vi.spyOn(console, "error").mockImplementation(() => {});
   try {
@@ -40,15 +49,6 @@ it("provides the resolved governance snapshot to page and wallet consumers", () 
 });
 
 describe("a status still being read", () => {
-  function deferred() {
-    let resolve!: (value: RootStatus) => void;
-    const promise = new Promise<RootStatus>((r) => {
-      resolve = r;
-    });
-    return { promise, resolve };
-  }
-  const ok = { ok: true, governance: { network: { label: "Read network" } } } as OkStatus;
-
   it("suspends a consumer until it is read: never a pending value", async () => {
     const status = deferred();
     render(
@@ -109,35 +109,28 @@ describe("useStatusIfRead", () => {
     const status = useStatusIfRead();
     return <p>{status ? status.governance.network.label : "not read yet"}</p>;
   }
-  const ok = { ok: true, governance: { network: { label: "Read network" } } } as OkStatus;
 
   it("never suspends: null until the status is read, then the status", async () => {
-    let resolve!: (value: RootStatus) => void;
-    const promise = new Promise<RootStatus>((r) => {
-      resolve = r;
-    });
+    const status = deferred();
     // No Suspense boundary: a suspension would fail the render.
     render(
-      <StatusSourceContext.Provider value={promise}>
+      <StatusSourceContext.Provider value={status.promise}>
         <Membership />
       </StatusSourceContext.Provider>
     );
     expect(screen.getByText("not read yet")).toBeInTheDocument();
-    await act(async () => resolve(ok));
+    await act(async () => status.resolve(ok));
     expect(screen.getByText("Read network")).toBeInTheDocument();
   });
 
   it("is null, never a throw, when the status could not be read", async () => {
-    let resolve!: (value: RootStatus) => void;
-    const promise = new Promise<RootStatus>((r) => {
-      resolve = r;
-    });
+    const status = deferred();
     render(
-      <StatusSourceContext.Provider value={promise}>
+      <StatusSourceContext.Provider value={status.promise}>
         <Membership />
       </StatusSourceContext.Provider>
     );
-    await act(async () => resolve({ ok: false, error: "rpc down", hint: "" }));
+    await act(async () => status.resolve({ ok: false, error: "rpc down", hint: "" }));
     expect(screen.getByText("not read yet")).toBeInTheDocument();
   });
 

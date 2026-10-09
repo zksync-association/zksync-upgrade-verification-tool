@@ -53,17 +53,13 @@ export function SignatureSetCard({
   historical?: { block: string; accepted: boolean | null; error: string | null } | null;
   footer?: ReactNode;
   testId?: string;
-  /** For a stale first answer (`set.stale`): where the fresh result is (see UntilFresh). */
   refresh?: Refresh;
 }) {
-  // On screen while shown, with the revision of what is shown: the engine verifies the set again
-  // at each new block, and the page reloads when the content changed.
+  // The engine verifies a watched set again at each new block; the page reloads when it changed.
   useWatchItem(set.watch);
   const live = useLive();
   const valid = set.valid.length;
   const met = set.thresholdCheck.status === "met";
-  // The newest block the content shown was verified at, and the head served now when the set was
-  // not verified there (its reads failed, it needs Safe, or a ?sig= page that is never followed).
   const { block: verifiedAt, behind } = setCurrency(set, live);
   // A page's first answer from an older block or old Safe copies, or a result behind the head
   // served: every verdict is shown as of its block, nothing in a passing colour, and nothing to
@@ -74,8 +70,6 @@ export function SignatureSetCard({
   const unavailable = set.members.filter((m) => m.status === "unavailable").length;
   const incomplete =
     set.thresholdCheck.status === "below" && (unavailable > 0 || !!set.safeApiError);
-  // How the copies of its members not valid yet are kept (an open set): the newer of the beat's
-  // report and the page's own.
   const safeCheck =
     state.status === "open" && set.safeCheck !== null
       ? newerCheck(set.watch ? live.checked[set.watch.key] : null, set.safeCheck)
@@ -140,9 +134,8 @@ export function SignatureSetCard({
           <DoneSummary state={state} used={used} historical={historical} />
         )}
         <div className="flex flex-col-reverse gap-x-3 gap-y-2 sm:flex-row sm:items-start sm:justify-between">
-          {/* The buttons keep their place whatever the label says or how tall it grows (a card
-              that falls behind the head and catches up again never moves them): first on a
-              phone, the label below them; at the top right from sm up. */}
+          {/* The buttons keep their place however tall the label grows: first on a phone, the
+              label below them; at the top right from sm up. */}
           <div className="min-w-0 sm:flex-1">
             <FreshnessNote
               set={
@@ -155,8 +148,7 @@ export function SignatureSetCard({
               followed={followed}
               what="The statuses and counts on this card"
               check={staleAt === null ? safeCheck : null}
-              // Behind because Safe cannot be read now: said, with Fetch signatures to retry (only
-              // where that button is).
+              // Behind because Safe cannot be read now: said only where Fetch signatures can retry.
               safeReason={
                 behind !== null && fetchable ? safeUnavailableReason(safeCheck, unavailable) : null
               }
@@ -212,11 +204,6 @@ export function SignatureSetCard({
   );
 }
 
-/**
- * "Fetch signatures": reads the set's member Safes now and checks the signatures again at the
- * current block; the card updates in place. Safe is also asked on its own every minute or so while
- * the set is on screen (the label beside says when).
- */
 function FetchSignatures({ watchKey }: { watchKey: string }) {
   const check = useSafeCheck(watchKey);
   return (
@@ -248,10 +235,7 @@ function FetchSignatures({ watchKey }: { watchKey: string }) {
   );
 }
 
-/**
- * For a result behind the head served (see setCurrency): reloads the page's data now, which
- * verifies the set at the current head (a page with a signature from its URL included).
- */
+// Reloads the page's data, which verifies the set at the current head (?sig= pages included).
 function CheckAgain() {
   const { reload } = usePresence();
   return (

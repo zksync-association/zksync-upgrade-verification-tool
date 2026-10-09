@@ -1,15 +1,11 @@
-// A whole fake L1 node behind fakeJsonRpc, for tests that run the app's real modules end to end
-// (rpc.ts lanes and viem client, governance(), the log index, upgrade status reads): mainnet's
-// chain id and pinned ProtocolUpgradeHandler, its governance contracts with small member lists,
-// member Safes, upgradeState/upgradeStatus per id, Multicall3's aggregate3, the head and the
-// 'finalized' tag, and eth_getLogs over the handler's logs. Every eth_call is recorded, decoded.
-// Nothing here touches the network.
+// A fake L1 node behind fakeJsonRpc for tests that run the app's real modules end to end: mainnet's
+// chain id and governance contracts (small member lists), member Safes, upgrade states, Multicall3,
+// the head, 'finalized' and the handler's logs. Every eth_call is recorded, decoded. No network.
 
 import {
   ERC1271_MAGIC_VALUE,
   emergencyUpgradeBoardAbi,
   guardiansAbi,
-  safeAbi,
   securityCouncilAbi,
   upgradeHandlerAbi,
 } from "@/common/abis";
@@ -50,14 +46,11 @@ export const G_MEMBERS = [0, 1, 2].map((i) => member(0xb, i));
 
 /** Every address's code on the fake node unless FakeL1Options.code says otherwise. */
 export const FAKE_CODE: Hex = "0x6080604052";
-/** The Safe singleton and fallback handler the fake node's Safes report (Safe 1.3.0's, as on mainnet). */
+/** The Safe singleton and fallback handler the fake Safes report (Safe 1.3.0's, as on mainnet). */
 export const FAKE_SAFE_SINGLETON = getAddress("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552");
 export const FAKE_SAFE_HANDLER = getAddress("0xf48f2B2d2a534e402487b3ee7C18c33Aec0Fe5e4");
 
-/**
- * Code pins (common/networks.ts CodePins) that the fake node's contracts match: with these in
- * place (chain/pins.ts overrideCodePinsForTests) the app relies on them as on mainnet.
- */
+/** Code pins the fake contracts match, for chain/pins.ts overrideCodePinsForTests. */
 export const FAKE_PINS = {
   securityCouncil: keccak256(FAKE_CODE),
   guardians: keccak256(FAKE_CODE),
@@ -90,54 +83,32 @@ export type FakeL1Options = {
   /** upgradeState/upgradeStatus per id (lower case). Others: None, zeros. */
   upgrades?: Map<string, UpgradeOnChain>;
   clientVersion?: string;
-  /** Answers a call instead of the contract (e.g. a FakeRpcError); undefined: the contract answers. */
+  /** Answers a call instead of the contract (e.g. a FakeRpcError); undefined: the contract runs. */
   inject?: (call: L1Call) => FakeRpcError | undefined;
-  /**
-   * The contract's value for a call instead of the table's (REVERTS: it reverts, as a member list
-   * past its end does); undefined: the table answers.
-   */
+  /** A call's value instead of the table's (REVERTS: it reverts); undefined: the table answers. */
   answer?: (call: L1Call) => unknown;
   /** Contracts at other addresses that behave as these (new address → existing contract). */
   aliases?: Map<Address, Address>;
   /** Awaited before answering a call (to hold a read in flight). */
   gate?: (call: L1Call) => Promise<void> | undefined;
-  /**
-   * The node's answer to every eth_call at `block` ("latest" or a hex number) instead of running
-   * it, e.g. an error for state it no longer keeps; undefined: the call runs.
-   */
+  /** The answer to every eth_call at `block` instead of running it (e.g. state not kept). */
   stateAt?: (block: string) => FakeRpcError | undefined;
   delayMs?: FakeOptions["delayMs"];
   /**
-   * Member signatures the Security Council and Guardians accept in checkSignatures (and in
-   * isValidSignature's abi.encode(signers, signatures)), and signatures a Safe accepts in its own
-   * isValidSignature, as `${signer}:${signature}` (`${safe}:${signature}`) in lower case (any
-   * threshold); every other set reverts.
+   * Signatures the multisigs (`${signer}:${signature}`) and Safes (`${safe}:${signature}`) accept,
+   * in lower case, at any threshold; every other set reverts.
    */
   signatures?: Set<string>;
-  /**
-   * How the node answers Multicall3's getBlockNumber()/getLastBlockHash() in an eth_call at a
-   * block: in that block's context ("block", the default: the block's number and its parent's
-   * hash) or the next block's ("next-block": number + 1 and the block's own hash). A function
-   * answers for one call's block tag instead (undefined: the convention).
-   */
+  /** Multicall3's block getters at block n: "block" n and n-1's hash, "next-block" n+1 and n's. */
   guard?: "block" | "next-block";
   guardAt?: (block: string) => { number: bigint; lastHash: Hex } | undefined;
-  /**
-   * The node's answer to an aggregate3 at `block` as a whole instead of running it (e.g. out of
-   * gas, an internal error); undefined: it runs. Direct calls are not affected.
-   */
+  /** The answer to a whole aggregate3 at `block` instead of running it (direct calls run). */
   aggregateError?: (block: string) => FakeRpcError | undefined;
   /** An address's code at a block tag ("latest" or hex; undefined: FAKE_CODE), or an error. */
   code?: (address: Address, block: string) => Hex | FakeRpcError | undefined;
-  /**
-   * The node's answer to eth_getTransactionReceipt: a receipt (fakeReceipt), null (not mined), or
-   * an error. Without it the node does not know the method.
-   */
+  /** eth_getTransactionReceipt's answer (fakeReceipt, null, an error); else an unknown method. */
   receipt?: (hash: Hex) => Record<string, unknown> | null | FakeRpcError;
-  /**
-   * The node's answer to eth_getTransactionByHash: a transaction, null (unknown), or an error.
-   * Without it the node does not know the method.
-   */
+  /** eth_getTransactionByHash's answer (a transaction, null, an error); else an unknown method. */
   transaction?: (hash: Hex) => Record<string, unknown> | null | FakeRpcError;
 };
 
@@ -168,8 +139,7 @@ export class RawAnswer {
 }
 
 const errorAbi = parseAbi(["error Panic(uint256)"]);
-// What the fake node's Safes answer (Safe 1.3.0's own getters besides the app's ABI), and
-// Multicall3's block getters.
+// The getters the fake Safes answer, and Multicall3's block getters.
 const fakeSafeAbi = parseAbi([
   "function VERSION() view returns (string)",
   "function getThreshold() view returns (uint256)",
@@ -185,7 +155,6 @@ const multicallViewAbi = parseAbi([
   "function getBlockNumber() view returns (uint256 blockNumber)",
   "function getLastBlockHash() view returns (bytes32 blockHash)",
 ]);
-void safeAbi;
 const outOfBounds = encodeErrorResult({ abi: errorAbi, errorName: "Panic", args: [0x32n] });
 const REVERT = Symbol("revert");
 /** FakeL1Options.answer's way to make a call revert (Panic 0x32, as members(i) past the end). */
@@ -250,7 +219,6 @@ export function fakeL1(options: FakeL1Options) {
         ? ERC1271_MAGIC_VALUE
         : REVERT;
     };
-    // Multicall3's block getters, as the node runs an eth_call at that block (see guard).
     const guardAt = () => {
       const custom = options.guardAt?.(call.block);
       if (custom) return custom;
@@ -361,8 +329,7 @@ export function fakeL1(options: FakeL1Options) {
     const result = value(call);
     if (result === REVERT) return { error: new FakeRpcError(3, "execution reverted", outOfBounds) };
     if (result instanceof RawAnswer) return { data: result.data };
-    // viem takes a single output's value wrapped in an array (else an array value would be
-    // read as the list of outputs).
+    // viem takes a single output wrapped (else an array value reads as the list of outputs).
     const item = abi.find(
       (entry) => entry.type === "function" && entry.name === decoded.functionName
     ) as { outputs: readonly unknown[] };

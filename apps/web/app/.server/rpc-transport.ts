@@ -5,32 +5,19 @@ import { concurrencyLimit } from "./cache";
 export type LimitedHttpOptions = {
   /** Names the source in logs ("L1", "L2"); the URL is never logged. */
   label: string;
-  /** Requests in flight at once, across all batches. */
   maxInFlight: number;
-  /** Requests per JSON-RPC batch. Defaults to `maxInFlight`. */
   batchSize?: number;
-  /**
-   * false: one request per POST. viem batches JSON-RPC requests per URL across every transport,
-   * so this is the only way to keep this transport's requests out of other transports' batches
-   * (and their slow entries). Default true.
-   */
+  /** false: one request per POST (viem batches per URL, across every transport). Default true. */
   batch?: boolean;
-  /**
-   * Called as each JSON-RPC request is sent upstream (a retry counts again), with its method:
-   * cost counting.
-   */
+  /** Called per JSON-RPC request sent upstream, retries included (cost counting). */
   onRequest?: (method: string) => void;
-  /**
-   * Asked before a request is made: a promise to wait for first (the sync engine's credit pacer,
-   * for the engine's own requests), or null to send it at once. A wait that rejects fails the
-   * request unsent (the engine's work once it may no longer send, sync/pacer.ts).
-   */
+  /** A wait before sending (the credit pacer) or null; a rejected wait fails the request unsent. */
   pace?: (method: string) => Promise<void> | null;
   /** The in-flight limit to share with another transport (default: one of its own, maxInFlight). */
   limit?: ConcurrencyLimit;
 };
 
-export type ConcurrencyLimit = ReturnType<typeof concurrencyLimit>;
+type ConcurrencyLimit = ReturnType<typeof concurrencyLimit>;
 
 /** Batch read-only JSON-RPC traffic, with a per-client fallback for providers rejecting batches. */
 export function limitedHttp(url: string, options: LimitedHttpOptions): Transport {
@@ -131,7 +118,6 @@ export function limitedHttp(url: string, options: LimitedHttpOptions): Transport
   };
 }
 
-/** The JSON-RPC error code of a batch-level reply, if it has one. */
 function errorCode(text: string): number | undefined {
   try {
     const body = JSON.parse(text);

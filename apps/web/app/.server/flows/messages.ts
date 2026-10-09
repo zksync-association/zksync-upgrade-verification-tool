@@ -43,28 +43,17 @@ export type Collected = {
   groups: Grouped[];
   errors: string[];
   anomalies: number;
-  /** When the oldest listing read was fetched (ISO time), or null when none was. */
   safeFetchedAt?: string | null;
-  /**
-   * Some listing was older than a page may use as current (only collectHeldMessages', for a
-   * page's first answer): more than 60 s old and not kept by the watcher for the screen, or read
-   * by the last run.
-   */
+  /** Only collectHeldMessages': some listing was older than a page may use as current. */
   stale?: boolean;
 };
 
-/** A Safe's listing as collected: its messages, and when Safe's answer arrived (when known). */
 type Listing = { messages: SafeMessage[]; fetchedAt?: number };
 
-/** A message read as one of ours: its typed data and digest, and whether Safe filed it right. */
 type Reading = { typedData: GovernanceTypedData; digest: Hex; filed: boolean } | null;
 
-// What each message read as, per Safe and chain, keyed by the message object the Safe store
-// holds: the store keeps the objects of messages that did not change when it reads a listing
-// again, so each message's typed data is parsed and hashed once, not on every page (on a page that
-// work comes before its first bytes are sent: about 0.1 s for the 17 member Safes' listings).
-// Dropped objects are collected with their readings. warmMessageReadings does it for the listings
-// held at the start, off the request path.
+// Keyed by the message objects the Safe store keeps while they do not change, so each message is
+// parsed and hashed once, not before every page's first bytes (about 0.1 s for 17 member Safes).
 const readings = new WeakMap<SafeMessage, Map<string, Reading>>();
 
 const readingKey = (safe: Address, chainId: number) => `${chainId}:${safe.toLowerCase()}`;
@@ -93,12 +82,7 @@ function readMessage(message: SafeMessage, safe: Address, chainId: number): Read
   return reading;
 }
 
-/**
- * Reads (parses and hashes) the messages of the listings held for these Safes, of any age, as
- * collecting them would, one Safe at a time with a turn of the event loop between: the boot
- * warm-up's, so that the first page to list them does not do it before its first bytes. Never asks
- * Safe. Returns how many messages it read (those not read before).
- */
+/** Boot warm-up: reads held listings' messages, one Safe per event-loop turn. Never asks Safe. */
 export async function warmMessageReadings(safes: readonly Address[]): Promise<number> {
   const { chainId } = await network();
   let read = 0;
@@ -123,9 +107,8 @@ const sameDomain = (a: Eip712Domain, b: Eip712Domain) =>
   isAddressEqual(a.verifyingContract, b.verifyingContract);
 
 /**
- * The governance messages in members' Safe listings: at most 60 s old, read when older; with
- * `page` (a page's list, never JSON), also a copy the watcher keeps checking for the lists on
- * screen (safe/store.ts pageSafeListing), labelled with its age.
+ * From listings at most 60 s old, read when older; with `page` (never JSON), also a copy the
+ * watcher keeps checking for the lists on screen, labelled with its age.
  */
 export function collectMessages(
   safes: Address[],
@@ -141,11 +124,7 @@ export function collectMessages(
   );
 }
 
-/**
- * collectMessages from the listings held now, whatever their age, without asking Safe: a page's
- * first answer while the fresh listings are read (`stale` when one is older than 60 s, or was read
- * by the last run). null when a Safe has no listing held.
- */
+/** From the listings held, of any age, never asking Safe; null when a Safe has none held. */
 export async function collectHeldMessages(
   safes: Address[],
   actions: readonly ActionName[],

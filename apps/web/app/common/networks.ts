@@ -9,24 +9,16 @@ import { type Address, type Hex, toEventSelector } from "viem";
 //   event at block 21788382 marks the deployment and doubles as the log-history canary.
 // - L2 governors: docs.zknation.io "ZKsync Governance Contract Addresses". The protocol governor
 //   is cross-checked on-chain: ZkProtocolGovernor.timelock() == ProtocolUpgradeHandler.L2_PROTOCOL_GOVERNOR.
-// - L2 governor log blocks (checked 2026-10-06 with one eth_getLogs over the three governors from
-//   Era genesis to head): the first ProposalCreated/ProposalExecuted/ProposalCanceled log, and the
-//   first log of any kind (the protocol governor's deployment). Mainnet 49077771 / 41196850,
-//   Sepolia 3590083 / 3584343.
+// - L2 governor log blocks (one eth_getLogs over the three governors from Era genesis, 2026-10-06):
+//   the first ProposalCreated/Executed/Canceled log, and the first log of any kind (deployment).
 // - Sepolia ProtocolUpgradeHandler 0x7444…: apps/web/docs (removed). It is the only Sepolia handler
 //   that still answers the handler ABI; the one listed in the docs (0xe3a6…) is a proxy whose
 //   implementation no longer has handler functions. Override with UPGRADE_HANDLER_ADDRESS.
 export type NetworkName = "mainnet" | "sepolia" | "local";
 
-/**
- * Bytecode the app knows and relies on, by keccak256 of the runtime code (read on mainnet at block
- * 26,141,196). With the governance contracts' code matching, the parts of governance that code
- * never writes after its constructor (members, domains, constants) are read once per process and
- * kept; everything else is read at each block. The verdict fast path (one Multicall3 aggregate3
- * for a set's checks) is used only on check contracts whose code matches, and for the ZK
- * Foundation Safe only while its singleton and fallback handler are these. Not pinned (Sepolia,
- * local chains): every read as without them.
- */
+// keccak256 of runtime code the app relies on (read on mainnet at block 26,141,196). Only while it
+// matches is what that code never writes after its constructor kept per process, and the verdict
+// fast path used (the ZK Foundation Safe's: while its singleton and fallback handler match too).
 export type CodePins = {
   securityCouncil: Hex;
   guardians: Hex;
@@ -49,10 +41,8 @@ export type NetworkConfig = {
   safeWalletPrefix: string | null;
   l2RpcUrl: string | null;
   l2Governors: { protocol: Address | null; token: Address | null; govOps: Address | null };
-  // Where the L2 governors' log index starts: the first block with a ProposalCreated,
-  // ProposalExecuted or ProposalCanceled log of any of the three pinned governors. The governors'
-  // deployment (their first log of any kind) is the fallback when it is not pinned. Both null:
-  // no index (every governor is read on demand).
+  // Where the L2 governors' log index starts (else their deployment). Both null: no index (every
+  // governor is read on demand).
   l2GovernorsFirstLogBlock: bigint | null;
   l2GovernorsDeployBlock: bigint | null;
   explorerUrl: string | null;

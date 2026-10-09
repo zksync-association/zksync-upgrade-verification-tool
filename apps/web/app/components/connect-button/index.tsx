@@ -15,11 +15,8 @@ const GROUP_LABEL: Record<SignerGroup, string> = {
   zkFoundation: "ZKsync Foundation",
 };
 
-/**
- * Which signer groups the connected account is a member Safe of (read from chain via the root
- * loader). Never waits for the root status: until it is read (or when it could not be), `known` is
- * false and `groups` is empty.
- */
+// Which signer groups the connected account is a member Safe of (from the root loader). Never waits
+// for the root status: until it is read (or when it could not be), `known` is false.
 export function useConnectedGroups(): {
   address: Address | undefined;
   groups: SignerGroup[];

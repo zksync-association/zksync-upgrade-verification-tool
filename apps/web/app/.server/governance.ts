@@ -95,13 +95,8 @@ const read = <T>(
   blockNumber?: bigint
 ) => l1.readContract({ address, abi, functionName, args, blockNumber }) as Promise<T>;
 
-/**
- * A read whose failure decides something: a contract without eip712Domain(), a Safe without a
- * getter (member lists confirm the same way, in readMembers). It goes out with the other reads
- * (through Multicall3); a failed one is asked again directly (chain/call.ts), whose error then
- * says whether the contract reverted. A failed Multicall3 sub-call carries no error code, and one
- * that ran out of gas looks like a revert.
- */
+// A read whose failure decides something (a missing eip712Domain(), a Safe getter): with the other
+// reads through Multicall3, then directly when it failed, so its error says whether it reverted.
 async function confirmedRead<T>(
   address: Address,
   abi: Abi,
@@ -139,7 +134,6 @@ async function readMembers(
 /** eip712Domain()'s answer, or null when the contract definitely has none (it reverts). */
 type DomainAnswer = readonly [string, string, string, bigint, Address, ...unknown[]] | null;
 
-/** What a governance read gathers, before it is checked and shaped (see shape). */
 type Reads = {
   puh: Address;
   sc: Address;
@@ -152,11 +146,8 @@ type Reads = {
   scDomain: DomainAnswer;
   gDomain: DomainAnswer;
   eubDomain: DomainAnswer;
-  /** SC_GETTERS' answers, in that order. */
   scValues: readonly unknown[];
-  /** G_GETTERS' answers, in that order. */
   gValues: readonly unknown[];
-  /** EUB_GETTERS' answers, in that order. */
   eubValues: readonly unknown[];
 };
 
@@ -198,12 +189,7 @@ const EUB_GETTERS = [
 const noContract = (net: Network) =>
   new Error(`No contract at ProtocolUpgradeHandler ${net.upgradeHandler} on chain ${net.chainId}`);
 
-/**
- * Today's reads, in rounds: the handler's code and its five getters together; then every getter
- * of the three contracts the handler names, with their member lists probed 16 at a time; then the
- * first member read that failed in Multicall3, asked again directly. All at `blockNumber` (at
- * 'latest' when undefined).
- */
+// The reads in rounds, at `blockNumber` ('latest' when undefined).
 async function readInRounds(net: Network, blockNumber: bigint | undefined): Promise<Reads> {
   const puh = net.upgradeHandler;
   const [code, puhValues] = await Promise.all([
@@ -255,7 +241,6 @@ async function readInRounds(net: Network, blockNumber: bigint | undefined): Prom
   };
 }
 
-/** What a speculative read asks for: the last read's role addresses and member counts. */
 type Layout = {
   puh: Address;
   sc: Address;
@@ -265,9 +250,8 @@ type Layout = {
   gCount: number;
 };
 
-// The layout of the last read under the current settings, and that read itself (whose
-// constructor-only part pages reuse, see governanceAtHead). Dropped with governance (refresh,
-// settings change, clearCache); a read that started before a drop does not set them.
+// The last read and its layout (pages reuse its constructor-only part): dropped with governance,
+// and never set by a read that started before the drop.
 let layout: Layout | null = null;
 let lastReads: Reads | null = null;
 let layoutEpoch = 0;
@@ -278,23 +262,15 @@ linkStore("governance-layout", () => {
   layoutEpoch++;
 });
 
-// Whether the contracts of a full read run the pinned code, by their three addresses: checked
-// once (pinnedContracts), a moment after a page first needs it (see governanceSplitApplies).
+// Whether a full read's three contracts run the pinned code, by address (see pinsChecked).
 const pinChecks = new Map<string, { result: boolean | null; started: boolean }>();
 const PIN_CHECK_AFTER_MS = 1_000;
 
 type SubCall = { target: Address; abi: Abi; functionName: string; args?: readonly unknown[] };
 
-/**
- * Every read of readInRounds in one POST, guessing that the handler still names the contracts it
- * named at the last read and that their member lists have the same length: the handler's code;
- * one aggregate3 of its five getters, both member lists (members(0) to members(count-1)), the
- * three domains and every other getter; and both lists' terminators members(count), directly
- * (four billed requests). Accepted only if the code is there, every sub-call succeeded with data
- * that decodes, the handler named the same three contracts, and both terminators definitely
- * reverted (a member list never ends on anything else, chain/call.ts). null otherwise: the caller
- * reads in rounds, as without the guess.
- */
+// Every read of readInRounds in one POST (four billed requests), guessing the last read's layout.
+// Accepted only if the code is there, every sub-call decodes, the handler named the same three
+// contracts, and both lists' terminators members(count) definitely reverted. null otherwise.
 async function readInOne(
   net: Network,
   blockNumber: bigint | undefined,
@@ -428,7 +404,6 @@ async function readInOne(
   };
 }
 
-/** The domain to sign with, and the warning its answer calls for (if any). */
 function domainOf(
   answer: DomainAnswer,
   address: Address,
@@ -453,7 +428,6 @@ function domainOf(
   return { name, version, chainId, verifyingContract: address };
 }
 
-/** The Governance a set of reads at `at` describes, with every check's warnings. */
 function shape(net: Network, at: BlockRef, reads: Reads): Governance {
   const warnings: string[] = [];
   const { puh, sc, g, eub } = reads;
@@ -550,8 +524,7 @@ function shape(net: Network, at: BlockRef, reads: Reads): Governance {
   } satisfies Governance;
 }
 
-// Today's bound for roles, thresholds and warnings. The sync engine re-reads them on every new
-// block while the app is in use (replacing the entry), so requests then never wait on this read.
+// The sync engine replaces this entry at every new block while the app is in use.
 export const GOVERNANCE_KEY = "governance";
 export const GOVERNANCE_TTL_MS = 30_000;
 
@@ -562,14 +535,7 @@ export function governance(): Promise<Governance> {
 // A backend behind the one that named the head does not know it yet; the next one usually does.
 const UNKNOWN_BLOCK_RETRY_MS = 300;
 
-/**
- * Reads everything governance() serves, now (uncached), at one block: `head` (the sync engine's
- * new head, before it is published), else the cached head. Every getter is read at that block's
- * number (at 'latest' on a dev node, whose state can change without a new block), in one round
- * when the last read's layout still holds (readInOne), else in rounds as before (readInRounds);
- * either way the same reads, and the same answer. Asked once more after a moment when the node
- * says it does not know the block (a load-balanced backend behind).
- */
+/** governance() uncached, at `head` (else the cached head); asked again if the node lacks it. */
 export async function readGovernance(head?: BlockRef): Promise<Governance> {
   const [net, at] = await Promise.all([network(), head ?? latestBlock()]);
   try {
@@ -601,22 +567,11 @@ async function readAt(net: Network, at: BlockRef): Promise<Governance> {
   return shape(net, at, reads);
 }
 
-// ---- governance at a head, for pages: the constructor-only part kept, the rest read there ----
-//
-// What the Security Council, Guardians and Emergency Upgrade Board hold never changes after their
-// constructors (members, EIP-712 domains, thresholds that are constants, the handler and the
-// contracts they name), PROVIDED they run the code pinned in common/networks.ts (checked once per
-// process, chain/pins.ts): that code has no other write to it. So pages take that part from the
-// last full read of these three contracts, and read everything else at each head (the handler's
-// role addresses and freeze state, the council's soft-freeze threshold and nonces, the Guardians'
-// nonce: the values that change, some of them without any log) in the head's aggregate3
-// (chain/aggregate.ts), beside the head's other reads. Another set of contracts named by the
-// handler, a value unknown at the head (a failed sub-call, an answer from another block), or no
-// full read yet: a full read at the head instead. Without pins (Sepolia, local chains, an
-// overridden trust anchor), or with code that is not the pinned code, pages read governance as
-// JSON does. JSON (/api/*) always reads governance() and never this.
+// Governance at a head, for pages. What the Security Council, Guardians and Emergency Upgrade Board
+// hold never changes after their constructors PROVIDED they run the pinned code (chain/pins.ts), so
+// pages keep that part from the last full read and read what changes at each head. Anything else
+// (other contracts, a value unknown at the head, no pins): a full read. JSON never reads this.
 
-/** The values governance holds that can change after deployment. */
 type Mutables = {
   sc: Address;
   g: Address;
@@ -639,11 +594,7 @@ const MUTABLE_SC_GETTERS = [
   "softFreezeThresholdSettingNonce",
 ] as const;
 
-/**
- * The mutable values at `head`, from the head's aggregate3, with the council's and the Guardians'
- * getters asked at `at` (the contracts the last full read found). null when any value is unknown
- * at the head (see chain/aggregate.ts).
- */
+/** The mutable values from the head's aggregate3; null when any is unknown at the head. */
 async function readMutablesAt(
   puh: Address,
   at: { sc: Address; g: Address },
@@ -718,7 +669,6 @@ async function readMutablesAt(
   };
 }
 
-/** A full read with the values that change replaced by `m` (read at another block). */
 function overlay(base: Reads, m: Mutables): Reads {
   const scValues = [...base.scValues];
   scValues[SC_GETTERS.indexOf("softFreezeThreshold")] = m.softFreezeThreshold;
@@ -743,10 +693,7 @@ function overlay(base: Reads, m: Mutables): Reads {
 const sameContracts = (a: { sc: Address; g: Address; eub: Address }, b: typeof a) =>
   isAddressEqual(a.sc, b.sc) && isAddressEqual(a.g, b.g) && isAddressEqual(a.eub, b.eub);
 
-/**
- * The three contracts of a full read run the pinned code: a definite answer (false for no pins,
- * other code or none). Rejects when a code hash cannot be read (not known yet: asked again).
- */
+/** A definite answer (false for no pins or other code); rejects when a code hash cannot be read. */
 async function pinnedContracts(reads: Reads): Promise<boolean> {
   const pins = await codePins();
   if (!pins) return false;
@@ -758,15 +705,9 @@ async function pinnedContracts(reads: Reads): Promise<boolean> {
   return checks.every(Boolean);
 }
 
-/** pinnedContracts, false when unsure (a code hash that cannot be read now). */
 const pinnedContractsNow = (reads: Reads) => pinnedContracts(reads).catch(() => false);
 
-/**
- * Pages read governance at each head (governanceAtHead): a live chain with code pins, a full read
- * already made under the current settings (its constructor-only part is what pages keep), and
- * that read's contracts running the pinned code. Otherwise pages read governance() as JSON does
- * (and the sync engine keeps it fresh for them as before).
- */
+/** Pages read governance at each head once a full read's contracts are known to run pinned code. */
 export async function governanceSplitApplies(): Promise<boolean> {
   try {
     const net = await network();
@@ -778,14 +719,9 @@ export async function governanceSplitApplies(): Promise<boolean> {
   }
 }
 
-/**
- * Whether the contracts of `reads` run the pinned code, once known. Unknown yet: false for now,
- * and the check (three eth_getCode, once per process) starts a moment later, on its own rather
- * than in the reads of whatever asked (a page's first governance read, a tick's). Only a definite
- * answer is kept (the hashes read: pinned or not); a check that could not read a hash (an RPC
- * error), or found the app no longer in use when its moment came (it then reads nothing), starts
- * again the next time it is needed. Nothing here repeats by itself.
- */
+// Whether `reads`' contracts run the pinned code, once known; until then false, with the check
+// (three eth_getCode, once per process) started a moment later on its own. Only a definite answer
+// is kept: a failed or disallowed check starts again when next needed.
 function pinsChecked(reads: Reads): boolean {
   const key = [reads.sc, reads.g, reads.eub].join(",").toLowerCase();
   let check = pinChecks.get(key);
@@ -816,8 +752,7 @@ function pinsChecked(reads: Reads): boolean {
   return false;
 }
 
-// An entry describes one head; pages move on to the next key with the head. The TTL only bounds
-// how long an entry nobody asks for any more stays in memory.
+// Keyed per head; the TTL only bounds how long an entry nobody asks for stays in memory.
 const PAGE_GOVERNANCE_TTL_MS = 60_000;
 
 export const pageGovernanceKey = (head: Pick<BlockRef, "hash">) =>
@@ -828,16 +763,11 @@ export type GovernanceAtHead = "split" | "full-read" | "as-json";
 
 const howRead = new WeakMap<Governance, GovernanceAtHead>();
 
-/** How `gov` was read, when it came from governanceAtHead. */
 export function governanceReadKind(gov: Governance): GovernanceAtHead | null {
   return howRead.get(gov) ?? null;
 }
 
-/**
- * Governance at `head` for pages (kept per head hash): the constructor-only part of the last full
- * read with the values that change read at the head, else a full read at the head; governance()
- * itself (JSON's) where the split does not apply.
- */
+/** Governance at `head` for pages, kept per head hash (see the section comment above). */
 export function governanceAtHead(head: BlockRef): Promise<Governance> {
   return cachedUntil(pageGovernanceKey(head), async () => {
     const { value, kind } = await computeGovernanceAt(head);
@@ -893,11 +823,7 @@ export function safeInfo(address: Address, at?: BlockRef): Promise<SafeInfo> {
 
 const SAFE_INFO_GETTERS = ["VERSION", "getThreshold", "getOwners", "domainSeparator"] as const;
 
-/**
- * The Safe info at `head` from the head's aggregate3 (chain/aggregate.ts), beside the head's other
- * reads: only when all four getters answered with data that decodes (a getter answering a word
- * shows the code is there). null otherwise: read as before (readSafeInfoDirect).
- */
+/** Safe info from the head's aggregate3, only when all four getters decode; else null. */
 async function safeInfoFromAggregate(
   address: Address,
   head: BlockRef,
@@ -939,10 +865,7 @@ async function safeInfoFromAggregate(
   };
 }
 
-/**
- * Reads what safeInfo() serves, now (uncached): at `head` (the sync engine's new head; else the
- * head requests read) in the head's aggregate3 when it can answer, else as before at 'latest'.
- */
+/** safeInfo() uncached: at `head` (else the served head) via aggregate3, else at 'latest'. */
 export async function readSafeInfo(address: Address, head?: BlockRef): Promise<SafeInfo> {
   const net = await network();
   if (!net.isDevNode) {

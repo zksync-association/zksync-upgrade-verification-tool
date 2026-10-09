@@ -1,8 +1,6 @@
-// A fake ZKsync Era behind fakeJsonRpc, for the L2 governor index and the flows that read it:
-// the three pinned mainnet governors' ProposalCreated / ProposalExecuted / ProposalCanceled logs
-// (plus VoteCast noise a topic filter must leave out), Era-like block times (about 0.7 s, several
-// blocks sharing a second), Governor.state(id) over eth_call, execution receipts with their
-// L2 → L1 message, and zks_getL2ToL1LogProof. Every call is recorded.
+// A fake ZKsync Era behind fakeJsonRpc for the L2 governor index and the flows that read it: the
+// pinned governors' proposal logs (and VoteCast noise), Era-like block times, Governor.state,
+// execution receipts with their L2 → L1 message, and zks_getL2ToL1LogProof. Calls are recorded.
 
 import { l1MessengerEventAbi, l2GovernorAbi } from "@/common/abis";
 import {

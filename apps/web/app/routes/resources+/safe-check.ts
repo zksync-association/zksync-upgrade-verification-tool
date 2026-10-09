@@ -14,36 +14,24 @@ import { currentRev, noteContent } from "@/.server/sync/revs";
 import { type ActionFunctionArgs, json } from "@remix-run/node";
 import type { Address } from "viem";
 
-// "Fetch signatures" on a signature set that can still be signed, and "Check Safe now" on a list
-// fed by Safe (pending emergency upgrades, freeze requests, vetoes): asks Safe about the member
-// Safes behind it now, at a request's priority (the same pacer as any request: one start at a
-// time, at most 4 in flight), verifies the set again at the head served now (or reads the list
-// from the copies just read), and answers with its revision; the page then reloads in place, from
-// memory. A second press while one runs joins it. Only this app's own pages may ask (a JSON body,
-// same origin), and it counts as use. Safe is only ever read (GET), never written.
+// "Fetch signatures" on an open set and "Check Safe now" on a Safe-fed list: reads the Safes behind
+// it now at a request's priority, verifies the set again at the served head (or reads the list
+// again) and answers with its revision. Only this app's own pages may ask; Safe is only read.
 
 export type SafeCheckAnswer = {
   key: string;
-  /** The item's revision after the check (sync/revs.ts), or null when it has none. */
   rev: string | null;
-  /** Safes Safe answered for (each asked now), and those it did not answer for. */
   checked: number;
   failed: number;
-  /**
-   * How the item's Safe copies are kept after the check (as a beat would say, see SafeCheck): the
-   * page shows it at once, without waiting for its next beat. null when nothing is watched for it.
-   */
   check: SafeCheck | null;
 };
 
 const NO_STORE = { "Cache-Control": "no-store" };
-// Bytes: a check's body is `{"key": "set:…"}`.
 const MAX_BODY = 1_024;
 const KEY = /^(?:set:[0-9a-f]{32}|list:emergency(?::all)?|list:freeze|list:vetoes)$/;
 
 const refuse = (status: number, error: string) => json({ error }, { status, headers: NO_STORE });
 
-// One check per item at a time: a second press joins the one running.
 const running = new Map<string, Promise<SafeCheckAnswer | null>>();
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -99,7 +87,7 @@ async function checkNow(key: string): Promise<SafeCheckAnswer | null> {
   const { checked, failed } = await checkSafesNow(safes);
   const at = { head: (await latestBlock()).number };
   let rev = currentRev(key);
-  // The lists built on governance are noted at the block it was read at, if older (readAt).
+  // Lists built on governance are noted at the block governance was read at, if older.
   if (key.startsWith("list:emergency")) {
     const list = await heldEmergencyList({ allHistory: key.endsWith(":all") });
     if (list)

@@ -62,8 +62,6 @@ const L2_INDEX = vi.hoisted(() => ({
 // What the Safe store's watcher reports (safe-store.test.ts covers how).
 const SAFE = vi.hoisted(() => ({
   sweeping: true,
-  groups: [],
-  baseline: null,
   watched: {
     safes: 16,
     lists: 0,

@@ -27,13 +27,9 @@ import {
 } from "../support/fake-chain";
 import { type FakeCall, type FakePost, fakeJsonRpc } from "../support/fake-jsonrpc";
 
-// A fresh process with no history kept from the last run: the handler's log index is still
-// reading the history when a detail page asks for one id. The page looks the event up directly
-// beside the index (an upgrade's start from its creation time, an emergency execution from its
-// state over archive blocks), shows what it finds at once, labelled "located directly", and checks
-// it against the index once that has the whole history: the same event, or an integrity error.
-// Nothing found directly is kept, nothing that acts on the proposal uses it, and JSON waits for
-// the index as before.
+// While the log index still reads the history, a detail page looks the event up directly, shows
+// it labelled "located directly" and checks it against the index (the same event, or an integrity
+// error). Nothing found directly is kept or acted on, and JSON waits for the index.
 
 const PUH: Address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3";
 const DEPLOY = 21_788_382n;
@@ -51,7 +47,6 @@ const state = vi.hoisted(() => ({
   transactions: new Map<string, Hex>(),
   // txHash → reads of the transaction that fail (once each) before it answers
   failing: new Map<string, number>(),
-  // Every transaction read, in order (lower-case hashes).
   txReads: [] as string[],
 }));
 
@@ -154,15 +149,13 @@ vi.mock("@/.server/signatures", async (importOriginal) => ({
   firstSignatureSet: async (_: unknown, fresh: Promise<unknown>) => fresh,
 }));
 
-/** A read of the history starting at or below `below`: held until released. */
 const isHeld = (call: FakeCall, below: bigint) =>
   call.method === "eth_getLogs" &&
   BigInt((call.params[0] as { fromBlock: Hex }).fromBlock) <= below;
 
 /**
- * The chain, with this run's backfill (every read starting at or below `holdBelow`, by default
- * the boundary: everything but the tail) held until `release()`, and any POST with a call
- * `holdCall` picks held until `releaseCalls()`; nothing from a last run.
+ * The chain, with this run's backfill (reads from at or below `holdBelow`: by default all but the
+ * tail) held until `release()`, and POSTs with a call `holdCall` picks held until `releaseCalls()`.
  */
 function upstream({
   holdBelow = FINAL,
@@ -202,17 +195,13 @@ function upstream({
   return { history, chain, release, releaseCalls };
 }
 
-/** The proposal of the i-th emergency upgrade of the fake history (the board is its executor). */
 const emergencyProposal = (i: number): UpgradeProposal => ({
   calls: [{ target: PUH, value: "0", data: "0x" }],
   executor: PUH,
   salt: `0x${i.toString(16).padStart(64, "0")}`,
 });
 
-/**
- * The fake history with each emergency upgrade's id replaced by the id of its proposal, as on
- * chain: the calls an execution sends to the board hash to the id its event names.
- */
+/** The fake history with each emergency upgrade's id replaced by its proposal's id, as on chain. */
 function withEmergencyProposals(history: PuhHistory): PuhHistory {
   const ids = new Map<string, Hex>();
   const emergencies = history.emergencies.map((emergency, i) => {
@@ -229,7 +218,6 @@ function withEmergencyProposals(history: PuhHistory): PuhHistory {
   return { ...history, logs, emergencies };
 }
 
-/** The i-th emergency upgrade's executeEmergencyUpgrade call to the board. */
 const calldata = (i: number) =>
   emergencyExecution(PUH, emergencyProposal(i), [], [], "0x01").data as Hex;
 
@@ -254,7 +242,6 @@ function startedLogOf(history: PuhHistory, id: Hex, change: Partial<ChainLog> = 
   } as unknown as Log;
 }
 
-/** Seeds the history the last run saved (up to SAVED), optionally changed. */
 function seedLastRun(history: PuhHistory, change: (log: ChainLog) => ChainLog = (log) => log) {
   const saved = history.logs
     .filter((l) => l.blockNumber <= SAVED)
@@ -274,7 +261,6 @@ function seedLastRun(history: PuhHistory, change: (log: ChainLog) => ChainLog = 
   return outcomes;
 }
 
-/** Whether `promise` has settled within `ms`. */
 async function settles(promise: Promise<unknown> | null, ms = 50): Promise<boolean> {
   let done = false;
   promise?.then(
@@ -393,7 +379,6 @@ describe("an upgrade's start, while the index reads the history", () => {
     const { history, release } = upstream();
     const upgrade = history.upgrades[3] as PuhHistory["upgrades"][number];
     const other = history.upgrades[4] as PuhHistory["upgrades"][number];
-    // An RPC answering the narrow read with another upgrade's UpgradeStarted log.
     direct.started.mockImplementation(async () => startedLogOf(history, other.id));
 
     const loading = loadStandardUpgrade(upgrade.id, { freshness: "page" });
@@ -481,8 +466,7 @@ describe("an emergency upgrade's execution, while the index reads the history", 
     const { history, release } = upstream();
     const emergency = history.emergencies[4] as PuhHistory["emergencies"][number];
     const other = history.emergencies[5] as PuhHistory["emergencies"][number];
-    // Another transaction (in another block) than the one the history has for this id, carrying
-    // the same calls.
+    // Another transaction (in another block) than the history's for this id, with the same calls.
     const elsewhere = txHash({ blockNumber: other.block, logIndex: 3 });
     state.transactions.set(elsewhere.toLowerCase(), calldata(4));
     direct.emergency.mockImplementation(async (id) => ({
@@ -527,7 +511,6 @@ describe("an emergency upgrade's execution, while the index reads the history", 
   it("whose transaction is not an execution sent to the board leaves the page to the index", async () => {
     const { history, release } = upstream();
     const emergency = history.emergencies[4] as PuhHistory["emergencies"][number];
-    // A transaction that is not an executeEmergencyUpgrade call to the board.
     direct.emergency.mockImplementation(async (id) => ({
       id,
       txHash: `0x${"77".repeat(32)}` as Hex,
@@ -546,8 +529,7 @@ describe("an emergency upgrade's execution, while the index reads the history", 
       txHash: tx,
       blockNumber: emergency.block,
     }));
-    // Reads of the transaction fail (a transient upstream error) while the index reads the
-    // history.
+    // Reads of the transaction fail (a transient upstream error) while the index reads.
     state.failing.set(tx.toLowerCase(), Number.POSITIVE_INFINITY);
     const loading = await loadEmergencyUpgrade(emergency.id, { freshness: "page" });
     await leftToTheIndex(
@@ -576,11 +558,9 @@ describe("an emergency upgrade's execution, while the index reads the history", 
     // The first read of the transaction fails (a transient upstream error).
     state.failing.set(tx.toLowerCase(), 1);
     const loading = loadEmergencyUpgrade(emergency.id, { freshness: "page" });
-    // While governance is read, the execution's event is located and its transaction read.
     await vi.waitFor(() => expect(state.txReads).toContain(tx.toLowerCase()));
     expect(await settles(loading)).toBe(false);
     releaseGovernance();
-    // The page shows it (labelled): the failed early read was read again.
     const first = await (await loading).executedFirst;
     expect(first).toMatchObject({ txHash: tx, locatedDirectly: true, idMatches: true });
     expect(state.txReads.filter((h) => h === tx.toLowerCase())).toHaveLength(2);

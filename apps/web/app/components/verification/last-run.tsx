@@ -3,17 +3,12 @@ import { AlertTriangle, Loader2 } from "lucide-react";
 import { Suspense } from "react";
 import type { Refresh } from "./freshness";
 
-// Data a page shows before this run's log index has confirmed it, always labelled as such:
-// - "last-run": from the history the app kept from its last run (.server/persist/chain-cache.ts),
-//   while this run reads the chain again;
-// - "direct": located directly (from an upgrade's creation time, or an emergency upgrade's state
-//   over archive blocks) while this run's index is still reading the handler's history.
-// The confirmed answer replaces it in the same response (or says it could not be confirmed).
+// Data a page shows before this run's log index has confirmed it (from the last run's history, or
+// located directly), always labelled; the confirmed answer replaces it in the same response.
 
 export const LAST_RUN_LABEL = "History from last run · re-verifying";
 export const DIRECT_LABEL = "Located directly · history index verifying";
 
-/** Where an unconfirmed item came from. */
 export type Provenance = "last-run" | "direct";
 
 export const PROVENANCE_LABEL: Record<Provenance, string> = {
@@ -21,7 +16,6 @@ export const PROVENANCE_LABEL: Record<Provenance, string> = {
   direct: DIRECT_LABEL,
 };
 
-/** Which provenance an item from the server carries, or null once confirmed by this run's index. */
 export function provenanceOf(item: {
   fromLastRun?: boolean;
   locatedDirectly?: boolean;
@@ -31,10 +25,6 @@ export function provenanceOf(item: {
   return null;
 }
 
-/**
- * A notice above a list taken from the last run's history: re-verifying while the verified list
- * streams in ("pending"), and saying so when it could not be read ("failed").
- */
 export function LastRunNote({ refresh, what }: { refresh: Refresh; what: string }) {
   const failed = refresh === "failed";
   return (
@@ -70,12 +60,6 @@ export function LastRunNote({ refresh, what }: { refresh: Refresh; what: string 
   );
 }
 
-/**
- * Text that says where something came from, for an item this run's index has not confirmed yet:
- * `pending` while it is checked (`check`), `confirmed` once it has been, `failed` when it was not
- * (or could not be read). Without a check (found in this run's index): `confirmed`. Inline, for a
- * sentence such as a section's description.
- */
 export function LastRunText({
   check,
   pending,
@@ -97,11 +81,7 @@ export function LastRunText({
   );
 }
 
-/**
- * For one item this run's index has not confirmed yet (an upgrade's start, an emergency upgrade's
- * execution): a line saying where it came from while it is checked, nothing once it is confirmed,
- * and an alert when the index says otherwise (or could not be read).
- */
+// An unconfirmed item's provenance while it is checked, nothing once confirmed, an alert otherwise.
 export function LastRunCheck({
   check,
   source = "last-run",

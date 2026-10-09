@@ -2,11 +2,9 @@ import type { L2Head } from "@/.server/rpc";
 import { type Hex, zeroHash } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The ZKsync Era timer (sync/era.ts): while a page showing Era is on screen (a veto's L2 proposal,
-// the vetoable list, the upgrades that can start) and someone uses the app, Era is read once a
-// minute ('finalized' every 32 reads), and at each on-screen proposal's voteStart/voteEnd, timed
-// from Era's own block timestamps; never otherwise. What a read does at Era's head (the index
-// tail, the states) is l2-index.test.ts's; here it is a stand-in that records each pass.
+// The Era timer (sync/era.ts): while an Era page is on screen and someone uses the app, Era is read
+// once a minute ('finalized' every 32 reads) and at on-screen proposals' voteStart/voteEnd, timed
+// by Era's block timestamps; never otherwise. The read itself is a stand-in (see l2-index.test.ts).
 
 const NOW = 1_800_000_000_000;
 
@@ -195,7 +193,6 @@ describe("S-27: boundary timers", () => {
       // A read 31 s after the first (by the time since Era answered, not the local clock).
       expect(state.passes.map((p) => p.at - NOW)).toEqual([0, 31_000]);
       expect(eraWatchStatus().boundaries).toBe(0);
-      // Then the minute timer as before.
       await vi.advanceTimersByTimeAsync(30_000);
       expect(state.passes.map((p) => p.at - NOW)).toEqual([0, 31_000, 60_000]);
     });

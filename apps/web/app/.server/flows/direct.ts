@@ -6,12 +6,9 @@ import { l1, latestBlock, network, safeBlockNumber } from "../rpc";
 import { topicOf } from "./common";
 import { type EmergencyEvent, archiveEmergencyEvent } from "./emergency-event";
 
-// One id's event found without the ProtocolUpgradeHandler's log index: from the on-chain
-// creation time (an upgrade's start) or by bisecting its state over archive blocks (an emergency
-// execution), then reading a few blocks' logs. The legacy lookups when the index cannot answer,
-// and, for a page in a process whose index is still reading the history (no history kept from
-// the last run either), a first answer beside the index's: labelled "located directly", never
-// kept, and checked against the index's answer once it has one.
+// One id's event found without the log index: from the on-chain creation time or by bisecting
+// state over archive blocks. The legacy lookups, and a page's first answer while the index reads
+// the history: labelled "located directly", never kept, checked against the index's answer.
 
 /** The first block mined at or after `timestamp`, by header search (no scan). */
 export async function blockAt(timestamp: number): Promise<bigint> {
@@ -26,7 +23,6 @@ export async function blockAt(timestamp: number): Promise<bigint> {
   );
 }
 
-/** The UpgradeStarted log of `id`, found from its on-chain creation time; null when not there. */
 export async function startedLog(id: Hex, creationTimestamp: number): Promise<Log | null> {
   const net = await network();
   const head = await latestBlock();
@@ -42,11 +38,7 @@ export async function startedLog(id: Hex, creationTimestamp: number): Promise<Lo
   return startedLogOf(logs, { address: net.upgradeHandler, id, fromBlock: block, toBlock });
 }
 
-/**
- * The first log in an RPC's answer to the narrow UpgradeStarted read that is what was asked for:
- * the handler's, the UpgradeStarted event of `id`, not removed, within the blocks asked. An RPC's
- * answer is not taken on trust: a log of another upgrade (or contract) is never shown as this one.
- */
+/** An RPC's answer is not taken on trust: a log of another upgrade (or contract) is never this one. */
 export function startedLogOf(
   logs: readonly Log[],
   {
@@ -71,20 +63,11 @@ export function startedLogOf(
   );
 }
 
-/**
- * The EmergencyUpgradeExecuted event of `id` from archive state and that one block's log; null
- * when not found this way (no archive state, or no such event): never a scan of the history.
- */
 export async function emergencyEventDirectly(id: Hex): Promise<EmergencyEvent | null> {
   return archiveEmergencyEvent(id, await network(), { scan: false });
 }
 
-/**
- * Whether a page's lookup of one event should run a direct lookup beside the index's: the index
- * has not covered the history yet (idle or backfilling) and holds no history from the last run
- * to answer from. Never on dev nodes (the legacy path already serves them), and never when the
- * index is ready or unavailable (the index answers, or its legacy fallback does).
- */
+/** Never on dev nodes: the legacy path already serves them. */
 export function directLookupHelps(net: { isDevNode: boolean }): boolean {
   if (net.isDevNode) return false;
   const index = puhIndex();
@@ -93,14 +76,10 @@ export function directLookupHelps(net: { isDevNode: boolean }): boolean {
   return !index.hasLastRunHistory();
 }
 
-/** An answer and whether it came from a direct lookup (else from the index). */
 export type FirstAnswer<T> = { value: T; direct: boolean };
 
-/**
- * Pages only: the index's answer, or the direct lookup's when it has found the event first. The
- * index decides everything else: its answer (null included) or its error settles this when it
- * comes first, and a direct lookup that fails or finds nothing is ignored.
- */
+// Pages only: the direct lookup wins only by finding the event first; the index's answer (null
+// included) or error settles it otherwise, and a failed or empty direct lookup is ignored.
 export function firstAnswer<T>(
   indexed: Promise<T>,
   direct: Promise<T | null> | null

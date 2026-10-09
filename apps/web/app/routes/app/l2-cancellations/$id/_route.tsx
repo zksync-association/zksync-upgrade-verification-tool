@@ -25,18 +25,15 @@ export const meta = Meta["/app/l2-cancellations/:id"];
 
 export function loader({ params, request }: LoaderFunctionArgs) {
   const veto = parseVetoParams(params.id, new URL(request.url));
-  // The signatures' first answer at once (possibly from an older block or older Safe copies,
-  // labelled), and the strict result after it in the same response. The set's key joins the page
-  // load's grace once it is found.
+  // The signatures' first answer at once (possibly an older block or older Safe copies, labelled),
+  // then the strict result in the same response; the set's key joins the page load's grace.
   const page = pageLoad(request, [watchKeys.l2(veto.l2GovernorAddress, veto.l2ProposalId)]);
   const loading = page.run(() =>
     loadL2Veto(veto, { supplied: suppliedSignatures(request), freshness: "page" })
   );
   return defer({
     watch: page.watch,
-    // The L2 proposal's key: its Era block label follows what the beats say about it.
     eraKey: watchKeys.l2(veto.l2GovernorAddress, veto.l2ProposalId),
-    // The L2 proposal as the page shows it, for its revision (the Era timer notes it too).
     revs: loaderRevs([
       [
         watchKeys.l2(veto.l2GovernorAddress, veto.l2ProposalId),

@@ -43,11 +43,9 @@ import type { Hex } from "viem";
 
 export const meta = Meta["/"];
 
-// Each count is answered first from what the app holds now (the history the last run saved while
-// this run reads it again, Safe copies of any age), labelled with where it came from, and the
-// count from fresh sources follows in the same response (see each flow's page freshness).
+// Each count is answered first from what the app holds now (the last run's history, Safe copies
+// of any age), labelled with where it came from; the fresh count follows in the same response.
 
-/** Where a first answer came from, or null when it is fresh. */
 const sourceOf = (
   lastRun: boolean,
   safe: { stale: boolean; safeFetchedAt: string | null } | null
@@ -82,7 +80,6 @@ const vetoCount = ([signed, vetoable]: [SignedVetoes, VetoableProposals]) => ({
   source: sourceOf(vetoable.fromLastRun, signed),
 });
 
-/** A count's first answer, and the fresh count after it when the first one was not fresh. */
 function counted<T extends { source: SummarySource }>(first: Promise<T>, fresh: () => Promise<T>) {
   const after = first.then((f) => (f.source ? fresh() : null));
   void after.catch(() => {});
@@ -90,9 +87,8 @@ function counted<T extends { source: SummarySource }>(first: Promise<T>, fresh: 
 }
 
 /**
- * A count as the page shows it (see counted): after a pause (no head in memory), the count as
- * this app last showed it comes first, as of its block (sync/last-shown.ts), until the current
- * count replaces it. Only a count from fresh sources is kept.
+ * After a pause, the count as last shown comes first, as of its block, until the current count
+ * replaces it. Only a count from fresh sources is kept.
  */
 function shownCount<T extends { source: SummarySource }>(
   shown: ReturnType<typeof lastShown>,
@@ -144,8 +140,6 @@ export function loader({ request }: LoaderFunctionArgs) {
     freeze: shownCount(shown, "freeze", fromSources.freeze, true),
     vetoes: shownCount(shown, "vetoes", fromSources.vetoes, true),
   };
-  // What each count was built from, once current (the first answer, or the fresh one after it),
-  // for the lists' revisions (sync/revs.ts).
   const currentList = upgrades.then((first) =>
     first.fromLastRun ? listStandardUpgrades({ allHistory: false }) : first
   );
@@ -425,10 +419,8 @@ function FlowRow({
 }
 
 /**
- * A count, once its sources answered. `indexed`: it is read from the upgrade handler's log index,
- * so while the index backfills the pending state says so (never a count: the count appears only
- * once the range it covers is complete). A first count that is not fresh (`source`) says where it
- * came from (`note`) until `fresh` replaces it.
+ * `indexed`: read from the upgrade handler's log index, so while the index backfills the pending
+ * state says so (never a count: the count appears only once the range it covers is complete).
  */
 function Deferred<T extends { source: SummarySource }>({
   value,
@@ -443,10 +435,7 @@ function Deferred<T extends { source: SummarySource }>({
   /** After a pause: what replaces a `fresh` count that is not fresh yet (see UntilFresh). */
   after?: Promise<T | null> | T | null;
   indexed?: boolean;
-  /**
-   * The list the count is built from: a current count not read again at the head served now
-   * says so (content-currency.tsx).
-   */
+  /** The list the count is built from: a current count not re-read at the head served says so. */
   watchKey?: string;
   children: (v: T, note: ReactNode) => ReactNode;
 }) {

@@ -36,14 +36,7 @@ export type SetState =
 
 export type ExecutionView = Execution & { simulation: Simulation };
 
-/**
- * A signature set for a flow. "strict" (JSON): the strict result, once (`immediate` is `fresh`).
- * "page": the page's result (verifyPageSignatureSet: verified at the head from Safe copies under
- * the page rule, with its key, revision and how its copies are kept) is started first, and the
- * page's first answer beside it (see firstSignatureSet: a labelled stale set, or that result);
- * both carry the key the page reports while it shows the set (`watch`, see watchSignatureSet),
- * which JSON never gets.
- */
+/** JSON ("strict"): the strict result, once. A page: its result and its first answer beside it. */
 export function streamSignatureSet(params: SignatureSetParams, freshness: Freshness): StreamedSet {
   if (freshness !== "page") {
     const strict = verifySignatureSet(params);
@@ -51,8 +44,7 @@ export function streamSignatureSet(params: SignatureSetParams, freshness: Freshn
   }
   const watch = watchSignatureSet(params);
   const fresh = verifyPageSignatureSet(params);
-  // Registered before anything else waits on it: known by the time a first answer that is the
-  // page's result resolves.
+  // Registered first: known by the time a first answer that is the page's result resolves.
   let freshSet: SignatureSet | null = null;
   fresh.then(
     (set) => {
@@ -60,22 +52,16 @@ export function streamSignatureSet(params: SignatureSetParams, freshness: Freshn
     },
     () => {}
   );
-  // A first answer that is the page's result is that result itself (one object); an earlier one
-  // is copied (without a revision: it is not the content the key stands for), never waiting for it.
+  // An earlier first answer is copied without a revision: it is not the content the key stands for.
   const immediate = firstSignatureSet(params, fresh).then((set) =>
     set === freshSet ? fresh : { ...set, watch }
   );
-  // Callers attach their handlers to what they use; neither may go unhandled meanwhile.
   void immediate.catch(() => {});
   void fresh.catch(() => {});
   return { immediate, fresh };
 }
 
-/**
- * What a page shows first for something built from signature sets: the fresh value when every
- * first answer already is the strict result, else `stale()` (built from the first answers, with
- * nothing that would act on them, e.g. no execution).
- */
+/** `fresh`, or `stale()` when a first answer is stale: built with nothing that would act on it. */
 export async function firstOrFresh<T>(
   streamed: readonly StreamedSet[],
   fresh: Promise<T>,
@@ -86,10 +72,6 @@ export async function firstOrFresh<T>(
   return sets.some((set) => set.stale) ? stale(sets) : fresh;
 }
 
-/**
- * For a page loader: the fresh value to stream after a first answer that `isStale` says is stale;
- * null (nothing to send twice) when the first answer already is the fresh one.
- */
 export async function freshAfter<T>(
   first: Promise<T>,
   fresh: Promise<T>,
@@ -98,11 +80,7 @@ export async function freshAfter<T>(
   return isStale(await first) ? fresh : null;
 }
 
-/**
- * What the signature set adds up to on-chain right now: a ready transaction or why not. Its
- * simulation is kept per head unless it carries a signature the viewer supplied; for a page
- * (`page`), such a kept one is simulated again at each new head while the page shows it.
- */
+/** What the signature set adds up to on-chain right now: a ready transaction or why not. */
 export async function executionFor(
   set: SignatureSet,
   state: SetState,
@@ -146,10 +124,7 @@ const execTransactionAbi = parseAbi([
 
 type SignedCall = { to: Address; data: Hex };
 
-/**
- * A transaction's recipient and input, by its hash (a hash names one transaction for good, wherever
- * it is mined): kept once read, so a caller may read it ahead of knowing what to look for in it.
- */
+/** Kept once read: a hash names one transaction for good, wherever it is mined. */
 export function transactionByHash(txHash: Hex): Promise<{ to: Address | null; input: Hex }> {
   return cached(`tx:${txHash.toLowerCase()}`, Number.POSITIVE_INFINITY, async () => {
     const tx = await l1.getTransaction({ hash: txHash });
@@ -210,10 +185,8 @@ export function decodeApprovalCall(data: Hex) {
   return null;
 }
 
-// How a node says it keeps no state for a past block: geth "missing trie node …" and "historical
-// state … is not available", Nethermind "No state available for block …", Besu "World state
-// unavailable for block …", Erigon/reth "… pruned", Infura "… does not have access to archive
-// state".
+// How a node says it keeps no state for a past block (geth "missing trie node …", Nethermind "No
+// state available …", Besu "World state unavailable …", Erigon/reth "… pruned", Infura "archive").
 const NO_STATE =
   /missing trie node|state\b[^\n]{0,80}?\b(?:not available|unavailable|pruned)|no state (?:available|for)|\bpruned\b|archive/i;
 // Or that it does not know the block at all. A load-balanced backend lagging the head says the
@@ -224,9 +197,7 @@ const NOT_NOW = new Set([-32603, -32005]);
 
 /**
  * True when the RPC can answer eth_call at a past block (needed to re-check executed signatures);
- * false only when the node says it keeps no state for that block. Any other failure (a rate limit,
- * a timeout, -32603, the network) rejects with UpstreamError and is not kept, so the caller shows
- * the check as not done, with the RPC error, and the next request asks again.
+ * false only when the node says it keeps no state there. Other failures reject and are not kept.
  */
 export function hasArchiveState(address: Address, blockNumber: bigint): Promise<boolean> {
   return cached(`archive:${blockNumber}`, 10 * 60_000, async () => {

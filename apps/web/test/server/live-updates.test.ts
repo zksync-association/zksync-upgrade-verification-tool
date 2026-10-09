@@ -3,12 +3,7 @@ import { overrideCodePinsForTests } from "@/.server/chain/pins";
 import { resetVerdicts } from "@/.server/chain/verdicts";
 import { latestBlock, resetRpcClients } from "@/.server/rpc";
 import { resetSafeClient } from "@/.server/safe-api";
-import {
-  type SafeCheck,
-  heldSafeListing,
-  pageSafeListing,
-  safeStoreStatus,
-} from "@/.server/safe/store";
+import { heldSafeListing, pageSafeListing, safeStoreStatus } from "@/.server/safe/store";
 import {
   type SignatureSetParams,
   signatureSetsStatus,
@@ -58,12 +53,8 @@ import {
 } from "../support/live-world";
 import { endTestSteps } from "../support/test-end";
 
-// Pages update themselves (Phase D3): what a page shows has a revision (sync/revs.ts) the tab
-// beats with; the engine notes each on-screen item's content at every served head, and when a
-// member Safe's listing changes, so a tab learns from its next beat that something changed and
-// reloads from memory. Safe is asked about the Safes the screen depends on (an open set's members
-// not valid yet), and "Fetch signatures" reads a set's Safes now. Driven by the fake L1 node and
-// Safe service of the live world, the server's own engine (a page load starts it), fake timers.
+// Pages update themselves: the engine notes each on-screen item's content (its revision) at every
+// served head and when a member Safe's listing changes; the tab learns it from its next beat.
 
 // With a key: Safe allows 5 requests/s, and the watcher asks every minute.
 vi.hoisted(() => {
@@ -75,7 +66,6 @@ afterAll(() => {
 
 const ID: Hex = `0x${"5a".repeat(32)}`;
 
-/** The Security Council's approval of a waiting upgrade: a set that can still be signed. */
 const openSet = (): SignatureSetParams => ({
   action: "ApproveUpgradeSecurityCouncil",
   signerGroup: "securityCouncil",
@@ -96,11 +86,9 @@ const pageGet = (path: string): RequestInfo => ({
   header: () => undefined,
 });
 
-/** A visible tab beats with these items (the revisions it rendered). */
 const beat = (items: { key: string; rev: string | null }[]) =>
   presence().beat({ tab: "tab-under-test", reason: "interval", items });
 
-/** Upstream requests since `from`: L1 posts, verdict sub-calls and direct verdicts, Safe GETs. */
 function since(
   w: ReturnType<typeof liveWorld>,
   from: { posts: number; calls: number; safe: number }
@@ -123,7 +111,6 @@ const mark = (w: ReturnType<typeof liveWorld>) => ({
   safe: w.safeRequests.length,
 });
 
-/** The page loads (the engine starts), shows the set, and its tab beats what it rendered. */
 async function openPage(params = openSet()) {
   await backfilled();
   noteRequest(pageGet(`/app/proposals/${ID}`));
@@ -134,7 +121,6 @@ async function openPage(params = openSet()) {
   return set;
 }
 
-/** The fake chain moves one block on (12 s), the tab beating as it does every 10 s. */
 async function nextBlock(
   w: ReturnType<typeof liveWorld>,
   item: { key: string; rev: string | null }
@@ -156,9 +142,8 @@ beforeEach(() => {
   overrideCodePinsForTests(FAKE_PINS);
 });
 
-// A test that timed out runs on: its body stops at the end of the fake-time step it is in
-// (endTestSteps) before the engine, the Safe watcher (stopSync stops both) and presence are reset,
-// so it cannot move the next test's clock or beat into its presence.
+// A timed-out test's body stops at the end of its fake-time step (endTestSteps) before the engine,
+// the Safe watcher and presence are reset, so it cannot move the next test's clock or presence.
 afterEach(async () => {
   await endTestSteps();
   stopSync();
@@ -183,11 +168,8 @@ describe("C-3: a member signs while the page is open", () => {
     const quiet = w.safeRequests.filter((u) => u.includes((SC_MEMBERS[0] as Address).slice(2)));
     expect(quiet.filter((u) => u.includes("ordering=-modified"))).toEqual([]);
 
-    // The second member signs in its Safe.
     w.signInSafe(SC_MEMBERS[1] as Address, params.typedData, ecdsa(902));
     const from = mark(w);
-    // Within its minute the watcher sees the change; the set is verified again at the served
-    // head, and its revision moves.
     let blocks = 0;
     for (let i = 0; i < 6 && compareRevs([item]).changed.length === 0; i++) {
       await nextBlock(w, item);
@@ -195,11 +177,9 @@ describe("C-3: a member signs while the page is open", () => {
     }
     expect(compareRevs([item]).changed).toEqual([item.key]);
     const cost = since(w, from);
-    // One listing read (the changed Safe's); the rest small change checks.
     expect(cost.listings).toBe(1);
     expect(cost.directVerdicts).toBe(0);
-    // One verdict read per signature (and per threshold check) at each head, in the head's
-    // aggregate: the change re-verifies the set once, never twice at a head.
+    // The change re-verifies the set once: never the same verdict read twice at a head.
     const verdictReads = new Map<string, number>();
     for (const call of w.fake.calls.slice(from.calls))
       if (call.functionName === "checkSignatures") {
@@ -210,7 +190,6 @@ describe("C-3: a member signs while the page is open", () => {
     // At most both members' signatures and the threshold check at each head.
     expect(cost.verdicts).toBeLessThanOrEqual(blocks * 3);
 
-    // The tab reloads: the page's set at the served head, from memory.
     const reload = mark(w);
     const after = await settle(verifyPageSignatureSet(params));
     expect(since(w, reload)).toMatchObject({ posts: 0, safe: 0 });
@@ -236,8 +215,7 @@ describe("S-29: what the watcher asks about follows the set's latest result", ()
     const lower = (list: Address[]) => list.map((a) => a.toLowerCase()).sort();
     expect(lower(watchedSetMembers())).toEqual(lower(SC_MEMBERS.slice(1) as Address[]));
 
-    // The member's Safe changes owners: its signature no longer counts (the contract rejects
-    // it). The next head's verification (the engine's) says so, and the member is watched again.
+    // The member's Safe changes owners: the contract rejects its signature from now on.
     w.signatures.delete(`${SC_MEMBERS[0]}:${signature}`.toLowerCase());
     const item = (await settle(verifyPageSignatureSet(params))).watch as {
       key: string;
@@ -248,13 +226,10 @@ describe("S-29: what the watcher asks about follows the set's latest result", ()
     beat([item]);
     await vi.advanceTimersByTimeAsync(3_000);
     expect(lower(watchedSetMembers())).toEqual(lower(SC_MEMBERS as Address[]));
-    // The tab learns it: the set's content changed.
     expect(compareRevs([item]).changed).toEqual([item.key]);
 
-    // The set can no longer be signed (a page shows it closed): nothing of it is watched...
     watchSignatureSet({ ...params, open: false });
     expect(watchedSetMembers()).toEqual([]);
-    // ...until it can be again.
     watchSignatureSet(params);
     expect(lower(watchedSetMembers())).toEqual(lower(SC_MEMBERS as Address[]));
   });
@@ -271,8 +246,7 @@ describe("S-29: a valid member whose Safe copy is older than 60 s stops being va
     expect(first.members.map((m) => m.status)).toEqual(["valid", "valid", "missing"]);
     expect(first.thresholdCheck.status).toBe("met");
     const item = first.watch as { key: string; rev: string };
-    // Ten blocks with the tab beating: the valid members are not watched, so their copies are
-    // now more than 60 s old (a page may still use them, only while they stay valid).
+    // The valid members are not watched: after ten blocks their copies are older than 60 s.
     for (let i = 0; i < 10; i++) await nextBlock(w, item);
     expect(compareRevs([item]).changed).toEqual([]);
     const lower = (list: Address[]) => list.map((a) => a.toLowerCase()).sort();
@@ -280,7 +254,6 @@ describe("S-29: a valid member whose Safe copy is older than 60 s stops being va
 
     // Member 0's Safe changes owners: the contract no longer accepts its signature.
     w.signatures.delete(`${SC_MEMBERS[0]}:${signature}`.toLowerCase());
-    // Within one block and one beat the page is told, and the member is watched again.
     w.nextBlock();
     await vi.advanceTimersByTimeAsync(SLOT_MS);
     beat([item]);
@@ -288,10 +261,8 @@ describe("S-29: a valid member whose Safe copy is older than 60 s stops being va
     expect(compareRevs([item]).changed).toEqual([item.key]);
     expect(lower(watchedSetMembers())).toContain((SC_MEMBERS[0] as string).toLowerCase());
 
-    // The watcher confirms member 0's copy; the next heads verify the set (not left to requests).
     for (let i = 0; i < 3; i++) await nextBlock(w, item);
     expect(signatureSetsStatus().lastRecompute).toMatchObject({ verified: 1, skipped: 0 });
-    // The tab's reload: member 0 not valid, the threshold not met, from memory.
     const reload = mark(w);
     const after = await settle(verifyPageSignatureSet(params));
     expect(since(w, reload)).toMatchObject({ posts: 0, safe: 0 });
@@ -315,12 +286,9 @@ describe("S-5: a set that can be signed only until a time (a freeze request's va
     const item = first.watch as { key: string; rev: string };
     const lower = (list: Address[]) => list.map((a) => a.toLowerCase()).sort();
     expect(lower(watchedSetMembers())).toEqual(lower(SC_MEMBERS as Address[]));
-    // Two blocks: still open.
     for (let i = 0; i < 2; i++) await nextBlock(w, item);
     expect(compareRevs([item]).changed).toEqual([]);
     expect(watchedSetMembers()).toHaveLength(3);
-    // The third block's timestamp is past it: the page reloads (and shows it closed), and
-    // nothing of it is watched any more.
     await nextBlock(w, item);
     await vi.advanceTimersByTimeAsync(3_000);
     expect(compareRevs([item]).changed).toEqual([item.key]);
@@ -339,27 +307,27 @@ describe("S-16: a signature supplied in the URL (?sig=)", () => {
     for (let load = 0; load < 2; load++) {
       const from = mark(w);
       const set = await settle(verifyPageSignatureSet({ ...params, supplied: [supplied] }));
-      // The base set's key, no revision of its own; the base revision untouched.
       expect(set.watch).toEqual({ key: (base.watch as { key: string }).key, rev: null });
       expect(currentRev((base.watch as { key: string }).key)).toBe(rev);
       expect(set.members[2]).toMatchObject({ status: "valid", source: "supplied" });
-      // Checked afresh each time, directly.
       expect(since(w, from).directVerdicts).toBeGreaterThanOrEqual(1);
     }
-    // Nothing about it in what the tab beats.
     expect(JSON.stringify([...presence().onScreen()])).not.toContain(
       supplied.signature.slice(2, 20)
     );
   });
 });
 
-/** The tab's beat through the route (as components/presence.tsx sends it): the whole answer. */
-async function beatThroughRoute(items: { key: string; rev: string | null }[]) {
+/** The tab's beat through the route, as components/presence.tsx sends it. */
+async function beatThroughRoute(
+  items: { key: string; rev: string | null }[],
+  tab = "tab-under-test"
+) {
   const response = (await beatAction({
     request: new Request("http://localhost/resources/presence", {
       method: "POST",
       headers: { "content-type": "application/json", "sec-fetch-site": "same-origin" },
-      body: JSON.stringify({ tab: "tab-under-test", reason: "interval", items }),
+      body: JSON.stringify({ tab, reason: "interval", items }),
     }),
     params: {},
     context: {},
@@ -402,25 +370,22 @@ describe("a set the engine could not verify at the served head (D2: current at M
       w.nextBlock();
       await vi.advanceTimersByTimeAsync(SLOT_MS);
       answer = await beatThroughRoute([item]);
-      // Nothing changed that the engine could see, but the tab is told its set was last verified
-      // at an older block than the head served: the page shows it as of that block.
+      // Nothing changed, but the beat names the older block the set was last verified at.
       expect(answer.changed).toEqual([]);
       expect(BigInt(answer.head?.number as string)).toBeGreaterThan(BigInt(lastGood));
       expect(answer.verifiedAt[item.key]).toEqual({ rev: item.rev, block: lastGood });
     }
     expect(signatureSetsStatus().lastRecompute).toMatchObject({ failed: 1 });
-    // JSON at that head: an error, as before (never the old verdict).
+    // JSON at that head: an error, never the old verdict.
     await expect(settle(verifySignatureSet(params))).rejects.toThrow(/internal error|-32603/);
 
-    // A tab showing other content than the current (a revision before a change, or none yet):
-    // nothing named for it, neither the block nor how its Safes are checked.
+    // A tab showing other content than the current: nothing named for it, nor its Safe checks.
     const other = await beatThroughRoute([{ key: item.key, rev: "0" }]);
     expect(other.verifiedAt[item.key]).toBeUndefined();
     expect(other.checked[item.key]).toBeUndefined();
     expect(answer.checked[item.key]).toMatchObject({ state: "watching" });
 
-    // The reads answer again: the content at the next head differs (member 0 no longer valid),
-    // and the tab is told to reload.
+    // The reads answer again: the content differs (member 0 no longer valid), so the tab reloads.
     failing.on = false;
     w.nextBlock();
     await vi.advanceTimersByTimeAsync(SLOT_MS);
@@ -435,8 +400,7 @@ describe("a set the engine could not verify at the served head (D2: current at M
       block: reloaded.head?.number,
     });
 
-    // A page with a signature from its URL: its set is keyed without it and has no revision, so
-    // the beat never names it as current (the page shows it as of its load's block).
+    // A ?sig= page: keyed without the signature, no revision, so the beat never names it current.
     const supplied = await settle(
       verifyPageSignatureSet({
         ...params,
@@ -456,7 +420,6 @@ describe("every item on screen says the head its content was noted at (notedAt),
     const failing = { on: false };
     const hash: Hex = `0x${"7e".repeat(32)}`;
     const w = liveWorld({
-      // Every contract read fails (an RPC fault), and so does the receipt's.
       aggregateError: () => (failing.on ? new FakeRpcError(-32603, "internal error") : undefined),
       inject: () => (failing.on ? new FakeRpcError(-32603, "internal error") : undefined),
       receipt: () =>
@@ -519,8 +482,7 @@ describe("every item on screen says the head its content was noted at (notedAt),
     // A tab showing other content than the current: nothing named for it.
     const other = await beatThroughRoute(items.map((item) => ({ key: item.key, rev: "0" })));
     expect(other.notedAt).toEqual({});
-    // The reads answer again: the upgrade's new state is learnt (the tab reloads), the rest is
-    // named at the head again.
+    // The reads answer again: the upgrade's new state is learnt, the rest named at the head.
     failing.on = false;
     w.nextBlock();
     await vi.advanceTimersByTimeAsync(SLOT_MS);
@@ -554,7 +516,6 @@ describe("every item on screen says the head its content was noted at (notedAt),
     await until(() => syncEngineStatus().ticks >= 1);
     await nextBlock(w, item);
     const before = (await beatThroughRoute([item])).head?.number as string;
-    /** A new block, run until the engine serves it; then the tab beats at once. */
     const served = async () => {
       w.nextBlock();
       const next = w.head().toString();
@@ -564,8 +525,7 @@ describe("every item on screen says the head its content was noted at (notedAt),
       );
       return next;
     };
-    // The content pass at the new head takes 1 s (the receipt's read): meanwhile the beat names
-    // the head before it, at which the receipt was read; then the new one.
+    // A 1 s content pass at the new head: meanwhile the beat names the head before it.
     slow.ms = 1_000;
     let next = await served();
     let answer = await beatThroughRoute([item]);
@@ -601,8 +561,7 @@ describe("an open set while Safe answers nothing (this IP's monthly quota used u
     expect(first.members.map((m) => m.status)).toEqual(["valid", "missing", "missing"]);
     let item = first.watch as { key: string; rev: string };
     for (let i = 0; i < 2; i++) await nextBlock(w, item);
-    // Safe's quota is used up: the watcher's next check gets a 429, and from then on every
-    // request to Safe fails at once until the quota resets.
+    // Safe's quota is used up: after the next check's 429 every Safe request fails at once.
     w.safeQuota.exhausted = true;
     const behind: string[] = [];
     let reloads = 0;
@@ -611,7 +570,6 @@ describe("an open set while Safe answers nothing (this IP's monthly quota used u
       await vi.advanceTimersByTimeAsync(SLOT_MS);
       let answer = await beatThroughRoute([item]);
       if (answer.changed.includes(item.key)) {
-        // The content changed (the members now unavailable): the tab reloads, from memory.
         reloads++;
         const reloaded = await settle(verifyPageSignatureSet(params));
         expect(reloaded.members.map((m) => m.status)).toEqual([
@@ -627,7 +585,6 @@ describe("an open set while Safe answers nothing (this IP's monthly quota used u
     }
     expect(reloads).toBe(1);
     expect(behind).toEqual([]);
-    // The label says why Safe is not checked.
     expect((await beatThroughRoute([item])).checked[item.key]).toMatchObject({
       state: "paused",
       reason: "quota-exhausted",
@@ -646,8 +603,7 @@ describe("R-D4: JSON never answers with a page's result from a copy older than 6
     w.safeFailing.add(member.toLowerCase());
     const age = () => Date.now() - (heldSafeListing(member)?.fetchedAt as number);
     while (age() <= 60_000) await nextBlock(w, item);
-    // Past 60 s, within the page rule (its cadence and 10 s): the engine verified the set at
-    // this head from it; a page's reload takes that result from memory.
+    // Past 60 s, within the page rule (cadence and 10 s): a reload takes the engine's result.
     expect(age()).toBeLessThanOrEqual(70_000);
     expect(pageSafeListing(member, "set")).not.toBeNull();
     const from = mark(w);
@@ -678,8 +634,7 @@ describe("S-24: what moves a revision", () => {
     expect(noteContent(key, { head: 101n, order: 1 }, content).rev).toBe("0");
     expect(compareRevs([{ key, rev: r1 }]).changed).toEqual([key]);
     expect(compareRevs([{ key, rev: r2 }]).changed).toEqual([]);
-    // A key without a revision (nothing rendered yet) is neither changed nor unknown; an unknown
-    // key (a restart) is.
+    // A key without a revision is neither changed nor unknown; an unknown key (a restart) is.
     expect(
       compareRevs([
         { key, rev: null },
@@ -740,7 +695,6 @@ describe("S-24: what moves a revision", () => {
     await until(() => syncEngineStatus().ticks >= 1);
     for (let i = 0; i < 3; i++) await nextBlock(w, status);
     expect(compareRevs([status]).changed).toEqual([]);
-    // A veto used the Guardians' nonce at the next block.
     change = Number(w.head() + 1n);
     await nextBlock(w, status);
     await vi.advanceTimersByTimeAsync(3_000);
@@ -781,7 +735,6 @@ describe("S-24: a list fed by Safe (pending emergency upgrades)", () => {
     await backfilled();
     noteRequest(pageGet("/app/emergency"));
     const key = watchKeys.emergencies(false);
-    /** The page's loader: the list it sends, noted at the head served as it starts. */
     const load = async () => {
       const head = await settle(latestBlock());
       const list = loadEmergencyList({ freshness: "page" });
@@ -797,7 +750,6 @@ describe("S-24: a list fed by Safe (pending emergency upgrades)", () => {
     await until(() => syncEngineStatus().ticks >= 1);
     for (let i = 0; i < 3; i++) await nextBlock(w, item);
     expect(compareRevs([item]).changed).toEqual([]);
-    // A Security Council member signs a new emergency upgrade in its Safe.
     const id: Hex = `0x${"e1".repeat(32)}`;
     const typedData = (of: Hex) =>
       buildTypedData("ExecuteEmergencyUpgradeSecurityCouncil", EUB_DOMAIN, { id: of });
@@ -825,7 +777,6 @@ describe("S-24: a list fed by Safe (pending emergency upgrades)", () => {
     expect(body.rev).toBe(currentRev(key));
     expect(body.rev).not.toBe(item.rev);
     expect(compareRevs([item]).changed).toEqual([item.key]);
-    // Its reload: both ids, at the revision just answered.
     const after = await load();
     expect(after.pending.pending.map((p) => p.id).sort()).toEqual([id, other].sort());
     expect(after.item.rev).toBe(body.rev);
@@ -864,18 +815,7 @@ describe("S-24: a simulation a page shows (a transaction ready to send)", () => 
     expect(item.key).toMatch(/^sim:[0-9a-f]{32}$/);
     // JSON's simulation of the same transaction: no key, nothing registered.
     expect((await settle(simulate(execution, { keep: true }))).watch).toBeUndefined();
-    const tab = async () => {
-      const response = (await beatAction({
-        request: new Request("http://localhost/resources/presence", {
-          method: "POST",
-          headers: { "content-type": "application/json", "sec-fetch-site": "same-origin" },
-          body: JSON.stringify({ tab: "tab-under-test", reason: "interval", items: [item] }),
-        }),
-        params: {},
-        context: {},
-      } as never)) as Response;
-      return (await response.json()) as BeatAnswer;
-    };
+    const tab = () => beatThroughRoute([item]);
     await tab();
     await until(() => syncEngineStatus().ticks >= 1);
     const calls = () => w.fake.calls.filter(simulated).length;
@@ -889,8 +829,7 @@ describe("S-24: a simulation a page shows (a transaction ready to send)", () => 
       expect(answer.changed).toEqual([]);
       expect(answer.simulatedAt[item.key]).toBe(answer.head?.number);
     }
-    // The node fails the simulation at the next block: nothing noted; the result the tab shows
-    // was simulated at the block before, which the beat says (so the page shows it as earlier).
+    // The node fails it at the next block: nothing noted, the beat names the block before.
     fails = Number(w.head() + 1n);
     w.nextBlock();
     await vi.advanceTimersByTimeAsync(SLOT_MS);
@@ -898,12 +837,10 @@ describe("S-24: a simulation a page shows (a transaction ready to send)", () => 
     expect(failed.changed).toEqual([]);
     expect(failed.head?.number).toBe(w.head().toString());
     expect(failed.simulatedAt[item.key]).toBe((w.head() - 1n).toString());
-    // From the next block on the transaction would revert: the tab learns it from its next beat.
     reverts = Number(w.head() + 1n);
     w.nextBlock();
     await vi.advanceTimersByTimeAsync(SLOT_MS);
     expect((await tab()).changed).toEqual([item.key]);
-    // Its reload: the result at the served head, from memory.
     const reload = mark(w);
     const after = await settle(simulate(execution, { keep: true, page: true }));
     expect(since(w, reload).posts).toBe(0);
@@ -931,7 +868,6 @@ describe("C-1 for the home page's lists with a pending emergency upgrade (from S
     w.signInSafe(SC_MEMBERS[0] as Address, typedData, ecdsa(961), { listed: true });
     await backfilled();
     noteRequest(pageGet("/"));
-    // The page's loader: the list from Safe (listings read now), as `/` shows it.
     const list = loadEmergencyList({ freshness: "page" });
     const [fresh, executed] = await settle(Promise.all([list.freshPending, list.executed]));
     expect(fresh.pending.map((p) => p.id)).toEqual([pending]);
@@ -965,7 +901,6 @@ describe("C-1 for the home page's lists with a pending emergency upgrade (from S
       const at = `0x${block.toString(16)}`;
       const aggregates = w.fake.aggregates.filter((a) => a.block === at);
       expect(aggregates.length, `aggregate3 calls at block ${block}`).toBe(1);
-      // The pending id's state is in it.
       expect(aggregates[0]?.functions).toContain("upgradeStatus");
     }
     const pendingReads = w.fake.calls.filter(
@@ -981,7 +916,6 @@ describe("C-1 for the home page's lists with a pending emergency upgrade (from S
 
 describe("a transaction's receipt: once found, never 'not mined' again", () => {
   const hash: Hex = `0x${"7d".repeat(32)}`;
-  /** The page's loader: its receipt answer, noted for the tab (as loaderRevs notes it). */
   async function load() {
     const head = await settle(latestBlock());
     const answer = await settle(pageReceipt(hash));
@@ -1012,7 +946,6 @@ describe("a transaction's receipt: once found, never 'not mined' again", () => {
     answer = "none";
     for (let i = 0; i < 2; i++) await nextBlock(w, item);
     expect(compareRevs([item]).changed).toEqual([]);
-    // Found once in a final block: not read again at all, and the page's reload shows it mined.
     const receipts = () => w.fake.requests("eth_getTransactionReceipt").length;
     expect(receipts()).toBe(1);
     const reload = await load();
@@ -1040,7 +973,6 @@ describe("a transaction's receipt: once found, never 'not mined' again", () => {
     beat([item]);
     await until(() => syncEngineStatus().ticks >= 1);
     const receipts = () => w.fake.requests("eth_getTransactionReceipt").length;
-    // Read at each head while not final (the same receipt: no change).
     const from = receipts();
     for (let i = 0; i < 2; i++) await nextBlock(w, item);
     expect(receipts() - from).toBeGreaterThanOrEqual(2);
@@ -1148,7 +1080,6 @@ describe("Fetch signatures (POST /resources/safe-check)", () => {
     const body = await a.json();
     expect(await b.json()).toEqual(body);
     expect(body).toMatchObject({ key, checked: 3, failed: 0 });
-    // How the set's copies are kept now, for the label at once: just checked.
     expect(body.check).toMatchObject({ state: "watching" });
     expect(Date.now() - Date.parse(body.check.checkedAt)).toBeLessThan(10_000);
     expect(body.rev).toBe(currentRev(key));
@@ -1162,7 +1093,6 @@ describe("Fetch signatures (POST /resources/safe-check)", () => {
       read.some((u) => u.toLowerCase().includes((SC_MEMBERS[1] as string).slice(2).toLowerCase()))
     ).toBe(true);
     expect(read.length).toBeLessThanOrEqual(2);
-    // The page's reload: from memory.
     const reload = mark(w);
     const after = await settle(verifyPageSignatureSet(params));
     expect(after.members.map((m) => m.status)).toEqual(["missing", "valid", "missing"]);
@@ -1241,24 +1171,12 @@ describe("an open set's page next to a list fed by Safe (two visible tabs)", () 
     presence().beat({ tab: "tab-two-under-test", reason: "interval", items: [listItem] });
     presence().beat({ tab: "tab-one-under-test", reason: "interval", items: [setItem] });
     await until(() => syncEngineStatus().ticks >= 1);
-    const tabBeat = async (tab: string, items: { key: string; rev: string | null }[]) => {
-      const response = (await beatAction({
-        request: new Request("http://localhost/resources/presence", {
-          method: "POST",
-          headers: { "content-type": "application/json", "sec-fetch-site": "same-origin" },
-          body: JSON.stringify({ tab, reason: "interval", items }),
-        }),
-        params: {},
-        context: {},
-      } as never)) as Response;
-      return (await response.json()) as BeatAnswer;
-    };
     const behind: number[] = [];
     for (let i = 0; i < 100; i++) {
       w.nextBlock();
       await vi.advanceTimersByTimeAsync(SLOT_MS);
-      await tabBeat("tab-two-under-test", [listItem]);
-      const answer = await tabBeat("tab-one-under-test", [setItem]);
+      await beatThroughRoute([listItem], "tab-two-under-test");
+      const answer = await beatThroughRoute([setItem], "tab-one-under-test");
       expect(answer.changed).toEqual([]);
       const at = answer.verifiedAt[setItem.key]?.block;
       if (!at || BigInt(at) < BigInt(answer.head?.number as string)) behind.push(i);
@@ -1274,23 +1192,11 @@ describe("a list fed by Safe on screen (the veto list)", () => {
     const w = liveWorld();
     await backfilled();
     noteRequest(pageGet("/app/l2-cancellations"));
-    // The tab beats with the revision of the list it rendered: the answer speaks of its Safes
-    // only for the current content (a list rendered before a change is told to reload instead).
+    // The tab beats the revision it rendered: the answer speaks of its Safes only if current.
     const item: { key: string; rev: string | null } = { key: watchKeys.vetoes, rev: null };
-    /** The tab's beat through the route: what the answer says about the list's Safes. */
     const tabBeat = async () => {
       item.rev = currentRev(watchKeys.vetoes);
-      const response = (await beatAction({
-        request: new Request("http://localhost/resources/presence", {
-          method: "POST",
-          headers: { "content-type": "application/json", "sec-fetch-site": "same-origin" },
-          body: JSON.stringify({ tab: "tab-under-test", reason: "interval", items: [item] }),
-        }),
-        params: {},
-        context: {},
-      } as never)) as Response;
-      const body = (await response.json()) as { checked: Record<string, SafeCheck> };
-      return body.checked[watchKeys.vetoes];
+      return (await beatThroughRoute([item])).checked[watchKeys.vetoes];
     };
     let check = await tabBeat();
     for (let i = 0; i < 30 && !check?.checkedAt; i++) {
@@ -1316,7 +1222,6 @@ describe("a list fed by Safe on screen (the veto list)", () => {
       300_000 / G_MEMBERS.length - 1_000
     );
     expect(Date.parse(check?.nextAt as string) - Date.now()).toBeLessThanOrEqual(300_000);
-    // Nobody looks any more: the answer for a list nobody shows is not given.
     presence().beat({ tab: "tab-under-test", reason: "leave", items: [] });
     await vi.advanceTimersByTimeAsync(40_000);
   });
@@ -1338,8 +1243,7 @@ describe("on a dev node (anvil): no chain follower, but Safe still reaches an op
     };
     tabBeat();
     expect(syncEngineStatus()).toMatchObject({ active: false });
-    // A member signs in Safe; within its minute (the three spread 20 s apart) the watcher sees
-    // it, and the page is told.
+    // Within its minute (the three Safes spread 20 s apart) the watcher sees a new signature.
     w.signInSafe(SC_MEMBERS[2] as Address, params.typedData, ecdsa(941));
     for (let i = 0; i < 13 && compareRevs([item]).changed.length === 0; i++) {
       await vi.advanceTimersByTimeAsync(10_000);
@@ -1353,8 +1257,7 @@ describe("on a dev node (anvil): no chain follower, but Safe still reaches an op
       changed: [],
       unknown: [],
     });
-    // The member now valid is no longer watched (nor said to be in the set's check); the others
-    // still are.
+    // The member now valid is no longer watched; the others still are.
     const watched = watchedSetMembers().map((m) => m.toLowerCase());
     expect(watched).not.toContain((SC_MEMBERS[2] as string).toLowerCase());
     expect(watched).toContain((SC_MEMBERS[0] as string).toLowerCase());

@@ -1,5 +1,5 @@
 import { clearCache, peek, remainingMs } from "@/.server/cache";
-import { allowPinChecksWhen, overrideCodePinsForTests } from "@/.server/chain/pins";
+import { overrideCodePinsForTests } from "@/.server/chain/pins";
 import { resetVerdicts } from "@/.server/chain/verdicts";
 import { type FreezeParams, loadFreezeRequest } from "@/.server/flows/freeze";
 import { type VetoParams, vetoState } from "@/.server/flows/l2-veto";
@@ -13,8 +13,7 @@ import {
   readGovernance,
 } from "@/.server/governance";
 import { pageGovernance } from "@/.server/page-governance";
-import { allowEngineWorkWhen } from "@/.server/sync/pacer";
-import { latestBlock, resetRpcClients, rpcGeneration } from "@/.server/rpc";
+import { latestBlock, resetRpcClients } from "@/.server/rpc";
 import { resetSafeClient } from "@/.server/safe-api";
 import { holdLastRunListings, listingsToKeep } from "@/.server/safe/store";
 import {
@@ -49,12 +48,9 @@ import {
   until,
 } from "../support/live-world";
 
-// Phase D2: what is on screen is read again at every served head, in as few combined calls as
-// possible, and nothing is carried between blocks. Per block, with pages on screen: the head
-// polls, the handler's index tail (one eth_getLogs), and ONE aggregate3 for the snapshot
-// (governance's values that change, the states of the ids not over for good and those on screen)
-// and the verdicts of every set on screen; no governance round, no direct verdict call, no Safe
-// request for sets that can no longer be signed.
+// What is on screen is read again at every served head, in as few combined calls as possible. Per
+// block with pages on screen: the head polls, one eth_getLogs for the index tail and ONE aggregate3
+// for the snapshot and the verdicts; no governance round, no direct verdict call, no Safe request.
 
 const VERDICTS = new Set(["checkSignatures", "isValidSignature", "signedMessages"]);
 const GOVERNANCE_GETTERS = new Set([
@@ -81,9 +77,7 @@ beforeEach(() => {
   overrideCodePinsForTests(FAKE_PINS);
 });
 
-// The engines a test started: stopped after it, whatever happened in it (a test that timed out
-// leaves its engine following the fake chain, counting into the next test's world otherwise),
-// and the test's own loops told to stop (`ended`: its body runs on after a timeout).
+// The engines a test started, stopped after it, and its loops told to stop (`ended`).
 const engines: { stop(): void }[] = [];
 let testRun = 0;
 /** For a test's loop: whether the test it belongs to has ended (timed out). */
@@ -396,46 +390,6 @@ describe("governance at each head, for pages", () => {
   });
 });
 
-describe("SYNC_MODE=always, nothing on screen", () => {
-  it("no full governance read once the split applies, the idle keep-alive armed before it included", async () => {
-    const w = liveWorld();
-    // PREWARM=0: no full read before the engine's first tick, so the split is not known yet when
-    // the first idle ticks keep JSON's governance alive.
-    await backfilled();
-    const engine = liveEngine({ mode: "always" });
-    engines.push(engine);
-    // As the module's engine allows them: while it follows the chain.
-    const previous = allowPinChecksWhen(() => engine.active);
-    const previousWork = allowEngineWorkWhen({
-      allowed: () => engine.active,
-      generation: rpcGeneration,
-    });
-    try {
-      engine.resume();
-      await until(() => engine.status().ticks >= 1);
-      // eip712Domain is read only by a full governance read (the split keeps the domains).
-      const fullReads = () => w.fake.calls.filter((c) => c.functionName === "eip712Domain").length;
-      const perBlock: number[] = [];
-      for (let b = 0; b < 20; b++) {
-        const before = fullReads();
-        w.nextBlock();
-        await vi.advanceTimersByTimeAsync(SLOT_MS);
-        perBlock.push(fullReads() - before);
-      }
-      expect(snapshotStatus()?.governance).toBe("split");
-      expect(perBlock.slice(5)).toEqual(new Array(15).fill(0));
-      // Nor between blocks (a stalled chain): no keep-alive left behind.
-      const stalled = fullReads();
-      await vi.advanceTimersByTimeAsync(120_000);
-      expect(fullReads()).toBe(stalled);
-    } finally {
-      engine.stop();
-      allowPinChecksWhen(previous);
-      allowEngineWorkWhen(previousWork);
-    }
-  });
-});
-
 describe("the snapshot: read at each head, nothing carried", () => {
   it("S-5: an upgrade's state moves with time: the first head past the boundary shows the new state and open-ness", async () => {
     let change = Number.POSITIVE_INFINITY as unknown as bigint;
@@ -603,9 +557,8 @@ describe("the snapshot: read at each head, nothing carried", () => {
 
 describe("sets verified by the engine from Safe copies older than 60 s", () => {
   /**
-   * The engine verifies the six sets (none can be signed any more) from the copies held, then
-   * JSON asks for the council's approval set (re-reading its member Safes: unchanged) and for the
-   * council's emergency set (the same member Safes, the same head).
+   * The engine verifies the six (closed) sets from the copies held, then JSON asks for the
+   * council's approval set and emergency set (the same member Safes, the same head).
    */
   async function jsonAfterHeldPrecompute(w: LiveWorld, verified = 6) {
     showPages(w);

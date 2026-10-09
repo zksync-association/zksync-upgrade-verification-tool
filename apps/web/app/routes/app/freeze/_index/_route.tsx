@@ -103,7 +103,6 @@ export default function FreezeListPage() {
   );
 }
 
-/** The protocol's freeze state and the next nonces, once the root status is read. */
 function ProtocolFacts({
   governance,
 }: { governance?: ReturnType<typeof useStatus>["governance"] }) {
@@ -220,7 +219,6 @@ function Rows({
             </span>
             <span className="text-slate-600 text-xs">
               Valid until {formatTime(r.validUntil)}
-              {/* How far off, by the head the root status was read at: once it is. */}
               <WithStatus fallback={null}>
                 {({ governance }) =>
                   ` (${relativeTime(r.validUntil, governance.latestBlock.timestamp)})`

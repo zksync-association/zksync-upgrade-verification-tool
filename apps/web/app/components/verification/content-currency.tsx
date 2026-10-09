@@ -3,29 +3,15 @@ import { formatNumber } from "@/utils/format";
 import { Clock } from "lucide-react";
 import { createContext, useContext } from "react";
 
-// Whether what a page shows was read again at the head the app serves now. Every item a page
-// shows (the root status, an upgrade's state, a list, a transaction's receipt) has a key the tab
-// beats with; the beat names, for the content the tab shows (its revision), the newest head that
-// content was noted at (`notedAt`: read there, or read again there with the same result). For
-// content that changed since (the tab reloads, or waits to while the viewer signs), that is the
-// head it was last noted at before the change. An item named at a block before the served head
-// was not read there, or what was read there is not what the tab shows (its reads failed, what it
-// needs is not in memory, or it changed): it is shown as of that block, in no passing colour, and
-// nothing on its page is signed or sent from it, until the tab shows content read at the served
-// head. Signature sets and simulations say the same through their own beats' fields
-// (freshness.tsx, execution-panel.tsx).
+// Whether what a page shows was read again at the head the app serves now. An item the beats name
+// at an older block is shown as of that block, in no passing colour, and nothing on its page is
+// signed or sent from it, until the tab shows content read at the served head.
 
 type Live = {
   head: { number: string } | null;
   notedAt?: Record<string, { rev: string; block: string }>;
 };
 
-/**
- * The newest block the beats name for the item under `key` (null when they name none: before the
- * first beat, on a dev node, for content the server has no block for: forgotten, or from an older
- * point than the key's, a reload being on its way), and the head served now when that block is
- * before it (`behind`), else null.
- */
 export function contentCurrency(
   key: string | null | undefined,
   live: Live
@@ -39,26 +25,19 @@ export function contentCurrency(
   };
 }
 
-/** contentCurrency for the item under `key`, from the tab's beats. */
 export function useContentCurrency(key: string | null | undefined) {
   return contentCurrency(key, useLive());
 }
 
-/** "As of block #N · not re-read at #M". */
 export function notReReadHeadline(block: string, behind: string): string {
   return `As of block #${formatNumber(block)} · not re-read at #${formatNumber(behind)}`;
 }
 
-/**
- * The notice for an item not read again at the head served now (see contentCurrency): its block
- * first, then what it speaks for. Nothing while the item is current.
- */
 export function NotReReadNote({
   watchKey,
   what,
 }: {
   watchKey: string;
-  /** What the notice speaks for ("The state and timeline below"). */
   what: string;
 }) {
   const { block, behind } = useContentCurrency(watchKey);
@@ -87,17 +66,14 @@ export type NotCurrent = { reason: string; waits: string };
 
 const PageCurrencyContext = createContext<NotCurrent | null>(null);
 
-/**
- * Around a page whose main item (an upgrade's state) may be behind the head served: while it is
- * (see contentCurrency), its Sign and Send buttons say why and wait.
- */
+// While the page's main item (an upgrade's state) is behind the head served, its Sign and Send
+// buttons say why and wait.
 export function PageCurrency({
   watchKey,
   what,
   children,
 }: {
   watchKey: string;
-  /** What was not read ("The upgrade's state"). */
   what: string;
   children: React.ReactNode;
 }) {
@@ -112,7 +88,6 @@ export function PageCurrency({
   return <PageCurrencyContext.Provider value={value}>{children}</PageCurrencyContext.Provider>;
 }
 
-/** Why this page's main item keeps its Sign and Send buttons waiting (see PageCurrency), or null. */
 export function usePageNotCurrent(): NotCurrent | null {
   return useContext(PageCurrencyContext);
 }

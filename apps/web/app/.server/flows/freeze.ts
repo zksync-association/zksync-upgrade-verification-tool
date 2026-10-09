@@ -95,16 +95,11 @@ export type FreezeList = {
   errors: string[];
   anomalies: number;
   governance: Governance;
-  /** When the oldest Safe listing the requests came from was read (ISO time), or null. */
   safeFetchedAt: string | null;
-  /**
-   * A page's first answer from Safe listings older than 60 s (see loadFreezeList); the fresh list
-   * follows. Always false for the fresh list (and so in JSON).
-   */
+  /** True only for a page's first answer from Safe listings older than 60 s; false in JSON. */
   stale: boolean;
 };
 
-/** The requests in Security Council members' Safe messages, each with its state at the head. */
 function freezeListFrom(gov: Governance, collected: Collected): FreezeList {
   const requests: FreezeSummary[] = collected.groups.map((group) => {
     const params: FreezeParams = {
@@ -131,14 +126,8 @@ function freezeListFrom(gov: Governance, collected: Collected): FreezeList {
   };
 }
 
-/**
- * `fresh` is the list from listings at most 60 s old. With `freshness: "page"`, `first` is the
- * page's first answer: from the listings held, whatever their age, when one is older than 60 s
- * (`stale`, labelled with `safeFetchedAt`; see firstFromHeld), else `fresh` itself. Requests'
- * states are always read at the head (governance); only which messages exist may be old.
- */
+/** States are always read at the head (governance); only which requests exist may be old. */
 export function loadFreezeList({ freshness = "strict" }: { freshness?: Freshness } = {}) {
-  // A page's at the head it is read at (governance.ts pageGovernance); JSON's as ever.
   const gov = governanceFor(freshness);
   const fresh = gov.then(async (g) =>
     freezeListFrom(
@@ -167,9 +156,8 @@ export function loadFreezeList({ freshness = "strict" }: { freshness?: Freshness
 }
 
 /**
- * For the sync engine: the freeze list as a page shows it, from the Safe copies held under the
- * page rule (never asking Safe) and governance at the head pages read; null when a member Safe's
- * copy is not one a page would use as current (the page then reads it itself).
+ * For the sync engine: the list as a page shows it, from the Safe copies held (never asking Safe);
+ * null when a member Safe's copy is not one a page would use as current.
  */
 export async function heldFreezeList(): Promise<FreezeList | null> {
   const gov = await governanceFor("page");
@@ -181,7 +169,6 @@ export async function heldFreezeList(): Promise<FreezeList | null> {
   return collected && !collected.stale ? freezeListFrom(gov, collected) : null;
 }
 
-/** The strict list (JSON). */
 export function listFreezeRequests(): Promise<FreezeList> {
   return loadFreezeList().fresh;
 }
@@ -194,7 +181,6 @@ export type FreezeDetail = {
   governance: Governance;
 };
 
-/** The strict result (JSON). */
 export function getFreezeRequest(
   params: FreezeParams,
   { supplied = [] }: { supplied?: MemberSignature[] } = {}
@@ -202,11 +188,7 @@ export function getFreezeRequest(
   return loadFreezeRequest(params, { supplied }).fresh;
 }
 
-/**
- * The request's signatures: `fresh` is the strict result; with `freshness: "page"`, `first` is the
- * page's first answer (a labelled stale set without an execution, or the strict result, see
- * firstSignatureSet). Otherwise `first` is `fresh`.
- */
+/** With `freshness: "page"`, `first` may be a labelled stale set, without an execution. */
 export function loadFreezeRequest(
   params: FreezeParams,
   {
@@ -228,7 +210,7 @@ export function loadFreezeRequest(
         check: { kind: "multisig", contract: gov.securityCouncil.address },
         supplied,
         open: state.status === "open",
-        // Closed from validUntil on (see freezeState): a page showing it then reloads.
+        // Closed from validUntil on: a page showing it then reloads.
         openUntil: BigInt(params.validUntil),
       },
       freshness

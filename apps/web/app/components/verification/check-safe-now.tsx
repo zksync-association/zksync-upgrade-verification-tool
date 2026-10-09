@@ -2,11 +2,6 @@ import { useSafeCheck } from "@/components/presence";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 
-/**
- * "Check Safe now" on a list built from members' Safe messages (pending emergency upgrades, freeze
- * requests, vetoes): reads those Safes now and updates the list in place. While the list is on
- * screen Safe is also asked on its own every few minutes.
- */
 export function CheckSafeNow({ watchKey }: { watchKey: string }) {
   const check = useSafeCheck(watchKey);
   return (

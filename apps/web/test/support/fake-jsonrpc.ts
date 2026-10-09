@@ -1,6 +1,5 @@
-// A JSON-RPC upstream as a `fetch` stub, for lane and index tests. It records every POST, tracks
-// how many are in flight, and lets a test answer per entry or take over a whole POST (rate limits,
-// batch rejections, oversized bodies). Nothing here touches the network.
+// A JSON-RPC upstream as a `fetch` stub: it records every POST and how many are in flight, and a
+// test answers per entry or takes over a whole POST (rate limits, batch rejections). No network.
 
 export type FakeCall = { id: unknown; method: string; params: unknown[] };
 
@@ -27,7 +26,6 @@ export type FakeOptions = {
   handle?: (call: FakeCall, post: FakePost) => unknown | Promise<unknown>;
   /** Takes over a whole POST when it returns a Response. */
   intercept?: (post: FakePost) => Response | undefined | Promise<Response | undefined>;
-  /** Delay before answering (default 0). */
   delayMs?: number | ((post: FakePost) => number);
   /** Answer batch entries in reverse order. */
   reverse?: boolean;

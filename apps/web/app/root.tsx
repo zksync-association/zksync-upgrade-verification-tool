@@ -42,15 +42,11 @@ export const links: LinksFunction = () => [
   },
 ];
 
-// Nothing here waits on the network before the first bytes of the page: the status is deferred
-// (the shell renders while it is read), and the chain the RPC is on is in hand once the server
-// has read it (before it starts listening), else deferred too. `watch` and `presence` are for the
-// tab's beats (components/presence.tsx): every page shows the status; a tab nobody touches for
-// `awayMs` stops beating.
+// Nothing here waits on the network before the page's first bytes: the status is deferred, and
+// the chain is in hand once the server has read it (before it starts listening), else deferred too.
 export function loader({ request }: LoaderFunctionArgs) {
   const cookies = request.headers.get("Cookie");
   const wagmiCookie = cookies ? parseWagmiCookie(cookies, "wagmi.store") : undefined;
-  // Governance at the head pages read (the sync engine reads it there at each block).
   const status = appStatus({ freshness: "page" });
   return defer({
     env: clientEnv,
@@ -59,15 +55,11 @@ export function loader({ request }: LoaderFunctionArgs) {
     presence: { awayMs: serverEnv.SYNC_AWAY_MS },
     chain: shellChain(),
     status,
-    // The status's revision, so an open tab learns when it changed (sync/revs.ts).
     revs: statusRevs(status),
   });
 }
 
-export type RootLoader = typeof loader;
-
-// After Refresh, a settings save, a request from the app (signing, a mined transaction, the log
-// index finishing) or once the status in hand is 30 s old; not on every navigation (revalidation.ts).
+// Not on every navigation: only when revalidation.ts says the status must be read again.
 export const shouldRevalidate: ShouldRevalidateFunction = shouldRevalidateRoot;
 
 export default function App() {
@@ -77,8 +69,8 @@ export default function App() {
     ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
     : undefined;
 
-  // The shell, the navigation and the page render at once; only the wallet needs the chain id
-  // first (in hand unless the server has not read it yet). The status fills in as it is read.
+  // The shell, the navigation and the page render at once: the chain id the wallet needs is in
+  // hand unless the server has not read it yet. The status fills in as it is read.
   return (
     <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
       <PresenceProvider awayMs={presence.awayMs}>

@@ -10,14 +10,12 @@ import { warmSafeListing } from "./safe/store";
 import { backgroundSafeReadsAllowed } from "./safe-api";
 
 // One warm-up after the server starts (and after a settings change): the reads every first page
-// waits on, made before anyone asks, through the same cached functions requests use. A request
-// that arrives mid-way joins the read in flight. Nothing here decides anything a page shows; the
-// caches keep their usual lifetimes. It never rejects, and it logs step names, timings, counts and
-// error class names only: an error message can carry the RPC URL and its key.
+// waits on, through the same cached functions requests use. It never rejects, and it logs step
+// names, timings, counts and error class names only: an error message can carry the RPC URL.
 
 const log = defaultLogger.child({ module: "prewarm" });
 
-export type PrewarmReason = "boot" | "settings";
+type PrewarmReason = "boot" | "settings";
 
 /** PREWARM=0 (or false/off/no) turns the warm-up off, at start and after settings changes. */
 export function shouldPrewarm(env: Record<string, string | undefined> = process.env): boolean {
@@ -34,10 +32,6 @@ const elapsed = (since: number) => Math.round(performance.now() - since);
 
 type Fields = Record<string, string | number | boolean | null>;
 
-/**
- * Runs one step, logs how it went, and returns its value (null when it failed). `details` adds
- * fields from the value; `progress` adds fields either way.
- */
 async function step<T>(
   reason: PrewarmReason,
   name: string,
@@ -96,11 +90,9 @@ async function warmSteps(reason: PrewarmReason, generation: number): Promise<voi
   const net = await step(reason, "network", () => network(), {
     details: (n) => ({ chainId: n.chainId }),
   });
-  // Everything below reads the network first; without it each step would fail the same way.
   if (!net || superseded()) return;
 
-  // The ZKsync Era governors' log index (the vetoable list every landing page shows) backfills
-  // beside everything else; nothing below waits for it (the Era RPC is another provider).
+  // Era's index backfills beside the rest (another provider); nothing below waits for it.
   const l2 = step(
     reason,
     "l2-index",
@@ -152,10 +144,8 @@ async function warmL1(
       }
     ),
   ]);
-  // The Safe listings need only governance (the member Safes): they are read while the log index
-  // backfills (another upstream), so a page opened a few seconds after the start finds both. Then
-  // the messages of every listing held (read now, or by the last run) are parsed and hashed, so
-  // the first page that lists them does not do it before its first bytes.
+  // Safe listings need only governance, so they are read while the log index backfills; then the
+  // messages held are parsed and hashed before the first page needs them.
   const gov = await governed;
   const listings =
     gov && !superseded()
@@ -176,12 +166,9 @@ async function warmListings(
   gov: Governance,
   superseded: () => boolean
 ): Promise<void> {
-  // Low priority: one listing at a time, behind any page's own Safe reads in the Safe API's
-  // pacer, and within the background budget. The first failure (often a rate limit) ends the
-  // step. The warm-up is not a page's interest: the sync engine's sweep keeps fresh only the
-  // signer groups that pages ask for.
+  // Low priority: one listing at a time, behind pages' Safe reads, within the background budget.
   // Only with SAFE_API_KEY or a self-hosted service: keyless, the public service's monthly per-IP
-  // quota is better kept for the pages that are actually opened.
+  // quota is kept for the pages actually opened.
   if (!net.safeTxServiceUrl) {
     log.info({ reason, step: "safe-listings", skipped: "no-service" }, "prewarm step");
     return;
@@ -208,25 +195,14 @@ async function warmListings(
 
 let running: { generation: number; run: Promise<void> } | null = null;
 
-/**
- * Reads which chain the RPC is on (network(): one batched call, kept for the settings generation),
- * for the server to call before it starts listening: the app shell (and the wallet set up for
- * that chain) then never waits for it on the first page. Unlike prewarm(), not turned off by
- * PREWARM=0: it is the same read every request needs first. Never rejects; logs its timing only.
- */
+/** Reads network() before the server listens (not turned off by PREWARM=0); never rejects. */
 export async function readNetwork(): Promise<void> {
   await step("boot", "network-before-listen", network, {
     details: (net) => ({ chainId: net.chainId }),
   });
 }
 
-/**
- * Warms network(), then together governance(), the log-history canary and the
- * ProtocolUpgradeHandler log index backfill, and once governance is in (with SAFE_API_KEY or a
- * self-hosted service) the governance Safes' message listings, while the backfill runs; beside all
- * of these, the L2 governors' log index backfill. One run per settings generation at a time;
- * never rejects.
- */
+/** Runs the warm-up, one run per settings generation at a time; never rejects. */
 export function prewarm(reason: PrewarmReason): Promise<void> {
   try {
     if (!shouldPrewarm()) return Promise.resolve();

@@ -4,12 +4,8 @@ import { formatNumber } from "@/utils/format";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 
-/**
- * Where a count's first answer came from when it is not fresh: the history the last run saved
- * (`lastRun`), Safe copies older than 60 s (`safeFetchedAt`, when the oldest was read), or both;
- * or, after a pause, the count as this app last showed it, read at block `asOfBlock`
- * (.server/sync/last-shown.ts). null for a fresh count.
- */
+// Where a count's first answer came from when it is not fresh (the last run's history, Safe copies
+// older than 60 s, or as last shown at `asOfBlock` after a pause); null for a fresh count.
 export type SummarySource = {
   lastRun: boolean;
   safeFetchedAt: string | null;
@@ -28,7 +24,6 @@ export function OverviewSummary({
   label: string;
   detail?: string;
   incomplete?: boolean;
-  /** Says where a count that is not fresh came from (see SummaryNote). */
   note?: ReactNode;
 }) {
   return (
@@ -51,10 +46,6 @@ export function OverviewSummary({
   );
 }
 
-/**
- * The line under a count that is not fresh: where it came from, while the fresh count is read
- * ("pending"), or that reading it did not complete ("failed"). Nothing for a fresh count.
- */
 export function SummaryNote({ source, refresh }: { source: SummarySource; refresh: Refresh }) {
   const now = useNowSeconds();
   if (!source) return null;

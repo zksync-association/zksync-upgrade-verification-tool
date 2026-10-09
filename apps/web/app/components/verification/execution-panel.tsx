@@ -22,13 +22,8 @@ export type ExecutionLike = {
   simulation?: Simulation | null;
 };
 
-/**
- * The block a simulation's result was last read at, and whether that is the head the app serves
- * now. A page's simulation (`watch`) is simulated again at each new head while it is on screen:
- * the beats name the newest block its result was read at, while the page shows the current
- * result. Before the first beat, on a dev node ('latest') and where nothing follows the chain,
- * the block it was read at is all there is.
- */
+// The newest block a simulation's result was read at (a page's is simulated again at each new head
+// and the beats name the block), and whether that is the head served now.
 export function simulationFreshness(
   simulation: Pick<Simulation, "atBlock" | "watch">,
   live: { head: { number: string } | null; simulatedAt?: Record<string, string> }
@@ -108,11 +103,7 @@ export function ExecutionPanel({
   title?: string;
   note?: ReactNode;
   extra?: ReactNode;
-  /**
-   * Why the transaction is not offered to send now (the signatures it carries were not verified
-   * at the head served now); null when it is. The panel stays (a Safe transaction hash it shows
-   * included); only sending waits.
-   */
+  /** Why sending waits (its signatures not verified at the head served); the panel stays. */
   blockedReason?: string | null;
 }) {
   useOfferWallet();
@@ -124,10 +115,9 @@ export function ExecutionPanel({
   const viaSafe = connector?.id === "safe";
   const [safeTxHash, setSafeTxHash] = useState<Hex | null>(null);
   // While the wallet request is pending, or the Safe transaction hash is shown (until dismissed),
-  // the page's data is not reloaded: this panel, and what it shows, stay as they are.
+  // the page's data is not reloaded.
   const waiting = useHoldUpdates(isPending || safeTxHash !== null);
-  // The signatures it carries not verified at the head served, or the page's own item (an
-  // upgrade's state) not read there (verification/content-currency.tsx): sending waits.
+  // The signatures it carries or the page's own item not current at the head served: sending waits.
   const page = usePageNotCurrent();
   const blocked =
     blockedReason !== null

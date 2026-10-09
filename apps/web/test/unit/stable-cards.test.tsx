@@ -4,11 +4,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// A page that reloads its data in place (the server said a signature set on it changed) must not
-// reset what the viewer opened: the member row showing the hashes a hardware wallet shows, "What
-// members sign", the members list, and an open Sign dialog. A reload can flip whether a set's
-// first answer was stale (an older block) or already current; the cards' tree is the same either
-// way (UntilFresh always renders a Suspense around an Await), so React keeps them mounted.
+// A reload in place must not reset what the viewer opened. It can flip whether a set's first
+// answer was stale or already current; the cards' tree is the same either way (UntilFresh always
+// renders a Suspense around an Await), so React keeps them mounted.
 
 const wallet = vi.hoisted(() => ({ address: undefined as string | undefined }));
 const MEMBER_A = "0x1000000000000000000000000000000000000001";
@@ -107,7 +105,6 @@ const set = (stale: boolean, verifiedAtBlock: string) =>
 const settled = <T,>(value: T) =>
   Object.assign(Promise.resolve(value), { _tracked: true, _data: value }) as Promise<T>;
 
-/** The upgrade page's set: its first answer until the fresh one replaces it. */
 function page(first: ReturnType<typeof set>, fresh: Promise<unknown> | null) {
   return (
     <UntilFresh stale={(first as { stale: boolean }).stale} fresh={fresh}>
@@ -132,8 +129,7 @@ describe("a set card through a reload of the page", () => {
     // First load: the first answer was an older block's; the current one came in.
     const view = render(page(set(true, "100"), settled(set(false, "101"))));
     expect(screen.getByText(/Verified at block #101/)).toBeInTheDocument();
-    // The viewer expands B's row (the hashes its hardware wallet shows) and "What members sign",
-    // and closes the members list... no: keeps it open, and opens the details of a member.
+    // The viewer expands B's row and "What members sign", and closes the members list.
     fireEvent.click(screen.getByText(MEMBER_B));
     fireEvent.click(screen.getByText(/What members sign/));
     expect(screen.getByText("A hardware wallet signing for this Safe shows")).toBeInTheDocument();

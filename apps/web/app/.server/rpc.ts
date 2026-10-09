@@ -25,9 +25,7 @@ import { creditsOf, isEngineWork, paceAsEngine, paceEngineRequest } from "./sync
 // None of the batched calls depend on msg.sender.
 export const MULTICALL3: Address = "0xcA11bde05977b3631167028862bE2a173976CA11";
 
-// Up to two batches of 8 in flight, so a fan-out above 8 reads does not wait for a whole round trip.
-// Every request sent is counted for /api/status (sync.engine.cost), L1 ones with their Infura
-// credit weight (an estimate).
+// Every request sent is counted for /api/status (sync.engine.cost), L1 ones by Infura credits.
 const countL1Method = (method: string) => countUpstream("l1", 1, creditsOf(method));
 const countL1 = (n: number, methods: readonly string[]) =>
   countUpstream(
@@ -43,8 +41,6 @@ const L1_TRANSPORT: LimitedHttpOptions = {
   onRequest: countL1Method,
   pace: paceEngineRequest,
 };
-// Contract state pinned to a block (upgrade states at the head): one aggregate3 per block, each
-// in a POST of its own.
 const L1_STATE_TRANSPORT: LimitedHttpOptions = {
   label: "L1-state",
   maxInFlight: 4,
@@ -58,11 +54,7 @@ const L2_TRANSPORT: LimitedHttpOptions = {
   onRequest: () => countL2(),
 };
 
-// The sync engine's own reads through viem go through clients of their own, on the same
-// connections (one in-flight limit): a request's read never shares a Multicall3 call with the
-// engine's (so it never waits for the engine's pace), and every request those clients send is the
-// engine's, paced and dropped once the engine may no longer send (sync/pacer.ts), however viem
-// scheduled it (a Multicall3 batch's timer, a retry).
+// The engine's viem reads use clients of their own: a request never shares a Multicall3 call.
 const engineOf = (options: LimitedHttpOptions, limit: ReturnType<typeof concurrencyLimit>) => ({
   ...options,
   limit,
@@ -93,10 +85,7 @@ let batched = makeBatched(transport);
 let engineBatched = makeBatched(engineTransport);
 let useMulticall = false;
 
-/**
- * L1 client: batched through Multicall3 once the chain is known to have it; the engine's own
- * client for the engine's work (see engineOf).
- */
+/** L1 client: batched through Multicall3 once the chain is known to have it. */
 export const l1 = new Proxy({} as PublicClient, {
   get: (_, property) => {
     const engine = isEngineWork();
@@ -111,9 +100,7 @@ export const l1 = new Proxy({} as PublicClient, {
   },
 });
 
-// Its own connections, and no JSON-RPC batching (viem batches per URL across clients): a slow
-// 'latest' read on `l1` (governance, Safe info) never shares a POST with a head's state read, so
-// it cannot hold that read up (nor, through the sync engine's state step, the next heads' reads).
+// Own connections and no batching: a slow 'latest' read on `l1` never holds up a head's state read.
 let stateLimit = concurrencyLimit(L1_STATE_TRANSPORT.maxInFlight);
 let stateTransport = limitedHttp(env.L1_RPC_URL, { ...L1_STATE_TRANSPORT, limit: stateLimit });
 let stateEngineTransport = limitedHttp(env.L1_RPC_URL, engineOf(L1_STATE_TRANSPORT, stateLimit));
@@ -122,10 +109,6 @@ let stateBatched = makeBatched(stateTransport);
 let stateEngineDirect = createPublicClient({ transport: stateEngineTransport });
 let stateEngineBatched = makeBatched(stateEngineTransport);
 
-/**
- * L1 client for contract state at a pinned block (upgrade states); Multicall3 as `l1`, and the
- * engine's own client for the engine's work as `l1`.
- */
 export const l1State = new Proxy({} as PublicClient, {
   get: (_, property) => {
     const engine = isEngineWork();
@@ -156,14 +139,9 @@ export type Network = NetworkConfig & {
 
 export class ConfigError extends Error {}
 
-// The network as last read under the current settings, for what needs it without waiting
-// (resolvedNetwork): set once network() has answered, never guessed.
 let settledNetwork: { generation: number; net: Network } | null = null;
 
-/**
- * The network network() answered under the current settings, or null while it has not (a fresh
- * process, or right after a settings change). Never reads anything.
- */
+/** network()'s answer under the current settings once it has answered, else null; never reads. */
 export function resolvedNetwork(): Network | null {
   return settledNetwork?.generation === generation ? settledNetwork.net : null;
 }
@@ -269,24 +247,18 @@ export async function l2(): Promise<PublicClient | null> {
   return l2Client;
 }
 
-/** The parts of a block header the app reads. */
 export type BlockRef = { number: bigint; hash: Hex; parentHash: Hex; timestamp: bigint };
 
-/**
- * What the node said about the 'finalized' tag: the block, that it does not know the tag (F is
- * then head − 64), or a failure (F is then the last finalized block known, if any).
- */
+/** The node's 'finalized' answer: a block, an unknown tag (F = head − 64), or a failure. */
 type FinalizedRead = { block: BlockRef } | { unsupported: true } | { error: unknown };
 type Heads = { latest: BlockRef; finalized: FinalizedRead };
 
 // Blocks this deep are treated as final even when the node's 'finalized' tag is further ahead.
 const FINALITY_DEPTH = 64n;
 
-// How a node says it does not know the 'finalized' tag: invalid params (-32602, e.g. geth before
-// the merge "invalid argument 0: hex string without 0x prefix"), method not found (-32601),
-// unknown block (-39001), or another code with that meaning in its text. Internal errors
-// (-32603) and -32000 are failures, never "unsupported": a node that is restarting says
-// "finalized block not found" and still has a finalized block a moment later.
+// How a node says it does not know the 'finalized' tag: -32602 (geth before the merge), -32601,
+// -39001, or that meaning in its text. -32603 and -32000 are failures, never "unsupported": a
+// restarting node says "finalized block not found" and has one a moment later.
 const UNSUPPORTED_TAG_CODES = new Set([-32602, -32601, -39001]);
 const UNSUPPORTED_TAG =
   /(?:unknown|invalid|unsupported) block tag|block tag\b[^\n]{0,40}\b(?:not supported|unsupported|unknown|invalid)/i;
@@ -296,8 +268,7 @@ function isUnknownTag(error: RpcError) {
   return UNSUPPORTED_TAG_CODES.has(error.code) || UNSUPPORTED_TAG.test(error.message.slice(0, 500));
 }
 
-// The newest finalized block read under the current settings: a failed 'finalized' read falls
-// back to it. Finality only moves forward, so an older answer is still a (deeper) boundary.
+// The newest finalized block known: a failed 'finalized' read falls back to it (a deeper boundary).
 let knownFinalized: { generation: number; block: BlockRef } | null = null;
 
 function rememberFinalized(block: BlockRef, readGeneration: number) {
@@ -307,7 +278,6 @@ function rememberFinalized(block: BlockRef, readGeneration: number) {
   knownFinalized = { generation, block };
 }
 
-// The node said it does not know the 'finalized' tag (under these settings).
 let tagUnsupported: { generation: number } | null = null;
 
 function finalizedRead(raw: unknown, readGeneration: number): FinalizedRead {
@@ -317,7 +287,6 @@ function finalizedRead(raw: unknown, readGeneration: number): FinalizedRead {
   return { block };
 }
 
-/** Asks the node for its 'finalized' block. Never rejects: a failure is part of the answer. */
 function readFinalizedTag(readGeneration: number): Promise<FinalizedRead> {
   return lanes()
     .head.request<unknown>("eth_getBlockByNumber", ["finalized", false])
@@ -331,21 +300,15 @@ function readFinalizedTag(readGeneration: number): Promise<FinalizedRead> {
     );
 }
 
-// How long a head read is served before the node is asked again.
 const HEAD_TTL_MS = 4_000;
 const HEAD_KEY = "latest-block";
 
-// Head reads (requests' and the sync engine's polls alike), numbered in the order they were sent.
 let headReads = 0;
 
-/** A chain's newest head read under some settings, and the number of the newest read naming it. */
 type NewestHead = { generation: number; block: BlockRef; read: number };
 
-/**
- * Whether `block`, named by head read number `read`, may stand as the newest head after `known`
- * (under the current settings): a higher block, or the same block, or another block at the same
- * height named by a later read (the earlier one named an orphan of a reorg the later read saw).
- */
+// Whether `block` (head read number `read`) may replace `known`: a higher block, the same block, or
+// another block at that height named by a later read (the earlier one named a reorged orphan).
 function supersedesHead(known: NewestHead | null, block: BlockRef, read: number): boolean {
   const current = known?.generation === generation ? known : null;
   if (!current) return true;
@@ -353,7 +316,6 @@ function supersedesHead(known: NewestHead | null, block: BlockRef, read: number)
   return block.hash === current.block.hash || read > current.read;
 }
 
-/** `known` after head read `read`, sent under `readGeneration`, named `block`. */
 function withHead(
   known: NewestHead | null,
   block: BlockRef,
@@ -367,12 +329,10 @@ function withHead(
   return { generation, block, read: latestRead };
 }
 
-// The newest head read under the current settings, by whoever read it. A head poll never
-// replaces the cached head with an older one: a lower block (a load-balanced RPC can answer from
-// a backend behind), or another block at the same height named by an earlier read.
+// The newest head read under these settings. A poll never replaces the cached head with an older
+// one: a lower block (a load-balanced RPC's backend behind), or a same-height block read earlier.
 let newestHead: NewestHead | null = null;
 
-/** Whether `block`, named by head read number `read`, may stand as the newest head. */
 function supersedes(block: BlockRef, read: number): boolean {
   return supersedesHead(newestHead, block, read);
 }
@@ -381,28 +341,19 @@ function noteHead(block: BlockRef, readGeneration: number, read: number) {
   newestHead = withHead(newestHead, block, readGeneration, read);
 }
 
-/** One read of the head (and 'finalized', when it asked) sent to the node. */
 type HeadRead = {
   generation: number;
-  /** Its number among head reads. */
   read: number;
-  /** When it was sent (ms since the epoch). */
   sentAt: number;
-  /** It asked for 'finalized' (else the last real answer stands in, see readHeads). */
   asksFinalized: boolean;
   answer: Promise<{ heads: Heads; answeredAt: number }>;
 };
 
-// The head read in flight: a request's (heads()) and the sync engine's poll share it, so the
-// first request after a pause and the engine waking for it ask the node once, not twice.
+// The head read in flight, shared by requests and the sync engine's poll: the node is asked once.
 let headInFlight: HeadRead | null = null;
 
-/**
- * Asks the node for its head, in one JSON-RPC batch with 'finalized' when `finalized` (or nothing
- * is known about it yet); otherwise the last real 'finalized' answer stands in, which is never
- * newer than the true boundary. Joins the read in flight under these settings instead when it
- * asked for 'finalized', or when `joinWithout` accepts one that did not (its stand-in).
- */
+// Asks for the head, with 'finalized' in the same batch unless one is known and not asked for (the
+// last real answer stands in, never newer than the boundary). Joins a read in flight that serves.
 function readHeads(finalized: boolean, joinWithout: boolean): HeadRead {
   const flight = headInFlight;
   if (flight?.generation === generation && (flight.asksFinalized || joinWithout)) return flight;
@@ -433,13 +384,8 @@ function readHeads(finalized: boolean, joinWithout: boolean): HeadRead {
   return next;
 }
 
-/**
- * The head and the 'finalized' block, read in one JSON-RPC batch so both describe the same moment.
- * Only the head can fail this read: whatever happens to 'finalized' is kept beside it, so the head
- * never waits on or fails with the finality boundary. The sync engine keeps this entry fresh with
- * its own polls (pollHead); a poll in flight when this needs a read is joined (its 'finalized' is
- * the one it asked for, or the last real answer: never newer than the true boundary).
- */
+// The head and 'finalized' in one batch (the same moment). Only the head can fail this read: it
+// never waits on or fails with the finality boundary.
 function heads(): Promise<Heads> {
   const read = cached(HEAD_KEY, HEAD_TTL_MS, async () => {
     const flight = readHeads(true, true);
@@ -451,8 +397,6 @@ function heads(): Promise<Heads> {
   return read;
 }
 
-// What each head read stored under HEAD_KEY resolved to, by its promise: a caller that must not
-// wait (a page's first answer) takes the head in memory, never one still being read.
 const settledHeads = new WeakMap<Promise<Heads>, Heads>();
 const trackedHeads = new WeakSet<Promise<Heads>>();
 
@@ -468,53 +412,27 @@ function trackHeads() {
   );
 }
 
-/**
- * The head requests read right now when it is already in memory, at once: null when none is
- * cached or its read has not answered yet (never waits, never asks the node).
- */
+/** The head requests read now, when it is in memory; else null (never waits, never asks). */
 export function servedHeadNow(): BlockRef | null {
   const stored = peek<Heads>(HEAD_KEY);
   return stored ? settledHeads.get(stored)?.latest ?? null : null;
 }
 
-/** A head the sync engine read: what the node said, and how to serve it. */
 export type PolledHead = {
   head: BlockRef;
-  /**
-   * The node's answer for 'finalized' when this poll asked: a block, or null when the node does
-   * not know the tag. undefined when the poll did not ask, or the read failed.
-   */
+  /** 'finalized' when this poll asked: a block, null for an unknown tag; else undefined. */
   finalized: BlockRef | null | undefined;
   generation: number;
-  /** When the node's answer arrived (ms since the epoch). */
   answeredAt: number;
-  /**
-   * When the read was sent (ms since the epoch): earlier than the poll when it joined a request's
-   * read already in flight.
-   */
   sentAt?: number;
-  /** The finality boundary F at this head, as chainHead() computes it (and rejects). */
   boundary(): Promise<bigint>;
-  /**
-   * The settings are unchanged and no newer head has been seen (a higher block, or another block
-   * at this height named by a later read): this head may be served.
-   */
   isNewest(): boolean;
-  /**
-   * Makes this head the cached head (the entry latestBlock() and chainHead() read) until 4 s after
-   * the node named it. False (and nothing changes) when the settings changed, a newer head is
-   * known (see isNewest), or the answer is already 4 s old.
-   */
+  /** Serves this head until 4 s after the node named it; false when stale or superseded. */
   publish(): boolean;
-  /**
-   * Serves this head for another 4 s without asking the node, for a moment the caller knows no
-   * newer block can exist yet. False (and nothing changes) when the settings changed or another
-   * head (newer, or the same height with another hash) has been seen since.
-   */
+  /** Serves this head 4 s more without asking, when no newer block can exist yet; else false. */
   confirm(): boolean;
 };
 
-/** Serves `heads` for `ttlMs` when it may stand as the newest head (see supersedes). */
 function publishHeads(heads: Heads, readGeneration: number, read: number, ttlMs: number): boolean {
   if (readGeneration !== generation || ttlMs <= 0 || !supersedes(heads.latest, read)) return false;
   noteHead(heads.latest, readGeneration, read);
@@ -527,14 +445,7 @@ function publishHeads(heads: Heads, readGeneration: number, read: number, ttlMs:
   return true;
 }
 
-/**
- * For the sync engine: asks the node for its head now. 'finalized' is asked in the same JSON-RPC
- * batch when `withFinalized` (or nothing is known about it yet); otherwise the last real answer
- * stands in, which is never newer than the true boundary. A head read already in flight (a
- * request's) is joined instead when it serves (see readHeads; `sentAt` then says when it was
- * sent). Nothing is served until the caller publishes the answer (after reading what requests at
- * that head need). Rejects when the head cannot be read.
- */
+/** The sync engine's head read (see readHeads): nothing is served until the caller publishes it. */
 export async function pollHead({ withFinalized }: { withFinalized: boolean }): Promise<PolledHead> {
   const flight = readHeads(withFinalized, !withFinalized);
   const { generation: readGeneration, read, sentAt } = flight;
@@ -561,22 +472,19 @@ export async function pollHead({ withFinalized }: { withFinalized: boolean }): P
       return boundary;
     },
     isNewest: () => readGeneration === generation && supersedes(head, read),
-    // Served for 4 s from the node's answer, as a request's own read would be: never longer
-    // because the engine published it later.
+    // 4 s from the node's answer, as a request's own read: never longer for a later publish.
     publish: () =>
       publishHeads(polled, readGeneration, read, HEAD_TTL_MS - (Date.now() - answeredAt)),
     confirm: () => {
       if (readGeneration !== generation) return false;
       const known = newest();
       if (known && known.hash !== head.hash) return false;
-      // The caller vouches for this moment: 4 s from now.
       return publishHeads(polled, readGeneration, read, HEAD_TTL_MS);
     },
   };
 }
 
-// One fresh 'finalized' read at a time, for a boundary needed after a failed read with nothing
-// known to fall back to.
+// One fresh 'finalized' read at a time, after a failed read with nothing known to fall back to.
 let rereading: { generation: number; read: Promise<FinalizedRead> } | null = null;
 
 function rereadFinalized(): Promise<FinalizedRead> {
@@ -589,11 +497,8 @@ function rereadFinalized(): Promise<FinalizedRead> {
   return read;
 }
 
-/**
- * The finalized block for the boundary: this read's, else (it failed) the newest one known under
- * these settings, else one fresh read. null: the node does not know the tag. Rejects when there
- * is no real answer: head − 64 is never assumed for a failure.
- */
+// The finalized block for the boundary: this read's, else the newest known, else one fresh read;
+// null for an unknown tag. Rejects without a real answer: head − 64 is never assumed for a failure.
 async function finalizedFor(read: FinalizedRead): Promise<BlockRef | null> {
   let answer = read;
   if ("error" in answer) {
@@ -617,34 +522,24 @@ export async function latestBlock(): Promise<BlockRef> {
   return (await heads()).latest;
 }
 
-/**
- * The head requests read right now, when one is cached (or a read of it is in flight): never asks
- * the node. null otherwise.
- */
+/** The head requests read now, when cached or in flight (never asks the node); else null. */
 export function servedHead(): Promise<BlockRef> | null {
   return peek<Heads>(HEAD_KEY)?.then((read) => read.latest) ?? null;
 }
 
-/**
- * The node's 'finalized' block (from the same read as the head when it answered; see finalizedFor
- * when it did not), or null when the node does not know the tag.
- */
 export async function finalizedBlock(): Promise<BlockRef | null> {
   return finalizedFor((await heads()).finalized);
 }
 
 /**
- * The head and the finality boundary F: blocks at or below F are treated as final and may be
- * cached forever. F = min(head − 64, finalized); head − 64 when the node does not know the tag; on
- * dev nodes, the fork block (without waiting on 'finalized'). Rejects when 'finalized' failed and
- * no finalized block is known.
+ * The head and the finality boundary F = min(head − 64, finalized): head − 64 for an unknown tag,
+ * the fork block on dev nodes. Rejects when 'finalized' failed and no finalized block is known.
  */
 export async function chainHead(): Promise<{ head: BlockRef; safe: bigint }> {
   const [net, read] = await Promise.all([network(), heads()]);
   return { head: read.latest, safe: await boundaryOf(net, read) };
 }
 
-/** F for a head read (see chainHead). */
 async function boundaryOf(net: Network, { latest, finalized }: Heads): Promise<bigint> {
   if (net.isDevNode) return net.forkBlock ?? -1n;
   const byDepth = latest.number - FINALITY_DEPTH;
@@ -657,16 +552,11 @@ export async function safeBlockNumber(): Promise<bigint> {
   return (await chainHead()).safe;
 }
 
-/** Drops the cached head, so the next read asks the node for its newest block. */
 export function refreshHead() {
   invalidate(HEAD_KEY);
 }
 
-/**
- * Timestamps of L1 blocks, read together (the call lane sends them as one JSON-RPC batch). A
- * block at or below the finality boundary never changes, so its timestamp is kept for good (not
- * on dev nodes, which can be rewound).
- */
+/** L1 block timestamps, in one batch; a final block's is kept for good (not on dev nodes). */
 export async function blockTimestamps(numbers: readonly bigint[]): Promise<Map<bigint, bigint>> {
   const unique = [...new Set(numbers)];
   if (unique.length === 0) return new Map();
@@ -691,8 +581,6 @@ export async function blockTimestamps(numbers: readonly bigint[]): Promise<Map<b
   return new Map(unique.map((n, i) => [n, times[i] as bigint]));
 }
 
-// Timestamps of final L1 blocks read under the current settings, for saving
-// (persist/chain-cache.ts); at most FINAL_TIMESTAMPS_LIMIT of them.
 const FINAL_TIMESTAMPS_LIMIT = 10_000;
 let finalTimestamps: { generation: number; times: Map<bigint, bigint> } = {
   generation: -1,
@@ -709,18 +597,13 @@ function noteFinalTimestamp(n: bigint, timestamp: bigint) {
   if (times.has(n) || times.size < FINAL_TIMESTAMPS_LIMIT) times.set(n, timestamp);
 }
 
-/**
- * The final L1 block timestamps to save: those read under the current settings, and those the
- * last run read that nothing has contradicted (a contradiction discards them all, see
- * seededTimestamps).
- */
+/** Final L1 timestamps to save: this run's, and the last run's that nothing contradicted. */
 export function finalBlockTimestamps(): Map<bigint, bigint> {
   return new Map([...(currentSeededTimestamps()?.times ?? []), ...currentFinalTimestamps()]);
 }
 
-// Timestamps the last run read (seeded from disk): unverified, so only pages use them (labelled,
-// see pageBlockTimestamps), until a read of the block confirms one. One that disagrees with the
-// node calls `onMismatch`.
+// Timestamps the last run read: unverified, so only pages use them (labelled) until a read of the
+// block confirms one. One that disagrees with the node calls `onMismatch`.
 let seededTimestamps: {
   generation: number;
   times: Map<bigint, bigint>;
@@ -730,7 +613,6 @@ let seededTimestamps: {
 const currentSeededTimestamps = () =>
   seededTimestamps?.generation === generation ? seededTimestamps : null;
 
-/** Seeds L1 block timestamps the last run read (see seededTimestamps). */
 export function seedProvisionalTimestamps(
   times: ReadonlyMap<bigint, bigint>,
   onMismatch?: () => void
@@ -738,7 +620,6 @@ export function seedProvisionalTimestamps(
   seededTimestamps = { generation, times: new Map(times), onMismatch };
 }
 
-/** Drops the seeded timestamps (the chain cache was found wrong, or is not used). */
 export function dropProvisionalTimestamps() {
   seededTimestamps = null;
 }
@@ -751,10 +632,7 @@ function checkSeededTimestamp(n: bigint, timestamp: bigint) {
   if (known !== timestamp) seeded.onMismatch?.();
 }
 
-/**
- * blockTimestamps for a page: a timestamp read in this run, else one the last run read (seeded,
- * unverified), else read now. `provisional`: one of the last run's was used.
- */
+/** blockTimestamps for pages: the last run's may stand in (`provisional` then says so). */
 export async function pageBlockTimestamps(
   numbers: readonly bigint[]
 ): Promise<{ times: Map<bigint, bigint>; provisional: boolean }> {
@@ -775,10 +653,6 @@ export async function pageBlockTimestamps(
   return { times, provisional };
 }
 
-/**
- * The chain the L1 RPC serves, named by its chain id and genesis block hash, read in one JSON-RPC
- * batch and kept for the settings generation. Names the chain cache's file.
- */
 export function chainIdentity(): Promise<{ chainId: number; genesisHash: Hex }> {
   return cached(`chain-identity:${generation}`, FOREVER, async () => {
     const readGeneration = generation;
@@ -807,7 +681,6 @@ export function knownChainIdentity(): { chainId: number; genesisHash: Hex } | nu
   return knownIdentity?.generation === generation ? knownIdentity.identity : null;
 }
 
-/** ZKsync Era's chain id, from the L2 RPC (kept for the settings generation); null without one. */
 export async function l2ChainId(): Promise<number | null> {
   const lane = await l2HeadLane();
   if (!lane) return null;
@@ -828,23 +701,16 @@ export function knownL2ChainId(): number | null {
   return knownL2Id?.generation === generation ? knownL2Id.chainId : null;
 }
 
-// Raw JSON-RPC lanes (chain/jsonrpc.ts). `history` carries eth_getLogs backfills, `call` the
-// eth_call/eth_getCode verdict reads, `head` the 'latest'/'finalized' reads (requests' and the
-// sync engine's polls). Each lane batches and adapts on its own, so a backfill never queues ahead
-// of a page's reads, and a head read never shares a POST with (or waits on) a slow eth_call. They
-// share one provider, though: while the call or head lane is under pressure (rate limited, or
-// requests waiting for a POST slot), the history lane sends one POST at a time, so a backfill
-// cannot take the provider's capacity from the reads a page waits on.
+// Raw JSON-RPC lanes (chain/jsonrpc.ts). While `call` or `head` is busy, `history` sends one POST
+// at a time, so a backfill never takes the provider's capacity from a page's reads.
 type L1Lanes = { history: Lane; call: Lane; head: Lane };
 let l1Lanes: L1Lanes | undefined;
 let generation = 0;
 
-/** L1 lanes for the current data source settings. */
 export function lanes(): L1Lanes {
   if (l1Lanes) return l1Lanes;
-  // The call and head lanes ask a read again when the node failed to answer it (an internal
-  // error): Infura answers reads pinned to a block it just named that way for up to about a
-  // second, and one failed read fails a whole JSON answer.
+  // askAgain: Infura answers a read pinned to a block it just named "Internal error" for up to
+  // about a second, and one failed read fails a whole JSON answer.
   const call = createLane({
     url: env.L1_RPC_URL,
     label: "l1-call",
@@ -854,8 +720,7 @@ export function lanes(): L1Lanes {
     onSend: countL1,
     pace: paceEngineRequest,
   });
-  // One head read ('latest' with 'finalized') per POST. The sync engine paces its polls itself
-  // (before it reads, so a request never joins a poll that is waiting its turn).
+  // One head read ('latest' with 'finalized') per POST; the engine paces its polls itself.
   const head = createLane({
     url: env.L1_RPC_URL,
     label: "l1-head",
@@ -877,41 +742,28 @@ export function lanes(): L1Lanes {
   return l1Lanes;
 }
 
-// ---- ZKsync Era head ----
-
 const L2_HEAD_KEY = "l2-latest-block";
 
-/**
- * ZKsync Era's head and its finality boundary: `safe` is Era's 'finalized' block (one whose batch
- * was executed on L1), never above the head. -1 when the node does not know the tag: then nothing
- * is final, and the flows scan their windows on demand (as before the L2 log index) instead of
- * reading the index, whose tail would then be the governors' whole history at every Era head.
- */
+/** Era's head; `safe`: Era's 'finalized' block (at most the head), -1 for an unknown tag. */
 export type L2Head = { head: BlockRef; safe: bigint; answeredAt: number };
 
-// The newest 'finalized' Era block read under the current settings: a failed 'finalized' read
-// falls back to it (finality only moves forward, so an older answer is a deeper boundary).
+// The newest Era 'finalized' block read under these settings: a failed read falls back to it.
 let knownL2Finalized: { generation: number; number: bigint } | null = null;
 
-// Era head reads (requests' and the sync engine's), numbered in the order they were sent.
 let l2HeadReads = 0;
 
-// The newest Era head read under the current settings, by whoever read it. Era's RPC is load
-// balanced and its backends can be a block or two apart: the sync engine's refresh never replaces
-// the served Era head with an older one (as for L1, see newestHead).
+// Era's RPC is load balanced (backends a block or two apart): a refresh never replaces the served
+// Era head with an older one (see newestHead).
 let newestL2Head: NewestHead | null = null;
 
 type L2HeadRead = { at: L2Head; read: number; readGeneration: number };
 
-// The newest Era head read under the current settings (by a request or the sync engine), with
-// when the node answered: what pages use while it is recent enough (pageL2ChainHead).
 let lastL2Read: { at: L2Head; generation: number } | null = null;
 
 async function readL2Head(lane: Lane, withFinalized = true): Promise<L2HeadRead> {
   const readGeneration = generation;
   const read = ++l2HeadReads;
-  // 'finalized' is skipped only when a finalized block is known already (finality only moves
-  // forward, so that one is a deeper boundary).
+  // 'finalized' is skipped only when one is known (finality only moves forward).
   const askFinalized = withFinalized || knownL2Finalized?.generation !== readGeneration;
   // One JSON-RPC batch: both answers describe the same moment.
   const [latest, finalized] = await Promise.all([
@@ -957,23 +809,14 @@ async function readL2Head(lane: Lane, withFinalized = true): Promise<L2HeadRead>
   return { at, read, readGeneration };
 }
 
-/**
- * ZKsync Era's head and 'finalized' block, read together and served for 4 s (as L1's head), or
- * null when no L2 RPC is configured. Rejects when the head cannot be read, or 'finalized' failed
- * and no finalized block is known yet (no boundary is ever assumed for a failure).
- */
+/** Era's head and 'finalized' (4 s); rejects when 'finalized' failed with none known yet. */
 export async function l2ChainHead(): Promise<L2Head | null> {
   const lane = await l2HeadLane();
   if (!lane) return null;
   return cached(L2_HEAD_KEY, HEAD_TTL_MS, async () => (await readL2Head(lane)).at);
 }
 
-/**
- * Reads Era's head now (the sync engine, ahead of requests) and serves it for 4 s from the node's
- * answer, unless the settings changed meanwhile or a newer Era head is known (a higher block, or
- * another block at this height named by a later read): then the head served stays. Resolves with
- * the node's answer either way; null without an L2 RPC.
- */
+/** The sync engine's Era head read: served unless the settings changed or a newer head is known. */
 export async function refreshL2ChainHead({
   withFinalized = true,
 }: { withFinalized?: boolean } = {}): Promise<L2Head | null> {
@@ -985,11 +828,7 @@ export async function refreshL2ChainHead({
   return at;
 }
 
-/**
- * For pages (never JSON): the newest Era head read under the current settings, while the node
- * answered it at most `maxAgeMs` ago (sync/era.ts reads one every minute while a page showing Era
- * is on screen), else l2ChainHead(). Pages label what they show with its block and age.
- */
+/** Pages only (never JSON): the newest Era head if at most `maxAgeMs` old, else l2ChainHead(). */
 export async function pageL2ChainHead(maxAgeMs: number): Promise<L2Head | null> {
   const known = lastL2Read;
   if (known && known.generation === generation && Date.now() - known.at.answeredAt <= maxAgeMs)
@@ -997,18 +836,15 @@ export async function pageL2ChainHead(maxAgeMs: number): Promise<L2Head | null> 
   return l2ChainHead();
 }
 
-/** The newest Era head read under the current settings (number, when answered), or null. */
 export function lastL2Head(): L2Head | null {
   return lastL2Read?.generation === generation ? lastL2Read.at : null;
 }
 
-// ZKsync Era lanes: `history` carries the governor index's eth_getLogs, `head` Era's
-// 'latest'/'finalized' reads and the block headers windows are cut by, so a head read never
-// queues behind a backfill's eth_getLogs chunks on an Era RPC that caps block ranges.
+// Era lanes: `history` for the governor index's eth_getLogs, `head` for heads and block headers,
+// so a head read never queues behind a backfill on an Era RPC that caps block ranges.
 type L2Lanes = { history: Lane; head: Lane };
 let l2Lanes: L2Lanes | null | undefined;
 
-/** Era lanes for the current settings, or null when no L2 RPC is configured. */
 async function l2LanesNow(): Promise<L2Lanes | null> {
   if (l2Lanes !== undefined) return l2Lanes;
   const started = generation;
@@ -1037,21 +873,15 @@ async function l2LanesNow(): Promise<L2Lanes | null> {
   return l2Lanes;
 }
 
-/** eth_getLogs lane for ZKsync Era, or null when no L2 RPC is configured. */
 export async function l2HistoryLane(): Promise<Lane | null> {
   return (await l2LanesNow())?.history ?? null;
 }
 
-/** Era head and block header lane, or null when no L2 RPC is configured. */
 export async function l2HeadLane(): Promise<Lane | null> {
   return (await l2LanesNow())?.head ?? null;
 }
 
-/**
- * The eth_getLogs lane behind a client from this module (`l1`, or the client `l2()` made), so
- * log scans batch on their own lane instead of the client's shared transport. null for any
- * other client.
- */
+/** The eth_getLogs lane behind `l1` or the client `l2()` made; null for any other client. */
 export async function historyLaneOf(client: unknown): Promise<Lane | null> {
   if (client === l1) return lanes().history;
   if (client && client === l2Client) return l2HistoryLane();
@@ -1099,8 +929,7 @@ export function resetRpcClients() {
   l2Lanes = undefined;
 }
 
-// A page loader decides, before its reads start, whether it must wait for the newest block, to
-// show what pages last showed until then (sync/last-shown.ts): it reads the head through these.
+// Page loaders read the head through these before their reads start (sync/last-shown.ts).
 provideHeads({
   servedHeadNow,
   latestBlock,

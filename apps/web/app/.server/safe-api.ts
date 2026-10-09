@@ -19,7 +19,6 @@ const confirmationSchema = z.object({
   signatureType: z.string(),
 });
 
-/** One Safe message as the service lists it (also how the chain cache checks a kept copy). */
 export const safeMessageSchema = z.object({
   created: z.string(),
   modified: z.string(),
@@ -39,25 +38,18 @@ const listSchema = z.object({
 export type SafeMessage = z.infer<typeof safeMessageSchema>;
 export type SafeMessages = { messages: SafeMessage[]; complete: boolean };
 
-/** One read of a Safe's listing: `count` is the service's total, `arrivedAt` its first answer. */
 export type SafeListing = SafeMessages & { count: number; arrivedAt: number };
 
-/** The Safe's most recently modified message, and how many it has (the store's change check). */
 export type NewestMessage = { count: number; messageHash: Hex | null; modified: string | null };
 
 export class SafeApiError extends Error {}
 
-/**
- * A read's place in the queue: "high" for what a request waits on, "low" for background reads.
- * A background read that a request then waits on is promoted (its priority set to "high").
- */
+/** "high": a request waits on it; "low": background (promoted once a request waits on it). */
 export type SafeTicket = { priority: "high" | "low" };
 
 export type SafeRequestOptions = {
   ticket?: SafeTicket;
-  /** Runs before each request waits for a start slot; throwing cancels it without using one. */
   beforeQueue?: () => void;
-  /** Runs as each request is about to be sent; throwing cancels it (a background budget). */
   beforeRequest?: () => void;
 };
 
@@ -66,15 +58,13 @@ const MAX_PAGES = 5;
 const MESSAGE_TTL_MS = 60_000;
 // Safe answers 429 at 8 requests in flight.
 const MAX_IN_FLIGHT = 4;
-// Background requests hold at most this many of those slots: a page's request always finds one
-// free, behind at most the spacing below, never behind a background request's answer.
+// A page's request always finds a slot free: background requests hold at most this many.
 const MAX_BACKGROUND_IN_FLIGHT = 2;
 
 // api.safe.global allows 2 requests/s without a key (5/s with one) and 5,000 a month per IP.
 // A self-hosted Transaction Service has no such limits.
 const minIntervalMs = () => (env.SAFE_API_KEY ? 220 : 550);
 
-/** The public Safe Transaction Service (rate limited, with a monthly per-IP quota without a key). */
 export function isPublicSafeService(baseUrl: string): boolean {
   try {
     return new URL(baseUrl).hostname === "api.safe.global";
@@ -84,9 +74,8 @@ export function isPublicSafeService(baseUrl: string): boolean {
 }
 
 /**
- * Whether reads nobody asked for yet (warm-up, background refresh) may be sent to this service:
- * with SAFE_API_KEY, or to a self-hosted service. Keyless reads of the public service would spend
- * the shared 5,000-a-month per-IP quota that the pages themselves need.
+ * Background reads only with a key or on a self-hosted service: keyless ones would spend the public
+ * service's 5,000-a-month per-IP quota that the pages need.
  */
 export function backgroundSafeReadsAllowed(
   baseUrl: string,
@@ -97,7 +86,6 @@ export function backgroundSafeReadsAllowed(
 
 let clientGeneration = 0;
 
-/** The settings generation the Safe client runs for; resetSafeClient() starts a new one. */
 export function safeClientGeneration(): number {
   return clientGeneration;
 }
@@ -111,29 +99,20 @@ function checkCooldown() {
   cooldown = null;
 }
 
-/** When the current rate-limit / quota cooldown ends, or null when there is none. */
 export function safeCooldownUntil(): number | null {
   return cooldown && Date.now() < cooldown.until ? cooldown.until : null;
 }
 
-/**
- * The error every request to Safe fails with right now (a rate-limit or monthly-quota cooldown:
- * nothing is sent until it ends), or null when there is no cooldown.
- */
 export function safeCooldownError(): SafeApiError | null {
   return cooldown && Date.now() < cooldown.until ? cooldown.error : null;
 }
 
-/** The current cooldown is for the service's monthly quota (used up), not a short rate limit. */
 export function safeQuotaExhausted(): boolean {
   return !!cooldown && Date.now() < cooldown.until && cooldown.exhausted;
 }
 
-// The pacer: requests start one at a time, at least minIntervalMs() apart on the public service,
-// with at most MAX_IN_FLIGHT in flight anywhere, of which at most MAX_BACKGROUND_IN_FLIGHT are
-// background ones. Waiting requests a page needs ("high") start before background ones ("low"),
-// whatever their order of arrival. Requests sent before a settings change count until they are
-// answered: they are still in flight at the service.
+// Requests start one at a time, minIntervalMs() apart on the public service, at most MAX_IN_FLIGHT
+// in flight (MAX_BACKGROUND_IN_FLIGHT of them background); those a page waits on go first.
 type Waiter = {
   ticket: SafeTicket;
   spaced: boolean;
@@ -149,7 +128,6 @@ let pumpTimer: ReturnType<typeof setTimeout> | null = null;
 function pump() {
   while (waiting.length > 0 && inFlight < MAX_IN_FLIGHT) {
     const high = waiting.findIndex((w) => w.ticket.priority === "high");
-    // Only background requests wait: one starts only while fewer than its share are in flight.
     if (high === -1 && lowInFlight >= MAX_BACKGROUND_IN_FLIGHT) return;
     const index = high === -1 ? 0 : high;
     const waiter = waiting[index] as Waiter;
@@ -174,7 +152,6 @@ function pump() {
   }
 }
 
-/** Waits for a start slot; resolves to the release to call once the response was read. */
 async function acquire(ticket: SafeTicket, spaced: boolean): Promise<() => void> {
   const low = await new Promise<boolean>((resolve, reject) => {
     waiting.push({ ticket, spaced, resolve, reject });
@@ -190,7 +167,6 @@ async function acquire(ticket: SafeTicket, spaced: boolean): Promise<() => void>
   };
 }
 
-/** Fails every request still waiting for a slot. */
 function rejectWaiting(error: Error) {
   const rejected = waiting;
   waiting = [];
@@ -223,20 +199,15 @@ function retryDelay(value: string | null): number {
 const settingsChanged = () =>
   new SafeApiError("Data source settings changed. Refresh to check signatures again.");
 
-/**
- * The service's quota as its last answer reported it (x-ratelimit-limit / -remaining), and when the
- * quota period ends (x-ratelimit-reset, ms since the epoch; null when not reported).
- */
+/** The quota the service last reported (x-ratelimit-limit, -remaining and -reset). */
 export const quota = {
   limit: null as number | null,
   remaining: null as number | null,
   resetAt: null as number | null,
 };
 
-/**
- * When the quota period ends, from x-ratelimit-reset: seconds from now (Safe's public service
- * reports ~2.6 million, the rest of the month), or an epoch time in seconds when that large.
- */
+// x-ratelimit-reset: seconds from now (the public service reports about 2.6 million, the rest of
+// the month), or an epoch time in seconds when that large.
 function resetAtOf(value: string | null, now: number): number | null {
   if (value === null || value.trim() === "") return null;
   const seconds = Number(value);
@@ -330,10 +301,7 @@ async function getJson(
 const messagesPath = (safe: Address, query: string) =>
   `/api/v1/safes/${getAddress(safe)}/messages/?${query}`;
 
-/**
- * Reads a Safe's newest messages (governance actions are recent, so a few pages cover them).
- * Callers read listings through the snapshot store (safe/store.ts), which decides when to.
- */
+/** A Safe's newest messages (governance actions are recent, so a few pages cover them). */
 export async function fetchListing(
   safe: Address,
   options: SafeRequestOptions = {}
@@ -366,9 +334,8 @@ export async function fetchListing(
 }
 
 /**
- * One small request that tells whether a Safe's listing changed: a new message raises the count,
- * a deleted one lowers it, and a new confirmation sets the message's `modified` (so it becomes the
- * newest by modification). Safe ignores time filters, so this is the cheapest check there is.
+ * The cheapest change check (Safe ignores time filters): a new or deleted message moves the count,
+ * a new confirmation the newest `modified`.
  */
 export async function fetchNewest(
   safe: Address,
@@ -406,10 +373,7 @@ export function getSafeMessage(messageHash: Hex): Promise<SafeMessage | null> {
 }
 
 let lastRefresh = 0;
-/**
- * Drops cached Safe answers, the snapshot store's listings included (at most every 10 s, to
- * protect the shared quota).
- */
+/** Drops cached Safe answers, the store's included (at most every 10 s, to protect the quota). */
 export function refreshSafeData(): boolean {
   if (Date.now() - lastRefresh < 10_000) return false;
   lastRefresh = Date.now();

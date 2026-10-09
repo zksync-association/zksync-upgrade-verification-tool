@@ -2,24 +2,9 @@ import { Await } from "@remix-run/react";
 import { type ReactNode, Suspense } from "react";
 import type { Refresh } from "./freshness";
 
-/**
- * A page's first answer until the fresh result streams in (see .server/signatures.ts
- * firstSignatureSet). A first answer that is not stale renders as it is. A stale one renders with
- * refresh "pending" until `fresh` resolves, then the fresh value renders in its place; when `fresh`
- * fails, the stale one stays with refresh "failed" (or `failed` renders, when given: the page's
- * own error for what could not be read). `fresh` resolving to null (nothing was stale after all)
- * keeps the first answer.
- *
- * After a pause the first answer is what the page last showed (as of its block), and the value
- * that replaces it may itself not be current yet (the current answer from older Safe copies,
- * `staleOf`): it then renders as a first answer does, with refresh "pending", until `after`
- * replaces it (or "failed" when that fails, the value staying, labelled as it is).
- *
- * The tree is the same either way (a Suspense around an Await, which renders at once for a value
- * that is not a promise): when a reload of the page turns a stale first answer into a current one
- * (or back), React keeps what is inside mounted, so an expanded member row, an open details panel
- * or an open Sign dialog stay as they were.
- */
+// Always the same tree (Await renders at once for a value that is not a promise): a reload that
+// turns a stale first answer into a current one keeps an open row or Sign dialog mounted. `fresh`
+// resolving to null (nothing was stale after all) keeps the first answer.
 export function UntilFresh<T>({
   stale,
   fresh,
@@ -30,11 +15,9 @@ export function UntilFresh<T>({
 }: {
   stale: boolean;
   fresh: Promise<T | null> | T | null;
-  /** `refresh` is null whenever the value given is current. */
   children: (fresh: T | null, refresh: Refresh) => ReactNode;
-  /** What renders when `fresh` fails (default: the first answer, with refresh "failed"). */
   failed?: ReactNode;
-  /** What replaces a `fresh` value that is not current yet (see above). */
+  /** What replaces a `fresh` value that is not current yet (`staleOf`). */
   after?: Promise<T | null> | T | null;
   staleOf?: (value: T) => boolean;
 }) {

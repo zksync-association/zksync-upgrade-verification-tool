@@ -19,98 +19,52 @@ import {
   safeQuotaExhausted,
 } from "../safe-api";
 
-// Snapshots of member Safes' message listings. They are candidate input only, as before: a
-// signature counts once the governance contract accepts it in an eth_call, whatever Safe says.
+// Member Safes' message listings: candidate input only. A signature counts once the governance
+// contract accepts it in an eth_call, whatever Safe says.
 //
-// A listing is served while it is at most 60 s old, counted from when Safe's answer arrived. An
-// older one is read again for the request that needs it, ahead of any background read (and a
-// background read of that Safe already under way is promoted and shared). Callers waiting on the
-// same Safe share one read. A page (never JSON) may show a held listing of any age first,
-// labelled with its age, while that read runs (heldSafeListing); the fresh answer then replaces it.
-//
-// While someone uses the app, a watcher (see the watcher section) asks Safe about the member Safes
-// the screen depends on: the members of the signature sets on screen that can still be signed and
-// whose signature is not valid yet (every SYNC_SAFE_WATCH_MS), and the Safes behind lists on
-// screen (every SYNC_SAFE_LIST_WATCH_MS). A check asks for the Safe's most recently modified
-// message (one small request) and re-reads the listing only when that changed. Checks go out one
-// Safe at a time, within SYNC_SAFE_HOURLY_BUDGET an hour, slower when Safe reports little quota
-// left for its period, paused below 10 % of it and during a rate-limit cooldown. Without a key on
-// Safe's public service they go at most every SYNC_SAFE_WATCH_KEYLESS_MS (0: never). Nothing is
-// checked while nobody uses the app, and nothing for a set that can no longer be signed or a
-// member whose signature is valid. A viewer who just signed has their own Safe read a few times
-// over two minutes (safeBurst), and a page's "Fetch signatures" reads a set's Safes at once
-// (checkSafesNow).
-//
-// Pages (never JSON) may use a copy the watcher keeps checking without reading Safe again, while
-// it is within the watcher's cadence for it (pageSafeListing); JSON keeps the 60 s rule above.
-// The watcher starts each check by the time its copy turns one cadence old, so a page finds every
-// watched copy within that bound: it plans at 80 % of the rate it may use (checks may start a
-// quarter faster than planned, to catch up), and copies read together (a page, Fetch signatures)
-// are checked again spread over one cadence rather than all at once, so neither kind of Safe holds
-// the other's checks up. A Safe whose reads keep failing is retried less and less often, and only
-// in a start no kept copy needs (its retries are not in the plan). Requests read on demand as
-// without the watcher; a member whose listing cannot be read shows as unavailable, never as
-// missing.
+// JSON uses a listing at most 60 s old (from Safe's answer); an older one is read again for the
+// request, ahead of background reads, and callers share one read. While someone uses the app the
+// watcher checks the Safes the screen depends on (open sets' members not valid yet, Safe-fed
+// lists) within the hourly budget and Safe's quota, and a page may use a watched copy within the
+// watcher's cadence. A member whose listing cannot be read is unavailable, never missing.
 
-/** A listing is served for this long after Safe's answer arrived. */
 export const SAFE_LISTING_MAX_AGE_MS = 60_000;
-// The watcher looks again this often when it has nothing due (and whenever it is nudged).
 const WATCH_RECHECK_MS = 5_000;
-// Checks start at least this far apart, whatever the cadence.
 const WATCH_MIN_SPACING_MS = 250;
-// The watcher plans its checks at this share of the rate it may use (the quota guard stretches
-// cadences until the demand fits it), and lets checks start at the full rate: the rest is room to
-// catch up when checks come due together, so none starts after its copy's cadence.
+// Checks are planned at this share of the allowed rate; the rest is room to catch up.
 export const WATCH_UTILISATION = 0.8;
-// After a Safe's reads failed n times in a row, the watcher waits 15 s x 2^(n-1), at most 5 min,
-// before reading it again (safe-api remembers a failed path for 15 s); a success resets it. Pages
-// are not held back: a request that needs the Safe still reads it.
+// After n failed reads in a row: 15 s × 2^(n-1), at most 5 min (requests still read the Safe).
 const WATCH_RETRY_MS = 15_000;
 const WATCH_RETRY_MAX_MS = 300_000;
 const HOUR_MS = 3_600_000;
-// The watcher pauses while the service reports less than this share of its quota left.
 const QUOTA_FLOOR = 0.1;
-// The quota guard: what is left of the period's quota above this reserve, spread over the time to
-// its reset as if a page were on screen this share of it (about 6 hours a day).
+// The quota guard spreads what is left above this reserve over the time to the quota's reset, as
+// if a page were on screen this share of it (about 6 hours a day).
 const QUOTA_RESERVE = 0.2;
 const ON_SCREEN_DUTY = 0.25;
-// A page uses a watched Safe's copy within the watcher's cadence for it, and this much more for a
-// copy confirmed while the Safe was watched (the check that replaces it is under way: Safe's
-// answer, the one-at-a-time start). A copy older than that is read again, as JSON reads it.
+// A page may use a watched copy within its cadence, plus this while its next check is under way.
 const PAGE_SLACK_MS = 10_000;
-// The keys this store answers for in cache.ts's invalidate() / clearCache().
 const KEY_PREFIX = "safe:list:";
 
 export type SafeSnapshot = SafeMessages & {
-  /** When Safe's answer arrived (the first page's, or the change check's that found none). */
   fetchedAt: number;
-  /** Changes whenever the listing's content changes (never reused); kept when it does not. */
+  /** Changes whenever the content changes (never reused); kept when it does not. */
   version: number;
-  /**
-   * Read by the last run and kept on disk (persist/chain-cache.ts), not by this one: whatever its
-   * age, only a page's first answer may use it, labelled; it is never served as a listing at
-   * most 60 s old, and the first read of the Safe replaces it.
-   */
+  /** Read by the last run (chain cache): only a page's labelled first answer may use it. */
   fromLastRun?: true;
 };
 
 type Held = {
   snapshot: SafeSnapshot;
   fingerprint: string;
-  /** The newest message by modification that the snapshot reflects; null when not known. */
   newest: NewestMessage | null;
 };
 
-/** One read in flight; its ticket is its identity (and its priority, which a request raises). */
 type Read = { ticket: SafeTicket; promise: Promise<SafeSnapshot> };
 
-/** A Safe whose last listing read failed. */
 type Failure = {
-  /** Failures in a row that were the Safe's own (a rate-limit cooldown is the service's). */
   inRow: number;
-  /** The sweep reads the Safe again from this time on. */
   retryAt: number;
-  /** The last failure's text (Safe's error, never a URL), and when it happened. */
   error: string;
   at: number;
 };
@@ -120,47 +74,33 @@ const reads = new Map<string, Read>();
 const failures = new Map<string, Failure>();
 let generation = safeClientGeneration();
 let versions = 0;
-// When each background request was sent, for the last hour.
 const spent: number[] = [];
 
-/**
- * A background read not sent: the budget, the quota floor or a cooldown stopped it, it is no
- * longer wanted, or it needed a lookup by hash, which only requests make. Not a failure of the
- * Safe.
- */
+/** A background read not sent (budget, quota, cooldown, unwanted): not a failure of the Safe. */
 class SweepPaused extends Error {
   override name = "SweepPaused";
 }
 
 /**
- * How a read asks Safe: "check" asks first whether anything changed since the listing held (one
- * small request) and reads the listing only when it did; "full" reads the listing. A read for a
- * request is "full" unless it says otherwise; a background read "check" (a listing the last run
- * read is always read in full: no check is trusted against it).
+ * "check" asks first whether anything changed (one small request), "full" reads the listing. A
+ * listing the last run read is always read in full: no check is trusted against it.
  */
 type ReadMode = "check" | "full";
 
 type ReadOptions = {
   mode?: ReadMode;
-  /** A background read the viewer asked for or the screen needs: allowed without a key. */
   keyless?: boolean;
 };
 
-/**
- * Drops listings (all of them for null): their next read goes to Safe, and reads in flight are
- * not stored.
- */
 function drop(prefix: string | null) {
   const covered = (key: string) => prefix === null || `${KEY_PREFIX}${key}`.startsWith(prefix);
   for (const map of [held, reads, failures])
     for (const key of [...map.keys()]) if (covered(key)) map.delete(key);
 }
 
-// refreshSafeData() (invalidate "safe:"), a settings change and dev-node refreshes (clearCache)
-// empty this store like the rest of the cache.
+// refreshSafeData(), settings changes and dev-node refreshes empty this store like the cache.
 linkStore(KEY_PREFIX, drop);
 
-/** Listings from before a settings change are never served. */
 function sync() {
   const current = safeClientGeneration();
   if (current === generation) return;
@@ -178,11 +118,7 @@ function servable(key: string): SafeSnapshot | null {
 }
 
 export type SafeReadOptions = {
-  /**
-   * For reads nobody waits on (the boot warm-up, precomputing): queued behind every request's
-   * reads, within the hourly background budget (they fail while sweeps are paused, and on the
-   * public service without a key).
-   */
+  /** For reads nobody waits on: behind every request's, within the hourly background budget. */
   background?: boolean;
 };
 
@@ -197,10 +133,7 @@ export function listSafeMessages(
   return snapshot ? Promise.resolve(snapshot) : readSafe(safe, background ? "low" : "high");
 }
 
-/**
- * The message with exactly this hash, preferring the listing to save quota. A background lookup
- * that the listing cannot answer fails instead of asking Safe by hash (outside the budget).
- */
+/** Prefers the listing to save quota; a background lookup never asks Safe by hash. */
 export async function findSafeMessage(
   safe: Address,
   messageHash: Hex,
@@ -211,21 +144,12 @@ export async function findSafeMessage(
 
 export type SafeMessageLookup = {
   message: SafeMessage | null;
-  /**
-   * The version of the listing that answered (see SafeSnapshot.version); null when it could not
-   * and Safe was asked for the message by its hash.
-   */
+  /** The listing version that answered; null when Safe was asked by hash. */
   version: number | null;
-  /**
-   * When the listing that answered arrived (ms since the epoch, see SafeSnapshot.fetchedAt); null
-   * when Safe was asked for the message by its hash (an answer read just now).
-   */
   fetchedAt: number | null;
-  /** The listing that answered was read by the last run (see SafeSnapshot.fromLastRun). */
   fromLastRun?: true;
 };
 
-/** findSafeMessage, with the listing version the answer came from. */
 export async function lookupSafeMessage(
   safe: Address,
   messageHash: Hex,
@@ -238,10 +162,6 @@ export async function lookupSafeMessage(
   return { message: await getSafeMessage(messageHash), version: null, fetchedAt: null };
 }
 
-/**
- * The same lookup from the listing held now, without asking Safe: null when there is no listing at
- * most 60 s old, or it cannot tell (the message may be past its last page). For precomputing.
- */
 export function peekSafeMessage(safe: Address, messageHash: Hex): SafeMessageLookup | null {
   sync();
   const listing = servable(safe.toLowerCase());
@@ -249,30 +169,20 @@ export function peekSafeMessage(safe: Address, messageHash: Hex): SafeMessageLoo
 }
 
 /**
- * The listing held for this Safe whatever its age (older than 60 s included), without asking Safe;
- * null when none is held. Only for a page's first answer,
- * labelled with the listing's fetchedAt while a fresh one is read (never for JSON, never for a
- * verdict that is kept): Safe data is candidate input only, so an old copy can only show fewer
- * signatures than there are, never make one count.
+ * The listing held, whatever its age: only for a page's labelled first answer. An old copy can
+ * only show fewer signatures than there are, never make one count.
  */
 export function heldSafeListing(safe: Address): SafeSnapshot | null {
   sync();
   return held.get(safe.toLowerCase())?.snapshot ?? null;
 }
 
-/**
- * peekSafeMessage from the listing held whatever its age (see heldSafeListing): null when none is
- * held or it cannot tell.
- */
 export function peekHeldSafeMessage(safe: Address, messageHash: Hex): SafeMessageLookup | null {
   const listing = heldSafeListing(safe);
   return listing ? answerFrom(listing, messageHash) : null;
 }
 
-/**
- * The lookup answered from this listing (one a caller already holds): the message, or null when
- * the listing cannot tell (it stops before its last page and lacks the message).
- */
+/** null when the listing cannot tell: it stops before its last page and lacks the message. */
 export function answerFromListing(
   listing: SafeSnapshot,
   messageHash: Hex
@@ -290,10 +200,7 @@ function answerFrom(listing: SafeSnapshot, messageHash: Hex): SafeMessageLookup 
   return listing.complete ? { message: null, version, fetchedAt, ...origin } : null;
 }
 
-/**
- * The version of the listing that would be served for this Safe now (at most 60 s old), or null
- * when there is none: a result computed from a listing holds while this still names its version.
- */
+/** A result computed from a listing holds while this still names its version. */
 export function freshListingVersion(safe: Address): number | null {
   sync();
   return servable(safe.toLowerCase())?.version ?? null;
@@ -302,10 +209,6 @@ export function freshListingVersion(safe: Address): number | null {
 type ListingListener = (safe: Address) => void;
 const listeners = new Set<ListingListener>();
 
-/**
- * Calls `listener` (after the read that stored it) whenever a Safe's listing is stored with a new
- * version: its content changed, or it was read for the first time. Returns the unsubscribe.
- */
 export function onSafeListingChange(listener: ListingListener): () => void {
   listeners.add(listener);
   return () => {
@@ -326,22 +229,18 @@ function notifyChange(safe: Address) {
   });
 }
 
-/** The boot / settings warm-up's read: a background listSafeMessages. */
 export function warmSafeListing(safe: Address): Promise<SafeSnapshot> {
   return listSafeMessages(safe, { background: true });
 }
 
-/** The version of the listing held for this Safe (served or not, see freshListingVersion), or null. */
 export function safeListingVersion(safe: Address): number | null {
   sync();
   return held.get(safe.toLowerCase())?.snapshot.version ?? null;
 }
 
 /**
- * Reads the Safe's listing. A background ("low") read is sent only while `wanted()` still holds
- * as each of its requests goes out (the watcher's: someone uses the app and the Safe is on
- * screen); otherwise it stops there (SweepPaused), as for the budget. A request waiting on it
- * lifts that.
+ * A background ("low") read sends each request only while `wanted()` holds (else SweepPaused);
+ * a request waiting on it lifts that.
  */
 function readSafe(
   safe: Address,
@@ -353,11 +252,9 @@ function readSafe(
   const running = reads.get(key);
   if (running) {
     if (priority === "low") return running.promise;
-    // A request waits on it now: its remaining requests go ahead of background ones.
     running.ticket.priority = "high";
     return running.promise.catch((error: unknown) => {
-      // It stopped for a background reason of its own (budget, quota floor, no key for the public
-      // service): read for the request.
+      // Stopped for a background reason (budget, quota, no key): read for the request.
       if (error instanceof SweepPaused) return readSafe(safe, "high", undefined, options);
       throw error;
     });
@@ -372,8 +269,7 @@ function readSafe(
   };
   // Registered first, so it runs before any joined caller's handlers.
   read.promise.then(settle, (error: unknown) => {
-    // A paused background read did not reach Safe; a read from before a refresh or a settings
-    // change says nothing about the Safe now.
+    // A paused read never reached Safe; one from before a settings change says nothing now.
     if (!(error instanceof SweepPaused) && current()) noteFailure(key, error);
     settle();
   });
@@ -405,10 +301,8 @@ async function runRead(
 ): Promise<SafeSnapshot> {
   const startGeneration = safeClientGeneration();
   const previous = held.get(key);
-  // Background requests (only while nobody waits on them) wait while the watcher is paused,
-  // without taking a start slot, and count against the budget as they are sent. One that is no
-  // longer wanted (its Safe left the screen, or nobody uses the app now) is not sent at all: a
-  // read the watcher queued just before use ended sends nothing after it.
+  // Background requests wait while the watcher is paused and count against the budget as they are
+  // sent; one no longer wanted (its Safe left the screen, use ended) is never sent.
   const options = {
     ticket,
     beforeQueue: () => {
@@ -419,9 +313,8 @@ async function runRead(
     },
   };
   if (ticket.priority === "low" && !keyless) {
-    // Never in the background on the public service without a key unless the screen needs it
-    // (the watcher, the viewer's own signature): its monthly per-IP quota is for the pages that
-    // are opened.
+    // Never in the background on the public service without a key unless the screen needs it: its
+    // monthly per-IP quota is for the pages.
     const { safeTxServiceUrl } = await network();
     if (
       ticket.priority === "low" &&
@@ -431,8 +324,6 @@ async function runRead(
       throw new SweepPaused("keyless-public-service");
   }
   let checked: NewestMessage | null = null;
-  // A check asks first whether anything changed since the listing it holds; never about a
-  // listing the last run read (no check is trusted against it: it is read in full).
   const check = (mode ?? (ticket.priority === "low" ? "check" : "full")) === "check";
   if (check && previous && !previous.snapshot.fromLastRun) {
     const newest = await fetchNewest(safe, options);
@@ -452,8 +343,8 @@ async function runRead(
     previous,
     {
       snapshot: {
-        // The objects held for messages that did not change (all of them, when none did): what
-        // was derived from them (flows/messages.ts parses and hashes each once) still applies.
+        // Unchanged messages keep their objects: what was derived from them (flows/messages.ts
+        // parses and hashes each once) still applies.
         messages: !previous
           ? listing.messages
           : unchanged
@@ -464,18 +355,14 @@ async function runRead(
         version,
       },
       fingerprint,
-      // From the listing itself when it shows it; otherwise the change check made before it
-      // (never newer than the listing, so a change after it is still seen by the next check).
+      // The change check made before the listing when the listing does not show its newest (never
+      // newer than the listing, so a change after it is still seen by the next check).
       newest: newestOf(listing) ?? checked,
     },
     startGeneration
   );
 }
 
-/**
- * Stores a read's result unless the listing was dropped meanwhile (refresh, settings change); the
- * callers waiting on it get it either way, except across a settings change.
- */
 function commit(
   key: string,
   ticket: SafeTicket,
@@ -493,10 +380,6 @@ function commit(
   return next.snapshot;
 }
 
-/**
- * The messages just read, each one that has not changed since `held` replaced by the object held
- * for it. Equal means the same JSON: exactly the same content.
- */
 function sameObjects(read: SafeMessage[], held: SafeMessage[]): SafeMessage[] {
   if (held.length === 0) return read;
   const byContent = new Map(held.map((message) => [JSON.stringify(message), message]));
@@ -519,10 +402,7 @@ function instant(value: string): number | null {
   return ms * 1_000 + Number(extra.padEnd(3, "0"));
 }
 
-/**
- * The listing's newest message by modification, as Safe's change check would name it: only for a
- * complete listing whose newest is unambiguous (no tie), otherwise null (not known).
- */
+/** As Safe's change check would name it: only for a complete listing with no tie, else null. */
 function newestOf(listing: SafeListing): NewestMessage | null {
   if (!listing.complete) return null;
   let best: { message: SafeMessage; at: number } | null = null;
@@ -545,14 +425,8 @@ function newestOf(listing: SafeListing): NewestMessage | null {
 
 // ---- listings kept between runs (persist/chain-cache.ts) ----
 
-/** A listing as kept on disk: what Safe answered, and when. */
 export type KeptSafeListing = SafeMessages & { safe: Address; fetchedAt: number };
 
-/**
- * The listings held, for saving, with their versions (a new version means the content changed):
- * those this run read, and those the last run read for Safes this run has not read yet (kept with
- * the time Safe answered then, so they stay labelled with their true age).
- */
 export function listingsToKeep(): (KeptSafeListing & { version: number })[] {
   sync();
   const out: (KeptSafeListing & { version: number })[] = [];
@@ -569,12 +443,7 @@ export function listingsToKeep(): (KeptSafeListing & { version: number })[] {
   return out;
 }
 
-/**
- * Holds listings the last run read (see SafeSnapshot.fromLastRun) for Safes this run has none of
- * yet. Each gets a version of its own; none is ever served as at most 60 s old, and the first
- * read of the Safe (a request's, or a background one, which reads it in full without a change
- * check first) replaces it. Returns how many were held.
- */
+/** Holds the last run's listings for Safes this run has none of; the first read replaces each. */
 export function holdLastRunListings(listings: readonly KeptSafeListing[]): number {
   sync();
   let count = 0;
@@ -597,7 +466,6 @@ export function holdLastRunListings(listings: readonly KeptSafeListing[]): numbe
   return count;
 }
 
-/** Drops the last run's listings still held (the chain cache was found wrong). */
 export function dropLastRunListings() {
   for (const [key, entry] of [...held]) if (entry.snapshot.fromLastRun) held.delete(key);
 }
@@ -609,10 +477,7 @@ function budgetUsed(now: number): number {
   return spent.length;
 }
 
-/**
- * The quota Safe last reported, while it still describes the current period: once the reported
- * period has ended, what was left then says nothing about the new one.
- */
+/** The quota Safe last reported, while that still describes the current period. */
 function currentQuota(
   now: number
 ): { limit: number; remaining: number; resetAt: number | null } | null {
@@ -621,7 +486,6 @@ function currentQuota(
   return { limit: quota.limit, remaining: quota.remaining, resetAt: quota.resetAt };
 }
 
-/** Why background reads must wait right now, or null. */
 function pauseReason(now: number): string | null {
   if (safeCooldownUntil() !== null) return "cooldown";
   const left = currentQuota(now);
@@ -633,7 +497,6 @@ function pauseReason(now: number): string | null {
 export type QuotaReport = {
   limit: number | null;
   remaining: number | null;
-  /** When the quota period ends (ms since the epoch), or null. */
   resetAt: number | null;
 };
 
@@ -647,7 +510,6 @@ function spendBackgroundRequest(wanted: () => boolean) {
   spent.push(Date.now());
 }
 
-/** Background reads under way: each sends at least one more request (a changed listing, more). */
 function backgroundReads(): number {
   let count = 0;
   for (const read of reads.values()) if (read.ticket.priority === "low") count++;
@@ -656,24 +518,17 @@ function backgroundReads(): number {
 
 // ---- the watcher ----
 
-/**
- * Why a Safe is watched: "set", a member of a signature set on screen that can still be signed,
- * whose signature is not valid at the served head; "list", a Safe a list on screen collects from.
- */
+/** "set": a member of an open set on screen not valid at the served head; "list": a list's Safe. */
 export type WatchKind = "set" | "list";
 export type WatchedSafe = { safe: Address; kind: WatchKind };
 
-/** How often each kind of watched Safe is asked about, in ms (Infinity: not at all). */
 export type WatchCadence = Record<WatchKind, number>;
 
 export type SafeWatchDriver = {
-  /** The sync engine follows the chain and someone uses the app (otherwise: nothing at all). */
   active: () => boolean;
-  /** The Safes the screen depends on now (asked again at every look). */
   watched: () => readonly WatchedSafe[];
 };
 
-/** The cadences asked for: SYNC_SAFE_WATCH_MS and SYNC_SAFE_LIST_WATCH_MS, slower keyless. */
 export function baseWatchCadence(keyless: boolean): WatchCadence {
   const set = env.SYNC_SAFE_WATCH_MS;
   const list = env.SYNC_SAFE_LIST_WATCH_MS;
@@ -684,14 +539,8 @@ export function baseWatchCadence(keyless: boolean): WatchCadence {
 }
 
 /**
- * The quota guard. `counts` Safes of each kind checked at `base` cost counts × 3,600 s / base
- * requests an hour; the guard allows min(SYNC_SAFE_HOURLY_BUDGET, (remaining − 20 % of limit) /
- * (hours to the quota's reset × 0.25)) (the budget alone without quota headers, or once the
- * reported period ended), and the watcher plans at 80 % of it (WATCH_UTILISATION), stretching
- * every cadence by the same factor when the demand is above that: T_eff = T × max(1, demand /
- * (0.8 × allowance)), which for one kind is max(T, N × 3,600 s / (0.8 × allowance)). Checks then
- * start at most at the allowance's rate (makePlan). Infinity when nothing is allowed (no budget,
- * nothing left above the reserve).
+ * The quota guard: the allowance is min(budget, (remaining − 20 % of limit) / (hours to reset ×
+ * 0.25)), and every cadence stretches by max(1, demand / (0.8 × allowance)). Infinity: none.
  */
 export function watchCadence(
   counts: Record<WatchKind, number>,
@@ -714,23 +563,15 @@ export function watchCadence(
 }
 
 type WatchPlan = {
-  /** Why nothing is checked here at all (dev node, no service, keyless with checks off), or null. */
   blocked: string | null;
   keyless: boolean;
   base: WatchCadence;
   effective: WatchCadence;
   safes: Map<string, WatchedSafe>;
   counts: Record<WatchKind, number>;
-  /**
-   * Checks start at least this far apart, one Safe at a time: 80 % of the planned interval, so
-   * they can catch up (WATCH_UTILISATION), and never faster than the allowance.
-   */
   spacingMs: number;
-  /** Why checks wait right now (cooldown, quota, budget), or null. */
   paused: string | null;
-  /** When the watcher asks next (ms since the epoch), or null. */
   nextAt: number | null;
-  /** The background Safe requests an hour the quota guard allows (see watchCadence). */
   allowancePerHour: number;
 };
 
@@ -741,22 +582,14 @@ let watchNudged = false;
 let plan: WatchPlan | null = null;
 let lastStartAt = Number.NEGATIVE_INFINITY;
 let watchError: string | null = null;
-// Since when each Safe has been watched without a break (by lower-case address): a copy confirmed
-// since then is one the watcher keeps checking (see pageBoundMs). Forgotten once it is not watched.
 const watchedSince = new Map<string, number>();
 
-/** Starts the watcher (idempotent); it stops by itself once `driver.active()` says no. */
 export function startSafeWatch(next: SafeWatchDriver) {
   watchDriver = next;
   if (watchTimer === null && !watchWaking) scheduleWatch(0);
 }
 
-/**
- * Looks at the Safes the screen depends on again now (a page showed a set, a set was verified at a
- * new head, a tab came back): a Safe newly watched whose copy is older than its cadence is asked
- * about at once. The plan (what is watched, at which cadence) is made again at once too, so what a
- * page says about its copies right after (safeCheckOf) uses it, not the one made before.
- */
+/** Looks again now (a set came on screen, a tab came back), replanning at once for safeCheckOf. */
 export function nudgeSafeWatch() {
   if (!watchDriver) return;
   replanNow();
@@ -801,7 +634,6 @@ async function wakeWatch() {
     delay = await watchOnce(current);
     watchError = null;
   } catch (error) {
-    // The network could not be read: look again shortly.
     watchError = describe(error);
   } finally {
     watchWaking = false;
@@ -809,7 +641,6 @@ async function wakeWatch() {
   if (watchDriver !== null && watchTimer === null) scheduleWatch(watchNudged ? 0 : delay);
 }
 
-/** When a watched Safe is due: its copy's confirmation plus its cadence, or its retry time. */
 function dueAt(key: string, kind: WatchKind, effective: WatchCadence, now: number): number {
   const entry = held.get(key);
   const confirmed =
@@ -819,22 +650,13 @@ function dueAt(key: string, kind: WatchKind, effective: WatchCadence, now: numbe
 
 type Queued = { key: string; safe: Address; kind: WatchKind; due: number; startBy: number };
 
-/** The Safe's own reads failed (not merely a service cooldown): it waits for its retry time. */
 function retrying(key: string): boolean {
   return (failures.get(key)?.inRow ?? 0) > 0;
 }
 
 /**
- * The Safes due for a check. `kept`: the copies the watcher keeps for the screen, the soonest
- * first, each with the latest time its check may start so that it and every one due after it
- * start by their due times, one at a time `spacingMs` apart (`startBy`). Copies confirmed together
- * (a page or Fetch signatures read them at once) would come due together and hold each other, and
- * the other kind's, up for as long as the bunch takes: so a kind's due times are kept at least its
- * cadence / its count apart, the earlier ones of a bunch checked early (never late: no copy goes
- * past its cadence). After one cadence the checks are evenly spaced and stay so (each Safe is
- * still checked once a cadence). `retries`: Safes whose reads keep failing, the soonest retry
- * first (`due`); a retry is not planned in the demand (it comes sooner than the cadence at first),
- * so it takes only a start no kept copy needs (watchOnce), never holding a copy past its bound.
+ * The Safes due: `kept` with `startBy`, the latest start that keeps every check by its due time (a
+ * bunch read together is spread over one cadence); `retries` take only starts no kept copy needs.
  */
 function checkQueue(current: WatchPlan, now: number): { kept: Queued[]; retries: Queued[] } {
   const kept: Queued[] = [];
@@ -872,11 +694,6 @@ function checkQueue(current: WatchPlan, now: number): { kept: Queued[]; retries:
   return { kept, retries };
 }
 
-/**
- * The check to start now, or when to look again: a kept copy's check by its `startBy`; a retry
- * once its time came, only in a start that leaves the next kept check its own by its `startBy`.
- * One at a time, no earlier than `notBefore` (the spacing after the last start).
- */
 function nextCheck(
   queue: { kept: Queued[]; retries: Queued[] },
   spacingMs: number,
@@ -897,11 +714,6 @@ function nextCheck(
   return { start: null, at: keptAt };
 }
 
-/**
- * The watcher's plan from what the screen depends on now (`blocked`/`keyless` from the network's
- * settings): the Safes watched and why, their cadences under the quota guard, the spacing of
- * checks, and why checks wait. Also notes since when each Safe is watched.
- */
 function makePlan(
   current: SafeWatchDriver,
   keyless: boolean,
@@ -952,11 +764,6 @@ function makePlan(
   };
 }
 
-/**
- * The plan made again now from the settings the last one was made with (nudgeSafeWatch): what a
- * page says about its copies right after a set came on screen uses the Safes and cadences that
- * include it. Nothing when there is no plan (nobody uses the app, or the first is being made).
- */
 function replanNow() {
   const current = watchDriver;
   const last = plan;
@@ -967,7 +774,6 @@ function replanNow() {
   plan = next;
 }
 
-/** Starts the check that is due (at most one per spacing); returns when to look again. */
 async function watchOnce(current: SafeWatchDriver): Promise<number> {
   sync();
   const net = await network();
@@ -988,9 +794,7 @@ async function watchOnce(current: SafeWatchDriver): Promise<number> {
   const { safes, spacingMs, paused } = plan;
   if (blocked !== null || safes.size === 0 || paused !== null) return WATCH_RECHECK_MS;
 
-  // One Safe at a time: the next start no earlier than the spacing after the last one (a clock
-  // stepped back never holds it up for longer than that). The Safe due first, when its check must
-  // start for none to start late, or a retry in a start no kept copy needs (checkQueue).
+  // One Safe at a time, the spacing apart (a clock stepped back never holds it up for longer).
   if (lastStartAt > now) lastStartAt = now;
   const { start: first, at: startAt } = nextCheck(
     checkQueue(plan, now),
@@ -1020,11 +824,7 @@ async function watchOnce(current: SafeWatchDriver): Promise<number> {
   return Math.max(WATCH_MIN_SPACING_MS, Math.min(spacingMs, WATCH_RECHECK_MS));
 }
 
-/**
- * The watcher still wants this Safe read, as one of its requests goes out: someone uses the app
- * and the screen still depends on the Safe (a read started just before the page left, or before
- * the member's signature became valid, sends nothing more).
- */
+/** Still wanted as each request goes out: in use, and the screen still depends on the Safe. */
 function watchWants(key: string): boolean {
   const current = watchDriver;
   if (!current?.active()) return false;
@@ -1033,17 +833,11 @@ function watchWants(key: string): boolean {
 
 // ---- what pages may use ----
 
-/** Which page rule applies: a signature set's member, or a list's source. */
 export type PageRule = WatchKind;
 
 /**
- * How old a copy of this Safe confirmed at `fetchedAt` a page may use: the watcher's cadence for
- * it (the effective one, as the quota guard stretches it), and 10 s more when the copy was
- * confirmed while the Safe was watched (its next check starts by then: see checkQueue; a copy the
- * page that put it on screen read a moment before the watcher planned counts too), while the
- * watcher checks it for the screen now (for "set", as a set's member); null when it does not
- * (nobody uses the app, the Safe is not watched, checks are off or paused for good). A copy read
- * before the Safe was watched (a start's warm-up, an earlier page) counts only within the cadence.
+ * How old a copy a page may use: the watcher's effective cadence for it, plus PAGE_SLACK_MS for a
+ * copy confirmed while watched; null when the Safe is not watched for the screen.
  */
 function pageBoundMs(key: string, rule: PageRule, fetchedAt: number): number | null {
   const current = plan;
@@ -1059,10 +853,8 @@ function pageBoundMs(key: string, rule: PageRule, fetchedAt: number): number | n
 }
 
 /**
- * The listing a page (never JSON) may use for this Safe without asking Safe: one at most 60 s
- * old, or one the watcher keeps checking for the screen, confirmed within its bound (see
- * pageBoundMs). null otherwise (the page then reads it as JSON would), and never the last run's.
- * Safe data is candidate input only: an older copy can only show fewer signatures than there are.
+ * A page's (never JSON's) copy without asking Safe: at most 60 s old, or watched and within its
+ * bound; never the last run's. An older copy can only show fewer signatures than there are.
  */
 export function pageSafeListing(safe: Address, rule: PageRule): SafeSnapshot | null {
   sync();
@@ -1075,30 +867,21 @@ export function pageSafeListing(safe: Address, rule: PageRule): SafeSnapshot | n
   return bound !== null && age <= bound ? entry.snapshot : null;
 }
 
-/** For a page: pageSafeListing, else read at the request's priority (as listSafeMessages). */
 export function listSafeMessagesForPage(safe: Address, rule: PageRule): Promise<SafeSnapshot> {
   const listing = pageSafeListing(safe, rule);
   return listing ? Promise.resolve(listing) : listSafeMessages(safe);
 }
 
-/** How the copies of a set's watched members are kept, for a page's label (see safeCheckOf). */
 export type SafeCheck = {
-  /** "watching": checked every `cadenceMs`; "paused": not now (see `reason`); "on-request": only
-   * when a page loads or Fetch signatures is pressed (no Safe key, keyless checks off); "off":
+  /** "on-request": only on a page load or Fetch signatures (no key, keyless checks off); "off":
    * nobody uses the app, or there is no Safe service. */
   state: "watching" | "paused" | "on-request" | "off";
-  /** When Safe last confirmed the oldest of the copies (ISO), or null when one is not held. */
   checkedAt: string | null;
-  /** When the next of them is checked (ISO; now when one is overdue), or null when none is. */
   nextAt: string | null;
   cadenceMs: number | null;
   reason: string | null;
 };
 
-/**
- * What a page says about how its copies of these Safes are kept: the watched members of a set
- * ("set"), or the Safes a list on screen collects from ("list", checked at the list cadence).
- */
 export function safeCheckOf(safes: readonly Address[], kind: WatchKind = "set"): SafeCheck {
   sync();
   const current = plan;
@@ -1111,7 +894,6 @@ export function safeCheckOf(safes: readonly Address[], kind: WatchKind = "set"):
       oldest = entry.snapshot.fetchedAt;
   }
   const checkedAt = missing || oldest === null ? null : new Date(oldest).toISOString();
-  // Safe's monthly quota used up is said as such, not as a short pause.
   const why = (reason: string) =>
     reason === "cooldown" && safeQuotaExhausted() ? "quota-exhausted" : reason;
   if (current?.blocked === "keyless-public-service") {
@@ -1121,7 +903,6 @@ export function safeCheckOf(safes: readonly Address[], kind: WatchKind = "set"):
       : { state: "on-request", checkedAt, nextAt: null, cadenceMs: null, reason: null };
   }
   if (!current || current.blocked !== null) {
-    // Not planned yet (the watcher plans again as use resumes): a cooldown still says why.
     const cooling = current === null && safeCooldownUntil() !== null;
     return cooling
       ? { state: "paused", checkedAt, nextAt: null, cadenceMs: null, reason: why("cooldown") }
@@ -1138,14 +919,11 @@ export function safeCheckOf(safes: readonly Address[], kind: WatchKind = "set"):
       reason: why(paused ?? "quota"),
     };
   const now = Date.now();
-  // When each watched Safe's check starts: one at a time, the spacing apart, the most overdue
-  // first (as watchOnce starts them), not merely when its copy comes due.
   const starts = plannedStarts(current, now);
   let next = Number.POSITIVE_INFINITY;
   for (const safe of safes) {
     const key = safe.toLowerCase();
-    // A set's members are checked at the set's cadence (a plan made before the set came on
-    // screen may still have one as a list's Safe).
+    // A set's members at the set's cadence (an older plan may still have one as a list's Safe).
     const watched = kind === "set" ? "set" : current.safes.get(key)?.kind ?? kind;
     const start = reads.has(key)
       ? now
@@ -1163,12 +941,6 @@ export function safeCheckOf(safes: readonly Address[], kind: WatchKind = "set"):
   };
 }
 
-/**
- * When the watcher would start each watched Safe's check (ms since the epoch), as watchOnce does:
- * one at a time, at least the spacing apart, the one due first first, each by the time it must
- * start for none to start late (checkQueue's `startBy`); a retry at its time at the earliest (it
- * takes a start no kept copy needs).
- */
 function plannedStarts(current: WatchPlan, now: number): Map<string, number> {
   const starts = new Map<string, number>();
   const first = Math.max(now, Math.min(lastStartAt, now) + current.spacingMs);
@@ -1193,7 +965,6 @@ const BURST_AT_MS = [
 
 type Burst = {
   timer: ReturnType<typeof setTimeout> | null;
-  /** The listing's version when it started: a new one ends it. */
   version: number | null;
   step: number;
   generation: number;
@@ -1201,13 +972,7 @@ type Burst = {
 };
 const bursts = new Map<string, Burst>();
 
-/**
- * The viewer just signed for this member Safe: reads its listing at once, then every 5 s for 30 s
- * and every 15 s up to 2 min (13 reads at most), and stops at the first new version of the
- * listing (by this burst, the watcher or a request) or once `wanted()` no longer holds (nobody
- * uses the app). Allowed without a key; it counts toward SYNC_SAFE_HOURLY_BUDGET and stops when
- * that is spent, below 10 % of the quota or during a cooldown. False when one already runs.
- */
+/** The viewer just signed: reads the Safe up to 13 times over 2 min, until its listing changes. */
 export function safeBurst(safe: Address, wanted: () => boolean): boolean {
   sync();
   const key = safe.toLowerCase();
@@ -1256,7 +1021,6 @@ async function burstStep(key: string, safe: Address, burst: Burst) {
   scheduleBurst(key, safe, burst, at - before);
 }
 
-/** Bursts running now (the viewer's own Safe read after they signed). */
 export function burstsRunning(): number {
   return bursts.size;
 }
@@ -1266,12 +1030,7 @@ function stopBursts() {
   bursts.clear();
 }
 
-/**
- * "Fetch signatures" / "Check Safe now": asks Safe about these Safes now, at a request's priority
- * (ahead of the watcher, within the same pacer: one start at a time, at most 4 in flight),
- * whatever their copies' age; a read already in flight is joined. Never rejects: `failed` names
- * the Safes Safe did not answer for (their members then show as unavailable, never missing).
- */
+/** Reads these Safes now at a request's priority; `failed` names those Safe did not answer for. */
 export async function checkSafesNow(
   safes: readonly Address[]
 ): Promise<{ checked: number; failed: Address[] }> {
@@ -1300,53 +1059,29 @@ function describe(error: unknown): string {
 }
 
 export type SafeStoreStatus = {
-  /** The watcher is checking Safes the screen depends on right now (not paused, not blocked). */
   sweeping: boolean;
-  /** Kept for older readers: always empty (the watcher works per Safe, not per signer group). */
-  groups: string[];
-  /** Kept for older readers: always null (nothing is checked while nobody uses the app). */
-  baseline: null;
-  /**
-   * What the watcher checks while someone uses the app: `safes` members of open sets on screen
-   * not valid yet and `lists` Safes behind lists on screen, the cadences asked for and those the
-   * quota guard allows (null: none allowed), when the next check is, and whether Safe is used
-   * without a key. null while nobody uses the app.
-   */
   watched: {
     safes: number;
     lists: number;
     keyless: boolean;
     cadenceMs: WatchCadence;
     effectiveCadenceMs: Record<WatchKind, number | null>;
-    /**
-     * Background Safe requests an hour the quota guard allows: SYNC_SAFE_HOURLY_BUDGET, or less
-     * when Safe reports little quota left for the rest of its period. Cadences stretch to fit it.
-     */
     allowancePerHour: number;
     nextCheckAt: string | null;
   } | null;
-  /** The oldest copy held of a watched Safe (ISO time), or null. */
   oldestFetchedAt: string | null;
-  /** Background requests sent in the last hour (watcher and bursts), and the hourly budget. */
   budgetUsedThisHour: number;
   budgetPerHour: number;
-  /** Safes being read after the viewer signed (safeBurst). */
   bursts: number;
-  /**
-   * Why the watcher is not checking: idle (nobody uses the app, or the engine is off), no-service,
-   * keyless-public-service (SYNC_SAFE_WATCH_KEYLESS_MS=0), cooldown, quota, budget; null when it
-   * is (or has nothing to check).
-   */
+  /** idle, no-service, keyless-public-service, cooldown, quota or budget; null while checking. */
   paused: string | null;
   /** The most recent failure among the watched Safes (Safe's error text, never a URL), or null. */
   lastError: string | null;
-  /** How many of the watched Safes the last listing read failed for (retried with backoff). */
   failingSafes: number;
 };
 
 const finite = (ms: number) => (Number.isFinite(ms) ? Math.round(ms) : null);
 
-/** What the watcher is doing, for /api/status. */
 export function safeStoreStatus(): SafeStoreStatus {
   sync();
   const now = Date.now();
@@ -1368,8 +1103,6 @@ export function safeStoreStatus(): SafeStoreStatus {
   }
   return {
     sweeping: current !== null && paused === null && current.safes.size > 0,
-    groups: [],
-    baseline: null,
     watched: current && {
       safes: current.counts.set,
       lists: current.counts.list,

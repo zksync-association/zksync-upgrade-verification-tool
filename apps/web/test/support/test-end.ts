@@ -1,17 +1,9 @@
 import { vi } from "vitest";
 
-// A test that times out keeps running. vitest goes on to the next test, but JavaScript cannot stop
-// the timed-out body, and that body is almost always inside a fake-time step then (a loop of
-// blocks). The step finishes and the body goes on: its next steps move the next test's fake clock,
-// and its beats reach the next test's presence registry. Stopping the engine and resetting presence
-// in afterEach cannot prevent this: the body has to stop. (D5: the watcher test ran past its 5 s
-// under load and failed the next test with "expected 12 to be 3".)
-//
-// Importing this module routes vi.advanceTimersByTimeAsync through a guard. A step that ends after
-// its test ended (endTestSteps, called first in the file's afterEach) never returns: the body waits
-// at that step for good, so nothing after it runs. No error is thrown, so a step nobody awaits
-// cannot cause an unhandled rejection. endTestSteps waits for the steps in flight, so the body has
-// stopped before afterEach resets anything.
+// A test that times out keeps running (vitest cannot stop it), and its next fake-time steps move
+// the next test's clock. Importing this module routes vi.advanceTimersByTimeAsync through a guard:
+// a step that ends after its test ended (endTestSteps, first in afterEach) never returns, so the
+// body stops there without an error; endTestSteps waits for the steps in flight.
 
 type Step = (ms: number) => Promise<unknown>;
 type Guard = { turn: number; inFlight: Set<Promise<unknown>>; parked: number };
@@ -49,9 +41,8 @@ function install(): Guard {
 }
 
 /**
- * For the first line of a file's afterEach: ends this test's fake-time steps. A body still running
- * (the test timed out) stops at the end of the step it is in. This waits for that step, up to
- * `maxMs` of real time, plus one real turn of the event loop for the body to reach it.
+ * For the first line of a file's afterEach: ends this test's fake-time steps, and waits up to
+ * `maxMs` of real time for one in flight (a timed-out body stops at its end).
  */
 export async function endTestSteps(maxMs = 20_000): Promise<void> {
   guard.turn++;

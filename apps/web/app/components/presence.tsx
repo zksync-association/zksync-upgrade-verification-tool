@@ -13,40 +13,26 @@ import {
   useState,
 } from "react";
 
-// While this tab is visible, it tells the server so every 10 s, with the keys of what it shows and
-// the revision of each as rendered (POST /resources/presence, see sync/presence.ts and
-// sync/revs.ts): the app follows the chain only while some tab does, and only for what is on
-// screen. A hidden tab (or one framed in Safe{Wallet} whose frame is hidden), a closed one, and
-// one nobody touched for SYNC_AWAY_MS say they left and stop; the next look or input brings them
-// back. Beats are plain fetches (never a Remix fetcher, which would revalidate the page after
-// each), carry no part of the URL (its search string can hold ?sig=), and make the server send
-// nothing upstream by themselves.
-//
-// The answer names the keys whose content changed since the revision rendered (the new content
-// is already in the server's memory): the page then reloads its data once, in place (a
-// same-pathname revalidation, which keeps what is on screen until the new data is in), at most
-// once every 5 s, never while a navigation or another reload runs, and never while the viewer is
-// in the middle of something a reload must not change under them (a Sign dialog open, a wallet
-// request pending, a Safe transaction hash being shown): then once they are done. The answer also
-// carries the head the server serves, the log index's progress, how each signature set's Safe
-// copies are kept, and ZKsync Era's block, for labels that update without any request.
+// While this tab is visible it beats every 10 s (POST /resources/presence) with the keys of what it
+// shows and their revisions as rendered: the app follows the chain only while some tab does, and
+// only for what is on screen. A hidden tab (or a hidden Safe{Wallet} frame), a closed one and one
+// nobody touched for SYNC_AWAY_MS leave. Beats are plain fetches (a Remix fetcher would revalidate
+// the page after each), carry no part of the URL (its search string can hold ?sig=), and make the
+// server send nothing upstream by themselves. An answer naming changed keys reloads the page's
+// data in place (a same-pathname revalidation keeps what is on screen until the new data is in),
+// as Reloader allows.
 
 export const PRESENCE_URL = "/resources/presence";
 export const SAFE_CHECK_URL = "/resources/safe-check";
-/** How often a visible tab beats, unless the server says otherwise (2-60 s). */
 export const BEAT_MS = 10_000;
 const MIN_NEXT_MS = 2_000;
 const MAX_NEXT_MS = 60_000;
-/** Key changes (a navigation rendering) settle this long before they are sent. */
 const KEYS_SETTLE_MS = 250;
-/** A focus beats at once only when the last beat is older than this. */
 const FOCUS_AFTER_MS = 5_000;
 /** At most this many keys go in a beat (the server's limit). */
 const MAX_KEYS = 32;
 const INPUT_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
-/** Reloads after a change: at most one every this long. */
 export const RELOAD_GAP_MS = 5_000;
-/** A key the server does not know is reloaded for at most once in this long. */
 export const UNKNOWN_EVERY_MS = 60_000;
 
 export type PresenceReason =
@@ -59,7 +45,6 @@ export type PresenceReason =
   | "resume"
   | "leave";
 
-/** Something the tab renders: the server's key, and the revision of its content as rendered. */
 export type WatchItem = { key: string; rev: string | null };
 
 /** What the server answers a beat with (routes/resources+/presence.ts BeatAnswer). */
@@ -69,20 +54,12 @@ export type BeatAnswer = {
   catchingUp: boolean;
   head: { number: string; hash: string; timestamp: string } | null;
   checked: Record<string, SafeCheck>;
-  /**
-   * By signature set (its key): the newest head its content (as the tab shows it, `rev`) was
-   * verified at. A set not named, or named at a block before `head`, is not current.
-   */
+  // By key, the newest head the content shown (`rev`) was verified at (sets) or noted at (other
+  // items but Era's). Not named, or named at a block before `head`: not current.
   verifiedAt: Record<string, { rev: string; block: string }>;
-  /**
-   * By item other than Era's (its key): the newest head its content (as the tab shows it, `rev`)
-   * was noted at. One named at a block before `head` was not read again there: not current.
-   */
   notedAt: Record<string, { rev: string; block: string }>;
-  /** By Era item: the Era head its content (as the tab shows it) was last read at. */
   eraAt: Record<string, { number: string; readAt: string }>;
   era: { number: string; readAt: string } | null;
-  /** By simulation (`sim:` key): the newest block its result (as the tab shows it) was read at. */
   simulatedAt: Record<string, string>;
   index: PuhIndexStatus | null;
   nextMs: number;
@@ -97,19 +74,13 @@ export type BeaterOptions = {
   now?: () => number;
   doc?: Document;
   win?: Window;
-  /** The tab's id; default: a new random one for this page (tabId). */
   tab?: string;
-  /** Each answer of the server, as it comes. */
   onAnswer?: (answer: Partial<BeatAnswer>) => void;
-  /** The tab's state changed: away (paused for the away cut-off), failing (beats not answered). */
   onState?: (state: { away: boolean; failing: boolean; lastBeatAt: number | null }) => void;
 };
 
-/**
- * A new random id for this page, never kept: a browser's Duplicate Tab copies sessionStorage, and
- * two tabs sharing an id would overwrite each other's keys, and one's leave would end the other.
- * A reload gets a new id; the old page left on pagehide.
- */
+// Never kept: Duplicate Tab copies sessionStorage, and two tabs sharing an id would overwrite each
+// other's keys, and one's leave would end the other.
 function tabId(win: Window): string {
   return typeof win.crypto?.randomUUID === "function"
     ? win.crypto.randomUUID()
@@ -118,10 +89,6 @@ function tabId(win: Window): string {
 
 const keysOf = (items: readonly WatchItem[]) => items.map((item) => item.key).join("\n");
 
-/**
- * The beating, outside React: one timer at most, listeners on the document and window, and a leave
- * when the tab is hidden, closed or its viewer away.
- */
 export class Beater {
   readonly #options: Required<
     Omit<BeaterOptions, "tab" | "sendBeacon" | "onAnswer" | "onState">
@@ -141,7 +108,6 @@ export class Beater {
   #away = false;
   // Framed (Safe{Wallet}) and the frame is not on screen.
   #occluded = false;
-  // The server counts this tab now (it beat and has not left).
   #present = false;
   #started = false;
   #inFlight = false;
@@ -171,17 +137,14 @@ export class Beater {
     return this.#tab;
   }
 
-  /** Paused because nobody touched the tab for awayMs (any input resumes). */
   get away(): boolean {
     return this.#away;
   }
 
-  /** The tab is visible (and, framed, its frame on screen). */
   get visible(): boolean {
     return this.#visible();
   }
 
-  /** Starts beating (at once, when visible). Idempotent. */
   start() {
     if (this.#started) return;
     this.#started = true;
@@ -206,7 +169,6 @@ export class Beater {
     this.#beatSoon("load");
   }
 
-  /** Stops for good: leaves, and removes every timer and listener. */
   stop() {
     this.#leave(false);
     this.#started = false;
@@ -216,16 +178,12 @@ export class Beater {
     this.#observer = null;
   }
 
-  /** setItems with no revisions (what the tab shows, before any content is rendered). */
   setKeys(keys: Iterable<string>) {
     this.setItems([...keys].map((key) => ({ key, rev: null })));
   }
 
-  /**
-   * What the tab shows now, with the revisions rendered: a change of keys is sent once they settle
-   * (before start(): the first beat carries them); a change of revisions only goes with the next
-   * beat (it follows a reload the server's answer asked for).
-   */
+  // A change of keys is sent once they settle; a change of revisions only goes with the next beat
+  // (it follows a reload the server's answer asked for).
   setItems(items: Iterable<WatchItem>) {
     const byKey = new Map<string, string | null>();
     for (const { key, rev } of items) if (!byKey.has(key) || rev !== null) byKey.set(key, rev);
@@ -380,7 +338,6 @@ export class Beater {
     }, ms);
   }
 
-  /** Tells the server this tab left (hidden, closed, away), without waiting for an answer. */
   #leave(away: boolean) {
     this.#clearTimer();
     if (!this.#present) return;
@@ -421,20 +378,11 @@ export class Beater {
   }
 }
 
-// ---- reloading after a change ----
-
 export type ReloadOptions = {
   now?: () => number;
-  /** Starts the reload (Remix's revalidate). */
   revalidate: () => void;
-  /**
-   * Whether a reload may start now: the tab is visible, and no navigation or other reload is
-   * running. (A hidden tab never reloads: a page's data request counts as use on the server.)
-   */
   idle: () => boolean;
-  /** The status changed: the root reads it again with the reload. */
   statusChanged?: () => void;
-  /** Something is waiting for the viewer to finish (a Sign dialog open, ...), or not any more. */
   onHeld?: (waiting: boolean) => void;
 };
 
@@ -460,7 +408,6 @@ export class Reloader {
     this.#options = { now: Date.now, ...options };
   }
 
-  /** A beat's answer: reloads for what changed (and, once a minute, for what is unknown). */
   noteAnswer({ changed = [], unknown = [] }: { changed?: string[]; unknown?: string[] }) {
     const now = this.#options.now();
     const keys = [...changed];
@@ -480,14 +427,12 @@ export class Reloader {
     this.tryReload();
   }
 
-  /** The viewer asked for it (Fetch signatures): reload as soon as nothing stands in the way. */
   force() {
     this.#dirty = true;
     this.#force = true;
     this.tryReload();
   }
 
-  /** The viewer is in the middle of something: no reload until the returned release. */
   hold(): () => void {
     this.#holds++;
     if (this.#dirty) this.#options.onHeld?.(true);
@@ -503,7 +448,6 @@ export class Reloader {
     };
   }
 
-  /** A reload that was waiting is now due (a navigation or reload ended, a hold was released). */
   tryReload() {
     if (!this.#dirty) return;
     if (this.#holds > 0) {
@@ -531,7 +475,6 @@ export class Reloader {
     this.#options.revalidate();
   }
 
-  /** Whether a reload is waiting (for a hold, the gap, or a navigation). */
   get waiting(): boolean {
     return this.#dirty;
   }
@@ -542,44 +485,21 @@ export class Reloader {
   }
 }
 
-// ---- React ----
-
 /** What beats tell about the server, for labels that need no request. */
 export type LiveState = {
-  /** The newest head the engine served, or null. */
   head: BeatAnswer["head"];
-  /** The log index, as the last beat saw it (null before the first). */
   index: PuhIndexStatus | null;
-  /** How each open signature set's Safe copies are kept, by key. */
   checked: Record<string, SafeCheck>;
-  /**
-   * By signature set (its key): the newest head the content the tab shows (`rev`) was verified at
-   * (see setCurrency in verification/freshness.tsx).
-   */
   verifiedAt: BeatAnswer["verifiedAt"];
-  /**
-   * By item other than Era's (its key): the newest head the content the tab shows (`rev`) was
-   * noted at (see verification/content-currency.tsx).
-   */
   notedAt: BeatAnswer["notedAt"];
-  /**
-   * By Era item (its key): the ZKsync Era head the content the tab shows was last read at (only
-   * while the tab shows the current content).
-   */
   eraAt: BeatAnswer["eraAt"];
-  /**
-   * By simulation (its key): the newest block the result the tab shows was simulated at (only
-   * while the tab shows the current result).
-   */
   simulatedAt: BeatAnswer["simulatedAt"];
   catchingUp: boolean;
   /** Paused: nobody touched the tab for the away cut-off (any input resumes). */
   away: boolean;
   /** Beats are not answered (the server is down or restarting). */
   failing: boolean;
-  /** When the last beat was answered (this browser's clock), or null. */
   lastBeatAt: number | null;
-  /** A reload after a change is running. */
   updating: boolean;
   /** A reload is waiting for the viewer to finish (a Sign dialog open, ...). */
   held: boolean;
@@ -602,15 +522,10 @@ const INITIAL: LiveState = {
 };
 
 type PresenceContextValue = {
-  /** A rendered item, on screen until the returned function is called. */
   register: (item: WatchItem) => () => void;
-  /** The viewer signed for this Safe. */
   signed: (safe: string) => void;
-  /** Holds reloads until the returned release (see Reloader.hold). */
   hold: () => () => void;
-  /** Reloads the page's data now (the viewer asked). */
   reload: () => void;
-  /** How an item's Safe copies are kept now (a Fetch signatures answer), ahead of the next beat. */
   applyCheck: (key: string, check: SafeCheck | null) => void;
 };
 
@@ -624,13 +539,10 @@ const PresenceContext = createContext<PresenceContextValue>({
 
 const LiveContext = createContext<LiveState>(INITIAL);
 
-/** What a tab knows before its first beat's answer. */
 export const INITIAL_LIVE: LiveState = INITIAL;
 
-/** Provides what beats tell (PresenceProvider does; tests and stand-alone shells may too). */
 export const LiveStateProvider = LiveContext.Provider;
 
-/** Puts `item` (its key, and the revision rendered) on screen while the component is mounted. */
 export function useWatchItem(item: WatchItem | null | undefined) {
   const { register } = useContext(PresenceContext);
   const key = item?.key ?? null;
@@ -638,17 +550,14 @@ export function useWatchItem(item: WatchItem | null | undefined) {
   useEffect(() => (key ? register({ key, rev }) : undefined), [key, rev, register]);
 }
 
-/** Puts `key` on screen while the calling component is mounted (nothing for null). */
 export function useWatchKey(key: string | null | undefined) {
   useWatchItem(key ? { key, rev: null } : null);
 }
 
-/** The tab's presence: to report a signature the viewer just made, to reload, to hold reloads. */
 export function usePresence(): PresenceContextValue {
   return useContext(PresenceContext);
 }
 
-/** What the beats tell about the server (head, index, Safe checks, Era, updating, paused). */
 export function useLive(): LiveState {
   return useContext(LiveContext);
 }
@@ -666,11 +575,8 @@ export function useHoldUpdates(active: boolean): boolean {
 
 type SafeCheckState = { running: boolean; error: string | null; failed: number; at: number | null };
 
-/**
- * "Fetch signatures" / "Check Safe now" for the item under `key`: asks the server to read its
- * Safes now (POST /resources/safe-check), then reloads the page's data in place. A press while one
- * runs does nothing more (the server joins it too).
- */
+// "Fetch signatures" / "Check Safe now" for `key`, then a reload in place. A press while one runs
+// does nothing more (the server joins it too).
 export function useSafeCheck(key: string | null | undefined) {
   const { reload, applyCheck } = useContext(PresenceContext);
   const [state, setState] = useState<SafeCheckState>({
@@ -729,10 +635,8 @@ type Watch = { key: string };
 const isPromise = (value: unknown): value is Promise<unknown> =>
   !!value && typeof (value as { then?: unknown }).then === "function";
 
-/**
- * The items the matched routes' loaders issued: their keys (`watch`), with the revisions of what
- * they sent (`revs`, deferred: in once the content is).
- */
+// The matched routes' loader items: keys (`watch`) and revisions (`revs`, deferred: in once the
+// content is).
 function useLoaderItems(): WatchItem[] {
   const matches = useMatches();
   const [resolved, setResolved] = useState<ReadonlyMap<unknown, WatchItem[]>>(new Map());
@@ -779,11 +683,6 @@ function useLoaderItems(): WatchItem[] {
   }, [matches, resolved]);
 }
 
-/**
- * Beats while this tab is visible, with the items its routes' loaders issued and those the items
- * it renders register (useWatchItem), and reloads the page's data when the server says what it
- * shows changed (see Reloader). In the root shell; renders nothing of its own.
- */
 export function PresenceProvider({ awayMs, children }: { awayMs: number; children: ReactNode }) {
   const loaderItems = useLoaderItems();
   const [registered, setRegistered] = useState<
@@ -869,7 +768,6 @@ export function PresenceProvider({ awayMs, children }: { awayMs: number; childre
       },
     });
     beater.current = next;
-    // The first beat carries what the page shows now.
     next.setItems(current.current);
     next.start();
     return () => {

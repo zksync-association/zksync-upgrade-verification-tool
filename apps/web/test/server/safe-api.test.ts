@@ -95,28 +95,24 @@ describe("Safe request cooldown", () => {
     await expect(api.getSafeMessage(hash(2))).resolves.toBeNull();
   });
 
-  it("respects transient Retry-After without retrying during the page request", async () => {
-    fetchMock.mockResolvedValue(
-      limited({ "retry-after": "10", "x-ratelimit-remaining": "50" }, "Rate limited")
-    );
-    await expect(api.getSafeMessage(hash(1))).rejects.toThrow("temporarily rate limited");
-    vi.advanceTimersByTime(9_000);
-    await expect(api.getSafeMessage(hash(2))).rejects.toThrow("temporarily rate limited");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(1_000);
-    fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
-    await expect(api.getSafeMessage(hash(2))).resolves.toBeNull();
-  });
-
-  it("accepts an HTTP-date Retry-After", async () => {
-    fetchMock.mockResolvedValue(
-      limited({ "retry-after": new Date(Date.now() + 5_000).toUTCString() }, "Rate limited")
-    );
-    await expect(api.getSafeMessage(hash(1))).rejects.toThrow("temporarily rate limited");
-    vi.advanceTimersByTime(5_000);
-    fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
-    await expect(api.getSafeMessage(hash(2))).resolves.toBeNull();
-  });
+  it.each([
+    ["in seconds", () => "10"],
+    ["as an HTTP date", () => new Date(Date.now() + 10_000).toUTCString()],
+  ])(
+    "respects a transient Retry-After %s without retrying during the page request",
+    async (_, after) => {
+      fetchMock.mockResolvedValue(
+        limited({ "retry-after": after(), "x-ratelimit-remaining": "50" }, "Rate limited")
+      );
+      await expect(api.getSafeMessage(hash(1))).rejects.toThrow("temporarily rate limited");
+      vi.advanceTimersByTime(9_000);
+      await expect(api.getSafeMessage(hash(2))).rejects.toThrow("temporarily rate limited");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(1_000);
+      fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
+      await expect(api.getSafeMessage(hash(2))).resolves.toBeNull();
+    }
+  );
 
   it("briefly remembers service failures without pretending a message is missing", async () => {
     fetchMock.mockRejectedValue(new Error("Connection failed"));
@@ -165,26 +161,25 @@ describe("reads nobody asked for yet (warm-up, background refresh)", () => {
 });
 
 describe("the request pacer", () => {
-  it("starts requests at least 550 ms apart without a key", async () => {
-    const seen = slowService(0);
-    const reads = Promise.all([1, 2, 3, 4, 5, 6].map((n) => api.fetchListing(SAFE(n))));
-    await vi.advanceTimersByTimeAsync(10_000);
-    await reads;
-    expect(seen.starts).toHaveLength(6);
-    for (const gap of gaps(seen.starts)) expect(gap).toBeGreaterThanOrEqual(550);
-  });
-
-  it("starts requests at least 220 ms apart with a key, and never has more than 4 in flight", async () => {
-    await withKey();
-    // Slow answers: at 220 ms spacing, a 2 s answer would otherwise overlap with nine others.
-    const seen = slowService(2_000);
-    const reads = Promise.all(Array.from({ length: 12 }, (_, n) => api.fetchListing(SAFE(n + 1))));
-    await vi.advanceTimersByTimeAsync(30_000);
-    await reads;
-    expect(seen.starts).toHaveLength(12);
-    for (const gap of gaps(seen.starts)) expect(gap).toBeGreaterThanOrEqual(220);
-    expect(seen.peak).toBe(4);
-  });
+  it.each([
+    ["550 ms apart without a key", false, 550],
+    ["220 ms apart with a key", true, 220],
+  ])(
+    "starts requests at least %s, and never has more than 4 in flight",
+    async (_, key, spacing) => {
+      if (key) await withKey();
+      // Slow answers: at 220 ms spacing, a 2 s answer would otherwise overlap with nine others.
+      const seen = slowService(2_000);
+      const reads = Promise.all(
+        Array.from({ length: 12 }, (_, n) => api.fetchListing(SAFE(n + 1)))
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+      await reads;
+      expect(seen.starts).toHaveLength(12);
+      for (const gap of gaps(seen.starts)) expect(gap).toBeGreaterThanOrEqual(spacing);
+      expect(seen.peak).toBe(4);
+    }
+  );
 
   it("caps a self-hosted service at 4 in flight too, without spacing", async () => {
     service.url = "http://127.0.0.1:18546";

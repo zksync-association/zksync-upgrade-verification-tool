@@ -41,28 +41,16 @@ import { shouldPrewarm } from "../prewarm";
 import { presence } from "../sync/presence";
 import { safeMessageSchema } from "../safe-api";
 
-// A local cache of PUBLIC chain data, kept between runs in apps/web/.cache/chain/ (one file per
-// chain, named by its chain id and genesis hash): the ProtocolUpgradeHandler's complete log
-// history up to the finality boundary, the ZKsync Era governors' (up to Era's 'finalized' block),
-// the timestamps of final blocks the app read, and the last Safe message listings of member Safes
-// (with when Safe answered). Never a verdict, a governance read, a status, a setting, an RPC URL
-// or an API key: everything in it is public, and none of it decides anything on its own.
+// A local cache of PUBLIC chain data between runs, in apps/web/.cache/chain/ (one file per chain,
+// named by chain id and genesis hash): both log histories up to their finality boundary, final
+// block timestamps, and member Safes' last message listings. Never a verdict, a governance read, a
+// setting, an RPC URL or an API key.
 //
-// At start the file is checked against the chain (its chain id and genesis block hash, read in one
-// JSON-RPC batch) and treated as untrusted input: it is validated, then only SEEDED, as
-// "provisional". The log indexes backfill from the chain as without it, and when a backfill has
-// covered the seeded range the two are compared: the same logs is "verified"; anything else is a
-// "mismatch": the seeded data and the file are dropped and a warning is logged. Until then only
-// pages may show the seeded history (labelled "history from last run · re-verifying", with the
-// verified answer streamed after it); JSON waits for this run's own reads, exactly as without the
-// file. A seeded timestamp is used by pages only, until a read of its block confirms it (one that
-// disagrees is a mismatch). Seeded Safe listings are never served as fresh: pages show them
-// labelled with their age, and the first read of each Safe replaces them.
-//
-// The file is written (atomically: a temporary file, then a rename; the directory 0700, the file
-// 0600) once the handler's history is complete, then at most once a minute when something in it
-// changed (new final logs, a Safe listing's content, new final timestamps), and on shutdown.
-// CHAIN_CACHE=0 turns it off; dev nodes (anvil, hardhat) never read or write it.
+// The file is untrusted: validated, then only SEEDED as "provisional". Once this run's backfill has
+// covered the seeded range the two are compared: the same logs is "verified", anything else a
+// "mismatch" (seeded data and file dropped). Until then only pages may show seeded data, labelled;
+// JSON waits for this run's own reads. Written atomically (directory 0700, file 0600) once the
+// handler's history is complete, then at most once a minute on change, and on shutdown.
 
 const log = defaultLogger.child({ module: "chain-cache" });
 
@@ -72,36 +60,25 @@ const MAX_FILE_BYTES = 64 * 1024 * 1024;
 const MAX_LOGS = 200_000;
 const MAX_TIMESTAMPS = 20_000;
 const MAX_LISTINGS = 256;
-// How often the saver looks whether something changed, and the least time between two saves.
 const SAVE_CHECK_MS = 10_000;
 const MIN_SAVE_INTERVAL_MS = 60_000;
 const FILE_NAME = /^\d+-0x[0-9a-f]{8}\.json$/;
 
-export type ChainCacheState = "absent" | "provisional" | "verified" | "mismatch" | "disabled";
+type ChainCacheState = "absent" | "provisional" | "verified" | "mismatch" | "disabled";
 
 export type ChainCacheStatus = {
-  /**
-   * absent: no file was loaded at start (none, or one that was ignored, see `detail`);
-   * provisional: the last run's data is seeded and being re-verified; verified: this run's
-   * backfill read the same history; mismatch: it did not, and the last run's data was discarded;
-   * disabled: CHAIN_CACHE=0, or a dev node.
-   */
   state: ChainCacheState;
   /** The file's name (never its path), once one was loaded or saved. */
   file: string | null;
-  /** When that file was written (ISO time). */
   savedAt: string | null;
   sizeBytes: number | null;
-  /** Why a file was ignored, what did not match, why saving failed; null otherwise. */
   detail: string | null;
 };
 
 /** CHAIN_CACHE=0 (or false/off/no) turns the cache off: nothing is read or written. */
-export function chainCacheEnabled(env: Record<string, string | undefined> = process.env): boolean {
+function chainCacheEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return !/^(0|false|off|no)$/i.test(env.CHAIN_CACHE?.trim() ?? "");
 }
-
-// ---- the file ----
 
 const quantity = z.string().regex(/^0x(?:0|[1-9a-fA-F][0-9a-fA-F]*)$/);
 const hash32 = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
@@ -193,16 +170,12 @@ function toRawLog(entry: IndexedLog): RawLog {
   };
 }
 
-/** The file for a chain: its chain id and the first 8 hex digits of its genesis block hash. */
 export function chainCacheFileName(identity: { chainId: number; genesisHash: Hex }): string {
   return `${identity.chainId}-${identity.genesisHash.toLowerCase().slice(0, 10)}.json`;
 }
 
-/**
- * Names the Safe Transaction Service the listings came from, without revealing a configured URL:
- * the pinned public service by its origin, any other (SAFE_TX_SERVICE_URL) by a hash of its URL.
- */
-export function safeServiceId(net: Pick<Network, "chainId" | "safeTxServiceUrl">): string | null {
+/** The Safe service the listings came from: the pinned one by origin, any other by a URL hash. */
+function safeServiceId(net: Pick<Network, "chainId" | "safeTxServiceUrl">): string | null {
   const url = net.safeTxServiceUrl;
   if (!url) return null;
   const pinned = knownNetwork(net.chainId)?.safeTxServiceUrl ?? null;
@@ -216,18 +189,14 @@ export function safeServiceId(net: Pick<Network, "chainId" | "safeTxServiceUrl">
   return `sha256:${createHash("sha256").update(url).digest("hex").slice(0, 32)}`;
 }
 
-// ---- state ----
-
 type Seedable = "puh" | "l2";
 
 const state = {
   dir: null as string | null,
-  /** absent/provisional/verified come from the flags below; these two stand on their own. */
   fixed: null as "mismatch" | "disabled" | null,
   loaded: false,
   pending: new Set<Seedable>(),
   verified: new Set<Seedable>(),
-  /** The file loaded at start, until something is saved over it. */
   loadedPath: null as string | null,
   file: null as string | null,
   savedAt: null as string | null,
@@ -259,7 +228,6 @@ export function chainCacheStatus(): ChainCacheStatus {
   };
 }
 
-/** How a seeded history ended (see LogIndex.seedProvisional). */
 function outcomeHandler(kind: Seedable, epoch: number) {
   return (outcome: ProvisionalOutcome) => {
     if (epoch !== state.epoch || !state.pending.has(kind)) return;
@@ -275,12 +243,8 @@ function outcomeHandler(kind: Seedable, epoch: number) {
   };
 }
 
-/**
- * The last run's data did not match the chain: everything seeded from it is dropped, and so is
- * what the file holds of it. A file this run has not saved over yet is deleted. One it has (or is
- * saving right now) still holds what this run kept of the last run's data unchecked (timestamps,
- * Safe listings, see collect): it is saved again at once without it, or deleted when that fails.
- */
+// The last run's data did not match the chain: everything seeded from it is dropped. A file this
+// run has not saved over is deleted; one it has is saved again without it (or deleted on failure).
 function discard(what: string) {
   if (state.fixed === "mismatch") return;
   state.fixed = "mismatch";
@@ -311,17 +275,10 @@ function ignore(detail: string) {
   log.info({ detail }, "Chain cache not used");
 }
 
-// ---- loading ----
-
-/**
- * Loads the file for the chain the RPC serves (at start, before the warm-up): checks it against
- * the chain and seeds what it holds as provisional (see the top of this file). Then keeps saving.
- * `dir` replaces apps/web/.cache/chain (tests). Never rejects.
- */
+/** Loads and seeds the file for the chain, then keeps saving; never rejects (`dir`: tests). */
 export async function loadChainCache({ dir }: { dir?: string } = {}): Promise<void> {
   if (dir !== undefined) state.dir = dir;
-  // Until the file is seeded (or found unusable), a page's read that may answer from it waits
-  // for it (at most 2 s) instead of deciding without it. Era's part may come a little later.
+  // A page's read that may answer from the file waits for it (bounded); Era's part may come later.
   const loaded = signal();
   const l2Seeded = signal();
   if (chainCacheEnabled() && !state.loaded) {
@@ -340,10 +297,8 @@ export async function loadChainCache({ dir }: { dir?: string } = {}): Promise<vo
     loaded.resolve();
     if (!l2Handed) l2Seeded.resolve();
   }
-  // The saver never asks the node while the app is idle: what a save needs to know about the
-  // chain (its identity, and Era's chain id) is read once now, beside the load (a memory hit when
-  // the load read it). Not with PREWARM=0, which keeps the start silent: then the first check
-  // while the app is in use reads them (or the shutdown save).
+  // The saver never asks the node while the app is idle: what a save needs (the chain's identity,
+  // Era's chain id) is read once now, unless PREWARM=0 keeps the start silent.
   void readIdentities();
   startSaver();
 }
@@ -355,7 +310,6 @@ async function readIdentities() {
   await Promise.all([chainIdentity().catch(() => null), l2ChainId().catch(() => null)]);
 }
 
-/** A promise and the function that resolves it. */
 function signal(): { promise: Promise<void>; resolve: () => void } {
   let resolve = () => {};
   const promise = new Promise<void>((settle) => {
@@ -364,7 +318,6 @@ function signal(): { promise: Promise<void>; resolve: () => void } {
   return { promise, resolve };
 }
 
-/** `onL2` hears of Era's part of the seeding, which completes after the rest (see seed). */
 async function load(onL2: (seeded: Promise<void>) => void) {
   if (state.loaded) return;
   state.loaded = true;
@@ -383,8 +336,6 @@ async function load(onL2: (seeded: Promise<void>) => void) {
     devNode(await network());
     return;
   }
-  // Read together (each is shared with the warm-up): the node's kind, the chain's id and genesis
-  // block (one JSON-RPC batch), and its head.
   const [net, identity, head] = await Promise.all([network(), chainIdentity(), latestBlock()]);
   if (devNode(net) || rpcGeneration() !== generation) return;
   const name = chainCacheFileName(identity);
@@ -455,15 +406,10 @@ type Checked = {
   listings: KeptSafeListing[];
 };
 
-/** The file is for another ProtocolUpgradeHandler than the one in use (an override). */
 class OtherHandler extends Error {}
 
-/**
- * Everything in the file checked as it would be from the chain or Safe: each history complete
- * from its first block, with logs that eth_getLogs could have answered for it (parseLogs); an L2
- * history for other governors is left out. Throws when anything is invalid, or the file is for
- * another handler: then nothing of the file is used.
- */
+// Everything in the file checked as if it came from the chain (complete histories, parseLogs); an
+// L2 history for other governors is left out. Throws when anything is invalid or another handler's.
 function check(file: CacheFile, net: Network): Checked {
   const address = getAddress(file.puh.address);
   const deployBlock = big(file.puh.deployBlock);
@@ -531,10 +477,7 @@ function check(file: CacheFile, net: Network): Checked {
   return { puh, l2, l1Times, l2Times, listings };
 }
 
-/**
- * Seeds what the file holds (see the top of this file). Era's part waits for Era's chain id: the
- * promise settles once it is seeded or left out.
- */
+/** Seeds what the file holds; the promise settles once Era's part is seeded or left out. */
 function seed(checked: Checked, net: Network, epoch: number): Promise<void> {
   const onMismatch = (what: string) => () => {
     if (epoch === state.epoch) discard(what);
@@ -544,9 +487,8 @@ function seed(checked: Checked, net: Network, epoch: number): Promise<void> {
   if (checked.l2Times.length > 0)
     seedProvisionalL2Times(checked.l2Times, onMismatch("A ZKsync Era block timestamp"));
   if (checked.listings.length > 0) holdLastRunListings(checked.listings);
-  // The handler's history last, and pending first: its outcome may be told at once (this run's
-  // backfill was already complete). A mismatch then drops everything seeded above, and nothing
-  // of the file is seeded after it.
+  // The handler's history last, and pending first: its outcome may be told at once. A mismatch
+  // then drops everything seeded above, and nothing of the file is seeded after it.
   state.pending.add("puh");
   puhIndex().seedProvisional(
     {
@@ -566,9 +508,8 @@ function seed(checked: Checked, net: Network, epoch: number): Promise<void> {
   state.pending.add("l2");
   return Promise.all([l2ChainId().catch(() => null), l2ChainHead().catch(() => null)]).then(
     ([id, head]) => {
-      // Meanwhile the file may have been found wrong (discard() dropped what was seeded and
-      // cleared `pending`: this part was not seeded yet, so nothing dropped it), or the cache
-      // stopped: then nothing of it is seeded now.
+      // Meanwhile the file may have been found wrong (nothing dropped this unseeded part), or the
+      // cache stopped: nothing of it is seeded now.
       if (epoch !== state.epoch || state.fixed === "mismatch" || !state.pending.has("l2")) return;
       const handler = outcomeHandler("l2", epoch);
       if (
@@ -593,8 +534,6 @@ function seed(checked: Checked, net: Network, epoch: number): Promise<void> {
   );
 }
 
-// ---- saving ----
-
 function startSaver() {
   if (state.saver || !chainCacheEnabled()) return;
   const timer = setInterval(() => void saveChainCache({ force: false }), SAVE_CHECK_MS);
@@ -603,9 +542,8 @@ function startSaver() {
 }
 
 /**
- * Saves what this run read, when the handler's history is complete: with `force` (shutdown) now;
- * otherwise only when something changed since the last save, at most once a minute. Resolves
- * whether it wrote the file; never rejects.
+ * Saves once the handler's history is complete: with `force` (shutdown) now, else only on change
+ * and at most once a minute. Resolves whether it wrote the file; never rejects.
  */
 export function saveChainCache({ force = true }: { force?: boolean } = {}): Promise<boolean> {
   // One save at a time. A forced save (shutdown, a discard) never stands in for a check that may
@@ -630,12 +568,9 @@ export function saveChainCache({ force = true }: { force?: boolean } = {}): Prom
 async function save(force: boolean): Promise<boolean> {
   if (!chainCacheEnabled() || state.fixed === "disabled") return false;
   const generation = rpcGeneration();
-  // The saver's checks (every 10 s, for as long as the process runs) never ask the node while
-  // nobody uses the app: they use what this run already read about the chain, and skip until it
-  // has (a failed read is not kept, so asking would repeat it every 10 s). While the app is in
-  // use (sync/presence.ts), a check reads what is missing: the chain's identity when the read at
-  // start failed, was skipped (PREWARM=0) or the settings changed since; kept once answered.
-  // Saving at shutdown may ask.
+  // The saver's checks never ask the node while nobody uses the app: they use what this run has
+  // read, and skip until it has. In use (sync/presence.ts), a check reads what is missing; saving
+  // at shutdown may ask.
   const mayRead = force || presence().inUse();
   const known = force ? null : resolvedNetwork();
   const net = force ? await network() : known;
@@ -667,11 +602,8 @@ async function save(force: boolean): Promise<boolean> {
   return true;
 }
 
-/**
- * What this run would save now (built only when it is saved): null until the handler's history
- * is complete. The signature changes when something worth a save does (new final logs, a
- * listing's content, new timestamps), not when only the time of the last Safe check does.
- */
+// What this run would save (built only when saved); null until the handler's history is complete.
+// The signature changes with what is worth a save, not with the time of the last Safe check.
 async function collect(
   net: Network,
   identity: { chainId: number; genesisHash: Hex },

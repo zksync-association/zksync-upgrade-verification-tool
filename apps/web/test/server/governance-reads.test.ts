@@ -189,14 +189,12 @@ describe("member lists", () => {
     expect(state.directReads).toContain(`${SC}:members:1`);
   });
 
-  it("fail instead of shortening the list when the direct read fails (-32603)", async () => {
-    state.direct.set(`${SC}:members:1`, internalError());
-    state.multicallFails.add(`${SC}:members:1`);
-    await expect(governance()).rejects.toBeInstanceOf(UpstreamError);
-  });
-
-  it("fail when the read past the end fails instead of reverting (-32603)", async () => {
-    state.direct.set(`${G}:members:2`, internalError());
+  it.each([
+    ["a member's direct read fails", `${SC}:members:1`, true],
+    ["the read past the end fails instead of reverting", `${G}:members:2`, false],
+  ])("fail instead of shortening the list when %s (-32603)", async (_, key, viaMulticall) => {
+    state.direct.set(key, internalError());
+    if (viaMulticall) state.multicallFails.add(key);
     await expect(governance()).rejects.toBeInstanceOf(UpstreamError);
   });
 });

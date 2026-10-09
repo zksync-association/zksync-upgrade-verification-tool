@@ -1,8 +1,5 @@
-// What the app asks upstream, counted where requests leave the process: every JSON-RPC request
-// (an entry of a batch counts as one, a retry counts again) to the L1 and ZKsync Era RPCs, and every
-// GET to the Safe Transaction Service, from requests and background work alike. Kept as rolling
-// one-hour counts in one-minute buckets, for /api/status (sync.engine.cost). Nothing about a
-// request is kept but its kind (and, for L1, the Infura credits its method costs).
+// Upstream requests (L1 and Era JSON-RPC, Safe GETs), counted where they leave the process, as
+// rolling one-hour counts in one-minute buckets (sync.engine.cost). A batch entry counts as one.
 
 export type UpstreamKind = "l1" | "l2" | "safe";
 
@@ -26,10 +23,6 @@ function bucketAt(now: number): Bucket {
   return bucket;
 }
 
-/**
- * Counts `n` requests of one kind sent upstream now, and (L1) the Infura credits they cost
- * (sync/pacer.ts creditsOf). Never throws.
- */
 export function countUpstream(kind: UpstreamKind, n = 1, credits = 0) {
   if (!(n > 0)) return;
   const bucket = bucketAt(Date.now());
@@ -38,24 +31,17 @@ export function countUpstream(kind: UpstreamKind, n = 1, credits = 0) {
 }
 
 export type UpstreamCost = {
-  /** JSON-RPC requests to the L1 and ZKsync Era RPCs in the last hour (batch entries count one each). */
   rpcPerHour: number;
   l1RpcPerHour: number;
   l2RpcPerHour: number;
-  /** Requests to the Safe Transaction Service in the last hour. */
   safePerHour: number;
-  /**
-   * An ESTIMATE of what the last hour's L1 requests cost on Infura: each request at Infura's
-   * published credit weight (eth_getLogs 255, eth_chainId 5, every other method 80; batch entries
-   * count one each). Other providers bill differently; see `creditsBasis`.
-   */
+  /** An estimate at Infura's credit weights; other providers bill differently. */
   infuraCreditsPerHour: number;
   creditsBasis: "estimate: Infura credit weights (eth_getLogs 255, eth_chainId 5, others 80)";
-  /** How much of the hour the counts cover: less than an hour right after the process started. */
+  /** Less than an hour right after the process started. */
   windowMs: number;
 };
 
-/** Requests sent upstream in the last hour (the current minute and the 59 before it). */
 export function upstreamCost(now = Date.now()): UpstreamCost {
   const current = Math.floor(now / BUCKET_MS);
   let l1 = 0;
@@ -80,7 +66,6 @@ export function upstreamCost(now = Date.now()): UpstreamCost {
   };
 }
 
-/** Starts counting afresh (tests). */
 export function resetUpstreamCost(now = Date.now()) {
   buckets = [];
   since = now;

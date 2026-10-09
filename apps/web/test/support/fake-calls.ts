@@ -11,9 +11,8 @@ import {
 } from "viem";
 import { type FakeCall, type FakeOptions, FakeRpcError, fakeJsonRpc } from "./fake-jsonrpc";
 
-// Contracts behind a fake JSON-RPC upstream, for tests of the direct eth_call path (chain/call.ts)
-// through a real lane: each eth_call is decoded against the given ABIs and answered by the test,
-// with a value, a revert, or any raw JSON-RPC error. Nothing here touches the network.
+// Contracts behind a fake upstream for the direct eth_call path (chain/call.ts) through a real
+// lane: each eth_call is decoded against the given ABIs and answered by the test. No network.
 
 /** An RPC URL with a "key" in it: no error the app produces may contain either. */
 export const SECRET_URL = "https://rpc.secret-host.test/v3/0123456789abcdef0123456789abcdef";
@@ -73,11 +72,9 @@ export const hardhatError = (message: string, data?: Hex) =>
     ...(data === undefined ? {} : { data }),
   });
 
-/** Error(string) revert bytes. */
 export const errorData = (reason: string) =>
   encodeErrorResult({ abi: errorAbi, errorName: "Error", args: [reason] });
 
-/** Panic(uint256) revert bytes. */
 export const panicData = (code: bigint) =>
   encodeErrorResult({ abi: errorAbi, errorName: "Panic", args: [code] });
 

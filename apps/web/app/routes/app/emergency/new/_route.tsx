@@ -166,9 +166,8 @@ export default function NewEmergency() {
           </Button>
         </Card>
 
-        {/* The form renders at once; the id (hashed with the Emergency Upgrade Board as executor)
-            and the payload need the board's address from the root status, and fill in once it
-            is read. */}
+        {/* The form renders at once; the id and the payload need the board's address from the
+            root status, and fill in once it is read. */}
         <WithStatus fallback={<PayloadPending />}>
           {({ governance }) => (
             <Payload
@@ -185,7 +184,6 @@ export default function NewEmergency() {
   );
 }
 
-/** The upgrade id and payload of the calls drafted, with the board as executor. */
 function Payload({
   board,
   title,
@@ -291,7 +289,6 @@ function Payload({
   );
 }
 
-/** In place of the id and the payload while the board's address is read. */
 function PayloadPending() {
   return (
     <Card className="space-y-3 p-6" data-testid="payload-pending">

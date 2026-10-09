@@ -30,41 +30,19 @@ const baseEnv = createEnv({
     ZK_PROTOCOL_GOVERNOR_ADDRESS: addressSchema.optional(),
     ZK_TOKEN_GOVERNOR_ADDRESS: addressSchema.optional(),
     ZK_GOV_OPS_GOVERNOR_ADDRESS: addressSchema.optional(),
-    // The sync engine follows the chain head and refreshes, ahead of requests, what is on screen:
-    // "window" (only while the app is in use: nothing is sent upstream while nobody uses it),
-    // "always" (follows the head for as long as the server runs; what is on screen still only
-    // while in use), or "off" (every request reads on demand). The app is in use while a visible
-    // tab beat, or a page loaded, within SYNC_KEEPWARM_MS (sync/presence.ts); JSON (/api/*) never
-    // counts. A visible tab nobody touched for SYNC_AWAY_MS stops counting (0: never). Dev nodes
-    // (anvil, hardhat) always read on demand.
-    SYNC_MODE: z.enum(["window", "always", "off"]).default("window"),
+    // "window": follow the head only while the app is in use (never for /api/*); "off": never.
+    SYNC_MODE: z.enum(["window", "off"]).default("window"),
     SYNC_KEEPWARM_MS: z.coerce.number().int().min(0).default(30_000),
     SYNC_AWAY_MS: z.coerce.number().int().min(0).default(1_800_000),
-    // While a page showing a signature set that can still be signed is on screen, the member Safes
-    // of that set whose signature is not valid yet are asked every SYNC_SAFE_WATCH_MS whether
-    // their messages changed (one small request each, the listing only when it did), one Safe at
-    // a time; the Safes behind lists on screen (pending emergency upgrades, freeze requests,
-    // vetoes) every SYNC_SAFE_LIST_WATCH_MS. Without SAFE_API_KEY on Safe's public service (2
-    // requests/s, 5,000 a month per IP) at most every SYNC_SAFE_WATCH_KEYLESS_MS (0: only on
-    // request). Never more than SYNC_SAFE_HOURLY_BUDGET such requests an hour, slower when Safe
-    // reports little quota left, paused below 10 % of it. Nothing while nobody uses the app.
-    // SYNC_SAFE_ACTIVE_MS is gone (ignored, with a warning at start).
+    // The Safe watcher's cadences; without a key on Safe's public service, ..._KEYLESS_MS at most.
     SYNC_SAFE_WATCH_MS: z.coerce.number().int().min(1_000).default(60_000),
     SYNC_SAFE_LIST_WATCH_MS: z.coerce.number().int().min(1_000).default(300_000),
     SYNC_SAFE_WATCH_KEYLESS_MS: z.coerce.number().int().min(0).default(300_000),
     SYNC_SAFE_HOURLY_BUDGET: z.coerce.number().int().min(0).default(1_200),
-    // A signature set's checks at a head go out in one Multicall3 aggregate3 with the head's other
-    // reads, and only positives are taken from it (ECDSA-only candidates on pinned contracts;
-    // everything else is asked directly, where only a definite revert rejects). 0: every check
-    // asked directly.
+    // 1: a set's checks at a head go in that head's aggregate3, which only supplies positives.
     SYNC_VERDICT_AGGREGATE: z.coerce.number().int().min(0).max(1).default(1),
-    // The sync engine's own upstream work, at most this many Infura credits a second (eth_getLogs
-    // 255, other methods 80; Infura's free plan allows 500). Requests are never held up. 0: unpaced.
+    // The engine's own pace in Infura credits a second (Infura's free plan allows 500). 0: unpaced.
     SYNC_CREDITS_PER_SECOND: z.coerce.number().int().min(0).default(450),
-    // How the head follower looks for the next block: "slot" polls when its slot begins (the proof
-    // that the local clock is not behind) and then every second; "late" makes the same proof poll,
-    // then its first search poll where most blocks have arrived by (learned), then every second.
-    SYNC_HEAD_POLL: z.enum(["slot", "late"]).default("slot"),
     ALLOW_INDEXING: z.coerce.boolean().default(false),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
     NODE_ENV: NodeEnvEnum.default("production"),

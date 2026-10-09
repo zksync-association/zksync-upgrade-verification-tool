@@ -162,8 +162,6 @@ export const emergencyPayloadSchema = z.object({
   calls: z.array(z.object({ target: address, value: uint.default("0"), data: hexBytes })).min(1),
 });
 
-export type EmergencyPayload = z.infer<typeof emergencyPayloadSchema>;
-
 export type PayloadCheck =
   | { ok: true; proposal: UpgradeProposal; id: Hex; title: string | null }
   | { ok: false; error: string; id?: Hex };

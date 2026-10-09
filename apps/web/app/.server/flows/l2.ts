@@ -32,12 +32,9 @@ import { callTo, topicOf } from "./common";
 import { L1_MESSENGER, findL2ProposalInBatch, upgradeBatch } from "./l2-batch";
 
 // ZKsync Era side of governance: the governors Guardians can veto, and the protocol governor whose
-// executed proposals start L1 upgrades. The pinned governors' ProposalCreated, ProposalExecuted
-// and ProposalCanceled logs come from the L2 governor log index (chain/l2-index.ts), and windows
-// ("the last 24 days") are cut by the timestamp of each event's block. A governor replaced through
-// env, and every governor while Era does not know the 'finalized' tag (see l2IndexHead), is
-// scanned on demand, as before: a timestamp search for the window's first block, then the
-// window's logs. Results near the head are never cached for good.
+// executed proposals start L1 upgrades. Pinned governors' logs come from the L2 governor log index;
+// a governor replaced through env, or any while Era lacks the 'finalized' tag, is scanned on
+// demand. Results near the head are never cached for good.
 
 const DAY = 86_400n;
 // 3-day voting delay + 7-day voting period + 7-day possible extension, with margin.
@@ -46,8 +43,7 @@ const VETO_WINDOW = 24n * DAY;
 const STARTABLE_WINDOW = 30n * DAY;
 // An upgrade's L2 execution, before its L1 creation (legacy discovery).
 const DISCOVERY_WINDOW = 21n * DAY;
-// A proposal's state() read at an Era head is served while that head is (4 s); for pages, while
-// they answer at that head (the Era timer's minute, sync/era.ts).
+// A proposal's state() read at an Era head is served while that head is (4 s).
 const STATE_TTL_MS = 4_000;
 
 // IGovernor.ProposalState
@@ -140,14 +136,12 @@ function hashL2Proposal(p: L2Proposal): bigint {
 
 type CreatedLog = Pick<Log, "data" | "topics" | "transactionHash" | "blockHash" | "logIndex">;
 
-/** What a ProposalCreated log says: everything about a proposal except its current state. */
 type Created = {
   proposal: L2Proposal;
   proposalId: bigint;
   proposer: Address;
   voteStart: bigint;
   voteEnd: bigint;
-  /** hashL2Proposal(proposal), computed here. */
   localId: bigint;
   createdTx: Hex;
 };
@@ -185,19 +179,10 @@ function createdOf(log: CreatedLog): Promise<Created> {
   );
 }
 
-/**
- * Where the Guardians' address comes from: JSON's governance() unless the caller says otherwise.
- * A page passes its own (page-governance.ts governanceFor): the sync engine keeps pages'
- * governance in memory at each head, never JSON's.
- */
+/** The governance that names the Guardians: JSON's governance() unless a page passes its own. */
 export type GovernanceRead = () => Promise<Governance>;
 
-/**
- * Guardians.hashL2Proposal on L1 for this content (a pure function of it): kept once read. null
- * when the read failed (asked again next time). `gov`: the governance that names the Guardians
- * (the sync engine's refresh passes pages' governance at the head, so it never makes JSON's full
- * read for an address).
- */
+/** Guardians.hashL2Proposal on L1, a pure function of the content: kept once read. */
 async function idOnL1(created: Created, gov: GovernanceRead = governance): Promise<bigint | null> {
   try {
     const { guardians } = await gov();
@@ -221,12 +206,7 @@ async function idOnL1(created: Created, gov: GovernanceRead = governance): Promi
   }
 }
 
-/**
- * The proposal a ProposalCreated log of `governor` describes, with its state read now. `at`: the
- * Era head the request answers at; the state read is then shared by requests at that head.
- * `fromLastRun`: the log comes from the history the last run saved, not read in this run yet; what
- * it says is decoded for this answer only, never kept for the log at that place.
- */
+/** A log `fromLastRun` (not read in this run yet) is decoded for this answer only, never kept. */
 async function viewOf(
   client: PublicClient,
   governor: Address,
@@ -247,16 +227,14 @@ async function viewOf(
         functionName: "state",
         args: [created.proposalId],
       })
-      // null only for a value outside IGovernor.ProposalState. A failed read fails the caller,
-      // whatever its kind: a proposal whose state went unread must neither drop out of what
-      // Guardians can veto nor close its veto. (viem turns Era's code-3 revert and an internal
-      // error -32603 into the same ContractFunctionRevertedError, so no failure here is an answer.)
+      // null only for a value outside IGovernor.ProposalState. A failed read fails the caller: an
+      // unread state must neither drop a proposal from what Guardians can veto nor close its veto
+      // (viem reports Era's code-3 revert and -32603 alike, so no failure here is an answer).
       .then((s) => L2_PROPOSAL_STATES[s] ?? null);
   const [state, governorName, contractId] = await Promise.all([
     at
       ? cached(
-          // A page's read at an Era head is kept apart from JSON's, for as long as pages answer
-          // at that head.
+          // A page's read is kept apart from JSON's, for as long as pages answer at that head.
           `l2-state${page ? "-page" : ""}:${governor.toLowerCase()}:${created.proposalId}:${at.head.hash}`,
           page ? ERA_PAGE_MAX_AGE_MS : STATE_TTL_MS,
           readState
@@ -287,27 +265,18 @@ const proposalKey = (governor: Address, id: bigint) => `${governor.toLowerCase()
 const isVetoable = (p: L2ProposalView) =>
   p.state === null || p.state === "Pending" || p.state === "Active";
 
-/**
- * Vetoable proposals, whether part of them came from the history the last run saved, and the Era
- * head they were read at (null when scanned on demand).
- */
+/** `provisional`: partly from the last run's history; `eraHead`: null when scanned on demand. */
 export type VetoableAnswer = {
   proposals: L2ProposalView[];
   provisional: boolean;
   eraHead?: { number: string; readAt: string } | null;
 };
 
-/** An Era head, as pages label what they read at it. */
 export const eraHeadOf = (at: L2Head | null) =>
   at && { number: at.head.number.toString(), readAt: new Date(at.answeredAt).toISOString() };
 
-/**
- * Indexed governors' proposals created in the last 24 days, except those the index shows
- * executed or canceled (final states: their state() would only confirm it), at Era head `at`.
- * `provisional` (pages only): the index may answer from the history the last run saved, and the
- * window from the block times it saved, while this run reads them again (the answer says so);
- * states are always read at `at`.
- */
+// Proposals of the last 24 days the index does not show executed or canceled (final states).
+// `provisional` (pages only): may use the last run's history; states are always read at `at`.
 async function recentFromIndex(
   client: PublicClient,
   governors: readonly Address[],
@@ -357,19 +326,14 @@ async function recentFromScan(
 }
 
 /**
- * Proposals on the Token and GovOps governors that Guardians can still veto (Pending or Active,
- * or a state value the app does not know: listed rather than hidden). A failed read fails the list.
+ * Proposals on the Token and GovOps governors that Guardians can still veto (Pending, Active, or an
+ * unknown state value: listed rather than hidden). A failed read fails the list.
  */
 export async function activeL2Proposals(): Promise<L2ProposalView[]> {
   return (await activeL2ProposalsAnswer()).proposals;
 }
 
-/**
- * activeL2Proposals, and whether the answer used the history the last run saved: with
- * `provisional` (a page's first answer), the indexed governors' events may come from it while this
- * run reads them again (see recentFromIndex); without it (JSON, and a page's fresh answer), never.
- * `gov`: the governance that names the Guardians (a page's; JSON's governance() by default).
- */
+// Events may come from the last run's history only with `provisional` (a page's first answer).
 export async function activeL2ProposalsAnswer({
   provisional = false,
   gov,
@@ -409,10 +373,7 @@ export async function activeL2ProposalsAnswer({
   };
 }
 
-/**
- * A specific L2 proposal's content, from its ProposalCreated log, with its state read now. `gov`:
- * the governance that names the Guardians (a page's; JSON's governance() by default).
- */
+/** A specific L2 proposal's content, from its ProposalCreated log, with its state read now. */
 export async function getL2Proposal(
   governor: Address,
   proposalId: bigint,
@@ -421,10 +382,6 @@ export async function getL2Proposal(
   return (await getL2ProposalAnswer(governor, proposalId, options)).proposal;
 }
 
-/**
- * getL2Proposal, and the Era head its state was read at (`eraHead`, as pages label it; null when
- * the governor is not indexed and the proposal was found by a scan).
- */
 export async function getL2ProposalAnswer(
   governor: Address,
   proposalId: bigint,
@@ -452,8 +409,7 @@ export async function getL2ProposalAnswer(
       eraHead: eraHeadOf(head),
     };
   }
-  // A replaced governor (or Era without the 'finalized' tag): found from its on-chain snapshot
-  // time.
+  // Not indexed: found from its on-chain snapshot time.
   const proposal = await cached(`l2-proposal:${governor}:${proposalId}`, 5 * 60_000, async () => {
     const [snapshot, votingDelay] = await Promise.all([
       client.readContract({
@@ -475,8 +431,7 @@ export async function getL2ProposalAnswer(
       to,
       { safeHead: -1n }
     );
-    // Only the matching proposal is read further: another proposal's failed state() read must
-    // not fail this one.
+    // Only the matching proposal is read: another's failed state() read must not fail this one.
     const log = logs.find(
       (l) =>
         decodeEventLog({
@@ -491,10 +446,6 @@ export async function getL2ProposalAnswer(
   return { proposal, eraHead: null };
 }
 
-/**
- * The protocol governor's ProposalExecuted events in blocks timed [since, until] from the index,
- * at Era head `at`.
- */
 async function executedFromIndex(
   governor: Address,
   at: L2Head,
@@ -563,7 +514,6 @@ export async function findL2ProposalForUpgrade(
   );
 }
 
-/** A replaced protocol governor's executions in [created − 21 days, created], scanned on demand. */
 async function windowLogs(client: PublicClient, governor: Address, created: bigint) {
   const from = await l2BlockAt(client, created - DISCOVERY_WINDOW);
   const to = await l2BlockAt(client, created);
@@ -577,10 +527,7 @@ async function windowLogs(client: PublicClient, governor: Address, created: bigi
   return logs.map((log) => ({ log, final: false }));
 }
 
-/**
- * The L2 → L1 message an execution sent, from its receipt. Kept for good when the execution is
- * final (at or below Era's 'finalized' block): its receipt never changes.
- */
+/** Kept for good only when the execution is final: its receipt never changes. */
 function l1MessageOf(client: PublicClient, txHash: Hex, final = false) {
   return final
     ? cached(`l2-message:${txHash.toLowerCase()}`, FOREVER, () => readL1Message(client, txHash))
@@ -599,11 +546,8 @@ async function readL1Message(client: PublicClient, txHash: Hex) {
   return { body: args._message, receipt };
 }
 
-/**
- * The L2 → L1 log proof of an execution's message, once Era has one: kept for the rest of the
- * process (it never changes once the batch is sealed), so the Era timer's minute reads do not ask
- * again for an upgrade that can start; not kept while it is not available yet. Never rejects.
- */
+// Kept once Era has it (it never changes once the batch is sealed), not while it is missing.
+// Never rejects.
 function logProofOf(client: PublicClient, txHash: Hex) {
   return cachedUntil(`l2-log-proof:${txHash.toLowerCase()}`, async () => {
     const proof = await getLogProof(client as never, { txHash, index: 0 }).catch(() => null);
@@ -630,9 +574,8 @@ export type NotStartedUpgrade = {
 );
 
 /**
- * Executed ZkProtocolGovernor proposals whose L1 upgrade has not been started yet. With `page` (a
- * page, never JSON): at the Era head pages answer at, and kept for as long as they do (the Era
- * timer reads it again every minute while such a page is on screen, sync/era.ts).
+ * Executed ZkProtocolGovernor proposals whose L1 upgrade has not been started yet. With `page`
+ * (never JSON): at the Era head pages answer at, kept for as long as they do.
  */
 export async function notStartedUpgrades({
   page = false,
@@ -680,8 +623,7 @@ async function readNotStarted(
           error: "No L2 → L1 message in the execution",
         };
       const l1ProposalId = keccak256(message.body);
-      // At the L1 head requests read now (without asking the node for it), like the other
-      // states a page shows; at 'latest' when none is known yet.
+      // At the L1 head requests read now (not asking the node), or 'latest' when none is known.
       const head = await (servedHead() ?? Promise.resolve(null)).catch(() => null);
       const state = await l1.readContract({
         address: net.upgradeHandler,

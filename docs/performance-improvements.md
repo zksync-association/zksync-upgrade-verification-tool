@@ -52,9 +52,9 @@ window.
 | On screen | Window | L1 requests a block (an hour) | Infura credits a block (an hour) | Era an hour | Safe an hour |
 | --- | --- | ---: | ---: | ---: | ---: |
 | Nothing: 0–60 minutes after the last tab closed (chain cache on) | 60 min | 0 (0) | 0 (0) | 0 | 0 |
-| Nothing, `SYNC_MODE=always` | 15 min, 75 blocks | 5.32 (1,596) | 601 (180,169) | 0 | 0 |
+| Nothing, `SYNC_MODE=always` (since removed) | 15 min, 75 blocks | 5.32 (1,596) | 601 (180,169) | 0 | 0 |
 | The upgrade page `0x77d5…` (executed) | 20 min, 100 blocks | 5.40 (1,620) | 611 (183,140) | 0 | 0 |
-| The same with `SYNC_HEAD_POLL=late` | 20 min, 98 blocks | 4.71 (1,386) | 556 (163,381) | 0 | 0 |
+| The same with `SYNC_HEAD_POLL=late` (since removed) | 20 min, 98 blocks | 4.71 (1,386) | 556 (163,381) | 0 | 0 |
 | Run A's two pages: that upgrade and the emergency upgrade `0xb166…` (executed) | 15 min, 75 blocks | 6.32 (1,896) | 683 (204,865) | 0 | 0 |
 | `/` | 10 min, 50 blocks | 5.34 (1,602) | 606 (181,694) | 120 | 144 |
 | The veto list | 10 min, 50 blocks | 5.44 (1,632) | 614 (184,089) | 120 | 96 |
@@ -111,8 +111,8 @@ Before and after:
 
 On Infura's free plan (3 M credits a day, 500 a second) a page open costs about 183,000 credits an hour, so it
 allows about 16 hours a day of a page open, and nothing is spent while none is. A start still reads the handler's
-whole history (about 117,000 credits with this provider), as before. `SYNC_MODE=always` now costs about 180,000
-credits an hour with nothing on screen (4.3 M a day): it is meant for paid plans.
+whole history (about 117,000 credits with this provider), as before. `SYNC_MODE=always` cost about 180,000
+credits an hour with nothing on screen (4.3 M a day); it has since been removed.
 
 The aim was a tenth of the in-use traffic. On run A's basis requests fell to 10.7 % (credits to 13.9 %); on the C5
 basis one page is 14.9 % of the L1 requests. What is left a block is the head polls (3.3) and the index tail (1, 255
@@ -120,9 +120,9 @@ credits), besides the one combined read. `SYNC_HEAD_POLL=late` lowers the polls 
 requests a block, 1,386 an hour against 1,620; 12.7 % of the C5 basis) and served heads about as soon as `slot`
 (median 0.30 s, p80 0.33 s, at most 1.06 s, against 0.29 s, 0.32 s and 1.05 s: about 10 ms later, measured at other
 heads in a run of its own, not side by side). October 7's rule makes `late` the default only if no head is served
-later than with `slot`, which this does not show, so `slot` stays the default; a run of both on the same heads would
-settle it. Reading the tail only when the handler logged something was not adopted: it would change the rule that
-the history above the finality boundary is read again at every head.
+later than with `slot`, which this does not show, so `slot` stayed, and `late` has since been removed. Reading the
+tail only when the handler logged something was not adopted: it would change the rule that the history above the
+finality boundary is read again at every head.
 
 ### How long things take
 
@@ -259,9 +259,9 @@ each with `test/support/upstream-trace.mjs` (each upstream request's method, blo
 kind; never a URL, host, query string or key), keeps pages on screen in Chrome tabs, stops on a trust problem, prints
 no URL or key, and writes its results to `.cache/local/benchmark-sync.json` at the repository's root (the servers'
 logs and traces to `.cache/local/benchmark-sync/`). The tables above come from one run of it (October 8,
-04:53–06:16 UTC), for `SYNC_HEAD_POLL=late` from `--only=late` right after it, and for the pages and JSON after a
-pause (90 s and 10 minutes) from `--only=resume,idle` (08:29–09:32 UTC); "October 7" figures are from that day's
-benchmark and cost study.
+04:53–06:16 UTC), for `SYNC_HEAD_POLL=late` (since removed) from `--only=late` right after it, and for the pages
+and JSON after a pause (90 s and 10 minutes) from `--only=resume,idle` (08:29–09:32 UTC); "October 7" figures are
+from that day's benchmark and cost study.
 
 ## October 6: answers kept ahead of requests, pages that never wait
 
@@ -454,7 +454,8 @@ anvil and hardhat never use it. Delete the folder to clear it.
 
 The engine and the Safe sweep spend the RPC's and Safe's quota ahead of requests. Counted as `sync.engine.cost`
 counts: every JSON-RPC request (a batch entry counts one, a retry again) and every Safe GET, measured with the same
-RPC and key on October 7 by the benchmark's `use`, `cost` and `head` conditions:
+RPC and key on October 7 by the benchmark's `use`, `cost` and `head` conditions (`SYNC_MODE=always` and
+`SYNC_SAFE_ACTIVE_MS` have since been removed; `window` is the default):
 
 | Setting (default) | What it does | Measured cost |
 | --- | --- | --- |

@@ -7,11 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type ContractCall, contracts, fakeCallLane, revertWith } from "../support/fake-calls";
 import { EMERGENCY_ID, MAINNET, SAFE_MESSAGES } from "../support/fixtures";
 
-// A page's first answer (freshness "page") against JSON's strict one, with the real Safe snapshot
-// store and Safe client in front of a fake Safe Transaction Service, and the governance contract
-// behind a fake JSON-RPC upstream. A page may show Safe copies older than 60 s and a set's last
-// result from an older block, labelled, and never as current; the strict result always follows,
-// and is the only thing JSON ever gets. Nothing about a supplied signature (?sig=) is kept.
+// A page's first answer may show Safe copies older than 60 s or a set's last result from an older
+// block, labelled and never as current; the strict result always follows and is all JSON gets.
+// Nothing about a supplied signature (?sig=) is kept.
 
 const state = vi.hoisted(() => ({
   lane: null as Lane | null,
@@ -76,7 +74,6 @@ vi.mock("@/.server/governance", async () => {
 const { verifySignatureSet, firstSignatureSet, watchSignatureSet } = await import(
   "@/.server/signatures"
 );
-/** The key a page reports for a set it shows. */
 const SET_KEY = /^set:[0-9a-f]{32}$/;
 const { streamSignatureSet } = await import("@/.server/flows/common");
 const { collectHeldMessages, collectMessages } = await import("@/.server/flows/messages");
@@ -117,7 +114,6 @@ const later = (ms: number) => {
 };
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/** `member` signed the set's message in its Safe (one owner, the Safe's threshold). */
 function signInSafe(member: Address, signature: Hex) {
   const messageHash = safeMessageHashes(1, member, digest).safeMessageHash;
   const list = state.lists.get(member.toLowerCase()) ?? [];
@@ -244,9 +240,8 @@ describe("a page's first answer for a signature set", () => {
     expect(fresh).toMatchObject({ stale: false, verifiedAtBlock: "1100" });
     expect(statuses(fresh)).toEqual(["valid", "valid"]);
     expect(fresh.thresholdCheck.status).toBe("met");
-    // The page rule: the member whose signature is valid from its older copy keeps that copy
-    // (labelled with its age); the member that is not was read again. Only the page's own result
-    // asked Safe, for that one listing.
+    // The page rule: a member valid from its older copy keeps it (labelled with its age); the
+    // other was read again, the page's only Safe request.
     expect(fresh.safeFetchedAt).toBe(iso(listed[0]?.fetchedAt as number));
     expect(state.sent.length - sent).toBe(1);
   });
@@ -276,7 +271,7 @@ describe("a page's first answer for a signature set", () => {
     // A copy: the kept result JSON answers with is not marked.
     expect(first).not.toBe(atOld);
     expect(atOld.stale).toBe(false);
-    // JSON waits for Safe and the head, as before.
+    // JSON waits for Safe and the head.
     expect(await settlesWithin(json, 50)).toBe(false);
     expect(await settlesWithin(page.fresh, 0)).toBe(false);
 
@@ -295,9 +290,8 @@ describe("a page's first answer for a signature set", () => {
     const page = streamSignatureSet({ ...params }, "page");
     const [first, fresh] = await Promise.all([page.immediate, page.fresh]);
     expect(first).toBe(fresh);
-    // The page's own result: the same verdicts from the same copies, with the key the page
-    // reports while it shows the set, its content's revision and how its copies are kept; JSON's
-    // (the kept strict result) has none of them.
+    // The page's own result: the same verdicts, plus its key, revision and how its copies are
+    // kept; JSON's (the kept strict result) has none of them.
     expect(first).toEqual({
       ...strict,
       watch: { key: expect.stringMatching(SET_KEY), rev: expect.stringMatching(/^[1-9]\d*$/) },
@@ -500,7 +494,6 @@ describe("pending messages from Safe listings held", () => {
     expect(held).toMatchObject({ stale: true, safeFetchedAt: strict.safeFetchedAt });
     expect(held?.groups).toEqual(strict.groups);
     expect(state.sent.length).toBe(sent);
-    // The strict list reads them again.
     const fresh = await collectMessages(SAFES, EMERGENCY, board);
     expect(fresh.stale).toBe(false);
     expect(state.sent.length).toBe(sent + SAFES.length);

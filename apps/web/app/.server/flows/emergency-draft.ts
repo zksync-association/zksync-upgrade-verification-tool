@@ -7,7 +7,6 @@ import { simulateCall } from "../signatures";
 
 export type DraftCallCheck =
   | { ok: true }
-  /** The call definitely reverts: the node's code 3 / "execution reverted". */
   | { ok: false; error: string }
   /** No answer (an RPC failure, a rate limit, out of gas): never shown as a revert. */
   | { ok: null; skipped: string };

@@ -19,15 +19,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FAKE_PINS } from "../support/fake-l1";
 import { HEAD, NOW, SLOT_MS, backfilled, liveWorld, settle } from "../support/live-world";
 
-// After a pause the app has no head in memory (nothing was read while nobody used it), so a
-// page's sections must read the newest block before they have anything to show. What a page last
-// showed as current is kept in memory (sync/last-shown.ts) and shown first then, labelled with the
-// block it was read at, until the current answer replaces it in the same response: never from a
-// stale or unconfirmed answer, never across a settings change, never on JSON.
+// After a pause what a page last showed as current is shown first, labelled with its block, until
+// the current answer replaces it in the same response: never a stale or unconfirmed answer, never
+// across a settings change, never on JSON.
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
-/** A section whose answer is read at the head: the block it was read at. */
 const atHead = () => latestBlock().then((head) => ({ block: head.number.toString() }));
 
 /** Whether `promise` settles without the fake clock moving (no upstream answer can arrive). */
@@ -84,14 +81,12 @@ describe("a section after a pause", () => {
     const after = lastShown().section("k", atHead(), Promise.resolve(null), {
       current: () => true,
     });
-    // At once, with nothing upstream answered: what it showed, with the block it was read at.
     const first = await settlesAtOnce(after.first);
     expect(first?.value).toMatchObject({
       block: HEAD.toString(),
       asOf: { block: HEAD.toString() },
     });
     expect(w.fake.posts.length - posts).toBeLessThanOrEqual(1);
-    // The current answer follows, at the newest block, without a label.
     const fresh = await settle(after.fresh);
     expect(fresh).toEqual({ block: (HEAD + 1n).toString() });
     expect(fresh).not.toHaveProperty("asOf");
@@ -153,7 +148,6 @@ describe("a section after a pause", () => {
   it("keeps only a current answer: never a first answer that was not, nor one that failed", async () => {
     const w = liveWorld();
     await backfilled();
-    // A first answer from older sources, and the current one after it: the current one is kept.
     const mixed = lastShown().section(
       "mixed",
       Promise.resolve({ stale: true, n: 1 }),
@@ -161,7 +155,6 @@ describe("a section after a pause", () => {
       { current: (v) => !v.stale }
     );
     await settle(mixed.fresh);
-    // An answer that is not current (it says so) is not kept, nor one that failed.
     lastShown().section("old", Promise.resolve({ stale: true }), Promise.resolve(null), {
       current: (v) => !v.stale,
     });
@@ -255,7 +248,6 @@ describe("a section after a pause", () => {
     await settle(Promise.resolve());
     expect(lastShownSize()).toBe(LAST_SHOWN_LIMIT);
     await pause(w);
-    // The oldest are gone, the newest kept.
     const shown = lastShown();
     expect(await settlesAtOnce(shown.held("k4"))).toEqual({ value: null });
     for (const i of [5, LAST_SHOWN_LIMIT + 4])

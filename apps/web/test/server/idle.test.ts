@@ -15,12 +15,9 @@ import { fakeEra } from "../support/fake-era";
 import { type FakePost, fakeJsonRpc } from "../support/fake-jsonrpc";
 import { L1, SC_MEMBERS, type UpgradeOnChain, fakeL1 } from "../support/fake-l1";
 
-// Nobody using the app means no upstream request at all (plan D1, decision 1): once the last tab
-// stopped beating (or the last page load's grace ended), the engine stops at its next wake, and
-// nothing (head polls, ticks, the Safe sweep, Era, retries, the chain cache's saver) sends
-// anything until the next use, however long that takes and whatever fails meanwhile. JSON and
-// prefetches never start it; a page load or a tab's beat does. The first use after a pause reads
-// each thing once: one head read shared by the request and the engine, governance in one round.
+// Nobody using the app means no upstream request at all: once the last tab stopped beating (or the
+// last page load's grace ended) nothing is sent until the next use, whatever fails meanwhile. JSON
+// and prefetches never start the engine; the first use after a pause reads each thing once.
 
 vi.mock("@/.server/safe-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/.server/safe-api")>()),
@@ -38,10 +35,7 @@ const KEEPWARM_MS = 30_000;
 type Kind = "l1" | "l2" | "safe";
 type Sent = { at: number; kind: Kind };
 
-/**
- * Mainnet-like L1, Era and Safe behind one fetch stub, counting what is sent to each. Each L1 POST
- * takes `latencyMs` (a real RPC: 130-440 ms a round).
- */
+/** Mainnet-like L1, Era and Safe behind one fetch stub, counting what is sent to each. */
 function world({ latencyMs = 0 }: { latencyMs?: number } = {}) {
   const history = puhHistory(L1.deployBlock, FINAL - 1_000n);
   const upgrades = new Map<string, UpgradeOnChain>();
@@ -88,7 +82,6 @@ function world({ latencyMs = 0 }: { latencyMs?: number } = {}) {
   return { l1, era, eraRpc, sent, failing, produce, history };
 }
 
-/** Runs the fake clock in small steps until `done`. */
 async function until(done: () => boolean, maxMs = 10_000) {
   for (let waited = 0; !done(); waited += 10) {
     if (waited > maxMs) throw new Error("timed out waiting");
@@ -96,7 +89,6 @@ async function until(done: () => boolean, maxMs = 10_000) {
   }
 }
 
-/** Runs the fake clock until `promise` settles, and returns its value. */
 async function settle<T>(promise: Promise<T>): Promise<T> {
   let done = false;
   const tracked = promise.finally(() => {
@@ -113,7 +105,6 @@ const page = (path: string, headers: Record<string, string> = {}): RequestInfo =
   header: (name) => headers[name],
 });
 
-/** The Security Council's approval set of an upgrade, as its page registers it. */
 const councilSet = (): SignatureSetParams => ({
   action: "ApproveUpgradeSecurityCouncil",
   signerGroup: "securityCouncil",
@@ -128,7 +119,6 @@ const councilSet = (): SignatureSetParams => ({
   open: true,
 });
 
-/** A visible tab beats with these keys. */
 const beat = (keys: string[], tab = "tab-under-test-1") =>
   presence().beat({ tab, reason: "interval", items: keys.map((key) => ({ key, rev: null })) });
 
@@ -165,8 +155,7 @@ describe("I-1: nobody uses the app", () => {
     const set = watchSignatureSet(councilSet());
     beat(["status", "upgrade:0xab", set.key, "list:vetoes"]);
     await until(() => syncEngineStatus().ticks >= 1);
-    // In use for a while, a block arriving meanwhile: the head is followed, the set's member
-    // Safes swept, Era followed.
+    // In use for a while, with a new block: the head, the set's member Safes and Era are followed.
     let lastBeat = Date.now();
     for (let i = 0; i < 2; i++) {
       await vi.advanceTimersByTimeAsync(10_000);
@@ -180,8 +169,7 @@ describe("I-1: nobody uses the app", () => {
     expect(sentAfter(w.sent, NOW, "l2").length).toBeGreaterThan(0);
     expect(syncEngineStatus()).toMatchObject({ active: true, cost: { mode: "viewing" } });
 
-    // The tab stops beating (closed without a leave). From the keep-warm's end, every upstream
-    // fails; one wake later (at most 2 s) the engine has stopped.
+    // The tab stops beating; from the keep-warm's end every upstream fails.
     await vi.advanceTimersByTimeAsync(lastBeat + KEEPWARM_MS - Date.now());
     w.failing.on = true;
     const cut = lastBeat + KEEPWARM_MS + 2_000;

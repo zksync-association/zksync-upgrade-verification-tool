@@ -35,18 +35,14 @@ import {
   createLogIndex,
 } from "./log-index";
 
-// The ZKsync Era governors' log index: every ProposalCreated, ProposalExecuted and
-// ProposalCanceled log of the pinned governors (token, GovOps, protocol), from the first such log
-// to the Era head, read once and kept for the settings generation. One eth_getLogs answers the
-// whole history on Era (about 80 logs on mainnet), and each new Era head re-reads only the blocks
-// above Era's 'finalized' block. The vetoable list, a veto's proposal and the startable upgrades
-// filter this in memory instead of searching block headers for a timestamp. Unlike the
-// ProtocolUpgradeHandler's index, this one keeps only these three events: the governors also emit
-// a VoteCast per vote, more than an eth_getLogs answer may hold.
+// The ZKsync Era governors' log index: their ProposalCreated, ProposalExecuted and ProposalCanceled
+// logs from the first one to the Era head, kept for the settings generation (one eth_getLogs holds
+// mainnet's ~80; each Era head re-reads only the blocks above Era's 'finalized'). Only these three
+// events: the governors also emit a VoteCast per vote, more than an eth_getLogs answer may hold.
 
-export type L2GovernorEventName = "ProposalCreated" | "ProposalExecuted" | "ProposalCanceled";
+type L2GovernorEventName = "ProposalCreated" | "ProposalExecuted" | "ProposalCanceled";
 
-export const L2_GOVERNOR_EVENTS: readonly L2GovernorEventName[] = [
+const L2_GOVERNOR_EVENTS: readonly L2GovernorEventName[] = [
   "ProposalCreated",
   "ProposalExecuted",
   "ProposalCanceled",
@@ -61,7 +57,6 @@ const TOPICS = new Map<string, L2GovernorEventName>(
 
 const LABEL = "L2 governors";
 
-/** topic0 of the three events the index keeps (lower case). */
 export const L2_GOVERNOR_TOPICS: readonly Hex[] = [...TOPICS.keys()] as Hex[];
 
 export type L2GovernorEvent = {
@@ -75,26 +70,20 @@ export type L2GovernorEvent = {
   provisional: boolean;
 };
 
-/**
- * An index answer: the Era head it is complete at, and every event up to that head.
- * `provisional`: part of it was answered from the last run's history (pages only).
- */
-export type L2GovernorRead = { head: L2Head; events: L2GovernorEvent[]; provisional: boolean };
+/** The Era head the answer is complete at; `provisional`: partly from the last run's history. */
+type L2GovernorRead = { head: L2Head; events: L2GovernorEvent[]; provisional: boolean };
 
-/** Which governors and Era chain a seeded history is for. */
-export type L2Seed = ProvisionalSeed & {
+type L2Seed = ProvisionalSeed & {
   chainId: number;
   l2ChainId: number;
   addresses: Address[];
   fromBlock: bigint;
 };
 
-/** The complete final history of the indexed governors, for saving. */
-export type L2Snapshot = FinalSnapshot & { chainId: number; addresses: Address[] };
+type L2Snapshot = FinalSnapshot & { chainId: number; addresses: Address[] };
 
 export type L2IndexStatus = Omit<IndexStatus, "deployBlock"> & {
   deployBlock: string | null;
-  /** The governors indexed (the pinned ones in use); empty when there is no index. */
   governors: Address[];
 };
 
@@ -115,11 +104,7 @@ const IDLE: L2IndexStatus = {
 
 type GovernorNetwork = Pick<Network, "chainId" | "l2RpcUrl" | "l2Governors">;
 
-/**
- * The governors the index answers for under `net`, and where it starts: the pinned governors
- * still in use (an env override replaces a governor with one the index never read, which keeps
- * the on-demand path). null when there are none, no L2 RPC, or no pinned start block.
- */
+/** The pinned governors in use under `net` (an override keeps the on-demand path), or null. */
 export function indexedL2Governors(
   net: GovernorNetwork
 ): { addresses: Address[]; fromBlock: bigint } | null {
@@ -136,34 +121,26 @@ export function indexedL2Governors(
   return addresses.length > 0 ? { addresses, fromBlock } : null;
 }
 
-/** Whether the index answers for `governor` (see indexedL2Governors). */
 export function isIndexedL2Governor(net: GovernorNetwork, governor: Address | null): boolean {
   if (!governor) return false;
   return !!indexedL2Governors(net)?.addresses.some((a) => isAddressEqual(a, governor));
 }
 
 /**
- * The Era head (the one served now) the index answers at, when a governor is indexed under `net`
- * and Era knows the 'finalized' tag; null otherwise, and callers scan on demand as before the
- * index. Without the tag nothing is final, so every Era head would re-read the governors' whole
- * history (on an Era RPC that caps block ranges, thousands of eth_getLogs per head), where an
- * on-demand scan reads only its window. Rejects when Era's head cannot be read.
+ * The Era head the index answers at; null when no governor is indexed or Era does not know the
+ * 'finalized' tag (nothing is final: callers scan on demand). Rejects when Era's head fails.
  */
 export async function l2IndexHead(
   net: GovernorNetwork,
   { page = false }: { page?: boolean } = {}
 ): Promise<L2Head | null> {
   if (!indexedL2Governors(net)) return null;
-  // A page (never JSON) answers at the newest Era head read in the last ERA_PAGE_MAX_AGE_MS
-  // (sync/era.ts reads one every minute while such a page is on screen), labelled with its age.
+  // Pages only (never JSON): the newest Era head at most ERA_PAGE_MAX_AGE_MS old.
   const at = page ? await pageL2ChainHead(ERA_PAGE_MAX_AGE_MS) : await l2ChainHead();
   return at && at.safe >= 0n ? at : null;
 }
 
-/**
- * How old an Era head a page answers at may be: the Era timer's minute (sync/era.ts) and a margin
- * for its read. JSON keeps Era's head at most 4 s old.
- */
+/** The Era timer's minute (sync/era.ts) plus a margin. JSON keeps Era's head at most 4 s old. */
 export const ERA_PAGE_MAX_AGE_MS = 75_000;
 
 /** One line of error text with every part of the configured RPC URLs removed. */
@@ -178,7 +155,6 @@ function describe(error: unknown, l2Url: string | null = null): string {
   return scrubText(raw.split("\n")[0] ?? raw, secrets);
 }
 
-/** The index key for these governors (see #index). */
 const keyOf = (chainId: number, fromBlock: bigint, addresses: readonly Address[]) =>
   [chainId, fromBlock, ...addresses.map((a) => a.toLowerCase())].join(":");
 
@@ -191,20 +167,18 @@ type Built = {
   decoded: Map<string, { eventName: L2GovernorEventName; governor: Address; proposalId: bigint }>;
 };
 
-export class L2GovernorIndex {
+class L2GovernorIndex {
   #built: Built | undefined;
   #error: string | null = null;
   #closed = false;
   // A history from the last run, until the index it is for is built (then handed to it).
   #seed: { seed: L2Seed; onOutcome?: (outcome: ProvisionalOutcome) => void } | null = null;
-  // The chain cache is being loaded: a page's read waits for its seed (bounded).
   #seedComing = new SeedExpectation();
 
   constructor(readonly generation: number) {}
 
   #current = () => !this.#closed && rpcGeneration() === this.generation;
 
-  /** The index for the current network and Era RPC; null when no governor is indexed. */
   async #index(): Promise<Built | null> {
     if (!this.#current()) throw new IndexClosed(LABEL);
     let net: Network;
@@ -249,7 +223,6 @@ export class L2GovernorIndex {
     return this.#built;
   }
 
-  /** Hands a pending seed to the built index when it is the one the seed is for. */
   #applySeed() {
     const pending = this.#seed;
     const built = this.#built;
@@ -262,12 +235,7 @@ export class L2GovernorIndex {
     if (!accepted) onOutcome?.("dropped");
   }
 
-  /**
-   * Seeds the history the last run read (see LogIndex.seedProvisional) for the governors it
-   * names: handed to the index when it is built (or now). The caller checked the Era chain.
-   * `onOutcome` hears "dropped" when the index in use is for other governors, or the settings
-   * change first.
-   */
+  /** Seeds the last run's history for the governors it names (the caller checked the Era chain). */
   seedProvisional(seed: L2Seed, onOutcome?: (outcome: ProvisionalOutcome) => void) {
     if (!this.#current() || this.#seed) {
       onOutcome?.("dropped");
@@ -277,18 +245,15 @@ export class L2GovernorIndex {
     this.#applySeed();
   }
 
-  /** A history from the last run may be seeded until `until` settles (see PuhIndex.expectSeed). */
   expectSeed(until: Promise<unknown>) {
     this.#seedComing.expect(until);
   }
 
-  /** Drops a seeded history still awaiting verification. */
   dropProvisional() {
     this.#seed = null;
     this.#built?.index.dropProvisional();
   }
 
-  /** The complete final history of the indexed governors, or null. */
   snapshot(): L2Snapshot | null {
     const built = this.#built;
     if (!built || !this.#current()) return null;
@@ -296,7 +261,6 @@ export class L2GovernorIndex {
     return final && { ...final, chainId: built.chainId, addresses: [...built.addresses] };
   }
 
-  /** Starts or resumes the backfill (when a governor is indexed). Never rejects. */
   async startBackfill(): Promise<void> {
     try {
       await (await this.#index())?.index.startBackfill();
@@ -310,11 +274,7 @@ export class L2GovernorIndex {
     return this.#error ? { ...IDLE, state: "unavailable", error: this.#error } : { ...IDLE };
   }
 
-  /**
-   * Every indexed event up to the Era head (`head`, or the head served now), complete and in
-   * chain order, with that head. Waits for the backfill (bounded); rejects when the index cannot
-   * answer, or no governor is indexed (callers check isIndexedL2Governor first).
-   */
+  /** Every indexed event up to the Era head (`head`, or the one served now), complete, in order. */
   async read({
     head,
     waitMs,
@@ -388,18 +348,12 @@ export function l2GovernorIndex(): L2GovernorIndex {
   return instance;
 }
 
-// ---- event-block timestamps ----
-
 // Headers per JSON-RPC batch when looking for a window's first block (Era allows 100).
 const TIMESTAMP_BATCH = 20;
-// At most this many final Era block timestamps are kept for saving (persist/chain-cache.ts).
 const FINAL_TIMES_LIMIT = 10_000;
 
-/** An Era block's timestamp, with its hash and number. */
 export type L2BlockTime = { hash: Hex; number: bigint; timestamp: bigint };
 
-// Timestamps of final Era blocks read under the current settings (event blocks the index answered
-// from its final range), for saving.
 let finalTimes: { generation: number; times: Map<string, L2BlockTime> } = {
   generation: -1,
   times: new Map(),
@@ -423,7 +377,6 @@ function currentSeededTimes() {
   return seededTimes?.generation === rpcGeneration() ? seededTimes : null;
 }
 
-/** Seeds Era block timestamps the last run read (see seededTimes). */
 export function seedProvisionalL2Times(times: readonly L2BlockTime[], onMismatch?: () => void) {
   seededTimes = {
     generation: rpcGeneration(),
@@ -432,22 +385,17 @@ export function seedProvisionalL2Times(times: readonly L2BlockTime[], onMismatch
   };
 }
 
-/** Drops the seeded timestamps (the chain cache was found wrong, or is not used). */
 export function dropProvisionalL2Times() {
   seededTimes = null;
 }
 
-/**
- * The final Era block timestamps to save: those read under the current settings, and those the
- * last run read that nothing has contradicted.
- */
+/** Final Era timestamps to save: this run's, and the last run's that nothing contradicted. */
 export function finalL2BlockTimes(): L2BlockTime[] {
   const times = new Map(currentSeededTimes()?.times ?? []);
   for (const [hash, time] of currentFinalTimes()) times.set(hash, time);
   return [...times.values()];
 }
 
-/** A block's timestamp as read now: confirms (or contradicts) a seeded one for the same hash. */
 function checkSeeded(hash: Hex, timestamp: bigint) {
   const seeded = currentSeededTimes();
   const known = seeded?.times.get(hash.toLowerCase());
@@ -456,10 +404,7 @@ function checkSeeded(hash: Hex, timestamp: bigint) {
   if (known.timestamp !== timestamp) seeded.onMismatch?.();
 }
 
-/**
- * The timestamp of the Era block with this hash. A block hash names one header for good, so the
- * answer is kept for good (a reorged block's hash is simply never asked for again).
- */
+/** An Era block's timestamp by hash: a hash names one header, so it is kept for good. */
 function l2BlockTime(hash: Hex): Promise<bigint> {
   return cached(`l2-block-ts:${hash.toLowerCase()}`, FOREVER, async () => {
     const lane = await l2HeadLane();
@@ -475,11 +420,8 @@ function l2BlockTime(hash: Hex): Promise<bigint> {
 }
 
 /**
- * The events in blocks whose timestamp is at least `since` (and at most `until`, when given), in
- * their order. Era block timestamps never decrease, so for `since` this is exactly the block
- * range [first block at or after `since`, head] a timestamp search would give. Headers are read
- * newest first, up to 20 per batch, until a block is older than `since`: one batch for a recent
- * window, then served from memory.
+ * The events in blocks with a timestamp in [since, until]. Era timestamps never decrease, so
+ * headers are read newest first, 20 per batch, until one is older than `since`.
  */
 export async function eventsInWindow<E extends { log: IndexedLog; final?: boolean }>(
   events: readonly E[],
@@ -489,10 +431,7 @@ export async function eventsInWindow<E extends { log: IndexedLog; final?: boolea
   return (await windowOf(events, since, until, false)).events;
 }
 
-/**
- * eventsInWindow for a page: a timestamp the last run read stands in for a header not read in
- * this run yet; `provisional` says one did (the window is then only as good as those).
- */
+/** eventsInWindow for pages: the last run's timestamps may stand in (`provisional` says so). */
 export function eventsInWindowAnswer<E extends { log: IndexedLog; final?: boolean }>(
   events: readonly E[],
   since: bigint,

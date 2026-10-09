@@ -18,24 +18,16 @@ import { lanes, network, safeBlockNumber } from "../rpc";
 import { LaneError, RpcError } from "./jsonrpc";
 
 // Direct eth_call over the l1-call lane, and the one place that decides what a failed call means.
-//
-// A negative verdict (a signature "invalid", a threshold "rejected", a historical check
-// "accepted: false", a simulation "reverted", the end of a member list) needs a DEFINITE revert:
-// JSON-RPC code 3, or -32000 "execution reverted" without out-of-gas text. Anything else (an
-// internal error -32603, out of gas, a rate limit, a timeout, an HTTP error, a malformed reply)
-// fails the read instead of answering it. Two dev nodes report reverts their own way (see
-// RevertDialect); their rules apply only when the node says it is one.
-//
-// Calls here never go through Multicall3: a failed aggregate3 sub-call has no error code, and one
-// that ran out of gas returns empty data, exactly like a revert without a reason.
+// A negative verdict (a signature "invalid", a threshold "rejected", a historical check "accepted:
+// false", a simulation "reverted", the end of a member list) needs a DEFINITE revert: code 3, or
+// -32000 "execution reverted" without out-of-gas text. Anything else fails the read instead. Never
+// through Multicall3: a failed sub-call has no error code, and out of gas looks like a revert.
 
 /** The contract reverted: a definite answer from the node, not a failure to get one. */
 export class CallReverted extends Error {
   override name = "CallReverted";
   constructor(
-    /** Error(string) message, Panic code, custom error name, or the node's message. */
     readonly reason: string,
-    /** Revert data, "0x" when the node sent none. */
     readonly data: Hex,
     readonly code: number
   ) {
@@ -63,7 +55,7 @@ export class NoContract extends Error {
   override name = "NoContract";
 }
 
-export type RpcErrorShape = { code: number; message: string; data?: unknown };
+type RpcErrorShape = { code: number; message: string; data?: unknown };
 
 const REVERTED = /execution reverted|reverted/i;
 const OUT_OF_GAS = /out of gas|gas required exceeds|gas limit/i;
@@ -71,17 +63,12 @@ const HARDHAT_REVERTED = /\breverted\b/i;
 const GANACHE_REVERT = /VM Exception while processing transaction: revert\b/i;
 
 /**
- * How the node reports a revert. "standard": mainnet providers, anvil, Era (code 3, or -32000
- * "execution reverted"). Two dev nodes differ, measured on the node itself or read from its source:
- * - "hardhat" sends EVERY eth_call revert as -32603 with the revert bytes in `data.data`, e.g.
- *   "Error: VM Exception while processing transaction: reverted with panic code 0x32 (...)" or
- *   "Error: Transaction reverted without a reason string". Its own failures are also -32603 but
- *   never say "reverted" and carry no revert bytes (a failed fork upstream reads "Error: task 486
- *   panicked"); its out of gas is -32000 "Transaction ran out of gas".
- * - "ganache" sends -32000 "VM Exception while processing transaction: revert[ reason]" with the
- *   revert bytes as `data` (out of gas: "...: out of gas").
+ * How the node reports a revert. "standard": mainnet providers, anvil, Era. "hardhat" sends every
+ * eth_call revert as -32603 with the revert bytes in `data.data` and "reverted" in its message (its
+ * own failures never say "reverted" and carry no bytes). "ganache" sends -32000 "VM Exception
+ * while processing transaction: revert[ reason]" with the revert bytes as `data`.
  */
-export type RevertDialect = "standard" | "hardhat" | "ganache";
+type RevertDialect = "standard" | "hardhat" | "ganache";
 
 /** A dev node that names itself in web3_clientVersion gets its dialect; every other node "standard". */
 export function revertDialect(net: { isDevNode: boolean; clientVersion?: string }): RevertDialect {
@@ -92,12 +79,10 @@ export function revertDialect(net: { isDevNode: boolean; clientVersion?: string 
 }
 
 /**
- * A JSON-RPC error that is a definite revert: code 3 (the code itself means "execution reverted";
- * its message carries the contract's own reason, whatever that says), or -32000 "execution
- * reverted" without out-of-gas text. On a dev node, its dialect's revert too (with revert bytes,
- * and without out-of-gas text, as its message mixes the node's words with the contract's).
+ * A definite revert: code 3 (whatever its message says), or -32000 "execution reverted" without
+ * out-of-gas text; on a dev node also its dialect's revert (with revert bytes, no out-of-gas text).
  */
-export function isDefiniteRevert(
+function isDefiniteRevert(
   { code, message, data }: RpcErrorShape,
   dialect: RevertDialect = "standard"
 ): boolean {
@@ -111,10 +96,8 @@ export function isDefiniteRevert(
 }
 
 /**
- * What a failed call means: "revert" only for a definite revert, "upstream" (no answer) for
- * everything else. Accepts this module's errors, a lane's RpcError/LaneError, viem errors (walked
- * for the node's JSON-RPC error; a failed Multicall3 sub-call is never definite) and raw JSON-RPC
- * error objects.
+ * What a failed call means: "revert" only for a definite revert, else "upstream" (no answer).
+ * Walks viem errors for the node's JSON-RPC error; a failed Multicall3 sub-call is never definite.
  */
 export function classify(
   error: unknown,
@@ -149,7 +132,6 @@ export type CallRequest = {
   data: Hex;
   from?: Address;
   value?: bigint;
-  /** Omitted: 'latest'. */
   blockNumber?: bigint;
   stateOverride?: readonly { address: Address; balance: bigint }[];
 };
@@ -157,10 +139,7 @@ export type CallRequest = {
 const blockTag = (blockNumber?: bigint) =>
   blockNumber === undefined ? "latest" : numberToHex(blockNumber);
 
-/**
- * eth_call on the l1-call lane. Resolves with the return data; rejects with CallReverted only for
- * a definite revert, otherwise with UpstreamError. `abi` decodes custom revert errors.
- */
+/** eth_call on the l1-call lane: CallReverted only for a definite revert, else UpstreamError. */
 export async function ethCall(request: CallRequest, abi?: Abi): Promise<Hex> {
   const tx: Record<string, Hex> = { to: request.to, data: request.data };
   if (request.from) tx.from = request.from;
@@ -187,10 +166,7 @@ export async function ethCall(request: CallRequest, abi?: Abi): Promise<Hex> {
   return result;
 }
 
-/**
- * The node's dialect, asked only for an error the standard rule does not call a revert (a dev
- * node's revert). Unknown (network() failed): standard, so nothing more counts as a revert.
- */
+/** The dialect, asked only when the standard rule finds no revert; "standard" if unknown. */
 async function dialectFor(error: unknown): Promise<RevertDialect> {
   if (!(error instanceof RpcError) || isDefiniteRevert(error)) return "standard";
   try {
@@ -218,10 +194,6 @@ function callError(error: unknown, abi?: Abi, dialect: RevertDialect = "standard
   });
 }
 
-/**
- * Revert bytes from an error's data: a hex string, or `{data: hex}` as Hardhat (and some
- * providers) nest it. null when there are none.
- */
 function revertDataOf(data: unknown): Hex | null {
   if (typeof data === "string" && isHex(data)) return data;
   if (typeof data === "object" && data !== null) {
@@ -245,27 +217,20 @@ function reasonOf(abi: Abi | undefined, data: Hex, message: string): string {
   return message || "execution reverted";
 }
 
-export type FunctionCall = {
+type FunctionCall = {
   address: Address;
   abi: Abi;
   functionName: string;
   args?: readonly unknown[];
-  /** Omitted: 'latest'. */
   blockNumber?: bigint;
-  /**
-   * The hash of `blockNumber` when the read stands for that one block (a head): what is kept
-   * about it (code presence) is kept under the hash, never shared with another block at that
-   * height. The node is still asked by number.
-   */
+  /** The hash of `blockNumber` when the read stands for that one block: presence is kept by it. */
   blockHash?: Hex;
 };
 
 /**
- * A contract function called directly (never through Multicall3) and decoded. Rejects with
- * CallReverted only for a definite revert. A function with outputs that returns nothing, or data
- * that does not decode, rejects with UndecodableResult. A function without outputs succeeds only
- * where there is a contract: a call to an empty address also "succeeds", so its success is not
- * an acceptance (NoContract).
+ * A contract function called directly (never through Multicall3) and decoded. Empty or undecodable
+ * data rejects with UndecodableResult. A function without outputs succeeds only where there is
+ * code: a call to an empty address also "succeeds" (NoContract).
  */
 export async function callFn<T = unknown>(call: FunctionCall): Promise<T> {
   const { address, abi, functionName, args = [], blockNumber, blockHash } = call;
@@ -294,11 +259,7 @@ export async function callFn<T = unknown>(call: FunctionCall): Promise<T> {
 // says it does not know the block.
 const UNKNOWN_BLOCK = /header not found|unknown block|block not found|cannot find block/i;
 
-/**
- * The node said it does not know the block it was asked about (anywhere in the error's cause
- * chain: this module's errors, a lane's, viem's). Never a revert, and never an answer about the
- * contract: at a block the node just named as its head, it means a backend behind the others.
- */
+/** The node does not know the block (in the cause chain): never an answer about the contract. */
 export function isUnknownBlock(error: unknown): boolean {
   let current: unknown = error;
   for (let depth = 0; current && depth < 8; depth++) {
@@ -314,11 +275,7 @@ export function isUnknownBlock(error: unknown): boolean {
   return false;
 }
 
-/**
- * True when `blockNumber` is at or below the finality boundary (never on a dev node). Never
- * rejects: when the boundary cannot be read the block counts as not final, so a result read at it
- * is simply not kept, and the read itself still stands.
- */
+/** At or below the finality boundary (never on dev nodes); false when it cannot be read. */
 export async function isFinalBlock(blockNumber: bigint): Promise<boolean> {
   try {
     const [net, safe] = await Promise.all([network(), safeBlockNumber()]);
@@ -328,24 +285,16 @@ export async function isFinalBlock(blockNumber: bigint): Promise<boolean> {
   }
 }
 
-// Code presence at a head counts for as long as a head's entries do (see requireCode).
 const CODE_AT_HEAD_TTL_MS = 60_000;
 
-/**
- * Records that `address` has code at the block with hash `blockHash`, as another read there
- * showed (a getter answering a word in the same aggregate3, chain/verdicts.ts), so requireCode at
- * that block need not ask again. Presence only: absence is never recorded.
- */
+/** Records code at `address` in block `blockHash`, as another read there showed (never absence). */
 export function noteCodePresent(address: Address, blockHash: Hex) {
   seed(`code:${address.toLowerCase()}:h:${blockHash.toLowerCase()}`, true, CODE_AT_HEAD_TTL_MS);
 }
 
 /**
  * Rejects with NoContract when `address` has no code at `blockNumber` ('latest' when omitted).
- * Presence is kept a minute at 'latest' (and above the finality boundary), for good at a final
- * block; absence is never kept. With `blockHash` (the hash of `blockNumber`), presence is kept
- * under that hash instead of the number, so a block at the same height on another branch reads
- * its own.
+ * Presence is kept a minute, for good at a final block, by `blockHash` when given; absence never.
  */
 export async function requireCode(
   address: Address,

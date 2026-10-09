@@ -20,7 +20,6 @@ import {
   type SyncEngineOptions,
   type Tick,
   type TickStep,
-  governanceDue,
   liveSteps,
   noteRequest,
   startSync,
@@ -55,10 +54,8 @@ import {
   fakeL1,
 } from "../support/fake-l1";
 
-// The sync engine: an activity window, a head follower that knows when no newer block can exist
-// yet, and a tick per new head that refills the caches requests read (head, governance, upgrade
-// states keyed by the head's hash, Safe info). The first part drives the engine's schedule with
-// stub dependencies; the second runs the live modules against a fake L1 node.
+// The sync engine: its activity window, the head follower and the ticks, with stub dependencies;
+// then the live modules against a fake L1 node.
 
 const NOW = 1_800_000_000_000;
 const SLOT = 12_000;
@@ -172,10 +169,8 @@ function stubEngine(
 const nowSeconds = () => BigInt(Math.floor(Date.now() / 1000));
 
 /**
- * Starts `engine` mid-slot on head n−1, so that its poll when head n's slot begins (by the local
- * clock) still finds n−1: the proof that the clock is not behind, which lets head n be confirmed
- * by the clock. Head n appears 500 ms into its slot and is seen by the next poll, a second after
- * the slot began. Returns T, head n's timestamp in ms.
+ * Starts `engine` mid-slot on head n−1, so its poll when head n's slot begins still finds n−1 (the
+ * clock's proof). Head n appears 500 ms into its slot. Returns T, head n's timestamp in ms.
  */
 async function bootBeforeSlot(
   chain: ReturnType<typeof stubChain>["chain"],
@@ -318,87 +313,21 @@ describe("activity window", () => {
     expect(engine.status().active).toBe(false);
   });
 
-  it("keeps running without requests in SYNC_MODE=always", async () => {
-    const { chain, pollHead } = stubChain({ timestamp: nowSeconds() - 1n });
-    const engine = stubEngine(pollHead, { mode: "always", keepWarmMs: 1_000 });
-    engine.resume();
-    await vi.advanceTimersByTimeAsync(60 * 60_000);
-    expect(engine.status().active).toBe(true);
-    expect(chain.polls.length).toBeGreaterThan(60 * 5);
-  });
-
-  it("does nothing in SYNC_MODE=off", async () => {
+  it.each<[string, Partial<SyncEngineOptions>, string]>([
+    ["with SYNC_MODE=off", { mode: "off" }, "SYNC_MODE=off"],
+    [
+      "on a dev node",
+      { network: async () => ({ isDevNode: true, name: "local", blockTimeSeconds: 12 }) },
+      "dev node",
+    ],
+  ])("is off %s: requests read on demand", async (_, options, reason) => {
     const { chain, pollHead } = stubChain({ timestamp: nowSeconds() });
-    const engine = stubEngine(pollHead, { mode: "off" });
-    touch(engine);
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(chain.polls).toHaveLength(0);
-    expect(engine.status()).toMatchObject({ mode: "off", reason: "SYNC_MODE=off", active: false });
-  });
-
-  it("in SYNC_MODE=always never stops, and tells its steps whether someone is viewing", async () => {
-    const { chain, pollHead } = stubChain({ timestamp: nowSeconds() - 1n });
-    const seen: { block: bigint; viewing: boolean }[] = [];
-    const engine = stubEngine(
-      async (options) => {
-        // A new block every poll, so every poll is a tick.
-        chain.head = {
-          ...chain.head,
-          number: chain.head.number + 1n,
-          hash: blockHash(chain.head.number + 1n),
-        };
-        return pollHead(options);
-      },
-      {
-        mode: "always",
-        keepWarmMs: 30_000,
-        steps: [
-          {
-            name: "probe",
-            run: async (tick) => {
-              seen.push({ block: tick.head.number, viewing: tick.viewing });
-            },
-          },
-        ],
-      }
-    );
-    // Started by the server, not by a request: following the head, nobody viewing.
-    engine.resume();
-    await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
-    expect(engine.status()).toMatchObject({ mode: "always", active: true, cost: { mode: "idle" } });
-    expect(engine.viewing).toBe(false);
-    // Polls every 2 s for the whole day (no idle stop).
-    expect(chain.polls.length).toBeGreaterThan(40_000);
-    expect(chain.polls.at(-1)?.at).toBeGreaterThan(NOW + 24 * 60 * 60_000 - 3_000);
-    expect(seen.length).toBeGreaterThan(40_000);
-    expect(seen.every((s) => !s.viewing)).toBe(true);
-
-    // A request: viewing for SYNC_KEEPWARM_MS, then idle again, still following the head.
-    touch(engine);
-    expect(engine.status().cost.mode).toBe("viewing");
-    const from = seen.length;
-    await vi.advanceTimersByTimeAsync(20_000);
-    expect(seen.slice(from).every((s) => s.viewing)).toBe(true);
-    await vi.advanceTimersByTimeAsync(15_000);
-    expect(engine.status()).toMatchObject({ active: true, cost: { mode: "idle" } });
-    const later = seen.length;
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(seen.length).toBeGreaterThan(later);
-    expect(seen.slice(later).every((s) => !s.viewing)).toBe(true);
-    engine.stop();
-    // A simulated day of 2 s polls: about 1 s alone, longer when the suite runs under load.
-  }, 30_000);
-
-  it("is off on a dev node: requests read on demand", async () => {
-    const { chain, pollHead } = stubChain({ timestamp: nowSeconds() });
-    const engine = stubEngine(pollHead, {
-      network: async () => ({ isDevNode: true, name: "local", blockTimeSeconds: 12 }),
-    });
+    const engine = stubEngine(pollHead, options);
     touch(engine);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(chain.polls).toHaveLength(0);
     expect(vi.getTimerCount()).toBe(0);
-    expect(engine.status()).toMatchObject({ mode: "off", reason: "dev node", active: false });
+    expect(engine.status()).toMatchObject({ mode: "off", reason, active: false });
     touch(engine);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(chain.polls).toHaveLength(0);
@@ -452,26 +381,19 @@ describe("head follower", () => {
     expect(engine.status().head?.ageMs).toBeLessThanOrEqual(2_000);
   });
 
-  it.each([
-    ["the head is older than two slots (a lagging RPC or a clock ahead)", -30_000],
-    ["the local clock is behind the chain", 5_000],
-  ])("polls every 2 s when %s", async (_, offset) => {
+  it.each<[string, number, "mainnet" | "local"]>([
+    ["the head is older than two slots (a lagging RPC or a clock ahead)", -30_000, "mainnet"],
+    ["the local clock is behind the chain", 5_000, "mainnet"],
+    ["the chain has no known slot schedule", 0, "local"],
+  ])("polls every 2 s when %s", async (_, offset, name) => {
     const { chain, pollHead } = stubChain({ timestamp: BigInt((NOW + offset) / 1000) });
-    const engine = stubEngine(pollHead);
+    const engine = stubEngine(pollHead, {
+      network: async () => ({ isDevNode: false, name, blockTimeSeconds: 12 }),
+    });
     touch(engine);
     await vi.advanceTimersByTimeAsync(10_000);
     expect(sinceSlot(chain.polls, NOW)).toEqual([0, 2_000, 4_000, 6_000, 8_000, 10_000]);
     expect(chain.confirms).toEqual([]);
-  });
-
-  it("polls every 2 s on chains without a known slot schedule", async () => {
-    const { chain, pollHead } = stubChain({ timestamp: nowSeconds() });
-    const engine = stubEngine(pollHead, {
-      network: async () => ({ isDevNode: false, name: "local", blockTimeSeconds: 12 }),
-    });
-    touch(engine);
-    await vi.advanceTimersByTimeAsync(6_000);
-    expect(sinceSlot(chain.polls, NOW)).toEqual([0, 2_000, 4_000, 6_000]);
   });
 
   it("never stacks a slow poll: the next one starts after it answers", async () => {
@@ -558,10 +480,8 @@ describe("head follower", () => {
   });
 });
 
-// The clock shortcut against a local clock that runs behind real time: a simulated chain with
-// 12 s slots, a node that has block n `propagation(n)` ms after its slot began, and requests that
-// read the served head (4 s per publication or confirmation, as rpc.ts serves it) or, when there
-// is none, the node itself (today's path).
+// The clock shortcut against a local clock that runs behind: 12 s slots, a node that has block n
+// `propagation(n)` ms into its slot, and requests that read the served head or else the node.
 describe("head follower vs the local clock", () => {
   // Real time of block 0's slot.
   const GENESIS = 1_800_000_000_000;
@@ -627,21 +547,15 @@ describe("head follower vs the local clock", () => {
   }
 
   /**
-   * Starts the engine `startInSlotMs` into a slot (real time), lets it settle, then makes a
-   * request every 100 ms for 5 minutes. `worst`: how long before a request the block after the
-   * head it got had appeared (0 when it got the newest). `tickMs`: how long reading what requests
-   * need at a new head takes (the live steps: the index tail, one aggregate3). `settleMs`: how
-   * long the engine runs before requests are made.
+   * Starts the engine `startInSlotMs` into a slot, lets it settle for `settleMs`, then makes a
+   * request every 100 ms for 5 minutes. `worst`: how long before a request the block after the head
+   * it got had appeared. `tickMs`: how long reading what requests need at a new head takes.
    */
   async function follow(
     lagMs: number,
     startInSlotMs: number,
     propagation: (n: bigint) => number,
-    {
-      tickMs = 0,
-      settleMs = 30_000,
-      headPoll = "slot",
-    }: { tickMs?: number; settleMs?: number; headPoll?: "slot" | "late" } = {}
+    { tickMs = 0, settleMs = 30_000 }: { tickMs?: number; settleMs?: number } = {}
   ) {
     vi.setSystemTime(GENESIS + 1_000 * SLOT + startInSlotMs - lagMs);
     const sim = slotSim(lagMs, propagation);
@@ -655,7 +569,7 @@ describe("head follower vs the local clock", () => {
             },
           ]
         : [];
-    const engine = stubEngine(sim.pollHead, { mode: "always", steps, headPoll });
+    const engine = stubEngine(sim.pollHead, { inUse: () => true, steps });
     engine.resume();
     await vi.advanceTimersByTimeAsync(settleMs);
     const pollsBefore = engine.status().polls;
@@ -666,9 +580,8 @@ describe("head follower vs the local clock", () => {
       if (got < sim.visible()) worst = Math.max(worst, sim.real() - sim.appearsAt(got + 1n));
     }
     const polls = engine.status().polls - pollsBefore;
-    const clock = engine.status().clock;
     engine.stop();
-    return { worst, polls, confirms: sim.confirms, wrong: sim.wrong.size, clock };
+    return { worst, polls, confirms: sim.confirms, wrong: sim.wrong.size };
   }
 
   beforeEach(() => {
@@ -702,10 +615,8 @@ describe("head follower vs the local clock", () => {
   );
 
   it("stops trusting the clock after one confirmation it may have got wrong", async () => {
-    // The clock is 2 s behind; blocks alternate between reaching the node 3 s and 0.5 s into
-    // their slot. A late block proves the clock (it was not there when its slot began by the
-    // local clock), but the early block after it is there 1.5 s before that slot begins by the
-    // local clock. Once seen, the clock is not trusted again for the next 10 minutes.
+    // The clock is 2 s behind; blocks alternate between 3 s and 0.5 s into their slot. A late block
+    // proves the clock, the early one after it shows it wrong: no confirmation for 10 minutes.
     const result = await follow(2_000, 2_500, (n) => (n % 2n === 0n ? 3_000 : 500));
     // The first late block opened a window, and the early block after it showed it wrong: that
     // one confirmation, then none (without the distrust, one for every second block).
@@ -715,49 +626,15 @@ describe("head follower vs the local clock", () => {
   });
 
   it("serves the next head at once after a confirmation it may have got wrong, however slow its tick", async () => {
-    // The clock is 2.9 s behind; blocks alternate between reaching the node 3 s and 0.1 s into
-    // their slot, and reading what requests need at a new head takes 1.9 s. The early block is
-    // at the node when its slot begins by the local clock, while the late one before it is
-    // still confirmed by the clock: it replaces that head at once, not after its tick (which
-    // would leave the old head served 4.6 s after the new one appeared). Requests from the start:
-    // this happens once, soon after the engine starts.
+    // The clock is 2.9 s behind; blocks alternate between 3 s and 0.1 s into their slot, and a tick
+    // takes 1.9 s. The early block replaces the head confirmed by the clock at once, not after its
+    // tick (which would leave the old head served 4.6 s after the new one appeared).
     const result = await follow(2_900, 2_500, (n) => (n % 2n === 0n ? 3_000 : 100), {
       tickMs: 1_900,
       settleMs: 0,
     });
     expect(result.wrong).toBe(1);
     expect(result.worst).toBeLessThanOrEqual(4_000);
-  });
-
-  it("SYNC_HEAD_POLL=late: after the proof poll, the first search poll goes where blocks have arrived by: fewer polls a slot, nothing confirmed wrongly, the same bounds", async () => {
-    // Blocks reach the node 1.6-2.4 s into their slot.
-    const arrival = (n: bigint) => 1_600 + Number(n % 5n) * 200;
-    const slot = await follow(0, 5_000, arrival, { settleMs: 120_000 });
-    const late = await follow(0, 5_000, arrival, { settleMs: 120_000, headPoll: "late" });
-    for (const result of [slot, late]) {
-      expect(result.wrong).toBe(0);
-      expect(result.worst).toBeLessThanOrEqual(4_000);
-    }
-    expect(slot.clock).toMatchObject({ headPoll: "slot", firstPollMs: null });
-    // Learned from slots searched every second: the 80th percentile of when polls found blocks.
-    expect(late.clock.headPoll).toBe("late");
-    expect(late.clock.samples).toBeGreaterThanOrEqual(8);
-    expect(late.clock.firstPollMs).toBeGreaterThanOrEqual(2_000);
-    expect(late.clock.firstPollMs).toBeLessThanOrEqual(3_000);
-    // 25 slots in 5 minutes: three polls a slot (start, +1 s, +2 s) against about two.
-    expect(slot.polls).toBeGreaterThanOrEqual(3 * 25 - 2);
-    expect(late.polls).toBeLessThan(slot.polls);
-    expect(late.polls).toBeLessThanOrEqual(Math.ceil(2.3 * 25));
-    expect(late.clock.recent.pollsPerBlock).toBeLessThan(slot.clock.recent.pollsPerBlock ?? 0);
-  });
-
-  it("SYNC_HEAD_POLL=late never waits past the head's 4 s: its first search poll stays inside them", async () => {
-    // Blocks reach the node 3.8 s into their slot: the search poll would go later than the head
-    // the proof poll confirmed stays served, so it goes 4 s minus the polls' time and a margin in.
-    const result = await follow(0, 5_000, () => 3_800, { settleMs: 120_000, headPoll: "late" });
-    expect(result.wrong).toBe(0);
-    expect(result.worst).toBeLessThanOrEqual(4_000);
-    expect(result.clock.firstPollMs).toBeLessThanOrEqual(3_500);
   });
 
   it("trusts a correct clock again right after a pause", async () => {
@@ -776,16 +653,14 @@ describe("head follower vs the local clock", () => {
       return { polls: engine.status().polls - polls, confirms: sim.confirms - confirms };
     };
     const before = await session();
-    // Nobody for 20 minutes: the engine stops. The next request comes 500 ms into a slot, so the
-    // first poll after the pause finds a block that was at the node when its slot began: no sign
-    // about the clock after a pause, whatever the head before it.
+    // Nobody for 20 minutes: the engine stops. The next request comes 500 ms into a slot: no sign
+    // about the clock after a pause.
     await vi.advanceTimersByTimeAsync(20 * 60_000);
     expect(engine.status().active).toBe(false);
     const slotStart = GENESIS + Math.ceil((Date.now() - GENESIS) / SLOT) * SLOT;
     await vi.advanceTimersByTimeAsync(slotStart + 500 - Date.now());
-    // The first head after the pause shows nothing about the clock: from the next slot on it is
-    // confirmed by the clock as before, and the node is asked about twice a slot (25 slots, a
-    // few more until a poll proves the clock again), not every second or two (~175 polls).
+    // From the next slot on the head is confirmed by the clock as before: about two polls a slot,
+    // not every second or two (~175 polls).
     const after = await session();
     expect(before.confirms).toBeGreaterThan(100);
     expect(after.confirms).toBeGreaterThan(100);
@@ -809,7 +684,7 @@ describe("head follower vs the local clock", () => {
         }
         return sim.pollHead();
       },
-      { mode: "always" }
+      { inUse: () => true }
     );
     engine.resume();
     await vi.advanceTimersByTimeAsync(failingSlot + 3_000 - Date.now());
@@ -1018,32 +893,6 @@ describe("ticks", () => {
   });
 });
 
-describe("governanceDue (the idle profile's governance reads)", () => {
-  const base = { head: 101n, lastRead: 100n, remainingMs: 18_000, slotMs: SLOT };
-  it.each([
-    ["while viewing, every block", { ...base, viewing: true }, true],
-    ["idle, right after a read with time to spare: skipped", { ...base, viewing: false }, false],
-    ["idle, two blocks after the last read", { ...base, viewing: false, head: 102n }, true],
-    ["idle, nothing read yet", { ...base, viewing: false, lastRead: null }, true],
-    ["idle, nothing served now", { ...base, viewing: false, remainingMs: null }, true],
-    [
-      "idle, would run out before the next block's read (slot + 4 s)",
-      { ...base, viewing: false, remainingMs: 15_999 },
-      true,
-    ],
-    ["idle, exactly a slot + 4 s left", { ...base, viewing: false, remainingMs: 16_000 }, false],
-    ["idle, the same height again (a reorg)", { ...base, viewing: false, head: 100n }, true],
-    ["idle, a lower head", { ...base, viewing: false, head: 99n }, true],
-    [
-      "idle, no slot schedule: 12 s assumed",
-      { ...base, viewing: false, slotMs: null, remainingMs: 15_000 },
-      true,
-    ],
-  ])("%s", (_name, plan, due) => {
-    expect(governanceDue(plan)).toBe(due);
-  });
-});
-
 // ---- live modules against a fake L1 node ----
 
 const HEAD = 26_129_107n;
@@ -1163,10 +1012,8 @@ async function settle<T>(promise: Promise<T>, maxMs = 10_000): Promise<T> {
 }
 
 /**
- * Safe's Transaction Service in front of the fake node, holding the member Safes' messages for the
- * Security Council's approval of the active upgrade. `sign(member)` adds that member's message
- * (2 confirmations, the Safe's threshold) and makes the council accept its signature; `view()`
- * verifies the set as the upgrade page does.
+ * Safe's Transaction Service in front of the fake node. `sign(member)` adds that member's message
+ * and makes the council accept its signature; `view()` verifies the set as the upgrade page does.
  */
 async function safeService(fake: ReturnType<typeof fakeL1>, signatures: Set<string>) {
   const gov = await governance();
@@ -1869,9 +1716,8 @@ describe("live engine", () => {
     expect(signatureSetsStatus().lastRun).toMatchObject({ sets: 1, failed: 0 });
     expect(fake.posts.length).toBe(before);
 
-    // The third member signs, and its listing is read again (as the sweep does before a listing
-    // turns 60 s old) with a new version: the set is verified again at the head being served,
-    // from the listings the store holds.
+    // The third member signs and its listing is read again with a new version: the set is verified
+    // again at the head being served, from the listings the store holds.
     await vi.advanceTimersByTimeAsync(20_000);
     safe.sign(SC_MEMBERS[2] as Hex);
     const requested = safe.requests.length;
@@ -1973,7 +1819,7 @@ describe("live engine", () => {
   });
 });
 
-describe("live engine, idle profile (SYNC_MODE=always, nobody viewing)", () => {
+describe("live engine, upstream cost", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -1981,9 +1827,6 @@ describe("live engine, idle profile (SYNC_MODE=always, nobody viewing)", () => {
     resetRpcClients();
     resetUpstreamCost();
   });
-
-  const governanceReads = (fake: ReturnType<typeof fakeL1>) =>
-    fake.calls.filter((c) => c.functionName === "securityCouncil").length;
 
   /** Produces block `n` 500 ms into its slot and waits for the engine to tick there. */
   async function produce(engine: SyncEngine, fake: ReturnType<typeof fakeL1>, n: bigint) {
@@ -1995,124 +1838,12 @@ describe("live engine, idle profile (SYNC_MODE=always, nobody viewing)", () => {
     await engine.settled();
   }
 
-  it("reads governance at most every second block, and never lets it run out, a missed slot included", async () => {
-    const { fake } = liveChain();
-    await backfilled();
-    const engine = liveEngine({ mode: "always" });
-    engine.resume();
-    await until(() => engine.status().ticks >= 1);
-    await engine.settled();
-    expect(engine.status().cost.mode).toBe("idle");
-    expect(governanceReads(fake)).toBe(1);
-
-    // Track whether governance is ever not served, sampling every 100 ms from here on.
-    let gaps = 0;
-    const sample = setInterval(() => {
-      if (remainingMs(GOVERNANCE_KEY) === null) gaps++;
-    }, 100);
-    try {
-      const readsAt: number[] = [];
-      for (const n of [1n, 2n, 3n, 4n, 5n, 6n]) {
-        await produce(engine, fake, HEAD + n);
-        readsAt.push(governanceReads(fake));
-        // Requests at the new head still get governance from memory.
-        expect((await governance()).securityCouncil.members).toEqual(SC_MEMBERS);
-      }
-      // HEAD+1 skipped, HEAD+2 read, and so on: one read per two blocks.
-      expect(readsAt).toEqual([1, 2, 2, 3, 3, 4]);
-      // The upgrade states are still read at every block.
-      for (const n of [1n, 2n, 3n, 4n, 5n, 6n])
-        expect(statusCalls(fake, HEAD + n).length).toBeGreaterThan(0);
-
-      // HEAD+7 (a skip), then two slots without a block: the value is read again before it would
-      // run out, at the head served then.
-      await produce(engine, fake, HEAD + 7n);
-      expect(governanceReads(fake)).toBe(4);
-      await vi.advanceTimersByTimeAsync(30_000);
-      expect(governanceReads(fake)).toBe(5);
-      expect(gaps).toBe(0);
-      expect((await governance()).latestBlock.number).toBe((HEAD + 7n).toString());
-      // Still no block a minute later (a stalled chain): read again before each read runs out,
-      // about every 27 s, never more often.
-      await vi.advanceTimersByTimeAsync(60_000);
-      expect(governanceReads(fake)).toBe(7);
-      expect(gaps).toBe(0);
-      expect((await governance()).latestBlock.number).toBe((HEAD + 7n).toString());
-    } finally {
-      clearInterval(sample);
-    }
-    // While viewing: every block (and the keep-alive stops once a tick has read it).
-    touch(engine);
-    await produce(engine, fake, HEAD + 16n);
-    const before = governanceReads(fake);
-    await produce(engine, fake, HEAD + 17n);
-    await produce(engine, fake, HEAD + 18n);
-    expect(governanceReads(fake)).toBe(before + 2);
-    expect(engine.status().cost.mode).toBe("viewing");
-    engine.stop();
-    // Many simulated blocks: about 2 s alone, longer when the suite runs under load.
-  }, 20_000);
-
-  it("verifies only the signature sets on screen at each new head: none while nobody uses the app", async () => {
-    const signatures = new Set<string>();
-    const { fake } = liveChain({ signatures });
-    await backfilled();
-    const engine = liveEngine({ mode: "always" });
-    engine.resume();
-    await until(() => engine.status().ticks >= 1);
-    await engine.settled();
-    const safe = await safeService(fake, signatures);
-    for (const member of SC_MEMBERS.slice(0, 2)) safe.sign(member);
-    const gov = await governance();
-    const set = (id: Hex, open: boolean): SignatureSetParams => ({
-      action: "ApproveUpgradeSecurityCouncil",
-      signerGroup: "securityCouncil",
-      typedData: buildTypedData("ApproveUpgradeSecurityCouncil", gov.securityCouncil.domain, {
-        id,
-      }),
-      members: [...gov.securityCouncil.members],
-      threshold: gov.securityCouncil.thresholds.approveUpgrade,
-      check: { kind: "multisig", contract: gov.securityCouncil.address },
-      open,
-    });
-    // The active upgrade's approval is open; another (executed) upgrade's is done. Pages showed
-    // both, then their tab was closed.
-    const open = set(ACTIVE_ID, true);
-    const done = set(`0x${"de".repeat(32)}`, false);
-    showOnScreen([open, done]);
-    await settle(verifySignatureSet(open));
-    await settle(verifySignatureSet(done));
-    presence().beat({ tab: "tab-under-test", reason: "leave", items: [] });
-    expect(signatureSetsStatus()).toMatchObject({ watched: 2, onScreen: 0 });
-
-    // Nobody uses the app: neither is verified again, open or not.
-    await produce(engine, fake, HEAD + 1n);
-    expect(signatureSetsStatus().lastRun).toMatchObject({
-      block: (HEAD + 1n).toString(),
-      trigger: "head",
-      profile: "idle",
-      sets: 0,
-    });
-    // A tab shows both: both.
-    showOnScreen([open, done]);
-    await produce(engine, fake, HEAD + 2n);
-    expect(signatureSetsStatus().lastRun).toMatchObject({
-      block: (HEAD + 2n).toString(),
-      profile: "viewing",
-      sets: 2,
-      verified: 2,
-    });
-    engine.stop();
-  });
-
   it("counts every JSON-RPC request and Safe request sent upstream, in /api/status's engine report", async () => {
     const signatures = new Set<string>();
     const { fake } = liveChain({ signatures });
     await backfilled();
-    const engine = liveEngine({ mode: "always" });
-    engine.resume();
-    await until(() => engine.status().ticks >= 1);
-    await engine.settled();
+    const engine = liveEngine();
+    await firstTick(engine);
     const safe = await safeService(fake, signatures);
     safe.sign(SC_MEMBERS[0] as Hex);
     await settle(safe.view());
@@ -2121,7 +1852,7 @@ describe("live engine, idle profile (SYNC_MODE=always, nobody viewing)", () => {
     const cost = engine.status().cost;
     expect(entries).toBeGreaterThan(10);
     expect(cost).toMatchObject({
-      mode: "idle",
+      mode: "viewing",
       l1RpcPerHour: entries,
       l2RpcPerHour: 0,
       rpcPerHour: entries,

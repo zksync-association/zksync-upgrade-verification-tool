@@ -162,7 +162,6 @@ vi.mock("@/.server/signatures", () => ({
         }
       : fresh,
   simulate: async () => ({ status: "ok" }),
-  // The key a page reports while it shows the set.
   watchSignatureSet: () => ({ key: "set:0123456789abcdef0123456789abcdef", rev: null }),
 }));
 // Members' Safe messages: the fresh listings (`collectMessages`, which a test may hold) and the
@@ -409,7 +408,6 @@ async function settles(promise: Promise<unknown>, ms = 30): Promise<boolean> {
   return done;
 }
 
-/** A message group as collected from members' Safes, for typed data `message` of `primaryType`. */
 const group = (primaryType: string, message: Record<string, string>, n: number) => ({
   digest: `0x${n.toString(16).padStart(64, "0")}`,
   typedData: { primaryType, message },

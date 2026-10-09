@@ -65,15 +65,6 @@ export function Hash({
   );
 }
 
-export function ShortHash({ value, className }: { value: string; className?: string }) {
-  return (
-    <span className={cn("inline-flex items-center gap-0.5", className)} title={value}>
-      <span className="mono text-slate-950">{shortHex(value, 10, 8)}</span>
-      <CopyButton value={value} />
-    </span>
-  );
-}
-
 export function useExplorer() {
   // The chain the app shell was set up for (known before the status is read), or the network of
   // a status in hand.

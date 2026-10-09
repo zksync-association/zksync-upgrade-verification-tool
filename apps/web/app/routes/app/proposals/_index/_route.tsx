@@ -27,8 +27,7 @@ export const meta = Meta["/app/proposals"];
 
 export function loader({ request }: LoaderFunctionArgs) {
   const allHistory = new URL(request.url).searchParams.get("history") === "all";
-  // After a pause (no head in memory), the list as this app last showed it comes first, as of its
-  // block, until the current one replaces it (sync/last-shown.ts).
+  // After a pause, the list as last shown comes first, as of its block.
   const shown = lastShown();
   // While this run re-reads the handler's history, the page may list from the history the last
   // run saved (labelled), and the list from this run's history follows in the same response.
@@ -126,11 +125,9 @@ function UpgradeTable({
   refresh = null,
 }: {
   result: SerializeFrom<Awaited<ReturnType<typeof listStandardUpgrades>>> & {
-    /** The list as this app last showed it, read at an older block (after a pause). */
     asOf?: AsOfBlock;
   };
   allHistory: boolean;
-  /** For a list from the last run's history, or as last shown: where the current list is. */
   refresh?: Refresh;
 }) {
   const active = result.upgrades.filter((u) => isUpgradeActive(u.state));

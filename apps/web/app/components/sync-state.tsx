@@ -14,22 +14,15 @@ import {
   useState,
 } from "react";
 
-// What the header says about the data behind the page: the block the app status was read at and
-// how long ago that block was mined (by this browser's clock), and whether the
-// ProtocolUpgradeHandler's log index is still backfilling. The root status is not read again on
-// every navigation (see utils/revalidation.ts), so the age keeps growing until it is.
+// The root status is not read again on every navigation (utils/revalidation.ts), so the block's
+// age keeps growing until it is.
 
 export type IndexStatusView = OkStatus["sync"]["index"];
 
-/** `percent` is null when there is no measure yet; it stays below 100 until the index is ready. */
 export type IndexProgress = { indexing: boolean; percent: number | null };
 
 const NOT_INDEXING: IndexProgress = { indexing: false, percent: null };
 
-/**
- * Backfill progress: chunks landed of chunks planned, or (before any chunk was planned, e.g. while
- * a full-range request is out) the share of [deployBlock, finalizedTo] covered.
- */
 export function indexProgress(index: IndexStatusView | null | undefined): IndexProgress {
   if (!index || index.state !== "backfilling") return NOT_INDEXING;
   let ratio: number | null = null;
@@ -46,17 +39,13 @@ export function indexProgress(index: IndexStatusView | null | undefined): IndexP
   return { indexing: true, percent };
 }
 
-/**
- * "Indexing 37%" ("Indexing log history · 37%" with a subject), or "Indexing…" while there is no
- * measure or it is still under 1%: an indexing state never shows a 0 that could be read as a count.
- */
+// "Indexing…" without a measure or under 1%: never a 0 that could be read as a count.
 export function indexingLabel(progress: IndexProgress, subject?: string): string {
   const what = subject ? `Indexing ${subject}` : "Indexing";
   if (!progress.percent) return `${what}…`;
   return subject ? `${what} · ${progress.percent}%` : `${what} ${progress.percent}%`;
 }
 
-/** The progress, and whether it comes from a root status (or a poll) yet. */
 type ProgressState = { progress: IndexProgress; known: boolean };
 
 const IndexProgressContext = createContext<ProgressState>({
@@ -64,30 +53,16 @@ const IndexProgressContext = createContext<ProgressState>({
   known: false,
 });
 
-/**
- * The live backfill progress: not indexing outside the app shell, and until the root status is
- * in this browser (a loading state then gives no share, never a count).
- */
 export function useIndexProgress(): IndexProgress {
   return useContext(IndexProgressContext).progress;
 }
 
-/** Not settled yet: the backfill has not started (e.g. right after a settings save) or runs. */
 const unsettled = (index: IndexStatusView) =>
   index.state === "idle" || index.state === "backfilling";
 
-/**
- * Provides the index progress from the root status (`initial`; null until it is in this
- * browser), and fresher progress from the tab's beats (components/presence.tsx: each answer
- * carries the index's state), which this asks nothing for: no request of its own, and nothing
- * while the tab is hidden (it does not beat then).
- *
- * `onSettled` runs once when a beat finds the index ready or unavailable after it was not. The
- * root status is not read again on its own, and it holds what the finished index changes: the
- * log-history check against the index (no opinion until it is ready) behind the "Your RPC may not
- * serve old logs" banner, warnings and `sync.index`. The app shell reads the root status again
- * there.
- */
+// Progress from the root status (`initial`), then from the tab's beats: no request of its own.
+// `onSettled` runs once when a beat finds the index settled after it was not: the root status holds
+// what the finished index changes (the log-history check behind the old-logs banner, warnings).
 export function IndexProgressProvider({
   initial,
   onSettled,
@@ -113,7 +88,6 @@ export function IndexProgressProvider({
     if (!beat) return;
     const before = shown.current;
     setIndex(beat);
-    // The index finished since the status in hand: the shell reads the status again, once.
     if (before && unsettled(before) && !unsettled(beat)) settled.current?.();
   }, [beat]);
 
@@ -121,12 +95,8 @@ export function IndexProgressProvider({
   return <IndexProgressContext.Provider value={value}>{children}</IndexProgressContext.Provider>;
 }
 
-/**
- * The header's indexing state; nothing once the index is ready. `fallback`: the index state of
- * the root status the header shows, for as long as the provider has none of its own (on the
- * server, and until the status is in this browser). Below `sm` only the spinner and the share
- * show (the word stays for screen readers), so the header fits a phone.
- */
+// `fallback`: the shown status's index, until the provider has its own (on the server, before the
+// status lands). Below `sm` only the spinner and share show (the word stays for screen readers).
 export function IndexingPill({ fallback }: { fallback?: IndexStatusView | null }) {
   const live = useContext(IndexProgressContext);
   const progress = live.known ? live.progress : indexProgress(fallback);
@@ -161,11 +131,8 @@ export function useNowSeconds(intervalMs = 1_000): number | null {
   return now;
 }
 
-/**
- * "block #N · 12s ago". The age needs the browser's clock, so the server (and hydration) render
- * only the block; the block number is hidden below 2xl (the header's row is crowded there: the
- * links would not fit beside it), the age is not.
- */
+// The age needs the browser's clock: the server (and hydration) render only the block. The number
+// is hidden below 2xl, where the header's links would not fit beside it.
 export function BlockAge({
   block,
   className,
@@ -192,10 +159,7 @@ export function BlockAge({
   );
 }
 
-/**
- * A list's loading state. While the index backfills it says so (with progress), and never a
- * count: a list is only shown once the range it covers is complete.
- */
+// While the index backfills, never a count: a list is only shown once its range is complete.
 export function IndexedLoadingCard({ label }: { label: string }) {
   const progress = useIndexProgress();
   if (!progress.indexing) return <LoadingCard label={label} />;

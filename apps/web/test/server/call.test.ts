@@ -370,18 +370,6 @@ describe("requireCode", () => {
     return () => reads;
   };
 
-  it("keeps presence for a minute at 'latest' and for good at a final block", async () => {
-    const reads = counting(() => "0x6080");
-    await requireCode(COUNCIL);
-    await requireCode(COUNCIL);
-    expect(reads()).toBe(1);
-    await requireCode(COUNCIL, 900n);
-    await requireCode(COUNCIL, 900n);
-    expect(reads()).toBe(2);
-    expect(await isFinalBlock(900n)).toBe(true);
-    expect(await isFinalBlock(1_001n)).toBe(false);
-  });
-
   it("never keeps absence, and never treats a dev node's block as final", async () => {
     const reads = counting(() => "0x");
     await expect(requireCode(EMPTY)).rejects.toBeInstanceOf(NoContract);
@@ -391,7 +379,7 @@ describe("requireCode", () => {
     expect(await isFinalBlock(1n)).toBe(false);
   });
 
-  it("reads presence again after a minute at 'latest' and above the boundary, never when final", async () => {
+  it("keeps presence a minute at 'latest' and above the boundary, and for good at a final block", async () => {
     const reads = counting(() => "0x6080");
     const all = () =>
       Promise.all([requireCode(COUNCIL), requireCode(COUNCIL, 1_001n), requireCode(COUNCIL, 900n)]);
@@ -406,6 +394,8 @@ describe("requireCode", () => {
       await all();
       // 'latest' and block 1,001 (above F = 1,000) again; block 900 is final and kept.
       expect(reads()).toBe(5);
+      expect(await isFinalBlock(900n)).toBe(true);
+      expect(await isFinalBlock(1_001n)).toBe(false);
     } finally {
       vi.useRealTimers();
     }

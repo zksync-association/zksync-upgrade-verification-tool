@@ -21,10 +21,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FAKE_PINS, L1 } from "../support/fake-l1";
 import { HEAD, NOW, SLOT_MS, backfilled, liveWorld, settle } from "../support/live-world";
 
-// The six pages the benchmark opens after a pause (acceptance target 5): each one's main data as
-// this app last showed it is there at once, labelled with the block it was read at, and the
-// current data replaces it in the same response. JSON after the same pause answers only with what
-// it reads at the newest block, as ever.
+// After a pause each page's main data as last shown is there at once, labelled with its block, and
+// the current data replaces it in the same response. JSON: only what it reads at the newest block.
 
 type Loader = (args: {
   request: Request;
@@ -32,7 +30,6 @@ type Loader = (args: {
   context: Record<string, unknown>;
 }) => unknown;
 
-/** What the tests read of the pages' loader data. */
 type Key =
   | "detail"
   | "freshDetail"
@@ -50,10 +47,7 @@ type Key =
   | "upgrades"
   | "upgradesFresh";
 
-/**
- * A page's loader data (the values its deferred response streams), for `path`. Page loaders
- * answer at once: what they stream comes later.
- */
+/** A page's loader data for `path`: the loader answers at once, its deferred values come later. */
 function open(loader: Loader, path: string, params: Record<string, string> = {}) {
   const result = loader({ request: new Request(`http://localhost${path}`), params, context: {} });
   return (result as { data: Record<Key, Promise<unknown>> }).data;
@@ -69,10 +63,7 @@ async function atOnce(promise: Promise<unknown>): Promise<Record<string, unknown
   return value;
 }
 
-/**
- * A pause of three blocks: the head read is no longer served (nor governance, read at most 30 s
- * ago) and nothing read another (no page was open).
- */
+/** Three blocks with no page open: neither the head nor governance (30 s) read is served now. */
 async function pause(w: ReturnType<typeof liveWorld>) {
   for (let i = 0; i < 3; i++) {
     await vi.advanceTimersByTimeAsync(SLOT_MS);
@@ -195,8 +186,7 @@ describe("pages after a pause", () => {
 
     await pause(w);
     const after = pages();
-    // The upgrade list and the executions, with their block; the Safe-fed vetoes and pending ids
-    // as a list from older Safe copies is (stale, with the block); the counts with their block.
+    // Each with its block; the Safe-fed pending ids and vetoes also as from older copies (stale).
     expect(await atOnce(after.upgrades.list)).toMatchObject({ ...current.upgrades, ...asOfHead });
     expect(await atOnce(after.emergency.executed)).toMatchObject({
       items: current.executed.items,
@@ -213,7 +203,6 @@ describe("pages after a pause", () => {
       total: current.count.total,
       source: { lastRun: false, safeFetchedAt: null, asOfBlock: HEAD.toString() },
     });
-    // The current ones follow, at the newest block, without the label.
     const fresh = {
       upgrades: await settle(after.upgrades.freshList),
       executed: await settle(after.emergency.freshExecuted),

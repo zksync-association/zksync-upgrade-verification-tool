@@ -36,34 +36,22 @@ export type PuhEventName = ContractEventName<typeof upgradeHandlerAbi>;
 export type PuhEvent<N extends PuhEventName = PuhEventName> = {
   args: DecodeEventLogReturnType<typeof upgradeHandlerAbi, N>["args"];
   log: IndexedLog;
-  /**
-   * The index answered with this event from its final range (at or below the finality boundary
-   * at answer time), so it never changes and may be kept for good. False for an event from the
-   * unfinalized tail, even when the boundary has passed its block since, and for one from the
-   * last run's history (`provisional`).
-   */
+  /** From the final range at answer time: never changes. False for tail and last-run events. */
   final: boolean;
-  /**
-   * From the history the last run read (seeded from disk), not read again in this run yet: only
-   * for a query that allowed it (LogQuery.provisional, pages only). Never kept.
-   */
+  /** From the last run's history, not read again yet (pages only). Never kept. */
   provisional: boolean;
 };
 
-/**
- * Events and where the answer came from: `provisional` when any part of the range was answered
- * from the last run's history (so an empty list, too, is only as good as that history).
- */
-export type PuhEventsAnswer<N extends PuhEventName> = {
+/** `provisional`: part of the range was answered from the last run's history. */
+type PuhEventsAnswer<N extends PuhEventName> = {
   events: PuhEvent<N>[];
   provisional: boolean;
 };
 
 /** Which handler a seeded history is for (the index answers only for the same chain and handler). */
-export type PuhSeed = ProvisionalSeed & { chainId: number; address: Address; deployBlock: bigint };
+type PuhSeed = ProvisionalSeed & { chainId: number; address: Address; deployBlock: bigint };
 
-/** The complete final history of the handler in use, for saving. */
-export type PuhSnapshot = FinalSnapshot & { chainId: number; address: Address };
+type PuhSnapshot = FinalSnapshot & { chainId: number; address: Address };
 
 export type PuhIndexStatus = Omit<IndexStatus, "deployBlock"> & { deployBlock: string | null };
 
@@ -110,7 +98,6 @@ function topicOf(name: PuhEventName): Hex {
 
 type Built = { key: string; net: Network; index: LogIndex };
 
-/** The index key a live chain's handler is built under (see #index). */
 const liveKey = (chainId: number, address: Address, deployBlock: bigint) =>
   [chainId, address.toLowerCase(), deployBlock, "live"].join(":");
 
@@ -125,14 +112,12 @@ export class PuhIndex {
   #closed = false;
   // A history from the last run, until the index it is for is built (then handed to it).
   #seed: PendingSeed | null = null;
-  // The chain cache is being loaded: a page's read waits for its seed (bounded).
   #seedComing = new SeedExpectation();
 
   constructor(readonly generation: number) {}
 
   #current = () => !this.#closed && rpcGeneration() === this.generation;
 
-  /** The index for the chain and handler the current network() reports (one per chain/address). */
   async #index(): Promise<Built> {
     if (!this.#current()) throw new IndexClosed("ProtocolUpgradeHandler");
     let net: Network;
@@ -177,7 +162,6 @@ export class PuhIndex {
     return this.#built;
   }
 
-  /** Hands a pending seed to the built index when it is the one the seed is for. */
   #applySeed() {
     const pending = this.#seed;
     const built = this.#built;
@@ -190,11 +174,7 @@ export class PuhIndex {
     if (!accepted) onOutcome?.("dropped");
   }
 
-  /**
-   * Seeds the history the last run read (see LogIndex.seedProvisional), for the chain and handler
-   * it names: handed to the index when it is built (or now). `onOutcome` hears "dropped" when the
-   * index in use is for another chain or handler, or the settings change first.
-   */
+  /** Seeds the last run's history; an index for another chain or handler drops it ("dropped"). */
   seedProvisional(seed: PuhSeed, onOutcome?: (outcome: ProvisionalOutcome) => void) {
     if (!this.#current() || this.#seed) {
       onOutcome?.("dropped");
@@ -204,26 +184,17 @@ export class PuhIndex {
     this.#applySeed();
   }
 
-  /**
-   * A history from the last run may be seeded until `until` settles (the chain cache is being
-   * loaded): a page's read that allows one waits for it, at most 2 s, instead of reading without.
-   */
   expectSeed(until: Promise<unknown>) {
     this.#seedComing.expect(until);
   }
 
-  /**
-   * Whether the history the last run saved can answer a page while this run's backfill re-reads
-   * it: one is seeded and not verified yet (handed to the index or waiting for it to be built), or
-   * the chain cache that may hold one is still being loaded.
-   */
+  /** A last-run history is seeded and unverified, or the chain cache that may hold one loads. */
   hasLastRunHistory(): boolean {
     if (!this.#current()) return false;
     if (this.#seed || this.#seedComing.pending) return true;
     return this.#built?.index.status().provisional?.state === "provisional";
   }
 
-  /** Drops a seeded history still awaiting verification (the chain cache was found wrong). */
   dropProvisional() {
     this.#seed = null;
     this.#built?.index.dropProvisional();
@@ -237,7 +208,6 @@ export class PuhIndex {
     return final && { ...final, chainId: built.net.chainId, address: built.net.upgradeHandler };
   }
 
-  /** Starts or resumes the backfill. Never rejects. */
   async startBackfill(): Promise<void> {
     try {
       await (await this.#index()).index.startBackfill();
@@ -246,7 +216,6 @@ export class PuhIndex {
     }
   }
 
-  /** Reads the tail for the current head (or `head`) now: the sync engine, ahead of requests. */
   async syncHead(head?: IndexHead): Promise<void> {
     await (await this.#index()).index.syncHead(head);
   }
@@ -256,7 +225,6 @@ export class PuhIndex {
     return this.#error ? { ...IDLE, state: "unavailable", error: this.#error } : { ...IDLE };
   }
 
-  /** Every handler log in the range, complete (waits for the backfill, bounded). */
   async logs(query?: LogQuery): Promise<IndexedLog[]> {
     return (await this.#index()).index.logs(query);
   }
@@ -270,10 +238,8 @@ export class PuhIndex {
   }
 
   /**
-   * events(), with whether the last run's history answered part of it (pages only). What that
-   * history holds never fails a page: an answer from it with a log that does not decode is given
-   * from this run's history instead (as JSON's is: waiting for it, and failing only on what this
-   * run read).
+   * events(), with whether the last run's history answered part of it (pages only). A log of that
+   * history that does not decode never fails a page: this run's history answers instead.
    */
   async eventsAnswer<N extends PuhEventName>(
     name: N,
@@ -298,11 +264,7 @@ export class PuhIndex {
     return (await this.singleAnswer(name, id, query)).event;
   }
 
-  /**
-   * single(), with whether the last run's history answered (pages only, see eventsAnswer). Only
-   * this run's history can make it an error: when the last run's names the event twice, this
-   * run's answers instead.
-   */
+  /** single() for pages: only this run's history can make two events an error. */
   async singleAnswer<N extends PuhEventName>(
     name: N,
     id: Hex,
@@ -319,10 +281,7 @@ export class PuhIndex {
     return { event: events[0] ?? null, provisional };
   }
 
-  /**
-   * Whether the index holds the pinned canary log (the handler's deployment event). null when the
-   * network has no canary on this handler, or the backfill has not reached its block yet.
-   */
+  /** Whether the index holds the pinned canary log; null without a canary or before its block. */
   async hasCanary(): Promise<boolean | null> {
     const { net, index } = await this.#index();
     const canary = net.logCanary;

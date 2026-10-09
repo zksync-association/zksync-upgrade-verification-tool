@@ -61,7 +61,6 @@ vi.mock("@/.server/flows/standard", () => ({
   loadStandardUpgrade: vi.fn(),
 }));
 vi.mock("@/.server/flows/emergency", () => ({
-  listRecentEmergencyUpgrades: vi.fn(),
   loadEmergencyList: vi.fn(),
   loadEmergencyUpgrade: vi.fn(),
 }));

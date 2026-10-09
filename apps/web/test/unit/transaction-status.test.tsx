@@ -8,11 +8,9 @@ import { act, render } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The transaction page after Send. It polls nothing for the receipt: the sync engine reads it
-// once per new block while the page is on screen, and the tab's beat says when it changed (the
-// page then reloads). Once the receipt is in, the status other pages read (freeze state and
-// nonces, members, thresholds) predates the transaction, so the page reads it again until it is
-// at least as new as the transaction's block, a few times at most.
+// The receipt is never polled: the sync engine reads it each block, the beat triggers a reload.
+// Once it is in, the status (freeze state and nonces, members, thresholds) predates the
+// transaction, so the page reads it again until it covers the transaction's block, a few times.
 
 type Receipt = { status: string; blockNumber: string; from: string; to: string; fee: string };
 type Answer = { receipt: Receipt | null; unread: boolean };

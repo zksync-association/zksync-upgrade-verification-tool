@@ -35,12 +35,10 @@ export const meta = Meta["/app/emergency"];
 
 export function loader({ request }: LoaderFunctionArgs) {
   const allHistory = new URL(request.url).searchParams.get("history") === "all";
-  // After a pause (no head in memory), both lists as this app last showed them come first, as of
-  // their block, until the current ones replace them (sync/last-shown.ts).
+  // After a pause, both lists as last shown come first, as of their block.
   const shown = lastShown();
-  // Pending ids come from members' Safe messages: the page lists them at once from the copies held
-  // (labelled with their age when older than 60 s, and not kept by the watcher for the screen)
-  // and the fresh list after it.
+  // Pending ids come from members' Safe messages: listed at once from the copies held (labelled
+  // when older than 60 s and not kept by the watcher for the screen), the fresh list after it.
   const loading = loadEmergencyList({ allHistory, freshness: "page" });
   const pending = loading.pending.then((p) => (p.stale ? loading.freshPending : p));
   // Executions likewise: from the history the last run saved while this run re-reads it
@@ -194,7 +192,6 @@ export default function EmergencyList() {
                 >
                   {(fresh, refresh) => {
                     const items = (fresh ?? first).items;
-                    // As this app last showed it (after a pause), until the current list is in.
                     const asOf = fresh ? undefined : first.asOf;
                     return (
                       <PendingRegion pending={switching}>
@@ -244,7 +241,6 @@ function PendingList({
   stale = false,
 }: {
   result: SerializeFrom<PendingEmergencies> & {
-    /** The list as this app last showed it, read at an older block (after a pause). */
     asOf?: AsOfBlock;
   };
   refresh: Refresh;

@@ -70,31 +70,22 @@ export type VetoSummary = VetoParams & {
   governorName: string | null;
 };
 
-/** The vetoes Guardians signed in their Safes, each with its state at the head. */
 export type SignedVetoes = {
   vetoes: VetoSummary[];
   errors: string[];
   anomalies: number;
   /** When the oldest Safe listing the vetoes came from was read (ISO time), or null. */
   safeFetchedAt: string | null;
-  /**
-   * A page's first answer from Safe listings older than 60 s (see loadL2VetoList); the fresh list
-   * follows. Always false for the fresh list (and so in JSON).
-   */
+  /** A page's first answer from Safe listings older than 60 s; always false in JSON. */
   stale: boolean;
 };
 
-/** The L2 proposals Guardians can still veto, or why they could not be read. */
 export type VetoableProposals = {
   vetoable: L2ProposalView[];
   /** Why the list could not be read (then `vetoable` is empty and says nothing). null when read. */
   l2Error: string | null;
-  /**
-   * A page's first answer from the governors' history the last run saved, while this run reads it
-   * again (pages only); the list from this run's history follows. Always false in JSON.
-   */
+  /** A page's first answer from the last run's history; always false in JSON. */
   fromLastRun: boolean;
-  /** The Era head the states were read at (block, when Era answered), for a page's label. */
   eraHead?: { number: string; readAt: string } | null;
 };
 
@@ -141,16 +132,11 @@ async function vetoableFrom(answer: Promise<VetoableAnswer>): Promise<VetoablePr
 }
 
 /**
- * The vetoes signed in Guardians' Safes and the L2 proposals they can still veto, independently.
- * `freshSigned` is the list from Safe listings at most 60 s old and `freshVetoable` the list from
- * this run's history of the governors. With `freshness: "page"`, `signed` is the page's first
- * answer (from the listings held, whatever their age, when one is older than 60 s: `stale`; see
- * firstFromHeld) and `vetoable` likewise (from the history the last run saved while this run reads
- * it again: `fromLastRun`); otherwise each is its fresh list. States are always read at the head.
+ * `freshSigned` and `freshVetoable` are the strict lists; a page's `signed` and `vetoable` may first
+ * be older (`stale`, `fromLastRun`). States are always read at the head.
  */
 export function loadL2VetoList({ freshness = "strict" }: { freshness?: Freshness } = {}) {
   const page = freshness === "page";
-  // A page's at the head it is read at (governance.ts pageGovernance); JSON's as ever.
   const gov = governanceFor(freshness);
   const freshSigned = gov.then(async (g) =>
     signedFrom(
@@ -174,10 +160,10 @@ export function loadL2VetoList({ freshness = "strict" }: { freshness?: Freshness
       )
     : freshSigned;
   // The Guardians that hash each proposal on L1 are named by this answer's governance: a page's
-  // (kept in memory by the sync engine at each head), never JSON's full read for a page.
+  // own (kept in memory at each head), never JSON's full read.
   const answerGov = () => gov;
   // The first answer may use the last run's history; one that failed there is this run's to give.
-  // A page answers at the Era head pages read (the Era timer's, sync/era.ts); JSON at Era's head.
+  // A page answers at the Era head pages read; JSON at Era's head.
   const firstVetoable = page
     ? activeL2ProposalsAnswer({ provisional: true, gov: answerGov, page }).then(
         (answer) => answer,
@@ -193,11 +179,8 @@ export function loadL2VetoList({ freshness = "strict" }: { freshness?: Freshness
   return { signed, freshSigned, vetoable, freshVetoable, governance: gov };
 }
 
-/**
- * For the sync engine: the veto list as a page shows it, from the Guardians' Safe copies held
- * under the page rule (never asking Safe), governance at the head pages read and ZKsync Era at the
- * Era head pages read; null when a member Safe's copy is not one a page would use as current.
- */
+// For the sync engine: the veto list as a page shows it, from held Safe copies (never asking
+// Safe); null when a member Safe's copy is not one a page would use as current.
 export async function heldVetoList(): Promise<{
   signed: SignedVetoes;
   vetoable: VetoableProposals;
@@ -241,19 +224,14 @@ export type VetoDetail = {
   execution: ExecutionView | null;
   /** null: not found on the governor, or not read (then `l2Error` says why). */
   l2Proposal: L2ProposalView | null;
-  /** Why the L2 proposal was not read: no L2 RPC, or the read failed. null when it was read. */
   l2Error: string | null;
-  /** The Era head the L2 proposal's state was read at (block, when Era answered), or null. */
   eraHead: { number: string; readAt: string } | null;
   governorKnown: boolean;
   governance: Governance;
 };
 
-/**
- * The L2 proposal, or why it could not be read. `l2Proposal: null` with no error is an answer
- * (the governor has no such proposal); a failed read is never reported as one. `gov`: the
- * governance the veto is checked against (it names the Guardians that hash the proposal on L1).
- */
+// `l2Proposal: null` with no error is an answer (the governor has no such proposal); a failed
+// read is never reported as one.
 async function readL2Proposal(
   params: VetoParams,
   gov: Governance,
@@ -299,11 +277,7 @@ export function getL2Veto(
   return loadL2Veto(params, { supplied }).fresh;
 }
 
-/**
- * The veto's signatures: `fresh` is the strict result; with `freshness: "page"`, `first` is the
- * page's first answer (a labelled stale set without an execution, or the strict result, see
- * firstSignatureSet). Otherwise `first` is `fresh`.
- */
+/** With `freshness: "page"`, `first` may be a labelled stale set without an execution. */
 export function loadL2Veto(
   params: VetoParams,
   {

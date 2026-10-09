@@ -45,8 +45,9 @@ beforeEach(() => {
 });
 
 describe("l2HistoryLane", () => {
-  it("is null when no L2 RPC is configured, and stays null without reading again", async () => {
+  it("is null for both Era lanes without an L2 RPC, and stays null without reading again", async () => {
     state.network = async () => ({ l2RpcUrl: null });
+    expect(await l2HeadLane()).toBeNull();
     expect(await l2HistoryLane()).toBeNull();
     expect(await l2HistoryLane()).toBeNull();
     expect(state.networkReads).toBe(1);
@@ -82,7 +83,7 @@ describe("l2HistoryLane", () => {
     });
   });
 
-  it("gives Era's head and header reads a lane of their own, beside the eth_getLogs lane", async () => {
+  it("gives Era's head and header reads a lane of their own, and closes both with the L1 lanes on a settings change", async () => {
     state.network = async () => ({ l2RpcUrl: "http://l2.example/" });
     const [history, head] = await Promise.all([l2HistoryLane(), l2HeadLane()]);
     expect(head).not.toBeNull();
@@ -95,25 +96,12 @@ describe("l2HistoryLane", () => {
     expect(created("l2-history")).toHaveLength(1);
     expect(head?.stats()).toMatchObject({ label: "l2-head", maxBatch: 20, maxInFlight: 2 });
 
-    resetRpcClients();
-    await expect(head?.request("eth_chainId")).rejects.toMatchObject({ kind: "aborted" });
-    expect(await l2HeadLane()).not.toBe(head);
-  });
-
-  it("is null without an L2 RPC for the head lane too", async () => {
-    state.network = async () => ({ l2RpcUrl: null });
-    expect(await l2HeadLane()).toBeNull();
-    expect(await l2HistoryLane()).toBeNull();
-    expect(state.networkReads).toBe(1);
-  });
-
-  it("closes the L2 lane with the L1 lanes on a settings change", async () => {
-    state.network = async () => ({ l2RpcUrl: "http://l2.example/" });
-    const before = await l2HistoryLane();
     const l1 = lanes();
     resetRpcClients();
-    await expect(before?.request("eth_chainId")).rejects.toMatchObject({ kind: "aborted" });
+    await expect(head?.request("eth_chainId")).rejects.toMatchObject({ kind: "aborted" });
+    await expect(history?.request("eth_chainId")).rejects.toMatchObject({ kind: "aborted" });
     await expect(l1.history.request("eth_chainId")).rejects.toMatchObject({ kind: "aborted" });
-    expect(await l2HistoryLane()).not.toBe(before);
+    expect(await l2HeadLane()).not.toBe(head);
+    expect(await l2HistoryLane()).not.toBe(history);
   });
 });

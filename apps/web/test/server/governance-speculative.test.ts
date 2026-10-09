@@ -7,13 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeRpcError, type FakePost } from "../support/fake-jsonrpc";
 import { type FakeL1Options, L1, REVERTS, SC_MEMBERS, fakeL1 } from "../support/fake-l1";
 
-// Governance in one round (plan D1): with the layout of the last read (the three contracts the
-// handler names, how many members each list has), every getter goes out in ONE POST at the head's
-// block: the handler's code, one aggregate3 of everything, and both member lists' terminators
-// asked directly (4 billed entries). It is taken only if the handler names the same contracts,
-// every sub-call answered, and both terminators definitely reverted; otherwise the read goes in
-// rounds as before, and answers exactly as a read in rounds does. A fresh process reads in three
-// rounds (the handler's code beside its getters).
+// Governance in one round: with the last read's layout, every getter goes out in ONE POST at the
+// head's block (4 billed entries). It is taken only if the handler names the same contracts, every
+// sub-call answered, and both terminators definitely reverted; otherwise the read goes in rounds,
+// and answers exactly as a read in rounds does.
 
 const NOW = 1_800_000_000_000;
 const HEAD = 26_129_107n;

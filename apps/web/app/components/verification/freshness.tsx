@@ -4,51 +4,27 @@ import { useNowSeconds } from "@/components/sync-state";
 import { formatAge, formatNumber, formatTime } from "@/utils/format";
 import { AlertTriangle, Loader2 } from "lucide-react";
 
-// Where a signature set's data came from and how old it is. Every set says the block its verdicts
-// were read at and when Safe's copies were read. A page's first answer may be stale (`stale`: an
-// older block's verdicts, or Safe copies older than 60 s, see .server/signatures.ts
-// firstSignatureSet); it says so prominently until the fresh result replaces it.
-
-/**
- * Where the fresh result is, for a stale first answer on screen: "pending" while it streams in,
- * "failed" when it could not be computed (the first answer then stays, saying so). "behind": a
- * set's result the app did not verify again at the head it serves now (`reverifyingAt`, see
- * setCurrency): it is shown as of its block until a result at a newer head replaces it. null
- * otherwise.
- */
+// For a stale first answer: "pending" while the fresh result streams in, "failed" when it could
+// not be computed (the first answer stays, saying so); "behind": not verified at the head served.
 export type Refresh = "pending" | "failed" | "behind" | null;
 
-/** What a set (or list) says about its own freshness (see SignatureSet). */
 export type Labelled = {
   verifiedAtBlock?: string | null;
   safeFetchedAt?: string | null;
   stale?: boolean;
   reverifyingAt?: string | null;
-  /**
-   * For an answer shown before the current one (`stale`): whether the current one reads Safe
-   * again (see .server/sync/last-shown.ts rereadsSafe). false: it uses the same copies (a set that
-   * can no longer be signed keeps them), so they are never said to be refreshing.
-   */
+  /** false: the current answer keeps these copies, so they are never said to be refreshing. */
   rereadsSafe?: boolean;
 };
 
-/**
- * How old a Safe copy is: "12s ago" by this browser's clock, or the time it was read until that
- * clock is known (the server render and hydration must match).
- */
+// "12s ago" by this browser's clock, or the time it was read until that clock is known (the
+// server render and hydration must match).
 export function copiesAge(fetchedAt: string, nowSeconds: number | null): string {
   const ms = Date.parse(fetchedAt);
   if (Number.isNaN(ms)) return "an unknown time";
   return nowSeconds === null ? formatTime(fetchedAt) : formatAge(nowSeconds - ms / 1000);
 }
 
-/**
- * The labels: "Verified at block #N" (+ " · re-verifying at #M" while the fresh result is
- * pending, " · not re-verified at #M" for a result behind the head served), "Safe copies from 12s
- * ago" (+ " · refreshing" while the pending result reads Safe again: never for one that keeps
- * these copies, `rereadsSafe: false`), and a line when re-verification failed. null for a label
- * the set has nothing for (a dev node's 'latest', no Safe copy read).
- */
 export function freshnessLabels(set: Labelled, refresh: Refresh, nowSeconds: number | null) {
   const block = set.verifiedAtBlock ?? null;
   const at =
@@ -71,21 +47,12 @@ export function freshnessLabels(set: Labelled, refresh: Refresh, nowSeconds: num
   };
 }
 
-/** What a set says about the block it was verified at, and the key it is followed under. */
 export type Followed = Pick<Labelled, "verifiedAtBlock" | "stale"> & {
   watch?: { key: string; rev: string | null } | null;
 };
 
-/**
- * Whether a set's verdicts are current: the newest block the content shown was verified at (the
- * block it loaded with, or a newer one the beats name for that content, `verifiedAt`, read again
- * there with the same result), and, when that is before the head the app serves now (`head`),
- * that head: the set was not verified there (its reads failed, it needs Safe, or the check has
- * not run yet; a page with a signature from its URL is never followed), so it is shown as of its
- * block, in no passing colour and with nothing to sign or send, until a result at a newer head
- * replaces it. Never behind before the first beat, on a dev node ('latest': no block), or for a
- * stale first answer (it says so itself).
- */
+// `behind`: the head served now, when the set was not verified there: it is then shown as of its
+// block, in no passing colour, nothing to sign or send, until a result at a newer head replaces it.
 export function setCurrency(
   set: Followed,
   live: {
@@ -104,12 +71,7 @@ export function setCurrency(
   return { block, behind };
 }
 
-/**
- * "ZKsync Era block #E · read 12s ago": the Era head what is shown was read at: the one the page
- * loaded at (`fallback`), or a newer one the beats name for this item (`watchKey`) while its
- * content is unchanged (read again there with the same result). Never a head whose read failed:
- * then the age just grows. Era is read about once a minute while such a page is on screen.
- */
+// The Era head what is shown was read at, never one whose read failed (then the age just grows).
 export function EraBlockNote({
   watchKey,
   fallback = null,
@@ -126,7 +88,6 @@ export function EraBlockNote({
   );
 }
 
-// Why Safe cannot be read now, for a set left behind the head served (see safeUnavailableReason).
 const UNAVAILABLE: Record<string, string> = {
   quota: "Safe quota low",
   budget: "hourly budget used",
@@ -134,12 +95,6 @@ const UNAVAILABLE: Record<string, string> = {
   "quota-exhausted": "Safe's monthly quota used up",
 };
 
-/**
- * For an open set not verified at the head served because its Safe copies cannot be used there
- * (the checks paused, Safe only read on request without a key, or Safe not answering for some
- * members): why, for its label ("Safe unavailable (Safe's monthly quota used up)"). null when
- * none of that applies (its reads failed for another reason: it is checked again at each block).
- */
 export function safeUnavailableReason(
   check: SafeCheck | null | undefined,
   unavailable: number
@@ -165,13 +120,8 @@ const PAUSED: Record<string, string> = {
   "quota-exhausted": "checks paused (Safe's monthly quota used up)",
 };
 
-/**
- * How the Safe copies of a set's members not valid yet are kept: "Safe checked 12s ago · next
- * check in 48s", "· checking now", "· checks paused (…)", "· only on request (no Safe key)". The
- * ages need this browser's clock: until it is known, the time the copy was confirmed. While this
- * tab's updates are paused (away, or the app not answering), nothing is checked for it: said so,
- * never a countdown.
- */
+// While this tab's updates are paused (away, or the app not answering), nothing is checked for it:
+// said so, never a countdown.
 export function safeCheckLabel(
   check: SafeCheck,
   nowSeconds: number | null,
@@ -199,11 +149,8 @@ export function safeCheckLabel(
   }
 }
 
-/**
- * Of two reports of how the same Safe copies are kept (the last beat's, and the page's own from
- * its last load or a Fetch signatures answer), the newer: the one whose Safes were checked more
- * recently, so the label never shows a check older than the result next to it.
- */
+// Of the beat's report and the page's own, the one whose Safes were checked more recently, so the
+// label never shows a check older than the result next to it.
 export function newerCheck(
   a: SafeCheck | null | undefined,
   b: SafeCheck | null | undefined
@@ -215,11 +162,8 @@ export function newerCheck(
   return at(b) > at(a) ? b : a;
 }
 
-/**
- * A set's freshness: one quiet line for a fresh result; for a stale first answer, a notice that
- * names its block first, so no status below reads as a current pass. `check`: how the copies of
- * members not valid yet are kept (an open set), said in place of the copies' age.
- */
+// A stale first answer gets a notice that names its block first, so no status below reads as a
+// current pass; a fresh result one quiet line.
 export function FreshnessNote({
   set,
   refresh = null,
@@ -230,19 +174,10 @@ export function FreshnessNote({
 }: {
   set: Labelled;
   refresh?: Refresh;
-  /** What the notice speaks for. */
   what?: string;
   check?: SafeCheck | null;
-  /**
-   * For a result behind the head ("behind"): whether the app verifies it again at each new block
-   * (false: a page with a signature from its URL, verified only when it loads).
-   */
+  /** false: a page with a signature from its URL, verified only when it loads. */
   followed?: boolean;
-  /**
-   * For a result behind the head because its Safe copies cannot be used now (see
-   * safeUnavailableReason): said in the label, with Fetch signatures to retry, not that it is
-   * checked again at each block.
-   */
   safeReason?: string | null;
 }) {
   const now = useNowSeconds();
@@ -257,7 +192,6 @@ export function FreshnessNote({
       </p>
     ) : null;
   }
-  // The block first when there is one (a verdict), else the copies' age (a list from Safe).
   const unavailable = refresh === "behind" && followed && safeReason ? safeReason : null;
   const headline = [labels.verified ?? labels.copies ?? "An earlier result", unavailable]
     .filter(Boolean)
@@ -296,12 +230,8 @@ export function FreshnessNote({
   );
 }
 
-/**
- * FreshnessNote for a list fed by Safe (pending emergency upgrades, freeze requests, vetoes): once
- * current, how the Safes it collects from are kept, as the beats report it ("Safe checked 2m ago ·
- * next check in 3m"). A check that finds nothing new leaves the list as it is (no reload), so the
- * copies' age the page loaded with would only grow.
- */
+// For a list fed by Safe, once current: how its Safes are kept, from the beats (a check that finds
+// nothing new does not reload the list, so the copies' age it loaded with would only grow).
 export function ListFreshnessNote({
   watchKey,
   ...props

@@ -3,13 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type ChainLog, PUH_TOPICS, puhHistory } from "../support/fake-chain";
 import { G_MEMBERS, L1, SC_MEMBERS, type UpgradeOnChain, fakeL1 } from "../support/fake-l1";
 
-// The first visitor of a freshly started server: the boot warm-up is reading governance, the
-// handler's log index (the backfill: seconds on a capped provider) and, with a key, the member
-// Safes' listings at low priority; the visitor opens an upgrade page. Measured live (B3/B5 builds,
-// mainnet): the page's signatures took 6.5-7.3 s, the index wait (2.5 s) PLUS the Safe floor (16
-// listings at Safe's 5/s, ~3.5 s), because the sets started reading Safe only once the proposal
-// had been found in the index. Now the page's listings are read while it waits for the index,
-// ahead of the warm-up's own, and the page is ready about when the index is.
+// The first visitor of a freshly started server opens an upgrade page while the boot warm-up reads
+// governance, the log index and (with a key) the member Safes at low priority: the page's listings
+// are read while it waits for the index, ahead of the warm-up's, so it is ready about when the
+// index is.
 
 // With a key: 220 ms between Safe requests; background reads of the public service are allowed.
 vi.stubEnv("SAFE_API_KEY", "test-key");
@@ -97,7 +94,6 @@ function boot() {
         headers: { "content-type": "application/json" },
       });
     }
-    // ZKsync Era is not part of this.
     if (!url.startsWith("http://127.0.0.1:9")) return new Response("unavailable", { status: 503 });
     return fake.fetch(input, init);
   });
@@ -150,22 +146,18 @@ describe("the first visitor during the boot warm-up", () => {
     const index = puhIndex().status();
     expect(index.state).toBe("ready");
 
-    // The proposal needed the index: the page waits for the backfill...
+    // The page waits for the backfill, but its Safe listings were read meanwhile.
     expect(overview).toBeGreaterThanOrEqual(BACKFILL_MS);
-    // ...but its Safe listings were read meanwhile: the signatures follow within moments, not
-    // 6 member Safes x 220 ms + 300 ms later.
     expect(signatures - overview).toBeLessThan(200);
     expect(signatures).toBeLessThan(BACKFILL_MS + 300);
     for (const member of members) {
       const reads = safe.requests.filter((r) => r.safe === member);
-      // Each member Safe's listing was read once (the warm-up's read and the page's were one),
-      // and answered before the index was ready.
+      // Each member Safe's listing was read once, before the index was ready.
       expect(reads).toHaveLength(1);
       expect(((reads[0] as SafeRequest).answeredAt as number) - NOW).toBeLessThanOrEqual(
         BACKFILL_MS
       );
     }
-    // Never more than 4 requests at Safe at once.
     expect(Math.max(...safe.requests.map((r) => r.concurrent))).toBeLessThanOrEqual(4);
     expect(verified.map((s) => s.set.members.map((m) => m.status))).toEqual([
       ["missing", "missing", "missing"],
@@ -182,8 +174,7 @@ describe("the first visitor during the boot warm-up", () => {
     const overview = await settledAt(loading);
     const signatures = await settledAt((await loading).sets);
     expect(overview).toBeGreaterThanOrEqual(BACKFILL_MS);
-    // 6 listings at 220 ms spacing (300 ms each) were done long before the index: not
-    // 2.5 s + 6 x 220 ms + 300 ms.
+    // 6 listings at 220 ms spacing were done long before the index.
     expect(signatures - overview).toBeLessThan(200);
     expect(safe.requests).toHaveLength(6);
     expect(Math.max(...safe.requests.map((r) => r.at - NOW))).toBeLessThan(1_500);
@@ -193,8 +184,7 @@ describe("the first visitor during the boot warm-up", () => {
     const { safe } = boot();
     const members = [...SC_MEMBERS, ...G_MEMBERS].map((m) => m.toLowerCase());
     const { warmSafeListing } = await import("@/.server/safe/store");
-    // Background reads of 17 other Safes are queued first (a sweep, the warm-up of a larger
-    // council), then the page asks for its members.
+    // Background reads of 17 other Safes are queued first, then the page asks for its members.
     const others = Array.from(
       { length: 17 },
       (_, i) => `0x${(0xf00 + i).toString(16).padStart(40, "0")}` as Hex
@@ -204,8 +194,7 @@ describe("the first visitor during the boot warm-up", () => {
     const loading = loadStandardUpgrade(ACTIVE_ID);
     await settledAt(loading);
     await settledAt((await loading).sets);
-    // The page's reads went out back to back, ahead of every background read still queued: only
-    // the (at most two) background requests already started when they arrived went first.
+    // The page's reads went out ahead of every background read still queued.
     const order = safe.requests.map((r) => (members.includes(r.safe) ? "page" : "background"));
     const first = order.indexOf("page");
     expect(first).toBeGreaterThanOrEqual(1);

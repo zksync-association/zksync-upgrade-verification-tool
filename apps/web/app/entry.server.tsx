@@ -13,10 +13,7 @@ import { RemixServer } from "@remix-run/react";
 import { isbot } from "isbot";
 import { renderToPipeableStream } from "react-dom/server";
 
-// The server (server/index.ts) reads which chain the RPC is on before it starts listening, loads
-// the chain cache kept from the last run, warms caches after it starts listening, starts the sync
-// engine, tells it about every request (a page load is use, see sync/presence.ts), and saves the
-// chain cache on shutdown. It must reach this build's own modules (build.entry.module), not a
+// For server/index.ts, which must reach this build's own modules (build.entry.module), not a
 // second copy bundled into the server.
 export { prewarm, readNetwork } from "@/.server/prewarm";
 export { noteRequest, startSync } from "@/.server/sync/engine";

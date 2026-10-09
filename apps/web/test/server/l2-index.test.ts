@@ -42,7 +42,7 @@ import {
 } from "../support/fake-era";
 import { FakeRpcError, fakeJsonRpc } from "../support/fake-jsonrpc";
 
-// The ZKsync Era governors' log index (B4): one eth_getLogs for the three pinned governors'
+// The ZKsync Era governors' log index: one eth_getLogs for the three pinned governors'
 // ProposalCreated/Executed/Canceled history, the tail above Era's 'finalized' block per Era head,
 // and windows ("the last 24 days") cut by each event's block timestamp instead of a header search
 // for the window's first block. The flows must answer exactly what the timestamp search answered.

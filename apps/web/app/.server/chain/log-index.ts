@@ -4,16 +4,12 @@ import { LogsUnavailableError } from "../logs";
 import { type Lane, RpcError } from "./jsonrpc";
 import { asRequestWork } from "../sync/pacer";
 
-// Every log one contract has emitted, from its deployment to the head, in memory. The filter is
-// the address alone: a topic OR-list would drop events the ABI does not list (a proxy's Upgraded,
-// Initialized and AdminChanged). An index over several contracts whose other events are not
-// needed (the L2 governors' votes) may name the topic0 values it keeps instead.
-//
-// Coverage is one contiguous range [coveredFrom, finalizedTo] of final blocks, plus a tail
-// (finalizedTo, head] that is read again for every new head and replaces the previous tail. The
-// backfill fills the final range downward from the finality boundary, newest blocks first, and a
-// query waits (bounded) until the range it asks for is covered. It never answers with a partial
-// list.
+// Every log one contract (or a few) has emitted since deployment, in memory. The filter is the
+// address alone (a topic OR-list would drop events the ABI does not list, a proxy's Upgraded),
+// unless an index names the topic0 values it keeps (the L2 governors' index skips their votes).
+// Coverage is one contiguous range of final blocks plus a tail (finalizedTo, head] read again for
+// every new head. The backfill fills the final range downward, newest first; a query waits
+// (bounded) until its range is covered and never answers with a partial list.
 
 /** The head a query is answered at, and the finality boundary F: blocks <= F never change. */
 export type IndexHead = { head: { number: bigint; hash: Hex }; safe: bigint };
@@ -22,37 +18,25 @@ export type IndexHead = { head: { number: bigint; hash: Hex }; safe: bigint };
 export type IndexedLog = Log<bigint, number, false>;
 
 /**
- * A query's answer and the boundary it was given at: every log at or below `finalTo` came from
- * the final range (read at or below the finality boundary, never from an older tail), so it never
- * changes; a log above it is from this head's tail and may still be reorged away.
- *
- * `provisionalTo` (only for a query that allowed it, see LogQuery.provisional): the logs at or
- * below this block come from what a previous run read (seeded from disk) and have not been read
- * again yet. They are neither final nor verified: never kept, and shown only as such. null when
- * every log was read in this run.
+ * A query's answer: logs at or below `finalTo` come from the final range and never change; above
+ * it, from this head's tail. Logs at or below `provisionalTo` are from the last run's history, not
+ * read again yet (pages only; never kept); null when every log was read in this run.
  */
 export type IndexRead = { logs: IndexedLog[]; finalTo: bigint; provisionalTo: bigint | null };
 
-export type IndexState = "idle" | "backfilling" | "ready" | "unavailable";
+type IndexState = "idle" | "backfilling" | "ready" | "unavailable";
 
-/**
- * What a previous run read, seeded from disk (persist/chain-cache.ts): the complete history from
- * the index's first block to `finalizedTo`. Untrusted until this run's own backfill has read the
- * same range: then it is "verified" (the same logs) or a "mismatch" (and dropped).
- */
+/** A previous run's history (from disk): untrusted until this run's backfill reads that range. */
 export type ProvisionalSeed = { finalizedTo: bigint; logs: IndexedLog[] };
 
-/** How a seeded history ended: matched this run's backfill, did not, or was dropped unchecked. */
 export type ProvisionalOutcome = "verified" | "mismatch" | "dropped";
 
-export type ProvisionalStatus = {
+type ProvisionalStatus = {
   state: "provisional" | "verified" | "mismatch";
-  /** The seeded history's last block. */
   finalizedTo: string;
   logs: number;
 };
 
-/** The complete final history, for saving: [deployBlock, finalizedTo]. */
 export type FinalSnapshot = {
   coveredFrom: bigint;
   finalizedTo: bigint;
@@ -62,138 +46,71 @@ export type FinalSnapshot = {
 export type IndexStatus = {
   state: IndexState;
   deployBlock: string;
-  /** Lowest block of the contiguous final coverage; null before anything is covered. */
   coveredFrom: string | null;
-  /** Highest final block covered (the finality boundary the index has reached). */
   finalizedTo: string | null;
-  /** Head of the last tail read. */
   headTo: string | null;
   chunks: { done: number; total: number };
-  /** "full-range": the RPC answered the whole history at once; "chunked": block range limits. */
   strategy: "full-range" | "chunked" | null;
-  /** Largest block range per eth_getLogs, once the RPC has limited it. */
   span: string | null;
   logs: number;
   error: string | null;
-  /** A history seeded from the last run (see ProvisionalSeed), or null when none was. */
   provisional: ProvisionalStatus | null;
 };
 
 export type LogQuery = {
-  /** Defaults to the deployment block. */
   fromBlock?: bigint;
-  /** Defaults to the head. */
   toBlock?: bigint;
-  /** How long to wait for the backfill to cover `fromBlock` before IndexIncomplete. */
   waitMs?: number;
   signal?: AbortSignal;
-  /** Answer at this head instead of the current one (the sync engine, before it publishes it). */
   head?: IndexHead;
-  /**
-   * Pages only, never JSON: while a history seeded from the last run awaits verification and the
-   * backfill has not covered `fromBlock` yet, answer from that history (and this run's reads
-   * above it) instead of waiting. The answer says which part is from the last run
-   * (IndexRead.provisionalTo).
-   */
+  /** Pages only, never JSON: may answer from the last run's history, not yet verified. */
   provisional?: boolean;
 };
 
 export type LogIndexOptions = {
-  /** Names the index in errors and logs. */
   label: string;
-  /** eth_getLogs goes through this lane (batching, rate limits, read-only allowlist). */
   lane: Lane;
-  /**
-   * Carries the small reads a query waits on (the tail for a head, the bridge above a seeded
-   * history) until the history is complete, so they never wait in a POST with (or queue behind)
-   * the backfill's chunks. Default: `lane`.
-   */
   quickLane?: Lane;
-  /** The contract, or the contracts (one eth_getLogs for all), whose logs are indexed. */
   address: Address | readonly Address[];
-  /**
-   * Only logs whose topic0 is one of these (an OR-list in the filter). Omitted: every log of the
-   * address(es), with no `topics` key in the filter at all.
-   */
   topic0?: readonly Hex[];
-  /** First block with a log of this contract. Nothing earlier is read. */
   deployBlock: bigint;
   head: () => Promise<IndexHead>;
   /** False once the settings this index was built for changed: nothing more is inserted. */
   isCurrent?: () => boolean;
   /** Error text for status and logs. Must not reveal RPC URLs. */
   describeError?: (error: unknown) => string;
-  /** Default wait for coverage in a query. */
   waitMs?: number;
-  /**
-   * A chunk outstanding this long (and twice as long as chunks usually take) is sent once more;
-   * the first answer wins.
-   */
   hedgeMs?: number;
-  /**
-   * Smallest block range the index splits a request into (default 1,000, as logs.ts). A range
-   * error at or below it, or an explicit cap below it, makes the backfill unavailable.
-   */
   minSpan?: bigint;
-  /** Retries of one chunk after an error that is not about its range. */
   chunkRetries?: number;
   retryDelayMs?: number;
-  /** After a failed backfill, queries report it for this long before trying again. */
   retryMs?: number;
-  /** Told the block range cap the provider named ("range N exceeds limit of M"), once adopted. */
   onCap?: (cap: bigint) => void;
 };
 
 export interface LogIndex {
-  readonly label: string;
-  readonly addresses: readonly Address[];
-  readonly deployBlock: bigint;
-  /**
-   * Starts (or resumes) the backfill of the final range. Never rejects; resolves when this run
-   * ends. A run keeps going when the request that started it is gone.
-   */
+  /** Starts or resumes the backfill; never rejects. A run outlives the request that started it. */
   startBackfill(): Promise<void>;
   status(): IndexStatus;
-  /** The committed contiguous final range, or null. */
   finalRange(): { from: bigint; to: bigint } | null;
   /** Every log in [fromBlock, toBlock], complete, ordered by (blockNumber, logIndex). */
   logs(query?: LogQuery): Promise<IndexedLog[]>;
-  /** As logs(), with the finality boundary the answer was given at (see IndexRead). */
   read(query?: LogQuery): Promise<IndexRead>;
-  /**
-   * Reads the tail (finalizedTo, head] for the current head (or `head`) now, as the first query
-   * at that head would (and shared with it), and starts or resumes the backfill. Rejects when the
-   * tail cannot be read.
-   */
   syncHead(head?: IndexHead): Promise<void>;
-  /**
-   * Seeds the history a previous run read (see ProvisionalSeed). Pages may read it (see
-   * LogQuery.provisional) until this run's backfill has covered [deployBlock, finalizedTo]; then
-   * `onOutcome` is told whether it matched, and it is dropped either way. False (and nothing
-   * changes) when a history was seeded before, the index is closed, or the seed's last block is
-   * below the first block. Logs must have been checked (parseLogs) against this index's filter.
-   */
+  /** Seeds a previous run's history (logs checked by parseLogs); false when it cannot be used. */
   seedProvisional(
     seed: ProvisionalSeed,
     onOutcome?: (outcome: ProvisionalOutcome) => void
   ): boolean;
-  /** Drops a seeded history still awaiting verification (its outcome is not reported). */
   dropProvisional(): void;
-  /** The complete final history once the backfill has covered it, else null. */
   finalSnapshot(): FinalSnapshot | null;
-  /** Drops everything; later results are discarded and queries fail. */
   close(): void;
 }
 
-/**
- * Whether a history from the last run may still be seeded (the chain cache is being loaded): a
- * page's read that allows one waits for it, at most `SEED_WAIT_MS`, instead of deciding without
- * it. Settles when the seed is in place, or will not come.
- */
+/** A seed from the last run may still come (the chain cache is loading): pages wait, bounded. */
 export class SeedExpectation {
   #pending: Promise<void> | null = null;
 
-  /** A seed may come until `until` settles. */
   expect(until: Promise<unknown>) {
     const settled = until.then(
       () => {},
@@ -205,12 +122,10 @@ export class SeedExpectation {
     });
   }
 
-  /** Whether a seed may still come. */
   get pending(): boolean {
     return this.#pending !== null;
   }
 
-  /** Resolves once no seed is expected any more, or after `ms`. */
   wait(ms = SEED_WAIT_MS): Promise<void> {
     const pending = this.#pending;
     if (!pending) return Promise.resolve();
@@ -225,10 +140,8 @@ export class SeedExpectation {
   }
 }
 
-/** The longest a page's read waits for the chain cache to be loaded before reading without it. */
-export const SEED_WAIT_MS = 2_000;
+const SEED_WAIT_MS = 2_000;
 
-/** The index has not covered the requested range within the wait. */
 export class IndexIncomplete extends Error {
   override name = "IndexIncomplete";
   constructor(
@@ -244,12 +157,10 @@ export class IndexIncomplete extends Error {
   }
 }
 
-/** The backfill failed: the RPC refused or kept failing eth_getLogs. */
 export class IndexUnavailable extends LogsUnavailableError {
   override name = "IndexUnavailable";
 }
 
-/** The data source changed after this index was built. */
 export class IndexClosed extends Error {
   override name = "IndexClosed";
   constructor(label: string) {
@@ -263,23 +174,17 @@ export class InvalidLogsAnswer extends Error {
 }
 
 type Range = { from: bigint; to: bigint };
-/** `lastFailure`: how many chunks of the run had landed and failed when this one last failed. */
 type Chunk = Range & { attempts: number; lastFailure?: { landings: number; failures: number } };
 type Landed = Range & { logs: IndexedLog[] };
 type Failure = { message: string; error: unknown; from: bigint; to: bigint; at: number };
-/** One read of (finalizedTo, head]: the logs above the boundary at that head. */
 type Tail = { head: { number: bigint; hash: Hex }; logs: IndexedLog[] };
 
 /** Below this many blocks per eth_getLogs, a history backfill is hopeless (logs.ts MIN_SPAN). */
-export const MIN_SPAN = 1_000n;
-// The bridge above a seeded history (see fromSeeded) is read on its own only when it spans at most
-// this many pieces of the index's span (10,000 blocks while none is known: Infura's cap). A wider
-// gap (a file from weeks ago) is left to the backfill, which reads the newest blocks first anyway:
-// a page then waits for it to cover the gap, instead of the gap being read twice, the second time
-// on the quick lane beside verdict calls.
-export const BRIDGE_MAX_CHUNKS = 8n;
+const MIN_SPAN = 1_000n;
+// The bridge above a seeded history is read on its own only up to this many spans (10,000 blocks
+// while none is known: Infura's cap); a wider gap is left to the newest-first backfill.
+const BRIDGE_MAX_CHUNKS = 8n;
 const BRIDGE_DEFAULT_SPAN = 10_000n;
-// Answer times kept to judge whether a chunk is slow compared with the others.
 const LATENCY_SAMPLES = 64;
 // Other chunks failing, with none landing, between two failures of one chunk: a provider-wide
 // burst, not a range too dense to answer.
@@ -291,15 +196,14 @@ const BURST_FAILURES = 16;
 const RANGE_ERROR =
   /block range|\brange\b.*\b(?:exceed|limit|too (?:large|wide|big))|exceed\w*\b.*\brange\b|range.*(?:block|exceed|limit|too large)|more than [\d,]+ (?:results|logs)|max(?:imum)? (?:results|logs)|too many (?:results|logs)|response size|response.*too large|query timeout|query (?:returned|exceeds)|query.*(?:too large|exceed)|log.*limit/i;
 const EXPLICIT_CAP = /range\s+\d+\s+exceeds limit of\s+([\d,]+)/i;
-// Range answers are short. Only the start of a message is matched, so a huge one stays cheap.
 const MAX_MATCHED = 1_000;
 
-export function isRangeError(error: unknown): boolean {
+function isRangeError(error: unknown): boolean {
   return error instanceof RpcError && RANGE_ERROR.test(error.message.slice(0, MAX_MATCHED));
 }
 
 /** The block cap in "range N exceeds limit of M" (Infura: to − from <= M). */
-export function explicitCap(error: unknown): bigint | null {
+function explicitCap(error: unknown): bigint | null {
   if (!(error instanceof RpcError)) return null;
   const cap = EXPLICIT_CAP.exec(error.message.slice(0, MAX_MATCHED))?.[1];
   return cap ? BigInt(cap.replaceAll(",", "")) : null;
@@ -312,7 +216,7 @@ const firstLine = (error: unknown) => {
 
 const keyOf = (log: IndexedLog) => `${log.blockNumber}:${log.logIndex}`;
 
-export function compareLogs(a: IndexedLog, b: IndexedLog) {
+function compareLogs(a: IndexedLog, b: IndexedLog) {
   if (a.blockNumber !== b.blockNumber) return a.blockNumber < b.blockNumber ? -1 : 1;
   return a.logIndex - b.logIndex;
 }
@@ -332,8 +236,7 @@ const identityOf = (log: IndexedLog) =>
     .join("|")
     .toLowerCase();
 
-/** The addresses (and topic0 values, when the index names them) a log must match. */
-export type LogFilterShape = { addresses: readonly Address[]; topic0?: readonly Hex[] | null };
+type LogFilterShape = { addresses: readonly Address[]; topic0?: readonly Hex[] | null };
 
 type FilterKeys = { addresses: ReadonlySet<string>; topics: ReadonlySet<string> | null };
 
@@ -343,10 +246,8 @@ const filterKeys = ({ addresses, topic0 }: LogFilterShape): FilterKeys => ({
 });
 
 /**
- * An eth_getLogs answer for [from, to] under `filter`, checked as the index checks every answer:
- * a list of mined logs (none removed), each from a filtered address (and topic0), with its
- * block, index, hashes and data, inside the range, and no log twice. Ordered by (block, index).
- * Throws InvalidLogsAnswer. For logs from anywhere else too (a history saved by a previous run).
+ * Checks an eth_getLogs answer as the index checks every one (throws InvalidLogsAnswer): mined
+ * logs only, each from the filter, complete, inside [from, to], none twice. Also for saved logs.
  */
 export function parseLogs(
   raw: unknown,
@@ -417,8 +318,7 @@ const min = (a: bigint, b: bigint) => (a < b ? a : b);
 const median = (values: readonly number[]) =>
   [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)] ?? 0;
 
-/** Splits [from, to] into ranges of at most `span` blocks, newest first. */
-export function chunksOf(range: Range, span: bigint): Range[] {
+function chunksOf(range: Range, span: bigint): Range[] {
   const out: Range[] = [];
   for (let to = range.to; to >= range.from; to -= span) {
     out.push({ from: max(range.from, to - span + 1n), to });
@@ -433,8 +333,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     typeof options.address === "string" ? [options.address] : [...options.address];
   if (addresses.length === 0) throw new Error(`The ${label} log index needs an address`);
   const keys = filterKeys({ addresses, topic0: options.topic0 });
-  // One address is sent as a string (as before), several as eth_getLogs' OR-list. A topic0 list
-  // goes in position 0; without one there is no `topics` key at all.
   const filter = {
     address: addresses.length === 1 ? addresses[0] : addresses,
     ...(options.topic0 ? { topics: [[...options.topic0]] } : {}),
@@ -457,14 +355,12 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
   let bottom = 0n;
   let final: IndexedLog[] = [];
   const finalKeys = new Set<string>();
-  // The last tail read, for status. A query answers from the read for its own head.
   let tail: Tail | null = null;
   // Chunks that landed below a chunk still missing; committed once the gap above them closes.
   const pending = new Map<bigint, Landed>();
 
-  // The block range the whole index uses per eth_getLogs. Only an explicit cap in an error, or
-  // the halving probe on the backfill's first request, sets it: a range error anywhere else
-  // splits that one range and leaves this alone.
+  // The index-wide span: set only by an explicit cap or the backfill's first probe (a range error
+  // anywhere else splits that one range).
   let span: bigint | null = null;
   let spanIsCap = false;
   let strategy: IndexStatus["strategy"] = null;
@@ -478,11 +374,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     for (const listener of [...listeners]) listener();
   };
 
-  // A history seeded from the last run (see ProvisionalSeed), while it awaits verification and
-  // after (its outcome, for status). `bridge`: this run's read of the final blocks between its
-  // last block and this run's boundary when the read started (`to`, never below the seeded last
-  // block), for pages that read the seeded history; a page reads what is above it at the same
-  // time. Only for a narrow gap (see BRIDGE_MAX_CHUNKS).
   type Bridge = { to: bigint; logs: Promise<IndexedLog[]> };
   type Seeded = {
     state: ProvisionalStatus["state"];
@@ -501,8 +392,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     anchored = true;
     top = safe < deployBlock - 1n ? deployBlock - 1n : safe;
     bottom = top + 1n;
-    // Read the blocks between a seeded history and this run's coverage now, beside the backfill's
-    // first requests, so a page can answer from the seeded history without waiting for it.
     if (seeded?.state === "provisional" && bridgeable(seeded)) startBridge(seeded);
   }
 
@@ -519,30 +408,19 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     return new IndexUnavailable(f.message, f.from, f.to);
   }
 
-  // ---- eth_getLogs ----
-
-  /**
-   * All logs in [from, to], checked (see checkLogs). A log already in the final range is a
-   * duplicate, unless `apart` (a read kept beside the final range: the bridge above a seeded
-   * history, which the backfill may cover meanwhile).
-   */
+  /** Checked logs in [from, to]; one already final is a duplicate, unless `apart` (the bridge). */
   async function getLogs(
     from: bigint,
     to: bigint,
     apart = false,
     via: Lane = lane
   ): Promise<IndexedLog[]> {
-    // Address only (no `topics` key at all), unless the index names its topic0 values.
     const raw = await via.request<unknown>("eth_getLogs", [
       { ...filter, fromBlock: numberToHex(from), toBlock: numberToHex(to) },
     ]);
     return checkLogs(raw, keys, from, to, apart ? null : finalKeys);
   }
 
-  /**
-   * An explicit cap ("range N exceeds limit of M") is the provider's own limit: it becomes the
-   * index's span, replacing one learned by halving, and only a smaller cap lowers it again.
-   */
   function adoptCap(cap: bigint) {
     if (spanIsCap && span !== null && span <= cap) return;
     span = cap;
@@ -550,28 +428,16 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     if (current()) options.onCap?.(cap);
   }
 
-  /**
-   * How a range error on `size` blocks is handled: a cap the provider named, the half to split
-   * this range into, or a plain failure (at or below the floor, or a cap below it).
-   */
   function onRangeError(error: unknown, size: bigint): { cap: bigint } | { half: bigint } | null {
     const cap = explicitCap(error);
     if (cap !== null) return cap < size && cap >= minSpan ? { cap } : null;
     return size > minSpan ? { half: max((size + 1n) / 2n, minSpan) } : null;
   }
 
-  /** Waits before retry number `attempt` (1-based), as a backfill chunk does. */
   const backoff = (attempt: number) =>
     new Promise((resolve) => setTimeout(resolve, retryDelayMs * attempt));
 
-  /**
-   * All logs in [from, to] (used for heads and their gaps, and the bridge above a seeded
-   * history), in pieces of at most `limit` blocks, through the quick lane until the history is
-   * complete.
-   * A range error splits this read only; the index-wide span changes only for an explicit cap.
-   * Any other failure (or a range error that cannot be split further) is retried like a backfill
-   * chunk, `chunkRetries` times with backoff, before the read fails.
-   */
+  /** All logs in [from, to] in pieces of at most `limit`; a range error splits this read only. */
   async function fetchRange(
     from: bigint,
     to: bigint,
@@ -588,8 +454,7 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
       return parts.flat().sort(compareLogs);
     }
     try {
-      // Never in a POST with the backfill's chunks: until the history is complete, through the
-      // quick lane.
+      // Until the history is complete, never in a POST with the backfill's chunks.
       return await getLogs(from, to, apart, complete() ? lane : quickLane);
     } catch (error) {
       const next = isRangeError(error) ? onRangeError(error, size) : null;
@@ -606,9 +471,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     }
   }
 
-  // ---- backfill ----
-
-  /** One chunk. `hedge()` sends it once more (true if it did); the first answer wins. */
   function fetchChunk(chunk: Range): { promise: Promise<IndexedLog[]>; hedge: () => boolean } {
     let settled = false;
     let outstanding = 0;
@@ -628,7 +490,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
         },
         (error: unknown) => {
           outstanding--;
-          // Wait for the other copy if one is still out.
           if (settled || outstanding > 0) return;
           settled = true;
           settle.reject(error);
@@ -665,7 +526,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     checkSeeded();
   }
 
-  /** Ranges of [deployBlock, bottom − 1] not yet fetched, newest first. */
   function gaps(): Range[] {
     const out: Range[] = [];
     let cursor = bottom - 1n;
@@ -689,12 +549,8 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     notify();
   }
 
-  /**
-   * Fetches chunks newest-first, about as many outstanding as the lane can send at once. A chunk
-   * still unanswered after it was surely sent (the lane had nothing queued) for `hedgeMs`, and for
-   * twice as long as chunks usually take, is sent once more; at most one POST's worth at a time,
-   * so a provider that is slow for everyone is not sent everything twice.
-   */
+  // About as many chunks outstanding as the lane can send at once; a slow one is sent once more
+  // (after hedgeMs and twice the usual time), at most a POST's worth at a time.
   function drain(work: Chunk[]): Promise<void> {
     return new Promise((resolve) => {
       let stopped = false;
@@ -718,7 +574,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
           // Requests still queued in the lane (or paused by a rate limit) are not slow upstream.
           if (stats.queued > 0 || stats.pausedMs > 0) return;
           const now = Date.now();
-          // Slow only compared with chunks that have answered; none yet means nothing to compare.
           const threshold = latencies.length > 0 ? Math.max(hedgeMs, 2 * median(latencies)) : null;
           let hedges = 0;
           for (const flight of flights.values()) if (flight.hedged) hedges++;
@@ -754,8 +609,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
         const previous = chunk.lastFailure;
         failures++;
         chunk.lastFailure = { landings, failures };
-        // Between this chunk's last failure and this one, nothing landed and many other chunks
-        // failed too: the provider is failing everything, not this range.
         const burst =
           previous !== undefined &&
           landings === previous.landings &&
@@ -763,14 +616,12 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
         if (!current()) {
           stopped = true;
         } else if (next && "cap" in next) {
-          // The provider named its limit: it holds for the whole index.
           adoptCap(next.cap);
           split(chunk, next.cap);
         } else if (next && "half" in next && previous !== undefined && !burst) {
-          // No cap named: the first range error is retried as is, so a passing "query timeout"
-          // costs one request. A range that fails again is too dense, and only it is split
-          // (never below minSpan; the index-wide span stays). A burst that hits every range at
-          // once is an ordinary failure: retries, then unavailable.
+          // No cap named: the first range error is retried as is (a passing "query timeout" costs
+          // one request); a range that fails again is too dense, and only it is split. A burst that
+          // hits every range at once is an ordinary failure: retries, then unavailable.
           split(chunk, next.half);
         } else if (chunk.attempts < chunkRetries) {
           chunk.attempts++;
@@ -801,7 +652,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
               (error: unknown) => failed(chunk, error).finally(() => flights.delete(chunk))
             )
             .catch((error: unknown) => {
-              // A bug in the handling above must not leave the run hanging.
               flights.delete(chunk);
               stopped = true;
               fail(error, chunk);
@@ -817,14 +667,8 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     });
   }
 
-  /**
-   * The newest piece of `gap` the RPC accepts in one request. Without an explicit cap the size is
-   * halved one request at a time (a single shared probe, not a fan-out of failures), never below
-   * `minSpan`: an RPC that refuses even that serves no usable history, as in logs.ts. A failure
-   * that is not about the range is retried like a backfill chunk (`chunkRetries` times, with
-   * backoff) before the backfill fails: on a provider without a cap this request is the whole
-   * backfill.
-   */
+  // The newest piece of `gap` the RPC accepts in one request: halved one request at a time without
+  // an explicit cap (one probe, not a fan-out of failures), never below `minSpan`.
   async function probe(
     gap: Range
   ): Promise<{ landed: Landed } | { cap: bigint } | { error: unknown; range: Range }> {
@@ -867,7 +711,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
 
     let todo = gaps();
     if (span === null) {
-      // No pending chunks exist without a span: this is the whole range below the coverage.
       const gap = todo[0] as Range;
       const result = await probe(gap);
       if (!current()) return;
@@ -881,7 +724,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
         chunksTotal += 1;
         land(result.landed, result.landed.logs);
         if (whole) return finished(startedAt);
-        // The size the halving probe got accepted, unless a cap was named meanwhile.
         span ??= result.landed.to - result.landed.from + 1n;
       } else {
         strategy = "chunked";
@@ -892,7 +734,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     const work = todo.flatMap((gap) =>
       chunksOf(gap, span as bigint).map((chunk) => ({ ...chunk, attempts: 0 }))
     );
-    // A resumed run counts what already landed plus what is left.
     chunksTotal = chunksDone + work.length;
     await drain(work);
     if (current() && !failure) finished(startedAt);
@@ -925,8 +766,7 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
       return run.then(() => startBackfill());
     }
     failure = null;
-    // Never paced, whoever started it (sync/pacer.ts): the engine's index step can start a
-    // backfill, which is not the engine's per-block work.
+    // Never paced (sync/pacer.ts): a backfill is not the engine's per-block work.
     const thisRun: Promise<void> = asRequestWork(backfill)
       .catch((error: unknown) => fail(error, { from: deployBlock, to: bottom - 1n }))
       .finally(() => {
@@ -938,21 +778,14 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     return thisRun;
   }
 
-  // ---- heads ----
-
   let chain: Promise<unknown> = Promise.resolve();
-  // The reads for the last few heads. A query answers from the read for its own head, and the
-  // sync engine reads a new head's tail before it serves that head: queries at the head still
-  // served meanwhile keep theirs instead of reading it again.
+  // The reads for the last few heads: a query answers from its own head's read, so queries at the
+  // head still served while the engine reads the next one do not read theirs again.
   const recentSyncs = new Map<string, Promise<Tail>>();
   const RECENT_HEADS = 4;
 
-  /**
-   * Reads (finalizedTo, head] once per head (number and hash); the part at or below the new
-   * boundary is promoted to final from this fresh read. Resolves with the read, which is what a
-   * query at this head answers from: a later read at another (even an older) head never stands
-   * in for it. Reads run one at a time.
-   */
+  // Reads (finalizedTo, head] once per head, one at a time, and promotes what is now final from
+  // that fresh read only; a query answers from its own head's read.
   function sync(head: IndexHead): Promise<Tail> {
     const key = `${head.head.number}:${head.head.hash.toLowerCase()}`;
     const known = recentSyncs.get(key);
@@ -980,7 +813,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
         logs = await fetchRange(from, head.number);
       } catch (error) {
         ensureCurrent();
-        // Today's LogsUnavailableError text, without the RPC URL.
         throw new IndexUnavailable(describe(error), from, head.number);
       }
     }
@@ -996,15 +828,11 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     const read: Tail = { head, logs: logs.filter((log) => log.blockNumber > top) };
     tail = read;
     notify();
-    // A seeded history whose last block was above the boundary when the backfill completed is
-    // checked once the boundary reaches it.
+    // A seeded history above the boundary at completion is checked once the boundary reaches it.
     checkSeeded();
     return read;
   }
 
-  // ---- a history seeded from the last run ----
-
-  /** Tells the seeded history's outcome to whoever seeded it. */
   function report(entry: Seeded, outcome: ProvisionalOutcome) {
     try {
       entry.onOutcome?.(outcome);
@@ -1013,11 +841,8 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     }
   }
 
-  /**
-   * Once this run's backfill covers the seeded history's whole range, compares the two: the same
-   * logs, each saying the same thing, is "verified"; anything else (a log added, removed or
-   * changed) is a "mismatch". Either way the seeded logs are dropped: this run's are complete.
-   */
+  // Once the backfill covers the seeded range: the same logs, each saying the same thing, is
+  // "verified"; anything else a "mismatch". The seeded logs are dropped either way.
   function checkSeeded() {
     const entry = seeded;
     if (!entry || entry.state !== "provisional" || !complete() || top < entry.finalizedTo) return;
@@ -1028,20 +853,13 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     report(entry, entry.state);
   }
 
-  /**
-   * Whether the blocks between the seeded history and this run's boundary are read on their own
-   * (a bridge): only once the boundary has reached the seeded last block (a read from below it
-   * would leave part of this run's range to be read twice), and only for a narrow gap.
-   */
+  // A bridge only once the boundary has reached the seeded last block (else part of this run's
+  // range would be read twice), and only for a narrow gap.
   function bridgeable(entry: Seeded): boolean {
     if (top < entry.finalizedTo) return false;
     return top - entry.finalizedTo <= (span ?? BRIDGE_DEFAULT_SPAN) * BRIDGE_MAX_CHUNKS;
   }
 
-  /**
-   * This run's read of (seeded last block, this run's boundary now]: final blocks. Only when
-   * bridgeable(entry).
-   */
   function startBridge(entry: Seeded): Bridge {
     if (entry.bridge) return entry.bridge;
     const from = entry.finalizedTo + 1n;
@@ -1080,38 +898,25 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
       bridge: null,
     };
     seeded = entry;
-    // Already covered by this run (the seed came late): checked now.
     checkSeeded();
     if (entry.state === "provisional" && anchored && bridgeable(entry)) startBridge(entry);
     return true;
   }
 
-  /**
-   * A page's answer from the seeded history (LogQuery.provisional): the seeded logs up to its last
-   * block, this run's bridge read above it (a narrow gap only), and this run's final range and
-   * tail above that (for a wider gap, once the newest-first backfill has covered it). null when
-   * the answer should not come from there (no history awaiting verification, the backfill
-   * already covers `fromBlock`, the history claims final blocks above the boundary at this head,
-   * `fromBlock` is above the seeded history and no bridge stands in for the backfill, or the
-   * bridge read failed): the query then reads as any other.
-   */
+  // A page's answer from the seeded history: its logs, the bridge above them, and this run's reads
+  // above that; null when it should not answer from there (the query then reads as any other).
   async function fromSeeded(query: LogQuery & { head: IndexHead }): Promise<IndexRead | null> {
     const entry = seeded;
     const observed = query.head;
     const from = max(query.fromBlock ?? deployBlock, deployBlock);
     if (!entry || entry.state !== "provisional" || covers(from)) return null;
     if (entry.finalizedTo > observed.safe || entry.finalizedTo > top) return null;
-    // A bridge that ends below the seeded last block would make this run's reads above it
-    // overlap the seeded logs (startBridge never makes one; never use one).
+    // A bridge ending below the seeded last block would overlap the seeded logs: never used.
     if (entry.bridge && entry.bridge.to < entry.finalizedTo) entry.bridge = null;
     const bridge = entry.bridge ?? (bridgeable(entry) ? startBridge(entry) : null);
-    // Nothing of the last run's is asked for, and nothing read on its own is faster: as any query.
     if (!bridge && from > entry.finalizedTo) return null;
     if (!complete() && !recentFailure()) void startBackfill();
     const upper = query.toBlock ?? observed.head.number;
-    // Above the seeded history and the bridge, read at the same time: this run's coverage and
-    // tail. Directly above the bridge that is already answerable (the bridge ends at a boundary
-    // this run reached); without a bridge, it waits for the backfill to cover the gap.
     const lower = max(from, max(bridge?.to ?? entry.finalizedTo, entry.finalizedTo) + 1n);
     const above = upper >= lower ? read({ ...query, fromBlock: lower, provisional: false }) : null;
     void above?.catch(() => {});
@@ -1138,8 +943,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
       provisionalTo: from <= entry.finalizedTo ? entry.finalizedTo : null,
     };
   }
-
-  // ---- queries ----
 
   function waitFor(from: bigint, waitMs: number, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -1188,7 +991,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     ensureCurrent();
     anchor(observed.safe);
     if (!complete()) {
-      // After a failure, report it for a while instead of hammering the RPC; then resume.
       const recent = recentFailure();
       if (recent && !covers(from)) throw unavailable(recent);
       if (!recent) void startBackfill();
@@ -1235,9 +1037,6 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
   }
 
   return {
-    label,
-    addresses,
-    deployBlock,
     startBackfill,
     logs: async (query) => (await read(query)).logs,
     read,

@@ -3,10 +3,6 @@ import { act, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { describe, expect, it } from "vitest";
 
-// A page's first answer stays on screen, saying the fresh result is pending, until that result
-// streams in and replaces it; a failure keeps it, saying so. A first answer that is not stale is
-// shown as it is.
-
 const view = (first: string) => (fresh: string | null, refresh: string | null) => (
   <p data-testid="shown">
     {fresh ?? first} · {refresh ?? "settled"}

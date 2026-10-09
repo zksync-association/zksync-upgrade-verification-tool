@@ -62,7 +62,6 @@ const ACTIVE_WINDOW_DAYS = 45n;
 
 type Status = UpgradeStatus;
 
-/** The id's state and status at the current head (shared with the sync engine's reads). */
 const readStatus = (id: Hex) => currentUpgradeStatus(id);
 
 export type StartedUpgrade = {
@@ -72,16 +71,9 @@ export type StartedUpgrade = {
   idMatches: boolean;
   blockNumber: string;
   txHash: Hex;
-  /**
-   * Pages only: found in the history the last run read (the chain cache), not read again in this
-   * run yet. Never set in JSON, and never kept.
-   */
+  /** Pages only (never in JSON, never kept): from the last run's history, not read again yet. */
   fromLastRun?: true;
-  /**
-   * Pages only: located directly from the upgrade's creation time (a narrow log read) while this
-   * run's log index was still reading the history, and not checked against it yet. Never set in
-   * JSON, and never kept.
-   */
+  /** Pages only (never in JSON, never kept): located directly, not confirmed by the index yet. */
   locatedDirectly?: true;
 };
 
@@ -114,10 +106,8 @@ function decodeStarted(log: Awaited<ReturnType<typeof getLogs>>[number]): Starte
 
 const startedKey = (id: Hex) => `started:${id.toLowerCase()}`;
 
-/**
- * A start the index answered from its final range never changes; one from the unfinalized tail is
- * read again, even once the boundary has passed it. Dev nodes can be rewound.
- */
+// A start from the final range never changes; one from the unfinalized tail is read again, even
+// once the boundary has passed it. Dev nodes can be rewound.
 const startedTtl = (event: { final: boolean }, net: Pick<Network, "isDevNode">) =>
   !net.isDevNode && event.final ? FOREVER : 0;
 
@@ -134,19 +124,11 @@ export type UpgradeList = {
   upgrades: UpgradeSummary[];
   fromBlock: string;
   allHistory: boolean;
-  /**
-   * Pages only (`freshness: "page"`): listed from the history the last run read, while this run's
-   * backfill re-verifies it; the verified list follows. Never set in JSON.
-   */
+  /** Pages only, never in JSON: from the last run's history while the backfill re-verifies it. */
   fromLastRun?: true;
 };
 
-/**
- * Standard upgrades started since `from` (45 days, or the deployment), newest first, each with
- * its state at the head. JSON ("strict") waits for this run's complete history; a page ("page")
- * may be answered from the last run's history while this run's backfill has not covered the
- * window yet (`fromLastRun`).
- */
+/** JSON waits for this run's complete history; a page may use the last run's (`fromLastRun`). */
 export async function listStandardUpgrades({
   allHistory,
   freshness = "strict",
@@ -158,8 +140,7 @@ export async function listStandardUpgrades({
     allHistory || windowStart < net.upgradeHandlerDeployBlock
       ? net.upgradeHandlerDeployBlock
       : windowStart;
-  // Complete from `from` to the head, or an error: never a partial list. A page may be answered
-  // from the last run's history (`provisional`); JSON reads only this run's.
+  // Complete from `from` to the head, or an error: never a partial list.
   const strict = async () => ({
     events: await puhIndex().events("UpgradeStarted", { fromBlock: from }),
     provisional: false,
@@ -174,9 +155,8 @@ export async function listStandardUpgrades({
   const upgrades = await Promise.all(
     events.map(async (event): Promise<UpgradeSummary> => {
       const started = startedFrom(event);
-      // The detail page then needs no lookup for a final start. Only seeded: the list never
-      // waits on (or fails with) a detail lookup of the same id in flight. One from the last
-      // run's history is not final (startedTtl 0): never kept.
+      // Only seeded: the list never waits on (or fails with) a detail lookup of the same id in
+      // flight. A start from the last run's history is not final (startedTtl 0): never kept.
       seed(startedKey(started.id), started, startedTtl(event, net));
       const { state, status } = await readStatus(started.id);
       return {
@@ -198,20 +178,10 @@ export async function listStandardUpgrades({
   };
 }
 
-/**
- * The UpgradeStarted event for `id` from the handler's log index, kept for good once the index
- * answers it from its final range; null when the complete index has none.
- */
 function indexedStart(id: Hex): Promise<StartedUpgrade | null> {
   return cachedUntil(startedKey(id), () => readStart(id));
 }
 
-/**
- * A page's lookup of the start: while this run's backfill has not covered it yet, from the
- * history the last run read (`fromLastRun`, never kept: confirmedStart checks it against this
- * run's); otherwise as indexedStart. null (no start there) falls back to this run's index in
- * startedUpgrade, as any miss does.
- */
 async function pageStart(id: Hex): Promise<StartedUpgrade | null> {
   const { event, provisional } = await puhIndex().singleAnswer("UpgradeStarted", id, {
     provisional: true,
@@ -221,7 +191,6 @@ async function pageStart(id: Hex): Promise<StartedUpgrade | null> {
   return event.provisional ? { ...startedFrom(event), fromLastRun: true } : startedFrom(event);
 }
 
-/** Two starts are the same: the same transaction, block and proposal. */
 function sameStart(a: StartedUpgrade, b: StartedUpgrade): boolean {
   const proposal = (s: StartedUpgrade) =>
     JSON.stringify(s.proposal, (_, value) =>
@@ -236,16 +205,9 @@ function sameStart(a: StartedUpgrade, b: StartedUpgrade): boolean {
   );
 }
 
-/** A start this run's index has not confirmed yet: from the last run's history, or located directly. */
 const unconfirmed = (started: StartedUpgrade) =>
   started.fromLastRun === true || started.locatedDirectly === true;
 
-/**
- * The page's core with the start as this run's index reads it: the same core when its start came
- * from it; otherwise (a start from the last run's history, or located directly) once the index
- * answers, which must be the same start (else an integrity error: the cached history, or the
- * direct read, was wrong).
- */
 async function confirmedStart(core: StandardUpgradeCore): Promise<StandardUpgradeCore> {
   if (!unconfirmed(core.started)) return core;
   const started = await startedUpgrade(
@@ -265,11 +227,8 @@ async function confirmedStart(core: StandardUpgradeCore): Promise<StandardUpgrad
   return { ...core, started, calls: started.proposal.calls.map(decodeCall) };
 }
 
-/**
- * A page's start: the index's (see pageStart), or, while the index is still reading the history
- * and has nothing from the last run to answer from, the start located directly from the creation
- * time if that comes first (`locatedDirectly`; confirmedStart checks it against the index's).
- */
+// The index's start, or the one located directly from the creation time if that comes first
+// (`locatedDirectly`; confirmedStart checks it against the index's).
 async function pageLocatedStart(
   id: Hex,
   status: Status,
@@ -292,11 +251,7 @@ async function readStart(id: Hex): Promise<{ value: StartedUpgrade | null; ttlMs
     : { value: null, ttlMs: 0 };
 }
 
-/**
- * The start of an upgrade the contract knows (creationTimestamp != 0). From the log index; the
- * legacy lookup only when the index cannot answer. A complete index without the event is an
- * error, never "not found".
- */
+/** A complete index without the event is an error, never "not found". */
 async function startedUpgrade(
   id: Hex,
   status: Status,
@@ -307,12 +262,9 @@ async function startedUpgrade(
   try {
     started = await indexed;
     if (!started) {
-      // The status and the index each read the cached head on their own, and a newer head can be
-      // served between the two reads (the sync engine publishes the next block, or the head's
-      // 4 s run out; dev nodes read the status at 'latest'): look once more at the newest head
-      // before calling the index wrong.
-      // Read directly, not through the cache, which could hand back another request's lookup
-      // still answering at the old head.
+      // The status and the index each read the cached head, and a newer head can be served between
+      // the two reads: look once more at the newest head before calling the index wrong. Directly,
+      // not through the cache, which could hand back another request's lookup at the old head.
       refreshHead();
       const again = await readStart(id);
       if (again.value) seed(startedKey(id), again.value, again.ttlMs);
@@ -333,7 +285,6 @@ async function startedUpgrade(
   throw await missingStart(id, status);
 }
 
-/** Why the complete index has no UpgradeStarted for an upgrade the contract knows. */
 async function missingStart(id: Hex, status: Status): Promise<Error> {
   const index = puhIndex().status();
   const created = BigInt(status.creationTimestamp);
@@ -354,10 +305,7 @@ async function missingStart(id: Hex, status: Status): Promise<Error> {
   );
 }
 
-/**
- * The UpgradeStarted event for `id`, found from the on-chain creation timestamp (no full scan):
- * the legacy lookup when the log index cannot answer, and a page's direct lookup beside it.
- */
+/** The UpgradeStarted event for `id`, found from the on-chain creation timestamp (no full scan). */
 async function findStarted(id: Hex, creationTimestamp: number): Promise<StartedUpgrade | null> {
   const log = await startedLog(id, creationTimestamp);
   const started = log ? decodeStarted(log) : null;
@@ -410,14 +358,9 @@ export type StandardUpgradeCore = Omit<
 >;
 
 /**
- * Independent sections start as soon as the status and original proposal are available. `sets`
- * are the current signatures alone (no recorded transaction, `used` or `historical` yet), so they
- * never wait on the recorded approvals' re-checks; `setEvidence` adds those to each set once both
- * are in.
- *
- * With `freshness: "page"`, `sets` is the page's first answer (each set the strict result, or a
- * labelled stale one without an execution, see firstSignatureSet) and `freshSets` the strict
- * result. Otherwise (JSON) both are the strict result.
+ * Independent sections start as soon as the status and original proposal are available; `sets`
+ * never wait on the recorded approvals' re-checks (`setEvidence` adds those). A page's `sets` may
+ * be labelled stale first answers (no execution); `freshSets` is the strict result.
  */
 export async function loadStandardUpgrade(
   id: Hex,
@@ -426,9 +369,8 @@ export async function loadStandardUpgrade(
     freshness = "strict",
   }: { supplied?: MemberSignature[]; freshness?: Freshness } = {}
 ) {
-  // The sets read the members' Safe listings: those reads start as soon as the upgrade is known
-  // to exist, while its proposal is looked up in the log index (a fresh process waits for the
-  // backfill there), instead of after it.
+  // The members' Safe listings are read as soon as the upgrade is known to exist, while its
+  // proposal is looked up in the log index (which may wait for the backfill), not after it.
   const overview = await getStandardUpgradeCore(id, {
     onExists: (gov) =>
       prefetchSafeListings([...gov.securityCouncil.members, ...gov.guardians.members], {
@@ -436,9 +378,8 @@ export async function loadStandardUpgrade(
       }),
     freshness,
   });
-  // A page may show a start from the last run's history (`fromLastRun`) or located directly
-  // (`locatedDirectly`); whatever acts on the proposal (its execution, the recorded approvals,
-  // the L2 proposal) waits for this run's index.
+  // A page may show an unconfirmed start (`fromLastRun`, `locatedDirectly`); whatever acts on the
+  // proposal (its execution, the recorded approvals, the L2 proposal) waits for this run's index.
   const confirmed = confirmedStart(overview);
   const startedCheck = unconfirmed(overview.started)
     ? confirmed.then((core) => core.started)
@@ -496,7 +437,6 @@ export async function getStandardUpgrade(
   };
 }
 
-/** What a set's recorded approval adds to it: the transaction, the signatures it used, the re-check. */
 export type SetEvidence = Pick<ApprovalSet, "key" | "state" | "used" | "historical">;
 
 function evidenceFor(set: ApprovalSet, records: RecordedApproval[]): SetEvidence {
@@ -509,7 +449,6 @@ function evidenceFor(set: ApprovalSet, records: RecordedApproval[]): SetEvidence
   };
 }
 
-/** A set with its recorded approval merged in (see SetEvidence). */
 function withEvidence(set: ApprovalSet, evidence: readonly SetEvidence[]): ApprovalSet {
   const found = evidence.find((e) => e.key === set.key);
   return found ? { ...set, ...found } : set;
@@ -526,12 +465,7 @@ export async function getStandardUpgradeOverview(id: Hex): Promise<StandardUpgra
   return { ...core, ...execution, l2Proposal };
 }
 
-/**
- * The upgrade's state, status, start and calls. With `freshness: "page"` the start may come from
- * the last run's history (`started.fromLastRun`, see pageStart) or be located directly while the
- * index reads the history (`started.locatedDirectly`, see pageLocatedStart); JSON's always comes
- * from this run's index.
- */
+/** JSON's start always comes from this run's index; a page's may not be confirmed yet. */
 export async function getStandardUpgradeCore(
   id: Hex,
   {
@@ -539,8 +473,7 @@ export async function getStandardUpgradeCore(
     freshness = "strict",
   }: { onExists?: (gov: Governance) => void; freshness?: Freshness } = {}
 ): Promise<StandardUpgradeCore> {
-  // The start event is looked up while governance and the status are read; a page's direct
-  // lookup (see pageLocatedStart) starts as soon as the status gives the creation time.
+  // The start is looked up while governance and the status are read, not after.
   const indexed = freshness === "page" ? pageStart(id) : indexedStart(id);
   void indexed.catch(() => {});
   const statusRead = timedRead(id, "status", () => readStatus(id));
@@ -550,7 +483,6 @@ export async function getStandardUpgradeCore(
       : indexed;
   void located.catch(() => {});
   const [gov, { state, status }] = await Promise.all([
-    // A page's at the head it is read at (governance.ts pageGovernance); JSON's as ever.
     timedRead(id, "governance", () => governanceFor(freshness)),
     statusRead,
   ]);
@@ -728,11 +660,7 @@ async function getRecordedApprovals(d: StandardUpgradeCore): Promise<RecordedApp
   );
 }
 
-/**
- * The current signatures of each set (the recorded approvals are merged in by withEvidence): the
- * strict result, and the page's first answer (see loadStandardUpgrade). A stale first answer has
- * no execution: nothing is offered to send from it.
- */
+/** A stale first answer has no execution: nothing is offered to send from it. */
 function streamStandardUpgradeSets(
   d: StandardUpgradeCore,
   supplied: MemberSignature[],
@@ -811,7 +739,6 @@ async function recheckAt(
     // The boundary is read before the check: a block at or below it was final when it was read.
     const final = await isFinalBlock(block);
     const value = await recheck(contract, set, used, block);
-    // Kept for good only when definite (accepted or a definite revert) at a final block.
     return { value, ttlMs: final && value.accepted !== null ? FOREVER : 0 };
   });
 }
@@ -842,10 +769,6 @@ async function recheck(
   }
 }
 
-/**
- * Legacy lookup, when the log index cannot answer: an id's event by scanning [fromBlock, toBlock
- * ?? head].
- */
 async function legacyEvent(
   handler: Address,
   name: string,
@@ -865,9 +788,8 @@ function simulateAs(
   executor: Address,
   page = false
 ) {
-  // The proposal comes from its UpgradeStarted log: nothing the viewer supplied, so the answer is
-  // kept per head (and, for a page, simulated again at each new head while it shows it). A
-  // proposal with an executor can only be executed by it; simulate from there.
+  // The proposal comes from its UpgradeStarted log, nothing the viewer supplied: kept per head.
+  // A proposal with an executor can only be executed by it; simulate from that address.
   if (!isAddressEqual(executor, zeroAddress)) {
     return simulateCall(
       { from: executor, to: execution.to, data: execution.data },

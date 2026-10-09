@@ -660,21 +660,16 @@ describe("the next start", () => {
     expect(puhIndex().status().provisional).toBeNull();
   });
 
-  it("ignores a file whose content names another chain than its name", async () => {
-    await firstRun();
-    const saved = readFile();
-    writeFile({ ...saved, chain: { ...saved.chain, genesisHash: OTHER_GENESIS } });
-    restart();
-    upstream();
-    await loadChainCache({ dir: cacheDir() });
-    expect(chainCacheStatus()).toMatchObject({
-      state: "absent",
-      detail: "The cache file is for another chain; it was ignored.",
-    });
-  });
-
   it.each([
     ["not JSON", () => "{ not json", "not valid JSON"],
+    [
+      "content naming another chain than its name",
+      (s: { chain: Record<string, unknown> }) => ({
+        ...s,
+        chain: { ...s.chain, genesisHash: OTHER_GENESIS },
+      }),
+      "The cache file is for another chain; it was ignored.",
+    ],
     [
       "another schema version",
       (s: Record<string, unknown>) => ({ ...s, schema: 2 }),
@@ -796,6 +791,24 @@ describe("the L2 governors' history", () => {
     },
     { governor: GOVERNORS.govOps, description: "second", created: ERA_FINAL - 9_000n, state: 1 },
   ];
+  /** Era whose backfill waits for `release()`; its tail is answered. */
+  const heldEra = (list: Parameters<typeof fakeEra>[0]) => {
+    const era = fakeEra(list);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const held = {
+      ...era,
+      handle: async (call: FakeCall) => {
+        const filter = call.params[0] as { toBlock?: Hex };
+        if (call.method === "eth_getLogs" && BigInt(filter.toBlock ?? "0x0") <= ERA_FINAL)
+          await gate;
+        return era.handle(call);
+      },
+    };
+    return { era: held as unknown as ReturnType<typeof fakeEra>, release };
+  };
 
   it("is saved with Era's chain id and seeded, then verified, on the next start", async () => {
     restart(ERA_MAINNET());
@@ -833,22 +846,8 @@ describe("the L2 governors' history", () => {
     writeFile({ ...saved, l2: { ...saved.l2, logs: [{ ...first, data: second.data }, ...rest] } });
 
     restart(ERA_MAINNET());
-    // Era's backfill waits for the test; its tail is answered.
-    const era = fakeEra(proposals());
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const held = {
-      ...era,
-      handle: async (call: FakeCall) => {
-        const filter = call.params[0] as { toBlock?: Hex };
-        if (call.method === "eth_getLogs" && BigInt(filter.toBlock ?? "0x0") <= ERA_FINAL)
-          await gate;
-        return era.handle(call);
-      },
-    };
-    upstream({ era: held as unknown as ReturnType<typeof fakeEra> });
+    const { era, release } = heldEra(proposals());
+    upstream({ era });
     await loadChainCache({ dir: cacheDir() });
     const backfill = l2GovernorIndex().startBackfill();
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -887,22 +886,8 @@ describe("the L2 governors' history", () => {
     });
 
     restart(ERA_MAINNET());
-    // Era's backfill waits for the test; its tail is answered.
-    const era = fakeEra(vetoable());
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const held = {
-      ...era,
-      handle: async (call: FakeCall) => {
-        const filter = call.params[0] as { toBlock?: Hex };
-        if (call.method === "eth_getLogs" && BigInt(filter.toBlock ?? "0x0") <= ERA_FINAL)
-          await gate;
-        return era.handle(call);
-      },
-    };
-    upstream({ era: held as unknown as ReturnType<typeof fakeEra> });
+    const { era, release } = heldEra(vetoable());
+    upstream({ era });
     await loadChainCache({ dir: cacheDir() });
     const backfill = l2GovernorIndex().startBackfill();
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -920,7 +905,13 @@ describe("the L2 governors' history", () => {
     expect(strict.proposals[0]?.proposalId).toBe(proposalIdOf("second").toString());
   });
 
-  it("is not seeded when it claims Era blocks beyond Era's head", async () => {
+  it.each([
+    [
+      "it claims Era blocks beyond Era's head",
+      (l2: Record<string, unknown>) => ({ ...l2, finalizedTo: numberToHex(ERA_HEAD + 1_000n) }),
+    ],
+    ["Era answers another chain id", (l2: Record<string, unknown>) => ({ ...l2, l2ChainId: 300 })],
+  ])("is not seeded when %s", async (_, tamper) => {
     restart(ERA_MAINNET());
     upstream({ era: fakeEra(proposals()) });
     await loadChainCache({ dir: cacheDir() });
@@ -928,7 +919,7 @@ describe("the L2 governors' history", () => {
     await l2GovernorIndex().read();
     expect(await saveChainCache()).toBe(true);
     const saved = readFile();
-    writeFile({ ...saved, l2: { ...saved.l2, finalizedTo: numberToHex(ERA_HEAD + 1_000n) } });
+    writeFile({ ...saved, l2: tamper(saved.l2) });
 
     restart(ERA_MAINNET());
     upstream({ era: fakeEra(proposals()) });
@@ -999,22 +990,4 @@ describe("the L2 governors' history", () => {
       if (end === "found wrong") expect(chainCacheStatus().state).toBe("mismatch");
     }
   );
-
-  it("is not seeded when Era answers another chain id", async () => {
-    restart(ERA_MAINNET());
-    upstream({ era: fakeEra(proposals()) });
-    await loadChainCache({ dir: cacheDir() });
-    await Promise.all([puhIndex().startBackfill(), l2GovernorIndex().startBackfill()]);
-    await l2GovernorIndex().read();
-    expect(await saveChainCache()).toBe(true);
-    const saved = readFile();
-    writeFile({ ...saved, l2: { ...saved.l2, l2ChainId: 300 } });
-
-    restart(ERA_MAINNET());
-    upstream({ era: fakeEra(proposals()) });
-    await loadChainCache({ dir: cacheDir() });
-    await Promise.all([puhIndex().startBackfill(), l2GovernorIndex().startBackfill()]);
-    await vi.waitFor(() => expect(chainCacheStatus().state).toBe("verified"));
-    expect(l2GovernorIndex().status().provisional).toBeNull();
-  });
 });

@@ -35,7 +35,7 @@ import {
   until,
 } from "../support/live-world";
 
-// C-6: the sync engine's own upstream work keeps to SYNC_CREDITS_PER_SECOND (Infura credit
+// The sync engine's own upstream work keeps to SYNC_CREDITS_PER_SECOND (Infura credit
 // weights: eth_getLogs 255, eth_chainId 5, everything else 80) in any one second, in steady state
 // and in recompute bursts; a request's own reads never wait for it.
 
@@ -161,6 +161,25 @@ describe("R-D3: the engine's work goes out only while the engine may send", () =
     };
   };
 
+  /** A node answering every JSON-RPC call with 0x1: the methods it was sent. */
+  const stubNode = () => {
+    const sent: string[] = [];
+    vi.stubGlobal("fetch", async (_input: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      const calls = (Array.isArray(body) ? body : [body]) as { id: number; method: string }[];
+      sent.push(...calls.map((call) => call.method));
+      const answers = calls.map((call) => ({ jsonrpc: "2.0", id: call.id, result: "0x1" }));
+      return new Response(JSON.stringify(Array.isArray(body) ? answers : answers[0]), {
+        headers: { "content-type": "application/json" },
+      });
+    });
+    return sent;
+  };
+  const clientPacedBy = (pace: typeof paceAsEngine) =>
+    createPublicClient({
+      transport: limitedHttp("http://127.0.0.1:9", { label: "L1", maxInFlight: 4, pace }),
+    });
+
   it("a waiter whose turn comes once the engine may no longer send is dropped, never released", async () => {
     const { state, rule: sendRule } = rule();
     const pace = new CreditPacer(160, Date.now, () => sendRule);
@@ -202,7 +221,6 @@ describe("R-D3: the engine's work goes out only while the engine may send", () =
     await vi.advanceTimersByTimeAsync(1_000);
     expect(await settledStale).toBeInstanceOf(EngineWorkDropped);
     expect(await settledCurrent).toBe("sent");
-    // drop(): what waits now is rejected at once, before its turn.
     const waiting = [pace.take(80), pace.take(80)].map((wait) =>
       (wait as Promise<void>).then(
         () => "sent",
@@ -280,23 +298,8 @@ describe("R-D3: the engine's work goes out only while the engine may send", () =
     const { state, rule: sendRule } = rule();
     previous = allowEngineWorkWhen(sendRule);
     readRateFrom(() => 0);
-    const sent: string[] = [];
-    vi.stubGlobal("fetch", async (_input: unknown, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body));
-      const calls = (Array.isArray(body) ? body : [body]) as { id: number; method: string }[];
-      sent.push(...calls.map((call) => call.method));
-      const answers = calls.map((call) => ({ jsonrpc: "2.0", id: call.id, result: "0x1" }));
-      return new Response(JSON.stringify(Array.isArray(body) ? answers : answers[0]), {
-        headers: { "content-type": "application/json" },
-      });
-    });
-    const client = createPublicClient({
-      transport: limitedHttp("http://127.0.0.1:9", {
-        label: "L1",
-        maxInFlight: 4,
-        pace: paceEngineRequest,
-      }),
-    });
+    const sent = stubNode();
+    const client = clientPacedBy(paceEngineRequest);
     const read = (engine: boolean) => {
       const go = () => client.getBlockNumber({ cacheTime: 0 });
       return (engine ? asEngineWork(go) : go()).then(
@@ -304,7 +307,6 @@ describe("R-D3: the engine's work goes out only while the engine may send", () =
         (error: unknown) => error
       );
     };
-    // The engine may send: its work goes at once.
     const first = read(true);
     await vi.advanceTimersByTimeAsync(100);
     expect(await first).toBe("answered");
@@ -344,23 +346,8 @@ describe("R-D3: the engine's work goes out only while the engine may send", () =
     const { state, rule: sendRule } = rule();
     previous = allowEngineWorkWhen(sendRule);
     readRateFrom(() => 450);
-    const sent: string[] = [];
-    vi.stubGlobal("fetch", async (_input: unknown, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body));
-      const calls = (Array.isArray(body) ? body : [body]) as { id: number; method: string }[];
-      sent.push(...calls.map((call) => call.method));
-      const answers = calls.map((call) => ({ jsonrpc: "2.0", id: call.id, result: "0x1" }));
-      return new Response(JSON.stringify(Array.isArray(body) ? answers : answers[0]), {
-        headers: { "content-type": "application/json" },
-      });
-    });
-    const client = createPublicClient({
-      transport: limitedHttp("http://127.0.0.1:9", {
-        label: "L1",
-        maxInFlight: 4,
-        pace: paceAsEngine,
-      }),
-    });
+    const sent = stubNode();
+    const client = clientPacedBy(paceAsEngine);
     // The second's credits are used up: the engine's read waits its turn.
     pacer().debit(450);
     const waiting = asEngineWork(() => client.getBlockNumber({ cacheTime: 0 })).then(
@@ -390,23 +377,8 @@ describe("R-D3: the engine's work goes out only while the engine may send", () =
       const { state, rule: sendRule } = rule();
       previous = allowEngineWorkWhen(sendRule);
       readRateFrom(() => 450);
-      const sent: string[] = [];
-      vi.stubGlobal("fetch", async (_input: unknown, init?: RequestInit) => {
-        const body = JSON.parse(String(init?.body));
-        const calls = (Array.isArray(body) ? body : [body]) as { id: number; method: string }[];
-        sent.push(...calls.map((call) => call.method));
-        const answers = calls.map((call) => ({ jsonrpc: "2.0", id: call.id, result: "0x1" }));
-        return new Response(JSON.stringify(Array.isArray(body) ? answers : answers[0]), {
-          headers: { "content-type": "application/json" },
-        });
-      });
-      const client = createPublicClient({
-        transport: limitedHttp("http://127.0.0.1:9", {
-          label: "L1",
-          maxInFlight: 4,
-          pace: via.includes("paceAsEngine") ? paceAsEngine : paceEngineRequest,
-        }),
-      });
+      const sent = stubNode();
+      const client = clientPacedBy(via.includes("paceAsEngine") ? paceAsEngine : paceEngineRequest);
       // The second's credits are used up: the engine's request waits its turn.
       pacer().debit(450);
       const read = asEngineWork(() => client.getBlockNumber({ cacheTime: 0 })).then(
@@ -420,7 +392,6 @@ describe("R-D3: the engine's work goes out only while the engine may send", () =
       await vi.advanceTimersByTimeAsync(10_000);
       expect(sent).toEqual([]);
       expect(await read).not.toBe("answered");
-      // Under the new settings, the engine's work goes.
       const next = asEngineWork(() => client.getBlockNumber({ cacheTime: 0 }));
       await vi.advanceTimersByTimeAsync(100);
       expect(await next).toBe(1n);

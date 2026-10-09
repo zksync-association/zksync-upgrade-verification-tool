@@ -1,37 +1,21 @@
-// Preload for the read-only benchmark (benchmark-sync.ts): `node --import <this file>
-// ./server-build/index.js` with UPSTREAM_TRACE_OUT set records every request the server sends
-// upstream, and SIGUSR2 writes what was recorded since the last signal to
-// `${UPSTREAM_TRACE_OUT}.<n>.json` (n = 0, 1, …) and starts afresh.
-//
-// Each request is recorded when it is sent, in the dump of the window it went out in, answered
-// or not: its timing and status are filled in when the answer comes, and one still unanswered
-// when its window is dumped says so (`inFlight`). An answer (or a failure, or the error codes of
-// its entries) that comes after its request's window was dumped is recorded in the window it came
-// in, as an `answer` record (never counted as a request), so an error or a rate limit on a request
-// that straddled a dump is never lost. What is recorded, per request: when it was sent and
-// answered, its HTTP status, and
-//   - JSON-RPC: a short hash of the host (to tell the L1 and ZKsync Era RPCs apart, never the host
-//     itself), each entry's method, block tag, the 4-byte selector of eth_call data (or the number
-//     of sub-calls of a Multicall3 aggregate3), the block span of eth_getLogs, and the error codes
-//     of the entries that failed; the chain id and head numbers the RPC answered;
-//   - Safe Transaction Service: what was asked (a change check, a listing page, a message, a Safe's
-//     info) and of which Safe (public addresses).
-// Never a URL, host, path, query string, header, key, calldata or answer body beyond the above.
-// Without UPSTREAM_TRACE_OUT it does nothing.
+// Preload for benchmark-sync.ts (`node --import <this file>`): with UPSTREAM_TRACE_OUT set it
+// records each upstream request in the window it was sent in (`inFlight` if not answered by its
+// dump; what comes later is an `answer` record), and SIGUSR2 writes the window to
+// `${UPSTREAM_TRACE_OUT}.<n>.json`. Recorded: times, HTTP status, a host hash, JSON-RPC methods,
+// tags, selectors, spans, error codes, chain ids and heads, Safe request kinds and Safes. Never a
+// URL, host, path, query, header, key, calldata or answer body.
 import { createHash } from "node:crypto";
 import { renameSync, writeFileSync } from "node:fs";
 
 const MULTICALL3 = "0xca11bde05977b3631167028862be2a173976ca11";
 const AGGREGATE3 = "0x82ad56cb";
 const LOCAL = new Set(["localhost", "127.0.0.1", "[::1]"]);
+// Any other string is recorded as "other", never copied.
+const NAMED_TAGS = new Set(["latest", "finalized", "safe", "pending", "earliest"]);
 
-/** A short hash of a host: tells two RPCs apart in a trace without naming either. */
 export function hostId(host) {
   return createHash("sha256").update(String(host)).digest("hex").slice(0, 6);
 }
-
-// The named block tags: any other string is recorded as "other", never copied.
-const NAMED_TAGS = new Set(["latest", "finalized", "safe", "pending", "earliest"]);
 
 function blockTag(value) {
   if (typeof value === "string") {
@@ -43,7 +27,6 @@ function blockTag(value) {
   return value === undefined ? null : "other";
 }
 
-/** One JSON-RPC entry as recorded: method, block tag, selector or aggregate3 size, log span. */
 export function describeCall(call) {
   const method = typeof call?.method === "string" ? call.method : "?";
   const out = { m: method };
@@ -94,10 +77,7 @@ export function safeRequest(url) {
   return { what, safe };
 }
 
-/**
- * A request as recorded (without its timing), or null for one that stays on this machine. JSON-RPC
- * is told by its body; the Safe Transaction Service by its API path (or Safe's own host).
- */
+/** A request as recorded (without its timing), or null for one that stays on this machine. */
 export function describeRequest(href, body) {
   const url = new URL(href);
   if (typeof body === "string" && body.includes('"jsonrpc"')) {
@@ -106,7 +86,7 @@ export function describeRequest(href, body) {
     return {
       kind: "rpc",
       host: hostId(url.host),
-      // A ZKsync Era RPC by its name (the app does not always ask it for its chain id).
+      // ZKsync Era by its name: the app does not always ask it for its chain id.
       ...(/zksync|(^|\.)era\./i.test(url.hostname) ? { hint: "era" } : {}),
       calls: calls.map(describeCall),
     };
@@ -117,7 +97,6 @@ export function describeRequest(href, body) {
   return { kind: "other" };
 }
 
-/** A window's events as dumped: a request not answered yet is marked `inFlight`. */
 export function dumped(events) {
   return events.map((event) =>
     event.kind !== "head" && event.kind !== "answer" && event.ms === undefined
@@ -126,11 +105,6 @@ export function dumped(events) {
   );
 }
 
-/**
- * What came for a request after its window was dumped (`fields`: its timing, HTTP status or
- * failure, its entries' error codes), for the window it came in: which kind of request it was,
- * when it was sent, and (JSON-RPC) its host's short hash.
- */
 export function answerRecord(event, fields, at = Date.now()) {
   return {
     kind: "answer",
@@ -144,15 +118,13 @@ export function answerRecord(event, fields, at = Date.now()) {
 
 function install(out) {
   let events = [];
-  // The requests of the window being recorded (the next dump's).
+  // The requests of the window being recorded.
   let current = new Set();
   let dumps = 0;
-  // Which chain each RPC host serves (from its eth_chainId answers): kept across dumps.
+  // Each RPC host's chain id (from its eth_chainId answers), kept across dumps.
   const chains = {};
   const original = globalThis.fetch;
 
-  // What came for `event`: on the request while its window is being recorded, else (its window
-  // was dumped) as an answer record in the window it came in.
   const answered = (event, fields) => {
     if (current.has(event)) Object.assign(event, fields);
     else events.push(answerRecord(event, fields));
@@ -188,8 +160,7 @@ function install(out) {
           number: Number(BigInt(head)),
         });
     }
-    if (Object.keys(errors).length > 0)
-      answered(event, { errors: current.has(event) ? mergeCounts(event.errors, errors) : errors });
+    if (Object.keys(errors).length > 0) answered(event, { errors });
   };
 
   globalThis.fetch = async (input, init) => {
@@ -207,7 +178,6 @@ function install(out) {
           const parsed = JSON.parse(body);
           sent = Array.isArray(parsed) ? parsed : [parsed];
         }
-        // Counted in the window it is sent in, whenever (and whether) it is answered.
         events.push(recorded);
         current.add(recorded);
         event = recorded;
@@ -219,17 +189,14 @@ function install(out) {
       const res = await original(input, init);
       if (event) {
         answered(event, { ms: Math.round(performance.now() - t0), status: res.status });
-        if (sent) {
-          const recorded = event;
-          const calls = sent;
+        if (sent)
           res
             .clone()
             .json()
             .then(
-              (answer) => readAnswers(recorded, calls, answer),
+              (answer) => readAnswers(event, sent, answer),
               () => {}
             );
-        }
       }
       return res;
     } catch (error) {
@@ -243,15 +210,12 @@ function install(out) {
   };
 
   process.on("SIGUSR2", () => {
-    const n = dumps++;
-    const file = `${out}.${n}.json`;
+    const file = `${out}.${dumps++}.json`;
     try {
       writeFileSync(
         `${file}.tmp`,
         JSON.stringify({ dumpedAt: Date.now(), chains, events: dumped(events) }),
-        {
-          mode: 0o600,
-        }
+        { mode: 0o600 }
       );
       renameSync(`${file}.tmp`, file);
     } catch {
@@ -260,13 +224,6 @@ function install(out) {
     events = [];
     current = new Set();
   });
-}
-
-/** Two counts by key, added. */
-function mergeCounts(a = {}, b = {}) {
-  const sum = { ...a };
-  for (const [key, n] of Object.entries(b)) sum[key] = (sum[key] ?? 0) + n;
-  return sum;
 }
 
 if (process.env.UPSTREAM_TRACE_OUT) install(process.env.UPSTREAM_TRACE_OUT);

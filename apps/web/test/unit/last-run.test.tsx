@@ -9,9 +9,8 @@ import { act, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { describe, expect, it } from "vitest";
 
-// What a page shows while it answers from the history the app saved in its last run: always
-// labelled "History from last run · re-verifying" until this run's answer replaces it, and an
-// alert (never silence) when re-reading fails or disagrees.
+// A page answering from the last run's history is always labelled until this run's answer
+// replaces it, with an alert (never silence) when re-reading fails or disagrees.
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -68,14 +67,16 @@ describe("LastRunText", () => {
     confirmed: "Decoded from the event.",
     failed: "Not confirmed by the chain.",
   };
+  const text = (check: Promise<unknown> | null) =>
+    render(
+      <p data-testid="text">
+        <LastRunText check={check} {...texts} />
+      </p>
+    );
 
   it("says re-verifying until this run confirms, then reads as any other", async () => {
     const check = deferred<unknown>();
-    render(
-      <p data-testid="text">
-        <LastRunText check={check.promise} {...texts} />
-      </p>
-    );
+    text(check.promise);
     expect(screen.getByTestId("text")).toHaveTextContent(texts.pending);
     await act(async () => check.resolve({ txHash: "0x01" }));
     expect(screen.getByTestId("text")).toHaveTextContent(texts.confirmed);
@@ -84,21 +85,13 @@ describe("LastRunText", () => {
 
   it("says so when this run's history does not confirm it", async () => {
     const check = deferred<unknown>();
-    render(
-      <p data-testid="text">
-        <LastRunText check={check.promise} {...texts} />
-      </p>
-    );
+    text(check.promise);
     await act(async () => check.reject(new Error("IndexIntegrityError")));
     expect(screen.getByTestId("text")).toHaveTextContent(texts.failed);
   });
 
   it("without a check (this run's history) is the confirmed text", () => {
-    render(
-      <p data-testid="text">
-        <LastRunText check={null} {...texts} />
-      </p>
-    );
+    text(null);
     expect(screen.getByTestId("text")).toHaveTextContent(texts.confirmed);
   });
 });

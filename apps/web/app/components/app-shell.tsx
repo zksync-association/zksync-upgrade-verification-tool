@@ -32,10 +32,9 @@ import { $path } from "remix-routes";
 
 export { useStatus } from "@/components/governance-context";
 
-// The app shell renders at once, before the root status (governance, trust anchors, log history)
-// is read: the header, the navigation and each page's own skeletons are in the first bytes of the
-// response. What the status says (the block and its age, banners, the footer's trust anchors)
-// fills in when it is read; until then it says it is being checked, never that all is well.
+// The shell renders at once, before the root status is read (the header, the navigation and each
+// page's skeletons are in the first bytes). What the status says fills in when it is read; until
+// then it says it is being checked, never that all is well.
 
 const NAV = [
   { to: $path("/app/proposals"), label: "Upgrades" },
@@ -45,10 +44,8 @@ const NAV = [
   { to: "/settings", label: "Settings" },
 ];
 
-/**
- * The root status once it is in this browser: right away for a status in hand, else when its
- * promise settles (after hydration, so the server's and the browser's first renders agree).
- */
+// A status in hand at once; a promise's once it settles, after hydration (so the server's and the
+// browser's first renders agree).
 function useLandedStatus(source: StatusSource): RootStatus | null {
   const [landed, setLanded] = useState<{ source: StatusSource; status: RootStatus } | null>(() =>
     source instanceof Promise ? null : { source, status: source }
@@ -77,10 +74,8 @@ export default function AppShell({
   children,
   wallet = true,
 }: {
-  /** The root status, read while the shell streams (or in hand). */
   status: StatusSource;
   children: ReactNode;
-  /** Whether a wallet provider is set up around the shell (it offers to connect one). */
   wallet?: boolean;
 }) {
   // How many Sign / Send buttons are on screen; the header offers to connect only while some are.
@@ -107,7 +102,6 @@ export default function AppShell({
             <Banners />
             <Main>
               <StatusBoundary source={status} problem={(p) => <StatusProblemCard problem={p} />}>
-                {/* A page that needs the status before anything else waits for it here. */}
                 <Suspense fallback={<PagePending />}>{children}</Suspense>
               </StatusBoundary>
             </Main>
@@ -119,10 +113,7 @@ export default function AppShell({
   );
 }
 
-/**
- * The shell before the app knows which chain the RPC is on (the first moments of a fresh
- * process): the header, the navigation and a page skeleton, nothing read yet.
- */
+// Before the app knows which chain the RPC is on (the first moments of a fresh process).
 export function AppFrame() {
   return (
     <div className="flex min-h-screen flex-col" aria-busy="true">
@@ -215,11 +206,8 @@ function Nav() {
   );
 }
 
-/**
- * The block the header names: the head the last beat named (the engine serves) when the status
- * this tab shows was read there too (the beats' notedAt for "status"); otherwise the status's own
- * block, whose age then grows. Never a block newer than the status it sits over.
- */
+// The head the last beat named when the status shown was read there too (notedAt "status"), else
+// the status's own block, whose age then grows: never a block newer than the status it sits over.
 export function headerBlock(
   status: { number: string; timestamp: string },
   live: {
@@ -234,13 +222,8 @@ export function headerBlock(
   return head;
 }
 
-/**
- * What the tab's live updates are doing, when it is worth saying: reloading after a change,
- * catching up after a pause, or paused (away, or the server not answering). Nothing otherwise.
- * It floats over the bottom of the page, outside the header and the page's flow: appearing and
- * going, it never moves the page (or the header's height on a phone) and never covers the
- * navigation. It takes no clicks: whatever is under it stays usable.
- */
+// It floats over the bottom of the page, outside its flow: appearing and going, it never moves the
+// page and never covers the navigation. It takes no clicks.
 function LiveNote() {
   const live = useLive();
   const now = useNowSeconds();
@@ -303,7 +286,6 @@ function Header({ offerWallet, wallet }: { offerWallet: boolean; wallet: boolean
           </div>
         </HeaderRow>
       </header>
-      {/* Once the status is read (before, the checking banner floats there). */}
       <WithStatus fallback={null} problem={() => null}>
         {() => <LiveNote />}
       </WithStatus>
@@ -311,10 +293,6 @@ function Header({ offerWallet, wallet }: { offerWallet: boolean; wallet: boolean
   );
 }
 
-/**
- * The chain the RPC is on and, once the status is read, the block it was read at and how long
- * ago that was mined. Until then it says so ("checking…"), with a neutral dot.
- */
 function NetworkPill({
   chain,
   block,
@@ -324,10 +302,7 @@ function NetworkPill({
   chain: Pick<ChainView, "label" | "isDevNode"> | null;
   block?: { number: string; timestamp: string };
   unavailable?: boolean;
-  /**
-   * The status under it was not read again at the head served now (TrustBanners says so): its
-   * own block, never in a passing colour.
-   */
+  // Not read again at the head served now: its own block, never in a passing colour.
   notReRead?: boolean;
 }) {
   return (
@@ -355,12 +330,9 @@ function NetworkPill({
   );
 }
 
-/**
- * Drops cached Safe and chain answers, then reloads the page data. The router reloads it once,
- * by itself, after the POST, and the fetcher stays busy until that pass is done; a second
- * revalidate() here would load everything again. The click also asks for the root status
- * (see revalidation.ts), so a navigation that cuts that reload short still reads it.
- */
+// Drops cached Safe and chain answers. The router revalidates once by itself after the POST (the
+// fetcher stays busy until then): a revalidate() here would load everything again. The click also
+// asks for the root status, so a navigation that cuts that reload short still reads it.
 export function RefreshButton() {
   const fetcher = useFetcher<{ refreshed: boolean }>();
   useEffect(() => {
@@ -421,11 +393,8 @@ function BannerArea({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * Until the status is read: no banner can say all is well yet. It floats over the bottom of the
- * page rather than taking a place in it, so nothing on the page moves when it goes (a warning that
- * follows takes its place at the top, in the page).
- */
+// Until the status is read no banner can say all is well. It floats over the bottom of the page,
+// so nothing on the page moves when it goes.
 function CheckingBanner() {
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-30 px-4 sm:px-6">
@@ -564,7 +533,6 @@ function Footer() {
   );
 }
 
-/** What this app keeps between runs, by the state of its chain cache (see /api/status sync.cache). */
 export function CacheSentence({ state }: { state: OkStatus["sync"]["cache"]["state"] }) {
   return (
     <span data-testid="cache-sentence">
@@ -643,7 +611,6 @@ function FooterRow({ label, children }: { label: string; children: ReactNode }) 
   );
 }
 
-/** A page that needs the status before anything else, while it is read. */
 function PagePending() {
   return (
     <div className="space-y-4" aria-busy="true" data-testid="page-pending">
@@ -659,7 +626,6 @@ function PagePending() {
   );
 }
 
-/** In place of a page that needed the status, when it could not be read. */
 function StatusProblemCard({ problem }: { problem: StatusProblemValue }) {
   return (
     <div className="w-full max-w-xl rounded-2xl bg-white p-8 shadow-[0_12px_24px_-4px_rgba(10,26,102,0.08)]">

@@ -4,11 +4,9 @@ import { Link, useNavigation } from "@remix-run/react";
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 
-// A list's "full history" / "recent only" switch. The router keeps the current list on screen
-// until the other one has loaded (it waits for deferred data of a route it revalidates), so
-// without feedback the click looks dead; this shows it is loading.
+// The router keeps the current list on screen until the other has loaded (it waits for deferred data
+// of a route it revalidates): without feedback the click would look dead.
 
-/** True while a navigation to exactly `to` (path and search) is in flight. */
 export function useNavigatingTo(to: string): boolean {
   const navigation = useNavigation();
   if (navigation.state === "idle") return false;
@@ -26,7 +24,6 @@ export function HistoryToggle({
 }: {
   to: string;
   children: ReactNode;
-  /** Shown, with a spinner, while the other list loads. */
   pendingLabel: string;
   variant?: "link" | "button";
 }) {
@@ -60,7 +57,6 @@ export function HistoryToggle({
   );
 }
 
-/** Dims a list while the other history range loads in its place. */
 export function PendingRegion({ pending, children }: { pending: boolean; children: ReactNode }) {
   return (
     <div

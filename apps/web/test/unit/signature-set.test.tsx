@@ -42,17 +42,6 @@ vi.mock("@/components/governance-context", async (importOriginal) => {
 });
 
 vi.mock("@remix-run/react", () => ({
-  useRouteLoaderData: () => ({
-    status: {
-      ok: true,
-      governance: {
-        network: { explorerUrl: "https://etherscan.io", l2ExplorerUrl: null },
-        securityCouncil: { members: [MEMBER_A, MEMBER_B, MEMBER_C] },
-        guardians: { members: [] },
-        emergencyUpgradeBoard: { zkFoundation: "0x0000000000000000000000000000000000000009" },
-      },
-    },
-  }),
   useNavigate: () => vi.fn(),
   useRevalidator: () => ({ revalidate: vi.fn(), state: "idle" }),
   Link: ({ children }: { children: React.ReactNode }) => <a href="/">{children}</a>,
@@ -775,33 +764,6 @@ describe("a set the app did not verify at the head it serves now (a beat says wh
     expect(screen.queryByTestId("not-reread")).not.toBeInTheDocument();
     expect(screen.getByTestId("sign-button")).toBeEnabled();
     expect(screen.queryByTestId("send-blocked")).not.toBeInTheDocument();
-  });
-
-  it("behind because Safe cannot be read (its monthly quota used up): the label keeps the reason and offers Fetch signatures, never 'checked again at each new block'; the Sign button says why, as text", () => {
-    wallet.address = undefined;
-    const paused = {
-      state: "paused" as const,
-      checkedAt: new Date(Date.now() - 300_000).toISOString(),
-      nextAt: null,
-      cadenceMs: null,
-      reason: "quota-exhausted",
-    };
-    const open = {
-      ...(metAt("1000", watch) as Record<string, unknown>),
-      safeCheck: paused,
-    } as never;
-    card(open, { head: head("1003"), verifiedAt: {} });
-    const label = screen.getByTestId("set-stale");
-    expect(label).toHaveTextContent(
-      "Verified at block #1,000 · not re-verified at #1,003 · Safe unavailable (Safe's monthly quota used up)"
-    );
-    expect(label).toHaveTextContent("Fetch signatures to retry");
-    expect(label).not.toHaveTextContent("checked again at each new block");
-    expect(screen.getByTestId("fetch-signatures")).toBeInTheDocument();
-    // Not connected: the reason is said beside the button, not only as its tooltip.
-    expect(screen.getByTestId("sign-blocked")).toHaveTextContent(
-      "Not verified at block #1,003 yet."
-    );
   });
 
   it("contentCurrency: behind only for an item the beats name at a block before the served head", () => {

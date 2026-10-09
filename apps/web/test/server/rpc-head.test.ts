@@ -89,23 +89,13 @@ describe("chain head", () => {
     expect(fake.posts).toHaveLength(1);
   });
 
-  it("uses the finalized block when it is deeper than head − 64", async () => {
-    upstream(HEAD - 94n);
-    expect(await safeBlockNumber()).toBe(HEAD - 94n);
-    const { head, safe } = await chainHead();
-    expect(head.number).toBe(HEAD);
-    expect(safe).toBe(HEAD - 94n);
-  });
-
-  it("uses head − 64 when the finalized block is newer", async () => {
-    upstream(HEAD - 63n);
-    expect(await safeBlockNumber()).toBe(HEAD - 64n);
-  });
-
-  it("falls back to head − 64 when the node does not know the 'finalized' tag", async () => {
-    upstream(null);
-    expect(await finalizedBlock()).toBeNull();
-    expect(await safeBlockNumber()).toBe(HEAD - 64n);
+  it.each([
+    ["the finalized block when it is deeper than head − 64", HEAD - 94n, HEAD - 94n],
+    ["head − 64 when the finalized block is newer", HEAD - 63n, HEAD - 64n],
+  ])("uses %s", async (_, finalized, safe) => {
+    upstream(finalized);
+    expect(await safeBlockNumber()).toBe(safe);
+    expect(await chainHead()).toMatchObject({ head: { number: HEAD }, safe });
   });
 
   it.each([
@@ -178,19 +168,14 @@ describe("chain head", () => {
     await expect(safeBlockNumber()).rejects.toThrow("internal error");
   });
 
-  it("uses the fork block on dev nodes", async () => {
-    upstream(HEAD - 80n);
-    state.network = { isDevNode: true, forkBlock: 21_000_000n };
-    expect(await safeBlockNumber()).toBe(21_000_000n);
-    state.network = { isDevNode: true, forkBlock: null };
-    expect(await safeBlockNumber()).toBe(-1n);
-  });
-
-  it("answers the head and the fork block on dev nodes even when 'finalized' fails", async () => {
+  it("uses the fork block on dev nodes, and answers the head even when 'finalized' fails", async () => {
     upstream(HEAD - 80n, new FakeRpcError(-32603, "internal error"));
     state.network = { isDevNode: true, forkBlock: 21_000_000n };
     expect((await latestBlock()).number).toBe(HEAD);
     expect(await chainHead()).toMatchObject({ safe: 21_000_000n });
+    expect(await safeBlockNumber()).toBe(21_000_000n);
+    state.network = { isDevNode: true, forkBlock: null };
+    expect(await safeBlockNumber()).toBe(-1n);
   });
 
   it("fails rather than guessing when the head cannot be read", async () => {
