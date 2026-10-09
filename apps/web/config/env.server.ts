@@ -35,6 +35,12 @@ const baseEnv = createEnv({
     // (every request reads on demand). Dev nodes (anvil, hardhat) always read on demand.
     SYNC_MODE: z.enum(["window", "always", "off"]).default("window"),
     SYNC_KEEPWARM_MS: z.coerce.number().int().min(0).default(600_000),
+    // While the engine runs, member Safes' message listings are re-checked before they turn 60 s
+    // old, for the signer groups (Security Council, Guardians, ZK Foundation) a page asked for in
+    // the last SYNC_SAFE_ACTIVE_MS. Only with SAFE_API_KEY or a self-hosted Safe service, and at
+    // most SYNC_SAFE_HOURLY_BUDGET background requests an hour.
+    SYNC_SAFE_ACTIVE_MS: z.coerce.number().int().min(0).default(300_000),
+    SYNC_SAFE_HOURLY_BUDGET: z.coerce.number().int().min(0).default(1_200),
     ALLOW_INDEXING: z.coerce.boolean().default(false),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
     NODE_ENV: NodeEnvEnum.default("production"),

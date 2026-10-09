@@ -10,11 +10,13 @@ import { EMERGENCY_ID, MAINNET, SAFE_MESSAGES } from "../support/fixtures";
 const listings = vi.hoisted(() => ({ tamper: false }));
 
 vi.mock("@/.server/rpc", () => ({ network: async () => ({ chainId: 1 }) }));
-vi.mock("@/.server/safe-api", async () => {
-  const { SAFE_MESSAGES } = await import("../support/fixtures");
+vi.mock("@/.server/safe-api", () => {
   class SafeApiError extends Error {}
+  return { SafeApiError };
+});
+vi.mock("@/.server/safe/store", async () => {
+  const { SAFE_MESSAGES } = await import("../support/fixtures");
   return {
-    SafeApiError,
     listSafeMessages: async (safe: string) => {
       const messages = (SAFE_MESSAGES[safe] ?? []) as unknown as SafeMessage[];
       return {

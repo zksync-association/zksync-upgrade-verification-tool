@@ -8,7 +8,8 @@ import {
 } from "@/common/typed-data";
 import { type Address, type Hex, isAddressEqual } from "viem";
 import { network } from "../rpc";
-import { SafeApiError, listSafeMessages } from "../safe-api";
+import { SafeApiError } from "../safe-api";
+import { listSafeMessages } from "../safe/store";
 
 // Freeze requests, L2 vetoes and emergency upgrades exist only as messages members signed in their
 // Safes. This turns those listings into proposals, keeping a message only when its typed data is

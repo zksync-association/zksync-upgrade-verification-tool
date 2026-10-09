@@ -119,16 +119,32 @@ export function remainingMs(key: string): number | null {
   return left > 0 ? left : null;
 }
 
+// Stores that keep their entries outside this map (the Safe snapshot store), under a key prefix
+// of their own: invalidate() and clearCache() empty them too, so "drop cached answers" means the
+// same wherever an answer is held.
+const linked = new Map<string, (prefix: string | null) => void>();
+
+/**
+ * Links a store whose keys start with `prefix`: `drop(prefix)` is called when invalidate() covers
+ * some of them, `drop(null)` on clearCache(). A later link for the same prefix replaces it.
+ */
+export function linkStore(prefix: string, drop: (prefix: string | null) => void) {
+  linked.set(prefix, drop);
+}
+
 export function invalidate(prefix: string) {
   for (const key of store.keys()) {
     if (key.startsWith(prefix)) {
       store.delete(key);
     }
   }
+  for (const [own, drop] of linked)
+    if (own.startsWith(prefix) || prefix.startsWith(own)) drop(prefix);
 }
 
 export function clearCache() {
   store.clear();
+  for (const drop of linked.values()) drop(null);
 }
 
 /** Entries held, expired ones not yet dropped included. */

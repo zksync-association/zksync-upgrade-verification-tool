@@ -23,6 +23,7 @@ import {
   syncEngineStatus,
   touchSync,
 } from "@/.server/sync/engine";
+import { safeStoreStatus } from "@/.server/safe/store";
 import { currentUpgradeStatus, upgradeStatusKey } from "@/.server/upgrade-status";
 import { type UpgradeProposal, encodeUpgradeProposal, upgradeProposalId } from "@/common/proposal";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
@@ -1372,12 +1373,20 @@ describe("live engine", () => {
     liveChain();
     await backfilled();
     expect(syncEngineStatus()).toMatchObject({ mode: "window", active: false, polls: 0 });
+    expect(safeStoreStatus()).toMatchObject({ sweeping: false, paused: "idle" });
     touchSync();
     await until(() => syncEngineStatus().ticks >= 1);
     const status = syncEngineStatus();
     expect(status).toMatchObject({ active: true, head: { number: HEAD.toString() } });
     // JSON-safe as served.
     expect(JSON.parse(JSON.stringify(status))).toEqual(status);
+    // The request also started the Safe store's sweep, which runs while the engine does: on the
+    // public Safe service without a key it never reads in the background; with one, it has
+    // nothing to do yet (no page asked for a Safe).
+    expect(safeStoreStatus()).toMatchObject({
+      sweeping: false,
+      paused: process.env.SAFE_API_KEY ? null : "keyless-public-service",
+    });
 
     // Settings change: the old engine retires at its next wake and the new one starts (the
     // change was a request), reading through the new settings.

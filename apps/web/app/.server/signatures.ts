@@ -33,7 +33,8 @@ import {
 } from "./chain/call";
 import { type SafeInfo, safeInfo } from "./governance";
 import { network } from "./rpc";
-import { SafeApiError, findSafeMessage, safeWalletUrl } from "./safe-api";
+import { findSafeMessage } from "./safe/store";
+import { SafeApiError, safeWalletUrl } from "./safe-api";
 
 // The verification core. A signature counts only if the contract that will consume it accepts it in
 // an eth_call: Multisig.checkSignatures for council/guardian members, and the Safe's own

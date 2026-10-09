@@ -40,6 +40,18 @@ const ENGINE = vi.hoisted(() => ({
   ticks: 3,
 }));
 
+// What the Safe store's sweep reports (safe-store.test.ts covers how).
+const SAFE = vi.hoisted(() => ({
+  sweeping: true,
+  groups: ["securityCouncil", "guardians"],
+  oldestFetchedAt: "2026-10-06T06:59:12.000Z",
+  budgetUsedThisHour: 40,
+  budgetPerHour: 1200,
+  paused: null,
+  lastError: null,
+  failingSafes: 0,
+}));
+
 vi.mock("@/.server/rpc", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/.server/rpc")>();
   return {
@@ -60,6 +72,7 @@ vi.mock("@/.server/chain/puh-index", () => ({
 }));
 vi.mock("@/.server/safe-api", () => ({ quota: { limit: null, remaining: null } }));
 vi.mock("@/.server/sync/engine", () => ({ syncEngineStatus: () => ENGINE }));
+vi.mock("@/.server/safe/store", () => ({ safeStoreStatus: () => SAFE }));
 
 const { appStatus, logHistoryStatus } = await import("@/.server/status");
 const { ConfigError } = await import("@/.server/rpc");
@@ -73,7 +86,7 @@ beforeEach(() => {
 });
 
 describe("appStatus", () => {
-  it("adds sync.index and sync.engine next to the fields it always had", async () => {
+  it("adds sync.index, sync.engine and sync.safe next to the fields it always had", async () => {
     const status = await appStatus();
     expect(status).toEqual({
       ok: true,
@@ -86,7 +99,7 @@ describe("appStatus", () => {
       },
       l2RpcConfigured: true,
       clientVersion: "Geth/v1.15",
-      sync: { index: state.index, engine: ENGINE },
+      sync: { index: state.index, engine: ENGINE, safe: SAFE },
     });
     // JSON-safe as served: strings and numbers only.
     expect(JSON.parse(JSON.stringify(status))).toEqual(status);

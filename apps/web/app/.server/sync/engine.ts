@@ -8,6 +8,7 @@ import {
   GOVERNANCE_TTL_MS,
   type Governance,
   SAFE_INFO_TTL_MS,
+  governance,
   readGovernance,
   readSafeInfo,
   safeInfoKey,
@@ -21,6 +22,7 @@ import {
   pollHead,
   rpcGeneration,
 } from "../rpc";
+import { type SafeSweepDriver, startSafeSweep, stopSafeSweep } from "../safe/store";
 import {
   type UpgradeStatusRead,
   isTerminalState,
@@ -221,6 +223,11 @@ export class SyncEngine {
 
   get lastTouch(): number | null {
     return this.#lastTouch;
+  }
+
+  /** Following the head right now (false while idle, off, or retired). */
+  get active(): boolean {
+    return this.#running;
   }
 
   /** A request was made: keeps the engine running, or starts it (that request reads on demand). */
@@ -769,10 +776,25 @@ function engine(): SyncEngine {
   return next;
 }
 
+// The Safe store's background sweep runs while the engine does (safe/store.ts decides what, and
+// whether this Safe service may be read in the background at all).
+const safeSweep: SafeSweepDriver = {
+  active: () => instance !== null && instance.generation === rpcGeneration() && instance.active,
+  groups: async () => {
+    const gov = await governance();
+    return {
+      securityCouncil: gov.securityCouncil.members,
+      guardians: gov.guardians.members,
+      zkFoundation: [gov.emergencyUpgradeBoard.zkFoundation],
+    };
+  },
+};
+
 /** Marks a request: keeps the engine running (or starts it). Never throws. */
 export function touchSync() {
   try {
     engine().touch();
+    startSafeSweep(safeSweep);
   } catch (error) {
     log.warn({ error: errorKind(error) }, "sync touch failed");
   }
@@ -806,4 +828,5 @@ export function syncEngineStatus(): SyncEngineStatus {
 export function stopSync() {
   instance?.stop();
   instance = null;
+  stopSafeSweep();
 }

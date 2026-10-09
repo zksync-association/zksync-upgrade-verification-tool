@@ -3,6 +3,7 @@ import { type PuhIndexStatus, puhIndex } from "./chain/puh-index";
 import { type Governance, governance } from "./governance";
 import { type LogHistoryStatus, checkLogHistory } from "./logs";
 import { ConfigError, l1, network } from "./rpc";
+import { type SafeStoreStatus, safeStoreStatus } from "./safe/store";
 import { quota } from "./safe-api";
 import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
 
@@ -13,9 +14,15 @@ import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
  * Background reads, for information: `index` is the ProtocolUpgradeHandler log index (deployment
  * to head). Lists wait for it, for a bounded time, or fail; they never answer from part of it.
  * `engine` is the sync engine, which follows the head while the app is in use and refreshes what
- * requests read ahead of them (never a source of answers of its own).
+ * requests read ahead of them (never a source of answers of its own). `safe` is the Safe
+ * listing store's background sweep, which keeps member Safes' listings under 60 s old while the
+ * app is in use (listings are never served older, sweep or not).
  */
-export type SyncStatus = { index: PuhIndexStatus; engine: SyncEngineStatus };
+export type SyncStatus = {
+  index: PuhIndexStatus;
+  engine: SyncEngineStatus;
+  safe: SafeStoreStatus;
+};
 
 export type AppStatus =
   | {
@@ -39,7 +46,7 @@ export async function appStatus(): Promise<AppStatus> {
       safeApi: { url: net.safeTxServiceUrl, withKey: !!env.SAFE_API_KEY, quota: { ...quota } },
       l2RpcConfigured: net.l2RpcUrl !== null,
       clientVersion: net.clientVersion,
-      sync: { index: puhIndex().status(), engine: syncEngineStatus() },
+      sync: { index: puhIndex().status(), engine: syncEngineStatus(), safe: safeStoreStatus() },
     };
   } catch (error) {
     if (error instanceof ConfigError) {

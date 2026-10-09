@@ -1,5 +1,3 @@
-import { setMaxListeners } from "node:events";
-import { setTimeout as delay } from "node:timers/promises";
 import { env } from "@config/env.server";
 import { defaultLogger } from "@config/log.server";
 import { hexSchema } from "@repo/common/schemas";
@@ -39,11 +37,33 @@ const listSchema = z.object({
 export type SafeMessage = z.infer<typeof messageSchema>;
 export type SafeMessages = { messages: SafeMessage[]; complete: boolean };
 
+/** One read of a Safe's listing: `count` is the service's total, `arrivedAt` its first answer. */
+export type SafeListing = SafeMessages & { count: number; arrivedAt: number };
+
+/** The Safe's most recently modified message, and how many it has (the store's change check). */
+export type NewestMessage = { count: number; messageHash: Hex | null; modified: string | null };
+
 export class SafeApiError extends Error {}
+
+/**
+ * A read's place in the queue: "high" for what a request waits on, "low" for background reads.
+ * A background read that a request then waits on is promoted (its priority set to "high").
+ */
+export type SafeTicket = { priority: "high" | "low" };
+
+export type SafeRequestOptions = {
+  ticket?: SafeTicket;
+  /** Runs before each request waits for a start slot; throwing cancels it without using one. */
+  beforeQueue?: () => void;
+  /** Runs as each request is about to be sent; throwing cancels it (a background budget). */
+  beforeRequest?: () => void;
+};
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 5;
-const LIST_TTL_MS = 60_000;
+const MESSAGE_TTL_MS = 60_000;
+// Safe answers 429 at 8 requests in flight.
+const MAX_IN_FLIGHT = 4;
 
 // api.safe.global allows 2 requests/s without a key (5/s with one) and 5,000 a month per IP.
 // A self-hosted Transaction Service has no such limits.
@@ -70,17 +90,13 @@ export function backgroundSafeReadsAllowed(
   return !!apiKey || !isPublicSafeService(baseUrl);
 }
 
-let nextSlot = 0;
 let clientGeneration = 0;
-function requestQueue() {
-  const controller = new AbortController();
-  // A governance scan legitimately queues more than ten members on this signal.
-  // The delay helper removes each listener when its timer resolves or is cancelled.
-  setMaxListeners(0, controller.signal);
-  return controller;
+
+/** The settings generation the Safe client runs for; resetSafeClient() starts a new one. */
+export function safeClientGeneration(): number {
+  return clientGeneration;
 }
 
-let queuedRequests = requestQueue();
 let cooldown: { until: number; error: SafeApiError } | null = null;
 const failures = new Map<string, { until: number; error: SafeApiError }>();
 
@@ -90,15 +106,80 @@ function checkCooldown() {
   cooldown = null;
 }
 
+/** When the current rate-limit / quota cooldown ends, or null when there is none. */
+export function safeCooldownUntil(): number | null {
+  return cooldown && Date.now() < cooldown.until ? cooldown.until : null;
+}
+
+// The pacer: requests start one at a time, at least minIntervalMs() apart on the public service,
+// with at most MAX_IN_FLIGHT in flight anywhere. Waiting requests a page needs ("high") start
+// before background ones ("low"), whatever their order of arrival. Requests sent before a
+// settings change count until they are answered: they are still in flight at the service.
+type Waiter = {
+  ticket: SafeTicket;
+  spaced: boolean;
+  resolve: () => void;
+  reject: (error: Error) => void;
+};
+let waiting: Waiter[] = [];
+let inFlight = 0;
+let nextSlot = 0;
+let pumpTimer: ReturnType<typeof setTimeout> | null = null;
+
+function pump() {
+  while (waiting.length > 0 && inFlight < MAX_IN_FLIGHT) {
+    const high = waiting.findIndex((w) => w.ticket.priority === "high");
+    const index = high === -1 ? 0 : high;
+    const waiter = waiting[index] as Waiter;
+    if (waiter.spaced) {
+      const now = Date.now();
+      if (now < nextSlot) {
+        pumpTimer ??= setTimeout(() => {
+          pumpTimer = null;
+          pump();
+        }, nextSlot - now);
+        return;
+      }
+      nextSlot = now + minIntervalMs();
+    }
+    waiting.splice(index, 1);
+    inFlight++;
+    waiter.resolve();
+  }
+}
+
+/** Waits for a start slot; resolves to the release to call once the response was read. */
+async function acquire(ticket: SafeTicket, spaced: boolean): Promise<() => void> {
+  await new Promise<void>((resolve, reject) => {
+    waiting.push({ ticket, spaced, resolve, reject });
+    pump();
+  });
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    inFlight--;
+    pump();
+  };
+}
+
+/** Fails every request still waiting for a slot. */
+function rejectWaiting(error: Error) {
+  const rejected = waiting;
+  waiting = [];
+  if (pumpTimer) clearTimeout(pumpTimer);
+  pumpTimer = null;
+  nextSlot = 0;
+  for (const waiter of rejected) waiter.reject(error);
+}
+
 function pauseRequests(ms: number, message: string): SafeApiError {
   // An older in-flight response must not shorten a quota cooldown established by another request.
   if (cooldown && cooldown.until >= Date.now() + ms) return cooldown.error;
   const error = new SafeApiError(message);
   cooldown = { until: Date.now() + ms, error };
-  // Release requests waiting for a throttle slot: they should fail promptly, not keep queueing.
-  queuedRequests.abort();
-  queuedRequests = requestQueue();
-  nextSlot = 0;
+  // Release requests waiting for a slot: they should fail promptly, not keep queueing.
+  rejectWaiting(error);
   return error;
 }
 
@@ -112,29 +193,18 @@ function retryDelay(value: string | null): number {
   return (secondsHeader(value) ?? Math.max(0, Date.parse(value ?? "") - Date.now())) || 2_000;
 }
 
-async function throttle(baseUrl: string) {
-  checkCooldown();
-  if (!isPublicSafeService(baseUrl)) return;
-  const now = Date.now();
-  const wait = Math.max(0, nextSlot - now);
-  nextSlot = Math.max(now, nextSlot) + minIntervalMs();
-  if (wait > 0) {
-    try {
-      await delay(wait, undefined, { signal: queuedRequests.signal });
-    } catch {
-      checkCooldown();
-    }
-  }
-  checkCooldown();
-}
+const settingsChanged = () =>
+  new SafeApiError("Data source settings changed. Refresh to check signatures again.");
 
 export const quota = { limit: null as number | null, remaining: null as number | null };
 
-async function getJson(path: string): Promise<unknown | null> {
+async function getJson(
+  path: string,
+  { ticket = { priority: "high" }, beforeQueue, beforeRequest }: SafeRequestOptions = {}
+): Promise<{ body: unknown | null; arrivedAt: number }> {
   const generation = clientGeneration;
   const checkGeneration = () => {
-    if (generation !== clientGeneration)
-      throw new SafeApiError("Data source settings changed. Refresh to check signatures again.");
+    if (generation !== clientGeneration) throw settingsChanged();
   };
   checkCooldown();
   const failure = failures.get(path);
@@ -145,83 +215,137 @@ async function getJson(path: string): Promise<unknown | null> {
     throw new SafeApiError("No Safe Transaction Service for this chain. Set SAFE_TX_SERVICE_URL.");
   }
 
-  await throttle(safeTxServiceUrl);
-  checkGeneration();
-  let response: Response;
+  beforeQueue?.();
+  const release = await acquire(ticket, isPublicSafeService(safeTxServiceUrl));
   try {
-    response = await fetch(`${safeTxServiceUrl}${path}`, {
-      headers: {
-        accept: "application/json",
-        ...(env.SAFE_API_KEY ? { authorization: `Bearer ${env.SAFE_API_KEY}` } : {}),
-      },
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch (error) {
+    checkCooldown();
     checkGeneration();
-    const unavailable = new SafeApiError(
-      `Safe Transaction Service unreachable: ${(error as Error).message}`
-    );
-    failures.set(path, { until: Date.now() + 15_000, error: unavailable });
-    throw unavailable;
-  }
+    beforeRequest?.();
+    let response: Response;
+    try {
+      response = await fetch(`${safeTxServiceUrl}${path}`, {
+        headers: {
+          accept: "application/json",
+          ...(env.SAFE_API_KEY ? { authorization: `Bearer ${env.SAFE_API_KEY}` } : {}),
+        },
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (error) {
+      checkGeneration();
+      const unavailable = new SafeApiError(
+        `Safe Transaction Service unreachable: ${(error as Error).message}`
+      );
+      failures.set(path, { until: Date.now() + 15_000, error: unavailable });
+      throw unavailable;
+    }
+    const arrivedAt = Date.now();
 
-  checkGeneration();
-  const limit = response.headers.get("x-ratelimit-limit");
-  const remaining = response.headers.get("x-ratelimit-remaining");
-  if (limit !== null && Number.isFinite(Number(limit))) quota.limit = Number(limit);
-  if (remaining !== null && Number.isFinite(Number(remaining))) quota.remaining = Number(remaining);
+    checkGeneration();
+    const limit = response.headers.get("x-ratelimit-limit");
+    const remaining = response.headers.get("x-ratelimit-remaining");
+    if (limit !== null && Number.isFinite(Number(limit))) quota.limit = Number(limit);
+    if (remaining !== null && Number.isFinite(Number(remaining)))
+      quota.remaining = Number(remaining);
 
-  if (response.status === 404) return null;
-  if (response.status === 429) {
-    const body = await response.text();
-    const exhausted = remaining === "0" || /monthly quota exceeded/i.test(body);
-    const wait = exhausted
-      ? secondsHeader(response.headers.get("x-ratelimit-reset")) ?? 60_000
-      : retryDelay(response.headers.get("retry-after"));
-    log.warn({ path, exhausted, cooldownMs: wait }, "Safe API requests paused");
-    throw pauseRequests(
-      Math.max(wait, 1_000),
-      exhausted
-        ? "Safe Transaction Service monthly quota exhausted. Signature copies are unavailable until the quota resets or service access is updated."
-        : "Safe Transaction Service is temporarily rate limited. Signature copies are unavailable; retry after the cooldown."
-    );
+    if (response.status === 404) return { body: null, arrivedAt };
+    if (response.status === 429) {
+      const body = await response.text();
+      const exhausted = remaining === "0" || /monthly quota exceeded/i.test(body);
+      const wait = exhausted
+        ? secondsHeader(response.headers.get("x-ratelimit-reset")) ?? 60_000
+        : retryDelay(response.headers.get("retry-after"));
+      log.warn({ path, exhausted, cooldownMs: wait }, "Safe API requests paused");
+      throw pauseRequests(
+        Math.max(wait, 1_000),
+        exhausted
+          ? "Safe Transaction Service monthly quota exhausted. Signature copies are unavailable until the quota resets or service access is updated."
+          : "Safe Transaction Service is temporarily rate limited. Signature copies are unavailable; retry after the cooldown."
+      );
+    }
+    if (!response.ok) {
+      const error = new SafeApiError(
+        `Safe Transaction Service returned HTTP ${response.status} for ${path}`
+      );
+      failures.set(path, { until: Date.now() + 15_000, error });
+      throw error;
+    }
+    const body: unknown = await response.json();
+    checkGeneration();
+    return { body, arrivedAt };
+  } finally {
+    release();
   }
-  if (!response.ok) {
-    const error = new SafeApiError(
-      `Safe Transaction Service returned HTTP ${response.status} for ${path}`
-    );
-    failures.set(path, { until: Date.now() + 15_000, error });
-    throw error;
-  }
-  return response.json();
 }
 
-/** Newest messages of a Safe (governance actions are recent, so a few pages cover them). */
-export function listSafeMessages(safe: Address): Promise<SafeMessages> {
-  return cached(`safe:list:${safe.toLowerCase()}`, LIST_TTL_MS, async () => {
-    const messages: SafeMessage[] = [];
-    let total = 0;
-    for (let page = 0; page < MAX_PAGES; page++) {
-      const body = await getJson(
-        `/api/v1/safes/${getAddress(safe)}/messages/?limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}&ordering=-created`
-      );
-      if (body === null) return { messages, complete: true };
-      const parsed = listSchema.safeParse(body);
-      if (!parsed.success) {
-        throw new SafeApiError(`Unexpected Safe Transaction Service response for ${safe}`);
-      }
-      total = parsed.data.count;
-      messages.push(...parsed.data.results);
-      if (messages.length >= total || parsed.data.results.length < PAGE_SIZE) break;
+const messagesPath = (safe: Address, query: string) =>
+  `/api/v1/safes/${getAddress(safe)}/messages/?${query}`;
+
+/**
+ * Reads a Safe's newest messages (governance actions are recent, so a few pages cover them).
+ * Callers read listings through the snapshot store (safe/store.ts), which decides when to.
+ */
+export async function fetchListing(
+  safe: Address,
+  options: SafeRequestOptions = {}
+): Promise<SafeListing> {
+  const messages: SafeMessage[] = [];
+  let total = 0;
+  let arrivedAt: number | null = null;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const answer = await getJson(
+      messagesPath(safe, `limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}&ordering=-created`),
+      options
+    );
+    arrivedAt ??= answer.arrivedAt;
+    if (answer.body === null)
+      return { messages, complete: true, count: messages.length, arrivedAt };
+    const parsed = listSchema.safeParse(answer.body);
+    if (!parsed.success) {
+      throw new SafeApiError(`Unexpected Safe Transaction Service response for ${safe}`);
     }
-    return { messages, complete: messages.length >= total };
-  });
+    total = parsed.data.count;
+    messages.push(...parsed.data.results);
+    if (messages.length >= total || parsed.data.results.length < PAGE_SIZE) break;
+  }
+  return {
+    messages,
+    complete: messages.length >= total,
+    count: total,
+    arrivedAt: arrivedAt ?? Date.now(),
+  };
+}
+
+/**
+ * One small request that tells whether a Safe's listing changed: a new message raises the count,
+ * a deleted one lowers it, and a new confirmation sets the message's `modified` (so it becomes the
+ * newest by modification). Safe ignores time filters, so this is the cheapest check there is.
+ */
+export async function fetchNewest(
+  safe: Address,
+  options: SafeRequestOptions = {}
+): Promise<NewestMessage & { arrivedAt: number }> {
+  const { body, arrivedAt } = await getJson(
+    messagesPath(safe, "ordering=-modified&limit=1"),
+    options
+  );
+  if (body === null) return { count: 0, messageHash: null, modified: null, arrivedAt };
+  const parsed = listSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new SafeApiError(`Unexpected Safe Transaction Service response for ${safe}`);
+  }
+  const newest = parsed.data.results[0];
+  return {
+    count: parsed.data.count,
+    messageHash: newest?.messageHash ?? null,
+    modified: newest?.modified ?? null,
+    arrivedAt,
+  };
 }
 
 /** Direct lookup by Safe message hash; null when Safe has no such message. */
 export function getSafeMessage(messageHash: Hex): Promise<SafeMessage | null> {
-  return cached(`safe:message:${messageHash.toLowerCase()}`, LIST_TTL_MS, async () => {
-    const body = await getJson(`/api/v1/messages/${messageHash}/`);
+  return cached(`safe:message:${messageHash.toLowerCase()}`, MESSAGE_TTL_MS, async () => {
+    const { body } = await getJson(`/api/v1/messages/${messageHash}/`);
     if (body === null) return null;
     const parsed = messageSchema.safeParse(body);
     if (!parsed.success) {
@@ -231,21 +355,11 @@ export function getSafeMessage(messageHash: Hex): Promise<SafeMessage | null> {
   });
 }
 
-/** The message with exactly this hash, preferring the cached listing to save quota. */
-export async function findSafeMessage(
-  safe: Address,
-  messageHash: Hex
-): Promise<SafeMessage | null> {
-  const listing = await listSafeMessages(safe);
-  const hit = listing.messages.find(
-    (m) => m.messageHash.toLowerCase() === messageHash.toLowerCase()
-  );
-  if (hit) return hit;
-  return listing.complete ? null : getSafeMessage(messageHash);
-}
-
 let lastRefresh = 0;
-/** Drops cached Safe answers (at most every 10 s, to protect the shared quota). */
+/**
+ * Drops cached Safe answers, the snapshot store's listings included (at most every 10 s, to
+ * protect the shared quota).
+ */
 export function refreshSafeData(): boolean {
   if (Date.now() - lastRefresh < 10_000) return false;
   lastRefresh = Date.now();
@@ -262,11 +376,10 @@ export async function safeWalletUrl(safe: Address): Promise<string | null> {
 
 export function resetSafeClient() {
   clientGeneration++;
-  queuedRequests.abort();
-  queuedRequests = requestQueue();
+  // Requests in flight keep their slots until answered (then dropped by their generation check).
+  rejectWaiting(settingsChanged());
   cooldown = null;
   failures.clear();
-  nextSlot = 0;
   lastRefresh = 0;
   quota.limit = null;
   quota.remaining = null;

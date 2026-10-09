@@ -81,9 +81,11 @@ vi.mock("@/.server/governance", () => ({
 
 vi.mock("@/.server/safe-api", () => {
   class SafeApiError extends Error {}
+  return { SafeApiError, safeWalletUrl: async () => null };
+});
+vi.mock("@/.server/safe/store", async () => {
+  const { SafeApiError } = await import("@/.server/safe-api");
   return {
-    SafeApiError,
-    safeWalletUrl: async () => null,
     findSafeMessage: async (_safe: string, hash: string) => {
       if (state.safeApiDown) throw new SafeApiError("Safe Transaction Service returned HTTP 503");
       return state.safeMessages.get(hash) ?? null;

@@ -4,7 +4,8 @@ import { puhIndex } from "./chain/puh-index";
 import { type Governance, governance } from "./governance";
 import { checkLogHistory } from "./logs";
 import { l1, network, rpcGeneration } from "./rpc";
-import { backgroundSafeReadsAllowed, listSafeMessages } from "./safe-api";
+import { warmSafeListing } from "./safe/store";
+import { backgroundSafeReadsAllowed } from "./safe-api";
 
 // One warm-up after the server starts (and after a settings change): the reads every first page
 // waits on, made before anyone asks, through the same cached functions requests use. A request
@@ -118,8 +119,10 @@ async function warmSteps(reason: PrewarmReason, generation: number): Promise<voi
   ]);
   if (!gov || superseded()) return;
 
-  // Low priority: one listing at a time, so a page's own Safe reads queue behind at most one of
-  // these in the Safe API's rate limiter. The first failure (often a rate limit) ends the step.
+  // Low priority: one listing at a time, behind any page's own Safe reads in the Safe API's
+  // pacer, and within the background budget. The first failure (often a rate limit) ends the
+  // step. The warm-up is not a page's interest: the sync engine's sweep keeps fresh only the
+  // signer groups that pages ask for.
   // Only with SAFE_API_KEY or a self-hosted service: keyless, the public service's monthly per-IP
   // quota is better kept for the pages that are actually opened.
   if (!net.safeTxServiceUrl) {
@@ -135,7 +138,7 @@ async function warmSteps(reason: PrewarmReason, generation: number): Promise<voi
       async () => {
         for (const safe of safes) {
           if (superseded()) return;
-          await listSafeMessages(safe);
+          await warmSafeListing(safe);
           listed++;
         }
       },

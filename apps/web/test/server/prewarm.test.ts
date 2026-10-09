@@ -54,8 +54,11 @@ vi.mock("@/.server/chain/puh-index", () => ({
   }),
 }));
 
+vi.mock("@/.server/safe/store", () => ({
+  warmSafeListing: vi.fn((safe: string) => state.listing?.(safe)),
+}));
+
 vi.mock("@/.server/safe-api", () => ({
-  listSafeMessages: vi.fn((safe: string) => state.listing?.(safe)),
   backgroundSafeReadsAllowed: vi.fn(() => state.safeBackground),
 }));
 
@@ -63,7 +66,9 @@ const { governanceSafes, prewarm, shouldPrewarm } = await import("@/.server/prew
 const { network } = await import("@/.server/rpc");
 const { governance } = await import("@/.server/governance");
 const { checkLogHistory } = await import("@/.server/logs");
-const { listSafeMessages, backgroundSafeReadsAllowed } = await import("@/.server/safe-api");
+const { backgroundSafeReadsAllowed } = await import("@/.server/safe-api");
+// The warm-up's reads go through the Safe store at low priority (safe-store.test.ts).
+const { warmSafeListing: listSafeMessages } = await import("@/.server/safe/store");
 
 const address = (n: number) => `0x${n.toString(16).padStart(40, "0")}` as Address;
 const SC = [address(1), address(2), address(3)];
