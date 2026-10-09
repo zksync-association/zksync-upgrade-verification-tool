@@ -194,6 +194,70 @@ describe("listings on the request path", () => {
     expect(second.version).toBe(first.version);
   });
 
+  it("answers from the listing it holds without asking Safe (verdict precomputes), and only while it is at most 60 s old", async () => {
+    await load();
+    const safe = fakeSafe();
+    safe.add(A, 1);
+    expect(store.peekSafeMessage(A, messageHash(1))).toBeNull();
+    expect(store.freshListingVersion(A)).toBeNull();
+    const listing = await store.listSafeMessages(A);
+    expect(store.freshListingVersion(A)).toBe(listing.version);
+    expect(store.peekSafeMessage(A, messageHash(1))).toMatchObject({
+      message: { messageHash: messageHash(1) },
+      version: listing.version,
+    });
+    // A complete listing without the message answers "none".
+    expect(store.peekSafeMessage(A, messageHash(2))).toEqual({
+      message: null,
+      version: listing.version,
+    });
+    expect(await store.lookupSafeMessage(A, messageHash(1))).toMatchObject({
+      version: listing.version,
+    });
+    expect(safe.sent).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(60_001);
+    expect(store.peekSafeMessage(A, messageHash(1))).toBeNull();
+    expect(store.freshListingVersion(A)).toBeNull();
+    // Peeking never reads.
+    expect(safe.sent).toHaveLength(1);
+  });
+
+  it("cannot tell from a listing that stops before its last page: a lookup asks by hash, a peek says nothing", async () => {
+    await load();
+    const safe = fakeSafe();
+    for (let n = 1; n <= 501; n++) safe.add(A, n);
+    await within(5_000, store.listSafeMessages(A));
+    expect(store.peekSafeMessage(A, messageHash(1))).toBeNull();
+    const byHash = await within(1_000, store.lookupSafeMessage(A, messageHash(1)));
+    expect(byHash).toMatchObject({ message: { messageHash: messageHash(1) }, version: null });
+  });
+
+  it("tells listeners when a listing is stored with a new version, not when it is read again unchanged", async () => {
+    await load();
+    const safe = fakeSafe();
+    safe.add(A, 1);
+    const seen: string[] = [];
+    const unsubscribe = store.onSafeListingChange((s) => seen.push(s));
+    await store.listSafeMessages(A);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(seen).toEqual([A.toLowerCase()]);
+    await vi.advanceTimersByTimeAsync(61_000);
+    await store.listSafeMessages(A);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(seen).toEqual([A.toLowerCase()]);
+    safe.add(A, 2);
+    await vi.advanceTimersByTimeAsync(61_000);
+    await store.listSafeMessages(A);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(seen).toEqual([A.toLowerCase(), A.toLowerCase()]);
+    unsubscribe();
+    safe.add(A, 3);
+    await vi.advanceTimersByTimeAsync(61_000);
+    await store.listSafeMessages(A);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(seen).toHaveLength(2);
+  });
+
   it("counts a paged listing's age from its first page's answer", async () => {
     await load();
     const safe = fakeSafe();

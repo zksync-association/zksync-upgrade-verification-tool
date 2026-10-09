@@ -294,7 +294,12 @@ export type StandardUpgradeCore = Omit<
   "execute" | "executedTx" | "l2Proposal"
 >;
 
-/** Independent sections start as soon as the status and original proposal are available. */
+/**
+ * Independent sections start as soon as the status and original proposal are available. `sets`
+ * are the current signatures alone (no recorded transaction, `used` or `historical` yet), so they
+ * never wait on the recorded approvals' re-checks; `setEvidence` adds those to each set once both
+ * are in.
+ */
 export async function loadStandardUpgrade(
   id: Hex,
   { supplied = [] }: { supplied?: MemberSignature[] } = {}
@@ -302,7 +307,10 @@ export async function loadStandardUpgrade(
   const overview = await getStandardUpgradeCore(id);
   const evidence = timedRead(id, "recorded-approvals", () => getRecordedApprovals(overview));
   const sets = timedRead(id, "current-signatures", () =>
-    getStandardUpgradeSets(overview, supplied, evidence)
+    getStandardUpgradeSets(overview, supplied)
+  );
+  const setEvidence = Promise.all([sets, evidence]).then(([verified, records]) =>
+    verified.map((set) => evidenceFor(set, records))
   );
   const execution = timedRead(id, "execution", () => getUpgradeExecution(overview));
   const l2Proposal = timedRead(id, "l2-discovery", () =>
@@ -310,8 +318,9 @@ export async function loadStandardUpgrade(
       startedTxHash: overview.started.txHash,
     })
   );
-  for (const pending of [evidence, sets, execution, l2Proposal]) void pending.catch(() => {});
-  return { overview, evidence, sets, execution, l2Proposal };
+  for (const pending of [evidence, sets, setEvidence, execution, l2Proposal])
+    void pending.catch(() => {});
+  return { overview, evidence, sets, setEvidence, execution, l2Proposal };
 }
 
 /** JSON waits for the same engine's complete result; the page streams each section separately. */
@@ -320,12 +329,37 @@ export async function getStandardUpgrade(
   options: { supplied?: MemberSignature[] } = {}
 ): Promise<StandardUpgradeDetail> {
   const loading = await loadStandardUpgrade(id, options);
-  const [sets, execution, l2Proposal] = await Promise.all([
+  const [sets, evidence, execution, l2Proposal] = await Promise.all([
     loading.sets,
+    loading.setEvidence,
     loading.execution,
     loading.l2Proposal.catch(() => null),
   ]);
-  return { ...loading.overview, ...execution, l2Proposal, sets };
+  return {
+    ...loading.overview,
+    ...execution,
+    l2Proposal,
+    sets: sets.map((set) => withEvidence(set, evidence)),
+  };
+}
+
+/** What a set's recorded approval adds to it: the transaction, the signatures it used, the re-check. */
+export type SetEvidence = Pick<ApprovalSet, "key" | "state" | "used" | "historical">;
+
+function evidenceFor(set: ApprovalSet, records: RecordedApproval[]): SetEvidence {
+  const recorded = records.find((e) => e.key === set.key);
+  return {
+    key: set.key,
+    state: recorded?.state ?? set.state,
+    used: recorded?.used ? compareUsedSignatures(recorded.used, set.set) : null,
+    historical: recorded?.historical ?? null,
+  };
+}
+
+/** A set with its recorded approval merged in (see SetEvidence). */
+function withEvidence(set: ApprovalSet, evidence: readonly SetEvidence[]): ApprovalSet {
+  const found = evidence.find((e) => e.key === set.key);
+  return found ? { ...set, ...found } : set;
 }
 
 export async function getStandardUpgradeOverview(id: Hex): Promise<StandardUpgradeOverview> {
@@ -517,10 +551,10 @@ async function getRecordedApprovals(d: StandardUpgradeCore): Promise<RecordedApp
   );
 }
 
+/** The current signatures of each set. The recorded approvals are merged in by withEvidence. */
 async function getStandardUpgradeSets(
   d: StandardUpgradeCore,
-  supplied: MemberSignature[],
-  evidence: Promise<RecordedApproval[]>
+  supplied: MemberSignature[]
 ): Promise<ApprovalSet[]> {
   const { governance: gov, id } = d;
   const specs = approvalSpecs(d);
@@ -539,11 +573,15 @@ async function getStandardUpgradeSets(
       const execution = await executionFor(set, spec.state, (valid) =>
         approvalExecution(spec.action, contract.address, id, valid)
       );
-      const recorded = (await evidence).find((e) => e.key === spec.key);
-      const used = recorded?.used ? compareUsedSignatures(recorded.used, set) : null;
-      const historical = recorded?.historical ?? null;
-      const state = recorded?.state ?? spec.state;
-      return { key: spec.key, title: spec.title, set, state, execution, used, historical };
+      return {
+        key: spec.key,
+        title: spec.title,
+        set,
+        state: spec.state,
+        execution,
+        used: null,
+        historical: null,
+      };
     })
   );
 }
@@ -635,11 +673,12 @@ async function blockAt(timestamp: number) {
 }
 
 function simulateAs(execution: ExecutionView | Parameters<typeof simulate>[0], executor: Address) {
-  // A proposal with an executor can only be executed by it; simulate from that address.
+  // The proposal comes from its UpgradeStarted log: nothing the viewer supplied, so the answer is
+  // kept per head. A proposal with an executor can only be executed by it; simulate from there.
   if (!isAddressEqual(executor, zeroAddress)) {
-    return simulateCall({ from: executor, to: execution.to, data: execution.data });
+    return simulateCall({ from: executor, to: execution.to, data: execution.data }, { keep: true });
   }
-  return simulate(execution);
+  return simulate(execution, { keep: true });
 }
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));

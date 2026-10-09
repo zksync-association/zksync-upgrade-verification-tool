@@ -25,7 +25,10 @@ export type SetState =
 
 export type ExecutionView = Execution & { simulation: Simulation };
 
-/** What the signature set adds up to on-chain right now: a ready transaction or why not. */
+/**
+ * What the signature set adds up to on-chain right now: a ready transaction or why not. Its
+ * simulation is kept per head unless it carries a signature the viewer supplied.
+ */
 export async function executionFor(
   set: SignatureSet,
   state: SetState,
@@ -34,7 +37,8 @@ export async function executionFor(
   if (state.status !== "open" || set.thresholdCheck.status !== "met") return null;
   const execution = build(set.valid);
   if (!execution) return null;
-  return { ...execution, simulation: await simulate(execution) };
+  const keep = set.members.every((m) => m.status !== "valid" || m.source !== "supplied");
+  return { ...execution, simulation: await simulate(execution, { keep }) };
 }
 
 export function topicOf(abi: readonly unknown[], name: string): Hex {

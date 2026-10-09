@@ -109,6 +109,15 @@ export function replace<T>(key: string, value: T, ttlMs: number) {
 }
 
 /**
+ * The entry under `key` (resolved or still in flight) without computing anything: null when there
+ * is none or it expired.
+ */
+export function peek<T>(key: string): Promise<T> | null {
+  const hit = store.get(key) as Entry<T> | undefined;
+  return hit && hit.expiresAt > Date.now() ? hit.value : null;
+}
+
+/**
  * How much longer the entry under `key` is served: null when there is none (or it expired),
  * Infinity while its read is still in flight or when it is kept for good.
  */

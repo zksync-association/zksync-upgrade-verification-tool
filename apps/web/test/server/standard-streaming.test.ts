@@ -218,6 +218,64 @@ it("re-checks recorded approvals while current signature checks are still pendin
   await full;
 });
 
+it("resolves current signatures without waiting for the recorded approvals' re-check; JSON waits for both", async () => {
+  // The historical re-check is held until `open()`.
+  let open!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  state.archive = async () => {
+    await gate;
+    return true;
+  };
+  release();
+  const loading = await loadStandardUpgrade(ID);
+  const sets = await loading.sets;
+  expect(sets).toHaveLength(3);
+  // The current signatures alone: the recorded transaction and its signatures come with the
+  // evidence.
+  expect(sets[0]).toMatchObject({
+    key: "securityCouncil",
+    state: { status: "done", txHash: null },
+    used: null,
+    historical: null,
+  });
+  let merged = false;
+  void loading.setEvidence.then(() => {
+    merged = true;
+  });
+  let answered = false;
+  const full = getStandardUpgrade(ID).then((detail) => {
+    answered = true;
+    return detail;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(merged).toBe(false);
+  expect(answered).toBe(false);
+  open();
+  const evidence = await loading.setEvidence;
+  expect(evidence.map((e) => e.key)).toEqual(["securityCouncil", "guardians", "legalVeto"]);
+  expect(evidence[0]).toMatchObject({
+    state: { status: "done", txHash: APPROVAL_TX },
+    historical: { block: "200", accepted: true, error: null },
+  });
+  expect(evidence[0]?.used).toHaveLength(6);
+  // Sets without a recorded approval keep their own state.
+  expect(evidence[1]).toEqual({
+    key: "guardians",
+    state: sets[1]?.state,
+    used: null,
+    historical: null,
+  });
+  const detail = await full;
+  expect(detail.sets[0]).toMatchObject({
+    key: "securityCouncil",
+    state: { status: "done", txHash: APPROVAL_TX },
+    historical: { block: "200", accepted: true, error: null },
+  });
+  expect(detail.sets[0]?.used).toHaveLength(6);
+});
+
 it("keeps the JSON engine waiting for verified sets and Safe comparisons", async () => {
   let finished = false;
   const full = getStandardUpgrade(ID).then((detail) => {

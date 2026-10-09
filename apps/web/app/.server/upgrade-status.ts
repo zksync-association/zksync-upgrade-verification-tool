@@ -2,6 +2,7 @@ import { upgradeHandlerAbi } from "@/common/abis";
 import { UPGRADE_STATES, type UpgradeState } from "@/common/upgrade-states";
 import type { Address, Hex } from "viem";
 import { cached, seed } from "./cache";
+import { isUnknownBlock } from "./chain/call";
 import { type BlockRef, type Network, l1State, latestBlock, network } from "./rpc";
 
 // upgradeState and upgradeStatus of one id, as the ProtocolUpgradeHandler answers them at one
@@ -24,8 +25,7 @@ export type UpgradeStatusRead = { state: UpgradeState; status: UpgradeStatus };
 // bounds how long an entry nobody asks for any more stays in memory.
 const STATUS_TTL_MS = 60_000;
 
-// A load-balanced RPC can name a head one of its backends does not have yet.
-const UNKNOWN_BLOCK = /header not found|unknown block|block not found|cannot find block/i;
+// A load-balanced RPC can name a head one of its backends does not have yet (isUnknownBlock).
 const UNKNOWN_BLOCK_RETRY_MS = 300;
 
 type Handler = Pick<Network, "chainId" | "upgradeHandler">;
@@ -88,7 +88,7 @@ export async function readUpgradeStatus(
   try {
     answer = await read();
   } catch (error) {
-    if (blockNumber === undefined || !unknownBlock(error)) throw error;
+    if (blockNumber === undefined || !isUnknownBlock(error)) throw error;
     // Once, after a moment: the backend that answers next has usually caught up.
     await new Promise((resolve) => setTimeout(resolve, UNKNOWN_BLOCK_RETRY_MS));
     answer = await read();
@@ -104,20 +104,4 @@ export async function readUpgradeStatus(
       executed: raw[4],
     },
   };
-}
-
-/** The node does not know the block it was asked about (anywhere in the error's cause chain). */
-function unknownBlock(error: unknown): boolean {
-  let current: unknown = error;
-  for (let depth = 0; current && depth < 8; depth++) {
-    const { details, message, cause } = current as {
-      details?: unknown;
-      message?: unknown;
-      cause?: unknown;
-    };
-    for (const text of [details, message])
-      if (typeof text === "string" && UNKNOWN_BLOCK.test(text.slice(0, 2_000))) return true;
-    current = cause;
-  }
-  return false;
 }

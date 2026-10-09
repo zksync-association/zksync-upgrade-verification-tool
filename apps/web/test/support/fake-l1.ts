@@ -76,6 +76,11 @@ export type FakeL1Options = {
    */
   stateAt?: (block: string) => FakeRpcError | undefined;
   delayMs?: FakeOptions["delayMs"];
+  /**
+   * Member signatures the Security Council and Guardians accept in checkSignatures, as
+   * `${signer}:${signature}` in lower case (any threshold); every other set reverts.
+   */
+  signatures?: Set<string>;
 };
 
 const errorAbi = parseAbi(["error Panic(uint256)"]);
@@ -113,6 +118,15 @@ export function fakeL1(options: FakeL1Options) {
     const to = getAddress(call.to);
     const domain = (name: string) => ["0x0f", name, "1", 1n, to, zeroHash, []];
     const id = String(call.args[0] ?? "").toLowerCase();
+    // Multisig.checkSignatures(digest, signers, signatures, threshold): returns nothing.
+    const checkSignatures = () => {
+      const [, signers, signatures] = call.args as [Hex, Address[], Hex[]];
+      return signers.every((signer, i) =>
+        options.signatures?.has(`${signer}:${signatures[i]}`.toLowerCase())
+      )
+        ? undefined
+        : REVERT;
+    };
     const tables: Record<string, Record<string, () => unknown>> = {
       [L1.upgradeHandler]: {
         securityCouncil: () => L1.securityCouncil,
@@ -137,6 +151,7 @@ export function fakeL1(options: FakeL1Options) {
         PROTOCOL_UPGRADE_HANDLER: () => L1.upgradeHandler,
         eip712Domain: () => domain("SecurityCouncil"),
         members: () => SC_MEMBERS[Number(call.args[0])] ?? REVERT,
+        checkSignatures,
       },
       [L1.guardians]: {
         EIP1271_THRESHOLD: () => 2n,
@@ -147,6 +162,7 @@ export function fakeL1(options: FakeL1Options) {
         PROTOCOL_UPGRADE_HANDLER: () => L1.upgradeHandler,
         eip712Domain: () => domain("Guardians"),
         members: () => G_MEMBERS[Number(call.args[0])] ?? REVERT,
+        checkSignatures,
       },
       [L1.emergencyUpgradeBoard]: {
         ZK_FOUNDATION_SAFE: () => L1.zkFoundation,
@@ -161,6 +177,8 @@ export function fakeL1(options: FakeL1Options) {
       getThreshold: () => 2n,
       getOwners: () => [member(0xc, 0), member(0xc, 1)],
       domainSeparator: () => safeMessageHashes(1, to, zeroHash).domainHash,
+      // No message approved on-chain (SignMessageLib).
+      signedMessages: () => 0n,
     };
     const answer = (tables[to] ?? safe)[call.functionName];
     if (!answer) throw new Error(`fake L1: unexpected ${to}.${call.functionName}`);

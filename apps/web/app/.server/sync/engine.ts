@@ -21,8 +21,15 @@ import {
   network,
   pollHead,
   rpcGeneration,
+  servedHead,
 } from "../rpc";
 import { type SafeSweepDriver, startSafeSweep, stopSafeSweep } from "../safe/store";
+import {
+  type SignatureWatchDriver,
+  precomputeSignatureSets,
+  startSignatureWatch,
+  stopSignatureWatch,
+} from "../signatures";
 import {
   type UpgradeStatusRead,
   isTerminalState,
@@ -32,10 +39,11 @@ import {
 } from "../upgrade-status";
 
 // The sync engine: while the app is in use it follows the chain head and, on every new block,
-// refills the same cache entries requests read (the head, governance, upgrade states, Safe info),
-// so a request finds them fresh and asks nothing upstream. It never serves anything itself: when
-// it is idle, failing or off, requests read on demand exactly as without it, with the same
-// lifetimes (head 4 s, governance 30 s). State read at the head is keyed by the head's hash.
+// refills the same cache entries requests read (the head, governance, upgrade states, Safe info,
+// the signature sets pages viewed lately), so a request finds them fresh and asks nothing
+// upstream. It never serves anything itself: when it is idle, failing or off, requests read on
+// demand exactly as without it, with the same lifetimes (head 4 s, governance 30 s). State read at
+// the head is keyed by the head's hash.
 //
 // A new head is served (published as the cached head) once what requests at it need has been
 // read (the index tail, upgrade states), at most 2 s after it was seen, and only while it is still
@@ -680,7 +688,33 @@ export function liveSteps(): TickStep[] {
         );
       },
     },
+    // (e) The signature sets pages viewed in the last 10 minutes, verified at this head once it
+    // is served (after its governance read and upgrade states), so the next request finds them.
+    signaturesStep((tick) => governanceFor(tick)),
   ];
+}
+
+/** The precompute could not verify some watched sets (an upstream error); nothing of them is kept. */
+class PrecomputeFailed extends Error {
+  override name = "PrecomputeFailed";
+}
+
+/**
+ * The tick step that verifies watched signature sets at the new head, after `after(tick)` settled
+ * and the head was served (requests then read at it). Sets that would need Safe (no listing at
+ * most 60 s old) are left to requests.
+ */
+export function signaturesStep(after: (tick: Tick) => Promise<unknown> = async () => {}): TickStep {
+  return {
+    name: "signatures",
+    run: async (tick) => {
+      await after(tick).catch(() => {});
+      if (!(await tick.served())) throw new StepSkipped("head replaced before it was served");
+      if (!tick.current()) return;
+      const run = await precomputeSignatureSets(tick.head, { current: tick.current });
+      if (run.failed > 0) throw new PrecomputeFailed(`${run.failed} of ${run.sets} sets failed`);
+    },
+  };
 }
 
 /**
@@ -790,11 +824,19 @@ const safeSweep: SafeSweepDriver = {
   },
 };
 
+// Watched signature sets are verified again at the served head when a member Safe's listing
+// changes, while the engine runs.
+const signatureWatch: SignatureWatchDriver = {
+  active: safeSweep.active,
+  head: servedHead,
+};
+
 /** Marks a request: keeps the engine running (or starts it). Never throws. */
 export function touchSync() {
   try {
     engine().touch();
     startSafeSweep(safeSweep);
+    startSignatureWatch(signatureWatch);
   } catch (error) {
     log.warn({ error: errorKind(error) }, "sync touch failed");
   }
@@ -829,4 +871,5 @@ export function stopSync() {
   instance?.stop();
   instance = null;
   stopSafeSweep();
+  stopSignatureWatch();
 }

@@ -15,7 +15,7 @@ import { formatTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
 import { Await, Link, useAsyncError, useLoaderData } from "@remix-run/react";
-import { Suspense } from "react";
+import { Fragment, Suspense } from "react";
 import { $path } from "remix-routes";
 import { zeroAddress } from "viem";
 
@@ -29,6 +29,7 @@ export function loader({ params, request }: LoaderFunctionArgs) {
     detail: loading.then((d) => d.overview),
     evidence: loading.then((d) => d.evidence),
     sets: loading.then((d) => d.sets),
+    setEvidence: loading.then((d) => d.setEvidence),
     execution: loading.then((d) => d.execution),
     l2Proposal: loading.then((d) => d.l2Proposal),
   });
@@ -91,7 +92,7 @@ function DetailError({ id }: { id: string }) {
 }
 
 function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeCore> }) {
-  const { sets, evidence, execution, l2Proposal } = useLoaderData<typeof loader>();
+  const { sets, evidence, setEvidence, execution, l2Proposal } = useLoaderData<typeof loader>();
   const { governance } = useStatus();
   const labels = {
     [governance.upgradeHandler.toLowerCase()]: "ProtocolUpgradeHandler",
@@ -348,19 +349,32 @@ function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeCore> }) {
           >
             {(verified) => (
               <div className="space-y-6">
-                {verified.map((s) => (
-                  <SignatureSetCard
-                    key={s.key}
-                    testId={`set-${s.key}`}
-                    title={s.title}
-                    set={s.set}
-                    state={s.state}
-                    execution={s.execution}
-                    executionToLabel={s.key === "securityCouncil" ? "SecurityCouncil" : "Guardians"}
-                    used={s.used}
-                    historical={s.historical}
-                  />
-                ))}
+                {verified.map((s) => {
+                  // A completed set shows its recorded transaction, the signatures it used and
+                  // their re-check once those are in; the current signatures do not wait.
+                  const card = (recorded: Pick<typeof s, "state" | "used" | "historical"> = s) => (
+                    <SignatureSetCard
+                      testId={`set-${s.key}`}
+                      title={s.title}
+                      set={s.set}
+                      state={recorded.state}
+                      execution={s.execution}
+                      executionToLabel={
+                        s.key === "securityCouncil" ? "SecurityCouncil" : "Guardians"
+                      }
+                      used={recorded.used}
+                      historical={recorded.historical}
+                    />
+                  );
+                  if (s.state.status !== "done") return <Fragment key={s.key}>{card()}</Fragment>;
+                  return (
+                    <Suspense key={s.key} fallback={card()}>
+                      <Await resolve={setEvidence} errorElement={card()}>
+                        {(merged) => card(merged.find((e) => e.key === s.key) ?? s)}
+                      </Await>
+                    </Suspense>
+                  );
+                })}
               </div>
             )}
           </Await>

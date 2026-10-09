@@ -1,4 +1,4 @@
-import { clearCache } from "@/.server/cache";
+import { clearCache, replace } from "@/.server/cache";
 import { CallReverted, NoContract, UndecodableResult, UpstreamError } from "@/.server/chain/call";
 import type { Lane } from "@/.server/chain/jsonrpc";
 import { ERC1271_MAGIC_VALUE, guardiansAbi, safeAbi } from "@/common/abis";
@@ -14,7 +14,7 @@ import {
   RpcRequestError,
   getAddress,
 } from "viem";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type ContractCall,
   RawResult,
@@ -56,46 +56,106 @@ const state = vi.hoisted(() => ({
   boundaryGate: null as (() => Promise<unknown>) | null,
   // Called when the contract answers a single-signer checkSignatures.
   onCheck: null as (() => void) | null,
+  // The head requests read (above the boundary), and whether the node is a dev node.
+  head: {
+    number: 1_100n,
+    hash: `0x${"a1".repeat(32)}`,
+    parentHash: `0x${"00".repeat(32)}`,
+    timestamp: 1n,
+  } as { number: bigint; hash: Hex; parentHash: Hex; timestamp: bigint },
+  devNode: false,
+  // The Safe store: the version of every member's listing, and whether it is at most 60 s old.
+  listingVersion: 1,
+  listingFresh: true,
+  // Listing lookups made (by request reads; precomputes only peek).
+  lookups: 0,
+  // The next `count` single-signer checkSignatures are answered with `error()` (attempts counts
+  // every single-signer checkSignatures asked, answered or not).
+  failChecks: { count: 0, error: () => undefined as unknown },
+  attempts: 0,
+  listeners: new Set<(safe: string) => void>(),
+  // Combined checkSignatures asked (more than one signer: the threshold check).
+  combined: 0,
+  // How long the node takes to answer each POST (ms).
+  delay: 0,
+  // Every listing is incomplete: messages are looked up by their hash (no listing version).
+  byHash: false,
+  // The Safes each markSafeDemand call named (a page answered from a kept or shared result).
+  demand: [] as string[][],
 }));
 
 vi.mock("@/.server/rpc", () => ({
-  network: async () => ({ chainId: 1, safeWalletPrefix: "eth", isDevNode: false }),
+  network: async () => ({ chainId: 1, safeWalletPrefix: "eth", isDevNode: state.devNode }),
   safeBlockNumber: async () => {
     if (state.headDown) throw new Error("head unavailable");
     await state.boundaryGate?.();
     return state.safe;
   },
+  latestBlock: async () => state.head,
+  rpcGeneration: () => 1,
   lanes: () => ({ call: state.lane }),
 }));
 
-vi.mock("@/.server/governance", () => ({
-  safeInfo: async (address: string) => ({
-    address,
-    isContract: true,
-    version: "1.3.0",
-    threshold: state.safeThreshold,
-    owners: [],
-    domainSeparatorMatches: true,
-  }),
-}));
+// Safe info cached as the real module caches it (5 minutes, under safeInfoKey).
+vi.mock("@/.server/governance", async () => {
+  const { cached } = await import("@/.server/cache");
+  const safeInfoKey = (address: string) => `safe-info:${address.toLowerCase()}`;
+  return {
+    safeInfoKey,
+    safeInfo: (address: string) =>
+      cached(safeInfoKey(address), 5 * 60_000, async () => ({
+        address,
+        isContract: true,
+        version: "1.3.0",
+        threshold: state.safeThreshold,
+        owners: [],
+        domainSeparatorMatches: true,
+      })),
+  };
+});
 
 vi.mock("@/.server/safe-api", () => {
   class SafeApiError extends Error {}
   return { SafeApiError, safeWalletUrl: async () => null };
 });
+// A Safe snapshot store whose every listing is complete, has one version and is fresh or not.
 vi.mock("@/.server/safe/store", async () => {
   const { SafeApiError } = await import("@/.server/safe-api");
+  const answer = (hash: string) => ({
+    message: state.safeMessages.get(hash) ?? null,
+    version: state.byHash ? null : state.listingVersion,
+  });
   return {
-    findSafeMessage: async (_safe: string, hash: string) => {
+    lookupSafeMessage: async (_safe: string, hash: string) => {
+      state.lookups++;
       if (state.safeApiDown) throw new SafeApiError("Safe Transaction Service returned HTTP 503");
-      return state.safeMessages.get(hash) ?? null;
+      return answer(hash);
+    },
+    // A listing that cannot answer (incomplete) is no answer for a precompute.
+    peekSafeMessage: (_safe: string, hash: string) =>
+      state.listingFresh && !state.safeApiDown && !state.byHash ? answer(hash) : null,
+    freshListingVersion: () => (state.listingFresh ? state.listingVersion : null),
+    markSafeDemand: (safes: Iterable<string>) => {
+      state.demand.push([...safes]);
+    },
+    onSafeListingChange: (listener: (safe: string) => void) => {
+      state.listeners.add(listener);
+      return () => state.listeners.delete(listener);
     },
   };
 });
 
-const { verifySignatureSet, isRevert, revertReason, simulate, simulateCall } = await import(
-  "@/.server/signatures"
-);
+const {
+  verifySignatureSet,
+  isRevert,
+  revertReason,
+  simulate,
+  simulateCall,
+  precomputeSignatureSets,
+  signatureSetsStatus,
+  startSignatureWatch,
+  stopSignatureWatch,
+} = await import("@/.server/signatures");
 const { safeMessageHashes } = await import("@/common/safe");
 
 const COUNCIL = getAddress("0x59195219d1176E42f8e607e9AC114926D47f9035");
@@ -123,6 +183,14 @@ const inSafe = (member: string, signature: Hex, confirmations = 1) =>
 function answer(call: ContractCall): unknown {
   const combined =
     call.functionName === "checkSignatures" && (call.args[1] as unknown[]).length > 1;
+  if (combined) state.combined++;
+  if (call.functionName === "checkSignatures" && !combined) {
+    state.attempts++;
+    if (state.failChecks.count > 0) {
+      state.failChecks.count--;
+      return state.failChecks.error();
+    }
+  }
   const injected =
     (combined ? state.inject.get(`${call.functionName}:combined`) : undefined) ??
     state.inject.get(call.functionName);
@@ -151,6 +219,7 @@ function answer(call: ContractCall): unknown {
 }
 
 let calls: () => { params: unknown[] }[];
+let posts: () => number;
 let codeReads: () => number;
 
 const run = (
@@ -184,6 +253,19 @@ beforeEach(() => {
   state.safe = 1_000n;
   state.boundaryGate = null;
   state.onCheck = null;
+  state.head = { ...state.head, number: 1_100n, hash: `0x${"a1".repeat(32)}` };
+  state.devNode = false;
+  state.listingVersion = 1;
+  state.listingFresh = true;
+  state.lookups = 0;
+  state.failChecks = { count: 0, error: () => undefined };
+  state.attempts = 0;
+  state.combined = 0;
+  state.delay = 0;
+  state.byHash = false;
+  state.demand = [];
+  stopSignatureWatch();
+  state.listeners.clear();
   const fake = fakeCallLane(
     contracts({
       abis: [guardiansAbi, safeAbi],
@@ -193,10 +275,12 @@ beforeEach(() => {
     {
       intercept: () =>
         state.rpcDown ? new Response("Service Unavailable", { status: 503 }) : undefined,
+      delayMs: () => state.delay,
     }
   );
   state.lane = fake.lane;
   calls = fake.calls;
+  posts = () => fake.upstream.posts.length;
   codeReads = () =>
     fake.upstream.posts.flatMap((p) => p.calls).filter((c) => c.method === "eth_getCode").length;
 });
@@ -311,21 +395,40 @@ describe("what is kept", () => {
     return () => vi.useRealTimers();
   });
 
-  it("never keeps the verdict on a supplied signature; keeps Safe's a minute", async () => {
+  it("never keeps the verdict on a supplied signature; keeps Safe's for the head it was read at", async () => {
     inSafe(MEMBERS[0] as Hex, "0xaa");
     state.valid.add(`${MEMBERS[0]}:0xaa`);
     state.valid.add(`${MEMBERS[1]}:0xcc`);
     const supplied = [{ signer: MEMBERS[1] as Hex, signature: "0xcc" as Hex }];
     await at(undefined, supplied);
     await at(undefined, supplied);
+    // Pinned to the head requests read (block 1,100), not 'latest'.
     expect(state.checked).toEqual([
-      `${MEMBERS[0]}:0xaa@latest`,
-      `${MEMBERS[1]}:0xcc@latest`,
-      `${MEMBERS[1]}:0xcc@latest`,
+      `${MEMBERS[0]}:0xaa@0x44c`,
+      `${MEMBERS[1]}:0xcc@0x44c`,
+      `${MEMBERS[1]}:0xcc@0x44c`,
     ]);
+    // The next head is another entry.
+    state.head = { ...state.head, number: 1_101n, hash: `0x${"a2".repeat(32)}` };
+    await at();
+    expect(state.checked.filter((c) => c.startsWith(`${MEMBERS[0]}:`))).toEqual([
+      `${MEMBERS[0]}:0xaa@0x44c`,
+      `${MEMBERS[0]}:0xaa@0x44d`,
+    ]);
+  });
+
+  it("on a dev node reads at 'latest' and keeps Safe's verdict a minute, as before", async () => {
+    state.devNode = true;
+    inSafe(MEMBERS[0] as Hex, "0xaa");
+    state.valid.add(`${MEMBERS[0]}:0xaa`);
+    await at();
+    await at();
+    expect(state.checked).toEqual([`${MEMBERS[0]}:0xaa@latest`]);
     later(61_000);
     await at();
-    expect(state.checked.filter((c) => c.startsWith(`${MEMBERS[0]}:`))).toHaveLength(2);
+    expect(state.checked).toEqual([`${MEMBERS[0]}:0xaa@latest`, `${MEMBERS[0]}:0xaa@latest`]);
+    // Dev nodes keep no set results and watch nothing.
+    expect(signatureSetsStatus().watched).toBe(0);
   });
 
   it("never keeps a supplied verdict, not even at a final block", async () => {
@@ -344,7 +447,7 @@ describe("what is kept", () => {
     // ...then Safe serves the same bytes: the contract is asked again, under Safe's own entry.
     inSafe(MEMBERS[1] as Hex, "0xcc");
     expect((await at()).members[1]).toMatchObject({ status: "valid", source: "safe" });
-    expect(state.checked).toEqual([`${MEMBERS[1]}:0xcc@latest`, `${MEMBERS[1]}:0xcc@latest`]);
+    expect(state.checked).toEqual([`${MEMBERS[1]}:0xcc@0x44c`, `${MEMBERS[1]}:0xcc@0x44c`]);
     // And a supplied check after it does not read Safe's entry either.
     await at(undefined, supplied);
     expect(state.checked).toHaveLength(3);
@@ -399,6 +502,413 @@ describe("what is kept", () => {
     later(61_000);
     await at(900n);
     expect(state.checked).toEqual([`${MEMBERS[0]}:0xaa@0x384`, `${MEMBERS[0]}:0xaa@0x384`]);
+  });
+});
+
+// A set's result is kept for the head it was verified at, while the Safe listings it came from
+// are still the ones served; the sync engine verifies the sets pages watch again at each new head
+// (precomputeSignatureSets), and when a member Safe's listing changes.
+describe("kept per head, and precomputed", () => {
+  const H1 = `0x${"a1".repeat(32)}` as Hex;
+  const nextHead = (hash: Hex = `0x${"a2".repeat(32)}`, number = state.head.number + 1n) => {
+    state.head = { ...state.head, number, hash };
+    return state.head;
+  };
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Two members signed in Safe and the contract accepts both: the threshold (2) is met. */
+  const twoSigned = () => {
+    for (const [i, m] of MEMBERS.slice(0, 2).entries()) {
+      inSafe(m, `0x0${i}` as Hex);
+      state.valid.add(`${m}:0x0${i}`);
+    }
+  };
+
+  it("verifies a set once per head: the next request at that head asks nothing upstream", async () => {
+    twoSigned();
+    const first = await run();
+    expect(first.thresholdCheck.status).toBe("met");
+    const sent = posts();
+    expect(sent).toBeGreaterThan(0);
+    for (let i = 0; i < 20; i++) expect(await run()).toBe(first);
+    expect(posts()).toBe(sent);
+    // Only the first request looked at the listings; the others knew they had not changed.
+    expect(state.lookups).toBe(MEMBERS.length);
+  });
+
+  it("at the next head the precompute verifies watched sets, and the request asks nothing upstream", async () => {
+    twoSigned();
+    await run();
+    const head = nextHead();
+    const precomputed = await precomputeSignatureSets(head);
+    expect(precomputed).toMatchObject({ block: "1101", trigger: "head", sets: 1, verified: 1 });
+    // Read at the new head (0x44d), from the listings the store holds (no lookup through Safe).
+    expect(state.checked.filter((c) => c.endsWith("@0x44d"))).toHaveLength(2);
+    expect(state.lookups).toBe(MEMBERS.length);
+    const sent = posts();
+    const set = await run();
+    expect(posts()).toBe(sent);
+    expect(state.lookups).toBe(MEMBERS.length);
+    expect(set.thresholdCheck.status).toBe("met");
+    expect(set.members.map((m) => m.status)).toEqual(["valid", "valid", "missing"]);
+    // Asked again at the same head: nothing to do.
+    expect(await precomputeSignatureSets(head)).toMatchObject({ verified: 0, reused: 1 });
+    expect(posts()).toBe(sent);
+    expect(signatureSetsStatus()).toMatchObject({
+      watched: 1,
+      lastRun: { block: "1101", reused: 1 },
+    });
+  });
+
+  it("leaves to the request a set whose listings are older than 60 s, and the request reads them", async () => {
+    twoSigned();
+    await run();
+    state.listingFresh = false;
+    const head = nextHead();
+    expect(await precomputeSignatureSets(head)).toMatchObject({ sets: 1, verified: 0, skipped: 1 });
+    expect(state.checked.some((c) => c.endsWith("@0x44d"))).toBe(false);
+    // The kept result at the old head no longer stands either: listings are never served older.
+    state.head = { ...state.head, number: 1_100n, hash: H1 };
+    const lookups = state.lookups;
+    const sent = posts();
+    await run();
+    expect(state.lookups).toBe(lookups + MEMBERS.length);
+    // The verdicts at this head were kept: only the listings were looked at again.
+    expect(posts()).toBe(sent);
+  });
+
+  it("a new listing version: the kept result no longer stands, and the watch verifies it again at the served head", async () => {
+    twoSigned();
+    const before = await run();
+    expect(before.members[2]?.status).toBe("missing");
+    startSignatureWatch({ active: () => true, head: () => Promise.resolve(state.head) });
+    // The third member signs; the store reads its listing with a new version.
+    inSafe(MEMBERS[2] as Hex, "0x02");
+    state.valid.add(`${MEMBERS[2]}:0x02`);
+    state.listingVersion = 2;
+    for (const listener of state.listeners) listener((MEMBERS[2] as string).toLowerCase());
+    await vi.waitFor(() =>
+      expect(signatureSetsStatus().lastRun).toMatchObject({ trigger: "safe", verified: 1 })
+    );
+    expect(state.checked).toContain(`${MEMBERS[2]}:0x02@0x44c`);
+    const sent = posts();
+    const after = await run();
+    expect(posts()).toBe(sent);
+    expect(after.members.map((m) => m.status)).toEqual(["valid", "valid", "valid"]);
+  });
+
+  it("does not verify again for a listing change while the engine is idle, or of a Safe no watched set has", async () => {
+    twoSigned();
+    await run();
+    let active = false;
+    startSignatureWatch({ active: () => active, head: () => Promise.resolve(state.head) });
+    const sent = posts();
+    for (const listener of state.listeners) listener((MEMBERS[2] as string).toLowerCase());
+    active = true;
+    for (const listener of state.listeners) listener(`0x${"99".repeat(20)}`);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(posts()).toBe(sent);
+    expect(signatureSetsStatus().lastRun).toBeNull();
+  });
+
+  it("never keeps a set with a supplied signature, and does not watch it", async () => {
+    state.valid.add(`${MEMBERS[1]}:0xcc`);
+    const supplied = [{ signer: MEMBERS[1] as Hex, signature: "0xcc" as Hex }];
+    await run(2, supplied);
+    await run(2, supplied);
+    expect(state.checked.filter((c) => c.startsWith(`${MEMBERS[1]}:0xcc`))).toHaveLength(2);
+    expect(signatureSetsStatus().watched).toBe(0);
+    expect(await precomputeSignatureSets(nextHead())).toMatchObject({ sets: 0 });
+    // The same set without ?sig= is its own entry: it does not see the supplied verdict.
+    state.head = { ...state.head, number: 1_100n, hash: H1 };
+    const plain = await run();
+    expect(plain.members[1]).toMatchObject({ status: "missing", source: null });
+  });
+
+  it("an upstream error (-32603) during the precompute keeps nothing: the request verifies on its own (and fails)", async () => {
+    twoSigned();
+    await run();
+    nextHead();
+    state.inject.set("checkSignatures", internalError());
+    const sent = posts();
+    expect(await precomputeSignatureSets(state.head)).toMatchObject({ verified: 0, failed: 1 });
+    expect(posts()).toBeGreaterThan(sent);
+    // Nothing was kept: the request asks the contract itself, and gets the same failure.
+    const before = posts();
+    await expect(run()).rejects.toBeInstanceOf(UpstreamError);
+    expect(posts()).toBeGreaterThan(before);
+    // Once the node answers again, the request verifies.
+    state.inject.clear();
+    expect((await run()).thresholdCheck.status).toBe("met");
+  });
+
+  it("a request that shared a precompute's computation which failed verifies on its own", async () => {
+    twoSigned();
+    await run();
+    nextHead();
+    // The precompute's first member check fails; the request's own reads succeed.
+    state.failChecks = { count: 1, error: internalError };
+    const precompute = precomputeSignatureSets(state.head);
+    const set = await run();
+    expect(set.thresholdCheck.status).toBe("met");
+    expect(await precompute).toMatchObject({ failed: 1 });
+    // Its result is kept: the next request at this head asks nothing.
+    const sent = posts();
+    expect(await run()).toBe(set);
+    expect(posts()).toBe(sent);
+  });
+
+  // While a set is being computed, the listings it read can change or turn 60 s old: whoever
+  // joins that computation takes its result only if it still stands for what the store serves
+  // when it ends, and otherwise reads Safe itself, as it would have without it.
+  describe("a computation in flight", () => {
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    /** The third member signs: the store now serves a new version of the listings. */
+    const thirdSigns = () => {
+      inSafe(MEMBERS[2] as Hex, "0x02");
+      state.valid.add(`${MEMBERS[2]}:0x02`);
+      state.listingVersion = 2;
+    };
+
+    it("is taken while its listings are still served: no Safe read of the request's own", async () => {
+      twoSigned();
+      await run();
+      nextHead();
+      state.delay = 120;
+      const precompute = precomputeSignatureSets(state.head);
+      // The precompute has read the listings; its eth_calls are in flight.
+      await sleep(40);
+      const lookups = state.lookups;
+      state.demand = [];
+      const set = await run();
+      expect(state.lookups).toBe(lookups);
+      expect(set.members.map((m) => m.status)).toEqual(["valid", "valid", "missing"]);
+      expect(await precompute).toMatchObject({ verified: 1 });
+      // The precompute's result, kept: the next request at this head gets the same object.
+      expect(await run()).toBe(set);
+      // Both pages count as asking for the member Safes (the sweep keeps them fresh).
+      const all = MEMBERS.map((m) => m.toLowerCase()).sort();
+      expect(state.demand.map((safes) => [...safes].sort())).toEqual([all, all]);
+    });
+
+    it("is not taken when a listing it read is replaced meanwhile: the request reads Safe and sees the new signature", async () => {
+      twoSigned();
+      await run();
+      nextHead();
+      state.delay = 120;
+      const precompute = precomputeSignatureSets(state.head);
+      await sleep(40);
+      thirdSigns();
+      const lookups = state.lookups;
+      const set = await run();
+      expect(state.lookups - lookups).toBe(MEMBERS.length);
+      expect(set.members.map((m) => m.status)).toEqual(["valid", "valid", "valid"]);
+      await precompute;
+      // The request's result is the one kept.
+      expect(await run()).toBe(set);
+    });
+
+    it("is not taken when its listings turn 60 s old meanwhile: the request reads them again", async () => {
+      twoSigned();
+      await run();
+      nextHead();
+      state.delay = 120;
+      const precompute = precomputeSignatureSets(state.head);
+      await sleep(40);
+      state.listingFresh = false;
+      const lookups = state.lookups;
+      await run();
+      expect(state.lookups - lookups).toBe(MEMBERS.length);
+      await precompute;
+    });
+
+    it("of another request is not taken when a listing it read is replaced meanwhile", async () => {
+      twoSigned();
+      state.delay = 120;
+      const first = run();
+      await sleep(40);
+      thirdSigns();
+      const lookups = state.lookups;
+      const second = await run();
+      expect((await first).members[2]?.status).toBe("missing");
+      expect(second.members[2]?.status).toBe("valid");
+      expect(state.lookups - lookups).toBe(MEMBERS.length);
+    });
+
+    it("is not taken when a member's Safe info is read again meanwhile", async () => {
+      twoSigned();
+      await run();
+      nextHead();
+      state.delay = 120;
+      const precompute = precomputeSignatureSets(state.head);
+      await sleep(40);
+      // The engine re-reads a member Safe's info before it expires: the owners now need two.
+      const { safeInfo } = await import("@/.server/governance");
+      const info = await safeInfo(MEMBERS[0] as Address);
+      replace(
+        `safe-info:${(MEMBERS[0] as string).toLowerCase()}`,
+        { ...info, threshold: 2 },
+        5 * 60_000
+      );
+      const lookups = state.lookups;
+      const set = await run();
+      expect(state.lookups - lookups).toBe(MEMBERS.length);
+      await precompute;
+      expect(await run()).toBe(set);
+    });
+  });
+
+  it("a kept set no longer stands once a member's Safe info is read again", async () => {
+    twoSigned();
+    const first = await run();
+    expect(await run()).toBe(first);
+    const { safeInfo } = await import("@/.server/governance");
+    const info = await safeInfo(MEMBERS[1] as Address);
+    // As the sync engine does before the entry expires: the same info, read again.
+    replace(`safe-info:${(MEMBERS[1] as string).toLowerCase()}`, { ...info }, 5 * 60_000);
+    const lookups = state.lookups;
+    const again = await run();
+    expect(again).not.toBe(first);
+    expect(state.lookups - lookups).toBe(MEMBERS.length);
+    expect(await run()).toBe(again);
+  });
+
+  it("a page answered from a kept set still counts as asking for its member Safes", async () => {
+    twoSigned();
+    await run();
+    expect(state.demand).toEqual([]);
+    await run();
+    expect(state.demand).toEqual([MEMBERS.map((m) => m.toLowerCase())]);
+    // A precompute is not a page.
+    await precomputeSignatureSets(nextHead());
+    expect(state.demand).toHaveLength(1);
+  });
+
+  // What is never kept, whatever else holds.
+  describe("never kept", () => {
+    it("the threshold verdict on a set holding a supplied signature, even next to Safe's", async () => {
+      inSafe(MEMBERS[0] as Hex, "0x00");
+      state.valid.add(`${MEMBERS[0]}:0x00`);
+      state.valid.add(`${MEMBERS[1]}:0xcc`);
+      const supplied = [{ signer: MEMBERS[1] as Hex, signature: "0xcc" as Hex }];
+      expect((await run(2, supplied)).thresholdCheck.status).toBe("met");
+      expect((await run(2, supplied)).thresholdCheck.status).toBe("met");
+      // The combined check was asked each time: nothing about the supplied signature is stored.
+      expect(state.combined).toBe(2);
+    });
+
+    it("a set whose Safe reads failed: the next request at that head reads Safe again", async () => {
+      twoSigned();
+      state.safeApiDown = true;
+      expect((await run()).members.map((m) => m.status)).toEqual([
+        "unavailable",
+        "unavailable",
+        "unavailable",
+      ]);
+      state.safeApiDown = false;
+      const lookups = state.lookups;
+      const set = await run();
+      expect(state.lookups - lookups).toBe(MEMBERS.length);
+      expect(set.members.map((m) => m.status)).toEqual(["valid", "valid", "missing"]);
+    });
+
+    it("a set whose messages were looked up by hash (no listing version to tell when it changes)", async () => {
+      twoSigned();
+      state.byHash = true;
+      await run();
+      await run();
+      expect(state.lookups).toBe(2 * MEMBERS.length);
+    });
+
+    it("a set past a minute, though the head and the listings are unchanged", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      twoSigned();
+      const first = await run();
+      vi.setSystemTime(Date.now() + 59_000);
+      expect(await run()).toBe(first);
+      vi.setSystemTime(Date.now() + 2_000);
+      const lookups = state.lookups;
+      expect(await run()).not.toBe(first);
+      expect(state.lookups - lookups).toBe(MEMBERS.length);
+    });
+
+    it("a precompute across a settings change: no result, no further sets, no last run", async () => {
+      twoSigned();
+      // Five watched sets (one more than the precompute verifies at once).
+      for (let threshold = 1; threshold <= 5; threshold++) await run(threshold);
+      const head = nextHead();
+      state.delay = 60;
+      let generation = 1;
+      const precompute = precomputeSignatureSets(head, { current: () => generation === 1 });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      // The settings change: every cache is emptied and the generation moves on.
+      clearCache();
+      generation = 2;
+      expect(await precompute).toMatchObject({ sets: 5, skipped: 1 });
+      expect(signatureSetsStatus().lastRun).toBeNull();
+      // Nothing the precompute computed was kept: a request at that head verifies on its own.
+      const lookups = state.lookups;
+      await run(2);
+      expect(state.lookups - lookups).toBe(MEMBERS.length);
+    });
+  });
+
+  it("a block at the same height on another branch is another entry", async () => {
+    twoSigned();
+    await run();
+    const sent = posts();
+    expect(codeReads()).toBe(1);
+    nextHead(`0x${"b1".repeat(32)}`, 1_100n);
+    const set = await run();
+    expect(posts()).toBeGreaterThan(sent);
+    expect(set.thresholdCheck.status).toBe("met");
+    // Each member was asked twice at block 1,100: once per block hash.
+    expect(state.checked.filter((c) => c === `${MEMBERS[0]}:0x00@0x44c`)).toHaveLength(2);
+    // The council's code too: presence learned at one block is not lent to its sibling.
+    expect(codeReads()).toBe(2);
+  });
+
+  it("asks a pinned read once more when the node does not know the head yet, then fails as an upstream error", async () => {
+    twoSigned();
+    const headerNotFound = () => new FakeRpcError(-32000, "header not found");
+    // The first member check finds a backend that has not seen block 1,100 yet.
+    state.failChecks = { count: 1, error: headerNotFound };
+    expect((await run()).thresholdCheck.status).toBe("met");
+    expect(state.attempts).toBe(3);
+    // A backend that keeps not knowing it: each read asked twice, then an upstream error, never
+    // "invalid".
+    clearCache();
+    state.attempts = 0;
+    state.failChecks = { count: Number.POSITIVE_INFINITY, error: headerNotFound };
+    await expect(run()).rejects.toBeInstanceOf(UpstreamError);
+    expect(state.attempts).toBe(4);
+  });
+
+  it("watches at most 64 sets, each until 10 minutes after it was last viewed", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    {
+      const view = (n: number) =>
+        verifySignatureSet({
+          action: "ApproveUpgradeSecurityCouncil",
+          signerGroup: "securityCouncil",
+          typedData: buildTypedData("ApproveUpgradeSecurityCouncil", typedData.domain, {
+            id: `0x${n.toString(16).padStart(64, "0")}`,
+          }),
+          members: MEMBERS,
+          threshold: 2,
+          check: { kind: "multisig", contract: COUNCIL },
+        });
+      for (let n = 1; n <= 65; n++) await view(n);
+      expect(signatureSetsStatus().watched).toBe(64);
+      vi.setSystemTime(Date.now() + 9 * 60_000);
+      await view(65);
+      vi.setSystemTime(Date.now() + 60_001);
+      expect(signatureSetsStatus().watched).toBe(1);
+      vi.setSystemTime(Date.now() + 9 * 60_000);
+      expect(signatureSetsStatus().watched).toBe(0);
+    }
   });
 });
 
@@ -534,6 +1044,62 @@ describe("simulate", () => {
       { to: COUNCIL, data: "0x1234", from: executor },
       "latest",
     ]);
+  });
+
+  describe("kept per head", () => {
+    const H2 = { number: 1_101n, hash: `0x${"a2".repeat(32)}` as Hex };
+
+    it("asks once per head, at its number; a definite answer is kept, an RPC failure is not", async () => {
+      let reply: unknown = "0x";
+      const fake = fakeCallLane(() => reply);
+      state.lane = fake.lane;
+      expect(await simulate(execution, { keep: true })).toEqual({ status: "ok" });
+      expect(await simulate(execution, { keep: true })).toEqual({ status: "ok" });
+      expect(fake.calls().map((c) => c.params[1])).toEqual(["0x44c"]);
+      // Without keep (a supplied signature in it): at 'latest', every time.
+      await simulate(execution);
+      expect(fake.calls().map((c) => c.params[1])).toEqual(["0x44c", "latest"]);
+
+      state.head = { ...state.head, ...H2 };
+      reply = revertWith("Protocol frozen");
+      const reverted = { status: "reverted", error: "Protocol frozen" };
+      expect(await simulate(execution, { keep: true })).toEqual(reverted);
+      expect(await simulate(execution, { keep: true })).toEqual(reverted);
+      expect(fake.calls()).toHaveLength(3);
+
+      state.head = { ...state.head, number: 1_102n, hash: `0x${"a3".repeat(32)}` };
+      reply = internalError();
+      expect(await simulate(execution, { keep: true })).toMatchObject({ status: "skipped" });
+      reply = "0x";
+      expect(await simulate(execution, { keep: true })).toEqual({ status: "ok" });
+      expect(fake.calls()).toHaveLength(5);
+    });
+
+    it("tells apart senders, values and calldata, and asks once more when the node does not know the head", async () => {
+      let notFound = 1;
+      const fake = fakeCallLane(() =>
+        notFound-- > 0 ? new FakeRpcError(-32000, "header not found") : "0x"
+      );
+      state.lane = fake.lane;
+      expect(await simulate(execution, { keep: true })).toEqual({ status: "ok" });
+      expect(fake.calls()).toHaveLength(2);
+      await simulate({ ...execution, value: "7" }, { keep: true });
+      await simulate({ ...execution, data: "0x5678" }, { keep: true });
+      await simulateCall(
+        { from: MEMBERS[0] as Address, to: COUNCIL, data: "0x1234" },
+        { keep: true }
+      );
+      expect(fake.calls()).toHaveLength(5);
+    });
+
+    it("on a dev node: at 'latest', never kept", async () => {
+      state.devNode = true;
+      const fake = fakeCallLane(() => "0x");
+      state.lane = fake.lane;
+      await simulate(execution, { keep: true });
+      await simulate(execution, { keep: true });
+      expect(fake.calls().map((c) => c.params[1])).toEqual(["latest", "latest"]);
+    });
   });
 
   it("as the executor: reverted only on a definite revert, skipped on -32603", async () => {

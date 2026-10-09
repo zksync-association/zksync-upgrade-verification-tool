@@ -5,6 +5,7 @@ import { type LogHistoryStatus, checkLogHistory } from "./logs";
 import { ConfigError, l1, network } from "./rpc";
 import { type SafeStoreStatus, safeStoreStatus } from "./safe/store";
 import { quota } from "./safe-api";
+import { type SignatureSetsStatus, signatureSetsStatus } from "./signatures";
 import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
 
 // What the header, footer and every page's trust panel show: which chain the RPC is on, the
@@ -16,12 +17,15 @@ import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
  * `engine` is the sync engine, which follows the head while the app is in use and refreshes what
  * requests read ahead of them (never a source of answers of its own). `safe` is the Safe
  * listing store's background sweep, which keeps member Safes' listings under 60 s old while the
- * app is in use (listings are never served older, sweep or not).
+ * app is in use (listings are never served older, sweep or not). `signatures` is the engine's
+ * precompute of the signature sets pages viewed lately, at each new head (results are the
+ * on-chain verdicts at that head, from Safe listings at most 60 s old).
  */
 export type SyncStatus = {
   index: PuhIndexStatus;
   engine: SyncEngineStatus;
   safe: SafeStoreStatus;
+  signatures: SignatureSetsStatus;
 };
 
 export type AppStatus =
@@ -46,7 +50,12 @@ export async function appStatus(): Promise<AppStatus> {
       safeApi: { url: net.safeTxServiceUrl, withKey: !!env.SAFE_API_KEY, quota: { ...quota } },
       l2RpcConfigured: net.l2RpcUrl !== null,
       clientVersion: net.clientVersion,
-      sync: { index: puhIndex().status(), engine: syncEngineStatus(), safe: safeStoreStatus() },
+      sync: {
+        index: puhIndex().status(),
+        engine: syncEngineStatus(),
+        safe: safeStoreStatus(),
+        signatures: signatureSetsStatus(),
+      },
     };
   } catch (error) {
     if (error instanceof ConfigError) {

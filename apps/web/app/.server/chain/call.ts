@@ -252,6 +252,12 @@ export type FunctionCall = {
   args?: readonly unknown[];
   /** Omitted: 'latest'. */
   blockNumber?: bigint;
+  /**
+   * The hash of `blockNumber` when the read stands for that one block (a head): what is kept
+   * about it (code presence) is kept under the hash, never shared with another block at that
+   * height. The node is still asked by number.
+   */
+  blockHash?: Hex;
 };
 
 /**
@@ -262,14 +268,14 @@ export type FunctionCall = {
  * an acceptance (NoContract).
  */
 export async function callFn<T = unknown>(call: FunctionCall): Promise<T> {
-  const { address, abi, functionName, args = [], blockNumber } = call;
+  const { address, abi, functionName, args = [], blockNumber, blockHash } = call;
   const item = getAbiItem({ abi, name: functionName, args } as never) as AbiFunction | undefined;
   if (item?.type !== "function") throw new Error(`No function ${functionName} in the ABI`);
   const data = encodeFunctionData({ abi: [item], functionName, args } as never);
   if (item.outputs.length === 0) {
     await Promise.all([
       ethCall({ to: address, data, blockNumber }, abi),
-      requireCode(address, blockNumber),
+      requireCode(address, blockNumber, blockHash),
     ]);
     return undefined as T;
   }
@@ -282,6 +288,30 @@ export async function callFn<T = unknown>(call: FunctionCall): Promise<T> {
     const message = `${functionName}() on ${address} returned data that does not decode`;
     throw new UndecodableResult(message, { cause });
   }
+}
+
+// A load-balanced RPC can name a head one of its backends does not have yet; that backend then
+// says it does not know the block.
+const UNKNOWN_BLOCK = /header not found|unknown block|block not found|cannot find block/i;
+
+/**
+ * The node said it does not know the block it was asked about (anywhere in the error's cause
+ * chain: this module's errors, a lane's, viem's). Never a revert, and never an answer about the
+ * contract: at a block the node just named as its head, it means a backend behind the others.
+ */
+export function isUnknownBlock(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; current && depth < 8; depth++) {
+    const { details, message, cause } = current as {
+      details?: unknown;
+      message?: unknown;
+      cause?: unknown;
+    };
+    for (const text of [details, message])
+      if (typeof text === "string" && UNKNOWN_BLOCK.test(text.slice(0, 2_000))) return true;
+    current = cause;
+  }
+  return false;
 }
 
 /**
@@ -301,29 +331,38 @@ export async function isFinalBlock(blockNumber: bigint): Promise<boolean> {
 /**
  * Rejects with NoContract when `address` has no code at `blockNumber` ('latest' when omitted).
  * Presence is kept a minute at 'latest' (and above the finality boundary), for good at a final
- * block; absence is never kept.
+ * block; absence is never kept. With `blockHash` (the hash of `blockNumber`), presence is kept
+ * under that hash instead of the number, so a block at the same height on another branch reads
+ * its own.
  */
-export async function requireCode(address: Address, blockNumber?: bigint): Promise<void> {
-  const present = await cachedUntil(
-    `code:${address.toLowerCase()}:${blockNumber ?? "latest"}`,
-    async () => {
-      // The boundary is read before the code: a block at or below it was final when it was read.
-      const final = blockNumber === undefined ? false : await isFinalBlock(blockNumber);
-      const code = await lanes()
-        .call.request<unknown>("eth_getCode", [address, blockTag(blockNumber)])
-        .catch((error: unknown) => {
-          // No eth_getCode error is an answer about the contract.
-          const upstream = callError(error);
-          throw upstream instanceof CallReverted
-            ? new UpstreamError(upstream.message, { cause: error })
-            : upstream;
-        });
-      if (typeof code !== "string" || !isHex(code))
-        throw new UpstreamError(`eth_getCode for ${address} returned no hex data`);
-      const value = code !== "0x" && code !== "0x0";
-      return { value, ttlMs: value ? (final ? FOREVER : 60_000) : 0 };
-    }
-  );
+export async function requireCode(
+  address: Address,
+  blockNumber?: bigint,
+  blockHash?: Hex
+): Promise<void> {
+  const at =
+    blockNumber === undefined
+      ? "latest"
+      : blockHash === undefined
+        ? blockNumber.toString()
+        : `h:${blockHash.toLowerCase()}`;
+  const present = await cachedUntil(`code:${address.toLowerCase()}:${at}`, async () => {
+    // The boundary is read before the code: a block at or below it was final when it was read.
+    const final = blockNumber === undefined ? false : await isFinalBlock(blockNumber);
+    const code = await lanes()
+      .call.request<unknown>("eth_getCode", [address, blockTag(blockNumber)])
+      .catch((error: unknown) => {
+        // No eth_getCode error is an answer about the contract.
+        const upstream = callError(error);
+        throw upstream instanceof CallReverted
+          ? new UpstreamError(upstream.message, { cause: error })
+          : upstream;
+      });
+    if (typeof code !== "string" || !isHex(code))
+      throw new UpstreamError(`eth_getCode for ${address} returned no hex data`);
+    const value = code !== "0x" && code !== "0x0";
+    return { value, ttlMs: value ? (final ? FOREVER : 60_000) : 0 };
+  });
   if (!present) {
     throw new NoContract(
       `No contract at ${address}${blockNumber === undefined ? "" : ` at block ${blockNumber}`}`

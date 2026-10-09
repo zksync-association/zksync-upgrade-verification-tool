@@ -1,4 +1,4 @@
-import { clearCache, remainingMs } from "@/.server/cache";
+import { clearCache, invalidate, remainingMs } from "@/.server/cache";
 import { puhIndex } from "@/.server/chain/puh-index";
 import { getStandardUpgradeCore, listStandardUpgrades } from "@/.server/flows/standard";
 import { GOVERNANCE_KEY, governance, safeInfo } from "@/.server/governance";
@@ -23,9 +23,13 @@ import {
   syncEngineStatus,
   touchSync,
 } from "@/.server/sync/engine";
-import { safeStoreStatus } from "@/.server/safe/store";
+import { listSafeMessages, safeStoreStatus } from "@/.server/safe/store";
+import type { SafeMessage } from "@/.server/safe-api";
+import { signatureSetsStatus, verifySignatureSet } from "@/.server/signatures";
 import { currentUpgradeStatus, upgradeStatusKey } from "@/.server/upgrade-status";
 import { type UpgradeProposal, encodeUpgradeProposal, upgradeProposalId } from "@/common/proposal";
+import { safeMessageHashes } from "@/common/safe";
+import { buildTypedData, governanceHashes } from "@/common/typed-data";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
 import { type Hex, numberToHex, pad, zeroAddress, zeroHash } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -815,7 +819,7 @@ const ACTIVE_STARTED = FINAL - 500n;
 const CREATED = Number(1_700_000_000n + ACTIVE_STARTED * 12n);
 
 function liveChain(
-  options: Pick<FakeL1Options, "inject" | "gate" | "clientVersion" | "stateAt"> = {}
+  options: Pick<FakeL1Options, "inject" | "gate" | "clientVersion" | "stateAt" | "signatures"> = {}
 ) {
   const history = puhHistory(L1.deployBlock, FINAL - 1_000n);
   const started: ChainLog = {
@@ -887,6 +891,72 @@ async function firstTick(engine: SyncEngine, ticks = 1) {
   engine.touch();
   await until(() => engine.status().ticks >= ticks);
   await engine.settled();
+}
+
+/** Runs the fake clock until `promise` settles, and returns its value. */
+async function settle<T>(promise: Promise<T>, maxMs = 10_000): Promise<T> {
+  let done = false;
+  const tracked = promise.finally(() => {
+    done = true;
+  });
+  void tracked.catch(() => {});
+  await until(() => done, maxMs);
+  return tracked;
+}
+
+/**
+ * Safe's Transaction Service in front of the fake node, holding the member Safes' messages for the
+ * Security Council's approval of the active upgrade. `sign(member)` adds that member's message
+ * (2 confirmations, the Safe's threshold) and makes the council accept its signature; `view()`
+ * verifies the set as the upgrade page does.
+ */
+async function safeService(fake: ReturnType<typeof fakeL1>, signatures: Set<string>) {
+  const gov = await governance();
+  const typedData = buildTypedData("ApproveUpgradeSecurityCouncil", gov.securityCouncil.domain, {
+    id: ACTIVE_ID,
+  });
+  const { digest } = governanceHashes(typedData);
+  const listings = new Map<string, SafeMessage[]>();
+  const requests: string[] = [];
+  vi.stubGlobal("fetch", async (input: unknown, init?: RequestInit) => {
+    const url = String(input);
+    if (!url.startsWith("https://api.safe.global/")) return fake.fetch(input as string, init);
+    requests.push(url);
+    const safe = /\/safes\/(0x[0-9a-fA-F]{40})\/messages\//.exec(url)?.[1]?.toLowerCase();
+    const results = (safe && listings.get(safe)) || [];
+    return new Response(JSON.stringify({ count: results.length, results }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  return {
+    requests,
+    sign(member: Hex) {
+      const at = new Date().toISOString();
+      const confirmation = { owner: zeroAddress, signature: "0x01" as Hex, signatureType: "EOA" };
+      listings.set(member.toLowerCase(), [
+        {
+          created: at,
+          modified: at,
+          safe: member,
+          messageHash: safeMessageHashes(1, member, digest).safeMessageHash,
+          message: {},
+          confirmations: [confirmation, confirmation],
+          preparedSignature: "0x01",
+        },
+      ]);
+      signatures.add(`${member}:0x01`.toLowerCase());
+    },
+    view: () =>
+      verifySignatureSet({
+        action: "ApproveUpgradeSecurityCouncil",
+        signerGroup: "securityCouncil",
+        typedData,
+        members: [...gov.securityCouncil.members],
+        threshold: gov.securityCouncil.thresholds.approveUpgrade,
+        check: { kind: "multisig", contract: gov.securityCouncil.address },
+      }),
+  };
 }
 
 const statusCalls = (fake: ReturnType<typeof fakeL1>, block: bigint) =>
@@ -1328,6 +1398,95 @@ describe("live engine", () => {
     await advanceChain(engine, fake, reach + 1n, reach - 63n, 5);
     expect(statusCalls(fake, reach + 1n)).toHaveLength(2);
     expect(engine.status().lastTick?.failedSteps).toEqual([]);
+  });
+
+  it("verifies the signature sets pages viewed at each new head: the request after the block asks nothing upstream", async () => {
+    // Two of the three Security Council members signed the active upgrade's approval in Safe.
+    const signatures = new Set<string>();
+    const { fake } = liveChain({ signatures });
+    await backfilled();
+    const engine = liveEngine();
+    await firstTick(engine);
+    const safe = await safeService(fake, signatures);
+    for (const member of SC_MEMBERS.slice(0, 2)) safe.sign(member);
+    // A page views the set.
+    const viewed = await settle(safe.view());
+    expect(viewed.members.map((m) => m.status)).toEqual(["valid", "valid", "missing"]);
+    expect(safe.requests).toHaveLength(SC_MEMBERS.length);
+
+    // The next block: the tick verifies the set at it once the head is served.
+    vi.setSystemTime(NOW + 12_500);
+    fake.chain.options.head = {
+      number: HEAD + 1n,
+      hash: blockHash(HEAD + 1n),
+      timestamp: HEAD_TIME + 12n,
+    };
+    await until(() => engine.status().ticks >= 2);
+    await engine.settled();
+    expect(engine.status().lastTick).toMatchObject({
+      block: (HEAD + 1n).toString(),
+      failedSteps: [],
+    });
+    expect(signatureSetsStatus()).toMatchObject({
+      watched: 1,
+      lastRun: { block: (HEAD + 1n).toString(), trigger: "head", sets: 1, verified: 1 },
+    });
+    // Asked at the new block itself, never at 'latest', and Safe was not asked again.
+    const checks = fake.calls.filter((c) => c.functionName === "checkSignatures");
+    expect(checks.filter((c) => c.block === numberToHex(HEAD + 1n))).not.toHaveLength(0);
+    expect(checks.some((c) => c.block === "latest")).toBe(false);
+    expect(safe.requests).toHaveLength(SC_MEMBERS.length);
+
+    const posts = fake.posts.length;
+    for (let round = 0; round < 50; round++) {
+      expect((await latestBlock()).number).toBe(HEAD + 1n);
+      const set = await safe.view();
+      expect(set.thresholdCheck.status).toBe("met");
+      expect(set.members.map((m) => m.status)).toEqual(["valid", "valid", "missing"]);
+    }
+    expect(fake.posts.length).toBe(posts);
+    expect(safe.requests).toHaveLength(SC_MEMBERS.length);
+  });
+
+  it("the server's engine verifies a watched set again at the served head when a member Safe's listing changes", async () => {
+    const signatures = new Set<string>();
+    const { fake } = liveChain({ signatures });
+    await backfilled();
+    touchSync();
+    await until(() => syncEngineStatus().ticks >= 1);
+    const safe = await safeService(fake, signatures);
+    for (const member of SC_MEMBERS.slice(0, 2)) safe.sign(member);
+    expect((await settle(safe.view())).members[2]?.status).toBe("missing");
+    // The listings the page read were new to the store: the set they were read for already has
+    // its result at this head.
+    await until(() => signatureSetsStatus().lastRun?.trigger === "safe");
+    expect(signatureSetsStatus().lastRun).toMatchObject({ verified: 0, reused: 1 });
+
+    // The third member signs, and its listing is read again (as the sweep does before a listing
+    // turns 60 s old) with a new version: the set is verified again at the head being served,
+    // from the listings the store holds.
+    await vi.advanceTimersByTimeAsync(20_000);
+    safe.sign(SC_MEMBERS[2] as Hex);
+    const requested = safe.requests.length;
+    invalidate(`safe:list:${(SC_MEMBERS[2] as Hex).toLowerCase()}`);
+    await settle(listSafeMessages(SC_MEMBERS[2] as Hex));
+    await until(() => signatureSetsStatus().lastRun?.verified === 1);
+    expect(signatureSetsStatus().lastRun).toMatchObject({
+      trigger: "safe",
+      block: HEAD.toString(),
+      sets: 1,
+      verified: 1,
+      failed: 0,
+    });
+    expect(safe.requests.length).toBe(requested + 1);
+
+    const posts = fake.posts.length;
+    const requests = safe.requests.length;
+    const set = await safe.view();
+    expect(set.members.map((m) => m.status)).toEqual(["valid", "valid", "valid"]);
+    expect(set.thresholdCheck.status).toBe("met");
+    expect(fake.posts.length).toBe(posts);
+    expect(safe.requests.length).toBe(requests);
   });
 
   it("drops a tick in flight when the settings change: nothing it read is stored", async () => {

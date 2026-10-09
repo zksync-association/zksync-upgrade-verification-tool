@@ -11,7 +11,7 @@ import {
   numberToHex,
 } from "viem";
 import { zksync } from "viem/chains";
-import { FOREVER, cached, cachedUntil, invalidate, replace } from "./cache";
+import { FOREVER, cached, cachedUntil, invalidate, peek, replace } from "./cache";
 import { type Lane, RpcError, createLane } from "./chain/jsonrpc";
 import { type LimitedHttpOptions, limitedHttp } from "./rpc-transport";
 
@@ -437,6 +437,14 @@ function toBlockRef(raw: unknown): BlockRef | null {
 /** The chain head (4 s TTL). Never depends on the 'finalized' answer. */
 export async function latestBlock(): Promise<BlockRef> {
   return (await heads()).latest;
+}
+
+/**
+ * The head requests read right now, when one is cached (or a read of it is in flight): never asks
+ * the node. null otherwise.
+ */
+export function servedHead(): Promise<BlockRef> | null {
+  return peek<Heads>(HEAD_KEY)?.then((read) => read.latest) ?? null;
 }
 
 /**

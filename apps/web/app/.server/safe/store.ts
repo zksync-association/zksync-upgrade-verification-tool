@@ -164,14 +164,93 @@ export async function findSafeMessage(
   messageHash: Hex,
   options: SafeReadOptions = {}
 ): Promise<SafeMessage | null> {
+  return (await lookupSafeMessage(safe, messageHash, options)).message;
+}
+
+export type SafeMessageLookup = {
+  message: SafeMessage | null;
+  /**
+   * The version of the listing that answered (see SafeSnapshot.version); null when it could not
+   * and Safe was asked for the message by its hash.
+   */
+  version: number | null;
+};
+
+/** findSafeMessage, with the listing version the answer came from. */
+export async function lookupSafeMessage(
+  safe: Address,
+  messageHash: Hex,
+  options: SafeReadOptions = {}
+): Promise<SafeMessageLookup> {
   const listing = await listSafeMessages(safe, options);
+  const answer = answerFrom(listing, messageHash);
+  if (answer) return answer;
+  if (options.background) throw new SweepPaused("lookup by hash");
+  return { message: await getSafeMessage(messageHash), version: null };
+}
+
+/**
+ * The same lookup from the listing held now, without asking Safe or marking the Safe as wanted by
+ * a page: null when there is no listing at most 60 s old, or it cannot tell (the message may be
+ * past its last page). For precomputing.
+ */
+export function peekSafeMessage(safe: Address, messageHash: Hex): SafeMessageLookup | null {
+  sync();
+  const listing = servable(safe.toLowerCase());
+  return listing ? answerFrom(listing, messageHash) : null;
+}
+
+function answerFrom(listing: SafeSnapshot, messageHash: Hex): SafeMessageLookup | null {
   const hit = listing.messages.find(
     (m) => m.messageHash.toLowerCase() === messageHash.toLowerCase()
   );
-  if (hit) return hit;
-  if (listing.complete) return null;
-  if (options.background) throw new SweepPaused("lookup by hash");
-  return getSafeMessage(messageHash);
+  if (hit) return { message: hit, version: listing.version };
+  return listing.complete ? { message: null, version: listing.version } : null;
+}
+
+/**
+ * The version of the listing that would be served for this Safe now (at most 60 s old), or null
+ * when there is none: a result computed from a listing holds while this still names its version.
+ */
+export function freshListingVersion(safe: Address): number | null {
+  sync();
+  return servable(safe.toLowerCase())?.version ?? null;
+}
+
+/**
+ * Marks Safes as wanted by a page, as listSafeMessages does, for a page answered from a result
+ * computed earlier from their listings: the sweep keeps their group fresh.
+ */
+export function markSafeDemand(safes: Iterable<string>) {
+  const now = Date.now();
+  for (const safe of safes) demandedAt.set(safe.toLowerCase(), now);
+}
+
+type ListingListener = (safe: Address) => void;
+const listeners = new Set<ListingListener>();
+
+/**
+ * Calls `listener` (after the read that stored it) whenever a Safe's listing is stored with a new
+ * version: its content changed, or it was read for the first time. Returns the unsubscribe.
+ */
+export function onSafeListingChange(listener: ListingListener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function notifyChange(safe: Address) {
+  if (listeners.size === 0) return;
+  queueMicrotask(() => {
+    for (const listener of listeners) {
+      try {
+        listener(safe);
+      } catch {
+        // A listener's failure is its own.
+      }
+    }
+  });
 }
 
 /** The boot / settings warm-up's read: a background listSafeMessages. */
@@ -179,7 +258,7 @@ export function warmSafeListing(safe: Address): Promise<SafeSnapshot> {
   return listSafeMessages(safe, { background: true });
 }
 
-/** The version of the listing held for this Safe (served or not), or null. */
+/** The version of the listing held for this Safe (served or not, see freshListingVersion), or null. */
 export function safeListingVersion(safe: Address): number | null {
   sync();
   return held.get(safe.toLowerCase())?.snapshot.version ?? null;
@@ -308,6 +387,7 @@ function commit(
   if (reads.get(key)?.ticket === ticket && held.get(key) === previous) {
     held.set(key, next);
     failures.delete(key);
+    if (previous?.snapshot.version !== next.snapshot.version) notifyChange(key as Address);
   }
   return next.snapshot;
 }
