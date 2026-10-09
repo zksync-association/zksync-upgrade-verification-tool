@@ -1,9 +1,16 @@
 import { type NetworkConfig, knownNetwork, localNetwork } from "@/common/networks";
 import { env } from "@config/env.server";
-import { type Address, type PublicClient, createPublicClient } from "viem";
+import {
+  type Address,
+  type Hex,
+  type PublicClient,
+  createPublicClient,
+  hexToBigInt,
+  isHex,
+} from "viem";
 import { zksync } from "viem/chains";
 import { FOREVER, cached } from "./cache";
-import { type Lane, createLane } from "./chain/jsonrpc";
+import { type Lane, RpcError, createLane } from "./chain/jsonrpc";
 import { type LimitedHttpOptions, limitedHttp } from "./rpc-transport";
 
 // Public RPCs throttle bursts, so every client funnels requests through a small pool and backs
@@ -157,15 +164,83 @@ export async function l2(): Promise<PublicClient | null> {
   return l2Client;
 }
 
-export function latestBlock() {
-  return cached("latest-block", 4_000, () => l1.getBlock({ blockTag: "latest" }));
+/** The parts of a block header the app reads. */
+export type BlockRef = { number: bigint; hash: Hex; parentHash: Hex; timestamp: bigint };
+type Heads = { latest: BlockRef; finalized: BlockRef | null };
+
+// Blocks this deep are treated as final even when the node's 'finalized' tag is further ahead.
+const FINALITY_DEPTH = 64n;
+
+// How a node says it does not know the 'finalized' tag: geth before the merge "invalid argument
+// 0: hex string without 0x prefix" (-32602), hardhat "invalid block tag", a fresh devnet
+// "finalized block not found". Anything else (-32603, a rate limit) is a failure, not an answer.
+const UNKNOWN_TAG = /finalized|block tag|unknown block|not supported|unsupported/i;
+
+function isUnknownTag(error: RpcError) {
+  return (
+    error.code === -32602 || error.code === -32601 || UNKNOWN_TAG.test(error.message.slice(0, 500))
+  );
+}
+
+/**
+ * The head and the 'finalized' block, read in one JSON-RPC batch so both describe the same moment.
+ * A node that does not know the 'finalized' tag answers it with an error: that block is null.
+ */
+function heads(): Promise<Heads> {
+  return cached("latest-block", 4_000, async () => {
+    const { call } = lanes();
+    const [latest, finalized] = await Promise.all([
+      call.request<unknown>("eth_getBlockByNumber", ["latest", false]),
+      call
+        .request<unknown>("eth_getBlockByNumber", ["finalized", false])
+        // Only an answer that the tag is unknown means it is unsupported. Any other failure
+        // (transport, -32603, rate limit) fails the whole read, so the boundary never silently
+        // falls back to head − 64.
+        .catch((error: unknown) => {
+          if (error instanceof RpcError && isUnknownTag(error)) return null;
+          throw error;
+        }),
+    ]);
+    const head = toBlockRef(latest);
+    if (!head) throw new Error("The RPC returned no latest block");
+    return { latest: head, finalized: toBlockRef(finalized) };
+  });
+}
+
+function toBlockRef(raw: unknown): BlockRef | null {
+  if (!raw || typeof raw !== "object") return null;
+  const { number, hash, parentHash, timestamp } = raw as Record<string, unknown>;
+  if (!isHex(number) || !isHex(hash) || !isHex(parentHash) || !isHex(timestamp)) return null;
+  return { number: hexToBigInt(number), hash, parentHash, timestamp: hexToBigInt(timestamp) };
+}
+
+/** The chain head (4 s TTL). */
+export async function latestBlock(): Promise<BlockRef> {
+  return (await heads()).latest;
+}
+
+/** The node's 'finalized' block from the same read as the head, or null without the tag. */
+export async function finalizedBlock(): Promise<BlockRef | null> {
+  return (await heads()).finalized;
+}
+
+/**
+ * The head and the finality boundary F from one read: blocks at or below F are treated as final
+ * and may be cached forever. F = min(head − 64, finalized); on dev nodes, the fork block.
+ */
+export async function chainHead(): Promise<{ head: BlockRef; safe: bigint }> {
+  const [net, { latest, finalized }] = await Promise.all([network(), heads()]);
+  if (net.isDevNode) return { head: latest, safe: net.forkBlock ?? -1n };
+  const byDepth = latest.number - FINALITY_DEPTH;
+  return {
+    head: latest,
+    safe: finalized && finalized.number < byDepth ? finalized.number : byDepth,
+  };
 }
 
 /** Blocks at or below this height are treated as final and may be cached forever. */
 export async function safeBlockNumber(): Promise<bigint> {
-  const [net, latest] = await Promise.all([network(), latestBlock()]);
-  if (net.isDevNode) return net.forkBlock ?? -1n;
-  return latest.number - 64n;
+  return (await chainHead()).safe;
 }
 
 // Raw JSON-RPC lanes (chain/jsonrpc.ts). `history` carries eth_getLogs backfills, `call` the
