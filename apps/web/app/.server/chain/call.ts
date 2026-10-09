@@ -13,7 +13,7 @@ import {
   isHex,
   numberToHex,
 } from "viem";
-import { FOREVER, cachedUntil } from "../cache";
+import { FOREVER, cachedUntil, seed } from "../cache";
 import { lanes, network, safeBlockNumber } from "../rpc";
 import { LaneError, RpcError } from "./jsonrpc";
 
@@ -328,6 +328,18 @@ export async function isFinalBlock(blockNumber: bigint): Promise<boolean> {
   }
 }
 
+// Code presence at a head counts for as long as a head's entries do (see requireCode).
+const CODE_AT_HEAD_TTL_MS = 60_000;
+
+/**
+ * Records that `address` has code at the block with hash `blockHash`, as another read there
+ * showed (a getter answering a word in the same aggregate3, chain/verdicts.ts), so requireCode at
+ * that block need not ask again. Presence only: absence is never recorded.
+ */
+export function noteCodePresent(address: Address, blockHash: Hex) {
+  seed(`code:${address.toLowerCase()}:h:${blockHash.toLowerCase()}`, true, CODE_AT_HEAD_TTL_MS);
+}
+
 /**
  * Rejects with NoContract when `address` has no code at `blockNumber` ('latest' when omitted).
  * Presence is kept a minute at 'latest' (and above the finality boundary), for good at a final
@@ -361,7 +373,7 @@ export async function requireCode(
     if (typeof code !== "string" || !isHex(code))
       throw new UpstreamError(`eth_getCode for ${address} returned no hex data`);
     const value = code !== "0x" && code !== "0x0";
-    return { value, ttlMs: value ? (final ? FOREVER : 60_000) : 0 };
+    return { value, ttlMs: value ? (final ? FOREVER : CODE_AT_HEAD_TTL_MS) : 0 };
   });
   if (!present) {
     throw new NoContract(

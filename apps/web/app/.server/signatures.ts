@@ -34,6 +34,14 @@ import {
   isUnknownBlock,
   requireCode,
 } from "./chain/call";
+import {
+  type FastAnswer,
+  type VerdictCounts,
+  fastAccepts,
+  fastSignedMessages,
+  noteVerdict,
+  verdictCounts,
+} from "./chain/verdicts";
 import { type SafeInfo, safeInfo, safeInfoKey } from "./governance";
 import { type BlockRef, latestBlock, network, rpcGeneration, servedHead } from "./rpc";
 import {
@@ -47,6 +55,7 @@ import {
   peekSafeMessage,
 } from "./safe/store";
 import { SafeApiError, safeWalletUrl } from "./safe-api";
+import { asEngineWork, requestJoinsEngineWork } from "./sync/pacer";
 import { type WatchItem, onPageLoad, presence } from "./sync/presence";
 
 // The verification core. A signature counts only if the contract that will consume it accepts it in
@@ -54,9 +63,12 @@ import { type WatchItem, onPageLoad, presence } from "./sync/presence";
 // EIP-1271 isValidSignature for the ZK Foundation (exactly what EmergencyUpgradeBoard calls).
 // The Safe Transaction Service is just one place to look for candidates.
 //
-// Every verdict read is a direct eth_call (chain/call.ts). Only a definite revert rejects; any
-// other failure (an internal RPC error, out of gas, a rate limit, a timeout) fails the read, so it
-// can never make a signature "invalid", a member "missing" or a threshold "rejected".
+// At a head, a verdict is first asked in the head's Multicall3 aggregate3 beside the head's other
+// reads (chain/verdicts.ts), and only a POSITIVE is taken from there (ECDSA-only candidates on
+// contracts running pinned code); everything else is a direct eth_call (chain/call.ts). Only a
+// definite revert of a direct call rejects; any other failure (an internal RPC error, out of gas,
+// a rate limit, a timeout) fails the read, so it can never make a signature "invalid", a member
+// "missing" or a threshold "rejected".
 //
 // On a live chain the verdicts are read at the head requests read (a memory hit while the sync
 // engine runs), sent with its block number and kept under its HASH (contract code presence too):
@@ -286,6 +298,32 @@ async function accepts(
   }
 }
 
+/**
+ * A check at a head: a positive from the head's aggregate3 when it gives one (chain/verdicts.ts),
+ * else `direct` (the only path that can reject). Elsewhere (a past block, 'latest'): `direct`.
+ */
+async function fastThenDirect(
+  check: SignatureCheck,
+  digest: Hex,
+  signatures: MemberSignature[],
+  threshold: number,
+  pin: Pin,
+  direct: () => Promise<{ ok: true } | { ok: false; error: string }>,
+  guess?: Promise<FastAnswer>
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (pin.kind !== "head") {
+    noteVerdict(blockOf(pin), "direct");
+    return direct();
+  }
+  const fast = await (guess ?? fastAccepts(check, digest, signatures, threshold, pin.head));
+  if (fast === "accepted") {
+    noteVerdict(pin.head.number, "fast");
+    return { ok: true };
+  }
+  noteVerdict(pin.head.number, fast === "not-asked" ? "direct" : "reasked");
+  return direct();
+}
+
 // One member's signature checked alone. Multisig members go through checkSignatures with
 // threshold 1, which also enforces membership. A signature the viewer supplied (?sig=) is checked
 // afresh every time and its verdict kept nowhere, as AGENTS.md promises.
@@ -298,8 +336,12 @@ function acceptsOne(
 ) {
   const single: SignatureCheck =
     check.kind === "multisig-1271" ? { kind: "multisig", contract: check.contract } : check;
-  const run = () => pinned(pin, () => accepts(single, digest, [signature], 1, pin));
-  if (source === "supplied") return run();
+  const direct = () => pinned(pin, () => accepts(single, digest, [signature], 1, pin));
+  if (source === "supplied") {
+    noteVerdict(blockOf(pin), "direct");
+    return direct();
+  }
+  const run = () => fastThenDirect(single, digest, [signature], 1, pin, direct);
   const key = `accepts:${single.kind}:${single.contract}:${digest}:${signature.signer}:${signature.signature}:${pinKey(pin)}`;
   if (pin.kind !== "block") return cached(key, VERDICT_TTL_MS, run);
   const { blockNumber } = pin;
@@ -376,6 +418,16 @@ const fromHeld: SafeSource = async (member, hash) => {
   return found;
 };
 
+/**
+ * A precompute of a set that can no longer be signed: the listing served (at most 60 s old) when
+ * there is one, else the listing held, whatever its age (never asks Safe).
+ */
+const fromAnyHeld: SafeSource = async (member, hash) => {
+  const found = peekSafeMessage(member, hash) ?? peekHeldSafeMessage(member, hash);
+  if (!found) throw new NeedsSafeRead(`No listing held answers for ${member}`);
+  return found;
+};
+
 type Computed = {
   set: SignatureSet;
   /** The listing version each member Safe's message came from (lower-case address). */
@@ -424,10 +476,33 @@ async function computeSet(
   params: Omit<SignatureSetParams, "supplied" | "blockNumber" | "open">,
   supplied: MemberSignature[],
   pin: Pin,
-  source: SafeSource
+  source: SafeSource,
+  /** The set's last valid signatures: its threshold check is asked beside the members' (see below). */
+  guess?: readonly MemberSignature[]
 ): Promise<Computed> {
   const { chainId } = await network();
   const hashes = governanceHashes(params.typedData);
+  // The threshold check needs the valid set, known only once every member is checked. At a head,
+  // it is asked in the same aggregate3 as the members' checks with the last valid set as a guess;
+  // when the members' checks give that same set, its answer is the threshold check's (a positive
+  // only, as any fast-path answer), else it is asked again with the set they gave.
+  const guessed =
+    pin.kind === "head" &&
+    supplied.length === 0 &&
+    guess !== undefined &&
+    guess.length >= params.threshold &&
+    guess.length > 0
+      ? sortBySigner([...guess])
+      : null;
+  const guessAnswer = guessed
+    ? fastAccepts(
+        params.check,
+        hashes.digest,
+        guessed,
+        params.threshold,
+        (pin as { head: BlockRef }).head
+      )
+    : null;
   let safeApiError: string | null = null;
   const listings = new Map<string, number>();
   let byHash = false;
@@ -440,7 +515,7 @@ async function computeSet(
     params.members.map(async (member): Promise<MemberResult> => {
       // safeInfo() hands out the cache entry's own promise: while the cache still holds that
       // promise, the info this set was computed from is the info served.
-      const infoRead = safeInfo(member);
+      const infoRead = safeInfo(member, pin.kind === "head" ? pin.head : undefined);
       infos.set(safeInfoKey(member), infoRead);
       const [info, walletUrl] = await Promise.all([infoRead, safeWalletUrl(member)]);
       const memberHashes = info.isContract
@@ -481,8 +556,14 @@ async function computeSet(
           const approved = await cached(
             `signed-messages:${member}:${memberHashes.safeMessageHash}:${pinKey(pin)}`,
             VERDICT_TTL_MS,
-            () =>
-              pinned(pin, () =>
+            async () => {
+              // At a head, from the head's aggregate3 when it answers one word.
+              const fast =
+                pin.kind === "head"
+                  ? await fastSignedMessages(member, memberHashes.safeMessageHash, pin.head)
+                  : null;
+              if (fast !== null) return fast;
+              return pinned(pin, () =>
                 callFn<bigint>({
                   address: member,
                   abi: safeAbi,
@@ -496,7 +577,8 @@ async function computeSet(
                     if (error instanceof CallReverted) return 0n;
                     throw error;
                   })
-              )
+              );
+            }
           );
           if (approved !== 0n) candidates.push({ source: "onchain", signature: "0x" });
         }
@@ -579,8 +661,29 @@ async function computeSet(
   if (valid.length < params.threshold) {
     thresholdCheck = { status: "below", valid: valid.length, threshold: params.threshold };
   } else {
-    const run = () =>
+    const direct = () =>
       pinned(pin, () => accepts(params.check, hashes.digest, valid, params.threshold, pin));
+    const sameAsGuess =
+      guessed !== null &&
+      guessed.length === valid.length &&
+      guessed.every(
+        (g, i) =>
+          isAddressEqual(g.signer, (valid[i] as MemberSignature).signer) &&
+          g.signature.toLowerCase() === (valid[i] as MemberSignature).signature.toLowerCase()
+      );
+    const anySupplied = members.some((m) => m.status === "valid" && m.source === "supplied");
+    const run = () =>
+      anySupplied
+        ? direct()
+        : fastThenDirect(
+            params.check,
+            hashes.digest,
+            valid,
+            params.threshold,
+            pin,
+            direct,
+            sameAsGuess && guessAnswer ? guessAnswer : undefined
+          );
     // Kept per head only when no signature in it was supplied; otherwise (and at 'latest' or a
     // past block) asked afresh every time.
     const keep =
@@ -646,9 +749,20 @@ const memoKey = (spec: SetSpec, head: BlockRef) => `verify:${spec.key}:${head.ha
  * version (none looked up by hash, no Safe failure), each of those listings is still the one
  * served (so at most 60 s old), and each member's Safe info is still the cached entry it read.
  * Then computing it again at the same head would give the same set.
+ *
+ * A set computed from a copy older than 60 s or from the last run's (`staleCopies`: the engine's
+ * "held" precompute of a set that can no longer be signed) never stands: an unchanged re-read of
+ * a listing keeps its version, so the version check alone would let it through to JSON (and to a
+ * page's fresh result) with its old `safeFetchedAt` and `stale: false`. Pages show it only as a
+ * labelled first answer (lastResults); every reader here computes from copies at most 60 s old.
+ * For the same reason a kept set stands only while the oldest copy it used is at most 60 s old
+ * (its `safeFetchedAt`), even when that listing was re-read unchanged since: computed again, it
+ * takes the copy just read (and the verdicts already read at this head).
  */
 function stands(computed: Computed): boolean {
-  if (computed.byHash || computed.set.safeApiError !== null) return false;
+  if (computed.byHash || computed.set.safeApiError !== null || computed.staleCopies) return false;
+  const copiedAt = computed.set.safeFetchedAt;
+  if (copiedAt && Date.now() - Date.parse(copiedAt) > SAFE_LISTING_MAX_AGE_MS) return false;
   for (const [safe, version] of computed.listings)
     if (freshListingVersion(safe as Address) !== version) return false;
   for (const [key, info] of computed.infos) if (peek(key) !== info) return false;
@@ -679,6 +793,15 @@ async function memoized(spec: SetSpec, head: BlockRef, background: boolean): Pro
   return (await resolveSet(spec, head, background)).set;
 }
 
+/**
+ * Which Safe listings a computation may use: "safe" reads Safe for a listing older than 60 s (a
+ * request); "store" only listings at most 60 s old the store holds (the engine's precompute of
+ * an open set); "held" whatever the store holds, of any age (the engine's precompute of a set
+ * that can no longer be signed: its result, labelled with the copies' age, is only a page's first
+ * answer, and no strict reader takes it, see stands()).
+ */
+type ListingSource = "safe" | "store" | "held";
+
 // Computations in flight one call may wait for before computing on its own: the one it found,
 // and one another caller started when that one no longer stood.
 const MAX_JOINS = 2;
@@ -687,13 +810,16 @@ const MAX_JOINS = 2;
 async function resolveSet(
   spec: SetSpec,
   head: BlockRef,
-  background: boolean
+  background: boolean,
+  listings: ListingSource = background ? "store" : "safe"
 ): Promise<{ set: SignatureSet; computed: boolean }> {
   const key = memoKey(spec, head);
   for (let joins = 0; joins < MAX_JOINS; joins++) {
     const found = memo.get(key);
     if (holds(found)) return answered(found.kept);
     if (!found || found.kept !== null || found.expiresAt <= Date.now()) break;
+    // A request waiting on the engine's computation: the engine's paced reads go now.
+    if (!background && found.background) requestJoinsEngineWork(found.promise);
     const shared = await found.promise.then(
       (computed) => ({ ok: true as const, computed }),
       (error: unknown) => ({ ok: false as const, error })
@@ -707,7 +833,7 @@ async function resolveSet(
       throw shared.error;
     }
   }
-  const computed = await compute(key, spec, head, background);
+  const computed = await compute(key, spec, head, background, listings);
   return { set: computed.set, computed: true };
 }
 
@@ -719,9 +845,13 @@ function compute(
   key: string,
   spec: SetSpec,
   head: BlockRef,
-  background: boolean
+  background: boolean,
+  listings: ListingSource
 ): Promise<Computed> {
-  const computed = computeSet(spec, [], { kind: "head", head }, background ? fromStore : fromSafe);
+  const source = listings === "safe" ? fromSafe : listings === "store" ? fromStore : fromAnyHeld;
+  // The last valid set, for the threshold check's guess (see computeSet).
+  const guess = lastResults.get(spec.key)?.set.valid;
+  const computed = computeSet(spec, [], { kind: "head", head }, source, guess);
   const entry: MemoEntry = { promise: computed, kept: null, expiresAt: FOREVER, background };
   sweepMemo();
   memo.set(key, entry);
@@ -883,22 +1013,32 @@ function onScreenSets(): PageSet[] {
 }
 
 /** What a precompute covers: the sets on screen, most recently shown first, at most 64. */
+function precomputeEntries(): PageSet[] {
+  return onScreenSets().slice(0, PRECOMPUTE_LIMIT);
+}
+
 function precomputeSpecs(): SetSpec[] {
-  return onScreenSets()
-    .slice(0, PRECOMPUTE_LIMIT)
-    .map((entry) => entry.spec);
+  return precomputeEntries().map((entry) => entry.spec);
 }
 
 /**
- * The signer group and member Safes of each set on screen (the Safe store keeps their listings
- * fresh while the app is in use).
+ * The signer group and member Safes of each set on screen (their Safe info is kept fresh while
+ * the app is in use); with `openOnly`, of the sets on screen that can still be signed (the Safe
+ * store keeps their listings fresh while the app is in use; a set that can no longer be signed is
+ * verified from the listings held, whatever their age, see ListingSource).
  */
-export function onScreenSigners(): { group: SignerGroup; members: readonly Address[] }[] {
-  return precomputeSpecs().map((spec) => ({ group: spec.signerGroup, members: spec.members }));
+export function onScreenSigners({ openOnly = false }: { openOnly?: boolean } = {}): {
+  group: SignerGroup;
+  members: readonly Address[];
+}[] {
+  return precomputeEntries()
+    .filter((entry) => !openOnly || entry.open)
+    .map(({ spec }) => ({ group: spec.signerGroup, members: spec.members }));
 }
 
-/** How many sets a precompute verifies at once (each is one POST of eth_calls or so). */
-const PRECOMPUTE_CONCURRENCY = 4;
+// Sets verified at once: their checks go out together in the head's aggregate3
+// (chain/aggregate.ts), not one set after another (pages show 3 to 6 sets at a time).
+export const PRECOMPUTE_CONCURRENCY = 16;
 
 export type PrecomputeRun = {
   block: string;
@@ -946,14 +1086,14 @@ export async function precomputeSignatureSets(
   const current = options.current ?? (() => true);
   const safes = options.safes;
   const viewing = options.viewing ?? true;
-  const specs = precomputeSpecs().filter(
-    (spec) => !safes || spec.members.some((m) => safes.has(m.toLowerCase()))
+  const entries = precomputeEntries().filter(
+    ({ spec }) => !safes || spec.members.some((m) => safes.has(m.toLowerCase()))
   );
   const run: PrecomputeRun = {
     block: head.number.toString(),
     trigger: safes ? "safe" : "head",
     profile: viewing ? "viewing" : "idle",
-    sets: specs.length,
+    sets: entries.length,
     verified: 0,
     reused: 0,
     skipped: 0,
@@ -962,14 +1102,14 @@ export async function precomputeSignatureSets(
   };
   const limit = concurrencyLimit(PRECOMPUTE_CONCURRENCY);
   await Promise.all(
-    specs.map((spec) =>
+    entries.map(({ spec, open }) =>
       limit(async () => {
         if (!current()) {
           run.skipped++;
           return;
         }
         try {
-          const { computed } = await resolveSet(spec, head, true);
+          const { computed } = await resolveSet(spec, head, true, open ? "store" : "held");
           if (computed) run.verified++;
           else run.reused++;
         } catch (error) {
@@ -1049,15 +1189,19 @@ async function recheckChanged() {
   rechecking = true;
   const generation = rpcGeneration();
   try {
-    await precomputeSignatureSets(await head, {
-      safes,
-      viewing: current.viewing?.() ?? true,
-      current: () =>
-        rpcGeneration() === generation &&
-        current === driver &&
-        current.active() &&
-        (current.viewing?.() ?? true),
-    });
+    const at = await head;
+    // The engine's own work (paced, sync/pacer.ts).
+    await asEngineWork(() =>
+      precomputeSignatureSets(at, {
+        safes,
+        viewing: current.viewing?.() ?? true,
+        current: () =>
+          rpcGeneration() === generation &&
+          current === driver &&
+          current.active() &&
+          (current.viewing?.() ?? true),
+      })
+    );
   } catch {
     // No head to verify at (its read failed): the next tick or request verifies.
   } finally {
@@ -1075,7 +1219,15 @@ export type SignatureSetsStatus = {
   recent: number;
   /** Of those on screen, open (still signable) when last shown. */
   open: number;
+  /**
+   * The verdict reads at the last precompute's block: positives taken from the head's aggregate3
+   * (`fast`), asked there without a positive and then asked directly (`reasked`), and asked only
+   * directly (`direct`: not for the fast path).
+   */
+  perBlock: VerdictCounts | null;
   /** The last precompute: its block, what it did, how long it took. */
+  lastRecompute: PrecomputeRun | null;
+  /** The same as lastRecompute (kept for older readers). */
   lastRun: PrecomputeRun | null;
 };
 
@@ -1087,6 +1239,8 @@ export function signatureSetsStatus(): SignatureSetsStatus {
     onScreen: sets.length,
     recent: sets.length,
     open: sets.filter((entry) => entry.open).length,
+    perBlock: lastRun ? verdictCounts(lastRun.block) : null,
+    lastRecompute: lastRun && { ...lastRun },
     lastRun: lastRun && { ...lastRun },
   };
 }

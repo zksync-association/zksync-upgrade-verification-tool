@@ -30,6 +30,7 @@ import { type RequestInfo, presence, resetPresence } from "@/.server/sync/presen
 import { listSafeMessages, safeStoreStatus } from "@/.server/safe/store";
 import type { SafeMessage } from "@/.server/safe-api";
 import {
+  PRECOMPUTE_CONCURRENCY,
   type SignatureSetParams,
   signatureSetsStatus,
   verifySignatureSet,
@@ -245,6 +246,35 @@ describe("activity window", () => {
     expect(engine.status()).toMatchObject({ active: false, ticks: 0, head: null });
     await vi.advanceTimersByTimeAsync(10 * 60_000);
     expect(chain.polls).toHaveLength(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("a head poll waiting its turn in the credit pacer when use ends is never sent", async () => {
+    const { chain, pollHead } = stubChain({ timestamp: nowSeconds() - 1n });
+    let gated = false;
+    let release: (() => void) | null = null;
+    const engine = stubEngine(pollHead, {
+      keepWarmMs: 30_000,
+      pacePoll: () =>
+        gated
+          ? new Promise<void>((resolve) => {
+              release = resolve;
+            })
+          : null,
+    });
+    touch(engine);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(chain.polls.length).toBeGreaterThan(0);
+    // From now on every poll waits for the pacer; use ends (30 s after the load) while one waits.
+    gated = true;
+    await vi.advanceTimersByTimeAsync(28_000);
+    expect(release).not.toBeNull();
+    expect(presence().inUse()).toBe(false);
+    const sent = chain.polls.length;
+    (release as unknown as () => void)();
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(chain.polls).toHaveLength(sent);
+    expect(engine.status().active).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -598,7 +628,11 @@ describe("head follower vs the local clock", () => {
     lagMs: number,
     startInSlotMs: number,
     propagation: (n: bigint) => number,
-    { tickMs = 0, settleMs = 30_000 }: { tickMs?: number; settleMs?: number } = {}
+    {
+      tickMs = 0,
+      settleMs = 30_000,
+      headPoll = "slot",
+    }: { tickMs?: number; settleMs?: number; headPoll?: "slot" | "late" } = {}
   ) {
     vi.setSystemTime(GENESIS + 1_000 * SLOT + startInSlotMs - lagMs);
     const sim = slotSim(lagMs, propagation);
@@ -612,7 +646,7 @@ describe("head follower vs the local clock", () => {
             },
           ]
         : [];
-    const engine = stubEngine(sim.pollHead, { mode: "always", steps });
+    const engine = stubEngine(sim.pollHead, { mode: "always", steps, headPoll });
     engine.resume();
     await vi.advanceTimersByTimeAsync(settleMs);
     const pollsBefore = engine.status().polls;
@@ -623,8 +657,9 @@ describe("head follower vs the local clock", () => {
       if (got < sim.visible()) worst = Math.max(worst, sim.real() - sim.appearsAt(got + 1n));
     }
     const polls = engine.status().polls - pollsBefore;
+    const clock = engine.status().clock;
     engine.stop();
-    return { worst, polls, confirms: sim.confirms, wrong: sim.wrong.size };
+    return { worst, polls, confirms: sim.confirms, wrong: sim.wrong.size, clock };
   }
 
   beforeEach(() => {
@@ -683,6 +718,37 @@ describe("head follower vs the local clock", () => {
     });
     expect(result.wrong).toBe(1);
     expect(result.worst).toBeLessThanOrEqual(4_000);
+  });
+
+  it("SYNC_HEAD_POLL=late: after the proof poll, the first search poll goes where blocks have arrived by: fewer polls a slot, nothing confirmed wrongly, the same bounds", async () => {
+    // Blocks reach the node 1.6-2.4 s into their slot.
+    const arrival = (n: bigint) => 1_600 + Number(n % 5n) * 200;
+    const slot = await follow(0, 5_000, arrival, { settleMs: 120_000 });
+    const late = await follow(0, 5_000, arrival, { settleMs: 120_000, headPoll: "late" });
+    for (const result of [slot, late]) {
+      expect(result.wrong).toBe(0);
+      expect(result.worst).toBeLessThanOrEqual(4_000);
+    }
+    expect(slot.clock).toMatchObject({ headPoll: "slot", firstPollMs: null });
+    // Learned from slots searched every second: the 80th percentile of when polls found blocks.
+    expect(late.clock.headPoll).toBe("late");
+    expect(late.clock.samples).toBeGreaterThanOrEqual(8);
+    expect(late.clock.firstPollMs).toBeGreaterThanOrEqual(2_000);
+    expect(late.clock.firstPollMs).toBeLessThanOrEqual(3_000);
+    // 25 slots in 5 minutes: three polls a slot (start, +1 s, +2 s) against about two.
+    expect(slot.polls).toBeGreaterThanOrEqual(3 * 25 - 2);
+    expect(late.polls).toBeLessThan(slot.polls);
+    expect(late.polls).toBeLessThanOrEqual(Math.ceil(2.3 * 25));
+    expect(late.clock.recent.pollsPerBlock).toBeLessThan(slot.clock.recent.pollsPerBlock ?? 0);
+  });
+
+  it("SYNC_HEAD_POLL=late never waits past the head's 4 s: its first search poll stays inside them", async () => {
+    // Blocks reach the node 3.8 s into their slot: the search poll would go later than the head
+    // the proof poll confirmed stays served, so it goes 4 s minus the polls' time and a margin in.
+    const result = await follow(0, 5_000, () => 3_800, { settleMs: 120_000, headPoll: "late" });
+    expect(result.wrong).toBe(0);
+    expect(result.worst).toBeLessThanOrEqual(4_000);
+    expect(result.clock.firstPollMs).toBeLessThanOrEqual(3_500);
   });
 
   it("trusts a correct clock again right after a pause", async () => {
@@ -1734,9 +1800,9 @@ describe("live engine", () => {
     await engine.settled();
     const safe = await safeService(fake, signatures);
     const gov = await governance();
-    // Six sets on screen (the precompute verifies four at a time), nobody signed in Safe: each
-    // set reads every member's on-chain approval.
-    const sets = Array.from({ length: 6 }, (_, i) => ({
+    // Two sets more on screen than the precompute verifies at a time, nobody signed in Safe:
+    // each set reads every member's on-chain approval.
+    const sets = Array.from({ length: PRECOMPUTE_CONCURRENCY + 2 }, (_, i) => ({
       ...safe.params,
       typedData: buildTypedData("ApproveUpgradeSecurityCouncil", gov.securityCouncil.domain, {
         id: pad(numberToHex(0x5e7 + i), { size: 32 }) as Hex,
@@ -1747,18 +1813,18 @@ describe("live engine", () => {
     const approvalsAt = () =>
       fake.calls.filter((c) => c.functionName === "signedMessages" && c.block === next).length;
 
-    // The next block: the first four sets' reads are out (and held) when the tab leaves.
+    // The next block: the first sets' reads are out (and held) when the tab leaves.
     fake.chain.options.head = {
       number: HEAD + 1n,
       hash: blockHash(HEAD + 1n),
       timestamp: HEAD_TIME + 12n,
     };
     const perSet = gov.securityCouncil.members.length;
-    await until(() => approvalsAt() === 4 * perSet, 15_000);
+    await until(() => approvalsAt() === PRECOMPUTE_CONCURRENCY * perSet, 15_000);
     presence().beat({ tab: "tab-under-test", reason: "leave", items: [] });
     release();
     await vi.advanceTimersByTimeAsync(5_000);
-    expect(approvalsAt()).toBe(4 * perSet);
+    expect(approvalsAt()).toBe(PRECOMPUTE_CONCURRENCY * perSet);
     engine.stop();
   });
 

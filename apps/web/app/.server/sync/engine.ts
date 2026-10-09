@@ -2,6 +2,7 @@ import { defaultLogger } from "@config/log.server";
 import { env } from "@config/env.server";
 import type { Address, Hex } from "viem";
 import { cached, remainingMs, replace } from "../cache";
+import { allowPinChecksWhen } from "../chain/pins";
 import { puhIndex } from "../chain/puh-index";
 import { refreshVetoableL2 } from "../flows/l2";
 import {
@@ -10,6 +11,7 @@ import {
   type Governance,
   SAFE_INFO_TTL_MS,
   governance,
+  governanceSplitApplies,
   readGovernance,
   readSafeInfo,
   safeInfo,
@@ -33,21 +35,20 @@ import {
   stopSignatureWatch,
 } from "../signatures";
 import { type RequestInfo, isL2Key, isPageLoad, presence, readKeepWarmFrom } from "./presence";
-import {
-  type UpgradeStatusRead,
-  isTerminalState,
-  readUpgradeStatus,
-  seedUpgradeStatus,
-  upgradeStatusAt,
-} from "../upgrade-status";
 import { type UpstreamCost, upstreamCost } from "./cost";
+import { pageGovernance } from "../page-governance";
+import { asEngineWork, creditsOf, pacer, readRateFrom } from "./pacer";
+import { snapshotState, snapshotStep } from "./snapshot";
 
 // The sync engine follows the chain head and, on every new block, refills the same cache entries
-// requests read (the head, governance, upgrade states, the Safe info and signature sets on
-// screen), so a request finds them fresh and asks nothing upstream. It never serves anything
-// itself: when it is stopped, failing or off, requests read on demand exactly as without it, with
-// the same lifetimes (head 4 s, governance 30 s). State read at the head is keyed by the head's
-// hash.
+// requests read (the head, upgrade states, pages' governance at the head, the Safe info and
+// signature sets on screen), so a request finds them fresh and asks nothing upstream. What changes
+// from block to block is read AT each block, in as few combined calls as possible (the snapshot,
+// sync/snapshot.ts, and the sets' verdicts share the head's aggregate3, chain/aggregate.ts), and
+// nothing is carried from the block before. It never serves anything itself: when it is stopped,
+// failing or off, requests read on demand exactly as without it, with the same lifetimes (head
+// 4 s, governance 30 s). State read at the head is keyed by the head's hash. Its own upstream
+// work is paced (sync/pacer.ts, SYNC_CREDITS_PER_SECOND).
 //
 // SYNC_MODE=window (the default) follows the head only while someone uses the app (presence.ts: a
 // visible tab's beat, or a page load, within SYNC_KEEPWARM_MS); nobody using it, it sends nothing
@@ -102,9 +103,45 @@ export type SyncEngineStatus = {
    * What the app asked upstream in the last hour (requests and background work alike), and
    * whether someone is using the app now ("viewing": a visible tab's beat or a page load within
    * SYNC_KEEPWARM_MS, see sync.presence; JSON and /api/status never count) or not.
+   * `infuraCreditsPerHour` is an estimate (see creditsBasis); `pacer` is the engine's own pace.
    */
-  cost: UpstreamCost & { mode: "viewing" | "idle" };
+  cost: UpstreamCost & {
+    mode: "viewing" | "idle";
+    pacer: ReturnType<ReturnType<typeof pacer>["status"]>;
+  };
+  /** How the head follower times its polls (SYNC_HEAD_POLL), and what it saw lately. */
+  clock: HeadClockStatus;
 };
+
+/** How the follower looks for the next block after the one it follows (SYNC_HEAD_POLL). */
+export type HeadPoll = "slot" | "late";
+
+export type HeadClockStatus = {
+  /**
+   * "slot": a poll when the next block's slot begins (the proof that the local clock is not
+   * behind), then every second; "late": the same proof poll, then the first search poll
+   * `firstPollMs` into the slot (learned from when blocks arrived), then every second.
+   */
+  headPoll: HeadPoll;
+  /** The first search poll's offset into the slot ("late"), or null. */
+  firstPollMs: number | null;
+  /** Arrival offsets learned from (polled every second from the slot's start), and the poll RTT. */
+  samples: number;
+  rttP95Ms: number | null;
+  /** The last heads (at most 64) that followed the one before: polls, when seen and served. */
+  recent: {
+    blocks: number;
+    pollsPerBlock: number | null;
+    /** From the block's timestamp to the poll answer that showed it. */
+    seenOffsetMs: Spread | null;
+    /** From the poll answer that showed it to when requests started to read it. */
+    servedDelayMs: Spread | null;
+    /** From the block's timestamp to when requests started to read it. */
+    servedOffsetMs: Spread | null;
+  };
+};
+
+export type Spread = { p50: number; p80: number; max: number };
 
 /** What a tick's steps get: the new head, and whether the settings are still the ones it ran for. */
 export type Tick = {
@@ -154,6 +191,13 @@ export type SyncEngineOptions = {
   steps: readonly TickStep[];
   /** Called when this engine finds that the settings changed (it has stopped itself). */
   onSuperseded?: () => void;
+  /** How the follower looks for the next block (default "slot"). */
+  headPoll?: HeadPoll;
+  /**
+   * The wait (null: none) before a head poll, asking `withFinalized` or not (the credit pacer,
+   * sync/pacer.ts). Waited before the read is made, so a request never joins a poll that waits.
+   */
+  pacePoll?: (withFinalized: boolean) => Promise<void> | null;
 };
 
 // Head follower cadence. On a chain with fixed slots, block N+1 cannot exist before N's timestamp
@@ -186,6 +230,13 @@ type Observation = {
   nextSlotAt: number | null;
   /** Until nextSlotAt the head is re-confirmed without asking the node (see #observe). */
   slotConfirm: boolean;
+  /**
+   * The next slot is searched every second from its start (always with "slot"; with "late", on
+   * the slots it learns arrival times from).
+   */
+  calibrating: boolean;
+  /** Head polls sent when it was seen (for polls per block). */
+  pollsAtSeen: number;
   /** Its publication point passed (its tick read what requests need, or the deadline). */
   published: boolean;
   /** When it was served; null until then, or when it never was. */
@@ -228,6 +279,147 @@ function errorKind(error: unknown): string {
   return /^[A-Za-z]\w{0,63}$/.test(name) ? name : "Error";
 }
 
+// "late" (SYNC_HEAD_POLL): the first search poll goes this far into the slot until enough
+// arrivals were seen, and never earlier than 1 s or later than leaves the head served (4 s from
+// the proof poll's answer) with half a second to spare after the slowest polls.
+const LATE_DEFAULT_MS = 2_500;
+const LATE_MIN_MS = 1_000;
+const LATE_HEAD_TTL_MS = 4_000;
+const LATE_MARGIN_MS = 500;
+const LATE_PERCENTILE = 0.8;
+// Arrival offsets are learned from slots searched every second from their start: the first
+// slots, then one in this many.
+const LATE_LEARN_FIRST = 8;
+const LATE_LEARN_EVERY = 8;
+const KEEP_SAMPLES = 32;
+const KEEP_RECENT = 64;
+
+function quantile(values: readonly number[], q: number): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(q * sorted.length) - 1))] ?? 0;
+}
+
+function spread(values: readonly number[]): Spread | null {
+  if (values.length === 0) return null;
+  return {
+    p50: Math.round(quantile(values, 0.5)),
+    p80: Math.round(quantile(values, 0.8)),
+    max: Math.round(Math.max(...values)),
+  };
+}
+
+const keepLast = <T>(list: T[], item: T, limit: number) => {
+  list.push(item);
+  if (list.length > limit) list.splice(0, list.length - limit);
+};
+
+/** What the follower learns about when blocks arrive, and reports (HeadClockStatus). */
+class HeadClock {
+  readonly mode: HeadPoll;
+  readonly #arrivals: number[] = [];
+  readonly #rtts: number[] = [];
+  readonly #recent: {
+    number: bigint;
+    timestampMs: number;
+    seenOffsetMs: number;
+    polls: number | null;
+    servedDelayMs: number | null;
+    servedOffsetMs: number | null;
+  }[] = [];
+  #seen = 0;
+
+  constructor(mode: HeadPoll) {
+    this.mode = mode;
+  }
+
+  /** Whether the slot after the head seen now is searched every second from its start. */
+  calibrating(): boolean {
+    if (this.mode === "slot") return true;
+    return this.#arrivals.length < LATE_LEARN_FIRST || this.#seen % LATE_LEARN_EVERY === 0;
+  }
+
+  /** The first search poll's offset into the slot ("late"). */
+  firstPollMs(): number {
+    const rtt = this.#rtts.length > 0 ? quantile(this.#rtts, 0.95) : 0;
+    const upper = Math.max(LATE_MIN_MS, LATE_HEAD_TTL_MS - rtt - LATE_MARGIN_MS);
+    const learned =
+      this.#arrivals.length > 0 ? quantile(this.#arrivals, LATE_PERCENTILE) : LATE_DEFAULT_MS;
+    return Math.round(Math.min(upper, Math.max(LATE_MIN_MS, learned)));
+  }
+
+  noteRtt(ms: number) {
+    if (ms >= 0) keepLast(this.#rtts, ms, KEEP_SAMPLES);
+  }
+
+  /**
+   * A head seen (by a poll sent at `sentAt`), after `previous`: what it shows about arrivals
+   * (only when the slot was searched every second from its start, and it is the next block),
+   * and for the report.
+   */
+  noteSeen(
+    head: BlockRef,
+    previous: { head: BlockRef; calibrating: boolean; pollsAtSeen: number } | null,
+    sentAt: number,
+    now: number,
+    polls: number,
+    slotMs: number | null
+  ) {
+    this.#seen++;
+    const timestampMs = Number(head.timestamp) * 1000;
+    const next = previous !== null && head.number === previous.head.number + 1n;
+    if (
+      next &&
+      previous.calibrating &&
+      slotMs !== null &&
+      Number(head.timestamp - previous.head.timestamp) * 1000 === slotMs &&
+      sentAt >= timestampMs &&
+      sentAt - timestampMs < slotMs
+    )
+      keepLast(this.#arrivals, sentAt - timestampMs, KEEP_SAMPLES);
+    if (next)
+      keepLast(
+        this.#recent,
+        {
+          number: head.number,
+          timestampMs,
+          seenOffsetMs: now - timestampMs,
+          polls: polls - previous.pollsAtSeen,
+          servedDelayMs: null,
+          servedOffsetMs: null,
+        },
+        KEEP_RECENT
+      );
+  }
+
+  noteServed(head: BlockRef, observedAt: number, servedAt: number) {
+    const entry = this.#recent.find((r) => r.number === head.number);
+    if (!entry || entry.servedDelayMs !== null) return;
+    entry.servedDelayMs = servedAt - observedAt;
+    entry.servedOffsetMs = servedAt - entry.timestampMs;
+  }
+
+  status(): HeadClockStatus {
+    const polls = this.#recent.flatMap((r) => (r.polls === null ? [] : [r.polls]));
+    const served = this.#recent.flatMap((r) => (r.servedDelayMs === null ? [] : [r]));
+    return {
+      headPoll: this.mode,
+      firstPollMs: this.mode === "late" ? this.firstPollMs() : null,
+      samples: this.#arrivals.length,
+      rttP95Ms: this.#rtts.length > 0 ? Math.round(quantile(this.#rtts, 0.95)) : null,
+      recent: {
+        blocks: this.#recent.length,
+        pollsPerBlock:
+          polls.length > 0
+            ? Math.round((polls.reduce((a, b) => a + b, 0) / polls.length) * 100) / 100
+            : null,
+        seenOffsetMs: spread(this.#recent.map((r) => r.seenOffsetMs)),
+        servedDelayMs: spread(served.map((r) => r.servedDelayMs as number)),
+        servedOffsetMs: spread(served.map((r) => r.servedOffsetMs as number)),
+      },
+    };
+  }
+}
+
 export class SyncEngine {
   readonly generation: number;
   readonly #options: SyncEngineOptions;
@@ -259,6 +451,7 @@ export class SyncEngine {
   // The newest head served, and whether one was served since the engine last started.
   #lastServed: BlockRef | null = null;
   #servedSinceStart = false;
+  readonly #clock: HeadClock;
 
   constructor(options: SyncEngineOptions) {
     this.#options = options;
@@ -266,6 +459,7 @@ export class SyncEngine {
     this.#now = options.now ?? Date.now;
     this.#offReason = options.mode === "off" ? "SYNC_MODE=off" : null;
     this.#lanes = options.steps.map(() => ({ running: null, queued: null }));
+    this.#clock = new HeadClock(options.headPoll ?? "slot");
   }
 
   /** Following the head right now (false while stopped for inactivity, off, or retired). */
@@ -335,7 +529,12 @@ export class SyncEngine {
       },
       polls: this.#polls,
       ticks: this.#ticks,
-      cost: { ...upstreamCost(now), mode: this.#options.inUse() ? "viewing" : "idle" },
+      cost: {
+        ...upstreamCost(now),
+        mode: this.#options.inUse() ? "viewing" : "idle",
+        pacer: pacer().status(),
+      },
+      clock: this.#clock.status(),
     };
   }
 
@@ -444,7 +643,15 @@ export class SyncEngine {
     // last one exactly when the slot begins. A poll then that still finds this head is the proof
     // that lets the next head be confirmed by the clock.
     if (now < seen.nextSlotAt) return Math.min(CONFIRM_EVERY_MS, seen.nextSlotAt - now);
-    if (now < seen.nextSlotAt + this.#slotMs) return SLOT_POLL_MS;
+    if (now < seen.nextSlotAt + this.#slotMs) {
+      // "late": after the proof poll at the slot's start, the first search poll goes where most
+      // blocks have arrived by (see HeadClock); every second from then on.
+      if (this.#clock.mode === "late" && !seen.calibrating) {
+        const first = seen.nextSlotAt + this.#clock.firstPollMs();
+        if (now < first) return first - now;
+      }
+      return SLOT_POLL_MS;
+    }
     return POLL_MS;
   }
 
@@ -460,6 +667,14 @@ export class SyncEngine {
 
   async #readHead(): Promise<void> {
     const withFinalized = this.#finalizedDue();
+    // The engine's own requests keep to their pace (sync/pacer.ts), waited for before the read is
+    // made: a request reading the head meanwhile reads it itself, never behind this wait.
+    const wait = this.#options.pacePoll?.(withFinalized) ?? null;
+    if (wait) {
+      await wait;
+      // Use may have ended while the poll waited its turn: then it is never sent (R-D3).
+      if (!this.#running || !this.#current() || !this.#active()) return;
+    }
     const askedAt = this.#now();
     this.#polls++;
     let polled: PolledHead;
@@ -478,6 +693,7 @@ export class SyncEngine {
     const sentAt = polled.sentAt ?? askedAt;
     this.#lastPollOk = true;
     this.#lastAnsweredAt = this.#now();
+    this.#clock.noteRtt(polled.answeredAt - sentAt);
     if (polled.finalized !== undefined)
       this.#finalized = { number: polled.finalized?.number ?? null, askedAt: polled.head.number };
     const previous = this.#lastPoll;
@@ -554,6 +770,18 @@ export class SyncEngine {
     const served = new Promise<boolean>((resolve) => {
       resolveServed = resolve;
     });
+    this.#clock.noteSeen(
+      polled.head,
+      seen && {
+        head: seen.polled.head,
+        calibrating: seen.calibrating,
+        pollsAtSeen: seen.pollsAtSeen,
+      },
+      sentAt,
+      now,
+      this.#polls,
+      slotMs ?? null
+    );
     const observation: Observation = {
       seq: ++this.#seq,
       polled,
@@ -561,6 +789,8 @@ export class SyncEngine {
       confirmedAt: polled.answeredAt,
       nextSlotAt: onSchedule && slotMs ? timestampMs + slotMs : null,
       slotConfirm: onSchedule && proven && now >= this.#distrustClockUntil,
+      calibrating: this.#clock.calibrating(),
+      pollsAtSeen: this.#polls,
       published: false,
       servedAt: null,
       deadline: null,
@@ -593,6 +823,7 @@ export class SyncEngine {
       observation.servedAt = this.#now();
       this.#lastServed = observation.polled.head;
       this.#servedSinceStart = true;
+      this.#clock.noteServed(observation.polled.head, observation.observedAt, observation.servedAt);
     }
     observation.resolveServed(served);
   }
@@ -651,7 +882,8 @@ export class SyncEngine {
         // Use ended since the head was seen (this step waited for an older head's run): nothing
         // more is read for it.
         if (!this.#active()) throw new StepSkipped("not in use");
-        return step.run(run.tick);
+        // The engine's own work: paced (sync/pacer.ts).
+        return asEngineWork(() => step.run(run.tick));
       })
       .then(
         () => {},
@@ -758,7 +990,7 @@ export function governanceDue({
  * still current, and only to the entries requests read.
  */
 export function liveSteps(): TickStep[] {
-  const terminal: TerminalIds = { ids: new Map(), finalReadsFrom: 0n };
+  const snapshot = snapshotState();
   // The engine's governance reads that were stored: the last one's block, and how many.
   const stored = { block: null as bigint | null, count: 0 };
   // Whether a tick reads governance, decided once per tick by the first step that asks.
@@ -809,11 +1041,15 @@ export function liveSteps(): TickStep[] {
   // Idle, after a skipped read: if no block comes before the value would run out, it is read
   // again at the head served then, as a request would read it, and again before that read runs
   // out, for as long as no tick stores a newer one (a stalled chain, failing head polls). A read
-  // that fails stops it: requests then read on demand, and the next tick reads it again.
+  // that fails stops it: requests then read on demand, and the next tick reads it again. Once the
+  // governance split applies there is nothing to keep fresh (see the step), and it stops.
   let keepAlive: ReturnType<typeof setTimeout> | null = null;
-  const keepGovernanceAlive = (tick: Tick): void => {
+  const stopKeepAlive = (): void => {
     if (keepAlive) clearTimeout(keepAlive);
     keepAlive = null;
+  };
+  const keepGovernanceAlive = (tick: Tick): void => {
+    stopKeepAlive();
     const left = remainingMs(GOVERNANCE_KEY);
     if (left === null || !Number.isFinite(left)) return;
     const reads = stored.count;
@@ -822,6 +1058,8 @@ export function liveSteps(): TickStep[] {
         keepAlive = null;
         // A newer read was stored, or the settings changed, or the engine stopped.
         if (stored.count !== reads || !tick.current()) return;
+        // Pages read governance at each head now; JSON reads its own on demand.
+        if (await governanceSplit()) return;
         try {
           const value = await readGovernance();
           const at = Date.now();
@@ -874,6 +1112,14 @@ export function liveSteps(): TickStep[] {
     {
       name: "governance",
       run: async (tick) => {
+        // Where the code is pinned, pages read governance at each head in the snapshot (sync/
+        // snapshot.ts) and JSON reads it on demand: nothing to keep fresh here.
+        if (await governanceSplit()) {
+          // A keep-alive armed by an idle tick before the split was known would otherwise read
+          // in full for as long as the engine runs (nothing stored under the split stops it).
+          stopKeepAlive();
+          throw new StepSkipped("pages read governance at each head (snapshot)");
+        }
         if (!readsGovernance(tick)) {
           keepGovernanceAlive(tick);
           throw new StepSkipped("idle: read at the previous block, still served");
@@ -888,8 +1134,10 @@ export function liveSteps(): TickStep[] {
         stored.count++;
       },
     },
-    // (c) upgradeState and upgradeStatus of every id the index knows, at this block.
-    { name: "status", beforePublish: true, run: (tick) => seedStatuses(tick, terminal) },
+    // (c) The snapshot: what pages show that can change from one block to the next, read at
+    // this block in its aggregate3 (sync/snapshot.ts): governance's values that change, and the
+    // states of the ids that are not over for good and of those on screen.
+    { name: "snapshot", beforePublish: true, run: (tick) => snapshotStep(tick, snapshot) },
     // (d) The info of the member Safes of the signature sets on screen, before it expires. One
     // that is not served at all is read through safeInfo(), whose read requests share; one about
     // to expire is read again ahead of them, replacing it.
@@ -901,13 +1149,14 @@ export function liveSteps(): TickStep[] {
           const left = remainingMs(safeInfoKey(safe));
           return left === null || left < SAFE_INFO_REFRESH_BEFORE_MS;
         });
+        // Read at this head: in its aggregate3, beside the snapshot and the verdicts.
         await Promise.all(
           due.map(async (safe) => {
             if (remainingMs(safeInfoKey(safe)) === null) {
-              await safeInfo(safe);
+              await safeInfo(safe, tick.head);
               return;
             }
-            const info = await readSafeInfo(safe);
+            const info = await readSafeInfo(safe, tick.head);
             if (tick.current()) replace(safeInfoKey(safe), info, SAFE_INFO_TTL_MS);
           })
         );
@@ -983,78 +1232,25 @@ export function signaturesStep(): TickStep {
   };
 }
 
-/**
- * Ids seen in a state that never changes again (executed, or expired without approval): the
- * value, the head it was read at, and whether a read at a FINAL block confirmed it. Only a
- * confirmed one is carried forward without reading: a read at a head that was then reorged away
- * says nothing about the canonical chain, even once the boundary passes its height.
- */
-type TerminalIds = {
-  ids: Map<string, { value: UpgradeStatusRead; block: bigint; final: boolean }>;
-  /** No read at the boundary before this head: one failed (see FINAL_READ_RETRY_BLOCKS). */
-  finalReadsFrom: bigint;
-};
-
-// The boundary is often ~100 blocks deep, past the state a non-archive node keeps (Geth and
-// Nethermind full nodes: 128 blocks, less while finality lags). There a read at the boundary
-// fails, and the ids it would have confirmed are read at the head like the others; the
-// boundary is asked again this many blocks later.
-const FINAL_READ_RETRY_BLOCKS = 32n;
-
-async function seedStatuses(tick: Tick, terminal: TerminalIds): Promise<void> {
-  const index = puhIndex();
-  // Lists wait for the backfill; the engine does not.
-  if (index.status().state !== "ready") throw new StepSkipped("index not ready");
-  const safe = await tick.boundary();
-  // The ids the index knows at this head (it is not served yet, so it is named explicitly).
-  const at = { waitMs: 0, head: { head: tick.head, safe } };
-  const [net, started, executed] = await Promise.all([
-    network(),
-    index.events("UpgradeStarted", at),
-    index.events("EmergencyUpgradeExecuted", at),
-  ]);
-  if (!tick.current()) return;
-  const ids = new Map<string, Hex>();
-  for (const { args } of [...started, ...executed]) ids.set(args._id.toLowerCase(), args._id);
-  // Issued together: the reads at one block go out as one Multicall3 call (one for the head,
-  // one for the boundary when terminal states are being confirmed).
-  await Promise.all(
-    [...ids].map(async ([key, id]) => {
-      const known = terminal.ids.get(key);
-      if (
-        known &&
-        !known.final &&
-        known.block <= safe &&
-        tick.head.number >= terminal.finalReadsFrom
-      ) {
-        // The boundary has passed the head it was read at: read it once at the boundary, which
-        // never changes. Still terminal there: terminal for good. This only saves reads: when
-        // the node cannot answer there, the id is read at the head below, as any other.
-        const atFinal = await readUpgradeStatus(net.upgradeHandler, id, safe).catch(() => null);
-        if (!tick.current()) return;
-        if (atFinal === null) {
-          const retryFrom = tick.head.number + FINAL_READ_RETRY_BLOCKS;
-          if (retryFrom > terminal.finalReadsFrom) terminal.finalReadsFrom = retryFrom;
-        } else if (isTerminalState(atFinal.state))
-          terminal.ids.set(key, { ...known, value: atFinal, final: true });
-        else terminal.ids.delete(key);
-      }
-      const confirmed = terminal.ids.get(key);
-      if (confirmed?.final) {
-        seedUpgradeStatus(net, id, tick.head, confirmed.value);
-        return;
-      }
-      const value = await upgradeStatusAt(net, id, tick.head);
-      if (isTerminalState(value.state) && tick.current() && !terminal.ids.has(key))
-        terminal.ids.set(key, { value, block: tick.head.number, final: false });
-    })
-  );
+/** Pages read governance at each head (governance.ts governanceSplitApplies). */
+function governanceSplit(): Promise<boolean> {
+  return governanceSplitApplies();
 }
 
-// How long a tab's beat or a page load counts as use (presence.ts reads no environment itself).
+// How long a tab's beat or a page load counts as use, and the engine's pace (presence.ts and
+// pacer.ts read no environment themselves).
 readKeepWarmFrom(() => env.SYNC_KEEPWARM_MS);
+readRateFrom(() => env.SYNC_CREDITS_PER_SECOND);
 
 let instance: SyncEngine | null = null;
+
+// The one-time check of governance's pinned code (governance.ts pinsChecked) reads only while
+// someone uses the app or the engine follows the chain (R-D3: nothing reads once use has ended).
+allowPinChecksWhen(
+  () =>
+    presence().inUse() ||
+    (instance !== null && instance.generation === rpcGeneration() && instance.active)
+);
 
 /** The engine for the current settings; a settings change retires the old one. */
 function engine(): SyncEngine {
@@ -1069,6 +1265,9 @@ function engine(): SyncEngine {
     network,
     pollHead,
     steps: liveSteps(),
+    headPoll: env.SYNC_HEAD_POLL,
+    pacePoll: (withFinalized) =>
+      pacer().take(creditsOf("eth_getBlockByNumber") * (withFinalized ? 2 : 1)),
     onSuperseded: () => {
       engine().resume();
     },
@@ -1081,13 +1280,15 @@ function engine(): SyncEngine {
 // whether this Safe service may be read in the background at all): the member Safes of the
 // signature sets on screen and, with SYNC_MODE=always, every governance member Safe at the
 // quota-paced interval.
+// Only the sets on screen that can still be signed: a set that can no longer be signed is
+// verified from the listings held (signatures.ts), so its members' Safes are not read for it.
 const safeSweep: SafeSweepDriver = {
   active: () => instance !== null && instance.generation === rpcGeneration() && instance.active,
   viewing: () => presence().inUse(),
-  onScreen: onScreenSigners,
+  onScreen: () => onScreenSigners({ openOnly: true }),
   baseline: () => instance?.mode === "always",
   groups: async () => {
-    const gov = await governance();
+    const gov = await pageGovernance();
     return {
       securityCouncil: gov.securityCouncil.members,
       guardians: gov.guardians.members,
@@ -1160,7 +1361,12 @@ export function syncEngineStatus(): SyncEngineStatus {
     polls: 0,
     ticks: 0,
     // No engine yet: nobody has used the app since the settings were applied.
-    cost: { ...upstreamCost(), mode: presence().inUse() ? "viewing" : "idle" },
+    cost: {
+      ...upstreamCost(),
+      mode: presence().inUse() ? "viewing" : "idle",
+      pacer: pacer().status(),
+    },
+    clock: new HeadClock(env.SYNC_HEAD_POLL).status(),
   };
 }
 

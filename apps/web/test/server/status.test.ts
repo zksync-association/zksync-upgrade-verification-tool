@@ -134,7 +134,7 @@ beforeEach(() => {
 });
 
 describe("appStatus", () => {
-  it("adds sync.index, sync.l2Index, sync.presence, sync.engine, sync.safe, sync.signatures and sync.cache next to the fields it always had", async () => {
+  it("adds sync.index, sync.l2Index, sync.presence, sync.engine, sync.safe, sync.signatures, sync.cache and sync.snapshot next to the fields it always had", async () => {
     const status = await appStatus();
     expect(status).toEqual({
       ok: true,
@@ -163,6 +163,8 @@ describe("appStatus", () => {
         safe: SAFE,
         signatures: SIGNATURES,
         cache: CACHE,
+        // No per-block snapshot yet (the engine has not run).
+        snapshot: null,
       },
     });
     // JSON-safe as served: strings and numbers only.

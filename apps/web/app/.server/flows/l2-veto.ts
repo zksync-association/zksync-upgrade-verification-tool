@@ -2,7 +2,8 @@ import { type MemberSignature, cancelL2Execution } from "@/common/execution";
 import { buildTypedData } from "@/common/typed-data";
 import { type Address, getAddress, isAddressEqual } from "viem";
 import { scrubText, secretsOf } from "../chain/jsonrpc";
-import { type Governance, governance } from "../governance";
+import type { Governance } from "../governance";
+import { governanceFor } from "../page-governance";
 import { l2, network } from "../rpc";
 import type { Freshness, SignatureSet } from "../signatures";
 import {
@@ -142,7 +143,8 @@ async function vetoableFrom(answer: Promise<VetoableAnswer>): Promise<VetoablePr
  */
 export function loadL2VetoList({ freshness = "strict" }: { freshness?: Freshness } = {}) {
   const page = freshness === "page";
-  const gov = governance();
+  // A page's at the head it is read at (governance.ts pageGovernance); JSON's as ever.
+  const gov = governanceFor(freshness);
   const freshSigned = gov.then(async (g) =>
     signedFrom(
       g,
@@ -162,16 +164,19 @@ export function loadL2VetoList({ freshness = "strict" }: { freshness?: Freshness
         )
       )
     : freshSigned;
+  // The Guardians that hash each proposal on L1 are named by this answer's governance: a page's
+  // (kept in memory by the sync engine at each head), never JSON's full read for a page.
+  const answerGov = () => gov;
   // The first answer may use the last run's history; one that failed there is this run's to give.
   const firstVetoable = page
-    ? activeL2ProposalsAnswer({ provisional: true }).then(
+    ? activeL2ProposalsAnswer({ provisional: true, gov: answerGov }).then(
         (answer) => answer,
-        () => activeL2ProposalsAnswer()
+        () => activeL2ProposalsAnswer({ gov: answerGov })
       )
-    : activeL2ProposalsAnswer();
+    : activeL2ProposalsAnswer({ gov: answerGov });
   const vetoable = vetoableFrom(firstVetoable);
   const freshVetoable = vetoable.then((first) =>
-    first.fromLastRun ? vetoableFrom(activeL2ProposalsAnswer()) : first
+    first.fromLastRun ? vetoableFrom(activeL2ProposalsAnswer({ gov: answerGov })) : first
   );
   for (const promise of [gov, signed, freshSigned, vetoable, freshVetoable])
     void promise.catch(() => {});
@@ -211,14 +216,18 @@ export type VetoDetail = {
 
 /**
  * The L2 proposal, or why it could not be read. `l2Proposal: null` with no error is an answer
- * (the governor has no such proposal); a failed read is never reported as one.
+ * (the governor has no such proposal); a failed read is never reported as one. `gov`: the
+ * governance the veto is checked against (it names the Guardians that hash the proposal on L1).
  */
 async function readL2Proposal(
-  params: VetoParams
+  params: VetoParams,
+  gov: Governance
 ): Promise<{ l2Proposal: L2ProposalView | null; l2Error: string | null }> {
   try {
     if (!(await l2())) return { l2Proposal: null, l2Error: "No ZKsync Era RPC is configured" };
-    const l2Proposal = await getL2Proposal(params.l2GovernorAddress, BigInt(params.l2ProposalId));
+    const l2Proposal = await getL2Proposal(params.l2GovernorAddress, BigInt(params.l2ProposalId), {
+      gov: async () => gov,
+    });
     return { l2Proposal, l2Error: null };
   } catch (error) {
     return { l2Proposal: null, l2Error: await l2ErrorText(error) };
@@ -260,9 +269,9 @@ export function loadL2Veto(
   }: { supplied?: MemberSignature[]; freshness?: Freshness } = {}
 ): { first: Promise<VetoDetail>; fresh: Promise<VetoDetail> } {
   const started = (async () => {
-    const gov = await governance();
+    const gov = await governanceFor(freshness);
     const [{ l2Proposal, l2Error }, governors] = await Promise.all([
-      readL2Proposal(params),
+      readL2Proposal(params, gov),
       knownGovernors(),
     ]);
     const state = vetoState(gov, params, l2Proposal);

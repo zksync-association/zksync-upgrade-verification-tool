@@ -1,15 +1,19 @@
 import { upgradeHandlerAbi } from "@/common/abis";
 import { UPGRADE_STATES, type UpgradeState } from "@/common/upgrade-states";
-import type { Address, Hex } from "viem";
-import { cached, seed } from "./cache";
+import { type Address, type Hex, decodeFunctionResult, encodeFunctionData } from "viem";
+import { cached, peek, seed } from "./cache";
+import { aggregateAllAt } from "./chain/aggregate";
 import { isUnknownBlock } from "./chain/call";
 import { type BlockRef, type Network, l1State, latestBlock, network } from "./rpc";
 
 // upgradeState and upgradeStatus of one id, as the ProtocolUpgradeHandler answers them at one
 // block. On a live chain both are read at the head and kept per head, keyed by the head's HASH (a
 // reorg at the same height is another entry): every reader at that head shares one read, and the
-// sync engine reads the known ids ahead of requests under the same keys. Dev nodes, which can be
-// rewound or changed in place, read at 'latest' every time.
+// sync engine reads the known ids ahead of requests under the same keys (its per-block snapshot).
+// A read at a head goes out in the head's aggregate3 (chain/aggregate.ts, with whatever else is
+// read there); when that cannot answer (a failed sub-call, an answer from another block, a failed
+// call), it is read on its own as before. Dev nodes, which can be rewound or changed in place,
+// read at 'latest' every time.
 
 export type UpgradeStatus = {
   creationTimestamp: number;
@@ -46,9 +50,74 @@ export async function currentUpgradeStatus(id: Hex): Promise<UpgradeStatusRead> 
 
 /** The id's state and status at `head`, read at that block and shared by every reader of it. */
 export function upgradeStatusAt(net: Handler, id: Hex, head: BlockRef): Promise<UpgradeStatusRead> {
-  return cached(upgradeStatusKey(net.chainId, id, head), STATUS_TTL_MS, () =>
-    readUpgradeStatus(net.upgradeHandler, id, head.number)
-  );
+  return cached(upgradeStatusKey(net.chainId, id, head), STATUS_TTL_MS, async () => {
+    const aggregated = await aggregatedStatus(net.upgradeHandler, id, head);
+    return aggregated ?? readUpgradeStatus(net.upgradeHandler, id, head.number);
+  });
+}
+
+/**
+ * For the sync engine's snapshot: the id's state and status at `head` from the head's aggregate3,
+ * stored where requests at that head look (unless one already read it there), or null when it is
+ * unknown at the head (nothing stored: requests then read it themselves). Never rejects.
+ */
+export async function snapshotUpgradeStatus(
+  net: Handler,
+  id: Hex,
+  head: BlockRef
+): Promise<UpgradeStatusRead | null> {
+  const key = upgradeStatusKey(net.chainId, id, head);
+  const held = peek<UpgradeStatusRead>(key);
+  if (held) return held.catch(() => null);
+  const value = await aggregatedStatus(net.upgradeHandler, id, head);
+  if (value) seed(key, value, STATUS_TTL_MS);
+  return value;
+}
+
+/** Both reads in the head's aggregate3; null when either is unknown there. Never rejects. */
+async function aggregatedStatus(
+  handler: Address,
+  id: Hex,
+  head: BlockRef
+): Promise<UpgradeStatusRead | null> {
+  const names = ["upgradeState", "upgradeStatus"] as const;
+  try {
+    const results = await aggregateAllAt(
+      head,
+      names.map((functionName) => ({
+        target: handler,
+        callData: encodeFunctionData({ abi: upgradeHandlerAbi, functionName, args: [id] }),
+      }))
+    );
+    const [state, raw] = names.map((functionName, i) => {
+      const result = results[i];
+      if (!result?.success || result.returnData === "0x") throw new Error("unknown");
+      return decodeFunctionResult({
+        abi: upgradeHandlerAbi,
+        functionName,
+        data: result.returnData,
+      });
+    }) as [number, readonly [number, number, boolean, boolean, boolean]];
+    return shapeStatus(state, raw);
+  } catch {
+    return null;
+  }
+}
+
+function shapeStatus(
+  state: number,
+  raw: readonly [number, number, boolean, boolean, boolean]
+): UpgradeStatusRead {
+  return {
+    state: state as UpgradeState,
+    status: {
+      creationTimestamp: raw[0],
+      securityCouncilApprovalTimestamp: raw[1],
+      guardiansApproval: raw[2],
+      guardiansExtendedLegalVeto: raw[3],
+      executed: raw[4],
+    },
+  };
 }
 
 /**
@@ -94,14 +163,5 @@ export async function readUpgradeStatus(
     answer = await read();
   }
   const [state, raw] = answer;
-  return {
-    state: state as UpgradeState,
-    status: {
-      creationTimestamp: raw[0],
-      securityCouncilApprovalTimestamp: raw[1],
-      guardiansApproval: raw[2],
-      guardiansExtendedLegalVeto: raw[3],
-      executed: raw[4],
-    },
-  };
+  return shapeStatus(state, raw);
 }

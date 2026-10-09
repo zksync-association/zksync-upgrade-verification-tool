@@ -146,6 +146,7 @@ vi.mock("@/.server/safe/store", async () => {
 });
 
 const {
+  PRECOMPUTE_CONCURRENCY,
   verifySignatureSet,
   isRevert,
   revertReason,
@@ -863,9 +864,11 @@ describe("kept per head, and precomputed", () => {
 
     it("a precompute across a settings change: no result, no further sets, no last run", async () => {
       twoSigned();
-      // Five sets on screen (one more than the precompute verifies at once).
-      onScreen([1, 2, 3, 4, 5].map((threshold) => paramsOf(threshold)));
-      for (let threshold = 1; threshold <= 5; threshold++) await run(threshold);
+      // One set more on screen than the precompute verifies at once.
+      const count = PRECOMPUTE_CONCURRENCY + 1;
+      const thresholds = Array.from({ length: count }, (_, i) => i + 1);
+      onScreen(thresholds.map((threshold) => paramsOf(threshold)));
+      for (const threshold of thresholds) await run(threshold);
       const head = nextHead();
       state.delay = 60;
       let generation = 1;
@@ -874,7 +877,7 @@ describe("kept per head, and precomputed", () => {
       // The settings change: every cache is emptied and the generation moves on.
       clearCache();
       generation = 2;
-      expect(await precompute).toMatchObject({ sets: 5, skipped: 1 });
+      expect(await precompute).toMatchObject({ sets: count, skipped: 1 });
       expect(signatureSetsStatus().lastRun).toBeNull();
       // Nothing the precompute computed was kept: a request at that head verifies on its own.
       const lookups = state.lookups;

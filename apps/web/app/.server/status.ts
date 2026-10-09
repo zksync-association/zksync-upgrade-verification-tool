@@ -1,7 +1,8 @@
 import { env } from "@config/env.server";
 import { type L2IndexStatus, l2GovernorIndex } from "./chain/l2-index";
 import { type PuhIndexStatus, puhIndex } from "./chain/puh-index";
-import { type Governance, governance } from "./governance";
+import type { Governance } from "./governance";
+import { governanceFor } from "./page-governance";
 import { type LogHistoryStatus, checkLogHistory } from "./logs";
 import { type ChainCacheStatus, chainCacheStatus } from "./persist/chain-cache";
 import { ConfigError, type Network, l1, network, resolvedNetwork } from "./rpc";
@@ -9,6 +10,7 @@ import { type SafeStoreStatus, safeStoreStatus } from "./safe/store";
 import { quota } from "./safe-api";
 import { type SignatureSetsStatus, signatureSetsStatus } from "./signatures";
 import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
+import { type SnapshotStatus, snapshotStatus } from "./sync/snapshot";
 import { type PresenceStatus, presence } from "./sync/presence";
 
 // What the header, footer and every page's trust panel show: which chain the RPC is on, the
@@ -33,7 +35,9 @@ import { type PresenceStatus, presence } from "./sync/presence";
  * vetoable list, veto pages and startable upgrades read; idle with no governors when none is
  * indexed (no L2 RPC, or every governor replaced through env). `cache` is the local cache of
  * public chain and Safe data kept between runs (persist/chain-cache.ts): what was loaded at start
- * and whether this run's own reads have verified it; JSON never answers from it.
+ * and whether this run's own reads have verified it; JSON never answers from it. `snapshot` is the
+ * engine's last per-block snapshot (sync/snapshot.ts): what it read at its head, what was unknown
+ * there, and how the provider answered the block guard; null before the first.
  */
 export type SyncStatus = {
   index: PuhIndexStatus;
@@ -43,6 +47,7 @@ export type SyncStatus = {
   safe: SafeStoreStatus;
   signatures: SignatureSetsStatus;
   cache: ChainCacheStatus;
+  snapshot: SnapshotStatus | null;
 };
 
 export type AppStatus =
@@ -80,9 +85,19 @@ export function shellChain(): ShellChain | Promise<ShellChain> {
   return known ? chain(known) : network().then(chain);
 }
 
-export async function appStatus(): Promise<AppStatus> {
+/**
+ * The status. `freshness: "page"` (the app shell): governance at the head pages read
+ * (governance.ts pageGovernance); JSON (/api/status) reads governance() as ever.
+ */
+export async function appStatus({
+  freshness = "strict",
+}: { freshness?: "strict" | "page" } = {}): Promise<AppStatus> {
   try {
-    const [net, gov, logHistory] = await Promise.all([network(), governance(), logHistoryStatus()]);
+    const [net, gov, logHistory] = await Promise.all([
+      network(),
+      governanceFor(freshness),
+      logHistoryStatus(),
+    ]);
     return {
       ok: true,
       governance: gov,
@@ -98,6 +113,7 @@ export async function appStatus(): Promise<AppStatus> {
         safe: safeStoreStatus(),
         signatures: signatureSetsStatus(),
         cache: chainCacheStatus(),
+        snapshot: snapshotStatus(),
       },
     };
   } catch (error) {

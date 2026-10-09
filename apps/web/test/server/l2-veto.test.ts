@@ -113,7 +113,28 @@ const gov = {
     domain: { name: "Guardians", version: "1", chainId: 1, verifyingContract: GUARDIANS },
   },
 };
-vi.mock("@/.server/governance", () => ({ governance: async () => gov }));
+// JSON's governance and pages', told apart (a page reads its own; see page-governance.ts).
+const govReads = vi.hoisted(() => ({ json: 0, page: 0 }));
+vi.mock("@/.server/governance", () => ({
+  governance: async () => {
+    govReads.json++;
+    return gov;
+  },
+}));
+vi.mock("@/.server/page-governance", () => {
+  const page = async () => {
+    govReads.page++;
+    return gov;
+  };
+  return {
+    pageGovernance: page,
+    governanceFor: async (freshness: string) => {
+      if (freshness === "page") return page();
+      govReads.json++;
+      return gov;
+    },
+  };
+});
 const sets = vi.hoisted(() => ({ firstStale: false }));
 vi.mock("@/.server/signatures", () => ({
   verifySignatureSet: async () => ({
@@ -293,6 +314,28 @@ describe("a page's first answer for a veto or a freeze request", () => {
     expect(fresh.execution?.to).toBe(GUARDIANS);
     // JSON never gets the stale one.
     expect((await getL2Veto(params)).set.stale).toBe(false);
+  });
+
+  it("checks the L2 proposal's id at the Guardians the page's governance names, never JSON's full read", async () => {
+    state.logs = [other.log, vetoed.log];
+    govReads.json = 0;
+    govReads.page = 0;
+    const veto = loadL2Veto(params, { freshness: "page" });
+    const fresh = await veto.fresh;
+    expect(fresh.l2Proposal).toMatchObject({ idMatchesLocal: true, idMatchesContract: true });
+    expect(await veto.first).toBe(fresh);
+    expect(govReads).toEqual({ json: 0, page: 1 });
+    // The vetoable list on the page (a governor read by its window, not the index): the same.
+    const list = loadL2VetoList({ freshness: "page" });
+    const vetoable = await list.freshVetoable;
+    await list.signed;
+    // (Each id read on L1; this file's L1 answers the vetoed proposal's id for any content.)
+    expect(vetoable.vetoable.map((p) => p.idMatchesContract)).toEqual([false, true]);
+    expect(govReads).toEqual({ json: 0, page: 2 });
+    // JSON's detail keeps JSON's governance.
+    clearCache();
+    expect((await getL2Veto(params)).l2Proposal).toMatchObject({ idMatchesContract: true });
+    expect(govReads).toEqual({ json: 1, page: 2 });
   });
 
   it("is the strict result itself when nothing older is shown", async () => {

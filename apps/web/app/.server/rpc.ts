@@ -15,6 +15,7 @@ import { FOREVER, cached, cachedUntil, invalidate, peek, replace } from "./cache
 import { type Lane, RpcError, createLane } from "./chain/jsonrpc";
 import { type LimitedHttpOptions, limitedHttp } from "./rpc-transport";
 import { countUpstream } from "./sync/cost";
+import { creditsOf, paceEngineRequest } from "./sync/pacer";
 
 // Public RPCs throttle bursts, so every client funnels requests through a small pool and backs
 // off on 429 (viem retries rate-limit errors with exponential delay: 0.5, 1, 2, 4, 8 s).
@@ -24,14 +25,22 @@ import { countUpstream } from "./sync/cost";
 export const MULTICALL3: Address = "0xcA11bde05977b3631167028862bE2a173976CA11";
 
 // Up to two batches of 8 in flight, so a fan-out above 8 reads does not wait for a whole round trip.
-// Every request sent is counted for /api/status (sync.engine.cost).
-const countL1 = (n = 1) => countUpstream("l1", n);
+// Every request sent is counted for /api/status (sync.engine.cost), L1 ones with their Infura
+// credit weight (an estimate).
+const countL1Method = (method: string) => countUpstream("l1", 1, creditsOf(method));
+const countL1 = (n: number, methods: readonly string[]) =>
+  countUpstream(
+    "l1",
+    n,
+    methods.reduce((sum, method) => sum + creditsOf(method), 0)
+  );
 const countL2 = (n = 1) => countUpstream("l2", n);
 const L1_TRANSPORT: LimitedHttpOptions = {
   label: "L1",
   maxInFlight: 16,
   batchSize: 8,
-  onRequest: countL1,
+  onRequest: countL1Method,
+  pace: paceEngineRequest,
 };
 // Contract state pinned to a block (upgrade states at the head): one aggregate3 per block, each
 // in a POST of its own.
@@ -39,9 +48,14 @@ const L1_STATE_TRANSPORT: LimitedHttpOptions = {
   label: "L1-state",
   maxInFlight: 4,
   batch: false,
-  onRequest: countL1,
+  onRequest: countL1Method,
+  pace: paceEngineRequest,
 };
-const L2_TRANSPORT: LimitedHttpOptions = { label: "L2", maxInFlight: 4, onRequest: countL2 };
+const L2_TRANSPORT: LimitedHttpOptions = {
+  label: "L2",
+  maxInFlight: 4,
+  onRequest: () => countL2(),
+};
 
 let transport = limitedHttp(env.L1_RPC_URL, L1_TRANSPORT);
 let direct = createPublicClient({ transport });
@@ -768,8 +782,10 @@ export function lanes(): L1Lanes {
     maxInFlight: 8,
     askAgain: true,
     onSend: countL1,
+    pace: paceEngineRequest,
   });
-  // One head read ('latest' with 'finalized') per POST.
+  // One head read ('latest' with 'finalized') per POST. The sync engine paces its polls itself
+  // (before it reads, so a request never joins a poll that is waiting its turn).
   const head = createLane({
     url: env.L1_RPC_URL,
     label: "l1-head",
@@ -784,6 +800,7 @@ export function lanes(): L1Lanes {
     maxBatch: 25,
     maxInFlight: 8,
     onSend: countL1,
+    pace: paceEngineRequest,
     yieldTo: () => call.busy() || head.busy(),
   });
   l1Lanes = { history, call, head };

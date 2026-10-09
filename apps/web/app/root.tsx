@@ -55,7 +55,8 @@ export function loader({ request }: LoaderFunctionArgs) {
     watch: watchItems(request, [watchKeys.status]),
     presence: { awayMs: serverEnv.SYNC_AWAY_MS },
     chain: shellChain(),
-    status: appStatus(),
+    // Governance at the head pages read (the sync engine reads it there at each block).
+    status: appStatus({ freshness: "page" }),
   });
 }
 

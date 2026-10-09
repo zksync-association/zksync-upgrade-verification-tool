@@ -9,6 +9,13 @@ export default defineConfig({
     environment: "node",
     include: ["test/server/*.{test,spec}.{ts,tsx}"],
     // IGNORE_LOCAL_SETTINGS: a developer's saved RPC (apps/web/.cache) must not replace the dummy.
-    env: { L1_RPC_URL: "http://127.0.0.1:9", LOG_LEVEL: "error", IGNORE_LOCAL_SETTINGS: "true" },
+    // SYNC_CREDITS_PER_SECOND=0: the engine's credit pacer only stretches fake time here; its own
+    // tests (pacer.test.ts) turn it on.
+    env: {
+      L1_RPC_URL: "http://127.0.0.1:9",
+      LOG_LEVEL: "error",
+      IGNORE_LOCAL_SETTINGS: "true",
+      SYNC_CREDITS_PER_SECOND: "0",
+    },
   },
 });

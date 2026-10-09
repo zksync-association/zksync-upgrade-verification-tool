@@ -24,7 +24,8 @@ import {
   l2GovernorIndex,
   l2IndexHead,
 } from "../chain/l2-index";
-import { governance } from "../governance";
+import { type Governance, governance } from "../governance";
+import { pageGovernance } from "../page-governance";
 import { findBlockByTimestamp, getLogs } from "../logs";
 import { type L2Head, l1, l2, network, refreshL2ChainHead } from "../rpc";
 import { callTo, topicOf } from "./common";
@@ -184,12 +185,21 @@ function createdOf(log: CreatedLog): Promise<Created> {
 }
 
 /**
- * Guardians.hashL2Proposal on L1 for this content (a pure function of it): kept once read. null
- * when the read failed (asked again next time).
+ * Where the Guardians' address comes from: JSON's governance() unless the caller says otherwise.
+ * A page passes its own (page-governance.ts governanceFor): the sync engine keeps pages'
+ * governance in memory at each head, never JSON's.
  */
-async function idOnL1(created: Created): Promise<bigint | null> {
+export type GovernanceRead = () => Promise<Governance>;
+
+/**
+ * Guardians.hashL2Proposal on L1 for this content (a pure function of it): kept once read. null
+ * when the read failed (asked again next time). `gov`: the governance that names the Guardians
+ * (the sync engine's refresh passes pages' governance at the head, so it never makes JSON's full
+ * read for an address).
+ */
+async function idOnL1(created: Created, gov: GovernanceRead = governance): Promise<bigint | null> {
   try {
-    const { guardians } = await governance();
+    const { guardians } = await gov();
     return await cached(`l2-id-on-l1:${guardians.address}:${created.localId}`, FOREVER, () =>
       l1.readContract({
         address: guardians.address,
@@ -221,7 +231,7 @@ async function viewOf(
   governor: Address,
   log: CreatedLog,
   at: L2Head | null,
-  { fromLastRun = false }: { fromLastRun?: boolean } = {}
+  { fromLastRun = false, gov }: { fromLastRun?: boolean; gov?: GovernanceRead } = {}
 ): Promise<L2ProposalView> {
   const created = fromLastRun ? decodeCreated(log) : await createdOf(log);
   const readState = () =>
@@ -248,7 +258,7 @@ async function viewOf(
     knownGovernors().then(
       (gs) => gs.find((g) => isAddressEqual(g.address, governor))?.name ?? null
     ),
-    idOnL1(created),
+    idOnL1(created, gov),
   ]);
   return {
     ...created.proposal,
@@ -284,7 +294,8 @@ async function recentFromIndex(
   client: PublicClient,
   governors: readonly Address[],
   at: L2Head,
-  provisional = false
+  provisional = false,
+  gov?: GovernanceRead
 ): Promise<VetoableAnswer> {
   const read = await l2GovernorIndex().read({ head: at, provisional });
   const { head, events } = read;
@@ -306,16 +317,20 @@ async function recentFromIndex(
   const proposals = await Promise.all(
     recent.events.map((e) => {
       const governor = governors.find((g) => isAddressEqual(g, e.governor)) ?? e.governor;
-      return viewOf(client, governor, e.log, head, { fromLastRun: e.provisional });
+      return viewOf(client, governor, e.log, head, { fromLastRun: e.provisional, gov });
     })
   );
   return { proposals, provisional: read.provisional || recent.provisional };
 }
 
 /** A replaced governor's proposals created in the last 24 days (scanned on demand). */
-async function recentFromScan(client: PublicClient, governor: Address): Promise<L2ProposalView[]> {
+async function recentFromScan(
+  client: PublicClient,
+  governor: Address,
+  gov?: GovernanceRead
+): Promise<L2ProposalView[]> {
   const logs = await scanWindow(client, governor, "ProposalCreated", VETO_WINDOW);
-  return Promise.all(logs.map((log) => viewOf(client, governor, log, null)));
+  return Promise.all(logs.map((log) => viewOf(client, governor, log, null, { gov })));
 }
 
 /**
@@ -330,10 +345,12 @@ export async function activeL2Proposals(): Promise<L2ProposalView[]> {
  * activeL2Proposals, and whether the answer used the history the last run saved: with
  * `provisional` (a page's first answer), the indexed governors' events may come from it while this
  * run reads them again (see recentFromIndex); without it (JSON, and a page's fresh answer), never.
+ * `gov`: the governance that names the Guardians (a page's; JSON's governance() by default).
  */
 export async function activeL2ProposalsAnswer({
   provisional = false,
-}: { provisional?: boolean } = {}): Promise<VetoableAnswer> {
+  gov,
+}: { provisional?: boolean; gov?: GovernanceRead } = {}): Promise<VetoableAnswer> {
   const client = await l2();
   if (!client) return { proposals: [], provisional: false };
   const [net, all] = await Promise.all([network(), knownGovernors()]);
@@ -348,10 +365,13 @@ export async function activeL2ProposalsAnswer({
           client,
           indexed.map((g) => g.address),
           at,
-          provisional
+          provisional,
+          gov
         )
       : { proposals: [], provisional: false },
-    ...governors.filter((g) => !indexed.includes(g)).map((g) => recentFromScan(client, g.address)),
+    ...governors
+      .filter((g) => !indexed.includes(g))
+      .map((g) => recentFromScan(client, g.address, gov)),
   ]);
   const found = [...(fromIndex?.proposals ?? []), ...scanned.flat()];
   // Per governor, in the order above; each governor's oldest first.
@@ -379,18 +399,26 @@ export async function refreshVetoableL2(): Promise<boolean> {
   if (!(await refreshL2ChainHead())) return false;
   const at = await l2IndexHead(net);
   if (!at) return false;
+  // The Guardians' address from pages' governance (at the head where the split applies), not
+  // JSON's full read (which the engine no longer keeps fresh).
   await recentFromIndex(
     client,
     indexed.map((g) => g.address),
-    at
+    at,
+    false,
+    pageGovernance
   );
   return true;
 }
 
-/** A specific L2 proposal's content, from its ProposalCreated log, with its state read now. */
+/**
+ * A specific L2 proposal's content, from its ProposalCreated log, with its state read now. `gov`:
+ * the governance that names the Guardians (a page's; JSON's governance() by default).
+ */
 export async function getL2Proposal(
   governor: Address,
-  proposalId: bigint
+  proposalId: bigint,
+  { gov }: { gov?: GovernanceRead } = {}
 ): Promise<L2ProposalView | null> {
   const client = await l2();
   if (!client) return null;
@@ -406,7 +434,7 @@ export async function getL2Proposal(
         isAddressEqual(e.governor, governor) &&
         e.proposalId === proposalId
     );
-    return event ? viewOf(client, governor, event.log, head) : null;
+    return event ? viewOf(client, governor, event.log, head, { gov }) : null;
   }
   // A replaced governor (or Era without the 'finalized' tag): found from its on-chain snapshot
   // time.
@@ -442,7 +470,7 @@ export async function getL2Proposal(
           topics: l.topics,
         }).args.proposalId === proposalId
     );
-    return log ? viewOf(client, governor, log, null) : null;
+    return log ? viewOf(client, governor, log, null, { gov }) : null;
   });
 }
 

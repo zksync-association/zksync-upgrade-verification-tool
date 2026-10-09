@@ -2,7 +2,8 @@ import { type FreezeAction, type MemberSignature, freezeExecution } from "@/comm
 import { FREEZE_ACTIONS } from "@/common/freeze";
 import { buildTypedData } from "@/common/typed-data";
 import { FREEZE_STATUS_LABELS } from "@/common/upgrade-states";
-import { type Governance, governance } from "../governance";
+import type { Governance } from "../governance";
+import { governanceFor } from "../page-governance";
 import type { Freshness, SignatureSet } from "../signatures";
 import {
   type ExecutionView,
@@ -137,7 +138,8 @@ function freezeListFrom(gov: Governance, collected: Collected): FreezeList {
  * states are always read at the head (governance); only which messages exist may be old.
  */
 export function loadFreezeList({ freshness = "strict" }: { freshness?: Freshness } = {}) {
-  const gov = governance();
+  // A page's at the head it is read at (governance.ts pageGovernance); JSON's as ever.
+  const gov = governanceFor(freshness);
   const fresh = gov.then(async (g) =>
     freezeListFrom(
       g,
@@ -195,7 +197,7 @@ export function loadFreezeRequest(
     freshness = "strict",
   }: { supplied?: MemberSignature[]; freshness?: Freshness } = {}
 ): { first: Promise<FreezeDetail>; fresh: Promise<FreezeDetail> } {
-  const started = governance().then((gov) => {
+  const started = governanceFor(freshness).then((gov) => {
     const message: Record<string, string> = { nonce: params.nonce, validUntil: params.validUntil };
     if (params.action === "SetSoftFreezeThreshold") message.threshold = params.threshold ?? "0";
     const state = freezeState(gov, params);

@@ -48,6 +48,18 @@ const baseEnv = createEnv({
     // decides).
     SYNC_SAFE_ACTIVE_MS: z.coerce.number().int().min(0).default(300_000),
     SYNC_SAFE_HOURLY_BUDGET: z.coerce.number().int().min(0).default(1_200),
+    // A signature set's checks at a head go out in one Multicall3 aggregate3 with the head's other
+    // reads, and only positives are taken from it (ECDSA-only candidates on pinned contracts;
+    // everything else is asked directly, where only a definite revert rejects). 0: every check
+    // asked directly.
+    SYNC_VERDICT_AGGREGATE: z.coerce.number().int().min(0).max(1).default(1),
+    // The sync engine's own upstream work, at most this many Infura credits a second (eth_getLogs
+    // 255, other methods 80; Infura's free plan allows 500). Requests are never held up. 0: unpaced.
+    SYNC_CREDITS_PER_SECOND: z.coerce.number().int().min(0).default(450),
+    // How the head follower looks for the next block: "slot" polls when its slot begins (the proof
+    // that the local clock is not behind) and then every second; "late" makes the same proof poll,
+    // then its first search poll where most blocks have arrived by (learned), then every second.
+    SYNC_HEAD_POLL: z.enum(["slot", "late"]).default("slot"),
     ALLOW_INDEXING: z.coerce.boolean().default(false),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
     NODE_ENV: NodeEnvEnum.default("production"),

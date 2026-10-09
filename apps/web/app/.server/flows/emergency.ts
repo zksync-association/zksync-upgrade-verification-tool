@@ -19,6 +19,7 @@ import { FOREVER, cached, cachedUntil } from "../cache";
 import { CallReverted, callFn, isFinalBlock } from "../chain/call";
 import { IndexIntegrityError, type PuhEvent, puhIndex } from "../chain/puh-index";
 import { type Governance, governance } from "../governance";
+import { governanceFor } from "../page-governance";
 import { findBlockByTimestamp, getLogs } from "../logs";
 import {
   type Network,
@@ -264,8 +265,8 @@ export function loadEmergencyList({
   const executed = executedFirst.then((first) =>
     first.fromLastRun ? executedEmergencies({ allHistory }).then(summaries) : first.items
   );
-  // The members' Safes come from governance.
-  const signers = governance().then((gov) => ({
+  // The members' Safes come from governance (a page's at the head, governance.ts pageGovernance).
+  const signers = governanceFor(freshness).then((gov) => ({
     domain: gov.emergencyUpgradeBoard.domain,
     safes: [
       ...gov.securityCouncil.members,
@@ -447,7 +448,7 @@ export async function loadEmergencyUpgrade(
         // Read again, and its failure handled, where the execution is decoded.
       });
   void locatedRead?.catch(() => {});
-  const [gov, { state }] = await Promise.all([governance(), status]);
+  const [gov, { state }] = await Promise.all([governanceFor(freshness), status]);
   const board = gov.emergencyUpgradeBoard;
 
   const specs = [

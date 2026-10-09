@@ -90,8 +90,16 @@ export type LaneOptions = {
   backoffMs?: number;
   /** Retries of one request after rate limiting, before it fails. */
   rateLimitRetries?: number;
-  /** Called as each POST is sent, with the number of JSON-RPC requests in it (cost counting). */
-  onSend?: (requests: number) => void;
+  /**
+   * Called as each POST is sent, with the number of JSON-RPC requests in it and their methods
+   * (cost counting).
+   */
+  onSend?: (requests: number, methods: readonly string[]) => void;
+  /**
+   * Asked as a request is made: a promise to wait for before it joins the queue (the sync
+   * engine's credit pacer, for the engine's own requests), or null to queue it at once.
+   */
+  pace?: (method: string) => Promise<void> | null;
   /**
    * While this says true (another lane on the same provider is under pressure, see Lane.busy),
    * this lane keeps at most one POST in flight, so it cannot take the provider's capacity from
@@ -176,7 +184,7 @@ export function createLane(options: LaneOptions): Lane {
   const backoffMs = options.backoffMs ?? 250;
   const rateLimitRetries = options.rateLimitRetries ?? 6;
   const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
-  const { onSend, yieldTo } = options;
+  const { onSend, yieldTo, pace } = options;
   const asksAgain = options.askAgain === true;
   const scrub = scrubber(secretsOf(url));
 
@@ -316,7 +324,10 @@ export function createLane(options: LaneOptions): Lane {
     posts++;
     peakInFlight = Math.max(peakInFlight, active);
     try {
-      onSend?.(group.length);
+      onSend?.(
+        group.length,
+        group.map((entry) => entry.method)
+      );
     } catch {
       // Counting never fails a request.
     }
@@ -578,6 +589,34 @@ export function createLane(options: LaneOptions): Lane {
     requeue(group);
   }
 
+  function enqueue<T>(method: string, params: readonly unknown[]): Promise<T> {
+    if (closed)
+      return Promise.reject(new LaneError("aborted", label, method, "the data source was reset"));
+    return new Promise<T>((resolve, reject) => {
+      const id = nextId++;
+      let json: string;
+      try {
+        json = JSON.stringify({ jsonrpc: "2.0", id, method, params });
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      requests++;
+      queue.push({
+        id,
+        method,
+        json,
+        resolve: resolve as (value: unknown) => void,
+        reject,
+        transient: 0,
+        limited: 0,
+        maxGroup: Number.POSITIVE_INFINITY,
+      });
+      if (queue.length >= Math.min(batch, batchCap) && active < inFlightLimit) pump();
+      else schedule(waitMs);
+    });
+  }
+
   return {
     label,
     request<T = unknown>(method: AllowedMethod, params: readonly unknown[] = []): Promise<T> {
@@ -592,29 +631,13 @@ export function createLane(options: LaneOptions): Lane {
         );
       if (closed)
         return Promise.reject(new LaneError("aborted", label, method, "the data source was reset"));
-      return new Promise<T>((resolve, reject) => {
-        const id = nextId++;
-        let json: string;
-        try {
-          json = JSON.stringify({ jsonrpc: "2.0", id, method, params });
-        } catch (error) {
-          reject(error);
-          return;
-        }
-        requests++;
-        queue.push({
-          id,
-          method,
-          json,
-          resolve: resolve as (value: unknown) => void,
-          reject,
-          transient: 0,
-          limited: 0,
-          maxGroup: Number.POSITIVE_INFINITY,
-        });
-        if (queue.length >= Math.min(batch, batchCap) && active < inFlightLimit) pump();
-        else schedule(waitMs);
-      });
+      let wait: Promise<void> | null = null;
+      try {
+        wait = pace?.(method) ?? null;
+      } catch {
+        // Pacing never fails a request.
+      }
+      return wait ? wait.then(() => enqueue<T>(method, params)) : enqueue<T>(method, params);
     },
     stats: () => ({
       label,

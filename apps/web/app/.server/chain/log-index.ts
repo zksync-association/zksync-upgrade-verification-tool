@@ -2,6 +2,7 @@ import { defaultLogger } from "@config/log.server";
 import { type Address, type Hex, type Log, formatLog, numberToHex } from "viem";
 import { LogsUnavailableError } from "../logs";
 import { type Lane, RpcError } from "./jsonrpc";
+import { asRequestWork } from "../sync/pacer";
 
 // Every log one contract has emitted, from its deployment to the head, in memory. The filter is
 // the address alone: a topic OR-list would drop events the ABI does not list (a proxy's Upgraded,
@@ -924,7 +925,9 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
       return run.then(() => startBackfill());
     }
     failure = null;
-    const thisRun: Promise<void> = backfill()
+    // Never paced, whoever started it (sync/pacer.ts): the engine's index step can start a
+    // backfill, which is not the engine's per-block work.
+    const thisRun: Promise<void> = asRequestWork(backfill)
       .catch((error: unknown) => fail(error, { from: deployBlock, to: bottom - 1n }))
       .finally(() => {
         if (run === thisRun) run = null;

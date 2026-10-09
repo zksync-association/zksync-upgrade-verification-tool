@@ -9,7 +9,7 @@ import {
   notStartedUpgrades,
   refreshVetoableL2,
 } from "@/.server/flows/l2";
-import { listL2Vetoes } from "@/.server/flows/l2-veto";
+import { listL2Vetoes, loadL2VetoList } from "@/.server/flows/l2-veto";
 import { l2ChainHead, l2HistoryLane, resetRpcClients } from "@/.server/rpc";
 import { l2GovernorAbi } from "@/common/abis";
 import {
@@ -116,9 +116,32 @@ const GOV = {
     domain: { name: "Guardians", version: "1", chainId: 1, verifyingContract: GUARDIANS },
   },
 };
-vi.mock("@/.server/governance", () => ({ governance: async () => GOV }));
+// JSON's governance and pages', told apart (the engine's Era refresh reads pages').
+const reads = vi.hoisted(() => ({ json: 0, page: 0 }));
+vi.mock("@/.server/governance", () => ({
+  governance: async () => {
+    reads.json++;
+    return GOV;
+  },
+}));
+vi.mock("@/.server/page-governance", () => {
+  const page = async () => {
+    reads.page++;
+    return GOV;
+  };
+  return {
+    pageGovernance: page,
+    governanceFor: async (freshness: string) => {
+      if (freshness === "page") return page();
+      reads.json++;
+      return GOV;
+    },
+  };
+});
 vi.mock("@/.server/flows/messages", () => ({
   collectMessages: async () => ({ groups: [], errors: [], anomalies: 0 }),
+  // No copies held (a page's first list is then the fresh one).
+  collectHeldMessages: async () => null,
 }));
 
 /** Mainnet with an Era RPC: the pinned governors are indexed. */
@@ -674,6 +697,53 @@ describe("the flows on the index", () => {
     expect(fake.posts.length).toBe(posts);
     expect(listed.map((p) => p.description)).toEqual(["in the tail", "pending on GovOps"]);
     expect((await l2GovernorIndex().read()).head.head.number).toBe(HEAD + 2n);
+  });
+
+  it("the engine's refresh takes the Guardians' address from pages' governance, never JSON's full read", async () => {
+    upstream();
+    await activeL2Proposals();
+    reads.json = 0;
+    reads.page = 0;
+    expect(await refreshVetoableL2()).toBe(true);
+    expect(reads.json).toBe(0);
+    expect(reads.page).toBeGreaterThan(0);
+  });
+
+  it("a page's vetoable list (/, the veto list) takes the Guardians' address from the page's governance, never JSON's full read", async () => {
+    upstream();
+    reads.json = 0;
+    reads.page = 0;
+    const loading = loadL2VetoList({ freshness: "page" });
+    const first = await loading.vetoable;
+    const fresh = await loading.freshVetoable;
+    await loading.signed;
+    // Every listed proposal's id was hashed on L1 at the Guardians the page's governance names.
+    for (const answer of [first, fresh]) {
+      expect(answer.vetoable).toHaveLength(3);
+      expect(answer.vetoable.every((p) => p.idMatchesContract === true)).toBe(true);
+    }
+    expect(reads.json).toBe(0);
+    expect(reads.page).toBe(1);
+    // JSON's list keeps JSON's governance, read once for the whole answer.
+    reads.page = 0;
+    const json = await listL2Vetoes();
+    expect(json.vetoable.every((p) => p.idMatchesContract === true)).toBe(true);
+    expect(reads.page).toBe(0);
+    expect(reads.json).toBe(1);
+  });
+
+  it("a veto's proposal is checked against the governance it is given (a page's), else JSON's", async () => {
+    upstream();
+    const id = proposalIdOf("the window's first block");
+    reads.json = 0;
+    reads.page = 0;
+    const { pageGovernance } = await import("@/.server/page-governance");
+    expect(await getL2Proposal(T, id, { gov: pageGovernance })).toMatchObject({
+      idMatchesContract: true,
+    });
+    expect(reads).toEqual({ json: 0, page: 1 });
+    expect(await getL2Proposal(T, id)).toMatchObject({ idMatchesContract: true });
+    expect(reads).toEqual({ json: 1, page: 1 });
   });
 
   it("never serve an older Era head after the engine's refresh is answered by a backend behind", async () => {

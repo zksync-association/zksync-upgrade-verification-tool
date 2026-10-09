@@ -13,6 +13,7 @@ export async function action() {
   }
   const refreshed = refreshSafeData();
   invalidate("governance");
+  invalidate("page-governance");
   invalidate("latest-block");
   return json({ refreshed });
 }

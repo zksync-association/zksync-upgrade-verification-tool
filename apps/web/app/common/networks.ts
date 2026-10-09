@@ -18,6 +18,26 @@ import { type Address, type Hex, toEventSelector } from "viem";
 //   implementation no longer has handler functions. Override with UPGRADE_HANDLER_ADDRESS.
 export type NetworkName = "mainnet" | "sepolia" | "local";
 
+/**
+ * Bytecode the app knows and relies on, by keccak256 of the runtime code (read on mainnet at block
+ * 26,141,196). With the governance contracts' code matching, the parts of governance that code
+ * never writes after its constructor (members, domains, constants) are read once per process and
+ * kept; everything else is read at each block. The verdict fast path (one Multicall3 aggregate3
+ * for a set's checks) is used only on check contracts whose code matches, and for the ZK
+ * Foundation Safe only while its singleton and fallback handler are these. Not pinned (Sepolia,
+ * local chains): every read as without them.
+ */
+export type CodePins = {
+  securityCouncil: Hex;
+  guardians: Hex;
+  emergencyUpgradeBoard: Hex;
+  /** Safe 1.3.0 proxy runtime code (every member Safe's and the ZK Foundation's). */
+  safeProxy: Hex;
+  /** Safe 1.3.0 singleton (slot 0 of the proxy) and CompatibilityFallbackHandler 1.3.0. */
+  safeSingleton: Address;
+  safeFallbackHandler: Address;
+};
+
 export type NetworkConfig = {
   name: NetworkName;
   label: string;
@@ -43,6 +63,7 @@ export type NetworkConfig = {
   // A log that must exist on any RPC with full log history. If an RPC returns nothing for it,
   // the app says so instead of silently showing an incomplete list.
   logCanary: { address: Address; topic0: Hex; blockNumber: bigint } | null;
+  codePins: CodePins | null;
 };
 
 const CHANGE_SECURITY_COUNCIL_TOPIC = toEventSelector("ChangeSecurityCouncil(address,address)");
@@ -74,6 +95,14 @@ export const NETWORKS: Record<1 | 11155111, NetworkConfig> = {
       topic0: CHANGE_SECURITY_COUNCIL_TOPIC,
       blockNumber: 21_788_382n,
     },
+    codePins: {
+      securityCouncil: "0x07a16e42a0b772364b7bd47f916d4dde6ac2106132cd0a6023a7284a9b5c1e63",
+      guardians: "0xa169d7c0fe3a79ef97995412a52a2821b95065574c263832f29fd1dd623eba38",
+      emergencyUpgradeBoard: "0x9999af49fff31340fdc41580fd792d782708cdd7749dbd3b6c6148080354c7a3",
+      safeProxy: "0xb89c1b3bdf2cf8827818646bce9a8f6e372885f8c55e5c07acbd307cb133b000",
+      safeSingleton: "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552",
+      safeFallbackHandler: "0xf48f2B2d2a534e402487b3ee7C18c33Aec0Fe5e4",
+    },
   },
   11155111: {
     name: "sepolia",
@@ -101,6 +130,7 @@ export const NETWORKS: Record<1 | 11155111, NetworkConfig> = {
       topic0: CHANGE_SECURITY_COUNCIL_TOPIC,
       blockNumber: 6_380_336n,
     },
+    codePins: null,
   },
 };
 
@@ -123,6 +153,7 @@ export function localNetwork(chainId: number): NetworkConfig {
     standardLegalVetoDays: 3,
     blockTimeSeconds: 12,
     logCanary: null,
+    codePins: null,
   };
 }
 

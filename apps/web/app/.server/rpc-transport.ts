@@ -15,16 +15,24 @@ export type LimitedHttpOptions = {
    * (and their slow entries). Default true.
    */
   batch?: boolean;
-  /** Called as each JSON-RPC request is sent upstream (a retry counts again): cost counting. */
-  onRequest?: () => void;
+  /**
+   * Called as each JSON-RPC request is sent upstream (a retry counts again), with its method:
+   * cost counting.
+   */
+  onRequest?: (method: string) => void;
+  /**
+   * Asked before a request is made: a promise to wait for first (the sync engine's credit pacer,
+   * for the engine's own requests), or null to send it at once.
+   */
+  pace?: (method: string) => Promise<void> | null;
 };
 
 /** Batch read-only JSON-RPC traffic, with a per-client fallback for providers rejecting batches. */
 export function limitedHttp(url: string, options: LimitedHttpOptions): Transport {
-  const { label, maxInFlight, onRequest } = options;
-  const sent = () => {
+  const { label, maxInFlight, onRequest, pace } = options;
+  const sent = (method: string) => {
     try {
-      onRequest?.();
+      onRequest?.(method);
     } catch {
       // Counting never fails a request.
     }
@@ -72,18 +80,25 @@ export function limitedHttp(url: string, options: LimitedHttpOptions): Transport
         retryCount: 2,
         retryDelay: 500,
         request: (async (request) => {
+          let wait: Promise<void> | null = null;
+          try {
+            wait = pace?.(request.method) ?? null;
+          } catch {
+            // Pacing never fails a request.
+          }
+          if (wait) await wait;
           const queuedAt = performance.now();
           return limit(async () => {
             const startedAt = performance.now();
             let failed = false;
             try {
-              sent();
+              sent(request.method);
               if (batchUnavailable()) return await singleTransport.request(request);
               try {
                 return await batchTransport.request(request);
               } catch (error) {
                 if (!batchUnavailable() && !tooLarge(error)) throw error;
-                sent();
+                sent(request.method);
                 return await singleTransport.request(request);
               }
             } catch (error) {

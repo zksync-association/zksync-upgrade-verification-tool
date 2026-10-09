@@ -6,6 +6,7 @@
 // Nothing here touches the network.
 
 import {
+  ERC1271_MAGIC_VALUE,
   emergencyUpgradeBoardAbi,
   guardiansAbi,
   safeAbi,
@@ -17,15 +18,19 @@ import {
   type Abi,
   type Address,
   type Hex,
+  decodeAbiParameters,
   decodeFunctionData,
   encodeErrorResult,
   encodeFunctionResult,
   getAddress,
+  keccak256,
   multicall3Abi,
+  pad,
   parseAbi,
+  parseAbiParameters,
   zeroHash,
 } from "viem";
-import { type ChainLog, fakeChain } from "./fake-chain";
+import { type ChainLog, blockHash, fakeChain } from "./fake-chain";
 import { type FakeCall, type FakeOptions, FakeRpcError, fakeJsonRpc } from "./fake-jsonrpc";
 
 export const L1 = {
@@ -42,6 +47,25 @@ const member = (group: number, i: number) =>
   getAddress(`0x${group.toString(16)}${(i + 1).toString(16).padStart(39, "0")}`);
 export const SC_MEMBERS = [0, 1, 2].map((i) => member(0xa, i));
 export const G_MEMBERS = [0, 1, 2].map((i) => member(0xb, i));
+
+/** Every address's code on the fake node unless FakeL1Options.code says otherwise. */
+export const FAKE_CODE: Hex = "0x6080604052";
+/** The Safe singleton and fallback handler the fake node's Safes report (Safe 1.3.0's, as on mainnet). */
+export const FAKE_SAFE_SINGLETON = getAddress("0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552");
+export const FAKE_SAFE_HANDLER = getAddress("0xf48f2B2d2a534e402487b3ee7C18c33Aec0Fe5e4");
+
+/**
+ * Code pins (common/networks.ts CodePins) that the fake node's contracts match: with these in
+ * place (chain/pins.ts overrideCodePinsForTests) the app relies on them as on mainnet.
+ */
+export const FAKE_PINS = {
+  securityCouncil: keccak256(FAKE_CODE),
+  guardians: keccak256(FAKE_CODE),
+  emergencyUpgradeBoard: keccak256(FAKE_CODE),
+  safeProxy: keccak256(FAKE_CODE),
+  safeSingleton: FAKE_SAFE_SINGLETON,
+  safeFallbackHandler: FAKE_SAFE_HANDLER,
+} as const;
 
 export type UpgradeOnChain = {
   state: number;
@@ -84,13 +108,53 @@ export type FakeL1Options = {
   stateAt?: (block: string) => FakeRpcError | undefined;
   delayMs?: FakeOptions["delayMs"];
   /**
-   * Member signatures the Security Council and Guardians accept in checkSignatures, as
-   * `${signer}:${signature}` in lower case (any threshold); every other set reverts.
+   * Member signatures the Security Council and Guardians accept in checkSignatures (and in
+   * isValidSignature's abi.encode(signers, signatures)), and signatures a Safe accepts in its own
+   * isValidSignature, as `${signer}:${signature}` (`${safe}:${signature}`) in lower case (any
+   * threshold); every other set reverts.
    */
   signatures?: Set<string>;
+  /**
+   * How the node answers Multicall3's getBlockNumber()/getLastBlockHash() in an eth_call at a
+   * block: in that block's context ("block", the default: the block's number and its parent's
+   * hash) or the next block's ("next-block": number + 1 and the block's own hash). A function
+   * answers for one call's block tag instead (undefined: the convention).
+   */
+  guard?: "block" | "next-block";
+  guardAt?: (block: string) => { number: bigint; lastHash: Hex } | undefined;
+  /**
+   * The node's answer to an aggregate3 at `block` as a whole instead of running it (e.g. out of
+   * gas, an internal error); undefined: it runs. Direct calls are not affected.
+   */
+  aggregateError?: (block: string) => FakeRpcError | undefined;
+  /** An address's code at a block tag ("latest" or hex; undefined: FAKE_CODE), or an error. */
+  code?: (address: Address, block: string) => Hex | FakeRpcError | undefined;
 };
 
+/** FakeL1Options.answer's way to answer a call with these exact bytes (e.g. "0x"). */
+export class RawAnswer {
+  constructor(readonly data: Hex) {}
+}
+
 const errorAbi = parseAbi(["error Panic(uint256)"]);
+// What the fake node's Safes answer (Safe 1.3.0's own getters besides the app's ABI), and
+// Multicall3's block getters.
+const fakeSafeAbi = parseAbi([
+  "function VERSION() view returns (string)",
+  "function getThreshold() view returns (uint256)",
+  "function getOwners() view returns (address[])",
+  "function domainSeparator() view returns (bytes32)",
+  "function signedMessages(bytes32) view returns (uint256)",
+  "function getMessageHash(bytes message) view returns (bytes32)",
+  "function isValidSignature(bytes32 _dataHash, bytes _signature) view returns (bytes4)",
+  "function masterCopy() view returns (address)",
+  "function getStorageAt(uint256 offset, uint256 length) view returns (bytes)",
+]);
+const multicallViewAbi = parseAbi([
+  "function getBlockNumber() view returns (uint256 blockNumber)",
+  "function getLastBlockHash() view returns (bytes32 blockHash)",
+]);
+void safeAbi;
 const outOfBounds = encodeErrorResult({ abi: errorAbi, errorName: "Panic", args: [0x32n] });
 const REVERT = Symbol("revert");
 /** FakeL1Options.answer's way to make a call revert (Panic 0x32, as members(i) past the end). */
@@ -107,8 +171,10 @@ function abiOf(to: Address, aliases?: Map<Address, Address>): Abi {
       return guardiansAbi as Abi;
     case L1.emergencyUpgradeBoard:
       return emergencyUpgradeBoardAbi as Abi;
+    case L1.multicall3:
+      return multicallViewAbi as Abi;
     default:
-      return safeAbi as Abi;
+      return fakeSafeAbi as Abi;
   }
 }
 
@@ -139,6 +205,31 @@ export function fakeL1(options: FakeL1Options) {
         ? undefined
         : REVERT;
     };
+    // Multisig.isValidSignature(digest, abi.encode(signers, signatures)).
+    const multisigIsValid = () => {
+      const [, encoded] = call.args as [Hex, Hex];
+      const [signers, signatures] = decodeAbiParameters(
+        parseAbiParameters("address[], bytes[]"),
+        encoded
+      );
+      return signers.length > 0 &&
+        signers.every((signer, i) =>
+          options.signatures?.has(`${signer}:${signatures[i]}`.toLowerCase())
+        )
+        ? ERC1271_MAGIC_VALUE
+        : REVERT;
+    };
+    // Multicall3's block getters, as the node runs an eth_call at that block (see guard).
+    const guardAt = () => {
+      const custom = options.guardAt?.(call.block);
+      if (custom) return custom;
+      const head = chain.options.head ?? { number: 0n };
+      const n = call.block === "latest" ? head.number : BigInt(call.block);
+      const hashOf = (k: bigint) => (head.hash && k === head.number ? head.hash : blockHash(k));
+      return options.guard === "next-block"
+        ? { number: n + 1n, lastHash: hashOf(n) }
+        : { number: n, lastHash: blockHash(n - 1n) };
+    };
     const tables: Record<string, Record<string, () => unknown>> = {
       [L1.upgradeHandler]: {
         securityCouncil: () => L1.securityCouncil,
@@ -164,6 +255,7 @@ export function fakeL1(options: FakeL1Options) {
         eip712Domain: () => domain("SecurityCouncil"),
         members: () => SC_MEMBERS[Number(call.args[0])] ?? REVERT,
         checkSignatures,
+        isValidSignature: multisigIsValid,
       },
       [L1.guardians]: {
         EIP1271_THRESHOLD: () => 2n,
@@ -175,6 +267,7 @@ export function fakeL1(options: FakeL1Options) {
         eip712Domain: () => domain("Guardians"),
         members: () => G_MEMBERS[Number(call.args[0])] ?? REVERT,
         checkSignatures,
+        isValidSignature: multisigIsValid,
       },
       [L1.emergencyUpgradeBoard]: {
         ZK_FOUNDATION_SAFE: () => L1.zkFoundation,
@@ -182,6 +275,10 @@ export function fakeL1(options: FakeL1Options) {
         GUARDIANS: () => L1.guardians,
         PROTOCOL_UPGRADE_HANDLER: () => L1.upgradeHandler,
         eip712Domain: () => domain("EmergencyUpgradeBoard"),
+      },
+      [L1.multicall3]: {
+        getBlockNumber: () => guardAt().number,
+        getLastBlockHash: () => guardAt().lastHash,
       },
     };
     const safe: Record<string, () => unknown> = {
@@ -191,6 +288,14 @@ export function fakeL1(options: FakeL1Options) {
       domainSeparator: () => safeMessageHashes(1, getAddress(call.to), zeroHash).domainHash,
       // No message approved on-chain (SignMessageLib).
       signedMessages: () => 0n,
+      isValidSignature: () => {
+        const [, signature] = call.args as [Hex, Hex];
+        return options.signatures?.has(`${getAddress(call.to)}:${signature}`.toLowerCase())
+          ? ERC1271_MAGIC_VALUE
+          : REVERT;
+      },
+      masterCopy: () => FAKE_SAFE_SINGLETON,
+      getStorageAt: () => pad(FAKE_SAFE_HANDLER.toLowerCase() as Hex, { size: 32 }),
     };
     const overridden = options.answer?.(call);
     if (overridden !== undefined) return overridden;
@@ -224,6 +329,7 @@ export function fakeL1(options: FakeL1Options) {
     if (injected) return { error: injected };
     const result = value(call);
     if (result === REVERT) return { error: new FakeRpcError(3, "execution reverted", outOfBounds) };
+    if (result instanceof RawAnswer) return { data: result.data };
     // viem takes a single output's value wrapped in an array (else an array value would be
     // read as the list of outputs).
     const item = abi.find(
@@ -244,8 +350,10 @@ export function fakeL1(options: FakeL1Options) {
         return "0x1";
       case "web3_clientVersion":
         return options.clientVersion ?? "Geth/v1.15.0-fake";
-      case "eth_getCode":
-        return "0x6080604052";
+      case "eth_getCode": {
+        const [address, block] = call.params as [Address, string];
+        return options.code?.(getAddress(address), block) ?? FAKE_CODE;
+      }
       case "eth_call": {
         const [tx, block] = call.params as [{ to: Address; data: Hex }, string];
         const refused = options.stateAt?.(block);
@@ -255,6 +363,8 @@ export function fakeL1(options: FakeL1Options) {
           return "error" in answer ? answer.error : answer.data;
         }
         multicalls.push(block);
+        const whole = options.aggregateError?.(block);
+        if (whole) return whole;
         const { args } = decodeFunctionData({ abi: multicall3Abi, data: tx.data });
         const subcalls = (args?.[0] ?? []) as readonly { target: Address; callData: Hex }[];
         const aggregate = { block, functions: [] as string[] };

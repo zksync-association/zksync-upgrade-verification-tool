@@ -1,7 +1,18 @@
+import { isEngineWork, requestJoinsEngineWork } from "./sync/pacer";
+
 // In-memory memoization. There is no database: anything worth keeping between requests lives here
 // for the lifetime of the process, and everything can be rebuilt from chain or Safe on a restart.
+// A request that joins a read the sync engine started (still in flight) lets the engine's paced
+// work go at once (sync/pacer.ts): it is never held up by the engine's pace.
 
-type Entry<T> = { value: Promise<T>; expiresAt: number };
+/** `engine`: the sync engine started the read and it is still in flight. */
+type Entry<T> = { value: Promise<T>; expiresAt: number; engine?: boolean };
+
+/** An entry found in flight that the engine started: a request joining it hurries it. */
+function joined<T>(hit: Entry<T>): Promise<T> {
+  if (hit.engine) requestJoinsEngineWork(hit.value);
+  return hit.value;
+}
 
 const store = new Map<string, Entry<unknown>>();
 
@@ -30,20 +41,23 @@ export function cached<T>(key: string, ttlMs: number, compute: () => Promise<T>)
   const now = Date.now();
   const hit = store.get(key) as Entry<T> | undefined;
   if (hit && hit.expiresAt > now) {
-    return hit.value;
+    return joined(hit);
   }
 
   sweepExpired();
   const value = compute();
-  const entry = { value, expiresAt: FOREVER };
+  const entry: Entry<T> = { value, expiresAt: FOREVER, engine: isEngineWork() };
   store.set(key, entry);
   // Slow reads still share one promise. Freshness starts when the result arrives,
   // not before the provider has answered; invalidated results are never reinserted.
   value.then(
     () => {
+      entry.engine = false;
       if (store.get(key) === entry) entry.expiresAt = Date.now() + ttlMs;
     },
-    () => {}
+    () => {
+      entry.engine = false;
+    }
   );
   value.catch(() => {
     if (store.get(key)?.value === value) {
@@ -64,20 +78,22 @@ export function cachedUntil<T>(
   compute: () => Promise<{ value: T; ttlMs: number }>
 ): Promise<T> {
   const hit = store.get(key) as Entry<T> | undefined;
-  if (hit && hit.expiresAt > Date.now()) return hit.value;
+  if (hit && hit.expiresAt > Date.now()) return joined(hit);
 
   sweepExpired();
   const result = compute();
   const value = result.then((r) => r.value);
-  const entry = { value, expiresAt: FOREVER };
+  const entry: Entry<T> = { value, expiresAt: FOREVER, engine: isEngineWork() };
   store.set(key, entry);
   result.then(
     ({ ttlMs }) => {
+      entry.engine = false;
       if (store.get(key) !== entry) return;
       if (ttlMs > 0) entry.expiresAt = Date.now() + ttlMs;
       else store.delete(key);
     },
     () => {
+      entry.engine = false;
       if (store.get(key) === entry) store.delete(key);
     }
   );

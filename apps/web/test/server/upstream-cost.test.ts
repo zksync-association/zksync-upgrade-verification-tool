@@ -28,6 +28,8 @@ describe("upstreamCost", () => {
       l1RpcPerHour: 21,
       l2RpcPerHour: 3,
       safePerHour: 1,
+      infuraCreditsPerHour: 0,
+      creditsBasis: "estimate: Infura credit weights (eth_getLogs 255, eth_chainId 5, others 80)",
       windowMs: 0,
     });
     vi.setSystemTime(NOW + 30 * MIN);

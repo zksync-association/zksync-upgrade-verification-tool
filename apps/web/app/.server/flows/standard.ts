@@ -17,7 +17,8 @@ import { type Address, type Hex, decodeEventLog, isAddressEqual, zeroAddress } f
 import { FOREVER, cachedUntil, seed } from "../cache";
 import { CallReverted, callFn, isFinalBlock } from "../chain/call";
 import { IndexIntegrityError, type PuhEvent, puhIndex } from "../chain/puh-index";
-import { type Governance, governance } from "../governance";
+import type { Governance } from "../governance";
+import { governanceFor } from "../page-governance";
 import type { getLogs } from "../logs";
 import { type Network, blockTimestamps, latestBlock, network, refreshHead } from "../rpc";
 import {
@@ -547,7 +548,8 @@ export async function getStandardUpgradeCore(
       : indexed;
   void located.catch(() => {});
   const [gov, { state, status }] = await Promise.all([
-    timedRead(id, "governance", governance),
+    // A page's at the head it is read at (governance.ts pageGovernance); JSON's as ever.
+    timedRead(id, "governance", () => governanceFor(freshness)),
     statusRead,
   ]);
   if (state === UPGRADE_STATES.None || status.creationTimestamp === 0) {
