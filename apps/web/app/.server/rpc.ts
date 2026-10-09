@@ -3,7 +3,8 @@ import { env } from "@config/env.server";
 import { type Address, type PublicClient, createPublicClient } from "viem";
 import { zksync } from "viem/chains";
 import { FOREVER, cached } from "./cache";
-import { limitedHttp } from "./rpc-transport";
+import { type Lane, createLane } from "./chain/jsonrpc";
+import { type LimitedHttpOptions, limitedHttp } from "./rpc-transport";
 
 // Public RPCs throttle bursts, so every client funnels requests through a small pool and backs
 // off on 429 (viem retries rate-limit errors with exponential delay: 0.5, 1, 2, 4, 8 s).
@@ -12,7 +13,11 @@ import { limitedHttp } from "./rpc-transport";
 // None of the batched calls depend on msg.sender.
 export const MULTICALL3: Address = "0xcA11bde05977b3631167028862bE2a173976CA11";
 
-let transport = limitedHttp(env.L1_RPC_URL, 8);
+// Up to two batches of 8 in flight, so a fan-out above 8 reads does not wait for a whole round trip.
+const L1_TRANSPORT: LimitedHttpOptions = { label: "L1", maxInFlight: 16, batchSize: 8 };
+const L2_TRANSPORT: LimitedHttpOptions = { label: "L2", maxInFlight: 4 };
+
+let transport = limitedHttp(env.L1_RPC_URL, L1_TRANSPORT);
 let direct = createPublicClient({ transport });
 const makeBatched = () =>
   createPublicClient({
@@ -146,7 +151,7 @@ export async function l2(): Promise<PublicClient | null> {
   l2Client = l2RpcUrl
     ? (createPublicClient({
         chain: zksync,
-        transport: limitedHttp(l2RpcUrl, 4),
+        transport: limitedHttp(l2RpcUrl, L2_TRANSPORT),
       }) as unknown as PublicClient)
     : null;
   return l2Client;
@@ -163,11 +168,57 @@ export async function safeBlockNumber(): Promise<bigint> {
   return latest.number - 64n;
 }
 
+// Raw JSON-RPC lanes (chain/jsonrpc.ts). `history` carries eth_getLogs backfills, `call` the
+// eth_call/eth_getCode verdict reads. Each lane batches and adapts on its own, so a backfill never
+// queues ahead of a page's reads.
+type L1Lanes = { history: Lane; call: Lane };
+let l1Lanes: L1Lanes | undefined;
+let l2History: Lane | null | undefined;
+let generation = 0;
+
+/** L1 lanes for the current data source settings. */
+export function lanes(): L1Lanes {
+  l1Lanes ??= {
+    history: createLane({
+      url: env.L1_RPC_URL,
+      label: "l1-history",
+      maxBatch: 25,
+      maxInFlight: 8,
+    }),
+    call: createLane({ url: env.L1_RPC_URL, label: "l1-call", maxBatch: 20, maxInFlight: 8 }),
+  };
+  return l1Lanes;
+}
+
+/** eth_getLogs lane for ZKsync Era, or null when no L2 RPC is configured. */
+export async function l2HistoryLane(): Promise<Lane | null> {
+  if (l2History !== undefined) return l2History;
+  const started = generation;
+  const { l2RpcUrl } = await network();
+  // The settings changed while the network was read: answer for the new settings.
+  if (started !== generation) return l2HistoryLane();
+  l2History ??= l2RpcUrl
+    ? createLane({ url: l2RpcUrl, label: "l2-history", maxBatch: 20, maxInFlight: 4 })
+    : null;
+  return l2History;
+}
+
+/** Bumped by every settings change. Results computed under an older generation are stale. */
+export function rpcGeneration(): number {
+  return generation;
+}
+
 /** Recreate clients after a local settings change. Call with cleared chain/log caches. */
 export function resetRpcClients() {
-  transport = limitedHttp(env.L1_RPC_URL, 8);
+  generation++;
+  transport = limitedHttp(env.L1_RPC_URL, L1_TRANSPORT);
   direct = createPublicClient({ transport });
   batched = makeBatched();
   useMulticall = false;
   l2Client = undefined;
+  l1Lanes?.history.close();
+  l1Lanes?.call.close();
+  l1Lanes = undefined;
+  l2History?.close();
+  l2History = undefined;
 }
