@@ -48,6 +48,28 @@ const LIST_TTL_MS = 60_000;
 // api.safe.global allows 2 requests/s without a key (5/s with one) and 5,000 a month per IP.
 // A self-hosted Transaction Service has no such limits.
 const minIntervalMs = () => (env.SAFE_API_KEY ? 220 : 550);
+
+/** The public Safe Transaction Service (rate limited, with a monthly per-IP quota without a key). */
+export function isPublicSafeService(baseUrl: string): boolean {
+  try {
+    return new URL(baseUrl).hostname === "api.safe.global";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether reads nobody asked for yet (warm-up, background refresh) may be sent to this service:
+ * with SAFE_API_KEY, or to a self-hosted service. Keyless reads of the public service would spend
+ * the shared 5,000-a-month per-IP quota that the pages themselves need.
+ */
+export function backgroundSafeReadsAllowed(
+  baseUrl: string,
+  apiKey: string | undefined = env.SAFE_API_KEY
+): boolean {
+  return !!apiKey || !isPublicSafeService(baseUrl);
+}
+
 let nextSlot = 0;
 let clientGeneration = 0;
 function requestQueue() {
@@ -92,7 +114,7 @@ function retryDelay(value: string | null): number {
 
 async function throttle(baseUrl: string) {
   checkCooldown();
-  if (new URL(baseUrl).hostname !== "api.safe.global") return;
+  if (!isPublicSafeService(baseUrl)) return;
   const now = Date.now();
   const wait = Math.max(0, nextSlot - now);
   nextSlot = Math.max(now, nextSlot) + minIntervalMs();

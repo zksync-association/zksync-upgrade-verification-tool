@@ -17,6 +17,10 @@ const state = vi.hoisted(() => ({
     error: null,
   } as Record<string, unknown>,
   governance: null as null | (() => Promise<unknown>),
+  // The standalone canary query, and whether the (ready) index holds the canary log.
+  canary: { status: "ok" } as Record<string, unknown>,
+  inIndex: null as boolean | null,
+  logCanary: null as null | { blockNumber: bigint },
 }));
 
 vi.mock("@/.server/rpc", async (importOriginal) => {
@@ -28,22 +32,26 @@ vi.mock("@/.server/rpc", async (importOriginal) => {
       safeTxServiceUrl: "https://api.safe.global/tx-service/eth",
       l2RpcUrl: "https://mainnet.era.zksync.io",
       clientVersion: "Geth/v1.15",
-      logCanary: null,
+      logCanary: state.logCanary,
     }),
   };
 });
 vi.mock("@/.server/governance", () => ({ governance: () => state.governance?.() }));
-vi.mock("@/.server/logs", () => ({ checkLogHistory: async () => ({ status: "ok" }) }));
+vi.mock("@/.server/logs", () => ({ checkLogHistory: async () => state.canary }));
 vi.mock("@/.server/chain/puh-index", () => ({
-  puhIndex: () => ({ status: () => state.index, hasCanary: async () => null }),
+  puhIndex: () => ({ status: () => state.index, hasCanary: async () => state.inIndex }),
 }));
 vi.mock("@/.server/safe-api", () => ({ quota: { limit: null, remaining: null } }));
 
-const { appStatus } = await import("@/.server/status");
+const { appStatus, logHistoryStatus } = await import("@/.server/status");
 const { ConfigError } = await import("@/.server/rpc");
 
 beforeEach(() => {
   state.governance = async () => ({ warnings: [], network: { overrides: [] } });
+  state.index.state = "backfilling";
+  state.canary = { status: "ok" };
+  state.inIndex = null;
+  state.logCanary = null;
 });
 
 describe("appStatus", () => {
@@ -75,5 +83,28 @@ describe("appStatus", () => {
       error: "No pinned ProtocolUpgradeHandler",
       hint: "Check the environment variables in the README.",
     });
+  });
+});
+
+describe("logHistoryStatus", () => {
+  const error = { status: "error", message: "429 Too Many Requests" };
+  const missing = { status: "missing", blockNumber: "21788382" };
+
+  it.each([
+    // [canary, index state, canary in the index, expected]
+    [{ status: "ok" }, "backfilling", null, { status: "ok" }],
+    [error, "backfilling", null, error],
+    // The index is ready and holds the canary log: that does not hide a failed canary query.
+    [error, "ready", true, error],
+    [{ status: "ok" }, "ready", true, { status: "ok" }],
+    // The worse view wins: a ready index without the canary log means lists can be incomplete.
+    [{ status: "ok" }, "ready", false, missing],
+    [error, "ready", false, missing],
+  ])("canary %j, index %s (canary in it: %s) → %j", async (canary, index, inIndex, expected) => {
+    state.logCanary = { blockNumber: 21_788_382n };
+    state.canary = canary;
+    state.index.state = index;
+    state.inIndex = inIndex;
+    expect(await logHistoryStatus()).toEqual(expected);
   });
 });

@@ -105,3 +105,19 @@ describe("Safe request cooldown", () => {
     await expect(api.getSafeMessage(hash(2))).resolves.toBeNull();
   });
 });
+
+describe("reads nobody asked for yet (warm-up, background refresh)", () => {
+  it("are allowed with a key, or against a self-hosted service, never keyless on the public one", () => {
+    const pub = "https://api.safe.global/tx-service/eth";
+    expect(api.isPublicSafeService(pub)).toBe(true);
+    expect(api.backgroundSafeReadsAllowed(pub, undefined)).toBe(false);
+    expect(api.backgroundSafeReadsAllowed(pub, "")).toBe(false);
+    expect(api.backgroundSafeReadsAllowed(pub, "key")).toBe(true);
+    for (const own of ["http://127.0.0.1:18546", "https://safe-tx.example.org/api"]) {
+      expect(api.isPublicSafeService(own)).toBe(false);
+      expect(api.backgroundSafeReadsAllowed(own, undefined)).toBe(true);
+    }
+    // Only the public host itself: a look-alike name is someone else's service.
+    expect(api.isPublicSafeService("https://api.safe.global.example.org/x")).toBe(false);
+  });
+});

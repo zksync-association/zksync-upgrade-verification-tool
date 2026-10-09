@@ -16,6 +16,8 @@ const state = vi.hoisted(() => ({
   logHistory: null as null | (() => Promise<unknown>),
   backfill: null as null | (() => Promise<void>),
   listing: null as null | ((safe: string) => Promise<unknown>),
+  // SAFE_API_KEY set or a self-hosted service (safe-api backgroundSafeReadsAllowed).
+  safeBackground: true,
   indexStatus: {
     state: "ready",
     strategy: "chunked",
@@ -54,13 +56,14 @@ vi.mock("@/.server/chain/puh-index", () => ({
 
 vi.mock("@/.server/safe-api", () => ({
   listSafeMessages: vi.fn((safe: string) => state.listing?.(safe)),
+  backgroundSafeReadsAllowed: vi.fn(() => state.safeBackground),
 }));
 
 const { governanceSafes, prewarm, shouldPrewarm } = await import("@/.server/prewarm");
 const { network } = await import("@/.server/rpc");
 const { governance } = await import("@/.server/governance");
 const { checkLogHistory } = await import("@/.server/logs");
-const { listSafeMessages } = await import("@/.server/safe-api");
+const { listSafeMessages, backgroundSafeReadsAllowed } = await import("@/.server/safe-api");
 
 const address = (n: number) => `0x${n.toString(16).padStart(40, "0")}` as Address;
 const SC = [address(1), address(2), address(3)];
@@ -103,6 +106,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.unstubAllEnvs();
   state.generation = 0;
+  state.safeBackground = true;
   state.events = [];
   state.records = [];
   state.network = tracked("network", () => NET);
@@ -233,6 +237,25 @@ describe("prewarm", () => {
     expect(state.records.find((r) => r.fields.step === "safe-listings")?.fields).toMatchObject({
       skipped: "no-service",
     });
+  });
+
+  it("skips Safe listings on the public service without SAFE_API_KEY (its monthly quota)", async () => {
+    state.safeBackground = false;
+    await expect(prewarm("boot")).resolves.toBeUndefined();
+    expect(backgroundSafeReadsAllowed).toHaveBeenCalledWith(NET.safeTxServiceUrl);
+    expect(listSafeMessages).not.toHaveBeenCalled();
+    expect(state.records.find((r) => r.fields.step === "safe-listings")?.fields).toMatchObject({
+      skipped: "keyless-public-service",
+    });
+    // Everything before the listings still ran.
+    expect(steps()).toEqual([
+      "network",
+      "governance",
+      "log-history",
+      "log-index",
+      "safe-listings",
+      "done",
+    ]);
   });
 
   it("never logs an RPC URL, host, key or error text", async () => {

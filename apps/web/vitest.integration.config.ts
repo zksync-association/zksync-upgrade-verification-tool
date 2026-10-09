@@ -14,8 +14,9 @@ export default defineConfig({
     env: {
       L1_RPC_URL: process.env.L1_RPC_URL ?? "https://mainnet.gateway.tenderly.co",
       LOG_LEVEL: "warn",
-      // The RPC above, not one saved in apps/web/.cache/local-settings.json.
-      IGNORE_LOCAL_SETTINGS: "true",
+      // The RPC above, not one saved in apps/web/.cache/local-settings.json. Only the RPC
+      // settings are ignored: a saved SAFE_API_KEY still applies (keyless, Safe allows 2 req/s).
+      LOCAL_SETTINGS_IGNORE: "L1_RPC_URL,L2_RPC_URL",
     },
   },
 });

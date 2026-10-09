@@ -326,6 +326,28 @@ describe("what is kept", () => {
     expect(state.checked.filter((c) => c.startsWith(`${MEMBERS[0]}:`))).toHaveLength(2);
   });
 
+  it("never keeps a supplied verdict, not even at a final block", async () => {
+    state.valid.add(`${MEMBERS[1]}:0xcc`);
+    const supplied = [{ signer: MEMBERS[1] as Hex, signature: "0xcc" as Hex }];
+    expect((await at(900n, supplied)).members[1]).toMatchObject({ status: "valid" });
+    expect((await at(900n, supplied)).members[1]).toMatchObject({ status: "valid" });
+    expect(state.checked).toEqual([`${MEMBERS[1]}:0xcc@0x384`, `${MEMBERS[1]}:0xcc@0x384`]);
+  });
+
+  it("never lets a supplied verdict stand in for Safe's copy of the same signature", async () => {
+    // The viewer's ?sig= is checked (and accepted) first...
+    state.valid.add(`${MEMBERS[1]}:0xcc`);
+    const supplied = [{ signer: MEMBERS[1] as Hex, signature: "0xcc" as Hex }];
+    expect((await at(undefined, supplied)).members[1]).toMatchObject({ source: "supplied" });
+    // ...then Safe serves the same bytes: the contract is asked again, under Safe's own entry.
+    inSafe(MEMBERS[1] as Hex, "0xcc");
+    expect((await at()).members[1]).toMatchObject({ status: "valid", source: "safe" });
+    expect(state.checked).toEqual([`${MEMBERS[1]}:0xcc@latest`, `${MEMBERS[1]}:0xcc@latest`]);
+    // And a supplied check after it does not read Safe's entry either.
+    await at(undefined, supplied);
+    expect(state.checked).toHaveLength(3);
+  });
+
   it("keeps a verdict at a final block for good, and above the boundary only a minute", async () => {
     inSafe(MEMBERS[0] as Hex, "0xaa");
     state.valid.add(`${MEMBERS[0]}:0xaa`);

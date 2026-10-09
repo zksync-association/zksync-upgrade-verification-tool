@@ -16,6 +16,8 @@ const state = vi.hoisted(() => ({
   // What the historical checkSignatures read throws instead of accepting.
   recheck: null as Error | null,
   devNode: true,
+  // What the archive-state probe answers (or throws).
+  archive: (async () => true) as () => Promise<boolean>,
 }));
 
 // The upgrade's start, Security Council approval (block 201, APPROVAL_TX) and execution come
@@ -97,7 +99,7 @@ vi.mock("@/.server/logs", async (original) => ({
 vi.mock("@/.server/flows/l2", () => ({ findL2ProposalForUpgrade: async () => state.discovery }));
 vi.mock("@/.server/flows/common", async (original) => ({
   ...(await original<typeof import("@/.server/flows/common")>()),
-  hasArchiveState: async () => true,
+  hasArchiveState: () => state.archive(),
   executionFor: async () => null,
 }));
 vi.mock("@/.server/signatures", async (original) => ({
@@ -132,6 +134,7 @@ beforeEach(() => {
   state.checks = [];
   state.recheck = null;
   state.devNode = true;
+  state.archive = async () => true;
   state.signatures = new Promise<void>((resolve) => {
     release = resolve;
   });
@@ -257,5 +260,34 @@ it("keeps a definite re-check at a final block for good, and an RPC failure neve
   expect((await (await loadStandardUpgrade(ID)).evidence)[0]?.historical?.accepted).toBe(true);
   expect((await (await loadStandardUpgrade(ID)).evidence)[0]?.historical?.accepted).toBe(true);
   expect(state.checks).toEqual([200n, 200n]);
+  release();
+});
+
+it("shows a failed archive-state probe as not re-checked, with the RPC error, and keeps nothing", async () => {
+  const { UpstreamError } = await import("@/.server/chain/call");
+  state.devNode = false;
+  state.archive = async () => {
+    throw new UpstreamError("Too Many Requests (JSON-RPC error 429)");
+  };
+  const failed = await (await loadStandardUpgrade(ID)).evidence;
+  expect(failed[0]?.historical).toEqual({
+    block: "200",
+    accepted: null,
+    error: "RPC error: Too Many Requests (JSON-RPC error 429)",
+  });
+  expect(state.checks).toEqual([]);
+  // The next view asks again and re-checks.
+  state.archive = async () => true;
+  const checked = await (await loadStandardUpgrade(ID)).evidence;
+  expect(checked[0]?.historical).toEqual({ block: "200", accepted: true, error: null });
+  // A definite "no archive state" is said as such.
+  clearCache();
+  state.archive = async () => false;
+  const none = await (await loadStandardUpgrade(ID)).evidence;
+  expect(none[0]?.historical).toEqual({
+    block: "200",
+    accepted: null,
+    error: "RPC has no archive state for this block",
+  });
   release();
 });

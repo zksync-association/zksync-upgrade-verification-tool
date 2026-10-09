@@ -341,54 +341,67 @@ export async function loadEmergencyUpgrade(
       if (decoded) {
         const { proposal, guardians, securityCouncil, zkFoundation } = decoded;
         const block = event.blockNumber - 1n;
-        const archive = await hasArchiveState(board.address, block);
         const hashes = specs.map((spec) => ({
           hashes: governanceHashes(buildTypedData(spec.action, board.domain, { id })),
         }));
+        // Keyed by the block the checks run at: the same transaction reorged into another
+        // block is checked again there, never answered from the old one.
+        const recheck = () =>
+          cachedUntil(`emergency-recheck:${event.txHash}:${block}`, async () => {
+            // The boundary is read before the checks: a block at or below it was final when
+            // they were read.
+            const final = await isFinalBlock(block);
+            const checks = await Promise.all([
+              check1271(
+                gov.securityCouncil.address,
+                hashes[0] as Pick<SignatureSet, "hashes">,
+                securityCouncil,
+                block,
+                "Security Council"
+              ),
+              check1271(
+                gov.guardians.address,
+                hashes[1] as Pick<SignatureSet, "hashes">,
+                guardians,
+                block,
+                "Guardians"
+              ),
+              checkSafe(
+                board.zkFoundation,
+                hashes[2] as Pick<SignatureSet, "hashes">,
+                zkFoundation,
+                block
+              ),
+            ]);
+            // Kept for good only when every answer is definite and the block is final.
+            const definite = checks.every((check) => check.accepted !== null);
+            return { value: checks, ttlMs: final && definite ? FOREVER : 0 };
+          });
+        // No answer about the archive state: every check reads as not done, with the RPC error
+        // (never as "no archive state"), and nothing is kept.
+        const archive = await hasArchiveState(board.address, block).catch(
+          (error: unknown) => `RPC error: ${error instanceof Error ? error.message : String(error)}`
+        );
+        const historical: EmergencyExecution["historical"] =
+          archive === false
+            ? null
+            : {
+                block: block.toString(),
+                checks:
+                  archive === true
+                    ? await recheck()
+                    : specs.map((spec) => ({ role: spec.title, accepted: null, error: archive })),
+              };
+        const historicalUnavailable =
+          archive === false ? "RPC has no archive state for the execution block" : null;
         return {
           txHash: event.txHash,
           blockNumber: event.blockNumber.toString(),
           proposal,
           calls: proposal.calls.map(decodeCall),
           idMatches: upgradeProposalId(proposal).toLowerCase() === id.toLowerCase(),
-          historical: archive
-            ? {
-                block: block.toString(),
-                checks: await cachedUntil(`emergency-recheck:${event.txHash}`, async () => {
-                  // The boundary is read before the checks: a block at or below it was final
-                  // when they were read.
-                  const final = await isFinalBlock(block);
-                  const checks = await Promise.all([
-                    check1271(
-                      gov.securityCouncil.address,
-                      hashes[0] as Pick<SignatureSet, "hashes">,
-                      securityCouncil,
-                      block,
-                      "Security Council"
-                    ),
-                    check1271(
-                      gov.guardians.address,
-                      hashes[1] as Pick<SignatureSet, "hashes">,
-                      guardians,
-                      block,
-                      "Guardians"
-                    ),
-                    checkSafe(
-                      board.zkFoundation,
-                      hashes[2] as Pick<SignatureSet, "hashes">,
-                      zkFoundation,
-                      block
-                    ),
-                  ]);
-                  // Kept for good only when every answer is definite and the block is final.
-                  const definite = checks.every((check) => check.accepted !== null);
-                  return { value: checks, ttlMs: final && definite ? FOREVER : 0 };
-                }),
-              }
-            : null,
-          historicalUnavailable: archive
-            ? null
-            : "RPC has no archive state for the execution block",
+          historical,
+          historicalUnavailable,
         };
       }
     }

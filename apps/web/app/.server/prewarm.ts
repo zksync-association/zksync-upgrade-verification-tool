@@ -4,7 +4,7 @@ import { puhIndex } from "./chain/puh-index";
 import { type Governance, governance } from "./governance";
 import { checkLogHistory } from "./logs";
 import { l1, network, rpcGeneration } from "./rpc";
-import { listSafeMessages } from "./safe-api";
+import { backgroundSafeReadsAllowed, listSafeMessages } from "./safe-api";
 
 // One warm-up after the server starts (and after a settings change): the reads every first page
 // waits on, made before anyone asks, through the same cached functions requests use. A request
@@ -120,8 +120,12 @@ async function warmSteps(reason: PrewarmReason, generation: number): Promise<voi
 
   // Low priority: one listing at a time, so a page's own Safe reads queue behind at most one of
   // these in the Safe API's rate limiter. The first failure (often a rate limit) ends the step.
+  // Only with SAFE_API_KEY or a self-hosted service: keyless, the public service's monthly per-IP
+  // quota is better kept for the pages that are actually opened.
   if (!net.safeTxServiceUrl) {
     log.info({ reason, step: "safe-listings", skipped: "no-service" }, "prewarm step");
+  } else if (!backgroundSafeReadsAllowed(net.safeTxServiceUrl)) {
+    log.info({ reason, step: "safe-listings", skipped: "keyless-public-service" }, "prewarm step");
   } else {
     const safes = governanceSafes(gov);
     let listed = 0;
@@ -144,8 +148,8 @@ let running: { generation: number; run: Promise<void> } | null = null;
 
 /**
  * Warms network(), then together governance(), the log-history canary and the
- * ProtocolUpgradeHandler log index backfill, then the governance Safes' message listings. One run
- * per settings generation at a time; never rejects.
+ * ProtocolUpgradeHandler log index backfill, then (with SAFE_API_KEY or a self-hosted service) the
+ * governance Safes' message listings. One run per settings generation at a time; never rejects.
  */
 export function prewarm(reason: PrewarmReason): Promise<void> {
   try {

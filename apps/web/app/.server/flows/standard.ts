@@ -582,7 +582,14 @@ async function recheckAt(
   used: { signers: readonly Address[]; signatures: readonly Hex[] },
   block: bigint
 ): Promise<ApprovalSet["historical"]> {
-  if (!(await hasArchiveState(contract, block))) {
+  let archive: boolean;
+  try {
+    archive = await hasArchiveState(contract, block);
+  } catch (error) {
+    // No answer about the archive state: not checked this time, never "no archive state".
+    return { block: block.toString(), accepted: null, error: `RPC error: ${errorMessage(error)}` };
+  }
+  if (!archive) {
     return {
       block: block.toString(),
       accepted: null,

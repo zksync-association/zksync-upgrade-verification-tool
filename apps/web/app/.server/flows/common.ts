@@ -7,12 +7,15 @@ import {
   decodeEventLog,
   decodeFunctionData,
   isAddressEqual,
+  numberToHex,
   parseAbi,
   toEventSelector,
 } from "viem";
 import { cached } from "../cache";
+import { UpstreamError, isFinalBlock } from "../chain/call";
+import { RpcError } from "../chain/jsonrpc";
 import { getLogs } from "../logs";
-import { l1 } from "../rpc";
+import { l1, lanes } from "../rpc";
 import { type SignatureSet, type Simulation, simulate } from "../signatures";
 
 export type SetState =
@@ -117,12 +120,45 @@ export function decodeApprovalCall(data: Hex) {
   return null;
 }
 
-/** True when the RPC can answer eth_call at a past block (needed to re-check executed signatures). */
+// How a node says it keeps no state for a past block: geth "missing trie node …" and "historical
+// state … is not available", Nethermind "No state available for block …", Besu "World state
+// unavailable for block …", Erigon/reth "… pruned", Infura "… does not have access to archive
+// state".
+const NO_STATE =
+  /missing trie node|state\b[^\n]{0,80}?\b(?:not available|unavailable|pruned)|no state (?:available|for)|\bpruned\b|archive/i;
+// Or that it does not know the block at all. A load-balanced backend lagging the head says the
+// same about a block it has not seen yet, so this is an answer only for a final block.
+const NO_BLOCK = /header not found|unknown block|block not found/i;
+// Internal error and limit exceeded mean "not now", whatever the text says.
+const NOT_NOW = new Set([-32603, -32005]);
+
+/**
+ * True when the RPC can answer eth_call at a past block (needed to re-check executed signatures);
+ * false only when the node says it keeps no state for that block. Any other failure (a rate limit,
+ * a timeout, -32603, the network) rejects with UpstreamError and is not kept, so the caller shows
+ * the check as not done, with the RPC error, and the next request asks again.
+ */
 export function hasArchiveState(address: Address, blockNumber: bigint): Promise<boolean> {
-  return cached(`archive:${blockNumber}`, 10 * 60_000, () =>
-    l1
-      .getBalance({ address, blockNumber })
-      .then(() => true)
-      .catch(() => false)
-  );
+  return cached(`archive:${blockNumber}`, 10 * 60_000, async () => {
+    try {
+      await lanes().call.request("eth_getBalance", [address, numberToHex(blockNumber)]);
+      return true;
+    } catch (error) {
+      if (error instanceof RpcError) {
+        if (!NOT_NOW.has(error.code)) {
+          const message = error.message.slice(0, 500);
+          if (NO_STATE.test(message)) return false;
+          if (NO_BLOCK.test(message) && (await isFinalBlock(blockNumber))) return false;
+        }
+        throw new UpstreamError(`${error.message} (JSON-RPC error ${error.code})`, {
+          code: error.code,
+          cause: error,
+        });
+      }
+      // Lane errors are already scrubbed of the URL.
+      throw new UpstreamError(error instanceof Error ? error.message : String(error), {
+        cause: error,
+      });
+    }
+  });
 }

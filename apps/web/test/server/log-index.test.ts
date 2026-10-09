@@ -174,6 +174,34 @@ describe("backfill", () => {
     });
   });
 
+  it("retries the full-range request after a passing internal error: ready after 1 + 1 requests", async () => {
+    let failures = 0;
+    const ctx = setup({
+      override: ({ from, to }) =>
+        from === DEPLOY && to === FINAL && failures++ === 0
+          ? new FakeRpcError(-32603, "internal error")
+          : undefined,
+    });
+    await ctx.index.startBackfill();
+    expect(ctx.chain.ranges()).toEqual([
+      [DEPLOY, FINAL],
+      [DEPLOY, FINAL],
+    ]);
+    expect(ctx.index.status()).toMatchObject({
+      state: "ready",
+      strategy: "full-range",
+      error: null,
+      logs: 98,
+    });
+  });
+
+  it("is unavailable only after the full-range request failed 1 + 3 times", async () => {
+    const ctx = setup({ override: () => new FakeRpcError(-32603, "internal error") });
+    await ctx.index.startBackfill();
+    expect(ctx.chain.ranges()).toEqual(Array(4).fill([DEPLOY, FINAL]));
+    expect(ctx.index.status()).toMatchObject({ state: "unavailable", error: "internal error" });
+  });
+
   it("halves with one sequential probe when the range error names no cap", async () => {
     const ctx = setup({
       override: ({ from, to }) =>
@@ -259,7 +287,8 @@ describe("backfill", () => {
     const status = ctx.index.status();
     expect(status.state).toBe("unavailable");
     expect(status.error).toContain("paid plan");
-    expect(ctx.chain.ranges()).toHaveLength(1);
+    // The full-range request, retried like any chunk (1 try + 3 retries), never split.
+    expect(ctx.chain.ranges()).toEqual(Array(4).fill([DEPLOY, FINAL]));
     const error = await ctx.index.logs().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(IndexUnavailable);
     expect(error).toBeInstanceOf(LogsUnavailableError);
@@ -404,14 +433,12 @@ describe("range limits", () => {
       span: "10000",
       chunks: { done: 435, total: 435 },
     });
-    // 80 blocks is below the floor: the query that hit it fails with today's
-    // LogsUnavailableError text, without the URL; the next one answers.
-    expect(query.status).toBe("rejected");
-    const error = (query as PromiseRejectedResult).reason as Error;
-    expect(error).toBeInstanceOf(IndexUnavailable);
-    expect(error.message).toContain("query timeout exceeded");
-    expect(error.message).not.toContain("rpc.example.invalid");
-    expect(error.message).not.toContain("0123456789abcdef0123456789abcdef");
+    // 80 blocks is below the floor, so it cannot be split: it is retried like a chunk, and the
+    // query that hit it answers.
+    expect(query.status).toBe("fulfilled");
+    expect((query as PromiseFulfilledResult<unknown[]>).value).toHaveLength(98);
+    const tail = ctx.chain.ranges().filter(([from, to]) => from === FINAL + 1n && to === HEAD);
+    expect(tail).toHaveLength(2);
     expect(await ctx.index.logs()).toHaveLength(98);
   });
 
@@ -643,7 +670,7 @@ describe("heads", () => {
     expect(r1).toHaveLength(99);
   });
 
-  it("fails a query whose tail read fails with IndexUnavailable, without waiting out the bound", async () => {
+  it("fails a query whose tail read keeps failing with IndexUnavailable, without waiting out the bound", async () => {
     const ctx = setup({
       override: ({ from }) =>
         from === FINAL + 1n ? new FakeRpcError(-32603, `internal error at ${URL_}`) : undefined,
@@ -652,12 +679,28 @@ describe("heads", () => {
     const started = Date.now();
     const error = await ctx.index.logs({ waitMs: 60_000 }).catch((e: unknown) => e);
     expect(Date.now() - started).toBeLessThan(1_000);
+    // Retried like a backfill chunk first: 1 try + 3 retries.
+    expect(ctx.chain.ranges().filter(([from]) => from === FINAL + 1n)).toHaveLength(4);
     expect(error).toBeInstanceOf(IndexUnavailable);
     expect(error).toBeInstanceOf(LogsUnavailableError);
     expect(error).toMatchObject({ fromBlock: FINAL + 1n, toBlock: H });
     expect((error as Error).message).toContain("internal error");
     expect((error as Error).message).not.toContain("rpc.example.invalid");
     // The backfill itself is unaffected.
+    expect(ctx.index.status().state).toBe("ready");
+  });
+
+  it("retries a tail read after a passing internal error, and the query answers", async () => {
+    let failures = 0;
+    const ctx = setup({
+      override: ({ from }) =>
+        from === FINAL + 1n && failures++ < 2
+          ? new FakeRpcError(-32603, "internal error")
+          : undefined,
+    });
+    await ctx.index.startBackfill();
+    expect(await ctx.index.logs({ waitMs: 0 })).toHaveLength(98);
+    expect(ctx.chain.ranges().filter(([from]) => from === FINAL + 1n)).toHaveLength(3);
     expect(ctx.index.status().state).toBe("ready");
   });
 

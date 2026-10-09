@@ -340,14 +340,21 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     return size > minSpan ? { half: max((size + 1n) / 2n, minSpan) } : null;
   }
 
+  /** Waits before retry number `attempt` (1-based), as a backfill chunk does. */
+  const backoff = (attempt: number) =>
+    new Promise((resolve) => setTimeout(resolve, retryDelayMs * attempt));
+
   /**
    * All logs in [from, to] (used for heads and their gaps), in pieces of at most `limit` blocks.
    * A range error splits this read only; the index-wide span changes only for an explicit cap.
+   * Any other failure (or a range error that cannot be split further) is retried like a backfill
+   * chunk, `chunkRetries` times with backoff, before the read fails.
    */
   async function fetchRange(
     from: bigint,
     to: bigint,
-    limit: bigint | null = span
+    limit: bigint | null = span,
+    attempt = 0
   ): Promise<IndexedLog[]> {
     if (from > to) return [];
     const size = to - from + 1n;
@@ -361,7 +368,11 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
       return await getLogs(from, to);
     } catch (error) {
       const next = isRangeError(error) ? onRangeError(error, size) : null;
-      if (!next) throw error;
+      if (!next) {
+        if (attempt >= chunkRetries || !current()) throw error;
+        await backoff(attempt + 1);
+        return fetchRange(from, to, limit, attempt + 1);
+      }
       if ("cap" in next) {
         adoptCap(next.cap);
         return fetchRange(from, to, next.cap);
@@ -536,7 +547,7 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
           split(chunk, next.half);
         } else if (chunk.attempts < chunkRetries) {
           chunk.attempts++;
-          await new Promise((r) => setTimeout(r, retryDelayMs * chunk.attempts));
+          await backoff(chunk.attempts);
           work.unshift(chunk);
         } else {
           stopped = true;
@@ -582,18 +593,28 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
   /**
    * The newest piece of `gap` the RPC accepts in one request. Without an explicit cap the size is
    * halved one request at a time (a single shared probe, not a fan-out of failures), never below
-   * `minSpan`: an RPC that refuses even that serves no usable history, as in logs.ts.
+   * `minSpan`: an RPC that refuses even that serves no usable history, as in logs.ts. A failure
+   * that is not about the range is retried like a backfill chunk (`chunkRetries` times, with
+   * backoff) before the backfill fails: on a provider without a cap this request is the whole
+   * backfill.
    */
   async function probe(
     gap: Range
   ): Promise<{ landed: Landed } | { cap: bigint } | { error: unknown; range: Range }> {
     let size = gap.to - gap.from + 1n;
+    let retries = 0;
     for (;;) {
       const from = gap.to - size + 1n;
       try {
         return { landed: { from, to: gap.to, logs: await getLogs(from, gap.to) } };
       } catch (error) {
-        const next = isRangeError(error) ? onRangeError(error, size) : null;
+        if (!isRangeError(error)) {
+          if (retries >= chunkRetries || !current()) return { error, range: { from, to: gap.to } };
+          retries++;
+          await backoff(retries);
+          continue;
+        }
+        const next = onRangeError(error, size);
         if (!next) return { error, range: { from, to: gap.to } };
         // An explicit cap needs no probing: every chunk goes out at once.
         if ("cap" in next) {

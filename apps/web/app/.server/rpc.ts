@@ -169,45 +169,107 @@ export async function l2(): Promise<PublicClient | null> {
 
 /** The parts of a block header the app reads. */
 export type BlockRef = { number: bigint; hash: Hex; parentHash: Hex; timestamp: bigint };
-type Heads = { latest: BlockRef; finalized: BlockRef | null };
+
+/**
+ * What the node said about the 'finalized' tag: the block, that it does not know the tag (F is
+ * then head − 64), or a failure (F is then the last finalized block known, if any).
+ */
+type FinalizedRead = { block: BlockRef } | { unsupported: true } | { error: unknown };
+type Heads = { latest: BlockRef; finalized: FinalizedRead };
 
 // Blocks this deep are treated as final even when the node's 'finalized' tag is further ahead.
 const FINALITY_DEPTH = 64n;
 
-// How a node says it does not know the 'finalized' tag: geth before the merge "invalid argument
-// 0: hex string without 0x prefix" (-32602), hardhat "invalid block tag", a fresh devnet
-// "finalized block not found". Anything else (-32603, a rate limit) is a failure, not an answer.
-const UNKNOWN_TAG = /finalized|block tag|unknown block|not supported|unsupported/i;
+// How a node says it does not know the 'finalized' tag: invalid params (-32602, e.g. geth before
+// the merge "invalid argument 0: hex string without 0x prefix"), method not found (-32601),
+// unknown block (-39001), or another code with that meaning in its text. Internal errors
+// (-32603) and -32000 are failures, never "unsupported": a node that is restarting says
+// "finalized block not found" and still has a finalized block a moment later.
+const UNSUPPORTED_TAG_CODES = new Set([-32602, -32601, -39001]);
+const UNSUPPORTED_TAG =
+  /(?:unknown|invalid|unsupported) block tag|block tag\b[^\n]{0,40}\b(?:not supported|unsupported|unknown|invalid)/i;
 
 function isUnknownTag(error: RpcError) {
-  return (
-    error.code === -32602 || error.code === -32601 || UNKNOWN_TAG.test(error.message.slice(0, 500))
-  );
+  if (error.code === -32603 || error.code === -32000) return false;
+  return UNSUPPORTED_TAG_CODES.has(error.code) || UNSUPPORTED_TAG.test(error.message.slice(0, 500));
+}
+
+// The newest finalized block read under the current settings: a failed 'finalized' read falls
+// back to it. Finality only moves forward, so an older answer is still a (deeper) boundary.
+let knownFinalized: { generation: number; block: BlockRef } | null = null;
+
+function rememberFinalized(block: BlockRef, readGeneration: number) {
+  if (readGeneration !== generation) return;
+  if (knownFinalized?.generation === generation && knownFinalized.block.number >= block.number)
+    return;
+  knownFinalized = { generation, block };
+}
+
+function finalizedRead(raw: unknown, readGeneration: number): FinalizedRead {
+  const block = toBlockRef(raw);
+  if (!block) return { error: new Error("The RPC returned no finalized block") };
+  rememberFinalized(block, readGeneration);
+  return { block };
 }
 
 /**
  * The head and the 'finalized' block, read in one JSON-RPC batch so both describe the same moment.
- * A node that does not know the 'finalized' tag answers it with an error: that block is null.
+ * Only the head can fail this read: whatever happens to 'finalized' is kept beside it, so the head
+ * never waits on or fails with the finality boundary.
  */
 function heads(): Promise<Heads> {
   return cached("latest-block", 4_000, async () => {
     const { call } = lanes();
+    const readGeneration = generation;
     const [latest, finalized] = await Promise.all([
       call.request<unknown>("eth_getBlockByNumber", ["latest", false]),
-      call
-        .request<unknown>("eth_getBlockByNumber", ["finalized", false])
-        // Only an answer that the tag is unknown means it is unsupported. Any other failure
-        // (transport, -32603, rate limit) fails the whole read, so the boundary never silently
-        // falls back to head − 64.
-        .catch((error: unknown) => {
-          if (error instanceof RpcError && isUnknownTag(error)) return null;
-          throw error;
-        }),
+      call.request<unknown>("eth_getBlockByNumber", ["finalized", false]).then(
+        (raw): FinalizedRead => finalizedRead(raw, readGeneration),
+        (error: unknown): FinalizedRead =>
+          error instanceof RpcError && isUnknownTag(error) ? { unsupported: true } : { error }
+      ),
     ]);
     const head = toBlockRef(latest);
     if (!head) throw new Error("The RPC returned no latest block");
-    return { latest: head, finalized: toBlockRef(finalized) };
+    return { latest: head, finalized };
   });
+}
+
+// One fresh 'finalized' read at a time, for a boundary needed after a failed read with nothing
+// known to fall back to.
+let rereading: { generation: number; read: Promise<FinalizedRead> } | null = null;
+
+function rereadFinalized(): Promise<FinalizedRead> {
+  if (rereading?.generation === generation) return rereading.read;
+  const readGeneration = generation;
+  const read = lanes()
+    .call.request<unknown>("eth_getBlockByNumber", ["finalized", false])
+    .then(
+      (raw): FinalizedRead => finalizedRead(raw, readGeneration),
+      (error: unknown): FinalizedRead =>
+        error instanceof RpcError && isUnknownTag(error) ? { unsupported: true } : { error }
+    )
+    .finally(() => {
+      if (rereading?.read === read) rereading = null;
+    });
+  rereading = { generation: readGeneration, read };
+  return read;
+}
+
+/**
+ * The finalized block for the boundary: this read's, else (it failed) the newest one known under
+ * these settings, else one fresh read. null: the node does not know the tag. Rejects when there
+ * is no real answer: head − 64 is never assumed for a failure.
+ */
+async function finalizedFor(read: FinalizedRead): Promise<BlockRef | null> {
+  let answer = read;
+  if ("error" in answer) {
+    if (knownFinalized?.generation === generation) return knownFinalized.block;
+    answer = await rereadFinalized();
+  }
+  if ("block" in answer) return answer.block;
+  if ("unsupported" in answer) return null;
+  throw answer.error;
 }
 
 function toBlockRef(raw: unknown): BlockRef | null {
@@ -217,28 +279,31 @@ function toBlockRef(raw: unknown): BlockRef | null {
   return { number: hexToBigInt(number), hash, parentHash, timestamp: hexToBigInt(timestamp) };
 }
 
-/** The chain head (4 s TTL). */
+/** The chain head (4 s TTL). Never depends on the 'finalized' answer. */
 export async function latestBlock(): Promise<BlockRef> {
   return (await heads()).latest;
 }
 
-/** The node's 'finalized' block from the same read as the head, or null without the tag. */
+/**
+ * The node's 'finalized' block (from the same read as the head when it answered; see finalizedFor
+ * when it did not), or null when the node does not know the tag.
+ */
 export async function finalizedBlock(): Promise<BlockRef | null> {
-  return (await heads()).finalized;
+  return finalizedFor((await heads()).finalized);
 }
 
 /**
- * The head and the finality boundary F from one read: blocks at or below F are treated as final
- * and may be cached forever. F = min(head − 64, finalized); on dev nodes, the fork block.
+ * The head and the finality boundary F: blocks at or below F are treated as final and may be
+ * cached forever. F = min(head − 64, finalized); head − 64 when the node does not know the tag; on
+ * dev nodes, the fork block (without waiting on 'finalized'). Rejects when 'finalized' failed and
+ * no finalized block is known.
  */
 export async function chainHead(): Promise<{ head: BlockRef; safe: bigint }> {
   const [net, { latest, finalized }] = await Promise.all([network(), heads()]);
   if (net.isDevNode) return { head: latest, safe: net.forkBlock ?? -1n };
   const byDepth = latest.number - FINALITY_DEPTH;
-  return {
-    head: latest,
-    safe: finalized && finalized.number < byDepth ? finalized.number : byDepth,
-  };
+  const final = await finalizedFor(finalized);
+  return { head: latest, safe: final && final.number < byDepth ? final.number : byDepth };
 }
 
 /** Blocks at or below this height are treated as final and may be cached forever. */
@@ -328,6 +393,8 @@ export function rpcGeneration(): number {
 /** Recreate clients after a local settings change. Call with cleared chain/log caches. */
 export function resetRpcClients() {
   generation++;
+  knownFinalized = null;
+  rereading = null;
   transport = limitedHttp(env.L1_RPC_URL, L1_TRANSPORT);
   direct = createPublicClient({ transport });
   batched = makeBatched();

@@ -334,6 +334,7 @@ export async function verifySignatureSet(params: {
   if (valid.length < params.threshold) {
     thresholdCheck = { status: "below", valid: valid.length, threshold: params.threshold };
   } else {
+    // Asked afresh every time and never kept: the set can hold supplied signatures.
     const result = await accepts(
       params.check,
       hashes.digest,

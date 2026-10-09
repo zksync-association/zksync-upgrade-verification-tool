@@ -25,6 +25,9 @@ const state = vi.hoisted(() => ({
   discovery: vi.fn(),
   // What the historical isValidSignature reads answer instead of the magic value.
   historical: null as Error | null,
+  // Where the execution event is (a reorg can move it), and what the archive probe answers.
+  eventBlock: 25_766_164n,
+  archive: (async () => true) as () => Promise<boolean>,
 }));
 // Executed emergency upgrades in the handler's log index: block → id. Blocks are 12 s apart from
 // timestamp 1,700,000,000 except one missed slot; the head is HEAD.
@@ -121,12 +124,12 @@ vi.mock("@/.server/chain/call", async (original) => ({
 vi.mock("@/.server/flows/emergency-event", () => ({
   findEmergencyEvent: async (id: string) => {
     state.discovery(id);
-    return { id, txHash: EMERGENCY_TX, blockNumber: 25_766_164n };
+    return { id, txHash: EMERGENCY_TX, blockNumber: state.eventBlock };
   },
 }));
 vi.mock("@/.server/flows/common", async (original) => ({
   ...(await original<typeof import("@/.server/flows/common")>()),
-  hasArchiveState: async () => true,
+  hasArchiveState: () => state.archive(),
 }));
 vi.mock("@/.server/flows/messages", () => ({ collectMessages: async () => state.messages }));
 vi.mock("@/.server/logs", () => ({
@@ -170,6 +173,8 @@ beforeEach(() => {
   state.current = UPGRADE_STATES.Done;
   state.checks = [];
   state.historical = null;
+  state.eventBlock = 25_766_164n;
+  state.archive = async () => true;
   state.verified = 0;
   state.discovery.mockClear();
   state.scans.mockClear();
@@ -307,5 +312,57 @@ it("retains deployment-to-head history for the JSON list", async () => {
   );
   // Every execution, without reading a header.
   expect(state.times).not.toHaveBeenCalled();
+  release();
+});
+
+it("keys the kept checks by the block they ran at: a reorged execution is checked again", async () => {
+  // F = head − 64. The execution lands at F + 1, so the checks run at F (final) and are kept.
+  const F = HEAD.number - 64n;
+  state.eventBlock = F + 1n;
+  const first = await (await loadEmergencyUpgrade(EMERGENCY_ID)).executed;
+  expect(first?.historical?.block).toBe(F.toString());
+  expect(state.checks.map((c) => c.blockNumber)).toEqual([F, F, F]);
+  // A reorg moves the same transaction to F + 3: checked at F + 2, never answered from F.
+  state.eventBlock = F + 3n;
+  const moved = await (await loadEmergencyUpgrade(EMERGENCY_ID)).executed;
+  expect(moved?.historical?.block).toBe((F + 2n).toString());
+  expect(state.checks.slice(3).map((c) => c.blockNumber)).toEqual([F + 2n, F + 2n, F + 2n]);
+  // Above F nothing is kept: asked again. At F the kept answer still stands.
+  await (await loadEmergencyUpgrade(EMERGENCY_ID)).executed;
+  expect(state.checks).toHaveLength(9);
+  state.eventBlock = F + 1n;
+  await (await loadEmergencyUpgrade(EMERGENCY_ID)).executed;
+  expect(state.checks).toHaveLength(9);
+  release();
+});
+
+it("shows a failed archive-state probe as checks not done, with the RPC error, and keeps nothing", async () => {
+  const { UpstreamError } = await import("@/.server/chain/call");
+  state.archive = async () => {
+    throw new UpstreamError("internal error (JSON-RPC error -32603)");
+  };
+  const failed = await (await loadEmergencyUpgrade(EMERGENCY_ID)).executed;
+  expect(failed?.historicalUnavailable).toBeNull();
+  expect(failed?.historical?.block).toBe("25766163");
+  expect(failed?.historical?.checks).toEqual(
+    ["Security Council", "Guardians", "ZKsync Foundation"].map((role) => ({
+      role,
+      accepted: null,
+      error: "RPC error: internal error (JSON-RPC error -32603)",
+    }))
+  );
+  expect(state.checks).toHaveLength(0);
+  // The next view asks again.
+  state.archive = async () => true;
+  const checked = await (await loadEmergencyUpgrade(EMERGENCY_ID)).executed;
+  expect(checked?.historical?.checks.every((c) => c.accepted === true)).toBe(true);
+  // A definite "no archive state" is said as such, with no checks.
+  clearCache();
+  state.archive = async () => false;
+  const none = await (await loadEmergencyUpgrade(EMERGENCY_ID)).executed;
+  expect(none).toMatchObject({
+    historical: null,
+    historicalUnavailable: "RPC has no archive state for the execution block",
+  });
   release();
 });

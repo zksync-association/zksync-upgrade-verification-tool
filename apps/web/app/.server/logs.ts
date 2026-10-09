@@ -1,5 +1,15 @@
-import { type Address, type Hex, type Log, type PublicClient, formatLog, numberToHex } from "viem";
-import { FOREVER, cached, concurrencyLimit } from "./cache";
+import {
+  type Address,
+  BaseError,
+  type Hex,
+  HttpRequestError,
+  type Log,
+  type PublicClient,
+  RpcRequestError,
+  formatLog,
+  numberToHex,
+} from "viem";
+import { FOREVER, cached, cachedUntil, concurrencyLimit } from "./cache";
 import type { Lane } from "./chain/jsonrpc";
 import { historyLaneOf, latestBlock, network, safeBlockNumber } from "./rpc";
 
@@ -296,27 +306,92 @@ export type LogHistoryStatus =
   | { status: "missing"; blockNumber: string }
   | { status: "error"; message: string };
 
+// An answer ("ok", "missing", "unchecked") holds for ten minutes. A failure is kept only briefly,
+// so a rate-limit blip (e.g. during the boot backfill) cannot pin the status to "error".
+const CANARY_TTL_MS = 10 * 60_000;
+const CANARY_ERROR_TTL_MS = 30_000;
+const CANARY_ATTEMPTS = 3;
+const CANARY_BACKOFF_MS = 500;
+
+// JSON-RPC answers that say "not now" rather than anything about the request: internal error,
+// resource unavailable, limit exceeded; and -32000 texts of the same kind.
+const TRANSIENT_CODES = new Set([-32603, -32002, -32005]);
+const TRANSIENT_TEXT =
+  /timeout|timed out|rate.?limit|too many requests|busy|overload|try again|temporar|unavailable/i;
+
+/**
+ * True for a failure worth retrying: no answer from the node (network, timeout, HTTP 408/425/429/
+ * 5xx) or an answer that says "not now". A JSON-RPC error about the request itself is final.
+ */
+export function isTransientRpcFailure(error: unknown): boolean {
+  if (error instanceof BaseError) {
+    const rpc = error.walk((e) => e instanceof RpcRequestError);
+    if (rpc instanceof RpcRequestError) return transientCode(rpc.code, rpc.details);
+    const http = error.walk((e) => e instanceof HttpRequestError);
+    if (http instanceof HttpRequestError) {
+      const status = http.status;
+      return status === undefined || [408, 425, 429].includes(status) || status >= 500;
+    }
+    const coded = error as BaseError & { code?: unknown };
+    if (typeof coded.code === "number" && coded.code !== -1)
+      return transientCode(coded.code, rpcMessage(error));
+    return true;
+  }
+  if (error && typeof error === "object") {
+    const { code, status, message } = error as {
+      code?: unknown;
+      status?: unknown;
+      message?: unknown;
+    };
+    if (typeof status === "number") return [408, 425, 429].includes(status) || status >= 500;
+    if (typeof code === "number") return transientCode(code, String(message ?? ""));
+  }
+  return true;
+}
+
+function transientCode(code: number, message: string) {
+  return (
+    TRANSIENT_CODES.has(code) || (code === -32000 && TRANSIENT_TEXT.test(message.slice(0, 500)))
+  );
+}
+
 /**
  * Asks the RPC for a log that must exist (the handler's own deployment event). Some RPCs return
  * an empty array for old blocks instead of an error; without this check an incomplete list would
- * look exactly like a quiet governance week.
+ * look exactly like a quiet governance week. A transient failure is retried (3 attempts, with
+ * backoff) before it reads as "error", and that "error" is kept for 30 s, not ten minutes.
  */
 export function checkLogHistory(client: PublicClient): Promise<LogHistoryStatus> {
-  return cached("log-canary", 10 * 60_000, async () => {
+  return cachedUntil<LogHistoryStatus>("log-canary", async () => {
     const { logCanary } = await network();
-    if (!logCanary) return { status: "unchecked" } as const;
-    try {
-      const logs = await request(
-        client,
-        { address: logCanary.address, topics: [logCanary.topic0] },
-        logCanary.blockNumber,
-        logCanary.blockNumber
-      );
-      return logs.length > 0
-        ? ({ status: "ok" } as const)
-        : ({ status: "missing", blockNumber: logCanary.blockNumber.toString() } as const);
-    } catch (error) {
-      return { status: "error", message: rpcMessage(error) } as const;
+    if (!logCanary) return { value: { status: "unchecked" }, ttlMs: CANARY_TTL_MS };
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const logs = await request(
+          client,
+          { address: logCanary.address, topics: [logCanary.topic0] },
+          logCanary.blockNumber,
+          logCanary.blockNumber
+        );
+        return {
+          value:
+            logs.length > 0
+              ? { status: "ok" }
+              : { status: "missing", blockNumber: logCanary.blockNumber.toString() },
+          ttlMs: CANARY_TTL_MS,
+        };
+      } catch (error) {
+        // A rate limit was already backed off and retried in request().
+        const limited = (error as { status?: number }).status === 429;
+        if (attempt < CANARY_ATTEMPTS && !limited && isTransientRpcFailure(error)) {
+          await new Promise((resolve) => setTimeout(resolve, CANARY_BACKOFF_MS * attempt));
+          continue;
+        }
+        return {
+          value: { status: "error", message: rpcMessage(error) },
+          ttlMs: CANARY_ERROR_TTL_MS,
+        };
+      }
     }
   });
 }
