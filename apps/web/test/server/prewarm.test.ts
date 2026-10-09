@@ -141,7 +141,7 @@ afterEach(() => {
 });
 
 describe("prewarm", () => {
-  it("reads the network, then governance, canary and backfill together, then Safe listings one at a time", async () => {
+  it("reads the network, then governance, canary and backfill together, and Safe listings one at a time once governance is in", async () => {
     const gov = deferred();
     const history = deferred();
     const index = deferred();
@@ -166,19 +166,25 @@ describe("prewarm", () => {
       "log-history:start",
       "log-index:start",
     ]);
-
-    gov.resolve();
-    history.resolve();
     await flush();
-    // Safe listings wait for every middle step, the backfill included.
+    // Safe listings wait for governance (the member Safes)...
     expect(state.events.some((e) => e.startsWith("safe:"))).toBe(false);
 
-    index.resolve();
-    // Nothing waits for the L2 backfill: the Safe listings all run while it is still going.
+    gov.resolve();
+    // ...and only for it: they all run while the canary and the backfill are still going (the
+    // Safe service is another upstream), so a page opened during the backfill finds them.
     for (let i = 0; i < 20 && !state.events.includes(`safe:end:${ZKF}`); i++) await flush();
     expect(state.events).toContain(`safe:end:${ZKF}`);
+    expect(state.events).not.toContain("log-history:end");
+    expect(state.events).not.toContain("log-index:end");
+
+    history.resolve();
+    index.resolve();
+    // Nothing waits for the L2 backfill; the run itself ends (and logs "done") only once its step
+    // has.
+    for (let i = 0; i < 5; i++) await flush();
+    expect(state.events).toContain("log-index:end");
     expect(state.events).not.toContain("l2-index:end");
-    // The run itself ends (and logs "done") only once the L2 backfill step has.
     expect(finished).toBe(false);
     l2.resolve();
     await run;
@@ -192,9 +198,9 @@ describe("prewarm", () => {
     expect(steps()).toEqual([
       "network",
       "governance",
+      "safe-listings",
       "log-history",
       "log-index",
-      "safe-listings",
       "l2-index",
       "done",
     ]);
@@ -288,16 +294,19 @@ describe("prewarm", () => {
     expect(state.records.find((r) => r.fields.step === "safe-listings")?.fields).toMatchObject({
       skipped: "keyless-public-service",
     });
-    // Everything before the listings still ran (the L2 backfill beside them).
-    expect(steps().filter((step) => step !== "l2-index")).toEqual([
-      "network",
+    // Everything else still ran (the L2 backfill beside it).
+    const ran = steps();
+    expect(ran.at(-1)).toBe("done");
+    expect(ran.slice(0, 2)).toEqual(["network", "governance"]);
+    expect([...ran].sort()).toEqual([
+      "done",
       "governance",
+      "l2-index",
       "log-history",
       "log-index",
+      "network",
       "safe-listings",
-      "done",
     ]);
-    expect(steps()).toContain("l2-index");
   });
 
   it("never logs an RPC URL, host, key or error text", async () => {

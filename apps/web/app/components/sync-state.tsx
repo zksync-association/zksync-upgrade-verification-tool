@@ -73,8 +73,9 @@ const unsettled = (index: IndexStatusView) =>
 
 /**
  * Provides the index progress from the root status, and while the index is not settled (idle or
- * backfilling) polls /api/status for fresher progress (only then: an idle tab must not keep the
- * sync engine running). A failed poll keeps the last value.
+ * backfilling) polls /api/status for fresher progress (only then: an idle tab must not poll
+ * forever; the server does not count these reads as a visit either). A failed poll keeps the last
+ * value.
  *
  * `onSettled` runs once when a poll finds the index ready or unavailable. The root status is not
  * read again on its own, and it holds what the finished index changes: the log-history check

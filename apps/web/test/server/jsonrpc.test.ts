@@ -734,3 +734,70 @@ describe("rpc lanes", () => {
     });
   });
 });
+
+// The L1 lanes share one provider. A backfill's eth_getLogs (history lane) must never hold up
+// the reads a page waits on (call and head lanes): not in the app (separate queues and POST
+// slots), and not at the provider (while the call or head lane is rate limited or out of POST
+// slots, the history lane sends one POST at a time).
+describe("L1 lanes on one provider", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetRpcClients();
+  });
+
+  it("answers a page's eth_call at once while the history lane is saturated", async () => {
+    resetRpcClients();
+    const fake = fakeJsonRpc({
+      delayMs: (post) => (post.calls.some((c) => c.method === "eth_getLogs") ? 2_000 : 5),
+      handle: (call) => (call.method === "eth_getLogs" ? [] : "0x"),
+    });
+    vi.stubGlobal("fetch", fake.fetch);
+    const { history, call } = lanes();
+    const backfill = Array.from({ length: 400 }, (_, i) =>
+      history.request("eth_getLogs", getLogs(i)).catch(() => null)
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(history.stats()).toMatchObject({ inFlight: 8 });
+    const started = Date.now();
+    await call.request("eth_call", [{ to: `0x${"11".repeat(20)}`, data: "0x" }, "latest"]);
+    expect(Date.now() - started).toBeLessThan(200);
+    history.close();
+    await Promise.all(backfill);
+  });
+
+  it("sends one history POST at a time while the call lane is rate limited, then all of them again", async () => {
+    resetRpcClients();
+    let limited = 0;
+    const fake = fakeJsonRpc({
+      delayMs: (post) => (post.calls.some((c) => c.method === "eth_getLogs") ? 40 : 0),
+      intercept: (post) => {
+        if (!post.calls.some((c) => c.method === "eth_call") || limited > 0) return undefined;
+        limited++;
+        return new Response("Too Many Requests", { status: 429, headers: { "retry-after": "1" } });
+      },
+      handle: (call) => (call.method === "eth_getLogs" ? [] : "0x"),
+    });
+    vi.stubGlobal("fetch", fake.fetch);
+    const { history, call } = lanes();
+    // A page's read is rate limited: the call lane pauses for a second.
+    const read = call.request("eth_call", [{ to: `0x${"11".repeat(20)}`, data: "0x" }, "latest"]);
+    await vi.waitFor(() => expect(call.busy()).toBe(true));
+    const pausedAt = Date.now();
+    const backfill = Promise.all(
+      Array.from({ length: 2_000 }, (_, i) => history.request("eth_getLogs", getLogs(i)))
+    );
+    await read;
+    const calls = fake.posts.filter((p) => p.calls.some((c) => c.method === "eth_call"));
+    const resumedAt = calls.at(-1)?.startedAt ?? 0;
+    expect(resumedAt - pausedAt).toBeGreaterThanOrEqual(900);
+    await backfill;
+    const logs = fake.posts.filter((p) => p.calls.some((c) => c.method === "eth_getLogs"));
+    const during = logs.filter((p) => p.startedAt < resumedAt - 50);
+    const after = logs.filter((p) => p.startedAt > resumedAt + 10);
+    // While the page's lane waited, the backfill kept going, one POST at a time...
+    expect(during.length).toBeGreaterThan(5);
+    expect(Math.max(...during.map((p) => p.concurrent))).toBe(1);
+    // ...and went back to its 8 POSTs at once after.
+    expect(Math.max(...after.map((p) => p.concurrent))).toBeGreaterThan(4);
+  });
+});

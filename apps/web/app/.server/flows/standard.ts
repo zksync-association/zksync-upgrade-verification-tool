@@ -28,7 +28,13 @@ import {
   refreshHead,
   safeBlockNumber,
 } from "../rpc";
-import { type SignatureSet, simulate, simulateCall, verifySignatureSet } from "../signatures";
+import {
+  type SignatureSet,
+  prefetchSafeListings,
+  simulate,
+  simulateCall,
+  verifySignatureSet,
+} from "../signatures";
 import {
   type ExecutionView,
   type SetState,
@@ -304,7 +310,13 @@ export async function loadStandardUpgrade(
   id: Hex,
   { supplied = [] }: { supplied?: MemberSignature[] } = {}
 ) {
-  const overview = await getStandardUpgradeCore(id);
+  // The sets read the members' Safe listings: those reads start as soon as the upgrade is known
+  // to exist, while its proposal is looked up in the log index (a fresh process waits for the
+  // backfill there), instead of after it.
+  const overview = await getStandardUpgradeCore(id, {
+    onExists: (gov) =>
+      prefetchSafeListings([...gov.securityCouncil.members, ...gov.guardians.members]),
+  });
   const evidence = timedRead(id, "recorded-approvals", () => getRecordedApprovals(overview));
   const sets = timedRead(id, "current-signatures", () =>
     getStandardUpgradeSets(overview, supplied)
@@ -373,7 +385,10 @@ export async function getStandardUpgradeOverview(id: Hex): Promise<StandardUpgra
   return { ...core, ...execution, l2Proposal };
 }
 
-export async function getStandardUpgradeCore(id: Hex): Promise<StandardUpgradeCore> {
+export async function getStandardUpgradeCore(
+  id: Hex,
+  { onExists }: { onExists?: (gov: Governance) => void } = {}
+): Promise<StandardUpgradeCore> {
   // The start event is looked up while governance and the status are read.
   const indexed = indexedStart(id);
   void indexed.catch(() => {});
@@ -384,6 +399,7 @@ export async function getStandardUpgradeCore(id: Hex): Promise<StandardUpgradeCo
   if (state === UPGRADE_STATES.None || status.creationTimestamp === 0) {
     throw new UpgradeNotFound(`ProtocolUpgradeHandler has no standard upgrade ${id}`);
   }
+  onExists?.(gov);
   const started = await timedRead(id, "started-event", () =>
     startedUpgrade(id, status, gov.network, indexed)
   );
@@ -569,6 +585,7 @@ async function getStandardUpgradeSets(
         threshold: spec.threshold,
         check: { kind: "multisig", contract: contract.address },
         supplied,
+        open: spec.state.status === "open",
       });
       const execution = await executionFor(set, spec.state, (valid) =>
         approvalExecution(spec.action, contract.address, id, valid)

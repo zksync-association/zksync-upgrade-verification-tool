@@ -26,15 +26,17 @@ import {
 // background read of that Safe already under way is promoted and shared). Callers waiting on the
 // same Safe share one read.
 //
-// While the sync engine runs (the app is in use), a background sweep keeps the listings of the
-// signer groups pages asked for in the last SYNC_SAFE_ACTIVE_MS from turning 60 s old: at 50-57 s
-// (later when there are more Safes, so that the checks fit the budget) it asks Safe for the Safe's
-// most recently modified message (one small request) and re-reads the listing only when that
-// changed. Sweeps run only with SAFE_API_KEY or a self-hosted service, spend at most
-// SYNC_SAFE_HOURLY_BUDGET requests an hour, pause while the service's quota is below 10 %, and stop
-// during a rate-limit cooldown. A Safe whose reads keep failing is retried less and less often.
-// Requests then read on demand as without the sweep; a member whose listing cannot be read shows
-// as unavailable, never as missing.
+// While the sync engine runs, a background sweep checks member Safes' listings: it asks Safe for
+// the Safe's most recently modified message (one small request) and re-reads the listing only
+// when that changed. While the app is in use, the listings of the signer groups pages asked for in
+// the last SYNC_SAFE_ACTIVE_MS are kept from turning 60 s old (checked at 50-57 s, later when there
+// are more Safes, so that the checks fit the budget). With SYNC_MODE=always every governance member
+// Safe is also checked, in use or idle, at an interval paced by the quota Safe reports as left
+// for its period (see idleSweepIntervalMs): about every 10-20 minutes with a key. Sweeps run only
+// with SAFE_API_KEY or a self-hosted service, spend at most SYNC_SAFE_HOURLY_BUDGET requests an
+// hour, pause while the service's quota is below 10 %, and stop during a rate-limit cooldown. A
+// Safe whose reads keep failing is retried less and less often. Requests read on demand as without
+// the sweep; a member whose listing cannot be read shows as unavailable, never as missing.
 
 /** A listing is served for this long after Safe's answer arrived. */
 export const SAFE_LISTING_MAX_AGE_MS = 60_000;
@@ -56,6 +58,11 @@ const SWEEP_RETRY_MAX_MS = 300_000;
 const HOUR_MS = 3_600_000;
 // Sweeps pause while the service reports less than this share of its quota left.
 const QUOTA_FLOOR = 0.1;
+// The quota-paced check of every governance Safe: never more often than this, keeping this share
+// of the period's quota in reserve, and at this interval when Safe reports no quota.
+const IDLE_MIN_INTERVAL_MS = 10 * 60_000;
+const IDLE_DEFAULT_INTERVAL_MS = 15 * 60_000;
+const IDLE_RESERVE = 0.2;
 // The keys this store answers for in cache.ts's invalidate() / clearCache().
 const KEY_PREFIX = "safe:list:";
 
@@ -439,17 +446,54 @@ function budgetUsed(now: number): number {
   return spent.length;
 }
 
+/**
+ * The quota Safe last reported, while it still describes the current period: once the reported
+ * period has ended, what was left then says nothing about the new one.
+ */
+function currentQuota(now: number): { limit: number; remaining: number } | null {
+  if (quota.limit === null || quota.remaining === null) return null;
+  if (quota.resetAt !== null && now >= quota.resetAt) return null;
+  return { limit: quota.limit, remaining: quota.remaining };
+}
+
 /** Why background reads must wait right now, or null. */
 function pauseReason(now: number): string | null {
   if (safeCooldownUntil() !== null) return "cooldown";
-  if (
-    quota.limit !== null &&
-    quota.remaining !== null &&
-    quota.remaining < quota.limit * QUOTA_FLOOR
-  )
-    return "quota";
+  const left = currentQuota(now);
+  if (left && left.remaining < left.limit * QUOTA_FLOOR) return "quota";
   if (budgetUsed(now) >= env.SYNC_SAFE_HOURLY_BUDGET) return "budget";
   return null;
+}
+
+export type QuotaReport = {
+  limit: number | null;
+  remaining: number | null;
+  /** When the quota period ends (ms since the epoch), or null. */
+  resetAt: number | null;
+};
+
+/**
+ * How often each of `safes` member Safes is checked when nobody is using the app: spread what is
+ * left of the period's quota above a 20 % reserve over the time to its end, one change check per
+ * Safe each round, never more often than every 10 minutes:
+ * max(10 min, safes x time to reset / max(1, remaining - 20 % of limit)). Without quota headers
+ * (or once the reported period has ended without a newer report): every 15 minutes. With nothing
+ * left above the reserve, a round costs the whole time to the reset: the Safes wait for it.
+ */
+export function idleSweepIntervalMs(
+  safes: number,
+  report: QuotaReport = quota,
+  now = Date.now()
+): number {
+  const { limit, remaining, resetAt } = report;
+  if (limit === null || remaining === null || resetAt === null) return IDLE_DEFAULT_INTERVAL_MS;
+  const untilReset = resetAt - now;
+  if (untilReset <= 0) return IDLE_DEFAULT_INTERVAL_MS;
+  const spare = Math.max(1, remaining - IDLE_RESERVE * limit);
+  const interval = (Math.max(1, safes) * untilReset) / spare;
+  return Number.isFinite(interval)
+    ? Math.max(IDLE_MIN_INTERVAL_MS, Math.ceil(interval))
+    : IDLE_DEFAULT_INTERVAL_MS;
 }
 
 function checkBackgroundRequest() {
@@ -485,8 +529,18 @@ export type SignerGroupName = "securityCouncil" | "guardians" | "zkFoundation";
 export type SafeGroups = Record<SignerGroupName, readonly Address[]>;
 
 export type SafeSweepDriver = {
-  /** Whether the sync engine is following the chain (the app is in use). */
+  /** Whether the sync engine is following the chain. */
   active: () => boolean;
+  /**
+   * Someone is using the app (a request within SYNC_KEEPWARM_MS): the groups pages asked for are
+   * kept under 60 s old. Default true.
+   */
+  viewing?: () => boolean;
+  /**
+   * Every governance member Safe is also checked at the quota-paced interval, in use or idle
+   * (SYNC_MODE=always). Default false.
+   */
+  baseline?: () => boolean;
   /** The member Safes of each signer group (from governance). */
   groups: () => Promise<SafeGroups>;
 };
@@ -501,8 +555,14 @@ const sweep = {
   running: false,
   /** Why sweeps cannot run at all here (dev node, keyless public service), or null. */
   blocked: null as string | null,
+  /** Groups kept under 60 s old (a page asked for them while the app is in use). */
   groups: [] as SignerGroupName[],
+  /** Every Safe swept, either way. */
   safes: [] as string[],
+  /** The Safes of those groups. */
+  fresh: [] as string[],
+  /** The quota-paced check of every governance Safe: how many, and how often; null when off. */
+  baseline: null as { safes: number; intervalMs: number } | null,
   /** Why the last wake could not look at the groups (governance, the network), or null. */
   error: null as string | null,
 };
@@ -524,6 +584,8 @@ function idle() {
   sweep.running = false;
   sweep.groups = [];
   sweep.safes = [];
+  sweep.fresh = [];
+  sweep.baseline = null;
 }
 
 function schedule(ms: number) {
@@ -566,31 +628,41 @@ async function sweepOnce(current: SafeSweepDriver): Promise<number> {
       : !backgroundSafeReadsAllowed(net.safeTxServiceUrl)
         ? "keyless-public-service"
         : null;
-  // Blocked, or nothing asked for lately: no need to know the groups (governance) at all.
-  if (
-    sweep.blocked !== null ||
-    ![...demandedAt.values()].some((at) => Date.now() - at <= env.SYNC_SAFE_ACTIVE_MS)
-  ) {
+  const viewing = current.viewing?.() ?? true;
+  const baseline = current.baseline?.() ?? false;
+  const asked =
+    viewing && [...demandedAt.values()].some((at) => Date.now() - at <= env.SYNC_SAFE_ACTIVE_MS);
+  // Blocked, or nothing to keep fresh: no need to know the groups (governance) at all.
+  if (sweep.blocked !== null || (!asked && !baseline)) {
     sweep.groups = [];
     sweep.safes = [];
+    sweep.fresh = [];
+    sweep.baseline = null;
     sweep.error = null;
     return SWEEP_RECHECK_MS;
   }
   const groups = await current.groups();
   sweep.error = null;
   const now = Date.now();
-  const { names, safes } = demanded(groups, now);
+  const { names, safes: fast } = asked ? demanded(groups, now) : { names: [], safes: [] };
+  const all = baseline ? everySafe(groups) : [];
+  const swept = new Map<string, Address>();
+  for (const safe of [...fast, ...all]) swept.set(safe.toLowerCase(), safe);
+  const fastKeys = new Set(fast.map((safe) => safe.toLowerCase()));
+  const slowAge = all.length > 0 ? idleSweepIntervalMs(all.length, quota, now) : null;
   sweep.groups = names;
-  sweep.safes = safes.map((safe) => safe.toLowerCase());
-  if (safes.length === 0 || pauseReason(now) !== null) return SWEEP_RECHECK_MS;
+  sweep.safes = [...swept.keys()];
+  sweep.fresh = [...fastKeys];
+  sweep.baseline = slowAge === null ? null : { safes: all.length, intervalMs: slowAge };
+  if (swept.size === 0 || pauseReason(now) !== null) return SWEEP_RECHECK_MS;
 
-  const age = sweepAgeMs(safes.length);
+  const fastAge = sweepAgeMs(fast.length);
   let next = SWEEP_RECHECK_MS;
   const due: { safe: Address; at: number }[] = [];
-  for (const safe of safes) {
-    const key = safe.toLowerCase();
+  for (const [key, safe] of swept) {
     if (reads.has(key)) continue;
     const entry = held.get(key);
+    const age = fastKeys.has(key) ? fastAge : (slowAge as number);
     // A Safe without a listing is due now; one that failed waits for its retry time.
     const at = Math.max(
       entry ? entry.snapshot.fetchedAt + age : now,
@@ -605,6 +677,15 @@ async function sweepOnce(current: SafeSweepDriver): Promise<number> {
   const room = env.SYNC_SAFE_HOURLY_BUDGET - budgetUsed(now) - backgroundReads();
   for (const { safe } of due.slice(0, Math.max(0, room))) void readSafe(safe, "low");
   return Math.max(SWEEP_MIN_DELAY_MS, next);
+}
+
+/** Every member Safe of the signer groups, each once. */
+function everySafe(groups: SafeGroups): Address[] {
+  const safes = new Map<string, Address>();
+  for (const name of GROUPS)
+    for (const safe of groups[name])
+      if (!safes.has(safe.toLowerCase())) safes.set(safe.toLowerCase(), safe);
+  return [...safes.values()];
 }
 
 /** The groups with a member Safe a page asked for within SYNC_SAFE_ACTIVE_MS, and their Safes. */
@@ -633,11 +714,26 @@ function describe(error: unknown): string {
 }
 
 export type SafeStoreStatus = {
-  /** Background reads are keeping the listings below fresh right now. */
+  /**
+   * Background reads are running right now: for `groups` (kept under 60 s old) and/or the
+   * `baseline` (every member Safe, checked only every `baseline.intervalMs`). Not by itself a sign
+   * that listings are under 60 s old: `groups` and `oldestFetchedAt` tell which are.
+   */
   sweeping: boolean;
-  /** Signer groups a page asked for within SYNC_SAFE_ACTIVE_MS (while the engine runs). */
+  /**
+   * Signer groups a page asked for within SYNC_SAFE_ACTIVE_MS while the app is in use: kept under
+   * 60 s old.
+   */
   groups: SignerGroupName[];
-  /** The oldest listing held for those groups' Safes (ISO time), or null. */
+  /**
+   * SYNC_MODE=always: every governance member Safe is also checked, in use or idle, this often
+   * (paced by the quota left for its period); null otherwise.
+   */
+  baseline: { safes: number; intervalMs: number } | null;
+  /**
+   * The oldest listing held for the Safes of `groups` (ISO time), or null; the baseline's other
+   * Safes are not counted.
+   */
   oldestFetchedAt: string | null;
   /** Background requests sent in the last hour, and the hourly budget. */
   budgetUsedThisHour: number;
@@ -648,11 +744,11 @@ export type SafeStoreStatus = {
    */
   paused: string | null;
   /**
-   * Why the sweep could not look at the groups, else the most recent failure among those groups'
-   * Safes whose listing has not been read since (Safe's error text, never a URL), or null.
+   * Why the sweep could not look at the groups, else the most recent failure among the Safes it
+   * sweeps whose listing has not been read since (Safe's error text, never a URL), or null.
    */
   lastError: string | null;
-  /** How many of those groups' Safes the last listing read failed for (retried with backoff). */
+  /** How many of the Safes it sweeps the last listing read failed for (retried with backoff). */
   failingSafes: number;
 };
 
@@ -665,9 +761,11 @@ export function safeStoreStatus(): SafeStoreStatus {
   let oldest: number | null = null;
   let latest: Failure | null = null;
   let failing = 0;
-  for (const key of sweep.safes) {
+  for (const key of sweep.fresh) {
     const at = held.get(key)?.snapshot.fetchedAt;
     if (at !== undefined && (oldest === null || at < oldest)) oldest = at;
+  }
+  for (const key of sweep.safes) {
     const failure = failures.get(key);
     if (!failure) continue;
     failing++;
@@ -676,6 +774,7 @@ export function safeStoreStatus(): SafeStoreStatus {
   return {
     sweeping: running && paused === null && sweep.safes.length > 0,
     groups: running ? [...sweep.groups] : [],
+    baseline: running && sweep.baseline ? { ...sweep.baseline } : null,
     oldestFetchedAt: running && oldest !== null ? new Date(oldest).toISOString() : null,
     budgetUsedThisHour: budgetUsed(now),
     budgetPerHour: env.SYNC_SAFE_HOURLY_BUDGET,

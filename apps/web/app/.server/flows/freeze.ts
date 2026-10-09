@@ -122,6 +122,7 @@ export async function getFreezeRequest(
   const gov = await governance();
   const message: Record<string, string> = { nonce: params.nonce, validUntil: params.validUntil };
   if (params.action === "SetSoftFreezeThreshold") message.threshold = params.threshold ?? "0";
+  const state = freezeState(gov, params);
   const set = await verifySignatureSet({
     action: params.action,
     signerGroup: "securityCouncil",
@@ -130,8 +131,8 @@ export async function getFreezeRequest(
     threshold: thresholdFor(gov, params.action),
     check: { kind: "multisig", contract: gov.securityCouncil.address },
     supplied,
+    open: state.status === "open",
   });
-  const state = freezeState(gov, params);
   const execution = await executionFor(set, state, (valid) =>
     freezeExecution(
       params.action,

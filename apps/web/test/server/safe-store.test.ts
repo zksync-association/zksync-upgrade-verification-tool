@@ -149,6 +149,25 @@ function driver(groups: Partial<SafeGroups>, activity = { on: true }): SafeSweep
   };
 }
 
+/**
+ * The engine in SYNC_MODE=always: always active, viewing while `viewing`, and every governance
+ * member Safe swept at the quota-paced interval.
+ */
+function alwaysDriver(groups: Partial<SafeGroups>, activity = { viewing: false }): SafeSweepDriver {
+  return {
+    ...driver(groups),
+    viewing: () => activity.viewing,
+    baseline: () => true,
+  };
+}
+
+// Safe's public service with a key, early in its period (as measured: 50,000 a month).
+const QUOTA_HEADERS = {
+  "x-ratelimit-limit": "50000",
+  "x-ratelimit-remaining": "49113",
+  "x-ratelimit-reset": "2577504",
+};
+
 /** Lets `ms` pass, then returns the promise's value. */
 async function within<T>(ms: number, promise: Promise<T>): Promise<T> {
   await vi.advanceTimersByTimeAsync(ms);
@@ -870,5 +889,154 @@ describe("background reads (warm-up, precomputing)", () => {
       messageHash: messageHash(1),
     });
     expect(safe.count("message")).toBe(1);
+  });
+});
+
+describe("the quota-paced sweep of every governance Safe (SYNC_MODE=always)", () => {
+  const HOUR = 3_600_000;
+  const MIN = 60_000;
+
+  it("spreads what is left of the period's quota above a 20 % reserve over the time to its reset", async () => {
+    await load();
+    const now = Date.now();
+    const interval = (safes: number, q: Parameters<Store["idleSweepIntervalMs"]>[1]) =>
+      store.idleSweepIntervalMs(safes, q, now);
+    // No quota headers: every 15 minutes.
+    expect(interval(17, { limit: null, remaining: null, resetAt: null })).toBe(15 * MIN);
+    expect(interval(17, { limit: 50_000, remaining: 49_113, resetAt: null })).toBe(15 * MIN);
+    // As measured (17 member Safes, 49,113 of 50,000 left, 2,577,504 s to the reset):
+    // 17 x 2,577,504 s / (49,113 - 10,000) = 1,120.3 s.
+    expect(interval(17, { limit: 50_000, remaining: 49_113, resetAt: now + 2_577_504_000 })).toBe(
+      Math.ceil((17 * 2_577_504_000) / 39_113)
+    );
+    expect(
+      interval(17, { limit: 50_000, remaining: 49_113, resetAt: now + 2_577_504_000 }) / MIN
+    ).toBeCloseTo(18.67, 1);
+    // Close to the reset with plenty left: never more often than every 10 minutes.
+    expect(interval(17, { limit: 50_000, remaining: 40_000, resetAt: now + HOUR })).toBe(10 * MIN);
+    // Little left: rarer (17 x 10 days / 1,000 = 4.08 h).
+    expect(interval(17, { limit: 50_000, remaining: 11_000, resetAt: now + 10 * 24 * HOUR })).toBe(
+      Math.ceil((17 * 10 * 24 * HOUR) / 1_000)
+    );
+    // Nothing left above the reserve (or nothing at all): a round costs the whole time to the
+    // reset, so no Safe is checked again before it.
+    for (const remaining of [10_000, 9_000, 0])
+      expect(
+        interval(17, { limit: 50_000, remaining, resetAt: now + 6 * HOUR })
+      ).toBeGreaterThanOrEqual(6 * HOUR);
+    // The reported period has ended: what was left then says nothing about now.
+    expect(interval(17, { limit: 50_000, remaining: 0, resetAt: now - 1 })).toBe(15 * MIN);
+  });
+
+  it("while idle, change-checks every member Safe once per interval (10 minutes early in the period)", async () => {
+    await load();
+    const safe = fakeSafe();
+    safe.headers = QUOTA_HEADERS;
+    const council = W.slice(0, 3);
+    for (const s of [...council, ...G, A]) safe.add(s, 1);
+    store.startSafeSweep(
+      alwaysDriver({ securityCouncil: council, guardians: G, zkFoundation: [A] })
+    );
+    await vi.advanceTimersByTimeAsync(HOUR + 30_000);
+    // Each Safe: one listing at first, then a change check every 10 minutes (6 x 2,577,504 s /
+    // 39,113 = 6.6 minutes is below the floor).
+    for (const s of [...council, ...G, A]) {
+      expect(safe.count("listing", s)).toBe(1);
+      const checks = safe.sent.filter((x) => x.kind === "newest" && x.safe === s.toLowerCase());
+      expect(checks).toHaveLength(6);
+      const starts = [
+        (safe.sent.find((x) => x.safe === s.toLowerCase()) as Sent).at,
+        ...checks.map((c) => c.at),
+      ];
+      for (let i = 1; i < starts.length; i++) {
+        expect((starts[i] as number) - (starts[i - 1] as number)).toBeGreaterThanOrEqual(10 * MIN);
+        expect((starts[i] as number) - (starts[i - 1] as number)).toBeLessThan(10 * MIN + 6_000);
+      }
+    }
+    expect(store.safeStoreStatus()).toMatchObject({
+      sweeping: true,
+      groups: [],
+      baseline: { safes: 6, intervalMs: 10 * MIN },
+      paused: null,
+    });
+    // About 36 background requests in the hour for 6 Safes (17 Safes at ~19 minutes: ~55).
+    expect(store.safeStoreStatus().budgetUsedThisHour).toBeLessThanOrEqual(6 * 7);
+  });
+
+  it("without quota headers checks every 15 minutes; never sweeps idle in window mode", async () => {
+    await load();
+    const safe = fakeSafe();
+    for (const s of [A, B]) safe.add(s, 1);
+    store.startSafeSweep(alwaysDriver({ securityCouncil: [A, B] }));
+    await vi.advanceTimersByTimeAsync(HOUR + 30_000);
+    expect(safe.count("newest", A)).toBe(4);
+    expect(store.safeStoreStatus().baseline).toEqual({ safes: 2, intervalMs: 15 * MIN });
+
+    // The same engine in window mode, idle (not viewing, no baseline): nothing.
+    store.stopSafeSweep();
+    const since = Date.now();
+    store.startSafeSweep({ ...driver({ securityCouncil: [A, B] }), viewing: () => false });
+    await vi.advanceTimersByTimeAsync(HOUR);
+    expect(background(safe, since)).toEqual([]);
+    expect(store.safeStoreStatus()).toMatchObject({ sweeping: false, baseline: null });
+  });
+
+  it("while viewing keeps the groups pages asked for under 60 s old, and the others at the interval", async () => {
+    await load();
+    const safe = fakeSafe();
+    safe.headers = QUOTA_HEADERS;
+    for (const s of [...W, ...G]) safe.add(s, 1);
+    // A page views a council member.
+    await within(1_000, store.listSafeMessages(W[0]));
+    store.startSafeSweep(alwaysDriver({ securityCouncil: W, guardians: G }, { viewing: true }));
+    await vi.advanceTimersByTimeAsync(4 * MIN);
+    // The council about every 50 s; the Guardians once (their listing), then not yet again.
+    expect(safe.count("newest", W[1])).toBeGreaterThanOrEqual(4);
+    for (const g of G) {
+      expect(safe.count("listing", g)).toBe(1);
+      expect(safe.count("newest", g)).toBe(0);
+    }
+    expect(store.safeStoreStatus()).toMatchObject({
+      groups: ["securityCouncil"],
+      baseline: { safes: 7, intervalMs: 10 * MIN },
+    });
+  });
+
+  it("never spends more than SYNC_SAFE_HOURLY_BUDGET", async () => {
+    await load({ budget: 4 });
+    const safe = fakeSafe();
+    const members = Array.from({ length: 6 }, (_, i) => address(0x600 + i));
+    for (const s of members) safe.add(s, 1);
+    store.startSafeSweep(alwaysDriver({ securityCouncil: members }));
+    await vi.advanceTimersByTimeAsync(55 * MIN);
+    expect(safe.sent).toHaveLength(4);
+    expect(store.safeStoreStatus()).toMatchObject({ paused: "budget", budgetUsedThisHour: 4 });
+  });
+
+  it("pauses below 10 % of the quota only until the reported period ends", async () => {
+    await load();
+    const safe = fakeSafe();
+    safe.headers = {
+      "x-ratelimit-limit": "1000",
+      "x-ratelimit-remaining": "99",
+      "x-ratelimit-reset": "120",
+    };
+    for (const s of [A, B]) safe.add(s, 1);
+    // A page's read reports the quota: below 10 %, its period ends in 2 minutes.
+    await within(1_000, store.listSafeMessages(A));
+    const since = Date.now();
+    store.startSafeSweep(alwaysDriver({ securityCouncil: [A, B] }));
+    await vi.advanceTimersByTimeAsync(110_000);
+    expect(background(safe, since)).toEqual([]);
+    expect(store.safeStoreStatus().paused).toBe("quota");
+    // The period ends; the next answers report the new one.
+    safe.headers = {
+      "x-ratelimit-limit": "1000",
+      "x-ratelimit-remaining": "1000",
+      "x-ratelimit-reset": "2592000",
+    };
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(background(safe, since).map((x) => x.safe)).toContain(B.toLowerCase());
+    expect(store.safeStoreStatus()).toMatchObject({ paused: null, sweeping: true });
   });
 });

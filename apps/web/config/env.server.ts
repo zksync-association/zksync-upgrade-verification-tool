@@ -31,14 +31,17 @@ const baseEnv = createEnv({
     ZK_TOKEN_GOVERNOR_ADDRESS: addressSchema.optional(),
     ZK_GOV_OPS_GOVERNOR_ADDRESS: addressSchema.optional(),
     // The sync engine follows the chain head and refreshes shared reads ahead of requests:
-    // "window" while the app is in use (a request within SYNC_KEEPWARM_MS), "always", or "off"
-    // (every request reads on demand). Dev nodes (anvil, hardhat) always read on demand.
-    SYNC_MODE: z.enum(["window", "always", "off"]).default("window"),
+    // "always" (for as long as the server runs; less while nobody uses the app), "window" (only
+    // while the app is in use), or "off" (every request reads on demand). The app is in use while
+    // a request was made within SYNC_KEEPWARM_MS. Dev nodes (anvil, hardhat) always read on demand.
+    SYNC_MODE: z.enum(["window", "always", "off"]).default("always"),
     SYNC_KEEPWARM_MS: z.coerce.number().int().min(0).default(600_000),
     // While the engine runs, member Safes' message listings are re-checked before they turn 60 s
     // old, for the signer groups (Security Council, Guardians, ZK Foundation) a page asked for in
-    // the last SYNC_SAFE_ACTIVE_MS. Only with SAFE_API_KEY or a self-hosted Safe service, and at
-    // most SYNC_SAFE_HOURLY_BUDGET background requests an hour.
+    // the last SYNC_SAFE_ACTIVE_MS while the app is in use; with SYNC_MODE=always every member
+    // Safe is also checked at an interval paced by the Safe quota left (10-20 minutes with a key).
+    // Only with SAFE_API_KEY or a self-hosted Safe service, and at most SYNC_SAFE_HOURLY_BUDGET
+    // background requests an hour.
     SYNC_SAFE_ACTIVE_MS: z.coerce.number().int().min(0).default(300_000),
     SYNC_SAFE_HOURLY_BUDGET: z.coerce.number().int().min(0).default(1_200),
     ALLOW_INDEXING: z.coerce.boolean().default(false),

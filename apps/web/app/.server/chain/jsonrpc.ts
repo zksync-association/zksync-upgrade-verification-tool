@@ -83,6 +83,14 @@ export type LaneOptions = {
   backoffMs?: number;
   /** Retries of one request after rate limiting, before it fails. */
   rateLimitRetries?: number;
+  /** Called as each POST is sent, with the number of JSON-RPC requests in it (cost counting). */
+  onSend?: (requests: number) => void;
+  /**
+   * While this says true (another lane on the same provider is under pressure, see Lane.busy),
+   * this lane keeps at most one POST in flight, so it cannot take the provider's capacity from
+   * that lane (a backfill's eth_getLogs from a page's eth_calls).
+   */
+  yieldTo?: () => boolean;
   fetch?: typeof fetch;
 };
 
@@ -114,6 +122,11 @@ export interface Lane {
   readonly label: string;
   request<T = unknown>(method: AllowedMethod, params?: readonly unknown[]): Promise<T>;
   stats(): LaneStats;
+  /**
+   * Under pressure: paused after a rate limit, or requests are waiting for a free POST slot.
+   * Lanes sharing a provider yield to a busy one (LaneOptions.yieldTo).
+   */
+  busy(): boolean;
   /** Fails queued and in-flight requests with an "aborted" LaneError; later requests fail too. */
   close(): void;
 }
@@ -141,6 +154,8 @@ const CEILING_MS = 60_000; // how long a batch size that was rate limited is not
 const MAX_PAUSE_MS = 15_000; // longest pause after one rate-limited reply
 const MAX_BACKOFF_MS = 4_000;
 const SLOW_POST_MS = 5_000;
+// How often a lane that yields to another looks again whether it still has to.
+const YIELD_RECHECK_MS = 25;
 
 let nextId = 1;
 
@@ -154,6 +169,7 @@ export function createLane(options: LaneOptions): Lane {
   const backoffMs = options.backoffMs ?? 250;
   const rateLimitRetries = options.rateLimitRetries ?? 6;
   const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
+  const { onSend, yieldTo } = options;
   const scrub = scrubber(secretsOf(url));
 
   const queue: Entry[] = [];
@@ -214,9 +230,22 @@ export function createLane(options: LaneOptions): Lane {
       return;
     }
     while (active < inFlightLimit && queue.length > 0) {
+      // Another lane on this provider is under pressure: one POST at a time until it is not.
+      if (active >= 1 && yielding()) {
+        schedule(YIELD_RECHECK_MS);
+        return;
+      }
       const group = take();
       if (group.length === 0) break;
       void post(group);
+    }
+  }
+
+  function yielding(): boolean {
+    try {
+      return yieldTo?.() === true;
+    } catch {
+      return false;
     }
   }
 
@@ -278,6 +307,11 @@ export function createLane(options: LaneOptions): Lane {
     active++;
     posts++;
     peakInFlight = Math.max(peakInFlight, active);
+    try {
+      onSend?.(group.length);
+    } catch {
+      // Counting never fails a request.
+    }
     const sentEpoch = epoch;
     const asBatch = group.length > 1;
     const startedAt = Date.now();
@@ -572,6 +606,7 @@ export function createLane(options: LaneOptions): Lane {
       acceptsBatch,
       pausedMs: Math.max(0, pausedUntil - Date.now()),
     }),
+    busy: () => pausedUntil > Date.now() || (queue.length > 0 && active >= inFlightLimit),
     close() {
       if (closed) return;
       closed = true;

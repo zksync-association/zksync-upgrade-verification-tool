@@ -125,8 +125,8 @@ async function warmL1(
   net: { safeTxServiceUrl: string | null },
   superseded: () => boolean
 ): Promise<void> {
-  const [gov] = await Promise.all([
-    step(reason, "governance", () => governance()),
+  const governed = step(reason, "governance", () => governance());
+  const history = Promise.all([
     step(reason, "log-history", () => checkLogHistory(l1), {
       details: (history) => ({ status: history.status }),
     }),
@@ -148,8 +148,19 @@ async function warmL1(
       }
     ),
   ]);
-  if (!gov || superseded()) return;
+  // The Safe listings need only governance (the member Safes): they are read while the log index
+  // backfills (another upstream), so a page opened a few seconds after the start finds both.
+  const gov = await governed;
+  const listings = gov && !superseded() ? warmListings(reason, net, gov, superseded) : null;
+  await Promise.all([history, listings]);
+}
 
+async function warmListings(
+  reason: PrewarmReason,
+  net: { safeTxServiceUrl: string | null },
+  gov: Governance,
+  superseded: () => boolean
+): Promise<void> {
   // Low priority: one listing at a time, behind any page's own Safe reads in the Safe API's
   // pacer, and within the background budget. The first failure (often a rate limit) ends the
   // step. The warm-up is not a page's interest: the sync engine's sweep keeps fresh only the
@@ -158,33 +169,36 @@ async function warmL1(
   // quota is better kept for the pages that are actually opened.
   if (!net.safeTxServiceUrl) {
     log.info({ reason, step: "safe-listings", skipped: "no-service" }, "prewarm step");
-  } else if (!backgroundSafeReadsAllowed(net.safeTxServiceUrl)) {
-    log.info({ reason, step: "safe-listings", skipped: "keyless-public-service" }, "prewarm step");
-  } else {
-    const safes = governanceSafes(gov);
-    let listed = 0;
-    await step(
-      reason,
-      "safe-listings",
-      async () => {
-        for (const safe of safes) {
-          if (superseded()) return;
-          await warmSafeListing(safe);
-          listed++;
-        }
-      },
-      { progress: () => ({ listed, of: safes.length }) }
-    );
+    return;
   }
+  if (!backgroundSafeReadsAllowed(net.safeTxServiceUrl)) {
+    log.info({ reason, step: "safe-listings", skipped: "keyless-public-service" }, "prewarm step");
+    return;
+  }
+  const safes = governanceSafes(gov);
+  let listed = 0;
+  await step(
+    reason,
+    "safe-listings",
+    async () => {
+      for (const safe of safes) {
+        if (superseded()) return;
+        await warmSafeListing(safe);
+        listed++;
+      }
+    },
+    { progress: () => ({ listed, of: safes.length }) }
+  );
 }
 
 let running: { generation: number; run: Promise<void> } | null = null;
 
 /**
  * Warms network(), then together governance(), the log-history canary and the
- * ProtocolUpgradeHandler log index backfill, then (with SAFE_API_KEY or a self-hosted service) the
- * governance Safes' message listings; beside all of these, the L2 governors' log index backfill.
- * One run per settings generation at a time; never rejects.
+ * ProtocolUpgradeHandler log index backfill, and once governance is in (with SAFE_API_KEY or a
+ * self-hosted service) the governance Safes' message listings, while the backfill runs; beside all
+ * of these, the L2 governors' log index backfill. One run per settings generation at a time;
+ * never rejects.
  */
 export function prewarm(reason: PrewarmReason): Promise<void> {
   try {

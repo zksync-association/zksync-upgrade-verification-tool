@@ -5,6 +5,7 @@ import { type Address, type Hex, getAddress } from "viem";
 import { z } from "zod";
 import { cached, invalidate } from "./cache";
 import { network } from "./rpc";
+import { countUpstream } from "./sync/cost";
 
 // Read-only client for the Safe Transaction Service. Its answers are untrusted input: callers only
 // ever use a message whose hash they computed themselves, and a signature only once the governance
@@ -64,6 +65,9 @@ const MAX_PAGES = 5;
 const MESSAGE_TTL_MS = 60_000;
 // Safe answers 429 at 8 requests in flight.
 const MAX_IN_FLIGHT = 4;
+// Background requests hold at most this many of those slots: a page's request always finds one
+// free, behind at most the spacing below, never behind a background request's answer.
+const MAX_BACKGROUND_IN_FLIGHT = 2;
 
 // api.safe.global allows 2 requests/s without a key (5/s with one) and 5,000 a month per IP.
 // A self-hosted Transaction Service has no such limits.
@@ -112,27 +116,33 @@ export function safeCooldownUntil(): number | null {
 }
 
 // The pacer: requests start one at a time, at least minIntervalMs() apart on the public service,
-// with at most MAX_IN_FLIGHT in flight anywhere. Waiting requests a page needs ("high") start
-// before background ones ("low"), whatever their order of arrival. Requests sent before a
-// settings change count until they are answered: they are still in flight at the service.
+// with at most MAX_IN_FLIGHT in flight anywhere, of which at most MAX_BACKGROUND_IN_FLIGHT are
+// background ones. Waiting requests a page needs ("high") start before background ones ("low"),
+// whatever their order of arrival. Requests sent before a settings change count until they are
+// answered: they are still in flight at the service.
 type Waiter = {
   ticket: SafeTicket;
   spaced: boolean;
-  resolve: () => void;
+  resolve: (low: boolean) => void;
   reject: (error: Error) => void;
 };
 let waiting: Waiter[] = [];
 let inFlight = 0;
+let lowInFlight = 0;
 let nextSlot = 0;
 let pumpTimer: ReturnType<typeof setTimeout> | null = null;
 
 function pump() {
   while (waiting.length > 0 && inFlight < MAX_IN_FLIGHT) {
     const high = waiting.findIndex((w) => w.ticket.priority === "high");
+    // Only background requests wait: one starts only while fewer than its share are in flight.
+    if (high === -1 && lowInFlight >= MAX_BACKGROUND_IN_FLIGHT) return;
     const index = high === -1 ? 0 : high;
     const waiter = waiting[index] as Waiter;
     if (waiter.spaced) {
       const now = Date.now();
+      // A clock stepped back (NTP) never holds requests up for longer than one interval.
+      if (nextSlot - now > minIntervalMs()) nextSlot = now + minIntervalMs();
       if (now < nextSlot) {
         pumpTimer ??= setTimeout(() => {
           pumpTimer = null;
@@ -144,13 +154,15 @@ function pump() {
     }
     waiting.splice(index, 1);
     inFlight++;
-    waiter.resolve();
+    const low = waiter.ticket.priority === "low";
+    if (low) lowInFlight++;
+    waiter.resolve(low);
   }
 }
 
 /** Waits for a start slot; resolves to the release to call once the response was read. */
 async function acquire(ticket: SafeTicket, spaced: boolean): Promise<() => void> {
-  await new Promise<void>((resolve, reject) => {
+  const low = await new Promise<boolean>((resolve, reject) => {
     waiting.push({ ticket, spaced, resolve, reject });
     pump();
   });
@@ -159,6 +171,7 @@ async function acquire(ticket: SafeTicket, spaced: boolean): Promise<() => void>
     if (released) return;
     released = true;
     inFlight--;
+    if (low) lowInFlight--;
     pump();
   };
 }
@@ -196,7 +209,26 @@ function retryDelay(value: string | null): number {
 const settingsChanged = () =>
   new SafeApiError("Data source settings changed. Refresh to check signatures again.");
 
-export const quota = { limit: null as number | null, remaining: null as number | null };
+/**
+ * The service's quota as its last answer reported it (x-ratelimit-limit / -remaining), and when the
+ * quota period ends (x-ratelimit-reset, ms since the epoch; null when not reported).
+ */
+export const quota = {
+  limit: null as number | null,
+  remaining: null as number | null,
+  resetAt: null as number | null,
+};
+
+/**
+ * When the quota period ends, from x-ratelimit-reset: seconds from now (Safe's public service
+ * reports ~2.6 million, the rest of the month), or an epoch time in seconds when that large.
+ */
+function resetAtOf(value: string | null, now: number): number | null {
+  if (value === null || value.trim() === "") return null;
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds < 0) return null;
+  return seconds >= 1_000_000_000 ? seconds * 1_000 : now + seconds * 1_000;
+}
 
 async function getJson(
   path: string,
@@ -221,6 +253,7 @@ async function getJson(
     checkCooldown();
     checkGeneration();
     beforeRequest?.();
+    countUpstream("safe");
     let response: Response;
     try {
       response = await fetch(`${safeTxServiceUrl}${path}`, {
@@ -246,6 +279,8 @@ async function getJson(
     if (limit !== null && Number.isFinite(Number(limit))) quota.limit = Number(limit);
     if (remaining !== null && Number.isFinite(Number(remaining)))
       quota.remaining = Number(remaining);
+    const resetAt = resetAtOf(response.headers.get("x-ratelimit-reset"), arrivedAt);
+    if (resetAt !== null) quota.resetAt = resetAt;
 
     if (response.status === 404) return { body: null, arrivedAt };
     if (response.status === 429) {
@@ -383,4 +418,5 @@ export function resetSafeClient() {
   lastRefresh = 0;
   quota.limit = null;
   quota.remaining = null;
+  quota.resetAt = null;
 }

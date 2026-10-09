@@ -15,12 +15,16 @@ import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
 /**
  * Background reads, for information: `index` is the ProtocolUpgradeHandler log index (deployment
  * to head). Lists wait for it, for a bounded time, or fail; they never answer from part of it.
- * `engine` is the sync engine, which follows the head while the app is in use and refreshes what
- * requests read ahead of them (never a source of answers of its own). `safe` is the Safe
- * listing store's background sweep, which keeps member Safes' listings under 60 s old while the
- * app is in use (listings are never served older, sweep or not). `signatures` is the engine's
- * precompute of the signature sets pages viewed lately, at each new head (results are the
- * on-chain verdicts at that head, from Safe listings at most 60 s old). `l2Index` is the ZKsync
+ * `engine` is the sync engine, which follows the head and refreshes what requests read ahead of
+ * them (never a source of answers of its own): with SYNC_MODE=always for as long as the server
+ * runs, doing less while nobody visits (`engine.cost.mode` "idle"; reads of this status are not
+ * visits), with "window" only while the app is in use. `safe` is the Safe listing store's
+ * background sweep, which keeps the listings of the signer groups pages asked for under 60 s old
+ * while the app is in use and, with SYNC_MODE=always, checks every member Safe at a quota-paced
+ * interval (listings are never served older than 60 s, sweep or not). `signatures` is the engine's
+ * precompute, at each new head, of the signature sets pages viewed in the last 10 minutes and of
+ * those still open when last viewed (only the open ones while idle); results are the on-chain
+ * verdicts at that head, from Safe listings at most 60 s old. `l2Index` is the ZKsync
  * Era governors' log index (ProposalCreated/Executed/Canceled of the pinned governors), which the
  * vetoable list, veto pages and startable upgrades read; idle with no governors when none is
  * indexed (no L2 RPC, or every governor replaced through env).

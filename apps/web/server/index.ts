@@ -84,7 +84,7 @@ async function getBuild() {
 type AppEntry = {
   prewarm?: (reason: "boot") => Promise<void>;
   startSync?: () => void;
-  touchSync?: () => void;
+  touchSync?: (path?: string) => void;
 };
 
 let productionEntry: Promise<AppEntry> | undefined;
@@ -107,12 +107,14 @@ function appEntry(): Promise<AppEntry> {
   return loading;
 }
 
-// Every request that reaches the app (pages, /api/*, resources; not static files) is activity
-// for the sync engine, which follows the chain only while the app is in use (SYNC_MODE,
-// SYNC_KEEPWARM_MS). The request itself never waits on it.
-app.use((_req, _res, next) => {
+// Every request that reaches the app (pages, /api/*, resources; not static files) is a visit for
+// the sync engine, except reads of /api/status (the build's countsAsVisit decides). With
+// SYNC_MODE=always (the default) the engine follows the chain for as long as the server runs and
+// does less while nobody visits; with "window" it follows it only within SYNC_KEEPWARM_MS of a
+// visit. The request itself never waits on it.
+app.use((req, _res, next) => {
   appEntry().then(
-    (entry) => entry.touchSync?.(),
+    (entry) => entry.touchSync?.(req.path),
     () => {}
   );
   next();

@@ -15,11 +15,20 @@ export type LimitedHttpOptions = {
    * (and their slow entries). Default true.
    */
   batch?: boolean;
+  /** Called as each JSON-RPC request is sent upstream (a retry counts again): cost counting. */
+  onRequest?: () => void;
 };
 
 /** Batch read-only JSON-RPC traffic, with a per-client fallback for providers rejecting batches. */
 export function limitedHttp(url: string, options: LimitedHttpOptions): Transport {
-  const { label, maxInFlight } = options;
+  const { label, maxInFlight, onRequest } = options;
+  const sent = () => {
+    try {
+      onRequest?.();
+    } catch {
+      // Counting never fails a request.
+    }
+  };
   const limit = concurrencyLimit(maxInFlight);
   let acceptsBatch: boolean | undefined = options.batch === false ? false : undefined;
   const batchUnavailable = () => acceptsBatch === false;
@@ -68,11 +77,13 @@ export function limitedHttp(url: string, options: LimitedHttpOptions): Transport
             const startedAt = performance.now();
             let failed = false;
             try {
+              sent();
               if (batchUnavailable()) return await singleTransport.request(request);
               try {
                 return await batchTransport.request(request);
               } catch (error) {
                 if (!batchUnavailable() && !tooLarge(error)) throw error;
+                sent();
                 return await singleTransport.request(request);
               }
             } catch (error) {

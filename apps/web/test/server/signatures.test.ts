@@ -886,29 +886,106 @@ describe("kept per head, and precomputed", () => {
     expect(state.attempts).toBe(4);
   });
 
-  it("watches at most 64 sets, each until 10 minutes after it was last viewed", async () => {
+  /** A page views set `n` (one per upgrade id), open (still signable) or not. */
+  const view = (n: number, open = false) =>
+    verifySignatureSet({
+      action: "ApproveUpgradeSecurityCouncil",
+      signerGroup: "securityCouncil",
+      typedData: buildTypedData("ApproveUpgradeSecurityCouncil", typedData.domain, {
+        id: `0x${n.toString(16).padStart(64, "0")}`,
+      }),
+      members: MEMBERS,
+      threshold: 2,
+      check: { kind: "multisig", contract: COUNCIL },
+      open,
+    });
+
+  it("remembers at most 256 sets, each for 24 hours after it was last viewed", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
-    {
-      const view = (n: number) =>
-        verifySignatureSet({
-          action: "ApproveUpgradeSecurityCouncil",
-          signerGroup: "securityCouncil",
-          typedData: buildTypedData("ApproveUpgradeSecurityCouncil", typedData.domain, {
-            id: `0x${n.toString(16).padStart(64, "0")}`,
-          }),
-          members: MEMBERS,
-          threshold: 2,
-          check: { kind: "multisig", contract: COUNCIL },
-        });
-      for (let n = 1; n <= 65; n++) await view(n);
-      expect(signatureSetsStatus().watched).toBe(64);
-      vi.setSystemTime(Date.now() + 9 * 60_000);
-      await view(65);
-      vi.setSystemTime(Date.now() + 60_001);
-      expect(signatureSetsStatus().watched).toBe(1);
-      vi.setSystemTime(Date.now() + 9 * 60_000);
-      expect(signatureSetsStatus().watched).toBe(0);
-    }
+    for (let n = 1; n <= 257; n++) await view(n, n % 2 === 0);
+    expect(signatureSetsStatus()).toMatchObject({ watched: 256, recent: 256, open: 128 });
+    vi.setSystemTime(Date.now() + 9 * 60_000);
+    await view(257);
+    // Past 10 minutes: no longer recent, still remembered (its last result is known).
+    vi.setSystemTime(Date.now() + 60_001);
+    expect(signatureSetsStatus()).toMatchObject({ watched: 256, recent: 1, open: 128 });
+    // 24 hours after the first views (set 257 was viewed again 9 minutes later).
+    vi.setSystemTime(Date.now() + 24 * 60 * 60_000 - 10 * 60_000);
+    expect(signatureSetsStatus()).toMatchObject({ watched: 1, recent: 0, open: 0 });
+    vi.setSystemTime(Date.now() + 9 * 60_000);
+    expect(signatureSetsStatus()).toMatchObject({ watched: 0, recent: 0, open: 0 });
+  });
+
+  it("precomputes while the app is in use the sets viewed in the last 10 minutes and the open ones; while idle only the open ones", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    twoSigned();
+    // Set 1 is open (e.g. an upgrade waiting for the council), set 2 is done.
+    await view(1, true);
+    await view(2, false);
+    const h2 = nextHead();
+    expect(await precomputeSignatureSets(h2, { viewing: false })).toMatchObject({
+      block: "1101",
+      profile: "idle",
+      sets: 1,
+      verified: 1,
+    });
+    expect(await precomputeSignatureSets(h2, { viewing: true })).toMatchObject({
+      profile: "viewing",
+      sets: 2,
+      verified: 1,
+      reused: 1,
+    });
+    // Eleven minutes later, still in use: the done set was not viewed again, the open one stays.
+    vi.setSystemTime(Date.now() + 11 * 60_000);
+    expect(await precomputeSignatureSets(nextHead(`0x${"a3".repeat(32)}`), {})).toMatchObject({
+      profile: "viewing",
+      sets: 1,
+      verified: 1,
+    });
+    // A later view that finds it closed takes it out of the idle precompute.
+    await view(1, false);
+    expect(
+      await precomputeSignatureSets(nextHead(`0x${"a4".repeat(32)}`), { viewing: false })
+    ).toMatchObject({ sets: 0 });
+  });
+
+  it("precomputes at most the 16 most recently viewed open sets, and 64 recent ones", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    for (let n = 1; n <= 20; n++) await view(n, true);
+    for (let n = 101; n <= 170; n++) await view(n, false);
+    const head = nextHead();
+    expect(await precomputeSignatureSets(head, { viewing: false })).toMatchObject({ sets: 16 });
+    expect(await precomputeSignatureSets(head, { viewing: true })).toMatchObject({
+      sets: 16 + 64,
+    });
+  });
+
+  it("verifies again on a listing change only the sets the current profile covers", async () => {
+    twoSigned();
+    await view(1, false);
+    let viewing = false;
+    startSignatureWatch({
+      active: () => true,
+      viewing: () => viewing,
+      head: () => Promise.resolve(state.head),
+    });
+    // Idle: the done set is not verified again when a member's listing changes.
+    state.listingVersion = 2;
+    for (const listener of state.listeners) listener((MEMBERS[2] as string).toLowerCase());
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(signatureSetsStatus().lastRun).toBeNull();
+    // In use: it is.
+    viewing = true;
+    state.listingVersion = 3;
+    for (const listener of state.listeners) listener((MEMBERS[2] as string).toLowerCase());
+    await vi.waitFor(() =>
+      expect(signatureSetsStatus().lastRun).toMatchObject({
+        trigger: "safe",
+        profile: "viewing",
+        sets: 1,
+        verified: 1,
+      })
+    );
   });
 });
 

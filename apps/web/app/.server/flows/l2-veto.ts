@@ -142,6 +142,7 @@ export async function getL2Veto(
     readL2Proposal(params),
     knownGovernors(),
   ]);
+  const state = vetoState(gov, params, l2Proposal);
   const set = await verifySignatureSet({
     action: "CancelL2GovernorProposal",
     signerGroup: "guardians",
@@ -150,8 +151,8 @@ export async function getL2Veto(
     threshold: gov.guardians.thresholds.cancelL2Proposal,
     check: { kind: "multisig", contract: gov.guardians.address },
     supplied,
+    open: state.status === "open",
   });
-  const state = vetoState(gov, params, l2Proposal);
   const execution = await executionFor(set, state, (valid) =>
     l2Proposal?.idMatchesLocal
       ? cancelL2Execution(

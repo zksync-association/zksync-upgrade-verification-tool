@@ -220,6 +220,99 @@ describe("the request pacer", () => {
     expect(order).toEqual([SAFE(1), SAFE(9), SAFE(8), SAFE(2), SAFE(3)].map(checksum));
   });
 
+  it("lets background requests hold at most 2 of the 4 slots: a page's request starts behind the spacing only", async () => {
+    service.url = "http://127.0.0.1:18546";
+    const seen = slowService(1_000);
+    const low = () => ({ ticket: { priority: "low" as const } });
+    // The sweep queues ten background reads at once.
+    const background = Array.from({ length: 10 }, (_, n) => api.fetchListing(SAFE(n + 1), low()));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(seen.starts).toHaveLength(2);
+    expect(seen.inFlight).toBe(2);
+    // A page needs two Safes: both start at once, beside the two background ones.
+    await vi.advanceTimersByTimeAsync(300);
+    const page = [api.fetchListing(SAFE(21)), api.fetchListing(SAFE(22))];
+    await vi.advanceTimersByTimeAsync(0);
+    expect(seen.starts.map((x) => x.at - (seen.starts[0] as { at: number }).at)).toEqual([
+      0, 0, 300, 300,
+    ]);
+    expect(seen.inFlight).toBe(4);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await Promise.all([...background, ...page]);
+    expect(seen.peak).toBe(4);
+    expect(seen.starts).toHaveLength(12);
+  });
+
+  it("starts a page's request ahead of every queued background one, with a key behind the 220 ms spacing only", async () => {
+    await withKey();
+    const seen = slowService(150);
+    const low = () => ({ ticket: { priority: "low" as const } });
+    const background = Array.from({ length: 17 }, (_, n) => api.fetchListing(SAFE(n + 1), low()));
+    await vi.advanceTimersByTimeAsync(1_000);
+    const sentBefore = seen.starts.length;
+    const at = Date.now();
+    const page = Array.from({ length: 6 }, (_, n) => api.fetchListing(SAFE(n + 31)));
+    await vi.advanceTimersByTimeAsync(2_000);
+    await Promise.all(page);
+    const pageStarts = seen.starts.filter((x) => /0{30}(1f|2[0-4])\//i.test(x.path));
+    expect(pageStarts).toHaveLength(6);
+    // The six go out back to back at the service's spacing, the first within one interval, and
+    // no background request starts in between.
+    expect((pageStarts[0] as { at: number }).at - at).toBeLessThanOrEqual(220);
+    const order = seen.starts.slice(sentBefore, sentBefore + 6).map((x) => x.path);
+    expect(order).toEqual(pageStarts.map((x) => x.path));
+    for (const gap of gaps(pageStarts)) expect(gap).toBe(220);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await Promise.all(background);
+  });
+
+  it("learns when the quota period ends from x-ratelimit-reset (seconds from now, or an epoch time)", async () => {
+    const respond = (headers: Record<string, string>) =>
+      fetchMock.mockResolvedValueOnce(
+        new Response(JSON.stringify({ count: 0, results: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json", ...headers },
+        })
+      );
+    respond({
+      "x-ratelimit-limit": "50000",
+      "x-ratelimit-remaining": "49113",
+      "x-ratelimit-reset": "2577504",
+    });
+    await api.fetchListing(SAFE(1));
+    expect(api.quota).toEqual({
+      limit: 50_000,
+      remaining: 49_113,
+      resetAt: Date.now() + 2_577_504_000,
+    });
+    respond({ "x-ratelimit-reset": "1790000000" });
+    await vi.advanceTimersByTimeAsync(1_000);
+    await api.fetchListing(SAFE(2));
+    expect(api.quota.resetAt).toBe(1_790_000_000_000);
+    // A reply without it keeps what was learned; a settings change forgets it.
+    respond({});
+    await vi.advanceTimersByTimeAsync(1_000);
+    await api.fetchListing(SAFE(3));
+    expect(api.quota.resetAt).toBe(1_790_000_000_000);
+    api.resetSafeClient();
+    expect(api.quota).toEqual({ limit: null, remaining: null, resetAt: null });
+  });
+
+  it("never holds requests up longer than one interval when the clock steps back", async () => {
+    await withKey();
+    const seen = slowService(0);
+    const first = api.fetchListing(SAFE(1));
+    await vi.advanceTimersByTimeAsync(0);
+    await first;
+    vi.setSystemTime(Date.now() - 10 * 60_000);
+    const asked = Date.now();
+    const next = api.fetchListing(SAFE(2));
+    await vi.advanceTimersByTimeAsync(1_000);
+    await next;
+    expect(seen.starts).toHaveLength(2);
+    expect((seen.starts[1] as { at: number }).at - asked).toBeLessThanOrEqual(220);
+  });
+
   it("asks for the newest message by modification in one small request", async () => {
     fetchMock.mockResolvedValue(
       new Response(

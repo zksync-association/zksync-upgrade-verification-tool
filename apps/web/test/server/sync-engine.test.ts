@@ -12,13 +12,17 @@ import {
   resetRpcClients,
   rpcGeneration,
 } from "@/.server/rpc";
+import { resetUpstreamCost } from "@/.server/sync/cost";
 import {
   StepSkipped,
   SyncEngine,
   type SyncEngineOptions,
   type Tick,
   type TickStep,
+  countsAsVisit,
+  governanceDue,
   liveSteps,
+  startSync,
   stopSync,
   syncEngineStatus,
   touchSync,
@@ -206,6 +210,58 @@ describe("activity window", () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect(chain.polls).toHaveLength(0);
     expect(engine.status()).toMatchObject({ mode: "off", reason: "SYNC_MODE=off", active: false });
+  });
+
+  it("in SYNC_MODE=always never stops, and tells its steps whether someone is viewing", async () => {
+    const { chain, pollHead } = stubChain({ timestamp: nowSeconds() - 1n });
+    const seen: { block: bigint; viewing: boolean }[] = [];
+    const engine = stubEngine(
+      async (options) => {
+        // A new block every poll, so every poll is a tick.
+        chain.head = {
+          ...chain.head,
+          number: chain.head.number + 1n,
+          hash: blockHash(chain.head.number + 1n),
+        };
+        return pollHead(options);
+      },
+      {
+        mode: "always",
+        keepWarmMs: 30_000,
+        steps: [
+          {
+            name: "probe",
+            run: async (tick) => {
+              seen.push({ block: tick.head.number, viewing: tick.viewing });
+            },
+          },
+        ],
+      }
+    );
+    // Started by the server, not by a request: following the head, nobody viewing.
+    engine.resume();
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
+    expect(engine.status()).toMatchObject({ mode: "always", active: true, cost: { mode: "idle" } });
+    expect(engine.viewing).toBe(false);
+    // Polls every 2 s for the whole day (no idle stop).
+    expect(chain.polls.length).toBeGreaterThan(40_000);
+    expect(chain.polls.at(-1)?.at).toBeGreaterThan(NOW + 24 * 60 * 60_000 - 3_000);
+    expect(seen.length).toBeGreaterThan(40_000);
+    expect(seen.every((s) => !s.viewing)).toBe(true);
+
+    // A request: viewing for SYNC_KEEPWARM_MS, then idle again, still following the head.
+    engine.touch();
+    expect(engine.status().cost.mode).toBe("viewing");
+    const from = seen.length;
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(seen.slice(from).every((s) => s.viewing)).toBe(true);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(engine.status()).toMatchObject({ active: true, cost: { mode: "idle" } });
+    const later = seen.length;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(seen.length).toBeGreaterThan(later);
+    expect(seen.slice(later).every((s) => !s.viewing)).toBe(true);
+    engine.stop();
   });
 
   it("is off on a dev node: requests read on demand", async () => {
@@ -798,6 +854,32 @@ describe("ticks", () => {
     expect(onSuperseded).toHaveBeenCalledTimes(1);
     expect(engine.status().active).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("governanceDue (the idle profile's governance reads)", () => {
+  const base = { head: 101n, lastRead: 100n, remainingMs: 18_000, slotMs: SLOT };
+  it.each([
+    ["while viewing, every block", { ...base, viewing: true }, true],
+    ["idle, right after a read with time to spare: skipped", { ...base, viewing: false }, false],
+    ["idle, two blocks after the last read", { ...base, viewing: false, head: 102n }, true],
+    ["idle, nothing read yet", { ...base, viewing: false, lastRead: null }, true],
+    ["idle, nothing served now", { ...base, viewing: false, remainingMs: null }, true],
+    [
+      "idle, would run out before the next block's read (slot + 4 s)",
+      { ...base, viewing: false, remainingMs: 15_999 },
+      true,
+    ],
+    ["idle, exactly a slot + 4 s left", { ...base, viewing: false, remainingMs: 16_000 }, false],
+    ["idle, the same height again (a reorg)", { ...base, viewing: false, head: 100n }, true],
+    ["idle, a lower head", { ...base, viewing: false, head: 99n }, true],
+    [
+      "idle, no slot schedule: 12 s assumed",
+      { ...base, viewing: false, slotMs: null, remainingMs: 15_000 },
+      true,
+    ],
+  ])("%s", (_name, plan, due) => {
+    expect(governanceDue(plan)).toBe(due);
   });
 });
 
@@ -1531,7 +1613,8 @@ describe("live engine", () => {
   it("the server's engine: a request starts it, /api/status reports it, a settings change replaces it", async () => {
     liveChain();
     await backfilled();
-    expect(syncEngineStatus()).toMatchObject({ mode: "window", active: false, polls: 0 });
+    // SYNC_MODE defaults to "always".
+    expect(syncEngineStatus()).toMatchObject({ mode: "always", active: false, polls: 0 });
     expect(safeStoreStatus()).toMatchObject({ sweeping: false, paused: "idle" });
     touchSync();
     await until(() => syncEngineStatus().ticks >= 1);
@@ -1554,5 +1637,221 @@ describe("live engine", () => {
     expect(syncEngineStatus()).toMatchObject({ active: false, polls: 0, ticks: 0 });
     await until(() => syncEngineStatus().ticks >= 1, 10_000);
     expect(syncEngineStatus()).toMatchObject({ active: true, ticks: 1 });
+  });
+});
+
+describe("live engine, idle profile (SYNC_MODE=always, nobody viewing)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    clearCache();
+    resetRpcClients();
+    resetUpstreamCost();
+  });
+
+  const governanceReads = (fake: ReturnType<typeof fakeL1>) =>
+    fake.calls.filter((c) => c.functionName === "securityCouncil").length;
+
+  /** Produces block `n` 500 ms into its slot and waits for the engine to tick there. */
+  async function produce(engine: SyncEngine, fake: ReturnType<typeof fakeL1>, n: bigint) {
+    const timestamp = HEAD_TIME + (n - HEAD) * 12n;
+    await vi.advanceTimersByTimeAsync(Number(timestamp) * 1000 + 500 - Date.now());
+    fake.chain.options.head = { number: n, hash: blockHash(n), timestamp };
+    const ticks = engine.status().ticks;
+    await until(() => engine.status().ticks > ticks, 5_000);
+    await engine.settled();
+  }
+
+  it("reads governance at most every second block, and never lets it run out, a missed slot included", async () => {
+    const { fake } = liveChain();
+    await backfilled();
+    const engine = liveEngine({ mode: "always" });
+    engine.resume();
+    await until(() => engine.status().ticks >= 1);
+    await engine.settled();
+    expect(engine.status().cost.mode).toBe("idle");
+    expect(governanceReads(fake)).toBe(1);
+
+    // Track whether governance is ever not served, sampling every 100 ms from here on.
+    let gaps = 0;
+    const sample = setInterval(() => {
+      if (remainingMs(GOVERNANCE_KEY) === null) gaps++;
+    }, 100);
+    try {
+      const readsAt: number[] = [];
+      for (const n of [1n, 2n, 3n, 4n, 5n, 6n]) {
+        await produce(engine, fake, HEAD + n);
+        readsAt.push(governanceReads(fake));
+        // Requests at the new head still get governance from memory.
+        expect((await governance()).securityCouncil.members).toEqual(SC_MEMBERS);
+      }
+      // HEAD+1 skipped, HEAD+2 read, and so on: one read per two blocks.
+      expect(readsAt).toEqual([1, 2, 2, 3, 3, 4]);
+      // The upgrade states are still read at every block.
+      for (const n of [1n, 2n, 3n, 4n, 5n, 6n])
+        expect(statusCalls(fake, HEAD + n).length).toBeGreaterThan(0);
+
+      // HEAD+7 (a skip), then two slots without a block: the value is read again before it would
+      // run out, at the head served then.
+      await produce(engine, fake, HEAD + 7n);
+      expect(governanceReads(fake)).toBe(4);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(governanceReads(fake)).toBe(5);
+      expect(gaps).toBe(0);
+      expect((await governance()).latestBlock.number).toBe((HEAD + 7n).toString());
+      // Still no block a minute later (a stalled chain): read again before each read runs out,
+      // about every 27 s, never more often.
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(governanceReads(fake)).toBe(7);
+      expect(gaps).toBe(0);
+      expect((await governance()).latestBlock.number).toBe((HEAD + 7n).toString());
+    } finally {
+      clearInterval(sample);
+    }
+    // While viewing: every block (and the keep-alive stops once a tick has read it).
+    engine.touch();
+    await produce(engine, fake, HEAD + 16n);
+    const before = governanceReads(fake);
+    await produce(engine, fake, HEAD + 17n);
+    await produce(engine, fake, HEAD + 18n);
+    expect(governanceReads(fake)).toBe(before + 2);
+    expect(engine.status().cost.mode).toBe("viewing");
+    engine.stop();
+  });
+
+  it("verifies only the open signature sets at each new head while idle, every viewed one while in use", async () => {
+    const signatures = new Set<string>();
+    const { fake } = liveChain({ signatures });
+    await backfilled();
+    const engine = liveEngine({ mode: "always" });
+    engine.resume();
+    await until(() => engine.status().ticks >= 1);
+    await engine.settled();
+    const safe = await safeService(fake, signatures);
+    for (const member of SC_MEMBERS.slice(0, 2)) safe.sign(member);
+    const gov = await governance();
+    const set = (id: Hex, open: boolean) =>
+      verifySignatureSet({
+        action: "ApproveUpgradeSecurityCouncil",
+        signerGroup: "securityCouncil",
+        typedData: buildTypedData("ApproveUpgradeSecurityCouncil", gov.securityCouncil.domain, {
+          id,
+        }),
+        members: [...gov.securityCouncil.members],
+        threshold: gov.securityCouncil.thresholds.approveUpgrade,
+        check: { kind: "multisig", contract: gov.securityCouncil.address },
+        open,
+      });
+    // The active upgrade's approval is open; another (executed) upgrade's is done.
+    await settle(set(ACTIVE_ID, true));
+    await settle(set(`0x${"de".repeat(32)}`, false));
+    expect(signatureSetsStatus()).toMatchObject({ watched: 2, open: 1 });
+
+    await produce(engine, fake, HEAD + 1n);
+    expect(signatureSetsStatus().lastRun).toMatchObject({
+      block: (HEAD + 1n).toString(),
+      trigger: "head",
+      profile: "idle",
+      sets: 1,
+      verified: 1,
+    });
+    // Someone views the app: both.
+    engine.touch();
+    await produce(engine, fake, HEAD + 2n);
+    expect(signatureSetsStatus().lastRun).toMatchObject({
+      block: (HEAD + 2n).toString(),
+      profile: "viewing",
+      sets: 2,
+      verified: 2,
+    });
+    engine.stop();
+  });
+
+  it("counts every JSON-RPC request and Safe request sent upstream, in /api/status's engine report", async () => {
+    const signatures = new Set<string>();
+    const { fake } = liveChain({ signatures });
+    await backfilled();
+    const engine = liveEngine({ mode: "always" });
+    engine.resume();
+    await until(() => engine.status().ticks >= 1);
+    await engine.settled();
+    const safe = await safeService(fake, signatures);
+    safe.sign(SC_MEMBERS[0] as Hex);
+    await settle(safe.view());
+    await produce(engine, fake, HEAD + 1n);
+    const entries = fake.posts.reduce((n, post) => n + post.calls.length, 0);
+    const cost = engine.status().cost;
+    expect(entries).toBeGreaterThan(10);
+    expect(cost).toMatchObject({
+      mode: "idle",
+      l1RpcPerHour: entries,
+      l2RpcPerHour: 0,
+      rpcPerHour: entries,
+      safePerHour: safe.requests.length,
+    });
+    expect(safe.requests.length).toBe(SC_MEMBERS.length);
+    expect(syncEngineStatus().cost.rpcPerHour).toBe(0 + entries);
+    engine.stop();
+  });
+
+  it("the server's engine starts without counting the start as a visit; a request does", async () => {
+    liveChain();
+    await backfilled();
+    startSync();
+    await until(() => syncEngineStatus().ticks >= 1);
+    expect(syncEngineStatus()).toMatchObject({
+      mode: "always",
+      active: true,
+      cost: { mode: "idle" },
+    });
+    touchSync();
+    expect(syncEngineStatus().cost.mode).toBe("viewing");
+  });
+
+  it("the server's engine: reading /api/status is not a visit, so the status can report idle and its ticks stay idle", async () => {
+    const { fake } = liveChain();
+    await backfilled();
+    startSync();
+    await until(() => syncEngineStatus().ticks >= 1);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(governanceReads(fake)).toBe(1);
+
+    // An agent polling the status, as AGENTS.md's first command does, any spelling the router
+    // matches: still idle.
+    for (const path of ["/api/status", "/API/Status", "/api/status/"]) touchSync(path);
+    expect(syncEngineStatus()).toMatchObject({ active: true, cost: { mode: "idle" } });
+    // The next block keeps the idle profile: governance, read at the block before and still
+    // served, is not read again (the full profile reads it at every block).
+    const timestamp = HEAD_TIME + 12n;
+    await vi.advanceTimersByTimeAsync(Number(timestamp) * 1000 + 500 - Date.now());
+    touchSync("/api/status");
+    fake.chain.options.head = { number: HEAD + 1n, hash: blockHash(HEAD + 1n), timestamp };
+    await until(() => syncEngineStatus().ticks >= 2);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(syncEngineStatus()).toMatchObject({
+      lastTick: { block: (HEAD + 1n).toString() },
+      cost: { mode: "idle" },
+    });
+    expect(governanceReads(fake)).toBe(1);
+
+    // Any other request is a visit: a page, its JSON twin.
+    touchSync("/api/upgrades");
+    expect(syncEngineStatus().cost.mode).toBe("viewing");
+  });
+});
+
+describe("countsAsVisit", () => {
+  it.each([
+    ["/api/status", false],
+    ["/API/STATUS", false],
+    ["/api/status/", false],
+    ["/", true],
+    ["/app/proposals", true],
+    ["/api/upgrades", true],
+    ["/api/status/extra", true],
+    ["/api/statuses", true],
+    ["/resources/refresh", true],
+  ])("%s → %s", (path, visit) => {
+    expect(countsAsVisit(path)).toBe(visit);
   });
 });

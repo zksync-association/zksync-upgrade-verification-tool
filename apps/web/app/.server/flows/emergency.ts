@@ -320,6 +320,8 @@ export async function loadEmergencyUpgrade(
         threshold: spec.threshold,
         check: spec.check,
         supplied,
+        // Signable until the upgrade is executed.
+        open: state !== UPGRADE_STATES.Done,
       })
     )
   );

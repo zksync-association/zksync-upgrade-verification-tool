@@ -14,6 +14,7 @@ import { zksync } from "viem/chains";
 import { FOREVER, cached, cachedUntil, invalidate, peek, replace } from "./cache";
 import { type Lane, RpcError, createLane } from "./chain/jsonrpc";
 import { type LimitedHttpOptions, limitedHttp } from "./rpc-transport";
+import { countUpstream } from "./sync/cost";
 
 // Public RPCs throttle bursts, so every client funnels requests through a small pool and backs
 // off on 429 (viem retries rate-limit errors with exponential delay: 0.5, 1, 2, 4, 8 s).
@@ -23,11 +24,24 @@ import { type LimitedHttpOptions, limitedHttp } from "./rpc-transport";
 export const MULTICALL3: Address = "0xcA11bde05977b3631167028862bE2a173976CA11";
 
 // Up to two batches of 8 in flight, so a fan-out above 8 reads does not wait for a whole round trip.
-const L1_TRANSPORT: LimitedHttpOptions = { label: "L1", maxInFlight: 16, batchSize: 8 };
+// Every request sent is counted for /api/status (sync.engine.cost).
+const countL1 = (n = 1) => countUpstream("l1", n);
+const countL2 = (n = 1) => countUpstream("l2", n);
+const L1_TRANSPORT: LimitedHttpOptions = {
+  label: "L1",
+  maxInFlight: 16,
+  batchSize: 8,
+  onRequest: countL1,
+};
 // Contract state pinned to a block (upgrade states at the head): one aggregate3 per block, each
 // in a POST of its own.
-const L1_STATE_TRANSPORT: LimitedHttpOptions = { label: "L1-state", maxInFlight: 4, batch: false };
-const L2_TRANSPORT: LimitedHttpOptions = { label: "L2", maxInFlight: 4 };
+const L1_STATE_TRANSPORT: LimitedHttpOptions = {
+  label: "L1-state",
+  maxInFlight: 4,
+  batch: false,
+  onRequest: countL1,
+};
+const L2_TRANSPORT: LimitedHttpOptions = { label: "L2", maxInFlight: 4, onRequest: countL2 };
 
 let transport = limitedHttp(env.L1_RPC_URL, L1_TRANSPORT);
 let direct = createPublicClient({ transport });
@@ -532,24 +546,41 @@ export async function blockTimestamps(numbers: readonly bigint[]): Promise<Map<b
 // Raw JSON-RPC lanes (chain/jsonrpc.ts). `history` carries eth_getLogs backfills, `call` the
 // eth_call/eth_getCode verdict reads, `head` the 'latest'/'finalized' reads (requests' and the
 // sync engine's polls). Each lane batches and adapts on its own, so a backfill never queues ahead
-// of a page's reads, and a head read never shares a POST with (or waits on) a slow eth_call.
+// of a page's reads, and a head read never shares a POST with (or waits on) a slow eth_call. They
+// share one provider, though: while the call or head lane is under pressure (rate limited, or
+// requests waiting for a POST slot), the history lane sends one POST at a time, so a backfill
+// cannot take the provider's capacity from the reads a page waits on.
 type L1Lanes = { history: Lane; call: Lane; head: Lane };
 let l1Lanes: L1Lanes | undefined;
 let generation = 0;
 
 /** L1 lanes for the current data source settings. */
 export function lanes(): L1Lanes {
-  l1Lanes ??= {
-    history: createLane({
-      url: env.L1_RPC_URL,
-      label: "l1-history",
-      maxBatch: 25,
-      maxInFlight: 8,
-    }),
-    call: createLane({ url: env.L1_RPC_URL, label: "l1-call", maxBatch: 20, maxInFlight: 8 }),
-    // One head read ('latest' with 'finalized') per POST.
-    head: createLane({ url: env.L1_RPC_URL, label: "l1-head", maxBatch: 2, maxInFlight: 4 }),
-  };
+  if (l1Lanes) return l1Lanes;
+  const call = createLane({
+    url: env.L1_RPC_URL,
+    label: "l1-call",
+    maxBatch: 20,
+    maxInFlight: 8,
+    onSend: countL1,
+  });
+  // One head read ('latest' with 'finalized') per POST.
+  const head = createLane({
+    url: env.L1_RPC_URL,
+    label: "l1-head",
+    maxBatch: 2,
+    maxInFlight: 4,
+    onSend: countL1,
+  });
+  const history = createLane({
+    url: env.L1_RPC_URL,
+    label: "l1-history",
+    maxBatch: 25,
+    maxInFlight: 8,
+    onSend: countL1,
+    yieldTo: () => call.busy() || head.busy(),
+  });
+  l1Lanes = { history, call, head };
   return l1Lanes;
 }
 
@@ -657,12 +688,25 @@ async function l2LanesNow(): Promise<L2Lanes | null> {
   const { l2RpcUrl } = await network();
   // The settings changed while the network was read: answer for the new settings.
   if (started !== generation) return l2LanesNow();
-  l2Lanes ??= l2RpcUrl
-    ? {
-        history: createLane({ url: l2RpcUrl, label: "l2-history", maxBatch: 20, maxInFlight: 4 }),
-        head: createLane({ url: l2RpcUrl, label: "l2-head", maxBatch: 20, maxInFlight: 2 }),
-      }
-    : null;
+  if (l2Lanes === undefined && l2RpcUrl) {
+    const head = createLane({
+      url: l2RpcUrl,
+      label: "l2-head",
+      maxBatch: 20,
+      maxInFlight: 2,
+      onSend: countL2,
+    });
+    const history = createLane({
+      url: l2RpcUrl,
+      label: "l2-history",
+      maxBatch: 20,
+      maxInFlight: 4,
+      onSend: countL2,
+      yieldTo: () => head.busy(),
+    });
+    l2Lanes = { history, head };
+  }
+  l2Lanes ??= null;
   return l2Lanes;
 }
 

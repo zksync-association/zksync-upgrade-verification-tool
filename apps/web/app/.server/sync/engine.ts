@@ -38,13 +38,21 @@ import {
   seedUpgradeStatus,
   upgradeStatusAt,
 } from "../upgrade-status";
+import { type UpstreamCost, upstreamCost } from "./cost";
 
-// The sync engine: while the app is in use it follows the chain head and, on every new block,
-// refills the same cache entries requests read (the head, governance, upgrade states, Safe info,
-// the signature sets pages viewed lately), so a request finds them fresh and asks nothing
-// upstream. It never serves anything itself: when it is idle, failing or off, requests read on
-// demand exactly as without it, with the same lifetimes (head 4 s, governance 30 s). State read at
-// the head is keyed by the head's hash.
+// The sync engine follows the chain head and, on every new block, refills the same cache entries
+// requests read (the head, governance, upgrade states, Safe info, the signature sets pages viewed),
+// so a request finds them fresh and asks nothing upstream. It never serves anything itself: when
+// it is stopped, failing or off, requests read on demand exactly as without it, with the same
+// lifetimes (head 4 s, governance 30 s). State read at the head is keyed by the head's hash.
+//
+// SYNC_MODE=always (the default) follows the head for as long as the process runs; "window" only
+// while the app is in use (a request within SYNC_KEEPWARM_MS), as before. Either way a tick knows
+// whether someone is viewing (a request within SYNC_KEEPWARM_MS). While idle it does less, within
+// the same bounds: governance is read at most every second block (never past its 30 s), only the
+// signature sets that were open when last viewed are verified again, and Era is not read. Reads
+// of /api/status are not a visit (see countsAsVisit): polling the status never changes the
+// profile, nor the cost and mode the status reports.
 //
 // A new head is served (published as the cached head) once what requests at it need has been
 // read (the index tail, upgrade states), at most 2 s after it was seen, and only while it is still
@@ -53,8 +61,8 @@ import {
 // and those confirmations may have been wrong). Each step runs on its own: a slow step for one
 // head delays only that step's next run, never the other steps of newer heads.
 //
-// Timers are unref'd and stop when nobody has made a request for SYNC_KEEPWARM_MS. Nothing here
-// logs an error's text: it can carry the RPC URL and its key.
+// Timers are unref'd; in "window" mode they stop when nobody has made a request for
+// SYNC_KEEPWARM_MS. Nothing here logs an error's text: it can carry the RPC URL and its key.
 
 export type SyncMode = "window" | "always" | "off";
 
@@ -63,7 +71,10 @@ export type SyncEngineStatus = {
   mode: SyncMode;
   /** Why the engine is off, or null. */
   reason: string | null;
-  /** Following the head right now (false while idle). */
+  /**
+   * Following the head right now. With SYNC_MODE=always: for as long as the process runs, in use
+   * or idle (`cost.mode` tells which); with "window": only while the app is in use.
+   */
   active: boolean;
   /** The newest head the engine has seen; ageMs is the time since it was last confirmed. */
   head: {
@@ -77,12 +88,27 @@ export type SyncEngineStatus = {
   lastTick: { block: string; ms: number; failedSteps: string[] } | null;
   polls: number;
   ticks: number;
+  /**
+   * What the app asked upstream in the last hour (requests and background work alike), and
+   * whether someone is using the app now ("viewing": a request within SYNC_KEEPWARM_MS, reads of
+   * /api/status not counted) or not.
+   */
+  cost: UpstreamCost & { mode: "viewing" | "idle" };
 };
 
 /** What a tick's steps get: the new head, and whether the settings are still the ones it ran for. */
 export type Tick = {
   head: BlockRef;
   generation: number;
+  /**
+   * The full profile applies: someone was using the app when the head was seen (a request within
+   * SYNC_KEEPWARM_MS). Always true in "window" mode, which runs only then.
+   */
+  viewing: boolean;
+  /** The engine still runs for these settings, and someone is using the app now. */
+  inUse(): boolean;
+  /** The chain's slot length (12 s on mainnet), or null without a slot schedule. */
+  slotMs: number | null;
   /** The finality boundary F at this head. */
   boundary(): Promise<bigint>;
   current(): boolean;
@@ -234,9 +260,18 @@ export class SyncEngine {
     return this.#lastTouch;
   }
 
-  /** Following the head right now (false while idle, off, or retired). */
+  /** Following the head right now (false while stopped for inactivity, off, or retired). */
   get active(): boolean {
     return this.#running;
+  }
+
+  /** Someone is using the app: a request within SYNC_KEEPWARM_MS. */
+  get viewing(): boolean {
+    return this.#lastTouch !== null && this.#now() - this.#lastTouch <= this.#options.keepWarmMs;
+  }
+
+  get mode(): SyncMode {
+    return this.#offReason === null ? this.#options.mode : "off";
   }
 
   /** A request was made: keeps the engine running, or starts it (that request reads on demand). */
@@ -285,6 +320,7 @@ export class SyncEngine {
       },
       polls: this.#polls,
       ticks: this.#ticks,
+      cost: { ...upstreamCost(now), mode: this.viewing ? "viewing" : "idle" },
     };
   }
 
@@ -302,8 +338,7 @@ export class SyncEngine {
   }
 
   #active() {
-    if (this.#options.mode === "always") return true;
-    return this.#lastTouch !== null && this.#now() - this.#lastTouch <= this.#options.keepWarmMs;
+    return this.#options.mode === "always" || this.viewing;
   }
 
   #schedule(ms: number) {
@@ -533,6 +568,9 @@ export class SyncEngine {
     const tick: Tick = {
       head: polled.head,
       generation: this.generation,
+      viewing: this.#options.mode === "window" || this.viewing,
+      inUse: () => this.#current() && this.#running && this.viewing,
+      slotMs: this.#slotMs ?? null,
       boundary: () => polled.boundary(),
       current: () => this.#current(),
       served: () => observation.served,
@@ -629,6 +667,46 @@ export class SyncEngine {
 
 // safeInfo entries are re-read this long before they would expire, so requests keep hitting.
 const SAFE_INFO_REFRESH_BEFORE_MS = 60_000;
+// While idle, governance read at the previous block is not read again at this one, unless it
+// would run out before the next block's read (a slot plus this) could replace it.
+const GOVERNANCE_IDLE_MARGIN_MS = 4_000;
+// ...and when no block comes in time, it is read again this long before it runs out.
+const GOVERNANCE_KEEPALIVE_LEAD_MS = 3_000;
+// While the vetoable L2 proposals are being viewed, Era is read again this long after the last
+// read (an L1 tick's, or this loop's), so its head (served for 4 s) never runs out between L1
+// blocks.
+const L2_REFRESH_MS = 3_000;
+
+export type GovernancePlan = {
+  /** Someone is using the app: read at every block. */
+  viewing: boolean;
+  /** The new head's number. */
+  head: bigint;
+  /** The block of the engine's last governance read that was stored, or null. */
+  lastRead: bigint | null;
+  /** How much longer the cached governance is served (remainingMs), or null when none is. */
+  remainingMs: number | null;
+  /** The chain's slot length, or null without a slot schedule (then 12 s is assumed). */
+  slotMs: number | null;
+};
+
+/**
+ * Whether a tick reads governance again. Every block while the app is in use; while idle at most
+ * every second block, but never letting the value run out: a head right after the block it was
+ * read at skips the read only while it will still be served when the next block's read lands.
+ */
+export function governanceDue({
+  viewing,
+  head,
+  lastRead,
+  remainingMs,
+  slotMs,
+}: GovernancePlan): boolean {
+  if (viewing || lastRead === null || remainingMs === null) return true;
+  // Not read at the block just before (or this head is not above it: a reorg): read now.
+  if (head <= lastRead || head - lastRead >= 2n) return true;
+  return remainingMs < (slotMs ?? 12_000) + GOVERNANCE_IDLE_MARGIN_MS;
+}
 
 /**
  * The steps of a tick on the live modules. Each writes only while the settings it ran for are
@@ -636,16 +714,88 @@ const SAFE_INFO_REFRESH_BEFORE_MS = 60_000;
  */
 export function liveSteps(): TickStep[] {
   const terminal: TerminalIds = { ids: new Map(), finalReadsFrom: 0n };
-  // One governance read per tick, shared by the steps that need it, with the time it arrived
-  // (its 30 s count from then, as cached() counts them).
+  // The engine's governance reads that were stored: the last one's block, and how many.
+  const stored = { block: null as bigint | null, count: 0 };
+  // Whether a tick reads governance, decided once per tick by the first step that asks.
+  const plans = new WeakMap<Tick, boolean>();
+  const readsGovernance = (tick: Tick) => {
+    let read = plans.get(tick);
+    if (read === undefined) {
+      read = governanceDue({
+        viewing: tick.viewing,
+        head: tick.head.number,
+        lastRead: stored.block,
+        remainingMs: remainingMs(GOVERNANCE_KEY),
+        slotMs: tick.slotMs,
+      });
+      plans.set(tick, read);
+    }
+    return read;
+  };
+  // One governance read per tick (when it reads one), shared by the steps that need it, with the
+  // time it arrived (its 30 s count from then, as cached() counts them). A tick that does not read
+  // it hands the steps the value served now.
   const governanceOf = new WeakMap<Tick, Promise<{ value: Governance; at: number }>>();
   const governanceFor = (tick: Tick) => {
     let read = governanceOf.get(tick);
     if (!read) {
-      read = readGovernance(tick.head).then((value) => ({ value, at: Date.now() }));
+      read = (readsGovernance(tick) ? readGovernance(tick.head) : governance()).then((value) => ({
+        value,
+        at: Date.now(),
+      }));
       governanceOf.set(tick, read);
     }
     return read;
+  };
+  // Idle, after a skipped read: if no block comes before the value would run out, it is read
+  // again at the head served then, as a request would read it, and again before that read runs
+  // out, for as long as no tick stores a newer one (a stalled chain, failing head polls). A read
+  // that fails stops it: requests then read on demand, and the next tick reads it again.
+  let keepAlive: ReturnType<typeof setTimeout> | null = null;
+  const keepGovernanceAlive = (tick: Tick): void => {
+    if (keepAlive) clearTimeout(keepAlive);
+    keepAlive = null;
+    const left = remainingMs(GOVERNANCE_KEY);
+    if (left === null || !Number.isFinite(left)) return;
+    const reads = stored.count;
+    const timer = setTimeout(
+      async () => {
+        keepAlive = null;
+        // A newer read was stored, or the settings changed, or the engine stopped.
+        if (stored.count !== reads || !tick.current()) return;
+        try {
+          const value = await readGovernance();
+          const at = Date.now();
+          if (stored.count !== reads || !tick.current()) return;
+          replace(GOVERNANCE_KEY, value, GOVERNANCE_TTL_MS - (Date.now() - at));
+          stored.count++;
+        } catch {
+          // Requests read it on demand once it runs out, as without the engine.
+          return;
+        }
+        // Kept alive again before this read runs out (in place of any timer a skipped tick armed
+        // meanwhile: it counted the reads before this one, so it would do nothing).
+        if (tick.current()) keepGovernanceAlive(tick);
+      },
+      Math.max(0, left - GOVERNANCE_KEEPALIVE_LEAD_MS)
+    );
+    (timer as { unref?: () => void }).unref?.();
+    keepAlive = timer;
+  };
+
+  // Era between L1 blocks: re-armed by every refresh, stopped by the first that has nothing to
+  // do (not viewed lately, or nobody using the app), fails, or finds the engine stopped.
+  let l2Timer: ReturnType<typeof setTimeout> | null = null;
+  const followL2 = (tick: Tick) => {
+    if (l2Timer) clearTimeout(l2Timer);
+    const timer = setTimeout(async () => {
+      if (l2Timer === timer) l2Timer = null;
+      if (!tick.inUse()) return;
+      const refreshed = await refreshVetoableL2().catch(() => false);
+      if (refreshed && tick.inUse() && l2Timer === null) followL2(tick);
+    }, L2_REFRESH_MS);
+    (timer as { unref?: () => void }).unref?.();
+    l2Timer = timer;
   };
 
   return [
@@ -655,17 +805,25 @@ export function liveSteps(): TickStep[] {
       beforePublish: true,
       run: async (tick) => puhIndex().syncHead({ head: tick.head, safe: await tick.boundary() }),
     },
-    // (b) Governance, re-read at this head; on failure the last good value stays for its 30 s.
-    // Stored once this head is served, so the latest block it reports is never ahead of the head
-    // requests read; not at all when the head was replaced before it was served. Served for 30 s
-    // from the read's answer, never longer because the head was served later (replace() stores
-    // nothing once that time has passed).
+    // (b) Governance, re-read at this head (while idle, at most every second head, see
+    // governanceDue); on failure the last good value stays for its 30 s. Stored once this head is
+    // served, so the latest block it reports is never ahead of the head requests read; not at all
+    // when the head was replaced before it was served. Served for 30 s from the read's answer,
+    // never longer because the head was served later (replace() stores nothing once that time has
+    // passed).
     {
       name: "governance",
       run: async (tick) => {
+        if (!readsGovernance(tick)) {
+          keepGovernanceAlive(tick);
+          throw new StepSkipped("idle: read at the previous block, still served");
+        }
         const { value, at } = await governanceFor(tick);
         if (!(await tick.served())) throw new StepSkipped("head replaced before it was served");
-        if (tick.current()) replace(GOVERNANCE_KEY, value, GOVERNANCE_TTL_MS - (Date.now() - at));
+        if (!tick.current()) return;
+        replace(GOVERNANCE_KEY, value, GOVERNANCE_TTL_MS - (Date.now() - at));
+        stored.block = tick.head.number;
+        stored.count++;
       },
     },
     // (c) upgradeState and upgradeStatus of every id the index knows, at this block.
@@ -689,18 +847,21 @@ export function liveSteps(): TickStep[] {
         );
       },
     },
-    // (e) The signature sets pages viewed in the last 10 minutes, verified at this head once it
-    // is served (after its governance read and upgrade states), so the next request finds them.
+    // (e) The signature sets pages viewed, verified at this head once it is served (after its
+    // governance read and upgrade states), so the next request finds them: while the app is in
+    // use, those viewed in the last 10 minutes and the open ones; while idle, the open ones.
     signaturesStep((tick) => governanceFor(tick)),
-    // (f) ZKsync Era, when the vetoable L2 proposals were viewed in the last 10 minutes: Era's
-    // head, the L2 governor index's tail at it and those proposals' states, read now, so requests
-    // in the next 4 s find them in memory. There is no Era head follower: between ticks, requests
-    // read Era on demand (its head is served for 4 s).
+    // (f) ZKsync Era, when the vetoable L2 proposals were viewed in the last 10 minutes (and the
+    // app is in use): Era's head, the L2 governor index's tail at it and those proposals' states,
+    // read now and then every 3 s until the next L1 block, so requests find them in memory (Era's
+    // head is served for 4 s).
     {
       name: "l2",
-      run: async () => {
+      run: async (tick) => {
+        if (!tick.viewing) throw new StepSkipped("idle");
         if (!(await refreshVetoableL2()))
           throw new StepSkipped("L2 proposals not viewed lately, or not indexed");
+        if (tick.current()) followL2(tick);
       },
     },
   ];
@@ -713,8 +874,9 @@ class PrecomputeFailed extends Error {
 
 /**
  * The tick step that verifies watched signature sets at the new head, after `after(tick)` settled
- * and the head was served (requests then read at it). Sets that would need Safe (no listing at
- * most 60 s old) are left to requests.
+ * and the head was served (requests then read at it): while the app is in use, those viewed in the
+ * last 10 minutes and the open ones; while idle, only the open ones. Sets that would need Safe (no
+ * listing at most 60 s old) are left to requests.
  */
 export function signaturesStep(after: (tick: Tick) => Promise<unknown> = async () => {}): TickStep {
   return {
@@ -723,7 +885,10 @@ export function signaturesStep(after: (tick: Tick) => Promise<unknown> = async (
       await after(tick).catch(() => {});
       if (!(await tick.served())) throw new StepSkipped("head replaced before it was served");
       if (!tick.current()) return;
-      const run = await precomputeSignatureSets(tick.head, { current: tick.current });
+      const run = await precomputeSignatureSets(tick.head, {
+        current: tick.current,
+        viewing: tick.viewing,
+      });
       if (run.failed > 0) throw new PrecomputeFailed(`${run.failed} of ${run.sets} sets failed`);
     },
   };
@@ -823,9 +988,13 @@ function engine(): SyncEngine {
 }
 
 // The Safe store's background sweep runs while the engine does (safe/store.ts decides what, and
-// whether this Safe service may be read in the background at all).
+// whether this Safe service may be read in the background at all): the groups pages asked for
+// while the app is in use and, with SYNC_MODE=always, every governance member Safe at the
+// quota-paced interval.
 const safeSweep: SafeSweepDriver = {
   active: () => instance !== null && instance.generation === rpcGeneration() && instance.active,
+  viewing: () => instance?.viewing ?? false,
+  baseline: () => instance?.mode === "always",
   groups: async () => {
     const gov = await governance();
     return {
@@ -837,30 +1006,65 @@ const safeSweep: SafeSweepDriver = {
 };
 
 // Watched signature sets are verified again at the served head when a member Safe's listing
-// changes, while the engine runs.
+// changes, while the engine runs (only the open ones while idle).
 const signatureWatch: SignatureWatchDriver = {
   active: safeSweep.active,
+  viewing: () => instance?.viewing ?? false,
   head: servedHead,
 };
 
-/** Marks a request: keeps the engine running (or starts it). Never throws. */
-export function touchSync() {
+function startDrivers() {
+  startSafeSweep(safeSweep);
+  startSignatureWatch(signatureWatch);
+}
+
+// Reads of the app's own status: AGENTS.md's first command, monitors, the header's indexing poll.
+const STATUS_PATHS = new Set(["/api/status"]);
+
+/**
+ * Whether a request to `path` is a visit: someone using the app, which switches the engine to the
+ * full profile for SYNC_KEEPWARM_MS (and in "window" mode starts it). A read of /api/status is
+ * not: polling it would otherwise keep the full profile running, and the status would always
+ * report itself as the visitor (`sync.engine.cost.mode` "viewing", the idle cost never seen).
+ * Paths match as the router matches them: case aside, and with or without a trailing slash.
+ */
+export function countsAsVisit(path: string): boolean {
+  const route = path.toLowerCase().replace(/\/+$/, "");
+  return !STATUS_PATHS.has(route);
+}
+
+/**
+ * Marks a request to `path` (any request when omitted). A visit (countsAsVisit) keeps the engine
+ * running in the full profile, or starts it; a status read only resumes an engine that should
+ * already be running (SYNC_MODE=always, or "window" within SYNC_KEEPWARM_MS of a visit), and
+ * leaves the profile as it is. Never throws.
+ */
+export function touchSync(path?: string) {
   try {
-    engine().touch();
-    startSafeSweep(safeSweep);
-    startSignatureWatch(signatureWatch);
+    const current = engine();
+    if (path === undefined || countsAsVisit(path)) current.touch();
+    else current.resume();
+    startDrivers();
   } catch (error) {
     log.warn({ error: errorKind(error) }, "sync touch failed");
   }
 }
 
 /**
- * Starts the engine after the server starts listening (counts as activity: "window" mode runs
- * for SYNC_KEEPWARM_MS, then waits for requests), and after a settings change (the old engine's
- * reads are dropped). Never throws.
+ * Starts the engine after the server starts listening, and after a settings change (the old
+ * engine's reads are dropped). In "always" mode it simply starts following the head (nobody is
+ * viewing yet); in "window" mode the start counts as activity, as before: it runs for
+ * SYNC_KEEPWARM_MS, then waits for requests. Never throws.
  */
 export function startSync() {
-  touchSync();
+  try {
+    const current = engine();
+    if (env.SYNC_MODE === "always") current.resume();
+    else current.touch();
+    startDrivers();
+  } catch (error) {
+    log.warn({ error: errorKind(error) }, "sync start failed");
+  }
 }
 
 /** What the engine is doing, for /api/status. */
@@ -875,6 +1079,8 @@ export function syncEngineStatus(): SyncEngineStatus {
     lastTick: null,
     polls: 0,
     ticks: 0,
+    // No engine yet: no request has been made since the settings were applied.
+    cost: { ...upstreamCost(), mode: "idle" },
   };
 }
 
