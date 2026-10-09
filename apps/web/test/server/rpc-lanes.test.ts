@@ -1,4 +1,4 @@
-import { l2HistoryLane, lanes, resetRpcClients } from "@/.server/rpc";
+import { l2HeadLane, l2HistoryLane, lanes, resetRpcClients } from "@/.server/rpc";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // network() is read through the cache; this stands in for it so a test can hold it pending.
@@ -80,6 +80,31 @@ describe("l2HistoryLane", () => {
     await expect(lane?.request("eth_sendRawTransaction" as never)).rejects.toMatchObject({
       kind: "method-not-allowed",
     });
+  });
+
+  it("gives Era's head and header reads a lane of their own, beside the eth_getLogs lane", async () => {
+    state.network = async () => ({ l2RpcUrl: "http://l2.example/" });
+    const [history, head] = await Promise.all([l2HistoryLane(), l2HeadLane()]);
+    expect(head).not.toBeNull();
+    expect(head).not.toBe(history);
+    expect(await l2HeadLane()).toBe(head);
+    expect(await l2HistoryLane()).toBe(history);
+    const created = (label: string) =>
+      vi.mocked(createLane).mock.calls.filter(([options]) => options.label === label);
+    expect(created("l2-head")).toHaveLength(1);
+    expect(created("l2-history")).toHaveLength(1);
+    expect(head?.stats()).toMatchObject({ label: "l2-head", maxBatch: 20, maxInFlight: 2 });
+
+    resetRpcClients();
+    await expect(head?.request("eth_chainId")).rejects.toMatchObject({ kind: "aborted" });
+    expect(await l2HeadLane()).not.toBe(head);
+  });
+
+  it("is null without an L2 RPC for the head lane too", async () => {
+    state.network = async () => ({ l2RpcUrl: null });
+    expect(await l2HeadLane()).toBeNull();
+    expect(await l2HistoryLane()).toBeNull();
+    expect(state.networkReads).toBe(1);
   });
 
   it("closes the L2 lane with the L1 lanes on a settings change", async () => {

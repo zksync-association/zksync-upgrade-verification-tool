@@ -24,7 +24,8 @@ const handler = "0x0000000000000000000000000000000000000002" as const;
 const txHash = `0x${"ab".repeat(32)}` as Hex;
 const proposal = { calls: [], executor: governor, salt: `0x${"cd".repeat(32)}` as Hex };
 const id = upgradeProposalId(proposal);
-vi.mock("@/.server/logs", () => ({
+vi.mock("@/.server/logs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/.server/logs")>()),
   findBlockByTimestamp: async () => 100n,
   getLogs: async (_client: unknown, filter: { address: string }, from: bigint, to: bigint) => {
     state.scans(filter, from, to);

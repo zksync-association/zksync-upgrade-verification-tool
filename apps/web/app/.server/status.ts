@@ -1,4 +1,5 @@
 import { env } from "@config/env.server";
+import { type L2IndexStatus, l2GovernorIndex } from "./chain/l2-index";
 import { type PuhIndexStatus, puhIndex } from "./chain/puh-index";
 import { type Governance, governance } from "./governance";
 import { type LogHistoryStatus, checkLogHistory } from "./logs";
@@ -19,10 +20,14 @@ import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
  * listing store's background sweep, which keeps member Safes' listings under 60 s old while the
  * app is in use (listings are never served older, sweep or not). `signatures` is the engine's
  * precompute of the signature sets pages viewed lately, at each new head (results are the
- * on-chain verdicts at that head, from Safe listings at most 60 s old).
+ * on-chain verdicts at that head, from Safe listings at most 60 s old). `l2Index` is the ZKsync
+ * Era governors' log index (ProposalCreated/Executed/Canceled of the pinned governors), which the
+ * vetoable list, veto pages and startable upgrades read; idle with no governors when none is
+ * indexed (no L2 RPC, or every governor replaced through env).
  */
 export type SyncStatus = {
   index: PuhIndexStatus;
+  l2Index: L2IndexStatus;
   engine: SyncEngineStatus;
   safe: SafeStoreStatus;
   signatures: SignatureSetsStatus;
@@ -52,6 +57,7 @@ export async function appStatus(): Promise<AppStatus> {
       clientVersion: net.clientVersion,
       sync: {
         index: puhIndex().status(),
+        l2Index: l2GovernorIndex().status(),
         engine: syncEngineStatus(),
         safe: safeStoreStatus(),
         signatures: signatureSetsStatus(),

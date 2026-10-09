@@ -1,9 +1,10 @@
 // A fake chain behind fakeJsonRpc, for log index tests: eth_getLogs over an in-memory log list
-// (with an optional Infura-like block range cap), and eth_getBlockByNumber for the head and the
-// 'finalized' tag. Every eth_getLogs query is recorded.
+// (with an optional Infura-like block range cap; one address or an OR-list of them), and
+// eth_getBlockByNumber / eth_getBlockByHash for the head, the 'finalized' tag and any block. Every
+// eth_getLogs query is recorded.
 
 import { type UpgradeProposal, encodeUpgradeProposal, upgradeProposalId } from "@/common/proposal";
-import { type Address, type Hex, numberToHex, pad, toEventSelector } from "viem";
+import { type Address, type Hex, hexToBigInt, numberToHex, pad, toEventSelector } from "viem";
 import { type FakeCall, FakeRpcError } from "./fake-jsonrpc";
 
 export type ChainLog = {
@@ -84,6 +85,19 @@ export function fakeChain(options: FakeChainOptions) {
         const n = BigInt(tag as string);
         return rawBlock(n, undefined, time(n));
       }
+      if (call.method === "eth_getBlockByHash") {
+        // blockHash(n, salt) encodes the number: n * 1000 + salt.
+        const hash = call.params[0] as Hex;
+        const head = options.head ?? { number: 0n };
+        if (head.hash && hash.toLowerCase() === head.hash.toLowerCase())
+          return rawBlock(
+            head.number,
+            head.hash,
+            head.timestamp ?? options.timestampOf?.(head.number)
+          );
+        const n = hexToBigInt(hash) / 1000n;
+        return rawBlock(n, hash, options.timestampOf?.(n));
+      }
       if (call.method !== "eth_getLogs") return new FakeRpcError(-32601, "method not found");
       const filter = call.params[0] as Record<string, unknown>;
       const from = BigInt(filter.fromBlock as string);
@@ -94,7 +108,10 @@ export function fakeChain(options: FakeChainOptions) {
       if (replaced !== undefined) return replaced;
       if (options.cap !== undefined && to - from > options.cap)
         return new FakeRpcError(-32602, `range ${to - from} exceeds limit of ${options.cap}`);
-      const address = String(filter.address).toLowerCase();
+      // One address, or eth_getLogs' OR-list of addresses.
+      const addresses = (Array.isArray(filter.address) ? filter.address : [filter.address]).map(
+        (a) => String(a).toLowerCase()
+      );
       // Topic positions as eth_getLogs reads them: null matches anything, a list is an OR.
       const topics = (filter.topics ?? []) as (string | string[] | null)[];
       const matches = (log: ChainLog) =>
@@ -110,7 +127,7 @@ export function fakeChain(options: FakeChainOptions) {
           (log) =>
             log.blockNumber >= from &&
             log.blockNumber <= to &&
-            (log.address ?? options.address).toLowerCase() === address &&
+            addresses.includes((log.address ?? options.address).toLowerCase()) &&
             matches(log)
         )
         .map((log) => rawLog(options, log));

@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
   governance: null as null | (() => Promise<unknown>),
   logHistory: null as null | (() => Promise<unknown>),
   backfill: null as null | (() => Promise<void>),
+  l2Backfill: null as null | (() => Promise<void>),
   listing: null as null | ((safe: string) => Promise<unknown>),
   // SAFE_API_KEY set or a self-hosted service (safe-api backgroundSafeReadsAllowed).
   safeBackground: true,
@@ -24,6 +25,7 @@ const state = vi.hoisted(() => ({
     chunks: { done: 435, total: 435 },
     logs: 98,
   } as Record<string, unknown>,
+  l2IndexStatus: { state: "ready", strategy: "full-range", logs: 81 } as Record<string, unknown>,
 }));
 
 vi.mock("@config/log.server", () => {
@@ -51,6 +53,13 @@ vi.mock("@/.server/chain/puh-index", () => ({
   puhIndex: () => ({
     startBackfill: vi.fn(() => state.backfill?.()),
     status: () => state.indexStatus,
+  }),
+}));
+
+vi.mock("@/.server/chain/l2-index", () => ({
+  l2GovernorIndex: () => ({
+    startBackfill: vi.fn(() => state.l2Backfill?.()),
+    status: () => state.l2IndexStatus,
   }),
 }));
 
@@ -118,6 +127,7 @@ beforeEach(() => {
   state.governance = tracked("governance", () => GOV);
   state.logHistory = tracked("log-history", () => ({ status: "ok" }));
   state.backfill = tracked("log-index", () => undefined);
+  state.l2Backfill = tracked("l2-index", () => undefined);
   state.listing = async (safe) => {
     state.events.push(`safe:start:${safe}`);
     await flush();
@@ -135,16 +145,23 @@ describe("prewarm", () => {
     const gov = deferred();
     const history = deferred();
     const index = deferred();
+    const l2 = deferred();
     state.governance = tracked("governance", () => GOV, gov.promise);
     state.logHistory = tracked("log-history", () => ({ status: "ok" }), history.promise);
     state.backfill = tracked("log-index", () => undefined, index.promise);
+    state.l2Backfill = tracked("l2-index", () => undefined, l2.promise);
 
-    const run = prewarm("boot");
+    let finished = false;
+    const run = prewarm("boot").then(() => {
+      finished = true;
+    });
     await flush();
-    // The three middle steps start together, after the network and before anything else.
+    // The three middle steps start together, after the network and before anything else; the
+    // L2 governors' backfill starts beside them.
     expect(state.events).toEqual([
       "network:start",
       "network:end",
+      "l2-index:start",
       "governance:start",
       "log-history:start",
       "log-index:start",
@@ -157,6 +174,13 @@ describe("prewarm", () => {
     expect(state.events.some((e) => e.startsWith("safe:"))).toBe(false);
 
     index.resolve();
+    // Nothing waits for the L2 backfill: the Safe listings all run while it is still going.
+    for (let i = 0; i < 20 && !state.events.includes(`safe:end:${ZKF}`); i++) await flush();
+    expect(state.events).toContain(`safe:end:${ZKF}`);
+    expect(state.events).not.toContain("l2-index:end");
+    // The run itself ends (and logs "done") only once the L2 backfill step has.
+    expect(finished).toBe(false);
+    l2.resolve();
     await run;
     const safeEvents = state.events.filter((e) => e.startsWith("safe:"));
     const order = [...SC, address(4), address(5), ZKF];
@@ -171,10 +195,18 @@ describe("prewarm", () => {
       "log-history",
       "log-index",
       "safe-listings",
+      "l2-index",
       "done",
     ]);
     const backfill = state.records.find((r) => r.fields.step === "log-index");
     expect(backfill?.fields).toMatchObject({ reason: "boot", state: "ready", logs: 98 });
+    const l2Backfill = state.records.find((r) => r.fields.step === "l2-index");
+    expect(l2Backfill?.fields).toMatchObject({
+      reason: "boot",
+      state: "ready",
+      strategy: "full-range",
+      logs: 81,
+    });
     const listings = state.records.find((r) => r.fields.step === "safe-listings");
     expect(listings?.fields).toMatchObject({ listed: 6, of: 6 });
     for (const record of state.records) expect(typeof record.fields.ms).toBe("number");
@@ -188,10 +220,13 @@ describe("prewarm", () => {
     state.network = async () => {
       throw new Error("down");
     };
+    const l2 = vi.fn(async () => {});
+    state.l2Backfill = l2;
     await expect(prewarm("boot")).resolves.toBeUndefined();
     expect(governance).not.toHaveBeenCalled();
     expect(checkLogHistory).not.toHaveBeenCalled();
     expect(listSafeMessages).not.toHaveBeenCalled();
+    expect(l2).not.toHaveBeenCalled();
     expect(state.records.map((r) => [r.level, r.fields.step])).toEqual([
       ["warn", "network"],
       ["info", "done"],
@@ -205,12 +240,13 @@ describe("prewarm", () => {
     state.governance = fail;
     state.logHistory = fail;
     state.backfill = fail;
+    state.l2Backfill = fail;
     state.listing = fail;
     await expect(prewarm("boot")).resolves.toBeUndefined();
     // Without governance there is nothing to list.
     expect(listSafeMessages).not.toHaveBeenCalled();
     const failed = state.records.filter((r) => r.level === "warn").map((r) => r.fields.step);
-    expect(failed.sort()).toEqual(["governance", "log-history", "log-index"]);
+    expect(failed.sort()).toEqual(["governance", "l2-index", "log-history", "log-index"]);
 
     // Synchronous throws are failures too.
     state.records = [];
@@ -252,8 +288,8 @@ describe("prewarm", () => {
     expect(state.records.find((r) => r.fields.step === "safe-listings")?.fields).toMatchObject({
       skipped: "keyless-public-service",
     });
-    // Everything before the listings still ran.
-    expect(steps()).toEqual([
+    // Everything before the listings still ran (the L2 backfill beside them).
+    expect(steps().filter((step) => step !== "l2-index")).toEqual([
       "network",
       "governance",
       "log-history",
@@ -261,6 +297,7 @@ describe("prewarm", () => {
       "safe-listings",
       "done",
     ]);
+    expect(steps()).toContain("l2-index");
   });
 
   it("never logs an RPC URL, host, key or error text", async () => {
@@ -277,6 +314,9 @@ describe("prewarm", () => {
     state.logHistory = async () => ({ status: "error", message: `eth_getLogs failed at ${url}` });
     state.backfill = async () => {
       throw Object.assign(new Error(url), { name: "HttpRequestError" });
+    };
+    state.l2Backfill = async () => {
+      throw leaky();
     };
     await prewarm("boot");
 
@@ -344,7 +384,7 @@ describe("prewarm", () => {
     expect(listSafeMessages).toHaveBeenCalledTimes(6);
     const boot = state.records.filter((r) => r.fields.reason === "boot").map((r) => r.fields.step);
     // Steps log as they finish: governance, held back above, comes last of the three.
-    expect(boot).toEqual([
+    expect(boot.filter((step) => step !== "l2-index")).toEqual([
       "network",
       "log-history",
       "log-index",
@@ -352,6 +392,7 @@ describe("prewarm", () => {
       "superseded",
       "done",
     ]);
+    expect(boot).toContain("l2-index");
 
     // Once a run ends, a later call starts a new one.
     vi.clearAllMocks();

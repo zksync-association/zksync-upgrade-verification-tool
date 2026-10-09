@@ -63,7 +63,8 @@ const log = {
   transactionHash: `0x${"ab".repeat(32)}`,
 };
 
-vi.mock("@/.server/logs", () => ({
+vi.mock("@/.server/logs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/.server/logs")>()),
   findBlockByTimestamp: async () => 1n,
   getLogs: async (_client: unknown, filter: { address: string }) =>
     filter.address === TOKEN_GOVERNOR ? [log] : [],

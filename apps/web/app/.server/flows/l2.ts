@@ -3,28 +3,49 @@ import type { L2Proposal } from "@/common/execution";
 import {
   type Address,
   type Hex,
+  type Log,
   type PublicClient,
   decodeEventLog,
   encodeAbiParameters,
   getAddress,
   isAddressEqual,
+  isHex,
   keccak256,
   numberToHex,
   toHex,
 } from "viem";
 import { getLogProof } from "viem/zksync";
-import { cached } from "../cache";
+import { FOREVER, cached } from "../cache";
+import {
+  type L2GovernorEvent,
+  eventsInWindow,
+  isIndexedL2Governor,
+  l2GovernorIndex,
+  l2IndexHead,
+} from "../chain/l2-index";
 import { governance } from "../governance";
 import { findBlockByTimestamp, getLogs } from "../logs";
-import { l1, l2, network } from "../rpc";
+import { type L2Head, l1, l2, network, refreshL2ChainHead } from "../rpc";
 import { callTo, topicOf } from "./common";
 import { L1_MESSENGER, findL2ProposalInBatch, upgradeBatch } from "./l2-batch";
 
 // ZKsync Era side of governance: the governors Guardians can veto, and the protocol governor whose
-// executed proposals start L1 upgrades. Era's public RPC serves wide log ranges, so windows are
-// scanned directly; results near the head are never cached.
+// executed proposals start L1 upgrades. The pinned governors' ProposalCreated, ProposalExecuted
+// and ProposalCanceled logs come from the L2 governor log index (chain/l2-index.ts), and windows
+// ("the last 24 days") are cut by the timestamp of each event's block. A governor replaced through
+// env, and every governor while Era does not know the 'finalized' tag (see l2IndexHead), is
+// scanned on demand, as before: a timestamp search for the window's first block, then the
+// window's logs. Results near the head are never cached for good.
 
 const DAY = 86_400n;
+// 3-day voting delay + 7-day voting period + 7-day possible extension, with margin.
+const VETO_WINDOW = 24n * DAY;
+// Executed protocol proposals whose L1 upgrade may still be started.
+const STARTABLE_WINDOW = 30n * DAY;
+// An upgrade's L2 execution, before its L1 creation (legacy discovery).
+const DISCOVERY_WINDOW = 21n * DAY;
+// A proposal's state() read at an Era head is served while that head is (4 s).
+const STATE_TTL_MS = 4_000;
 
 // IGovernor.ProposalState
 export const L2_PROPOSAL_STATES = [
@@ -54,6 +75,8 @@ export async function knownGovernors(): Promise<
   );
 }
 
+// ---- governors that are not indexed: on-demand scans ----
+
 async function l2Head(client: PublicClient) {
   return cached("l2-head", 4_000, () => client.getBlock({ blockTag: "latest" }));
 }
@@ -66,6 +89,26 @@ async function l2BlockAt(client: PublicClient, timestamp: bigint) {
     safeHead: head.number - 1_000n,
   });
 }
+
+/** `name` logs of `governor` in [from block, head] (scanned on demand, never cached). */
+async function scanWindow(
+  client: PublicClient,
+  governor: Address,
+  name: "ProposalCreated" | "ProposalExecuted",
+  since: bigint
+) {
+  const head = await l2Head(client);
+  const from = await l2BlockAt(client, head.timestamp - since);
+  return getLogs(
+    client,
+    { address: governor, topics: [topicOf(l2GovernorAbi, name)] },
+    from,
+    head.number,
+    { safeHead: -1n }
+  );
+}
+
+// ---- proposals ----
 
 export type L2ProposalView = L2Proposal & {
   governor: Address;
@@ -92,16 +135,26 @@ function hashL2Proposal(p: L2Proposal): bigint {
   );
 }
 
-async function decodeCreated(
-  client: PublicClient,
-  governor: Address,
-  log: Awaited<ReturnType<typeof getLogs>>[number]
-): Promise<L2ProposalView> {
+type CreatedLog = Pick<Log, "data" | "topics" | "transactionHash" | "blockHash" | "logIndex">;
+
+/** What a ProposalCreated log says: everything about a proposal except its current state. */
+type Created = {
+  proposal: L2Proposal;
+  proposalId: bigint;
+  proposer: Address;
+  voteStart: bigint;
+  voteEnd: bigint;
+  /** hashL2Proposal(proposal), computed here. */
+  localId: bigint;
+  createdTx: Hex;
+};
+
+function decodeCreated(log: CreatedLog): Created {
   const { args } = decodeEventLog({
     abi: l2GovernorAbi,
     eventName: "ProposalCreated",
     data: log.data,
-    topics: log.topics,
+    topics: log.topics as [Hex, ...Hex[]],
   });
   const proposal: L2Proposal = {
     targets: args.targets.map((t) => getAddress(t)),
@@ -109,90 +162,230 @@ async function decodeCreated(
     calldatas: [...args.calldatas],
     description: args.description,
   };
-  const [state, governorName, contractId] = await Promise.all([
+  return {
+    proposal,
+    proposalId: args.proposalId,
+    proposer: getAddress(args.proposer),
+    voteStart: args.voteStart,
+    voteEnd: args.voteEnd,
+    localId: hashL2Proposal(proposal),
+    createdTx: log.transactionHash as Hex,
+  };
+}
+
+/** decodeCreated, once per log: a block hash and a log index name one log for good. */
+function createdOf(log: CreatedLog): Promise<Created> {
+  if (!isHex(log.blockHash) || typeof log.logIndex !== "number")
+    return Promise.resolve(decodeCreated(log));
+  return cached(`l2-created:${log.blockHash.toLowerCase()}:${log.logIndex}`, FOREVER, async () =>
+    decodeCreated(log)
+  );
+}
+
+/**
+ * Guardians.hashL2Proposal on L1 for this content (a pure function of it): kept once read. null
+ * when the read failed (asked again next time).
+ */
+async function idOnL1(created: Created): Promise<bigint | null> {
+  try {
+    const { guardians } = await governance();
+    return await cached(`l2-id-on-l1:${guardians.address}:${created.localId}`, FOREVER, () =>
+      l1.readContract({
+        address: guardians.address,
+        abi: guardiansAbi,
+        functionName: "hashL2Proposal",
+        args: [
+          {
+            targets: created.proposal.targets,
+            values: created.proposal.values.map(BigInt),
+            calldatas: created.proposal.calldatas,
+            description: created.proposal.description,
+          },
+        ],
+      })
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The proposal a ProposalCreated log of `governor` describes, with its state read now. `at`: the
+ * Era head the request answers at; the state read is then shared by requests at that head.
+ */
+async function viewOf(
+  client: PublicClient,
+  governor: Address,
+  log: CreatedLog,
+  at: L2Head | null
+): Promise<L2ProposalView> {
+  const created = await createdOf(log);
+  const readState = () =>
     client
       .readContract({
         address: governor,
         abi: l2GovernorAbi,
         functionName: "state",
-        args: [args.proposalId],
+        args: [created.proposalId],
       })
       // null only for a value outside IGovernor.ProposalState. A failed read fails the caller,
       // whatever its kind: a proposal whose state went unread must neither drop out of what
       // Guardians can veto nor close its veto. (viem turns Era's code-3 revert and an internal
       // error -32603 into the same ContractFunctionRevertedError, so no failure here is an answer.)
-      .then((s) => L2_PROPOSAL_STATES[s] ?? null),
+      .then((s) => L2_PROPOSAL_STATES[s] ?? null);
+  const [state, governorName, contractId] = await Promise.all([
+    at
+      ? cached(
+          `l2-state:${governor.toLowerCase()}:${created.proposalId}:${at.head.hash}`,
+          STATE_TTL_MS,
+          readState
+        )
+      : readState(),
     knownGovernors().then(
       (gs) => gs.find((g) => isAddressEqual(g.address, governor))?.name ?? null
     ),
-    governance()
-      .then((gov) =>
-        l1.readContract({
-          address: gov.guardians.address,
-          abi: guardiansAbi,
-          functionName: "hashL2Proposal",
-          args: [
-            {
-              targets: proposal.targets,
-              values: proposal.values.map(BigInt),
-              calldatas: proposal.calldatas,
-              description: proposal.description,
-            },
-          ],
-        })
-      )
-      .catch(() => null),
+    idOnL1(created),
   ]);
   return {
-    ...proposal,
+    ...created.proposal,
     governor,
     governorName,
-    proposalId: args.proposalId.toString(),
-    proposer: getAddress(args.proposer),
+    proposalId: created.proposalId.toString(),
+    proposer: created.proposer,
     state,
-    voteStart: args.voteStart.toString(),
-    voteEnd: args.voteEnd.toString(),
-    idMatchesLocal: hashL2Proposal(proposal) === args.proposalId,
-    idMatchesContract: contractId === null ? null : contractId === args.proposalId,
-    createdTx: log.transactionHash as Hex,
+    voteStart: created.voteStart.toString(),
+    voteEnd: created.voteEnd.toString(),
+    idMatchesLocal: created.localId === created.proposalId,
+    idMatchesContract: contractId === null ? null : contractId === created.proposalId,
+    createdTx: created.createdTx,
   };
 }
+
+const proposalKey = (governor: Address, id: bigint) => `${governor.toLowerCase()}:${id}`;
+
+const isVetoable = (p: L2ProposalView) =>
+  p.state === null || p.state === "Pending" || p.state === "Active";
+
+/**
+ * Indexed governors' proposals created in the last 24 days, except those the index shows
+ * executed or canceled (final states: their state() would only confirm it), at Era head `at`.
+ */
+async function recentFromIndex(
+  client: PublicClient,
+  governors: readonly Address[],
+  at: L2Head
+): Promise<L2ProposalView[]> {
+  const { head, events } = await l2GovernorIndex().read({ head: at });
+  const closed = new Set(
+    events
+      .filter((e) => e.eventName !== "ProposalCreated")
+      .map((e) => proposalKey(e.governor, e.proposalId))
+  );
+  const created = events.filter(
+    (e) =>
+      e.eventName === "ProposalCreated" &&
+      governors.some((g) => isAddressEqual(g, e.governor)) &&
+      !closed.has(proposalKey(e.governor, e.proposalId))
+  );
+  const recent = await eventsInWindow(created, head.head.timestamp - VETO_WINDOW);
+  return Promise.all(
+    recent.map((e) => {
+      const governor = governors.find((g) => isAddressEqual(g, e.governor)) ?? e.governor;
+      return viewOf(client, governor, e.log, head);
+    })
+  );
+}
+
+/** A replaced governor's proposals created in the last 24 days (scanned on demand). */
+async function recentFromScan(client: PublicClient, governor: Address): Promise<L2ProposalView[]> {
+  const logs = await scanWindow(client, governor, "ProposalCreated", VETO_WINDOW);
+  return Promise.all(logs.map((log) => viewOf(client, governor, log, null)));
+}
+
+// When the vetoable proposals (or a veto's proposal) were last asked for, for the sync engine.
+let vetoInterestAt: number | null = null;
+const VETO_INTEREST_MS = 10 * 60_000;
 
 /**
  * Proposals on the Token and GovOps governors that Guardians can still veto (Pending or Active,
  * or a state value the app does not know: listed rather than hidden). A failed read fails the list.
  */
 export async function activeL2Proposals(): Promise<L2ProposalView[]> {
+  vetoInterestAt = Date.now();
   const client = await l2();
   if (!client) return [];
-  const head = await l2Head(client);
-  // 3-day voting delay + 7-day voting period + 7-day possible extension, with margin.
-  const from = await l2BlockAt(client, head.timestamp - 24n * DAY);
-  const governors = (await knownGovernors()).filter((g) => g.kind !== "protocol");
-  const lists = await Promise.all(
-    governors.map(async (g) => {
-      const logs = await getLogs(
-        client,
-        { address: g.address, topics: [topicOf(l2GovernorAbi, "ProposalCreated")] },
-        from,
-        head.number,
-        { safeHead: -1n }
-      );
-      return Promise.all(logs.map((log) => decodeCreated(client, g.address, log)));
-    })
-  );
-  return lists
-    .flat()
-    .filter((p) => p.state === null || p.state === "Pending" || p.state === "Active");
+  const [net, all] = await Promise.all([network(), knownGovernors()]);
+  const governors = all.filter((g) => g.kind !== "protocol");
+  const at = governors.some((g) => isIndexedL2Governor(net, g.address))
+    ? await l2IndexHead(net)
+    : null;
+  const indexed = at ? governors.filter((g) => isIndexedL2Governor(net, g.address)) : [];
+  const lists = await Promise.all([
+    at && indexed.length > 0
+      ? recentFromIndex(
+          client,
+          indexed.map((g) => g.address),
+          at
+        )
+      : [],
+    ...governors.filter((g) => !indexed.includes(g)).map((g) => recentFromScan(client, g.address)),
+  ]);
+  const found = lists.flat();
+  // Per governor, in the order above; each governor's oldest first.
+  return governors
+    .flatMap((g) => found.filter((p) => isAddressEqual(p.governor, g.address)))
+    .filter(isVetoable);
 }
 
-/** A specific L2 proposal's content, found from its on-chain snapshot time. */
+/**
+ * For the sync engine, on a new L1 head: when vetoable proposals were asked for in the last 10
+ * minutes, reads Era's head now, the governor index's tail at the Era head served then (this one,
+ * unless a newer one is known) and those proposals' states, so requests in the next 4 s find them
+ * in memory. False when they were not asked for lately, no vetoable governor is indexed, or Era
+ * does not know the 'finalized' tag (requests then scan on demand).
+ */
+export async function refreshVetoableL2(): Promise<boolean> {
+  if (vetoInterestAt === null || Date.now() - vetoInterestAt > VETO_INTEREST_MS) return false;
+  const client = await l2();
+  if (!client) return false;
+  const [net, all] = await Promise.all([network(), knownGovernors()]);
+  const indexed = all.filter((g) => g.kind !== "protocol" && isIndexedL2Governor(net, g.address));
+  if (indexed.length === 0) return false;
+  if (!(await refreshL2ChainHead())) return false;
+  const at = await l2IndexHead(net);
+  if (!at) return false;
+  await recentFromIndex(
+    client,
+    indexed.map((g) => g.address),
+    at
+  );
+  return true;
+}
+
+/** A specific L2 proposal's content, from its ProposalCreated log, with its state read now. */
 export async function getL2Proposal(
   governor: Address,
   proposalId: bigint
 ): Promise<L2ProposalView | null> {
+  vetoInterestAt = Date.now();
   const client = await l2();
   if (!client) return null;
+  const net = await network();
+  const at = isIndexedL2Governor(net, governor) ? await l2IndexHead(net) : null;
+  if (at) {
+    // The index holds every ProposalCreated of this governor up to the head: none for this id
+    // means the governor has no such proposal.
+    const { head, events } = await l2GovernorIndex().read({ head: at });
+    const event = events.find(
+      (e) =>
+        e.eventName === "ProposalCreated" &&
+        isAddressEqual(e.governor, governor) &&
+        e.proposalId === proposalId
+    );
+    return event ? viewOf(client, governor, event.log, head) : null;
+  }
+  // A replaced governor (or Era without the 'finalized' tag): found from its on-chain snapshot
+  // time.
   return cached(`l2-proposal:${governor}:${proposalId}`, 5 * 60_000, async () => {
     const [snapshot, votingDelay] = await Promise.all([
       client.readContract({
@@ -225,8 +418,25 @@ export async function getL2Proposal(
           topics: l.topics,
         }).args.proposalId === proposalId
     );
-    return log ? decodeCreated(client, governor, log) : null;
+    return log ? viewOf(client, governor, log, null) : null;
   });
+}
+
+/**
+ * The protocol governor's ProposalExecuted events in blocks timed [since, until] from the index,
+ * at Era head `at`.
+ */
+async function executedFromIndex(
+  governor: Address,
+  at: L2Head,
+  since: bigint,
+  until?: bigint
+): Promise<L2GovernorEvent[]> {
+  const { events } = await l2GovernorIndex().read({ head: at });
+  const executed = events.filter(
+    (e) => e.eventName === "ProposalExecuted" && isAddressEqual(e.governor, governor)
+  );
+  return eventsInWindow(executed, since, until);
 }
 
 /** ZkProtocolGovernor proposal whose L2 → L1 message is the upgrade `l1Id` (for the Tally link). */
@@ -236,7 +446,8 @@ export async function findL2ProposalForUpgrade(
   { startedTxHash, strategy = "batch" }: { startedTxHash?: Hex; strategy?: "batch" | "legacy" } = {}
 ) {
   const client = await l2();
-  const { l2Governors, isDevNode, upgradeHandler } = await network();
+  const net = await network();
+  const { l2Governors, isDevNode, upgradeHandler } = net;
   if (!client || !l2Governors.protocol) return null;
   const governor = l2Governors.protocol;
   return cached(
@@ -255,17 +466,15 @@ export async function findL2ProposalForUpgrade(
           // Unsupported RPC methods or unavailable batch history retain the existing discovery path.
         }
       }
-      const from = await l2BlockAt(client, BigInt(creationTimestamp) - 21n * DAY);
-      const to = await l2BlockAt(client, BigInt(creationTimestamp));
-      const logs = await getLogs(
-        client,
-        { address: governor, topics: [topicOf(l2GovernorAbi, "ProposalExecuted")] },
-        from,
-        to,
-        { safeHead: -1n }
-      );
-      for (const log of logs) {
-        const message = await l1MessageOf(client, log.transactionHash as Hex);
+      const created = BigInt(creationTimestamp);
+      // Executions in the 21 days before the upgrade's creation on L1. (Its own execution was
+      // proven on L1 before then, so it is in a block timed before the creation.)
+      const at = isIndexedL2Governor(net, governor) ? await l2IndexHead(net) : null;
+      const logs: { log: Log; final: boolean }[] = at
+        ? await executedFromIndex(governor, at, created - DISCOVERY_WINDOW, created)
+        : await windowLogs(client, governor, created);
+      for (const { log, final } of logs) {
+        const message = await l1MessageOf(client, log.transactionHash as Hex, final);
         if (message && keccak256(message.body) === l1Id) {
           const { args } = decodeEventLog({
             abi: l2GovernorAbi,
@@ -285,7 +494,31 @@ export async function findL2ProposalForUpgrade(
   );
 }
 
-async function l1MessageOf(client: PublicClient, txHash: Hex) {
+/** A replaced protocol governor's executions in [created − 21 days, created], scanned on demand. */
+async function windowLogs(client: PublicClient, governor: Address, created: bigint) {
+  const from = await l2BlockAt(client, created - DISCOVERY_WINDOW);
+  const to = await l2BlockAt(client, created);
+  const logs = await getLogs(
+    client,
+    { address: governor, topics: [topicOf(l2GovernorAbi, "ProposalExecuted")] },
+    from,
+    to,
+    { safeHead: -1n }
+  );
+  return logs.map((log) => ({ log, final: false }));
+}
+
+/**
+ * The L2 → L1 message an execution sent, from its receipt. Kept for good when the execution is
+ * final (at or below Era's 'finalized' block): its receipt never changes.
+ */
+function l1MessageOf(client: PublicClient, txHash: Hex, final = false) {
+  return final
+    ? cached(`l2-message:${txHash.toLowerCase()}`, FOREVER, () => readL1Message(client, txHash))
+    : readL1Message(client, txHash);
+}
+
+async function readL1Message(client: PublicClient, txHash: Hex) {
   const receipt = await client.getTransactionReceipt({ hash: txHash });
   const log = receipt.logs.find(
     (l) =>
@@ -320,17 +553,16 @@ export async function notStartedUpgrades(): Promise<NotStartedUpgrade[]> {
   const client = await l2();
   const net = await network();
   if (!client || !net.l2Governors.protocol) return [];
-  const head = await l2Head(client);
-  const from = await l2BlockAt(client, head.timestamp - 30n * DAY);
-  const logs = await getLogs(
-    client,
-    { address: net.l2Governors.protocol, topics: [topicOf(l2GovernorAbi, "ProposalExecuted")] },
-    from,
-    head.number,
-    { safeHead: -1n }
-  );
+  const governor = net.l2Governors.protocol;
+  const at = isIndexedL2Governor(net, governor) ? await l2IndexHead(net) : null;
+  const logs: { log: Log; final: boolean }[] = at
+    ? await executedFromIndex(governor, at, at.head.timestamp - STARTABLE_WINDOW)
+    : (await scanWindow(client, governor, "ProposalExecuted", STARTABLE_WINDOW)).map((log) => ({
+        log,
+        final: false,
+      }));
   const results = await Promise.all(
-    logs.map(async (log): Promise<NotStartedUpgrade | null> => {
+    logs.map(async ({ log, final }): Promise<NotStartedUpgrade | null> => {
       const { args } = decodeEventLog({
         abi: l2GovernorAbi,
         eventName: "ProposalExecuted",
@@ -339,7 +571,7 @@ export async function notStartedUpgrades(): Promise<NotStartedUpgrade[]> {
       });
       const l2ProposalId = numberToHex(args.proposalId);
       const executedTx = log.transactionHash as Hex;
-      const message = await l1MessageOf(client, executedTx);
+      const message = await l1MessageOf(client, executedTx, final);
       if (!message)
         return {
           l2ProposalId,

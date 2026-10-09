@@ -72,7 +72,8 @@ const state = vi.hoisted(() => ({
   logs: [] as unknown[],
 }));
 
-vi.mock("@/.server/logs", () => ({
+vi.mock("@/.server/logs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/.server/logs")>()),
   findBlockByTimestamp: async () => 1n,
   getLogs: async () => state.logs,
 }));

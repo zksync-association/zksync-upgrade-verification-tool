@@ -40,6 +40,25 @@ const ENGINE = vi.hoisted(() => ({
   ticks: 3,
 }));
 
+// What the L2 governor log index reports (l2-index.test.ts covers how).
+const L2_INDEX = vi.hoisted(() => ({
+  state: "ready",
+  deployBlock: "49077771",
+  coveredFrom: "49077771",
+  finalizedTo: "72350514",
+  headTo: "72352499",
+  chunks: { done: 1, total: 1 },
+  strategy: "full-range",
+  span: null,
+  logs: 81,
+  error: null,
+  governors: [
+    "0xb83FF6501214ddF40C91C9565d095400f3F45746",
+    "0xEEEa739a8b6fB1b8f703E23C9Be03CeeA643b160",
+    "0x76705327e682F2d96943280D99464Ab61219e34f",
+  ],
+}));
+
 // What the Safe store's sweep reports (safe-store.test.ts covers how).
 const SAFE = vi.hoisted(() => ({
   sweeping: true,
@@ -85,6 +104,9 @@ vi.mock("@/.server/logs", () => ({ checkLogHistory: async () => state.canary }))
 vi.mock("@/.server/chain/puh-index", () => ({
   puhIndex: () => ({ status: () => state.index, hasCanary: async () => state.inIndex }),
 }));
+vi.mock("@/.server/chain/l2-index", () => ({
+  l2GovernorIndex: () => ({ status: () => L2_INDEX }),
+}));
 vi.mock("@/.server/safe-api", () => ({ quota: { limit: null, remaining: null } }));
 vi.mock("@/.server/sync/engine", () => ({ syncEngineStatus: () => ENGINE }));
 vi.mock("@/.server/safe/store", () => ({ safeStoreStatus: () => SAFE }));
@@ -102,7 +124,7 @@ beforeEach(() => {
 });
 
 describe("appStatus", () => {
-  it("adds sync.index, sync.engine, sync.safe and sync.signatures next to the fields it always had", async () => {
+  it("adds sync.index, sync.l2Index, sync.engine, sync.safe and sync.signatures next to the fields it always had", async () => {
     const status = await appStatus();
     expect(status).toEqual({
       ok: true,
@@ -115,7 +137,13 @@ describe("appStatus", () => {
       },
       l2RpcConfigured: true,
       clientVersion: "Geth/v1.15",
-      sync: { index: state.index, engine: ENGINE, safe: SAFE, signatures: SIGNATURES },
+      sync: {
+        index: state.index,
+        l2Index: L2_INDEX,
+        engine: ENGINE,
+        safe: SAFE,
+        signatures: SIGNATURES,
+      },
     });
     // JSON-safe as served: strings and numbers only.
     expect(JSON.parse(JSON.stringify(status))).toEqual(status);

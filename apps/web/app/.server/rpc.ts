@@ -258,25 +258,47 @@ const HEAD_KEY = "latest-block";
 // Head reads (requests' and the sync engine's polls alike), numbered in the order they were sent.
 let headReads = 0;
 
-// The newest head read under the current settings, by whoever read it, and the number of the
-// newest read that named it. A head poll never replaces the cached head with an older one: a
-// lower block (a load-balanced RPC can answer from a backend behind), or another block at the
-// same height named by an earlier read (an orphan of a reorg the later read already saw).
-let newestHead: { generation: number; block: BlockRef; read: number } | null = null;
+/** A chain's newest head read under some settings, and the number of the newest read naming it. */
+type NewestHead = { generation: number; block: BlockRef; read: number };
+
+/**
+ * Whether `block`, named by head read number `read`, may stand as the newest head after `known`
+ * (under the current settings): a higher block, or the same block, or another block at the same
+ * height named by a later read (the earlier one named an orphan of a reorg the later read saw).
+ */
+function supersedesHead(known: NewestHead | null, block: BlockRef, read: number): boolean {
+  const current = known?.generation === generation ? known : null;
+  if (!current) return true;
+  if (block.number !== current.block.number) return block.number > current.block.number;
+  return block.hash === current.block.hash || read > current.read;
+}
+
+/** `known` after head read `read`, sent under `readGeneration`, named `block`. */
+function withHead(
+  known: NewestHead | null,
+  block: BlockRef,
+  readGeneration: number,
+  read: number
+): NewestHead | null {
+  if (readGeneration !== generation || !supersedesHead(known, block, read)) return known;
+  const current = known?.generation === generation ? known : null;
+  const latestRead =
+    current && current.block.hash === block.hash ? Math.max(current.read, read) : read;
+  return { generation, block, read: latestRead };
+}
+
+// The newest head read under the current settings, by whoever read it. A head poll never
+// replaces the cached head with an older one: a lower block (a load-balanced RPC can answer from
+// a backend behind), or another block at the same height named by an earlier read.
+let newestHead: NewestHead | null = null;
 
 /** Whether `block`, named by head read number `read`, may stand as the newest head. */
 function supersedes(block: BlockRef, read: number): boolean {
-  const known = newestHead?.generation === generation ? newestHead : null;
-  if (!known) return true;
-  if (block.number !== known.block.number) return block.number > known.block.number;
-  return block.hash === known.block.hash || read > known.read;
+  return supersedesHead(newestHead, block, read);
 }
 
 function noteHead(block: BlockRef, readGeneration: number, read: number) {
-  if (readGeneration !== generation || !supersedes(block, read)) return;
-  const known = newestHead?.generation === generation ? newestHead : null;
-  const latestRead = known && known.block.hash === block.hash ? Math.max(known.read, read) : read;
-  newestHead = { generation, block, read: latestRead };
+  newestHead = withHead(newestHead, block, readGeneration, read);
 }
 
 /**
@@ -513,7 +535,6 @@ export async function blockTimestamps(numbers: readonly bigint[]): Promise<Map<b
 // of a page's reads, and a head read never shares a POST with (or waits on) a slow eth_call.
 type L1Lanes = { history: Lane; call: Lane; head: Lane };
 let l1Lanes: L1Lanes | undefined;
-let l2History: Lane | null | undefined;
 let generation = 0;
 
 /** L1 lanes for the current data source settings. */
@@ -532,17 +553,127 @@ export function lanes(): L1Lanes {
   return l1Lanes;
 }
 
-/** eth_getLogs lane for ZKsync Era, or null when no L2 RPC is configured. */
-export async function l2HistoryLane(): Promise<Lane | null> {
-  if (l2History !== undefined) return l2History;
+// ---- ZKsync Era head ----
+
+const L2_HEAD_KEY = "l2-latest-block";
+
+/**
+ * ZKsync Era's head and its finality boundary: `safe` is Era's 'finalized' block (one whose batch
+ * was executed on L1), never above the head. -1 when the node does not know the tag: then nothing
+ * is final, and the flows scan their windows on demand (as before the L2 log index) instead of
+ * reading the index, whose tail would then be the governors' whole history at every Era head.
+ */
+export type L2Head = { head: BlockRef; safe: bigint; answeredAt: number };
+
+// The newest 'finalized' Era block read under the current settings: a failed 'finalized' read
+// falls back to it (finality only moves forward, so an older answer is a deeper boundary).
+let knownL2Finalized: { generation: number; number: bigint } | null = null;
+
+// Era head reads (requests' and the sync engine's), numbered in the order they were sent.
+let l2HeadReads = 0;
+
+// The newest Era head read under the current settings, by whoever read it. Era's RPC is load
+// balanced and its backends can be a block or two apart: the sync engine's refresh never replaces
+// the served Era head with an older one (as for L1, see newestHead).
+let newestL2Head: NewestHead | null = null;
+
+type L2HeadRead = { at: L2Head; read: number; readGeneration: number };
+
+async function readL2Head(lane: Lane): Promise<L2HeadRead> {
+  const readGeneration = generation;
+  const read = ++l2HeadReads;
+  // One JSON-RPC batch: both answers describe the same moment.
+  const [latest, finalized] = await Promise.all([
+    lane.request<unknown>("eth_getBlockByNumber", ["latest", false]),
+    lane.request<unknown>("eth_getBlockByNumber", ["finalized", false]).then(
+      (raw) => ({ block: toBlockRef(raw) }),
+      (error: unknown) => ({ error })
+    ),
+  ]);
+  const answeredAt = Date.now();
+  const head = toBlockRef(latest);
+  if (!head) throw new Error("The ZKsync Era RPC returned no latest block");
+  let safe: bigint;
+  if ("block" in finalized && finalized.block) {
+    safe = finalized.block.number < head.number ? finalized.block.number : head.number;
+    if (
+      readGeneration === generation &&
+      !(knownL2Finalized?.generation === generation && knownL2Finalized.number >= safe)
+    )
+      knownL2Finalized = { generation, number: safe };
+  } else if (
+    "error" in finalized &&
+    finalized.error instanceof RpcError &&
+    isUnknownTag(finalized.error)
+  ) {
+    safe = -1n;
+  } else if (knownL2Finalized?.generation === readGeneration) {
+    safe = knownL2Finalized.number < head.number ? knownL2Finalized.number : head.number;
+  } else {
+    throw "error" in finalized
+      ? finalized.error
+      : new Error("The ZKsync Era RPC returned no finalized block");
+  }
+  newestL2Head = withHead(newestL2Head, head, readGeneration, read);
+  return { at: { head, safe, answeredAt }, read, readGeneration };
+}
+
+/**
+ * ZKsync Era's head and 'finalized' block, read together and served for 4 s (as L1's head), or
+ * null when no L2 RPC is configured. Rejects when the head cannot be read, or 'finalized' failed
+ * and no finalized block is known yet (no boundary is ever assumed for a failure).
+ */
+export async function l2ChainHead(): Promise<L2Head | null> {
+  const lane = await l2HeadLane();
+  if (!lane) return null;
+  return cached(L2_HEAD_KEY, HEAD_TTL_MS, async () => (await readL2Head(lane)).at);
+}
+
+/**
+ * Reads Era's head now (the sync engine, ahead of requests) and serves it for 4 s from the node's
+ * answer, unless the settings changed meanwhile or a newer Era head is known (a higher block, or
+ * another block at this height named by a later read): then the head served stays. Resolves with
+ * the node's answer either way; null without an L2 RPC.
+ */
+export async function refreshL2ChainHead(): Promise<L2Head | null> {
+  const lane = await l2HeadLane();
+  if (!lane) return null;
+  const { at, read, readGeneration } = await readL2Head(lane);
+  if (readGeneration === generation && supersedesHead(newestL2Head, at.head, read))
+    replace(L2_HEAD_KEY, at, HEAD_TTL_MS - (Date.now() - at.answeredAt));
+  return at;
+}
+
+// ZKsync Era lanes: `history` carries the governor index's eth_getLogs, `head` Era's
+// 'latest'/'finalized' reads and the block headers windows are cut by, so a head read never
+// queues behind a backfill's eth_getLogs chunks on an Era RPC that caps block ranges.
+type L2Lanes = { history: Lane; head: Lane };
+let l2Lanes: L2Lanes | null | undefined;
+
+/** Era lanes for the current settings, or null when no L2 RPC is configured. */
+async function l2LanesNow(): Promise<L2Lanes | null> {
+  if (l2Lanes !== undefined) return l2Lanes;
   const started = generation;
   const { l2RpcUrl } = await network();
   // The settings changed while the network was read: answer for the new settings.
-  if (started !== generation) return l2HistoryLane();
-  l2History ??= l2RpcUrl
-    ? createLane({ url: l2RpcUrl, label: "l2-history", maxBatch: 20, maxInFlight: 4 })
+  if (started !== generation) return l2LanesNow();
+  l2Lanes ??= l2RpcUrl
+    ? {
+        history: createLane({ url: l2RpcUrl, label: "l2-history", maxBatch: 20, maxInFlight: 4 }),
+        head: createLane({ url: l2RpcUrl, label: "l2-head", maxBatch: 20, maxInFlight: 2 }),
+      }
     : null;
-  return l2History;
+  return l2Lanes;
+}
+
+/** eth_getLogs lane for ZKsync Era, or null when no L2 RPC is configured. */
+export async function l2HistoryLane(): Promise<Lane | null> {
+  return (await l2LanesNow())?.history ?? null;
+}
+
+/** Era head and block header lane, or null when no L2 RPC is configured. */
+export async function l2HeadLane(): Promise<Lane | null> {
+  return (await l2LanesNow())?.head ?? null;
 }
 
 /**
@@ -565,6 +696,8 @@ export function rpcGeneration(): number {
 export function resetRpcClients() {
   generation++;
   knownFinalized = null;
+  knownL2Finalized = null;
+  newestL2Head = null;
   tagUnsupported = null;
   newestHead = null;
   rereading = null;
@@ -580,6 +713,7 @@ export function resetRpcClients() {
   l1Lanes?.call.close();
   l1Lanes?.head.close();
   l1Lanes = undefined;
-  l2History?.close();
-  l2History = undefined;
+  l2Lanes?.history.close();
+  l2Lanes?.head.close();
+  l2Lanes = undefined;
 }

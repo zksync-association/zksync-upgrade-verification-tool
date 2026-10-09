@@ -29,7 +29,8 @@ is cached for a minute.
 At start the app reads the ProtocolUpgradeHandler's log history in the background (`PREWARM=0` turns this off).
 `/api/status` shows its progress in `sync.index`: `state` goes from `idle` to `backfilling` to `ready`, or is
 `unavailable` with an `error`. Lists wait a bounded time for it and fail rather than answer from part of the
-history. `logHistory` is still the check that counts.
+history. `logHistory` is still the check that counts. The ZKsync Era governors' proposal events (created,
+executed, canceled) are indexed the same way, in `sync.l2Index`, for the veto pages and startable upgrades.
 
 ## Verify
 

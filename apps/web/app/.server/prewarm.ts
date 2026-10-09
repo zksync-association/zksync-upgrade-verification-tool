@@ -1,5 +1,6 @@
 import { defaultLogger } from "@config/log.server";
 import type { Address } from "viem";
+import { l2GovernorIndex } from "./chain/l2-index";
 import { puhIndex } from "./chain/puh-index";
 import { type Governance, governance } from "./governance";
 import { checkLogHistory } from "./logs";
@@ -94,6 +95,36 @@ async function warmSteps(reason: PrewarmReason, generation: number): Promise<voi
   // Everything below reads the network first; without it each step would fail the same way.
   if (!net || superseded()) return;
 
+  // The ZKsync Era governors' log index (the vetoable list every landing page shows) backfills
+  // beside everything else; nothing below waits for it (the Era RPC is another provider).
+  const l2 = step(
+    reason,
+    "l2-index",
+    async () => {
+      const index = l2GovernorIndex();
+      await index.startBackfill();
+      return index.status();
+    },
+    {
+      details: (status) => ({
+        state: status.state,
+        strategy: status.strategy,
+        logs: status.logs,
+      }),
+    }
+  );
+  try {
+    await warmL1(reason, net, superseded);
+  } finally {
+    await l2;
+  }
+}
+
+async function warmL1(
+  reason: PrewarmReason,
+  net: { safeTxServiceUrl: string | null },
+  superseded: () => boolean
+): Promise<void> {
   const [gov] = await Promise.all([
     step(reason, "governance", () => governance()),
     step(reason, "log-history", () => checkLogHistory(l1), {
@@ -152,7 +183,8 @@ let running: { generation: number; run: Promise<void> } | null = null;
 /**
  * Warms network(), then together governance(), the log-history canary and the
  * ProtocolUpgradeHandler log index backfill, then (with SAFE_API_KEY or a self-hosted service) the
- * governance Safes' message listings. One run per settings generation at a time; never rejects.
+ * governance Safes' message listings; beside all of these, the L2 governors' log index backfill.
+ * One run per settings generation at a time; never rejects.
  */
 export function prewarm(reason: PrewarmReason): Promise<void> {
   try {

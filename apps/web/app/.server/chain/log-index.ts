@@ -5,7 +5,8 @@ import { type Lane, RpcError } from "./jsonrpc";
 
 // Every log one contract has emitted, from its deployment to the head, in memory. The filter is
 // the address alone: a topic OR-list would drop events the ABI does not list (a proxy's Upgraded,
-// Initialized and AdminChanged).
+// Initialized and AdminChanged). An index over several contracts whose other events are not
+// needed (the L2 governors' votes) may name the topic0 values it keeps instead.
 //
 // Coverage is one contiguous range [coveredFrom, finalizedTo] of final blocks, plus a tail
 // (finalizedTo, head] that is read again for every new head and replaces the previous tail. The
@@ -63,7 +64,13 @@ export type LogIndexOptions = {
   label: string;
   /** eth_getLogs goes through this lane (batching, rate limits, read-only allowlist). */
   lane: Lane;
-  address: Address;
+  /** The contract, or the contracts (one eth_getLogs for all), whose logs are indexed. */
+  address: Address | readonly Address[];
+  /**
+   * Only logs whose topic0 is one of these (an OR-list in the filter). Omitted: every log of the
+   * address(es), with no `topics` key in the filter at all.
+   */
+  topic0?: readonly Hex[];
   /** First block with a log of this contract. Nothing earlier is read. */
   deployBlock: bigint;
   head: () => Promise<IndexHead>;
@@ -94,7 +101,7 @@ export type LogIndexOptions = {
 
 export interface LogIndex {
   readonly label: string;
-  readonly address: Address;
+  readonly addresses: readonly Address[];
   readonly deployBlock: bigint;
   /**
    * Starts (or resumes) the backfill of the final range. Never rejects; resolves when this run
@@ -215,8 +222,18 @@ export function chunksOf(range: Range, span: bigint): Range[] {
 }
 
 export function createLogIndex(options: LogIndexOptions): LogIndex {
-  const { label, lane, address, deployBlock } = options;
-  const addressKey = address.toLowerCase();
+  const { label, lane, deployBlock } = options;
+  const addresses: readonly Address[] =
+    typeof options.address === "string" ? [options.address] : [...options.address];
+  if (addresses.length === 0) throw new Error(`The ${label} log index needs an address`);
+  const addressKeys = new Set(addresses.map((a) => a.toLowerCase()));
+  const topicKeys = options.topic0 ? new Set(options.topic0.map((t) => t.toLowerCase())) : null;
+  // One address is sent as a string (as before), several as eth_getLogs' OR-list. A topic0 list
+  // goes in position 0; without one there is no `topics` key at all.
+  const filter = {
+    address: addresses.length === 1 ? addresses[0] : addresses,
+    ...(options.topic0 ? { topics: [[...options.topic0]] } : {}),
+  };
   const defaultWaitMs = options.waitMs ?? 20_000;
   const hedgeMs = options.hedgeMs ?? 2_500;
   const chunkRetries = options.chunkRetries ?? 3;
@@ -281,9 +298,9 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
   // ---- eth_getLogs ----
 
   async function getLogs(from: bigint, to: bigint): Promise<IndexedLog[]> {
-    // Address only: no `topics` key at all.
+    // Address only (no `topics` key at all), unless the index names its topic0 values.
     const raw = await lane.request<unknown>("eth_getLogs", [
-      { address, fromBlock: numberToHex(from), toBlock: numberToHex(to) },
+      { ...filter, fromBlock: numberToHex(from), toBlock: numberToHex(to) },
     ]);
     return validate(raw, from, to);
   }
@@ -302,7 +319,7 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
       }
       if ((entry as { removed?: unknown }).removed === true)
         throw new InvalidLogsAnswer("a removed log");
-      if (typeof log.address !== "string" || log.address.toLowerCase() !== addressKey)
+      if (typeof log.address !== "string" || !addressKeys.has(log.address.toLowerCase()))
         throw new InvalidLogsAnswer("a log from another address");
       if (
         log.blockNumber === null ||
@@ -313,6 +330,8 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
         typeof log.data !== "string"
       )
         throw new InvalidLogsAnswer("a log without its block, index, hash or data");
+      if (topicKeys && !topicKeys.has(String(log.topics[0]).toLowerCase()))
+        throw new InvalidLogsAnswer("a log the filter does not ask for");
       if (log.blockNumber < from || log.blockNumber > to)
         throw new InvalidLogsAnswer(
           `a log at block ${log.blockNumber}, outside the requested ${from}-${to}`
@@ -867,7 +886,7 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
 
   return {
     label,
-    address,
+    addresses,
     deployBlock,
     startBackfill,
     logs: async (query) => (await read(query)).logs,

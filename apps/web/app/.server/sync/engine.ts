@@ -3,6 +3,7 @@ import { env } from "@config/env.server";
 import type { Hex } from "viem";
 import { remainingMs, replace } from "../cache";
 import { puhIndex } from "../chain/puh-index";
+import { refreshVetoableL2 } from "../flows/l2";
 import {
   GOVERNANCE_KEY,
   GOVERNANCE_TTL_MS,
@@ -691,6 +692,17 @@ export function liveSteps(): TickStep[] {
     // (e) The signature sets pages viewed in the last 10 minutes, verified at this head once it
     // is served (after its governance read and upgrade states), so the next request finds them.
     signaturesStep((tick) => governanceFor(tick)),
+    // (f) ZKsync Era, when the vetoable L2 proposals were viewed in the last 10 minutes: Era's
+    // head, the L2 governor index's tail at it and those proposals' states, read now, so requests
+    // in the next 4 s find them in memory. There is no Era head follower: between ticks, requests
+    // read Era on demand (its head is served for 4 s).
+    {
+      name: "l2",
+      run: async () => {
+        if (!(await refreshVetoableL2()))
+          throw new StepSkipped("L2 proposals not viewed lately, or not indexed");
+      },
+    },
   ];
 }
 
