@@ -3,6 +3,7 @@ import { type L2IndexStatus, l2GovernorIndex } from "./chain/l2-index";
 import { type PuhIndexStatus, puhIndex } from "./chain/puh-index";
 import { type Governance, governance } from "./governance";
 import { type LogHistoryStatus, checkLogHistory } from "./logs";
+import { type ChainCacheStatus, chainCacheStatus } from "./persist/chain-cache";
 import { ConfigError, l1, network } from "./rpc";
 import { type SafeStoreStatus, safeStoreStatus } from "./safe/store";
 import { quota } from "./safe-api";
@@ -27,7 +28,9 @@ import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
  * verdicts at that head, from Safe listings at most 60 s old. `l2Index` is the ZKsync
  * Era governors' log index (ProposalCreated/Executed/Canceled of the pinned governors), which the
  * vetoable list, veto pages and startable upgrades read; idle with no governors when none is
- * indexed (no L2 RPC, or every governor replaced through env).
+ * indexed (no L2 RPC, or every governor replaced through env). `cache` is the local cache of
+ * public chain and Safe data kept between runs (persist/chain-cache.ts): what was loaded at start
+ * and whether this run's own reads have verified it; JSON never answers from it.
  */
 export type SyncStatus = {
   index: PuhIndexStatus;
@@ -35,6 +38,7 @@ export type SyncStatus = {
   engine: SyncEngineStatus;
   safe: SafeStoreStatus;
   signatures: SignatureSetsStatus;
+  cache: ChainCacheStatus;
 };
 
 export type AppStatus =
@@ -65,6 +69,7 @@ export async function appStatus(): Promise<AppStatus> {
         engine: syncEngineStatus(),
         safe: safeStoreStatus(),
         signatures: signatureSetsStatus(),
+        cache: chainCacheStatus(),
       },
     };
   } catch (error) {

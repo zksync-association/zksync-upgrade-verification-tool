@@ -529,6 +529,7 @@ export async function blockTimestamps(numbers: readonly bigint[]): Promise<Map<b
   const unique = [...new Set(numbers)];
   if (unique.length === 0) return new Map();
   const [net, { safe }] = await Promise.all([network(), chainHead()]);
+  const readGeneration = generation;
   const times = await Promise.all(
     unique.map((n) =>
       cachedUntil(`block-ts:${net.chainId}:${n}`, async () => {
@@ -536,11 +537,129 @@ export async function blockTimestamps(numbers: readonly bigint[]): Promise<Map<b
           await lanes().call.request("eth_getBlockByNumber", [numberToHex(n), false])
         );
         if (!block || block.number !== n) throw new Error(`The RPC returned no block ${n}`);
-        return { value: block.timestamp, ttlMs: !net.isDevNode && n <= safe ? FOREVER : 0 };
+        const final = !net.isDevNode && n <= safe;
+        if (readGeneration === generation) {
+          checkSeededTimestamp(n, block.timestamp);
+          if (final) noteFinalTimestamp(n, block.timestamp);
+        }
+        return { value: block.timestamp, ttlMs: final ? FOREVER : 0 };
       })
     )
   );
   return new Map(unique.map((n, i) => [n, times[i] as bigint]));
+}
+
+// Timestamps of final L1 blocks read under the current settings, for saving
+// (persist/chain-cache.ts); at most FINAL_TIMESTAMPS_LIMIT of them.
+const FINAL_TIMESTAMPS_LIMIT = 10_000;
+let finalTimestamps: { generation: number; times: Map<bigint, bigint> } = {
+  generation: -1,
+  times: new Map(),
+};
+
+function currentFinalTimestamps(): Map<bigint, bigint> {
+  if (finalTimestamps.generation !== generation) finalTimestamps = { generation, times: new Map() };
+  return finalTimestamps.times;
+}
+
+function noteFinalTimestamp(n: bigint, timestamp: bigint) {
+  const times = currentFinalTimestamps();
+  if (times.has(n) || times.size < FINAL_TIMESTAMPS_LIMIT) times.set(n, timestamp);
+}
+
+/**
+ * The final L1 block timestamps to save: those read under the current settings, and those the
+ * last run read that nothing has contradicted (a contradiction discards them all, see
+ * seededTimestamps).
+ */
+export function finalBlockTimestamps(): Map<bigint, bigint> {
+  return new Map([...(currentSeededTimestamps()?.times ?? []), ...currentFinalTimestamps()]);
+}
+
+// Timestamps the last run read (seeded from disk): unverified, so only pages use them (labelled,
+// see pageBlockTimestamps), until a read of the block confirms one. One that disagrees with the
+// node calls `onMismatch`.
+let seededTimestamps: {
+  generation: number;
+  times: Map<bigint, bigint>;
+  onMismatch?: () => void;
+} | null = null;
+
+const currentSeededTimestamps = () =>
+  seededTimestamps?.generation === generation ? seededTimestamps : null;
+
+/** Seeds L1 block timestamps the last run read (see seededTimestamps). */
+export function seedProvisionalTimestamps(
+  times: ReadonlyMap<bigint, bigint>,
+  onMismatch?: () => void
+) {
+  seededTimestamps = { generation, times: new Map(times), onMismatch };
+}
+
+/** Drops the seeded timestamps (the chain cache was found wrong, or is not used). */
+export function dropProvisionalTimestamps() {
+  seededTimestamps = null;
+}
+
+function checkSeededTimestamp(n: bigint, timestamp: bigint) {
+  const seeded = currentSeededTimestamps();
+  const known = seeded?.times.get(n);
+  if (!seeded || known === undefined) return;
+  seeded.times.delete(n);
+  if (known !== timestamp) seeded.onMismatch?.();
+}
+
+/**
+ * blockTimestamps for a page: a timestamp read in this run, else one the last run read (seeded,
+ * unverified), else read now. `provisional`: one of the last run's was used.
+ */
+export async function pageBlockTimestamps(
+  numbers: readonly bigint[]
+): Promise<{ times: Map<bigint, bigint>; provisional: boolean }> {
+  const known = currentFinalTimestamps();
+  const seeded = currentSeededTimestamps();
+  const times = new Map<bigint, bigint>();
+  const missing: bigint[] = [];
+  let provisional = false;
+  for (const n of new Set(numbers)) {
+    const time = known.get(n) ?? seeded?.times.get(n);
+    if (time === undefined) missing.push(n);
+    else {
+      if (!known.has(n)) provisional = true;
+      times.set(n, time);
+    }
+  }
+  if (missing.length > 0) for (const [n, t] of await blockTimestamps(missing)) times.set(n, t);
+  return { times, provisional };
+}
+
+/**
+ * The chain the L1 RPC serves, named by its chain id and genesis block hash, read in one JSON-RPC
+ * batch and kept for the settings generation. Names the chain cache's file.
+ */
+export function chainIdentity(): Promise<{ chainId: number; genesisHash: Hex }> {
+  return cached(`chain-identity:${generation}`, FOREVER, async () => {
+    const call = lanes().call;
+    const [chainId, genesis] = await Promise.all([
+      call.request<unknown>("eth_chainId", []),
+      call.request<unknown>("eth_getBlockByNumber", ["0x0", false]),
+    ]);
+    const block = toBlockRef(genesis);
+    if (!isHex(chainId) || !block || block.number !== 0n)
+      throw new Error("The RPC returned no chain id or genesis block");
+    return { chainId: Number(hexToBigInt(chainId)), genesisHash: block.hash.toLowerCase() as Hex };
+  });
+}
+
+/** ZKsync Era's chain id, from the L2 RPC (kept for the settings generation); null without one. */
+export async function l2ChainId(): Promise<number | null> {
+  const lane = await l2HeadLane();
+  if (!lane) return null;
+  return cached(`l2-chain-id:${generation}`, FOREVER, async () => {
+    const id = await lane.request<unknown>("eth_chainId", []);
+    if (!isHex(id)) throw new Error("The ZKsync Era RPC returned no chain id");
+    return Number(hexToBigInt(id));
+  });
 }
 
 // Raw JSON-RPC lanes (chain/jsonrpc.ts). `history` carries eth_getLogs backfills, `call` the

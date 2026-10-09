@@ -68,8 +68,8 @@ export function collectMessages(
 
 /**
  * collectMessages from the listings held now, whatever their age, without asking Safe: a page's
- * first answer while the fresh listings are read (`stale` when one is older than 60 s). null when
- * a Safe has no listing held.
+ * first answer while the fresh listings are read (`stale` when one is older than 60 s, or was read
+ * by the last run). null when a Safe has no listing held.
  */
 export async function collectHeldMessages(
   safes: Address[],
@@ -83,8 +83,9 @@ export async function collectHeldMessages(
     held.set(safe.toLowerCase(), listing);
   }
   const now = Date.now();
+  // A listing the last run read (kept on disk) is stale whatever its age.
   const stale = [...held.values()].some(
-    (listing) => now - listing.fetchedAt > SAFE_LISTING_MAX_AGE_MS
+    (listing) => listing.fromLastRun || now - listing.fetchedAt > SAFE_LISTING_MAX_AGE_MS
   );
   const collected = await collectFrom(safes, actions, domain, async (safe) => {
     const listing = held.get(safe.toLowerCase());

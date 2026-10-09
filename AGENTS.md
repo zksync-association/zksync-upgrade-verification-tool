@@ -11,7 +11,8 @@ How to run this app for a ZKsync governance signer, verify a proposal with it, a
   contract accepted it in an `eth_call`.
 - Stop and report if `governance.warnings` is non-empty, `governance.network.overrides` is non-empty, or
   `logHistory.status` is not `"ok"`. These mean the contracts disagree, a trust anchor was replaced, or proposal lists
-  may be incomplete.
+  may be incomplete. Also report `sync.cache.state` `"mismatch"`: the log history the RPC serves now differs from the
+  one the app saved in its last run (a changed cache file, or an RPC with different history).
 
 ## Run
 
@@ -20,7 +21,7 @@ RPC, or `https://mainnet.gateway.tenderly.co` / `https://sepolia.gateway.tenderl
 
 ```bash
 L1_RPC_URL=<rpc> npm start          # repo root: install, build, serve on http://localhost:3000
-curl -s localhost:3000/api/status | jq '{ok, chain: .governance.network.label, warnings: .governance.warnings, overrides: .governance.network.overrides, logHistory}'
+curl -s localhost:3000/api/status | jq '{ok, chain: .governance.network.label, warnings: .governance.warnings, overrides: .governance.network.overrides, logHistory, cache: .sync.cache.state}'
 ```
 
 The first load of a page takes up to about 15 s. Without a Safe API key, Safe allows 2 requests/s, and every result
@@ -31,6 +32,18 @@ At start the app reads the ProtocolUpgradeHandler's log history in the backgroun
 `unavailable` with an `error`. Lists wait a bounded time for it and fail rather than answer from part of the
 history. `logHistory` is still the check that counts. The ZKsync Era governors' proposal events (created,
 executed, canceled) are indexed the same way, in `sync.l2Index`, for the veto pages and startable upgrades.
+
+The app keeps a local cache of public chain and Safe data between runs, in
+`apps/web/.cache/chain/<chainId>-<first 8 hex digits of the genesis hash>.json` (folder 0700, file 0600): both log
+histories up to their finality boundary, timestamps of final blocks it read, and members' last Safe message listings
+with the time Safe answered. Never verdicts, governance reads, settings, RPC URLs or API keys. At start the file is
+checked against the chain id and genesis block, and the normal backfill re-reads the history: `sync.cache.state` is
+`provisional` until then, `verified` when it matched, `mismatch` when it did not (the last run's data is then dropped
+from memory and from the file, and the app uses what it read), `absent` without a usable file (`sync.cache.detail`
+says why), `disabled` with `CHAIN_CACHE=0` or on anvil/hardhat. JSON never answers from it: `/api/*` waits for this
+run's own reads exactly as without it. Pages may show it first, labelled "History from last run · re-verifying" (Safe
+copies with their age), and this run's answer replaces it in the same response. To drop it, stop the app and delete
+`apps/web/.cache/chain/`.
 
 ## Verify
 

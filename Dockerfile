@@ -27,6 +27,9 @@ COPY . .
 
 RUN pnpm run build
 
+# The app's local state (saved settings, the chain cache) lives here; mount a volume to keep it.
+RUN install -d -m 0700 -o node -g node /app/apps/web/.cache
+
 ENV SERVER_PORT=3000
 ENV SERVER_HOST=0.0.0.0
 EXPOSE 3000

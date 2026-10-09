@@ -2,7 +2,9 @@
 
 Check ZKsync governance actions and their signatures yourself. The web app reads every proposal from the chain
 through **your** RPC, fetches members' signatures from the Safe Transaction Service, and counts a signature only when
-the governance contract itself accepts it in an `eth_call`. It stores nothing and never posts to Safe.
+the governance contract itself accepts it in an `eth_call`. It keeps only a local cache of public chain and Safe data
+(its log history is read from the chain again at every start; saved Safe copies are shown with their age until Safe is
+read again) and never posts to Safe.
 
 It covers protocol upgrades (Security Council and Guardian approval, legal veto extension), emergency upgrades,
 freeze / unfreeze / soft-freeze threshold requests and Guardian vetoes of L2 proposals. For each it shows what is
@@ -43,6 +45,7 @@ You can also connect your Safe over WalletConnect: start the app with `WALLET_CO
 | `SAFE_WALLET_ORIGINS` | Safe{Wallet} origins that may open the app as a Safe App (default `https://app.safe.global`) |
 | `SAFE_API_KEY` | Safe API key. Without one, Safe allows 2 requests/s and 5,000 a month per IP: enough for one signer, not for a hosted instance |
 | `UPGRADE_HANDLER_ADDRESS`, `SAFE_TX_SERVICE_URL`, `ZK_*_GOVERNOR_ADDRESS` | Overrides for local chains. The app warns when a pinned address is overridden |
+| `CHAIN_CACHE` | `0` turns off the local cache of public chain and Safe data kept between runs in `apps/web/.cache/chain/` (logs, block timestamps, Safe listings; never verdicts, settings or keys). Delete that folder to clear it |
 
 [AGENTS.md](AGENTS.md) is for running and checking it with an agent, and running the tests.
 The upgrade verification CLI for deep upgrade analysis lives in [apps/cli](apps/cli/README.md).

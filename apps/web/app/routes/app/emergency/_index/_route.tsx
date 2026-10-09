@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FreshnessNote, type Refresh } from "@/components/verification/freshness";
+import { LastRunNote } from "@/components/verification/last-run";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { formatDay, formatNumber } from "@/utils/format";
 import { Meta } from "@/utils/meta";
@@ -30,16 +31,22 @@ export function loader({ request }: LoaderFunctionArgs) {
   // Pending ids come from members' Safe messages: the page lists them at once from the copies held
   // (labelled with their age when older than 60 s) and the fresh list after it.
   const loading = loadEmergencyList({ allHistory, freshness: "page" });
+  // Executions likewise: from the history the last run saved while this run re-reads it
+  // (labelled), and the list from this run's history after it.
   return defer({
     allHistory,
     pending: loading.then((d) => d.pending),
     freshPending: loading.then((d) => freshAfter(d.pending, d.freshPending, (p) => p.stale)),
-    executed: loading.then((d) => d.executed),
+    executed: loading.then((d) => d.executedFirst),
+    freshExecuted: loading.then((d) =>
+      d.executedFirst.then((first) => (first.fromLastRun ? d.executed : null))
+    ),
   });
 }
 
 export default function EmergencyList() {
-  const { pending, freshPending, executed, allHistory } = useLoaderData<typeof loader>();
+  const { pending, freshPending, executed, freshExecuted, allHistory } =
+    useLoaderData<typeof loader>();
   const { governance } = useStatus();
   const toggle = allHistory ? $path("/app/emergency") : `${$path("/app/emergency")}?history=all`;
   const switching = useNavigatingTo(toggle);
@@ -123,18 +130,30 @@ export default function EmergencyList() {
                 <EmptyState>Execution history could not be read. Refresh to retry.</EmptyState>
               }
             >
-              {(items) => (
-                <PendingRegion pending={switching}>
-                  {items.length ? (
-                    <Rows items={items} testId="executed-emergencies" />
-                  ) : (
-                    <EmptyState>
-                      {allHistory
-                        ? "No emergency executions found since deployment."
-                        : `No emergency executions in the last ${EMERGENCY_RECENT_DAYS} days.`}
-                    </EmptyState>
-                  )}
-                </PendingRegion>
+              {(first) => (
+                <UntilFresh stale={first.fromLastRun} fresh={freshExecuted}>
+                  {(fresh, refresh) => {
+                    const items = fresh ?? first.items;
+                    return (
+                      <PendingRegion pending={switching}>
+                        <div className="space-y-3">
+                          {!fresh && first.fromLastRun && (
+                            <LastRunNote refresh={refresh} what="The executions listed below" />
+                          )}
+                          {items.length ? (
+                            <Rows items={items} testId="executed-emergencies" />
+                          ) : (
+                            <EmptyState>
+                              {allHistory
+                                ? "No emergency executions found since deployment."
+                                : `No emergency executions in the last ${EMERGENCY_RECENT_DAYS} days.`}
+                            </EmptyState>
+                          )}
+                        </div>
+                      </PendingRegion>
+                    );
+                  }}
+                </UntilFresh>
               )}
             </Await>
           </Suspense>

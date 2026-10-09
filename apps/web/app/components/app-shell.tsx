@@ -237,8 +237,10 @@ function Footer({ status }: { status: OkStatus }) {
           <p className="max-w-3xl text-slate-950">
             Proposals and roles are read from the chain through your RPC. Signatures are fetched
             from the Safe Transaction Service and counted only after the governance contract accepts
-            them in an <code className="mono">eth_call</code>. This app stores nothing and never
-            posts to Safe.
+            them in an <code className="mono">eth_call</code>. This app keeps a local cache of
+            public chain and Safe data between runs (never verdicts, settings or keys): its log
+            history is read from the chain again at every start, and saved Safe copies are shown
+            with their age until Safe is read again. It never posts to Safe.
           </p>
         </div>
         <FooterRow label="Chain">

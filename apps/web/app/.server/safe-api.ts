@@ -19,7 +19,8 @@ const confirmationSchema = z.object({
   signatureType: z.string(),
 });
 
-const messageSchema = z.object({
+/** One Safe message as the service lists it (also how the chain cache checks a kept copy). */
+export const safeMessageSchema = z.object({
   created: z.string(),
   modified: z.string(),
   safe: z.string(),
@@ -32,10 +33,10 @@ const messageSchema = z.object({
 
 const listSchema = z.object({
   count: z.number(),
-  results: z.array(messageSchema),
+  results: z.array(safeMessageSchema),
 });
 
-export type SafeMessage = z.infer<typeof messageSchema>;
+export type SafeMessage = z.infer<typeof safeMessageSchema>;
 export type SafeMessages = { messages: SafeMessage[]; complete: boolean };
 
 /** One read of a Safe's listing: `count` is the service's total, `arrivedAt` its first answer. */
@@ -382,7 +383,7 @@ export function getSafeMessage(messageHash: Hex): Promise<SafeMessage | null> {
   return cached(`safe:message:${messageHash.toLowerCase()}`, MESSAGE_TTL_MS, async () => {
     const { body } = await getJson(`/api/v1/messages/${messageHash}/`);
     if (body === null) return null;
-    const parsed = messageSchema.safeParse(body);
+    const parsed = safeMessageSchema.safeParse(body);
     if (!parsed.success) {
       throw new SafeApiError(`Unexpected Safe Transaction Service response for ${messageHash}`);
     }

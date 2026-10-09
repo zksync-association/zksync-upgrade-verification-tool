@@ -380,7 +380,10 @@ type Computed = {
   byHash: boolean;
   /** The cached Safe info read for each member: its cache key, and the entry's own promise. */
   infos: Map<string, Promise<SafeInfo>>;
-  /** Some message came from a listing older than 60 s when it was used (only fromHeld's). */
+  /**
+   * Some message came from a listing older than 60 s when it was used, or read by the last run
+   * (only fromHeld's).
+   */
   staleCopies: boolean;
 };
 
@@ -455,7 +458,9 @@ async function computeSet(
           // A message Safe was asked for by its hash was read just now.
           const copiedAt = lookup.fetchedAt ?? Date.now();
           if (oldestCopy === null || copiedAt < oldestCopy) oldestCopy = copiedAt;
-          if (Date.now() - copiedAt > SAFE_LISTING_MAX_AGE_MS) staleCopies = true;
+          // A copy the last run read (kept on disk) is stale whatever its age.
+          if (lookup.fromLastRun || Date.now() - copiedAt > SAFE_LISTING_MAX_AGE_MS)
+            staleCopies = true;
           if (message?.preparedSignature) {
             candidates.push({
               source: "safe",

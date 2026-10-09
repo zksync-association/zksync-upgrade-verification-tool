@@ -8,6 +8,7 @@ import { AddressLink, ExternalAnchor, Hash, TxLink } from "@/components/hex";
 import { Check, EmptyState, Facts, LoadingCard, PageHeader, Section } from "@/components/page";
 import { CallList } from "@/components/verification/calls";
 import { ExecutionPanel } from "@/components/verification/execution-panel";
+import { LastRunCheck, LastRunText } from "@/components/verification/last-run";
 import { SignatureSetCard } from "@/components/verification/signature-set";
 import { UpgradeStateBadge } from "@/components/verification/badges";
 import { Timeline } from "@/components/verification/timeline";
@@ -34,6 +35,8 @@ export function loader({ params, request }: LoaderFunctionArgs) {
   return defer({
     id,
     detail: loading.then((d) => d.overview),
+    // A start found in the history the last run saved (labelled) is confirmed against this run's.
+    startedCheck: loading.then((d) => d.startedCheck),
     evidence: loading.then((d) => d.evidence),
     sets: loading.then((d) => d.sets),
     freshSets: loading.then((d) =>
@@ -102,7 +105,7 @@ function DetailError({ id }: { id: string }) {
 }
 
 function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeCore> }) {
-  const { sets, freshSets, evidence, setEvidence, execution, l2Proposal } =
+  const { sets, freshSets, evidence, setEvidence, execution, l2Proposal, startedCheck } =
     useLoaderData<typeof loader>();
   const { governance } = useStatus();
   const labels = {
@@ -130,9 +133,12 @@ function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeCore> }) {
             {
               label: "Started",
               value: (
-                <span className="space-x-2">
-                  <span>{formatTime(d.status.creationTimestamp)}</span>
-                  <TxLink hash={d.started.txHash} />
+                <span className="block space-y-1">
+                  <span className="space-x-2">
+                    <span>{formatTime(d.status.creationTimestamp)}</span>
+                    <TxLink hash={d.started.txHash} />
+                  </span>
+                  {d.started.fromLastRun && <LastRunCheck check={startedCheck} />}
                 </span>
               ),
             },
@@ -259,7 +265,16 @@ function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeCore> }) {
 
       <Section
         title={`What the upgrade does · ${d.calls.length} call${d.calls.length === 1 ? "" : "s"}`}
-        description="Decoded from the UpgradeStarted event. The handler executes these calls in order when the upgrade runs."
+        description={
+          // A start from the last run's history says so until this run's history confirms it
+          // (the same transaction, block and proposal), then reads as any other.
+          <LastRunText
+            check={d.started.fromLastRun ? startedCheck : null}
+            pending="Decoded from the UpgradeStarted event in the history saved by the last run (re-verifying; checked against the id above). The handler executes these calls in order when the upgrade runs."
+            confirmed="Decoded from the UpgradeStarted event. The handler executes these calls in order when the upgrade runs."
+            failed="Decoded from the UpgradeStarted event in the history saved by the last run, which the chain's current history did not confirm. Do not rely on these calls; reload the page."
+          />
+        }
       >
         <CallList calls={d.calls} labels={labels} />
         <UpgradeFile proposal={d.started.proposal} name={`upgrade-${d.id.slice(0, 10)}`} />

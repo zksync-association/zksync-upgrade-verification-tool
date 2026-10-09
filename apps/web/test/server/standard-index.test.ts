@@ -374,7 +374,9 @@ describe("one upgrade", () => {
     const upgrade = history.upgrades[7] as (typeof history.upgrades)[number];
     const core = await getStandardUpgradeCore(upgrade.id);
     expect(core.started).toMatchObject({ id: upgrade.id, blockNumber: upgrade.started.toString() });
-    expect(puhIndex().status().state).toBe("unavailable");
+    // The failed tail read (its own POST, not the backfill's) is what sent the lookup to the
+    // fallback; the backfill's own retries end in "unavailable" too.
+    await vi.waitFor(() => expect(puhIndex().status().state).toBe("unavailable"));
     // The legacy path: a header search for the creation time, then a 17-block topic query.
     expect(state.headers.length).toBeGreaterThan(0);
     const legacy = state.chain as ReturnType<typeof fakeChain>;

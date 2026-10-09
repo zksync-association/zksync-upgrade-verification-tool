@@ -20,7 +20,14 @@ import { CallReverted, callFn, isFinalBlock } from "../chain/call";
 import { type PuhEvent, puhIndex } from "../chain/puh-index";
 import { type Governance, governance } from "../governance";
 import { findBlockByTimestamp, getLogs } from "../logs";
-import { type Network, blockTimestamps, l1, latestBlock, network } from "../rpc";
+import {
+  type Network,
+  blockTimestamps,
+  l1,
+  latestBlock,
+  network,
+  pageBlockTimestamps,
+} from "../rpc";
 import type { Freshness, SignatureSet } from "../signatures";
 import {
   type UsedSignature,
@@ -56,14 +63,47 @@ const TIMESTAMP_BATCH = 20;
  * it by default.
  */
 async function executedEmergencies({ allHistory = true } = {}): Promise<Executed[]> {
+  return (await readExecuted({ allHistory, provisional: false })).executed;
+}
+
+/**
+ * executedEmergencies, for a page when `provisional`: the history and the timestamps the last run
+ * read stand in for what this run has not read yet; `provisional` in the answer says they did.
+ */
+async function readExecuted({
+  allHistory,
+  provisional: allowed,
+}: { allHistory: boolean; provisional: boolean }): Promise<{
+  executed: Executed[];
+  provisional: boolean;
+}> {
   const net = await network();
-  if (net.isDevNode) return legacyExecutedEmergencies(net, allHistory);
+  if (net.isDevNode)
+    return { executed: await legacyExecutedEmergencies(net, allHistory), provisional: false };
   const toExecuted = ({ args, log }: PuhEvent<"EmergencyUpgradeExecuted">): Executed => ({
     id: args._id,
     txHash: log.transactionHash,
     blockNumber: log.blockNumber,
   });
-  if (allHistory) return (await puhIndex().events("EmergencyUpgradeExecuted")).map(toExecuted);
+  // A page may be answered from the last run's history; JSON reads only this run's. The last
+  // run's history listing one execution twice is not shown: this run's answers instead.
+  const strict = async (query?: { fromBlock: bigint }) => ({
+    events: await puhIndex().events("EmergencyUpgradeExecuted", query),
+    provisional: false,
+  });
+  const read = async (query?: { fromBlock: bigint }) => {
+    if (!allowed) return strict(query);
+    const answer = await puhIndex().eventsAnswer("EmergencyUpgradeExecuted", {
+      ...query,
+      provisional: true,
+    });
+    const ids = new Set(answer.events.map((e) => e.args._id.toLowerCase()));
+    return answer.provisional && ids.size !== answer.events.length ? strict(query) : answer;
+  };
+  if (allHistory) {
+    const answer = await read();
+    return { executed: answer.events.map(toExecuted), provisional: answer.provisional };
+  }
   // The recent window: executed in a block with timestamp >= head − 7 days. A slot holds at most
   // one block, so those blocks are within the last 7 days / block time; twice that is asked of
   // the index, so the window needs only recent coverage (not the whole backfill). The cut itself
@@ -73,20 +113,26 @@ async function executedEmergencies({ allHistory = true } = {}): Promise<Executed
   const cutoff = head.timestamp - recentSeconds;
   const below = head.number - (2n * recentSeconds) / BigInt(net.blockTimeSeconds);
   const fromBlock = below > net.upgradeHandlerDeployBlock ? below : net.upgradeHandlerDeployBlock;
-  const executed = (await puhIndex().events("EmergencyUpgradeExecuted", { fromBlock })).map(
-    toExecuted
-  );
+  const answer = await read({ fromBlock });
+  const executed = answer.events.map(toExecuted);
+  let provisional = answer.provisional;
+  const timesOf = async (numbers: bigint[]) => {
+    if (!allowed) return blockTimestamps(numbers);
+    const read = await pageBlockTimestamps(numbers);
+    if (read.provisional) provisional = true;
+    return read.times;
+  };
   let end = executed.length;
   while (end > 0) {
     const start = Math.max(0, end - TIMESTAMP_BATCH);
-    const times = await blockTimestamps(executed.slice(start, end).map((e) => e.blockNumber));
+    const times = await timesOf(executed.slice(start, end).map((e) => e.blockNumber));
     for (let i = end - 1; i >= start; i--) {
       const time = times.get((executed[i] as Executed).blockNumber) as bigint;
-      if (time < cutoff) return executed.slice(i + 1);
+      if (time < cutoff) return { executed: executed.slice(i + 1), provisional };
     }
     end = start;
   }
-  return executed;
+  return { executed, provisional };
 }
 
 /** Dev nodes (which can be rewound) keep the direct scan from the recent window's first block. */
@@ -201,10 +247,22 @@ async function firstPending(
   return early === null || freshIn ? fresh : early;
 }
 
+/** A page's first list of executed emergency upgrades (see loadEmergencyList). */
+export type ExecutedFirst = {
+  items: EmergencySummary[];
+  /**
+   * Listed from the history (or block timestamps) the last run read, while this run re-reads
+   * them; the verified list (`executed`) follows.
+   */
+  fromLastRun: boolean;
+};
+
 /**
  * Pending Safe messages and executed events do not wait for one another. With `freshness:
  * "page"`, `pending` is the page's first answer (see firstPending) and `freshPending` the list from
- * listings at most 60 s old; otherwise both are the latter.
+ * listings at most 60 s old; otherwise both are the latter. Likewise `executedFirst` is the
+ * page's first list of executions (possibly from the last run's history, `fromLastRun`) and
+ * `executed` the list from this run's history; without "page" both are the latter.
  */
 export async function loadEmergencyList({
   allHistory = false,
@@ -218,16 +276,23 @@ export async function loadEmergencyList({
     freshness === "page"
       ? firstPending(collectHeldMessages(safes, EMERGENCY_ACTIONS, board.domain), freshPending)
       : freshPending;
-  const executed = executedEmergencies({ allHistory }).then((events) =>
+  const summaries = (events: Executed[]) =>
     events
       .map((event) => ({
         ...summary(event.id),
         executed: { txHash: event.txHash, blockNumber: event.blockNumber.toString() },
       }))
-      .reverse()
+      .reverse();
+  const executedFirst: Promise<ExecutedFirst> = readExecuted({
+    allHistory,
+    provisional: freshness === "page",
+  }).then((read) => ({ items: summaries(read.executed), fromLastRun: read.provisional }));
+  const executed = executedFirst.then((first) =>
+    first.fromLastRun ? executedEmergencies({ allHistory }).then(summaries) : first.items
   );
-  for (const promise of [pending, freshPending, executed]) void promise.catch(() => {});
-  return { pending, freshPending, executed };
+  for (const promise of [pending, freshPending, executedFirst, executed])
+    void promise.catch(() => {});
+  return { pending, freshPending, executedFirst, executed };
 }
 
 export async function listRecentEmergencyUpgrades() {

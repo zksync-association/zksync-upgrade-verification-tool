@@ -70,21 +70,32 @@ vi.mock("@/.server/governance", () => ({
     },
   }),
 }));
-vi.mock("@/.server/chain/puh-index", () => ({
-  puhIndex: () => ({
-    events: async (name: string, query?: { fromBlock?: bigint }) => {
-      state.scans(name, query);
-      await state.history;
-      return EXECUTED.filter(([blockNumber]) => blockNumber >= (query?.fromBlock ?? 0n)).map(
-        ([blockNumber, id]) => ({
-          args: { _id: id },
-          log: { blockNumber, transactionHash: `0x${blockNumber.toString(16).padStart(64, "0")}` },
-          final: true,
-        })
-      );
-    },
-  }),
-}));
+vi.mock("@/.server/chain/puh-index", () => {
+  const events = async (name: string, query?: { fromBlock?: bigint }) => {
+    state.scans(name, query);
+    await state.history;
+    return EXECUTED.filter(([blockNumber]) => blockNumber >= (query?.fromBlock ?? 0n)).map(
+      ([blockNumber, id]) => ({
+        args: { _id: id },
+        log: { blockNumber, transactionHash: `0x${blockNumber.toString(16).padStart(64, "0")}` },
+        final: true,
+      })
+    );
+  };
+  return {
+    puhIndex: () => ({
+      events,
+      // A page's read: this run's index answers (no history from the last run is seeded here).
+      eventsAnswer: async (
+        name: string,
+        { provisional: _, ...query }: { fromBlock?: bigint; provisional?: boolean } = {}
+      ) => ({
+        events: await events(name, "fromBlock" in query ? query : undefined),
+        provisional: false,
+      }),
+    }),
+  };
+});
 vi.mock("@/.server/rpc", () => {
   const l1 = {
     getTransaction: async () => TRANSACTIONS[EMERGENCY_TX],
@@ -112,6 +123,11 @@ vi.mock("@/.server/rpc", () => {
     blockTimestamps: async (numbers: bigint[]) => {
       state.times(numbers);
       return new Map(numbers.map((n) => [n, blockTime(n)]));
+    },
+    // A page's read: no timestamps from the last run are seeded here.
+    pageBlockTimestamps: async (numbers: bigint[]) => {
+      state.times(numbers);
+      return { times: new Map(numbers.map((n) => [n, blockTime(n)])), provisional: false };
     },
     l1,
     l1State: l1,

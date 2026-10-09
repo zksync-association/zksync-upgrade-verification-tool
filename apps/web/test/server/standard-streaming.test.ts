@@ -26,21 +26,29 @@ const state = vi.hoisted(() => ({
 // from the handler's log index.
 const PROPOSAL: UpgradeProposal = { calls: [], executor: zeroAddress, salt: UPGRADE_ID };
 const ID = upgradeProposalId(PROPOSAL);
-vi.mock("@/.server/chain/puh-index", async (original) => ({
-  ...(await original<typeof import("@/.server/chain/puh-index")>()),
-  puhIndex: () => ({
-    single: async (name: string, id: string) => {
-      state.lookups.push(name);
-      if (name === "UpgradeStarted")
-        return {
-          args: { _id: id, _proposal: PROPOSAL },
-          log: { blockNumber: 100n, transactionHash: APPROVAL_TX },
-        };
-      if (name === "UpgradeExecuted") await state.execution;
-      return { args: { _id: id }, log: { blockNumber: 201n, transactionHash: APPROVAL_TX } };
-    },
-  }),
-}));
+vi.mock("@/.server/chain/puh-index", async (original) => {
+  const single = async (name: string, id: string) => {
+    state.lookups.push(name);
+    if (name === "UpgradeStarted")
+      return {
+        args: { _id: id, _proposal: PROPOSAL },
+        log: { blockNumber: 100n, transactionHash: APPROVAL_TX },
+      };
+    if (name === "UpgradeExecuted") await state.execution;
+    return { args: { _id: id }, log: { blockNumber: 201n, transactionHash: APPROVAL_TX } };
+  };
+  return {
+    ...(await original<typeof import("@/.server/chain/puh-index")>()),
+    puhIndex: () => ({
+      single,
+      // A page's lookup: this run's index answers (no history from the last run is seeded here).
+      singleAnswer: async (name: string, id: string) => ({
+        event: await single(name, id),
+        provisional: false,
+      }),
+    }),
+  };
+});
 
 vi.mock("@/.server/rpc", () => {
   const l1 = {

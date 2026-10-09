@@ -23,10 +23,14 @@ import {
 } from "../rpc";
 import { scrubText, secretsOf } from "./jsonrpc";
 import {
+  type FinalSnapshot,
   IndexClosed,
   type IndexStatus,
   type IndexedLog,
   type LogIndex,
+  type ProvisionalOutcome,
+  type ProvisionalSeed,
+  SeedExpectation,
   createLogIndex,
 } from "./log-index";
 
@@ -56,6 +60,9 @@ const TOPICS = new Map<string, L2GovernorEventName>(
 
 const LABEL = "L2 governors";
 
+/** topic0 of the three events the index keeps (lower case). */
+export const L2_GOVERNOR_TOPICS: readonly Hex[] = [...TOPICS.keys()] as Hex[];
+
 export type L2GovernorEvent = {
   eventName: L2GovernorEventName;
   governor: Address;
@@ -63,10 +70,26 @@ export type L2GovernorEvent = {
   log: IndexedLog;
   /** From the final range (at or below Era's 'finalized' block when answered): never changes. */
   final: boolean;
+  /** From the history the last run read, not read again yet (pages only): never kept. */
+  provisional: boolean;
 };
 
-/** An index answer: the Era head it is complete at, and every event up to that head. */
-export type L2GovernorRead = { head: L2Head; events: L2GovernorEvent[] };
+/**
+ * An index answer: the Era head it is complete at, and every event up to that head.
+ * `provisional`: part of it was answered from the last run's history (pages only).
+ */
+export type L2GovernorRead = { head: L2Head; events: L2GovernorEvent[]; provisional: boolean };
+
+/** Which governors and Era chain a seeded history is for. */
+export type L2Seed = ProvisionalSeed & {
+  chainId: number;
+  l2ChainId: number;
+  addresses: Address[];
+  fromBlock: bigint;
+};
+
+/** The complete final history of the indexed governors, for saving. */
+export type L2Snapshot = FinalSnapshot & { chainId: number; addresses: Address[] };
 
 export type L2IndexStatus = Omit<IndexStatus, "deployBlock"> & {
   deployBlock: string | null;
@@ -85,6 +108,7 @@ const IDLE: L2IndexStatus = {
   span: null,
   logs: 0,
   error: null,
+  provisional: null,
   governors: [],
 };
 
@@ -142,8 +166,13 @@ function describe(error: unknown, l2Url: string | null = null): string {
   return scrubText(raw.split("\n")[0] ?? raw, secrets);
 }
 
+/** The index key for these governors (see #index). */
+const keyOf = (chainId: number, fromBlock: bigint, addresses: readonly Address[]) =>
+  [chainId, fromBlock, ...addresses.map((a) => a.toLowerCase())].join(":");
+
 type Built = {
   key: string;
+  chainId: number;
   addresses: Address[];
   index: LogIndex;
   /** Decoded events per log (block hash and log index name one log for good). */
@@ -154,6 +183,10 @@ export class L2GovernorIndex {
   #built: Built | undefined;
   #error: string | null = null;
   #closed = false;
+  // A history from the last run, until the index it is for is built (then handed to it).
+  #seed: { seed: L2Seed; onOutcome?: (outcome: ProvisionalOutcome) => void } | null = null;
+  // The chain cache is being loaded: a page's read waits for its seed (bounded).
+  #seedComing = new SeedExpectation();
 
   constructor(readonly generation: number) {}
 
@@ -174,16 +207,13 @@ export class L2GovernorIndex {
     const lane = await l2HistoryLane();
     if (!this.#current()) throw new IndexClosed(LABEL);
     if (!lane) return null;
-    const key = [
-      net.chainId,
-      covered.fromBlock,
-      ...covered.addresses.map((a) => a.toLowerCase()),
-    ].join(":");
+    const key = keyOf(net.chainId, covered.fromBlock, covered.addresses);
     if (this.#built?.key !== key) {
       this.#built?.index.close();
       const l2Url = net.l2RpcUrl;
       this.#built = {
         key,
+        chainId: net.chainId,
         addresses: covered.addresses,
         decoded: new Map(),
         index: createLogIndex({
@@ -201,9 +231,57 @@ export class L2GovernorIndex {
           describeError: (error) => describe(error, l2Url),
         }),
       };
+      this.#applySeed();
     }
     this.#error = null;
     return this.#built;
+  }
+
+  /** Hands a pending seed to the built index when it is the one the seed is for. */
+  #applySeed() {
+    const pending = this.#seed;
+    const built = this.#built;
+    if (!pending || !built) return;
+    this.#seed = null;
+    const { seed, onOutcome } = pending;
+    const accepted =
+      built.key === keyOf(seed.chainId, seed.fromBlock, seed.addresses) &&
+      built.index.seedProvisional(seed, onOutcome);
+    if (!accepted) onOutcome?.("dropped");
+  }
+
+  /**
+   * Seeds the history the last run read (see LogIndex.seedProvisional) for the governors it
+   * names: handed to the index when it is built (or now). The caller checked the Era chain.
+   * `onOutcome` hears "dropped" when the index in use is for other governors, or the settings
+   * change first.
+   */
+  seedProvisional(seed: L2Seed, onOutcome?: (outcome: ProvisionalOutcome) => void) {
+    if (!this.#current() || this.#seed) {
+      onOutcome?.("dropped");
+      return;
+    }
+    this.#seed = { seed, onOutcome };
+    this.#applySeed();
+  }
+
+  /** A history from the last run may be seeded until `until` settles (see PuhIndex.expectSeed). */
+  expectSeed(until: Promise<unknown>) {
+    this.#seedComing.expect(until);
+  }
+
+  /** Drops a seeded history still awaiting verification. */
+  dropProvisional() {
+    this.#seed = null;
+    this.#built?.index.dropProvisional();
+  }
+
+  /** The complete final history of the indexed governors, or null. */
+  snapshot(): L2Snapshot | null {
+    const built = this.#built;
+    if (!built || !this.#current()) return null;
+    const final = built.index.finalSnapshot();
+    return final && { ...final, chainId: built.chainId, addresses: [...built.addresses] };
   }
 
   /** Starts or resumes the backfill (when a governor is indexed). Never rejects. */
@@ -225,41 +303,64 @@ export class L2GovernorIndex {
    * chain order, with that head. Waits for the backfill (bounded); rejects when the index cannot
    * answer, or no governor is indexed (callers check isIndexedL2Governor first).
    */
-  async read({ head, waitMs }: { head?: L2Head; waitMs?: number } = {}): Promise<L2GovernorRead> {
+  async read({
+    head,
+    waitMs,
+    provisional,
+  }: { head?: L2Head; waitMs?: number; provisional?: boolean } = {}): Promise<L2GovernorRead> {
+    if (provisional) await this.#seedComing.wait();
     const built = await this.#index();
     if (!built) throw new Error("No ZKsync Era governor is indexed under the current settings");
     const at = head ?? (await l2ChainHead());
     if (!at) throw new Error("No ZKsync Era RPC is configured");
     if (!this.#current()) throw new IndexClosed(LABEL);
-    const { logs, finalTo } = await built.index.read({
+    const { logs, finalTo, provisionalTo } = await built.index.read({
       head: { head: at.head, safe: at.safe },
       waitMs,
+      provisional,
     });
     const events: L2GovernorEvent[] = [];
-    for (const log of logs) {
-      const key = `${log.blockHash.toLowerCase()}:${log.logIndex}`;
-      let decoded = built.decoded.get(key);
-      if (!decoded) {
-        const eventName = TOPICS.get(String(log.topics[0]).toLowerCase());
-        if (!eventName) continue;
-        const { args } = decodeEventLog({
-          abi: l2GovernorAbi,
-          eventName,
-          topics: log.topics,
-          data: log.data,
+    try {
+      for (const log of logs) {
+        const fromLastRun = provisionalTo !== null && log.blockNumber <= provisionalTo;
+        const key = `${log.blockHash.toLowerCase()}:${log.logIndex}`;
+        // A log from the last run's history is decoded for this answer only: what it says is
+        // never kept for this run's log at the same place.
+        let decoded = fromLastRun ? undefined : built.decoded.get(key);
+        if (!decoded) {
+          const eventName = TOPICS.get(String(log.topics[0]).toLowerCase());
+          if (!eventName) continue;
+          const { args } = decodeEventLog({
+            abi: l2GovernorAbi,
+            eventName,
+            topics: log.topics,
+            data: log.data,
+          });
+          decoded = { eventName, governor: getAddress(log.address), proposalId: args.proposalId };
+          if (!fromLastRun) built.decoded.set(key, decoded);
+        }
+        events.push({
+          ...decoded,
+          log,
+          final: !fromLastRun && log.blockNumber <= finalTo,
+          provisional: fromLastRun,
         });
-        decoded = { eventName, governor: getAddress(log.address), proposalId: args.proposalId };
-        built.decoded.set(key, decoded);
       }
-      events.push({ ...decoded, log, final: log.blockNumber <= finalTo });
+    } catch (error) {
+      // What the last run's history holds never fails a page: this run's history answers.
+      if (provisionalTo === null) throw error;
+      return this.read({ head: at, waitMs, provisional: false });
     }
-    return { head: at, events };
+    return { head: at, events, provisional: provisionalTo !== null };
   }
 
   close() {
     this.#closed = true;
     this.#built?.index.close();
     this.#built = undefined;
+    const pending = this.#seed;
+    this.#seed = null;
+    pending?.onOutcome?.("dropped");
   }
 }
 
@@ -279,6 +380,69 @@ export function l2GovernorIndex(): L2GovernorIndex {
 
 // Headers per JSON-RPC batch when looking for a window's first block (Era allows 100).
 const TIMESTAMP_BATCH = 20;
+// At most this many final Era block timestamps are kept for saving (persist/chain-cache.ts).
+const FINAL_TIMES_LIMIT = 10_000;
+
+/** An Era block's timestamp, with its hash and number. */
+export type L2BlockTime = { hash: Hex; number: bigint; timestamp: bigint };
+
+// Timestamps of final Era blocks read under the current settings (event blocks the index answered
+// from its final range), for saving.
+let finalTimes: { generation: number; times: Map<string, L2BlockTime> } = {
+  generation: -1,
+  times: new Map(),
+};
+
+// Timestamps the last run read (seeded from disk): unverified, so only pages use them (labelled),
+// until a read of the block confirms one. One that disagrees with the node calls `onMismatch`.
+let seededTimes: {
+  generation: number;
+  times: Map<string, L2BlockTime>;
+  onMismatch?: () => void;
+} | null = null;
+
+function currentFinalTimes(): Map<string, L2BlockTime> {
+  const generation = rpcGeneration();
+  if (finalTimes.generation !== generation) finalTimes = { generation, times: new Map() };
+  return finalTimes.times;
+}
+
+function currentSeededTimes() {
+  return seededTimes?.generation === rpcGeneration() ? seededTimes : null;
+}
+
+/** Seeds Era block timestamps the last run read (see seededTimes). */
+export function seedProvisionalL2Times(times: readonly L2BlockTime[], onMismatch?: () => void) {
+  seededTimes = {
+    generation: rpcGeneration(),
+    times: new Map(times.map((t) => [t.hash.toLowerCase(), t])),
+    onMismatch,
+  };
+}
+
+/** Drops the seeded timestamps (the chain cache was found wrong, or is not used). */
+export function dropProvisionalL2Times() {
+  seededTimes = null;
+}
+
+/**
+ * The final Era block timestamps to save: those read under the current settings, and those the
+ * last run read that nothing has contradicted.
+ */
+export function finalL2BlockTimes(): L2BlockTime[] {
+  const times = new Map(currentSeededTimes()?.times ?? []);
+  for (const [hash, time] of currentFinalTimes()) times.set(hash, time);
+  return [...times.values()];
+}
+
+/** A block's timestamp as read now: confirms (or contradicts) a seeded one for the same hash. */
+function checkSeeded(hash: Hex, timestamp: bigint) {
+  const seeded = currentSeededTimes();
+  const known = seeded?.times.get(hash.toLowerCase());
+  if (!seeded || !known) return;
+  seeded.times.delete(hash.toLowerCase());
+  if (known.timestamp !== timestamp) seeded.onMismatch?.();
+}
 
 /**
  * The timestamp of the Era block with this hash. A block hash names one header for good, so the
@@ -292,7 +456,9 @@ function l2BlockTime(hash: Hex): Promise<bigint> {
     const { hash: answered, timestamp } = (raw ?? {}) as { hash?: unknown; timestamp?: unknown };
     if (!isHex(answered) || answered.toLowerCase() !== hash.toLowerCase() || !isHex(timestamp))
       throw new Error(`The ZKsync Era RPC returned no block ${hash}`);
-    return hexToBigInt(timestamp);
+    const value = hexToBigInt(timestamp);
+    checkSeeded(hash, value);
+    return value;
   });
 }
 
@@ -303,25 +469,69 @@ function l2BlockTime(hash: Hex): Promise<bigint> {
  * newest first, up to 20 per batch, until a block is older than `since`: one batch for a recent
  * window, then served from memory.
  */
-export async function eventsInWindow<E extends { log: IndexedLog }>(
+export async function eventsInWindow<E extends { log: IndexedLog; final?: boolean }>(
   events: readonly E[],
   since: bigint,
   until?: bigint
 ): Promise<E[]> {
-  const blocks = new Map<bigint, Hex>();
-  for (const { log } of events) blocks.set(log.blockNumber, log.blockHash);
+  return (await windowOf(events, since, until, false)).events;
+}
+
+/**
+ * eventsInWindow for a page: a timestamp the last run read stands in for a header not read in
+ * this run yet; `provisional` says one did (the window is then only as good as those).
+ */
+export function eventsInWindowAnswer<E extends { log: IndexedLog; final?: boolean }>(
+  events: readonly E[],
+  since: bigint,
+  until?: bigint
+): Promise<{ events: E[]; provisional: boolean }> {
+  return windowOf(events, since, until, true);
+}
+
+async function windowOf<E extends { log: IndexedLog; final?: boolean }>(
+  events: readonly E[],
+  since: bigint,
+  until: bigint | undefined,
+  allowSeeded: boolean
+): Promise<{ events: E[]; provisional: boolean }> {
+  const blocks = new Map<bigint, { hash: Hex; final: boolean }>();
+  for (const { log, final } of events)
+    blocks.set(log.blockNumber, {
+      hash: log.blockHash,
+      final: (blocks.get(log.blockNumber)?.final ?? false) || final === true,
+    });
   const newestFirst = [...blocks].sort(([a], [b]) => (a > b ? -1 : a < b ? 1 : 0));
   const kept = new Set<bigint>();
+  const known = currentFinalTimes();
+  let provisional = false;
+  const timeOf = (hash: Hex): Promise<bigint> => {
+    if (allowSeeded) {
+      const verified = known.get(hash.toLowerCase());
+      if (verified) return Promise.resolve(verified.timestamp);
+      const seeded = currentSeededTimes()?.times.get(hash.toLowerCase());
+      if (seeded) {
+        provisional = true;
+        return Promise.resolve(seeded.timestamp);
+      }
+    }
+    return l2BlockTime(hash);
+  };
   for (let i = 0; i < newestFirst.length; i += TIMESTAMP_BATCH) {
     const batch = newestFirst.slice(i, i + TIMESTAMP_BATCH);
-    const times = await Promise.all(batch.map(([, hash]) => l2BlockTime(hash)));
+    const times = await Promise.all(batch.map(([, { hash }]) => timeOf(hash)));
     let older = false;
-    batch.forEach(([number], j) => {
+    batch.forEach(([number, { hash, final }], j) => {
       const time = times[j] as bigint;
+      // A final block's timestamp read in this run (not a seeded one): kept for saving.
+      if (final && !known.has(hash.toLowerCase()) && known.size < FINAL_TIMES_LIMIT) {
+        const seeded = allowSeeded && currentSeededTimes()?.times.has(hash.toLowerCase());
+        if (!seeded) known.set(hash.toLowerCase(), { hash, number, timestamp: time });
+      }
       if (time < since) older = true;
       else if (!older && (until === undefined || time <= until)) kept.add(number);
     });
     if (older) break;
   }
-  return events.filter(({ log }) => kept.has(log.blockNumber));
+  return { events: events.filter(({ log }) => kept.has(log.blockNumber)), provisional };
 }

@@ -290,7 +290,9 @@ describe("findEmergencyEvent", () => {
       txHash: txHash(log),
       blockNumber: log.blockNumber,
     });
-    expect(puhIndex().status().state).toBe("unavailable");
+    // The failed tail read (its own POST, not the backfill's) is what sent the lookup to the
+    // fallback; the backfill's own retries end in "unavailable" too.
+    await vi.waitFor(() => expect(puhIndex().status().state).toBe("unavailable"));
     expect(state.archiveReads).toBeGreaterThan(0);
   });
 });

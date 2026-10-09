@@ -38,6 +38,7 @@ function index(overrides: Partial<IndexStatusView> = {}): IndexStatusView {
     span: null,
     logs: 0,
     error: null,
+    provisional: null,
     ...overrides,
   };
 }

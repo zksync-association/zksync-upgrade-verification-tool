@@ -79,6 +79,11 @@ export type StartedUpgrade = {
   idMatches: boolean;
   blockNumber: string;
   txHash: Hex;
+  /**
+   * Pages only: found in the history the last run read (the chain cache), not read again in this
+   * run yet. Never set in JSON, and never kept.
+   */
+  fromLastRun?: true;
 };
 
 function startedFrom({
@@ -126,7 +131,27 @@ export type UpgradeSummary = StartedUpgrade & {
   legalVetoExtended: boolean;
 };
 
-export async function listStandardUpgrades({ allHistory }: { allHistory: boolean }) {
+export type UpgradeList = {
+  upgrades: UpgradeSummary[];
+  fromBlock: string;
+  allHistory: boolean;
+  /**
+   * Pages only (`freshness: "page"`): listed from the history the last run read, while this run's
+   * backfill re-verifies it; the verified list follows. Never set in JSON.
+   */
+  fromLastRun?: true;
+};
+
+/**
+ * Standard upgrades started since `from` (45 days, or the deployment), newest first, each with
+ * its state at the head. JSON ("strict") waits for this run's complete history; a page ("page")
+ * may be answered from the last run's history while this run's backfill has not covered the
+ * window yet (`fromLastRun`).
+ */
+export async function listStandardUpgrades({
+  allHistory,
+  freshness = "strict",
+}: { allHistory: boolean; freshness?: Freshness }): Promise<UpgradeList> {
   const net = await network();
   const head = await latestBlock();
   const windowStart = head.number - (ACTIVE_WINDOW_DAYS * DAY) / BigInt(net.blockTimeSeconds);
@@ -134,13 +159,25 @@ export async function listStandardUpgrades({ allHistory }: { allHistory: boolean
     allHistory || windowStart < net.upgradeHandlerDeployBlock
       ? net.upgradeHandlerDeployBlock
       : windowStart;
-  // Complete from `from` to the head, or an error: never a partial list.
-  const events = await puhIndex().events("UpgradeStarted", { fromBlock: from });
+  // Complete from `from` to the head, or an error: never a partial list. A page may be answered
+  // from the last run's history (`provisional`); JSON reads only this run's.
+  const strict = async () => ({
+    events: await puhIndex().events("UpgradeStarted", { fromBlock: from }),
+    provisional: false,
+  });
+  let { events, provisional } =
+    freshness === "page"
+      ? await puhIndex().eventsAnswer("UpgradeStarted", { fromBlock: from, provisional: true })
+      : await strict();
+  // The last run's history listing one upgrade twice is not shown: this run's answers instead.
+  if (provisional && new Set(events.map((e) => e.args._id.toLowerCase())).size !== events.length)
+    ({ events, provisional } = await strict());
   const upgrades = await Promise.all(
     events.map(async (event): Promise<UpgradeSummary> => {
       const started = startedFrom(event);
       // The detail page then needs no lookup for a final start. Only seeded: the list never
-      // waits on (or fails with) a detail lookup of the same id in flight.
+      // waits on (or fails with) a detail lookup of the same id in flight. One from the last
+      // run's history is not final (startedTtl 0): never kept.
       seed(startedKey(started.id), started, startedTtl(event, net));
       const { state, status } = await readStatus(started.id);
       return {
@@ -158,6 +195,7 @@ export async function listStandardUpgrades({ allHistory }: { allHistory: boolean
     upgrades: upgrades.reverse(),
     fromBlock: from.toString(),
     allHistory: from === net.upgradeHandlerDeployBlock,
+    ...(provisional ? { fromLastRun: true as const } : {}),
   };
 }
 
@@ -167,6 +205,56 @@ export async function listStandardUpgrades({ allHistory }: { allHistory: boolean
  */
 function indexedStart(id: Hex): Promise<StartedUpgrade | null> {
   return cachedUntil(startedKey(id), () => readStart(id));
+}
+
+/**
+ * A page's lookup of the start: while this run's backfill has not covered it yet, from the
+ * history the last run read (`fromLastRun`, never kept: confirmedStart checks it against this
+ * run's); otherwise as indexedStart. null (no start there) falls back to this run's index in
+ * startedUpgrade, as any miss does.
+ */
+async function pageStart(id: Hex): Promise<StartedUpgrade | null> {
+  const { event, provisional } = await puhIndex().singleAnswer("UpgradeStarted", id, {
+    provisional: true,
+  });
+  if (!provisional) return indexedStart(id);
+  if (!event) return null;
+  return event.provisional ? { ...startedFrom(event), fromLastRun: true } : startedFrom(event);
+}
+
+/** Two starts are the same: the same transaction, block and proposal. */
+function sameStart(a: StartedUpgrade, b: StartedUpgrade): boolean {
+  const proposal = (s: StartedUpgrade) =>
+    JSON.stringify(s.proposal, (_, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    );
+  return (
+    a.id.toLowerCase() === b.id.toLowerCase() &&
+    a.txHash.toLowerCase() === b.txHash.toLowerCase() &&
+    a.blockNumber === b.blockNumber &&
+    a.idMatches === b.idMatches &&
+    proposal(a) === proposal(b)
+  );
+}
+
+/**
+ * The page's core with the start as this run reads it: the same core when its start was read in
+ * this run; otherwise (a start from the last run's history) once this run's index answers, which
+ * must be the same start (else an integrity error: the cached history was wrong).
+ */
+async function confirmedStart(core: StandardUpgradeCore): Promise<StandardUpgradeCore> {
+  if (!core.started.fromLastRun) return core;
+  const started = await startedUpgrade(
+    core.id,
+    core.status,
+    core.governance.network,
+    indexedStart(core.id)
+  );
+  if (!sameStart(started, core.started))
+    throw new IndexIntegrityError(
+      `The start of upgrade ${core.id} in the history from the last run (block ${core.started.blockNumber}, transaction ${core.started.txHash}) is not the one the chain has (block ${started.blockNumber}, transaction ${started.txHash}). Reload the page.`
+    );
+  return { ...core, started, calls: started.proposal.calls.map(decodeCall) };
 }
 
 async function readStart(id: Hex): Promise<{ value: StartedUpgrade | null; ttlMs: number }> {
@@ -324,23 +412,43 @@ export async function loadStandardUpgrade(
   const overview = await getStandardUpgradeCore(id, {
     onExists: (gov) =>
       prefetchSafeListings([...gov.securityCouncil.members, ...gov.guardians.members]),
+    freshness,
   });
-  const evidence = timedRead(id, "recorded-approvals", () => getRecordedApprovals(overview));
+  // A page may show a start from the last run's history (`fromLastRun`); whatever acts on the
+  // proposal (its execution, the recorded approvals, the L2 proposal) waits for this run's.
+  const confirmed = confirmedStart(overview);
+  const startedCheck = overview.started.fromLastRun ? confirmed.then((core) => core.started) : null;
+  const evidence = confirmed.then((core) =>
+    timedRead(id, "recorded-approvals", () => getRecordedApprovals(core))
+  );
   const streamed = streamStandardUpgradeSets(overview, supplied, freshness);
   const freshSets = timedRead(id, "current-signatures", () => streamed.fresh);
   const sets = streamed.immediate;
   const setEvidence = Promise.all([freshSets, evidence]).then(([verified, records]) =>
     verified.map((set) => evidenceFor(set, records))
   );
-  const execution = timedRead(id, "execution", () => getUpgradeExecution(overview));
-  const l2Proposal = timedRead(id, "l2-discovery", () =>
-    findL2ProposalForUpgrade(id, overview.status.creationTimestamp, {
-      startedTxHash: overview.started.txHash,
-    })
+  const execution = confirmed.then((core) =>
+    timedRead(id, "execution", () => getUpgradeExecution(core))
   );
-  for (const pending of [evidence, sets, freshSets, setEvidence, execution, l2Proposal])
-    void pending.catch(() => {});
-  return { overview, evidence, sets, freshSets, setEvidence, execution, l2Proposal };
+  const l2Proposal = confirmed.then((core) =>
+    timedRead(id, "l2-discovery", () =>
+      findL2ProposalForUpgrade(id, core.status.creationTimestamp, {
+        startedTxHash: core.started.txHash,
+      })
+    )
+  );
+  for (const pending of [
+    confirmed,
+    startedCheck,
+    evidence,
+    sets,
+    freshSets,
+    setEvidence,
+    execution,
+    l2Proposal,
+  ])
+    void pending?.catch(() => {});
+  return { overview, startedCheck, evidence, sets, freshSets, setEvidence, execution, l2Proposal };
 }
 
 /** JSON waits for the same engine's complete result; the page streams each section separately. */
@@ -393,12 +501,20 @@ export async function getStandardUpgradeOverview(id: Hex): Promise<StandardUpgra
   return { ...core, ...execution, l2Proposal };
 }
 
+/**
+ * The upgrade's state, status, start and calls. With `freshness: "page"` the start may come from
+ * the last run's history (`started.fromLastRun`, see pageStart); JSON's always comes from this
+ * run's index.
+ */
 export async function getStandardUpgradeCore(
   id: Hex,
-  { onExists }: { onExists?: (gov: Governance) => void } = {}
+  {
+    onExists,
+    freshness = "strict",
+  }: { onExists?: (gov: Governance) => void; freshness?: Freshness } = {}
 ): Promise<StandardUpgradeCore> {
   // The start event is looked up while governance and the status are read.
-  const indexed = indexedStart(id);
+  const indexed = freshness === "page" ? pageStart(id) : indexedStart(id);
   void indexed.catch(() => {});
   const [gov, { state, status }] = await Promise.all([
     timedRead(id, "governance", governance),

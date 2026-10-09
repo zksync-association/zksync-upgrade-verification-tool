@@ -4,7 +4,8 @@ Run it with the one command in the [root README](../../README.md). This page is 
 
 ## How it works
 
-There is no database. Everything is derived on each request (with short in-memory caches):
+There is no database. Everything is derived from the chain and Safe (with in-memory caches, and a local cache of public
+chain data kept between runs):
 
 - **Roles and rules come from the chain.** The ProtocolUpgradeHandler address is pinned per network in
   `app/common/networks.ts`. The Security Council, Guardians, Emergency Upgrade Board, members, thresholds, nonces and
@@ -21,6 +22,14 @@ There is no database. Everything is derived on each request (with short in-memor
 
 Log scans split ranges the RPC refuses, learn its limit, and cache everything below the safe head (or below the fork
 block on anvil). A canary log flags RPCs that silently return no history.
+
+**Chain cache** (`app/.server/persist/chain-cache.ts`): the log histories (ProtocolUpgradeHandler, Era governors) up
+to their finality boundary, final block timestamps and members' last Safe listings are saved to
+`.cache/chain/<chainId>-<genesis hash prefix>.json` (atomic write, 0600; at most once a minute when something changed,
+and on shutdown). At start the file is checked against the chain and seeded as provisional; the backfill re-reads the
+history and the two must match (else the file is discarded). A saved block timestamp is checked when that block is
+read again; saved Safe listings are shown with their age until the Safe is read again. Only pages read provisional
+data, labelled; `/api/*` never does. `CHAIN_CACHE=0` turns it off; dev nodes never use it. Delete `.cache/chain/` to clear it.
 
 ## Develop
 

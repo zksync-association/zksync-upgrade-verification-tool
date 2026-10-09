@@ -72,6 +72,12 @@ export type SafeSnapshot = SafeMessages & {
   fetchedAt: number;
   /** Changes whenever the listing's content changes (never reused); kept when it does not. */
   version: number;
+  /**
+   * Read by the last run and kept on disk (persist/chain-cache.ts), not by this one: whatever its
+   * age, only a page's first answer may use it, labelled; it is never served as a listing at
+   * most 60 s old, and the first read of the Safe replaces it.
+   */
+  fromLastRun?: true;
 };
 
 type Held = {
@@ -136,7 +142,9 @@ function sync() {
 
 function servable(key: string): SafeSnapshot | null {
   const entry = held.get(key);
-  return entry && Date.now() - entry.snapshot.fetchedAt <= SAFE_LISTING_MAX_AGE_MS
+  return entry &&
+    !entry.snapshot.fromLastRun &&
+    Date.now() - entry.snapshot.fetchedAt <= SAFE_LISTING_MAX_AGE_MS
     ? entry.snapshot
     : null;
 }
@@ -187,6 +195,8 @@ export type SafeMessageLookup = {
    * when Safe was asked for the message by its hash (an answer read just now).
    */
   fetchedAt: number | null;
+  /** The listing that answered was read by the last run (see SafeSnapshot.fromLastRun). */
+  fromLastRun?: true;
 };
 
 /** findSafeMessage, with the listing version the answer came from. */
@@ -239,8 +249,9 @@ function answerFrom(listing: SafeSnapshot, messageHash: Hex): SafeMessageLookup 
     (m) => m.messageHash.toLowerCase() === messageHash.toLowerCase()
   );
   const { version, fetchedAt } = listing;
-  if (hit) return { message: hit, version, fetchedAt };
-  return listing.complete ? { message: null, version, fetchedAt } : null;
+  const origin = listing.fromLastRun ? { fromLastRun: true as const } : {};
+  if (hit) return { message: hit, version, fetchedAt, ...origin };
+  return listing.complete ? { message: null, version, fetchedAt, ...origin } : null;
 }
 
 /**
@@ -373,8 +384,9 @@ async function runRead(safe: Address, key: string, ticket: SafeTicket): Promise<
       throw new SweepPaused("keyless-public-service");
   }
   let checked: NewestMessage | null = null;
-  // A background read asks first whether anything changed since the listing it holds.
-  if (ticket.priority === "low" && previous) {
+  // A background read asks first whether anything changed since the listing it holds; never
+  // about a listing the last run read (no check is trusted against it: it is read in full).
+  if (ticket.priority === "low" && previous && !previous.snapshot.fromLastRun) {
     const newest = await fetchNewest(safe, options);
     if (previous.newest && sameNewest(newest, previous.newest)) {
       const snapshot = { ...previous.snapshot, fetchedAt: newest.arrivedAt };
@@ -465,6 +477,65 @@ function newestOf(listing: SafeListing): NewestMessage | null {
     messageHash: best?.message.messageHash ?? null,
     modified: best?.message.modified ?? null,
   };
+}
+
+// ---- listings kept between runs (persist/chain-cache.ts) ----
+
+/** A listing as kept on disk: what Safe answered, and when. */
+export type KeptSafeListing = SafeMessages & { safe: Address; fetchedAt: number };
+
+/**
+ * The listings held, for saving, with their versions (a new version means the content changed):
+ * those this run read, and those the last run read for Safes this run has not read yet (kept with
+ * the time Safe answered then, so they stay labelled with their true age).
+ */
+export function listingsToKeep(): (KeptSafeListing & { version: number })[] {
+  sync();
+  const out: (KeptSafeListing & { version: number })[] = [];
+  for (const [key, entry] of held) {
+    const { snapshot } = entry;
+    out.push({
+      safe: key as Address,
+      messages: snapshot.messages,
+      complete: snapshot.complete,
+      fetchedAt: snapshot.fetchedAt,
+      version: snapshot.version,
+    });
+  }
+  return out;
+}
+
+/**
+ * Holds listings the last run read (see SafeSnapshot.fromLastRun) for Safes this run has none of
+ * yet. Each gets a version of its own; none is ever served as at most 60 s old, and the first
+ * read of the Safe (a request's, or a background one, which reads it in full without a change
+ * check first) replaces it. Returns how many were held.
+ */
+export function holdLastRunListings(listings: readonly KeptSafeListing[]): number {
+  sync();
+  let count = 0;
+  for (const listing of listings) {
+    const key = listing.safe.toLowerCase();
+    if (held.has(key) || reads.has(key)) continue;
+    held.set(key, {
+      snapshot: {
+        messages: listing.messages,
+        complete: listing.complete,
+        fetchedAt: listing.fetchedAt,
+        version: ++versions,
+        fromLastRun: true,
+      },
+      fingerprint: JSON.stringify([listing.complete, listing.messages]),
+      newest: null,
+    });
+    count++;
+  }
+  return count;
+}
+
+/** Drops the last run's listings still held (the chain cache was found wrong). */
+export function dropLastRunListings() {
+  for (const [key, entry] of [...held]) if (entry.snapshot.fromLastRun) held.delete(key);
 }
 
 // ---- background budget ----

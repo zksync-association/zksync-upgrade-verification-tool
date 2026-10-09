@@ -86,6 +86,15 @@ const SIGNATURES = vi.hoisted(() => ({
   },
 }));
 
+// What the chain cache reports (chain-cache.test.ts covers how).
+const CACHE = vi.hoisted(() => ({
+  state: "verified",
+  file: "1-0xd4e56740.json",
+  savedAt: "2026-10-06T06:58:00.000Z",
+  sizeBytes: 812_345,
+  detail: null,
+}));
+
 vi.mock("@/.server/rpc", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/.server/rpc")>();
   return {
@@ -111,6 +120,7 @@ vi.mock("@/.server/safe-api", () => ({ quota: { limit: null, remaining: null } }
 vi.mock("@/.server/sync/engine", () => ({ syncEngineStatus: () => ENGINE }));
 vi.mock("@/.server/safe/store", () => ({ safeStoreStatus: () => SAFE }));
 vi.mock("@/.server/signatures", () => ({ signatureSetsStatus: () => SIGNATURES }));
+vi.mock("@/.server/persist/chain-cache", () => ({ chainCacheStatus: () => CACHE }));
 
 const { appStatus, logHistoryStatus } = await import("@/.server/status");
 const { ConfigError } = await import("@/.server/rpc");
@@ -124,7 +134,7 @@ beforeEach(() => {
 });
 
 describe("appStatus", () => {
-  it("adds sync.index, sync.l2Index, sync.engine, sync.safe and sync.signatures next to the fields it always had", async () => {
+  it("adds sync.index, sync.l2Index, sync.engine, sync.safe, sync.signatures and sync.cache next to the fields it always had", async () => {
     const status = await appStatus();
     expect(status).toEqual({
       ok: true,
@@ -143,6 +153,7 @@ describe("appStatus", () => {
         engine: ENGINE,
         safe: SAFE,
         signatures: SIGNATURES,
+        cache: CACHE,
       },
     });
     // JSON-safe as served: strings and numbers only.

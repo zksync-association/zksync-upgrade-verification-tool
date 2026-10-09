@@ -7,6 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { UpgradeStateBadge } from "@/components/verification/badges";
+import type { Refresh } from "@/components/verification/freshness";
+import { LastRunNote } from "@/components/verification/last-run";
+import { UntilFresh } from "@/components/verification/until-fresh";
 import { formatDay, formatNumber } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
@@ -19,11 +22,18 @@ export const meta = Meta["/app/proposals"];
 
 export function loader({ request }: LoaderFunctionArgs) {
   const allHistory = new URL(request.url).searchParams.get("history") === "all";
-  return defer({ allHistory, list: listStandardUpgrades({ allHistory }) });
+  // While this run re-reads the handler's history, the page may list from the history the last
+  // run saved (labelled), and the list from this run's history follows in the same response.
+  const list = listStandardUpgrades({ allHistory, freshness: "page" });
+  const freshList = list.then((first) =>
+    first.fromLastRun ? listStandardUpgrades({ allHistory }) : null
+  );
+  void freshList.catch(() => {});
+  return defer({ allHistory, list, freshList });
 }
 
 export default function Upgrades() {
-  const { list, allHistory } = useLoaderData<typeof loader>();
+  const { list, freshList, allHistory } = useLoaderData<typeof loader>();
   return (
     <div>
       <PageHeader
@@ -68,7 +78,17 @@ export default function Upgrades() {
             </EmptyState>
           }
         >
-          {(result) => <UpgradeTable result={result} allHistory={allHistory} />}
+          {(first) => (
+            <UntilFresh stale={first.fromLastRun === true} fresh={freshList}>
+              {(fresh, refresh) => (
+                <UpgradeTable
+                  result={fresh ?? first}
+                  allHistory={allHistory}
+                  refresh={fresh ? null : refresh}
+                />
+              )}
+            </UntilFresh>
+          )}
         </Await>
       </Suspense>
     </div>
@@ -78,9 +98,12 @@ export default function Upgrades() {
 function UpgradeTable({
   result,
   allHistory,
+  refresh = null,
 }: {
   result: SerializeFrom<Awaited<ReturnType<typeof listStandardUpgrades>>>;
   allHistory: boolean;
+  /** For a list from the last run's history: where the verified list is. */
+  refresh?: Refresh;
 }) {
   const active = result.upgrades.filter((u) => isUpgradeActive(u.state));
   const past = result.upgrades.filter((u) => !isUpgradeActive(u.state));
@@ -88,6 +111,7 @@ function UpgradeTable({
   const switching = useNavigatingTo(toggle);
   return (
     <div className="space-y-8">
+      {result.fromLastRun && <LastRunNote refresh={refresh} what="The upgrades listed below" />}
       <div className="space-y-3">
         <h2 className="text-[22px] leading-7">In progress</h2>
         <PendingRegion pending={switching}>

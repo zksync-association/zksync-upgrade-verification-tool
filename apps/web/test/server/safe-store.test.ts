@@ -903,6 +903,22 @@ describe("background reads (warm-up, precomputing)", () => {
     });
   });
 
+  it("read a listing the last run kept in full, without a change check first", async () => {
+    await load();
+    const safe = fakeSafe();
+    safe.add(A, 1);
+    const kept = { safe: A, messages: [], complete: true, fetchedAt: Date.now() - 3_600_000 };
+    expect(store.holdLastRunListings([kept])).toBe(1);
+    const snapshot = await within(1_000, store.warmSafeListing(A));
+    expect(safe.sent.map((s) => s.kind)).toEqual(["listing"]);
+    expect(snapshot.fromLastRun).toBeUndefined();
+    expect(snapshot.messages).toHaveLength(1);
+    // This run's listing is change-checked as usual: unchanged, it is not read again.
+    vi.advanceTimersByTime(61_000);
+    await within(1_000, store.warmSafeListing(A));
+    expect(safe.sent.map((s) => s.kind)).toEqual(["listing", "newest"]);
+  });
+
   it("do not mark a page's interest, and leave lookups by hash to requests", async () => {
     await load();
     const safe = fakeSafe();
