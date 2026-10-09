@@ -1,4 +1,5 @@
 import { linkStore } from "../cache";
+import type { SignatureSet } from "../signatures";
 
 // What pages last showed as current, kept in this process's memory so that a page loaded after a
 // pause can show it at once, labelled with the block it was read at, while the newest block is
@@ -191,4 +192,46 @@ export function lastShown() {
   }
 
   return { held, keep, section };
+}
+
+/**
+ * The page rule's floor: a page's current answer uses a member Safe's copy at most this old
+ * without asking Safe (.server/safe/store.ts SAFE_LISTING_MAX_AGE_MS, the same value: a test
+ * checks it; this module cannot load the store, which loads rpc.ts, which loads this module).
+ */
+export const PAGE_COPY_MS = 60_000;
+
+/**
+ * Whether the current answer for a set a page shows before it (a stale first answer, or the set
+ * as last shown) reads Safe again, so that its Safe copies may be said to be refreshing: only for
+ * a set that can still be signed (`open`: for one that cannot, the page keeps any copy it holds,
+ * see .server/signatures.ts pageSource), with a member Safe whose signature is not valid in it,
+ * when its copies are older than the page rule's floor (or none was read). Otherwise the current
+ * answer uses the same copies, and only their age is said.
+ */
+export function rereadsSafe(
+  set: Pick<SignatureSet, "members" | "safeFetchedAt">,
+  open: boolean,
+  now = Date.now()
+): boolean {
+  if (!open || !set.members.some((m) => m.safe.isContract && m.status !== "valid")) return false;
+  const at = set.safeFetchedAt ? Date.parse(set.safeFetchedAt) : Number.NaN;
+  return Number.isNaN(at) || now - at > PAGE_COPY_MS;
+}
+
+/**
+ * A set a page kept (see `keep`), as the page shows it first after a pause: not current
+ * (`stale`, as of the block it was verified at; no head to name for its re-verification yet),
+ * never followed under its key or reported with Safe checks, and whether its copies are being
+ * refreshed (rereadsSafe). Its card shows nothing in a passing colour and nothing to sign or send.
+ */
+export function heldSet<S extends SignatureSet>(set: S, open: boolean) {
+  return {
+    ...set,
+    stale: true,
+    reverifyingAt: null,
+    watch: undefined,
+    safeCheck: null,
+    rereadsSafe: rereadsSafe(set, open),
+  };
 }

@@ -221,7 +221,8 @@ describe("a read the node fails to answer for a moment (-32603 Internal error)",
       ).length;
     expect(atHead("checkSignatures")).toBeGreaterThan(1);
     expect(atHead("signedMessages")).toBeGreaterThan(1);
-  });
+    // The lanes' retries wait in real time: about 2-3 s alone, longer under load.
+  }, 20_000);
 
   it("a node that keeps failing a read still fails the answer (502), never with a verdict", async () => {
     const { l1, failed } = world({ failAlways: ["signedMessages"] });

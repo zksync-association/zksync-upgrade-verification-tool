@@ -13,7 +13,8 @@ import {
   readGovernance,
 } from "@/.server/governance";
 import { pageGovernance } from "@/.server/page-governance";
-import { latestBlock, resetRpcClients } from "@/.server/rpc";
+import { allowEngineWorkWhen } from "@/.server/sync/pacer";
+import { latestBlock, resetRpcClients, rpcGeneration } from "@/.server/rpc";
 import { resetSafeClient } from "@/.server/safe-api";
 import { holdLastRunListings, listingsToKeep } from "@/.server/safe/store";
 import {
@@ -405,6 +406,10 @@ describe("SYNC_MODE=always, nothing on screen", () => {
     engines.push(engine);
     // As the module's engine allows them: while it follows the chain.
     const previous = allowPinChecksWhen(() => engine.active);
+    const previousWork = allowEngineWorkWhen({
+      allowed: () => engine.active,
+      generation: rpcGeneration,
+    });
     try {
       engine.resume();
       await until(() => engine.status().ticks >= 1);
@@ -426,6 +431,7 @@ describe("SYNC_MODE=always, nothing on screen", () => {
     } finally {
       engine.stop();
       allowPinChecksWhen(previous);
+      allowEngineWorkWhen(previousWork);
     }
   });
 });

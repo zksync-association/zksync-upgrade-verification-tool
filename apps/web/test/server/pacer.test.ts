@@ -18,6 +18,7 @@ import {
   paceEngineRequest,
   pacer,
   readRateFrom,
+  requestJoinsEngineWork,
   resetPacer,
 } from "@/.server/sync/pacer";
 import { presence, resetPresence } from "@/.server/sync/presence";
@@ -214,6 +215,168 @@ describe("R-D3: the engine's work goes out only while the engine may send", () =
       expect(outcome).toBeInstanceOf(EngineWorkDropped);
     await vi.advanceTimersByTimeAsync(5_000);
     expect(pace.status().dropped).toBe(3);
+  });
+
+  it("unpaced (SYNC_CREDITS_PER_SECOND=0): the engine's work still goes only while the engine may send, under the settings it started under", async () => {
+    const { state, rule: sendRule } = rule();
+    const pace = new CreditPacer(0, Date.now, () => sendRule);
+    // Nothing waits a turn at rate 0.
+    expect(pace.take(80)).toBeNull();
+    expect(pace.take(255, 1)).toBeNull();
+    // Work started under the settings before is never sent.
+    await expect(pace.take(80, 0)).rejects.toBeInstanceOf(EngineWorkDropped);
+    // Nor, once the engine may no longer send (use ended, paused, stopped), is any of it.
+    state.allowed = false;
+    await expect(pace.take(80)).rejects.toBeInstanceOf(EngineWorkDropped);
+    await expect(pace.take(80, 1)).rejects.toBeInstanceOf(EngineWorkDropped);
+    expect(pace.status()).toMatchObject({ creditsPerSecond: 0, dropped: 3, queued: 0 });
+    state.allowed = true;
+    expect(pace.take(80)).toBeNull();
+  });
+
+  it("a hurry speeds up only what the engine may still send: new work and waiters alike", async () => {
+    const { state, rule: sendRule } = rule();
+    const pace = new CreditPacer(160, Date.now, () => sendRule);
+    const outcome = (wait: Promise<void> | null) =>
+      (wait as Promise<void>).then(
+        () => "sent",
+        (error: unknown) => (error instanceof EngineWorkDropped ? "dropped" : error)
+      );
+    expect(pace.take(160)).toBeNull();
+    // Two waiters under these settings, then the settings change: one more under the new ones.
+    const before = [outcome(pace.take(80)), outcome(pace.take(80))];
+    state.generation = 2;
+    const after = outcome(pace.take(80));
+    expect(pace.status().queued).toBe(3);
+    // A request waits on the engine's work: only the waiter of the current settings goes now.
+    let settle: () => void = () => {};
+    pace.hurry(
+      new Promise<void>((resolve) => {
+        settle = resolve;
+      })
+    );
+    expect(await Promise.all(before)).toEqual(["dropped", "dropped"]);
+    expect(await after).toBe("sent");
+    expect(pace.status()).toMatchObject({ queued: 0, dropped: 2, expedited: 1 });
+    // While hurried, new work the engine may send goes at once; work from the settings before,
+    // or any once the engine may no longer send, never goes.
+    expect(pace.take(80)).toBeNull();
+    await expect(pace.take(80, 1)).rejects.toBeInstanceOf(EngineWorkDropped);
+    state.allowed = false;
+    await expect(pace.take(80)).rejects.toBeInstanceOf(EngineWorkDropped);
+    // Waiting work the engine may no longer send is dropped by a hurry, never released.
+    state.allowed = true;
+    settle();
+    await vi.advanceTimersByTimeAsync(0);
+    const waiting = outcome(pace.take(80));
+    expect(pace.status().queued).toBe(1);
+    state.allowed = false;
+    pace.hurry(new Promise<void>(() => {}));
+    expect(await waiting).toBe("dropped");
+    expect(pace.status()).toMatchObject({ queued: 0, dropped: 5, expedited: 2 });
+  });
+
+  it("through a viem client at rate 0: nothing the engine may not send goes out, a request's own reads do", async () => {
+    const { state, rule: sendRule } = rule();
+    previous = allowEngineWorkWhen(sendRule);
+    readRateFrom(() => 0);
+    const sent: string[] = [];
+    vi.stubGlobal("fetch", async (_input: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      const calls = (Array.isArray(body) ? body : [body]) as { id: number; method: string }[];
+      sent.push(...calls.map((call) => call.method));
+      const answers = calls.map((call) => ({ jsonrpc: "2.0", id: call.id, result: "0x1" }));
+      return new Response(JSON.stringify(Array.isArray(body) ? answers : answers[0]), {
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const client = createPublicClient({
+      transport: limitedHttp("http://127.0.0.1:9", {
+        label: "L1",
+        maxInFlight: 4,
+        pace: paceEngineRequest,
+      }),
+    });
+    const read = (engine: boolean) => {
+      const go = () => client.getBlockNumber({ cacheTime: 0 });
+      return (engine ? asEngineWork(go) : go()).then(
+        () => "answered",
+        (error: unknown) => error
+      );
+    };
+    // The engine may send: its work goes at once.
+    const first = read(true);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await first).toBe("answered");
+    expect(sent).toEqual(["eth_blockNumber"]);
+    // Use ended: the engine's work is not sent (viem's retries included); a request's is. (One
+    // after the other: viem shares one getBlockNumber in flight between its callers.)
+    state.allowed = false;
+    const late = read(true);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(await late).not.toBe("answered");
+    expect(sent).toEqual(["eth_blockNumber"]);
+    const own = read(false);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await own).toBe("answered");
+    expect(sent).toEqual(["eth_blockNumber", "eth_blockNumber"]);
+    // Work the engine started under the settings before, asked after they changed: not sent.
+    state.allowed = true;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const stale = asEngineWork(async () => {
+      await gate;
+      return client.getBlockNumber({ cacheTime: 0 });
+    }).then(
+      () => "answered",
+      (error: unknown) => error
+    );
+    state.generation = 2;
+    release();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(await stale).not.toBe("answered");
+    expect(sent).toHaveLength(2);
+  });
+
+  it("a request joining the engine's work after use ended does not release the engine's waiting reads", async () => {
+    const { state, rule: sendRule } = rule();
+    previous = allowEngineWorkWhen(sendRule);
+    readRateFrom(() => 450);
+    const sent: string[] = [];
+    vi.stubGlobal("fetch", async (_input: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      const calls = (Array.isArray(body) ? body : [body]) as { id: number; method: string }[];
+      sent.push(...calls.map((call) => call.method));
+      const answers = calls.map((call) => ({ jsonrpc: "2.0", id: call.id, result: "0x1" }));
+      return new Response(JSON.stringify(Array.isArray(body) ? answers : answers[0]), {
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const client = createPublicClient({
+      transport: limitedHttp("http://127.0.0.1:9", {
+        label: "L1",
+        maxInFlight: 4,
+        pace: paceAsEngine,
+      }),
+    });
+    // The second's credits are used up: the engine's read waits its turn.
+    pacer().debit(450);
+    const waiting = asEngineWork(() => client.getBlockNumber({ cacheTime: 0 })).then(
+      () => "answered",
+      (error: unknown) => error
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pacer().status().queued).toBe(1);
+    // Use ends; then a request (JSON's, which is no use) joins a read the engine started.
+    state.allowed = false;
+    requestJoinsEngineWork(new Promise<void>(() => {}));
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(sent).toEqual([]);
+    expect(await waiting).not.toBe("answered");
+    expect(pacer().status()).toMatchObject({ queued: 0, expedited: 0 });
+    expect(pacer().status().dropped).toBeGreaterThan(0);
   });
 
   // viem retries a request that failed with an unknown error (twice, 0.5 s and 1 s later): each

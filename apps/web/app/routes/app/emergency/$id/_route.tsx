@@ -1,5 +1,5 @@
 import { idContent, loaderRevs } from "@/.server/sync/content";
-import { lastShown } from "@/.server/sync/last-shown";
+import { heldSet, lastShown } from "@/.server/sync/last-shown";
 import { pageLoad, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import {
@@ -7,6 +7,7 @@ import {
   type EmergencyExecutionFirst,
   type EmergencyHistorical,
   type EmergencyOverview,
+  type EmergencyRole,
   loadEmergencyUpgrade,
 } from "@/.server/flows/emergency";
 import { governance } from "@/.server/governance";
@@ -67,13 +68,12 @@ export function loader({ params, request }: LoaderFunctionArgs) {
   // After a pause (no head in memory), the upgrade and its execution as this app last showed
   // them come first, as of their block, until the current ones replace them (sync/last-shown.ts).
   const shown = lastShown();
+  const supplied = suppliedSignatures(request);
   // The page shows the signatures' first answer at once (possibly from an older block or older
   // Safe copies, labelled) and the strict result after it in the same response. Its sets' keys
   // join the page load's grace as they are found.
   const page = pageLoad(request, [watchKeys.emergency(id)]);
-  const loading = page.run(() =>
-    loadEmergencyUpgrade(id, { supplied: suppliedSignatures(request), freshness: "page" })
-  );
+  const loading = page.run(() => loadEmergencyUpgrade(id, { supplied, freshness: "page" }));
   const key = `emergency:${id.toLowerCase()}`;
   // Only an execution this run's index found is kept: never one from the last run or located
   // directly.
@@ -87,12 +87,38 @@ export function loader({ params, request }: LoaderFunctionArgs) {
     ),
     ({ execution }) => !execution || provenanceOf(execution) === null
   );
+  // With them, its signatures as last shown (kept apart: the upgrade never waits on them), in the
+  // first flush too. Never for a page with a signature from its URL (its sets are verified with it).
+  const rolesKey = `${key}:roles`;
+  if (supplied.length === 0)
+    shown.keep(
+      rolesKey,
+      loading.then(
+        async (d): Promise<LastShownRoles> => ({
+          roles: (await d.detail).roles,
+          executed: d.overview.state === UPGRADE_STATES.Done,
+        })
+      ),
+      ({ roles }) => roles.every((r) => !r.set.stale)
+    );
   return defer({
     watch: page.watch,
     // The upgrade's state and status, for its revision (its sets carry their own).
     revs: loaderRevs([[watchKeys.emergency(id), loading.then((d) => d.status).then(idContent)]]),
     id,
     lastShown: shown.held<LastShownEmergency>(key),
+    // The signatures as last shown, after a pause (null otherwise): each set as of the block it
+    // was verified at, nothing to sign or send from it.
+    lastShownRoles:
+      supplied.length === 0
+        ? shown.held<LastShownRoles>(rolesKey).then(
+            (held) =>
+              held && {
+                ...held,
+                roles: held.roles.map((r) => ({ ...r, set: heldSet(r.set, !held.executed) })),
+              }
+          )
+        : Promise.resolve(null),
     detail: loading.then((d) => d.overview),
     // While this run's index reads the history, the execution may come first from the history
     // the last run saved, or be located directly (labelled); executedCheck confirms it against the
@@ -114,6 +140,9 @@ type LastShownEmergency = {
   overview: EmergencyOverview;
   execution: EmergencyExecutionFirst | null;
 };
+
+/** What the page keeps of its signatures (the current result of each role), likewise. */
+type LastShownRoles = { roles: EmergencyRole[]; executed: boolean };
 
 // Opt-in simulation of the execution transaction. Only calls to the Emergency Upgrade Board are
 // accepted, so this is not a general eth_call proxy.
@@ -196,7 +225,7 @@ function HeldDetail({
   held: SerializeFrom<LastShownEmergency> & { asOf: AsOfBlock };
   refresh: Refresh;
 }) {
-  const { executedHistorical } = useLoaderData<typeof loader>();
+  const { executedHistorical, lastShownRoles } = useLoaderData<typeof loader>();
   const d = held.overview;
   const executed = d.state === UPGRADE_STATES.Done;
   return (
@@ -228,8 +257,54 @@ function HeldDetail({
           />
         </AsOfContent>
       )}
-      <LoadingCard label="Checking Security Council, Guardian and Foundation signatures at the newest block…" />
+      <Suspense fallback={<SignaturesPending />}>
+        <Await resolve={lastShownRoles ?? null} errorElement={<SignaturesPending />}>
+          {(kept) =>
+            // Only those shown with this upgrade (the same page load): never another block's.
+            kept && kept.asOf.block === held.asOf.block ? (
+              <AsOfContent asOf={held.asOf}>
+                <Section
+                  title="Signatures"
+                  description="All three are needed. The board checks each group through its EIP-1271 isValidSignature."
+                >
+                  <div className="space-y-6">
+                    {kept.roles.map((r) => (
+                      // As of the block it was verified at: nothing to sign or send from it.
+                      <SignatureSetCard
+                        key={r.key}
+                        testId={`set-${r.key}`}
+                        title={r.title}
+                        set={r.set}
+                        state={
+                          kept.executed
+                            ? {
+                                status: "done",
+                                detail: "The emergency upgrade was executed",
+                                txHash: held.execution?.txHash ?? null,
+                              }
+                            : { status: "open" }
+                        }
+                        used={r.used}
+                        refresh={refresh}
+                      />
+                    ))}
+                  </div>
+                </Section>
+              </AsOfContent>
+            ) : (
+              <SignaturesPending />
+            )
+          }
+        </Await>
+      </Suspense>
     </div>
+  );
+}
+
+/** The signatures' pending state, as of an older block with nothing kept for them. */
+function SignaturesPending() {
+  return (
+    <LoadingCard label="Checking Security Council, Guardian and Foundation signatures at the newest block…" />
   );
 }
 

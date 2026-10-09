@@ -100,13 +100,17 @@ async function noteKey(
   if (key === "list:emergency" || key === "list:emergency:all") {
     const list = await heldEmergencyList({ allHistory: key.endsWith(":all") });
     if (!list || !current()) return false;
-    noteContent(key, at, emergencyListContent(list.pending, list.executed));
+    noteContent(
+      key,
+      readAt(at, list.governance),
+      emergencyListContent(list.pending, list.executed)
+    );
     return true;
   }
   if (key === "list:freeze") {
     const list = await heldFreezeList();
     if (!list || !current()) return false;
-    noteContent(key, at, freezeListContent(list));
+    noteContent(key, readAt(at, list.governance), freezeListContent(list));
     return true;
   }
   if (key === "list:vetoes") return noteVetoList(at, current);
@@ -128,6 +132,17 @@ async function noteKey(
     return true;
   }
   return false;
+}
+
+/**
+ * Where a list built on governance was read: at the head, or at the older block its governance
+ * was read at (a full read kept up to 30 s, or one the engine could not read again at this head),
+ * as the status is noted. Its requests' states (nonces, the freeze status) and the member Safes
+ * collected from are governance's: never noted at a head they were not read at.
+ */
+export function readAt(at: { head: bigint }, gov: { latestBlock: { number: string } }) {
+  const read = BigInt(gov.latestBlock.number);
+  return { head: read < at.head ? read : at.head };
 }
 
 async function noteVetoList(at: { head: bigint }, current: () => boolean): Promise<boolean> {

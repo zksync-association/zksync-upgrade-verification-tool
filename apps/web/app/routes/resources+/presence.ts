@@ -14,7 +14,7 @@ import {
   presence,
   requestInfo,
 } from "@/.server/sync/presence";
-import { compareRevs, currentRev, notedHead } from "@/.server/sync/revs";
+import { compareRevs, currentRev, notedHead, revNotedHead } from "@/.server/sync/revs";
 import { type ActionFunctionArgs, json } from "@remix-run/node";
 
 // A visible tab's beat (components/presence.tsx): the app is in use while tabs beat, and the
@@ -54,12 +54,15 @@ export type BeatAnswer = {
   verifiedAt: Record<string, { rev: string; block: string }>;
   /**
    * For each item of the tab other than ZKsync Era's (the root status, an upgrade's state, a list,
-   * a transaction's receipt, a set, a simulation) whose content is the current one (its revision,
-   * repeated here): the newest head that content was noted at (read there, or read again there
-   * with the same result). An item named at a block before `head` was not read again at the head
-   * served now (its reads failed, or what it needs is not in memory there): the page shows it as
-   * of that block, never as current (components/verification/content-currency.tsx). Era items
-   * have `eraAt`.
+   * a transaction's receipt, a set, a simulation), by the revision the tab shows (repeated here):
+   * the newest head that content was noted at (read there, or read again there with the same
+   * result). For content that is the current one, the newest head; for content that changed (or
+   * was touched) since, the head it was last noted at before it did (sync/revs.ts revNotedHead),
+   * while the tab still shows it (its reload waits for the viewer, or for the reload gap). An item
+   * named at a block before `head` was not read again at the head served now (its reads failed,
+   * what it needs is not in memory there, or what was read there is not what the tab shows): the
+   * page shows it as of that block, never as current
+   * (components/verification/content-currency.tsx). Era items have `eraAt`.
    */
   notedAt: Record<string, { rev: string; block: string }>;
   /**
@@ -77,14 +80,19 @@ export type BeatAnswer = {
   simulatedAt: Record<string, string>;
   /** The handler's log history index, for the header. */
   index: PuhIndexStatus | null;
-  /** When to beat next: 10 s; 5 s while the viewer's own Safe is read; 2 s while settling. */
+  /**
+   * When to beat next: 10 s; 5 s while the viewer's own Safe is read; 2 s while settling, and
+   * after a beat that named content as changed (its reload lands meanwhile, and the next beat
+   * names the new content's block instead of the old one's).
+   */
   nextMs: number;
 };
 
 // While the viewer's own Safe is being read after they signed, tabs beat more often.
 const BURST_BEAT_MS = 5_000;
 // While the engine catches up after a pause, or the log index backfills, the header's state
-// ("Checking for changes…", "Indexing 37%") follows it closely: a beat costs nothing upstream.
+// ("Checking for changes…", "Indexing 37%") follows it closely, and after a change, the label of
+// what the tab reloaded: a beat costs nothing upstream.
 const SETTLING_BEAT_MS = 2_000;
 
 const NO_STORE = { "Cache-Control": "no-store" };
@@ -142,7 +150,7 @@ function answer(items: Parameters<typeof compareRevs>[0]): BeatAnswer {
     simulatedAt: simulatedAt(items),
     index,
     nextMs:
-      catchingUp || index.state === "backfilling"
+      catchingUp || index.state === "backfilling" || changed.length > 0
         ? SETTLING_BEAT_MS
         : burstsRunning() > 0
           ? BURST_BEAT_MS
@@ -174,8 +182,9 @@ function notedAt(
 ): Record<string, { rev: string; block: string }> {
   const at: Record<string, { rev: string; block: string }> = {};
   for (const { key, rev } of items) {
-    if (isL2Key(key) || rev === null || rev !== currentRev(key)) continue;
-    const head = notedHead(key);
+    if (isL2Key(key) || rev === null) continue;
+    // The content the tab shows, current or changed since: never a newer head than it was read at.
+    const head = revNotedHead(key, rev);
     // A dev node's content is read at 'latest' (noted at 0): no block to name.
     if (head !== null && head > 0n) at[key] = { rev, block: head.toString() };
   }

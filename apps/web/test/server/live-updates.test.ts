@@ -56,6 +56,7 @@ import {
   settle,
   until,
 } from "../support/live-world";
+import { endTestSteps } from "../support/test-end";
 
 // Pages update themselves (Phase D3): what a page shows has a revision (sync/revs.ts) the tab
 // beats with; the engine notes each on-screen item's content at every served head, and when a
@@ -155,13 +156,17 @@ beforeEach(() => {
   overrideCodePinsForTests(FAKE_PINS);
 });
 
-afterEach(() => {
+// A test that timed out runs on: its body stops at the end of the fake-time step it is in
+// (endTestSteps) before the engine, the Safe watcher (stopSync stops both) and presence are reset,
+// so it cannot move the next test's clock or beat into its presence.
+afterEach(async () => {
+  await endTestSteps();
   stopSync();
   overrideCodePinsForTests(undefined);
   resetPresence();
   vi.useRealTimers();
   vi.unstubAllGlobals();
-});
+}, 30_000);
 
 describe("C-3: a member signs while the page is open", () => {
   it("one changed-listing read, the new signature's verdicts, a new revision, and a reload from memory", async () => {
@@ -1260,7 +1265,8 @@ describe("an open set's page next to a list fed by Safe (two visible tabs)", () 
     }
     expect(behind).toEqual([]);
     expect(safeStoreStatus().watched).toMatchObject({ safes: 2, lists: 5 });
-  });
+    // 100 blocks with two tabs beating: about 1.5 s on its own, past 5 s under load.
+  }, 30_000);
 });
 
 describe("a list fed by Safe on screen (the veto list)", () => {

@@ -32,10 +32,18 @@ type Entry = {
   /** The revision: a number from one sequence for every key, never reused. */
   seq: number;
   touchedAt: number;
+  /**
+   * The key's last revisions before this one (newest first, at most PAST_LIMIT), each with the
+   * newest head its content was noted at: a tab may still show that content (its reload is held
+   * while the viewer signs, or waits for the reload gap), and its beat says as of which block.
+   */
+  past: { seq: number; head: bigint }[];
 };
 
 // At most this many keys (the least recently noted go first): pages open at once show far fewer.
 const LIMIT = 512;
+// Revisions remembered per key besides the current one: a reload replaces a tab's within seconds.
+const PAST_LIMIT = 4;
 
 const entries = new Map<string, Entry>();
 let seq = 0;
@@ -70,7 +78,7 @@ export function noteDigest(key: string, at: ContentAt, digest: string): WatchIte
   const now = Date.now();
   const entry = entries.get(key);
   if (!entry) {
-    entries.set(key, { digest, ...point, seq: ++seq, touchedAt: now });
+    entries.set(key, { digest, ...point, seq: ++seq, touchedAt: now, past: [] });
     prune();
     return { key, rev: String(seq) };
   }
@@ -85,6 +93,7 @@ export function noteDigest(key: string, at: ContentAt, digest: string): WatchIte
     return { key, rev: String(entry.seq) };
   }
   if (later(point, entry) || (point.head === entry.head && point.order === entry.order)) {
+    rememberPast(entry);
     entry.digest = digest;
     entry.head = point.head;
     entry.order = point.order;
@@ -97,6 +106,14 @@ export function noteDigest(key: string, at: ContentAt, digest: string): WatchIte
 // The digest of a key whose content is known to be out of date (touchRev): no content has it.
 const TOUCHED = "touched";
 
+/** Keeps the entry's revision, and the head its content was last noted at, before it changes. */
+function rememberPast(entry: Entry) {
+  // A touched revision has no content: no page shows it.
+  if (entry.digest === TOUCHED) return;
+  entry.past.unshift({ seq: entry.seq, head: entry.head });
+  if (entry.past.length > PAST_LIMIT) entry.past.length = PAST_LIMIT;
+}
+
 /**
  * Something the key's content uses changed (a member Safe's listing on a dev node, where nothing
  * is verified ahead of requests; a member the engine found no longer valid from a copy it may not
@@ -107,6 +124,7 @@ const TOUCHED = "touched";
 export function touchRev(key: string) {
   const entry = entries.get(key);
   if (!entry || entry.digest === TOUCHED) return;
+  rememberPast(entry);
   entry.digest = TOUCHED;
   entry.seq = ++seq;
 }
@@ -124,6 +142,20 @@ export function currentRev(key: string): string | null {
 export function notedHead(key: string): bigint | null {
   const entry = entries.get(key);
   return entry && entry.digest !== TOUCHED ? entry.head : null;
+}
+
+/**
+ * The newest head the content a tab shows under `rev` was noted at: the key's current content's
+ * (notedHead), or, for content that changed (or was touched) since, the head that content was last
+ * noted at before it did, while the key remembers it (its last few revisions). Null for content
+ * the server has no head for: from an older point than the key's (rev "0"), a revision forgotten,
+ * a key never noted or forgotten, or touched since it was last noted.
+ */
+export function revNotedHead(key: string, rev: string): bigint | null {
+  const entry = entries.get(key);
+  if (!entry) return null;
+  if (rev === String(entry.seq)) return entry.digest !== TOUCHED ? entry.head : null;
+  return entry.past.find((past) => String(past.seq) === rev)?.head ?? null;
 }
 
 /**

@@ -1,8 +1,13 @@
 import { idContent, loaderRevs } from "@/.server/sync/content";
-import { lastShown } from "@/.server/sync/last-shown";
+import { heldSet, lastShown, rereadsSafe } from "@/.server/sync/last-shown";
 import { pageLoad, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
-import { type StandardUpgradeCore, loadStandardUpgrade } from "@/.server/flows/standard";
+import {
+  type ApprovalSet,
+  type RecordedApproval,
+  type StandardUpgradeCore,
+  loadStandardUpgrade,
+} from "@/.server/flows/standard";
 import { parseId } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
@@ -28,7 +33,7 @@ import type { Refresh } from "@/components/verification/freshness";
 import { Timeline } from "@/components/verification/timeline";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { UpgradeFile } from "@/components/verification/upgrade-file";
-import { formatTime } from "@/utils/format";
+import { formatNumber, formatTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
 import { Await, Link, useAsyncError, useLoaderData } from "@remix-run/react";
@@ -43,13 +48,12 @@ export function loader({ params, request }: LoaderFunctionArgs) {
   // After a pause (no head in memory), the upgrade as this app last showed it comes first, as of
   // its block, until the current one replaces it (sync/last-shown.ts).
   const shown = lastShown();
+  const supplied = suppliedSignatures(request);
   // The page shows each set's first answer at once (possibly from an older block or older Safe
   // copies, labelled) and the strict result after it in the same response. Its sets' keys join
   // the page load's grace as they are found.
   const page = pageLoad(request, [watchKeys.upgrade(id)]);
-  const loading = page.run(() =>
-    loadStandardUpgrade(id, { supplied: suppliedSignatures(request), freshness: "page" })
-  );
+  const loading = page.run(() => loadStandardUpgrade(id, { supplied, freshness: "page" }));
   // Only a start this run's index found is kept: never one from the last run or located directly.
   const detail = shown.section(
     `upgrade:${id.toLowerCase()}`,
@@ -57,6 +61,12 @@ export function loader({ params, request }: LoaderFunctionArgs) {
     Promise.resolve(null),
     { current: (o) => !o.started.fromLastRun && !o.started.locatedDirectly }
   );
+  // With it, its approvals as last shown (the sets, with the recorded transactions of those done,
+  // and the recorded approvals): in the first flush too, never waiting on the newest block. Never
+  // for a page with a signature from its URL (its sets are verified with it).
+  const approvalsKey = `upgrade:${id.toLowerCase()}:approvals`;
+  if (supplied.length === 0)
+    shown.keep(approvalsKey, shownApprovals(loading), (a) => a.sets.every((s) => !s.set.stale));
   return defer({
     watch: page.watch,
     // The upgrade's state and status, for its revision (its sets carry their own).
@@ -68,7 +78,20 @@ export function loader({ params, request }: LoaderFunctionArgs) {
     // index reads the history (labelled), is confirmed against this run's index.
     startedCheck: loading.then((d) => d.startedCheck),
     evidence: loading.then((d) => d.evidence),
-    sets: loading.then((d) => d.sets),
+    // The approvals as last shown, after a pause (null otherwise): each set as of the block it was
+    // verified at, nothing to sign or send from it.
+    heldApprovals:
+      supplied.length === 0
+        ? shown.held<HeldApprovals>(approvalsKey).then((held) => held && heldApprovalsOf(held))
+        : Promise.resolve(null),
+    // A stale first answer says whether the current one reads Safe again (its copies refreshing).
+    sets: loading.then(async (d) =>
+      (await d.sets).map((s) =>
+        s.set.stale
+          ? { ...s, set: { ...s.set, rereadsSafe: rereadsSafe(s.set, s.state.status === "open") } }
+          : s
+      )
+    ),
     freshSets: loading.then((d) =>
       freshAfter(d.sets, d.freshSets, (sets) => sets.some((s) => s.set.stale === true))
     ),
@@ -76,6 +99,42 @@ export function loader({ params, request }: LoaderFunctionArgs) {
     execution: loading.then((d) => d.execution),
     l2Proposal: loading.then((d) => d.l2Proposal),
   });
+}
+
+/** What the page keeps of an upgrade's approvals, to show first after a pause (see the loader). */
+type HeldApprovals = {
+  /** The sets as the page showed them (with their recorded evidence, for those done). */
+  sets: ApprovalSet[];
+  /** The recorded approvals, or null when they could not be read. */
+  evidence: RecordedApproval[] | null;
+};
+
+/** The approvals the page shows once its current reads are in (each set's current result). */
+async function shownApprovals(
+  loading: ReturnType<typeof loadStandardUpgrade>
+): Promise<HeldApprovals> {
+  const d = await loading;
+  const [sets, merged, evidence] = await Promise.all([
+    d.freshSets,
+    d.setEvidence.catch(() => null),
+    d.evidence.catch(() => null),
+  ]);
+  return {
+    sets: sets.map((s) => {
+      const found = s.state.status === "done" ? merged?.find((e) => e.key === s.key) : undefined;
+      // Nothing to send is kept (a held set never offers it).
+      return { ...s, ...found, execution: null };
+    }),
+    evidence,
+  };
+}
+
+/** The approvals as last shown, labelled as the page shows them first (see heldSet). */
+function heldApprovalsOf(held: HeldApprovals & { asOf: { block: string; timestamp: string } }) {
+  return {
+    ...held,
+    sets: held.sets.map((s) => ({ ...s, set: heldSet(s.set, s.state.status === "open") })),
+  };
 }
 
 export default function UpgradePage() {
@@ -183,8 +242,16 @@ function Detail({
   /** For `asOf`: where the current upgrade is (see UntilFresh). */
   refresh?: Refresh;
 }) {
-  const { sets, freshSets, evidence, setEvidence, execution, l2Proposal, startedCheck } =
-    useLoaderData<typeof loader>();
+  const {
+    sets,
+    freshSets,
+    evidence,
+    setEvidence,
+    execution,
+    l2Proposal,
+    startedCheck,
+    heldApprovals,
+  } = useLoaderData<typeof loader>();
   // The governance the upgrade was read with (the same reads as the app status): the page
   // never waits on the root status for it.
   const governance = d.governance;
@@ -197,6 +264,10 @@ function Detail({
   };
   const now = Number(governance.latestBlock.timestamp);
   const anyone = d.started.proposal.executor.toLowerCase() === zeroAddress;
+  const recorded =
+    d.status.securityCouncilApprovalTimestamp !== 0 ||
+    d.status.guardiansApproval ||
+    d.status.guardiansExtendedLegalVeto;
   // The upgrade's state as the beats name it: one not read again at the head served now is shown
   // as of its block, in no colour, and nothing is signed or sent from the page until it is.
   const watchKey = `upgrade:${d.id.toLowerCase()}`;
@@ -381,14 +452,24 @@ function Detail({
         </Section>
       </AsOfContent>
 
-      {/* What follows waits on the current reads: as of an older block, only its pending state. */}
+      {/* What follows waits on the current reads: as of an older block, the approvals as last
+          shown with it (each set as of its block), else only their pending state. */}
       {asOf ? (
-        <LoadingCard label="Checking the approvals and member signatures at the newest block…" />
+        <Suspense fallback={<ApprovalsPending />}>
+          <Await resolve={heldApprovals ?? null} errorElement={<ApprovalsPending />}>
+            {(held) =>
+              // Only those shown with this upgrade (the same page load): never another block's.
+              held && held.asOf.block === asOf.block ? (
+                <HeldApprovalsView held={held} asOf={asOf} recorded={recorded} refresh={refresh} />
+              ) : (
+                <ApprovalsPending />
+              )
+            }
+          </Await>
+        </Suspense>
       ) : (
         <>
-          {(d.status.securityCouncilApprovalTimestamp !== 0 ||
-            d.status.guardiansApproval ||
-            d.status.guardiansExtendedLegalVeto) && (
+          {recorded && (
             <Section
               title="Recorded approvals"
               description="Transaction evidence and historical checks load independently of current Safe signatures."
@@ -407,55 +488,7 @@ function Detail({
                     </EmptyState>
                   }
                 >
-                  {(records) => (
-                    <div className="space-y-4" data-testid="recorded-approvals">
-                      {records.map((record) => (
-                        <div
-                          key={record.key}
-                          className="space-y-2 rounded-xl border border-slate-300 bg-white p-4 sm:p-6"
-                        >
-                          <h3 className="font-semibold text-navy-800">{record.title}</h3>
-                          <p className="text-sm">
-                            {record.state.status !== "open" && record.state.detail}
-                          </p>
-                          {record.state.status === "done" && record.state.txHash ? (
-                            <TxLink hash={record.state.txHash} />
-                          ) : (
-                            <p className="text-amber-900 text-sm">
-                              The approval transaction could not be located.
-                            </p>
-                          )}
-                          {record.used && (
-                            <p className="text-slate-700 text-sm">
-                              The transaction carried {record.used.signers.length} signatures.
-                              Comparison with current Safe copies appears below.
-                            </p>
-                          )}
-                          {record.historical ? (
-                            <p
-                              className={
-                                record.historical.accepted === true
-                                  ? "text-green-900 text-sm"
-                                  : record.historical.accepted === false
-                                    ? "text-red-900 text-sm"
-                                    : "text-slate-700 text-sm"
-                              }
-                            >
-                              {record.historical.accepted === true
-                                ? `Re-checked at block ${record.historical.block} (just before execution): accepted.`
-                                : record.historical.accepted === false
-                                  ? `Re-checked at block ${record.historical.block}: rejected (${record.historical.error}).`
-                                  : `Not re-checked at block ${record.historical.block}: ${record.historical.error}.`}
-                            </p>
-                          ) : (
-                            <p className="text-amber-900 text-sm">
-                              Historical signatures could not be reconstructed for a re-check.
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {(records) => <RecordedApprovalList records={records} />}
                 </Await>
               </Suspense>
             </Section>
@@ -574,5 +607,118 @@ function Detail({
     <PageCurrency watchKey={watchKey} what="The upgrade's state">
       {page}
     </PageCurrency>
+  );
+}
+
+/** The approvals' pending state, as of an older block with nothing kept for them. */
+function ApprovalsPending() {
+  return <LoadingCard label="Checking the approvals and member signatures at the newest block…" />;
+}
+
+/** The recorded approvals: each one's transaction, the signatures it carried and their re-check. */
+function RecordedApprovalList({
+  records,
+}: {
+  records: SerializeFrom<RecordedApproval>[];
+}) {
+  return (
+    <div className="space-y-4" data-testid="recorded-approvals">
+      {records.map((record) => (
+        <div
+          key={record.key}
+          className="space-y-2 rounded-xl border border-slate-300 bg-white p-4 sm:p-6"
+        >
+          <h3 className="font-semibold text-navy-800">{record.title}</h3>
+          <p className="text-sm">{record.state.status !== "open" && record.state.detail}</p>
+          {record.state.status === "done" && record.state.txHash ? (
+            <TxLink hash={record.state.txHash} />
+          ) : (
+            <p className="text-amber-900 text-sm">The approval transaction could not be located.</p>
+          )}
+          {record.used && (
+            <p className="text-slate-700 text-sm">
+              The transaction carried {record.used.signers.length} signatures. Comparison with
+              current Safe copies appears below.
+            </p>
+          )}
+          {record.historical ? (
+            <p
+              className={
+                record.historical.accepted === true
+                  ? "text-green-900 text-sm"
+                  : record.historical.accepted === false
+                    ? "text-red-900 text-sm"
+                    : "text-slate-700 text-sm"
+              }
+            >
+              {record.historical.accepted === true
+                ? `Re-checked at block ${record.historical.block} (just before execution): accepted.`
+                : record.historical.accepted === false
+                  ? `Re-checked at block ${record.historical.block}: rejected (${record.historical.error}).`
+                  : `Not re-checked at block ${record.historical.block}: ${record.historical.error}.`}
+            </p>
+          ) : (
+            <p className="text-amber-900 text-sm">
+              Historical signatures could not be reconstructed for a re-check.
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The approvals as this app last showed them with the upgrade above (after a pause), until the
+ * current ones replace them: in no colour, each set under its own notice naming the block it was
+ * verified at, with nothing to sign, fetch or send (its card offers none of it for a stale set).
+ */
+function HeldApprovalsView({
+  held,
+  asOf,
+  recorded,
+  refresh,
+}: {
+  held: NonNullable<SerializeFrom<Awaited<ReturnType<typeof heldApprovalsOf>>>>;
+  asOf: AsOfBlock;
+  recorded: boolean;
+  refresh: Refresh;
+}) {
+  return (
+    <AsOfContent asOf={asOf} className="space-y-10">
+      {recorded && (
+        <Section
+          title="Recorded approvals"
+          description={`As this app last showed them, read at block #${formatNumber(asOf.block)}. The current ones replace them when they arrive.`}
+        >
+          {held.evidence ? (
+            <RecordedApprovalList records={held.evidence} />
+          ) : (
+            <LoadingCard label="Reading recorded approvals and re-checking their historical signatures…" />
+          )}
+        </Section>
+      )}
+      <Section
+        title="Approvals"
+        description="Each member is a Safe. Its signature is looked up in the Safe Transaction Service by the hash this page computes, and counted only if the contract accepts it."
+      >
+        <div className="space-y-6">
+          {held.sets.map((s) => (
+            <SignatureSetCard
+              key={s.key}
+              testId={`set-${s.key}`}
+              title={s.title}
+              set={s.set}
+              state={s.state}
+              execution={null}
+              executionToLabel={s.key === "securityCouncil" ? "SecurityCouncil" : "Guardians"}
+              used={s.used}
+              historical={s.historical}
+              refresh={refresh}
+            />
+          ))}
+        </div>
+      </Section>
+    </AsOfContent>
   );
 }

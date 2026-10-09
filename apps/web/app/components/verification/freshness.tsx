@@ -24,6 +24,12 @@ export type Labelled = {
   safeFetchedAt?: string | null;
   stale?: boolean;
   reverifyingAt?: string | null;
+  /**
+   * For an answer shown before the current one (`stale`): whether the current one reads Safe
+   * again (see .server/sync/last-shown.ts rereadsSafe). false: it uses the same copies (a set that
+   * can no longer be signed keeps them), so they are never said to be refreshing.
+   */
+  rereadsSafe?: boolean;
 };
 
 /**
@@ -39,8 +45,9 @@ export function copiesAge(fetchedAt: string, nowSeconds: number | null): string 
 /**
  * The labels: "Verified at block #N" (+ " · re-verifying at #M" while the fresh result is
  * pending, " · not re-verified at #M" for a result behind the head served), "Safe copies from 12s
- * ago" (+ " · refreshing"), and a line when re-verification failed. null for a label the set has
- * nothing for (a dev node's 'latest', no Safe copy read).
+ * ago" (+ " · refreshing" while the pending result reads Safe again: never for one that keeps
+ * these copies, `rereadsSafe: false`), and a line when re-verification failed. null for a label
+ * the set has nothing for (a dev node's 'latest', no Safe copy read).
  */
 export function freshnessLabels(set: Labelled, refresh: Refresh, nowSeconds: number | null) {
   const block = set.verifiedAtBlock ?? null;
@@ -49,6 +56,7 @@ export function freshnessLabels(set: Labelled, refresh: Refresh, nowSeconds: num
       ? ` at #${formatNumber(set.reverifyingAt)}`
       : "";
   const pending = refresh === "pending";
+  const refreshing = pending && set.rereadsSafe !== false;
   const behind = refresh === "behind" && at !== "" ? ` · not re-verified${at}` : "";
   return {
     verified:
@@ -56,7 +64,7 @@ export function freshnessLabels(set: Labelled, refresh: Refresh, nowSeconds: num
         ? null
         : `Verified at block #${formatNumber(block)}${pending ? ` · re-verifying${at}` : behind}`,
     copies: set.safeFetchedAt
-      ? `Safe copies from ${copiesAge(set.safeFetchedAt, nowSeconds)}${pending ? " · refreshing" : ""}`
+      ? `Safe copies from ${copiesAge(set.safeFetchedAt, nowSeconds)}${refreshing ? " · refreshing" : ""}`
       : null,
     failed:
       refresh === "failed" ? "Checking again did not complete. Refresh the page to retry." : null,

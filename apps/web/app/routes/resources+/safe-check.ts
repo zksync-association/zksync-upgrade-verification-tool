@@ -7,6 +7,7 @@ import { readBodyAtMost } from "@/.server/request";
 import { latestBlock } from "@/.server/rpc";
 import { type SafeCheck, checkSafesNow } from "@/.server/safe/store";
 import { pageSetOf, pageSetSafeCheck, reverifyPageSet } from "@/.server/signatures";
+import { readAt } from "@/.server/sync/content-engine";
 import { listSafeChecks, wakeSync } from "@/.server/sync/engine";
 import { isOwnBeat, presence, requestInfo } from "@/.server/sync/presence";
 import { currentRev, noteContent } from "@/.server/sync/revs";
@@ -98,12 +99,18 @@ async function checkNow(key: string): Promise<SafeCheckAnswer | null> {
   const { checked, failed } = await checkSafesNow(safes);
   const at = { head: (await latestBlock()).number };
   let rev = currentRev(key);
+  // The lists built on governance are noted at the block it was read at, if older (readAt).
   if (key.startsWith("list:emergency")) {
     const list = await heldEmergencyList({ allHistory: key.endsWith(":all") });
-    if (list) rev = noteContent(key, at, emergencyListContent(list.pending, list.executed)).rev;
+    if (list)
+      rev = noteContent(
+        key,
+        readAt(at, list.governance),
+        emergencyListContent(list.pending, list.executed)
+      ).rev;
   } else if (key === "list:freeze") {
     const list = await heldFreezeList();
-    if (list) rev = noteContent(key, at, freezeListContent(list)).rev;
+    if (list) rev = noteContent(key, readAt(at, list.governance), freezeListContent(list)).rev;
   } else {
     const list = await heldVetoList();
     if (list && list.vetoable.l2Error === null)

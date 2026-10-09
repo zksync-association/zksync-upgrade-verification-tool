@@ -8,6 +8,9 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["test/server/*.{test,spec}.{ts,tsx}"],
+    // Many tests drive the sync engine through hundreds of fake blocks, and a few wait on real
+    // retry timers: 1-4 s alone, past the 5 s default when the machine is busy. A hung test still fails.
+    testTimeout: 20_000,
     // IGNORE_LOCAL_SETTINGS: a developer's saved RPC (apps/web/.cache) must not replace the dummy.
     // SYNC_CREDITS_PER_SECOND=0: the engine's credit pacer only stretches fake time here; its own
     // tests (pacer.test.ts) turn it on.

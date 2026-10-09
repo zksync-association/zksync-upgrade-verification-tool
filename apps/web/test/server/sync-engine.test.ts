@@ -1,3 +1,4 @@
+import { allowEngineWorkWhen } from "@/.server/sync/pacer";
 import { clearCache, invalidate, remainingMs } from "@/.server/cache";
 import { puhIndex } from "@/.server/chain/puh-index";
 import { getStandardUpgradeCore, listStandardUpgrades } from "@/.server/flows/standard";
@@ -1109,8 +1110,14 @@ async function until(done: () => boolean, maxMs = 5_000) {
   }
 }
 
+const workRules: ReturnType<typeof allowEngineWorkWhen>[] = [];
+afterEach(() => {
+  const first = workRules.splice(0)[0];
+  if (first) allowEngineWorkWhen(first);
+});
+
 function liveEngine(options: Partial<SyncEngineOptions> = {}) {
-  return new SyncEngine({
+  const engine = new SyncEngine({
     mode: "window",
     inUse: () => presence().inUse(),
     generation: rpcGeneration(),
@@ -1120,6 +1127,15 @@ function liveEngine(options: Partial<SyncEngineOptions> = {}) {
     steps: liveSteps(),
     ...options,
   });
+  // As the module's engine (engine.ts engineMaySend): its work goes while someone uses the app
+  // or it follows the chain under the settings it was made for.
+  workRules.push(
+    allowEngineWorkWhen({
+      allowed: () => presence().inUse() || (engine.generation === rpcGeneration() && engine.active),
+      generation: rpcGeneration,
+    })
+  );
+  return engine;
 }
 
 /** The handler's index backfilled, as the boot warm-up leaves it. */
@@ -1904,7 +1920,13 @@ describe("live engine", () => {
     release();
     await until(() => fake.calls.filter((c) => c.functionName === "securityCouncil").length > 0);
     await vi.advanceTimersByTimeAsync(100);
-    await engine.settled();
+    // What the tick still asks is dropped unsent (other settings), viem's retries included: they
+    // take their backoff in fake time.
+    let settled = false;
+    void engine.settled().then(() => {
+      settled = true;
+    });
+    await until(() => settled, 10_000);
     expect(engine.status()).toMatchObject({ ticks: 0, lastTick: null });
     expect(remainingMs(GOVERNANCE_KEY)).toBeNull();
     expect(remainingMs("latest-block")).toBeNull();
@@ -2028,7 +2050,8 @@ describe("live engine, idle profile (SYNC_MODE=always, nobody viewing)", () => {
     expect(governanceReads(fake)).toBe(before + 2);
     expect(engine.status().cost.mode).toBe("viewing");
     engine.stop();
-  });
+    // Many simulated blocks: about 2 s alone, longer when the suite runs under load.
+  }, 20_000);
 
   it("verifies only the signature sets on screen at each new head: none while nobody uses the app", async () => {
     const signatures = new Set<string>();

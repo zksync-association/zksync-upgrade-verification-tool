@@ -18,10 +18,11 @@ import { AsyncLocalStorage } from "node:async_hooks";
 // sync/engine.ts: someone uses the app or the engine follows the chain, under the settings it was
 // asked under). Engine work that would wait while it may not, or whose wait ends once it may no
 // longer (use ended, the engine paused or stopped, the settings changed), is never sent: its wait
-// rejects with EngineWorkDropped (R-D3: nothing is read once use has ended). A wait a request
-// hurried along is a request's, and always goes. The engine's work remembers the settings
-// generation it started under: none of it goes out under later settings, a retry of a request
-// dropped here (viem retries unknown errors) included.
+// rejects with EngineWorkDropped (R-D3: nothing is read once use has ended). This holds unpaced
+// (SYNC_CREDITS_PER_SECOND=0) and hurried alike: a hurry only speeds up what the engine may still
+// send. The engine's work remembers the settings generation it started under: none of it goes
+// out under later settings, a retry of a request dropped here (viem retries unknown errors)
+// included.
 
 // The settings generation the engine's work started under (asEngineWork); false for a request's.
 const engineWork = new AsyncLocalStorage<number | false>();
@@ -105,8 +106,9 @@ type Waiter = {
  * turn of the event loop). A take larger than the whole rate goes out alone in an empty second.
  * Waiters go in order. While `rule` does not allow the engine to send, a take rejects at once,
  * and a waiter whose turn comes then (or whose settings generation passed) rejects instead of
- * going (EngineWorkDropped); so does a take for work started under other settings, hurried or
- * not. drop() rejects every waiter now.
+ * going (EngineWorkDropped); so does a take for work started under other settings. Both hold at
+ * any rate (0 included) and while hurried: expedite() drops such waiters too. drop() rejects
+ * every waiter now.
  */
 export class CreditPacer {
   readonly #rate: () => number;
@@ -139,22 +141,20 @@ export class CreditPacer {
    * under other settings is never sent.
    */
   take(credits: number, started?: number): Promise<void> | null {
-    const rate = this.#rate();
-    if (!(rate > 0) || !(credits > 0)) return null;
     const rule = this.#rule();
     const generation = started ?? rule.generation();
-    if (generation !== rule.generation()) {
+    // R-D3 before any pace: unpaced (rate 0) or hurried, the engine's work goes only while the
+    // engine may send, under the settings it started under.
+    if (!mayGo(rule, generation)) {
       this.#dropped++;
       return Promise.reject(dropped());
     }
+    const rate = this.#rate();
+    if (!(rate > 0) || !(credits > 0)) return null;
     if (this.#hurry > 0) {
       this.#expedited++;
       this.#count(credits);
       return null;
-    }
-    if (!rule.allowed()) {
-      this.#dropped++;
-      return Promise.reject(dropped());
     }
     if (this.#waiting.length === 0 && this.#fits(credits, rate)) {
       this.#count(credits);
@@ -189,7 +189,7 @@ export class CreditPacer {
 
   /**
    * A request waits on the engine's work until `settled` settles: until then the engine's
-   * requests go at once (those waiting now too).
+   * requests go at once (those waiting now too), as long as the engine may send them.
    */
   hurry(settled: Promise<unknown>) {
     this.#hurry++;
@@ -200,14 +200,23 @@ export class CreditPacer {
     this.expedite();
   }
 
-  /** Lets every waiting engine request go now. */
+  /**
+   * Lets every waiting engine request the engine may still send go now; the others (the engine
+   * may no longer send, or they were asked under other settings) are dropped, as at their turn.
+   */
   expedite() {
     if (this.#waiting.length === 0) return;
     const waiting = this.#waiting;
     this.#waiting = [];
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
+    const rule = this.#rule();
     for (const waiter of waiting) {
+      if (!mayGo(rule, waiter.generation)) {
+        this.#dropped++;
+        waiter.reject(dropped());
+        continue;
+      }
       this.#expedited++;
       this.#count(waiter.credits);
       waiter.resolve();
@@ -287,7 +296,7 @@ export class CreditPacer {
     while (this.#waiting.length > 0) {
       const next = this.#waiting[0] as Waiter;
       // Its turn came once the engine could no longer send it: never sent.
-      if (!rule.allowed() || rule.generation() !== next.generation) {
+      if (!mayGo(rule, next.generation)) {
         this.#waiting.shift();
         this.#dropped++;
         next.reject(dropped());
@@ -333,6 +342,11 @@ export function pacer(): CreditPacer {
     () => sendRule
   );
   return instance;
+}
+
+/** Whether engine work started under `generation` may be sent now (see the top). */
+function mayGo(rule: EngineSendRule, generation: number): boolean {
+  return rule.generation() === generation && rule.allowed();
 }
 
 function dropped(): EngineWorkDropped {

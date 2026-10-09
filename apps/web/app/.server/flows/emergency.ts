@@ -300,14 +300,16 @@ export function loadEmergencyList({
 
 /**
  * For the sync engine: the emergency list as a page shows it, from the Safe copies held under the
- * page rule (never asking Safe), governance at the head pages read and this run's log index; null
- * when a member Safe's copy is not one a page would use as current.
+ * page rule (never asking Safe), governance at the head pages read (`governance`: the member Safes
+ * collected from, read at its `latestBlock`) and this run's log index; null when a member Safe's
+ * copy is not one a page would use as current.
  */
 export async function heldEmergencyList({
   allHistory = false,
 }: { allHistory?: boolean } = {}): Promise<{
   pending: PendingEmergencies;
   executed: EmergencySummary[];
+  governance: Governance;
 } | null> {
   const gov = await governanceFor("page");
   const collected = await collectHeldMessages(
@@ -332,6 +334,7 @@ export async function heldEmergencyList({
         executed: { txHash: event.txHash, blockNumber: event.blockNumber.toString() },
       }))
       .reverse(),
+    governance: gov,
   };
 }
 
