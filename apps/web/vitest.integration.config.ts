@@ -14,6 +14,8 @@ export default defineConfig({
     env: {
       L1_RPC_URL: process.env.L1_RPC_URL ?? "https://mainnet.gateway.tenderly.co",
       LOG_LEVEL: "warn",
+      // The RPC above, not one saved in apps/web/.cache/local-settings.json.
+      IGNORE_LOCAL_SETTINGS: "true",
     },
   },
 });

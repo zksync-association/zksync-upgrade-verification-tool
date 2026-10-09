@@ -17,6 +17,8 @@ const state = vi.hoisted(() => ({
   // What the log index answers for EmergencyUpgradeExecuted(id).
   index: vi.fn(),
   refreshHead: vi.fn(),
+  // When set, every archive read fails with this (an upstream failure, not an answer).
+  readError: null as Error | null,
 }));
 vi.mock("@/.server/rpc", () => ({
   network: async () => ({
@@ -26,16 +28,22 @@ vi.mock("@/.server/rpc", () => ({
   }),
   safeBlockNumber: async () => state.safe,
   refreshHead: state.refreshHead,
-  l1: {
-    getBlockNumber: async () => 26_128_706n,
-    readContract: async (params: { blockNumber: bigint }) => {
+  l1: { getBlockNumber: async () => 26_128_706n },
+}));
+// The bisection's upgradeStatus reads are direct eth_calls (chain/call.ts).
+vi.mock("@/.server/chain/call", async (original) => {
+  const actual = await original<typeof import("@/.server/chain/call")>();
+  return {
+    ...actual,
+    callFn: async (params: { functionName: string; args: unknown[]; blockNumber: bigint }) => {
       state.reads(params);
+      if (state.readError) throw state.readError;
       if (!state.archive && params.blockNumber < 26_128_706n)
-        throw new Error("archive unavailable");
+        throw new actual.UpstreamError("missing trie node (JSON-RPC error -32000)");
       return [0, 0, false, false, params.blockNumber >= state.transition];
     },
-  },
-}));
+  };
+});
 vi.mock("@/.server/logs", async (original) => ({
   ...(await original<typeof import("@/.server/logs")>()),
   getLogs: async (_client: unknown, filter: unknown, from: bigint, to: bigint) => {
@@ -58,6 +66,7 @@ beforeEach(() => {
   state.devNode = true;
   state.safe = 26_128_642n;
   state.logError = false;
+  state.readError = null;
   state.logs = [{ transactionHash: EMERGENCY_TX, blockNumber: state.transition }];
   state.scans.mockClear();
   state.reads.mockClear();
@@ -206,6 +215,22 @@ describe("when the log index is unavailable", () => {
 
   it("keeps fallback failure visible instead of returning not found", async () => {
     state.archive = false;
+    state.logError = true;
+    await expect(findEmergencyEvent(EMERGENCY_ID)).rejects.toThrow("history unavailable");
+  });
+
+  it("never reads a failed archive read (-32603) as not executed: logs answer, or it errors", async () => {
+    const { UpstreamError } = await import("@/.server/chain/call");
+    state.readError = new UpstreamError("internal error (JSON-RPC error -32603)");
+    expect(await findEmergencyEvent(EMERGENCY_ID)).toEqual({
+      id: EMERGENCY_ID,
+      txHash: EMERGENCY_TX,
+      blockNumber: state.transition,
+    });
+    // The complete log scan answered, not the failed bisection.
+    expect(state.scans.mock.calls[0]?.slice(1)).toEqual([21_788_382n, 26_128_706n]);
+
+    clearCache();
     state.logError = true;
     await expect(findEmergencyEvent(EMERGENCY_ID)).rejects.toThrow("history unavailable");
   });

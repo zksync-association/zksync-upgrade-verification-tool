@@ -141,4 +141,11 @@ describe("vetoState", () => {
     const executed = { state: "Executed" } as Parameters<typeof vetoState>[2];
     expect(vetoState(gov(), veto, executed).status).toBe("closed");
   });
+
+  it("stays open when the L2 proposal's state is unknown: only a known final state closes it", () => {
+    const unknown = { state: null } as Parameters<typeof vetoState>[2];
+    expect(vetoState(gov(), veto, unknown).status).toBe("open");
+    const active = { state: "Active" } as Parameters<typeof vetoState>[2];
+    expect(vetoState(gov(), veto, active).status).toBe("open");
+  });
 });

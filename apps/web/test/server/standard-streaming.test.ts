@@ -13,6 +13,9 @@ const state = vi.hoisted(() => ({
   discovery: Promise.resolve(null) as Promise<null>,
   execution: Promise.resolve() as Promise<void>,
   lookups: [] as string[],
+  // What the historical checkSignatures read throws instead of accepting.
+  recheck: null as Error | null,
+  devNode: true,
 }));
 
 // The upgrade's start, Security Council approval (block 201, APPROVAL_TX) and execution come
@@ -36,24 +39,26 @@ vi.mock("@/.server/chain/puh-index", async (original) => ({
 }));
 
 vi.mock("@/.server/rpc", () => ({
-  network: async () => ({ isDevNode: true }),
-  safeBlockNumber: async () => -1n,
+  network: async () => ({ isDevNode: state.devNode }),
+  safeBlockNumber: async () => (state.devNode ? -1n : 900n),
   l1: {
     getTransaction: async () => TRANSACTIONS[APPROVAL_TX],
-    readContract: async ({
-      functionName,
-      blockNumber,
-    }: { functionName: string; blockNumber?: bigint }) => {
+    readContract: async ({ functionName }: { functionName: string }) => {
       if (functionName === "upgradeState") return UPGRADE_STATES.Done;
       if (functionName === "upgradeStatus") return [100, 200, false, false, true];
-      if (functionName === "checkSignatures") {
-        state.checks.push(blockNumber);
-        return;
-      }
       throw new Error(`Unexpected ${functionName}`);
     },
   },
   latestBlock: async () => ({ number: 1_000n }),
+}));
+// The historical checkSignatures is a direct eth_call (chain/call.ts).
+vi.mock("@/.server/chain/call", async (original) => ({
+  ...(await original<typeof import("@/.server/chain/call")>()),
+  callFn: async ({ functionName, blockNumber }: { functionName: string; blockNumber?: bigint }) => {
+    if (functionName !== "checkSignatures") throw new Error(`Unexpected ${functionName}`);
+    state.checks.push(blockNumber);
+    if (state.recheck) throw state.recheck;
+  },
 }));
 
 vi.mock("@/.server/governance", () => ({
@@ -125,6 +130,8 @@ beforeEach(() => {
   state.execution = Promise.resolve();
   state.verified = 0;
   state.checks = [];
+  state.recheck = null;
+  state.devNode = true;
   state.signatures = new Promise<void>((resolve) => {
     release = resolve;
   });
@@ -218,4 +225,37 @@ it("keeps the JSON engine waiting for verified sets and Safe comparisons", async
   expect(detail.sets[0]?.historical?.accepted).toBe(true);
   expect(detail.sets[0]?.used).toHaveLength(6);
   expect(detail.sets[0]?.used?.every((s) => s.matchesSafe === null)).toBe(true);
+});
+
+it("keeps an RPC failure in the historical re-check unknown, and only a revert false", async () => {
+  const { CallReverted, UpstreamError } = await import("@/.server/chain/call");
+  state.recheck = new UpstreamError("internal error (JSON-RPC error -32603)");
+  const failed = await (await loadStandardUpgrade(ID)).evidence;
+  expect(failed[0]?.historical).toEqual({
+    block: "200",
+    accepted: null,
+    error: "internal error (JSON-RPC error -32603)",
+  });
+  // Not kept: the next view asks again.
+  state.recheck = new CallReverted("Signature verification failed", "0x", 3);
+  const reverted = await (await loadStandardUpgrade(ID)).evidence;
+  expect(reverted[0]?.historical).toEqual({
+    block: "200",
+    accepted: false,
+    error: "Signature verification failed",
+  });
+  expect(state.checks).toEqual([200n, 200n]);
+  release();
+});
+
+it("keeps a definite re-check at a final block for good, and an RPC failure never", async () => {
+  const { UpstreamError } = await import("@/.server/chain/call");
+  state.devNode = false;
+  state.recheck = new UpstreamError("timed out");
+  await (await loadStandardUpgrade(ID)).evidence;
+  state.recheck = null;
+  expect((await (await loadStandardUpgrade(ID)).evidence)[0]?.historical?.accepted).toBe(true);
+  expect((await (await loadStandardUpgrade(ID)).evidence)[0]?.historical?.accepted).toBe(true);
+  expect(state.checks).toEqual([200n, 200n]);
+  release();
 });

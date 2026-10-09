@@ -1,6 +1,4 @@
-import { governance } from "@/.server/governance";
-import { l1 } from "@/.server/rpc";
-import { revertReason } from "@/.server/signatures";
+import { type DraftCallCheck, checkDraftCalls } from "@/.server/flows/emergency-draft";
 import { upgradeProposalId } from "@/common/proposal";
 import { useStatus } from "@/components/app-shell";
 import { CopyButton, Hash } from "@/components/hex";
@@ -24,29 +22,29 @@ import { z } from "zod";
 export const meta = Meta["/app/emergency/new"];
 
 // Checks each call by eth_call from the ProtocolUpgradeHandler, which is who executes them.
-// Opt-in: it sends the calls to this app's RPC.
+// Opt-in: it sends the calls to this app's RPC. A call "reverts" only on the node's definite
+// revert; an RPC failure reads "could not check" (ok: null), never as a revert.
 export async function action({ request }: ActionFunctionArgs) {
   const body = z
     .object({
-      calls: z.array(z.object({ target: z.string(), value: z.string(), data: z.string() })).max(64),
+      calls: z
+        .array(
+          z.object({
+            target: z.string().refine((target) => isAddress(target)),
+            value: z.string().regex(/^\d{1,78}$/),
+            data: z.string().refine((data) => isHex(data) && data.length % 2 === 0),
+          })
+        )
+        .max(64),
     })
     .safeParse(await request.json().catch(() => null));
   if (!body.success) throw badRequest("Invalid calls");
-  const gov = await governance();
-  const results = await Promise.all(
-    body.data.calls.map(async (call) => {
-      try {
-        await l1.call({
-          account: gov.upgradeHandler,
-          to: call.target as Hex,
-          data: call.data as Hex,
-          value: BigInt(call.value),
-        });
-        return { ok: true as const };
-      } catch (error) {
-        return { ok: false as const, error: revertReason(error) };
-      }
-    })
+  const results: DraftCallCheck[] = await checkDraftCalls(
+    body.data.calls.map((call) => ({
+      target: getAddress(call.target),
+      value: BigInt(call.value),
+      data: call.data as Hex,
+    }))
   );
   return json({ results });
 }
@@ -187,17 +185,7 @@ export default function NewEmergency() {
                 value={call.data}
                 onChange={(e) => update(i, { data: e.target.value })}
               />
-              {fetcher.data?.results[i] && (
-                <p
-                  className={
-                    fetcher.data.results[i]?.ok ? "text-green-900 text-xs" : "text-red-800 text-xs"
-                  }
-                >
-                  {fetcher.data.results[i]?.ok
-                    ? "eth_call from the handler succeeds"
-                    : `eth_call from the handler reverts: ${(fetcher.data.results[i] as { error: string }).error}`}
-                </p>
-              )}
+              <DraftCheckLine result={fetcher.data?.results[i]} />
             </div>
           ))}
           <Button variant="secondary" size="sm" onClick={() => setCalls([...calls, emptyCall()])}>
@@ -272,4 +260,15 @@ export default function NewEmergency() {
       </div>
     </div>
   );
+}
+
+function DraftCheckLine({ result }: { result: DraftCallCheck | undefined }) {
+  if (!result) return null;
+  if (result.ok === true)
+    return <p className="text-green-900 text-xs">eth_call from the handler succeeds</p>;
+  if (result.ok === false)
+    return (
+      <p className="text-red-800 text-xs">eth_call from the handler reverts: {result.error}</p>
+    );
+  return <p className="text-amber-800 text-xs">Could not check this call: {result.skipped}</p>;
 }

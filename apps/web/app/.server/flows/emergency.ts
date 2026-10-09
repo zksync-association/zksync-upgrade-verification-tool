@@ -15,12 +15,13 @@ import {
 import { type ActionName, buildTypedData, governanceHashes } from "@/common/typed-data";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
 import { type Address, type Hex, decodeAbiParameters, decodeFunctionData, getAddress } from "viem";
-import { cached } from "../cache";
+import { FOREVER, cached, cachedUntil } from "../cache";
+import { CallReverted, callFn, isFinalBlock } from "../chain/call";
 import { type PuhEvent, puhIndex } from "../chain/puh-index";
 import { type Governance, governance } from "../governance";
 import { findBlockByTimestamp, getLogs } from "../logs";
 import { type Network, blockTimestamps, l1, latestBlock, network } from "../rpc";
-import { type SignatureSet, isRevert, revertReason, verifySignatureSet } from "../signatures";
+import { type SignatureSet, verifySignatureSet } from "../signatures";
 import {
   type UsedSignature,
   callTo,
@@ -353,33 +354,36 @@ export async function loadEmergencyUpgrade(
           historical: archive
             ? {
                 block: block.toString(),
-                checks: await cached(
-                  `emergency-recheck:${event.txHash}`,
-                  gov.network.isDevNode ? 0 : 10 * 60_000,
-                  () =>
-                    Promise.all([
-                      check1271(
-                        gov.securityCouncil.address,
-                        hashes[0] as Pick<SignatureSet, "hashes">,
-                        securityCouncil,
-                        block,
-                        "Security Council"
-                      ),
-                      check1271(
-                        gov.guardians.address,
-                        hashes[1] as Pick<SignatureSet, "hashes">,
-                        guardians,
-                        block,
-                        "Guardians"
-                      ),
-                      checkSafe(
-                        board.zkFoundation,
-                        hashes[2] as Pick<SignatureSet, "hashes">,
-                        zkFoundation,
-                        block
-                      ),
-                    ])
-                ),
+                checks: await cachedUntil(`emergency-recheck:${event.txHash}`, async () => {
+                  // The boundary is read before the checks: a block at or below it was final
+                  // when they were read.
+                  const final = await isFinalBlock(block);
+                  const checks = await Promise.all([
+                    check1271(
+                      gov.securityCouncil.address,
+                      hashes[0] as Pick<SignatureSet, "hashes">,
+                      securityCouncil,
+                      block,
+                      "Security Council"
+                    ),
+                    check1271(
+                      gov.guardians.address,
+                      hashes[1] as Pick<SignatureSet, "hashes">,
+                      guardians,
+                      block,
+                      "Guardians"
+                    ),
+                    checkSafe(
+                      board.zkFoundation,
+                      hashes[2] as Pick<SignatureSet, "hashes">,
+                      zkFoundation,
+                      block
+                    ),
+                  ]);
+                  // Kept for good only when every answer is definite and the block is final.
+                  const definite = checks.every((check) => check.accepted !== null);
+                  return { value: checks, ttlMs: final && definite ? FOREVER : 0 };
+                }),
               }
             : null,
           historicalUnavailable: archive
@@ -463,52 +467,58 @@ async function decodeExecution(txHash: Hex, board: Address) {
   });
 }
 
-async function check1271(
+type HistoricalCheck = { role: string; accepted: boolean | null; error: string | null };
+
+/**
+ * An EIP-1271 isValidSignature at a past block. accepted: false only for a non-magic answer or the
+ * contract's own revert; an RPC failure (or an empty result) leaves it unknown (null).
+ */
+async function historicalCheck(
+  role: string,
+  address: Address,
+  digest: Hex,
+  signature: Hex,
+  block: bigint
+): Promise<HistoricalCheck> {
+  try {
+    const result = await callFn<Hex>({
+      address,
+      abi: safeAbi,
+      functionName: "isValidSignature",
+      args: [digest, signature],
+      blockNumber: block,
+    });
+    return { role, accepted: result === ERC1271_MAGIC_VALUE, error: null };
+  } catch (error) {
+    return error instanceof CallReverted
+      ? { role, accepted: false, error: error.reason }
+      : { role, accepted: null, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function check1271(
   contract: Address,
   set: Pick<SignatureSet, "hashes">,
   used: Blob,
   block: bigint,
   role: string
 ) {
-  try {
-    const result = await l1.readContract({
-      address: contract,
-      abi: safeAbi,
-      functionName: "isValidSignature",
-      args: [
-        set.hashes.digest,
-        encodeMultisigSignature(
-          used.signers.map((signer, i) => ({ signer, signature: used.signatures[i] as Hex }))
-        ),
-      ],
-      blockNumber: block,
-    });
-    return { role, accepted: result === ERC1271_MAGIC_VALUE, error: null };
-  } catch (error) {
-    return { role, accepted: isRevert(error) ? false : null, error: revertReason(error) };
-  }
+  return historicalCheck(
+    role,
+    contract,
+    set.hashes.digest,
+    encodeMultisigSignature(
+      used.signers.map((signer, i) => ({ signer, signature: used.signatures[i] as Hex }))
+    ),
+    block
+  );
 }
 
-async function checkSafe(
+function checkSafe(
   safe: Address,
   set: Pick<SignatureSet, "hashes">,
   signature: Hex,
   block: bigint
 ) {
-  try {
-    const result = await l1.readContract({
-      address: safe,
-      abi: safeAbi,
-      functionName: "isValidSignature",
-      args: [set.hashes.digest, signature],
-      blockNumber: block,
-    });
-    return { role: "ZKsync Foundation", accepted: result === ERC1271_MAGIC_VALUE, error: null };
-  } catch (error) {
-    return {
-      role: "ZKsync Foundation",
-      accepted: isRevert(error) ? false : null,
-      error: revertReason(error),
-    };
-  }
+  return historicalCheck("ZKsync Foundation", safe, set.hashes.digest, signature, block);
 }

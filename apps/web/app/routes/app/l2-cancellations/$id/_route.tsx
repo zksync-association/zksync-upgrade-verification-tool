@@ -72,7 +72,7 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
             label: "L2 proposal",
             value: l2 ? (
               <span className="space-x-2">
-                <span>{l2.state}</span>
+                <span>{l2.state ?? "state unknown"}</span>
                 <span className="text-slate-600">
                   voting {formatTime(l2.voteStart)} → {formatTime(l2.voteEnd)}
                 </span>
@@ -83,6 +83,10 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
                     Tally
                   </ExternalAnchor>
                 )}
+              </span>
+            ) : d.l2Error ? (
+              <span className="text-amber-900" data-testid="l2-error">
+                Not read from ZKsync Era: {d.l2Error}
               </span>
             ) : (
               <span className="text-amber-900">Not found on ZKsync Era</span>
@@ -139,7 +143,9 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
           </div>
         ) : (
           <EmptyState>
-            The L2 proposal could not be read, so the veto cannot be executed from here yet.
+            {d.l2Error
+              ? "The L2 proposal could not be read, so the veto cannot be executed from here yet. Refresh to retry."
+              : "The proposal was not found on this governor, so the veto cannot be executed from here."}
           </EmptyState>
         )}
       </Section>

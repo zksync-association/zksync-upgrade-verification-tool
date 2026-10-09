@@ -2,6 +2,7 @@ import { upgradeHandlerAbi } from "@/common/abis";
 import type { Hex } from "viem";
 import { defaultLogger } from "@config/log.server";
 import { FOREVER, cachedUntil } from "../cache";
+import { callFn } from "../chain/call";
 import { getLogs } from "../logs";
 import { type Network, l1, network, safeBlockNumber } from "../rpc";
 import { topicOf } from "./common";
@@ -38,7 +39,11 @@ export async function findEmergencyEvent(id: Hex): Promise<EmergencyEvent | null
   });
 }
 
-/** Without the index: bisect upgradeStatus over archive state, then read that one block's log. */
+/**
+ * Without the index: bisect upgradeStatus over archive state, then read that one block's log.
+ * Each read is a direct eth_call that either decodes or throws, so a failed read never counts as
+ * "not executed yet"; any failure of the bisection falls back to the complete log scan.
+ */
 async function archiveEmergencyEvent(id: Hex, net: Network): Promise<EmergencyEvent | null> {
   const head = await l1.getBlockNumber({ cacheTime: 0 });
   const filter = {
@@ -49,7 +54,7 @@ async function archiveEmergencyEvent(id: Hex, net: Network): Promise<EmergencyEv
   try {
     block = await firstExecutedBlock(
       async (blockNumber) => {
-        const status = await l1.readContract({
+        const status = await callFn<readonly [number, number, boolean, boolean, boolean]>({
           address: net.upgradeHandler,
           abi: upgradeHandlerAbi,
           functionName: "upgradeStatus",

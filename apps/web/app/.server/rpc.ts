@@ -36,7 +36,9 @@ const makeBatched = () =>
       rpcUrls: { default: { http: [env.L1_RPC_URL] } },
       contracts: { multicall3: { address: MULTICALL3 } },
     },
-    batch: { multicall: { wait: 10 } },
+    // Value reads only (governance getters, Safe info): verdicts never go through Multicall3
+    // (chain/call.ts). Up to 64 KB of calldata per aggregate3.
+    batch: { multicall: { batchSize: 65_536, wait: 10 } },
     transport,
   });
 

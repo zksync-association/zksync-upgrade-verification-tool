@@ -21,15 +21,28 @@ import {
   ContractFunctionRevertedError,
   isAddressEqual,
 } from "viem";
-import { cached } from "./cache";
+import { FOREVER, cached, cachedUntil } from "./cache";
+import {
+  type CallRequest,
+  CallReverted,
+  callFn,
+  classify,
+  ethCall,
+  isFinalBlock,
+  requireCode,
+} from "./chain/call";
 import { type SafeInfo, safeInfo } from "./governance";
-import { l1, network } from "./rpc";
+import { network } from "./rpc";
 import { SafeApiError, findSafeMessage, safeWalletUrl } from "./safe-api";
 
 // The verification core. A signature counts only if the contract that will consume it accepts it in
 // an eth_call: Multisig.checkSignatures for council/guardian members, and the Safe's own
 // EIP-1271 isValidSignature for the ZK Foundation (exactly what EmergencyUpgradeBoard calls).
 // The Safe Transaction Service is just one place to look for candidates.
+//
+// Every verdict read is a direct eth_call (chain/call.ts). Only a definite revert rejects; any
+// other failure (an internal RPC error, out of gas, a rate limit, a timeout) fails the read, so it
+// can never make a signature "invalid", a member "missing" or a threshold "rejected".
 
 export type SignatureCheck =
   // SecurityCouncil / Guardians actions: checkSignatures(digest, signers, signatures, threshold)
@@ -75,15 +88,18 @@ export type SignatureSet = {
   safeApiError: string | null;
 };
 
-/** True only when the contract itself rejected the call (not when the RPC failed). */
+/**
+ * True only for a definite revert (see chain/call.ts classify): the node answered with JSON-RPC
+ * code 3, or -32000 "execution reverted" without out-of-gas text. Never for an RPC failure, and
+ * never for a failed Multicall3 sub-call (it carries no error code). Kept for compatibility;
+ * verdicts use chain/call.ts directly.
+ */
 export function isRevert(error: unknown): boolean {
-  return (
-    error instanceof BaseError &&
-    error.walk((e) => e instanceof ContractFunctionRevertedError) !== null
-  );
+  return classify(error) === "revert";
 }
 
 export function revertReason(error: unknown): string {
+  if (error instanceof CallReverted) return error.reason;
   if (error instanceof BaseError) {
     const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError);
     if (reverted instanceof ContractFunctionRevertedError) {
@@ -104,7 +120,9 @@ async function accepts(
   try {
     if (check.kind === "multisig") {
       const sorted = sortBySigner(signatures);
-      await l1.readContract({
+      // checkSignatures returns nothing: callFn counts its success only where the contract has
+      // code at that block (requireCode, one shared read per contract and block).
+      await callFn({
         address: check.contract,
         abi: guardiansAbi,
         functionName: "checkSignatures",
@@ -122,37 +140,50 @@ async function accepts(
       check.kind === "safe-1271"
         ? signatures[0]?.signature ?? "0x"
         : encodeMultisigSignature(signatures);
-    const result = await l1.readContract({
-      address: check.contract,
-      abi: safeAbi,
-      functionName: "isValidSignature",
-      args: [digest, signature],
-      blockNumber,
-    });
+    const [, result] = await Promise.all([
+      requireCode(check.contract, blockNumber),
+      callFn<Hex>({
+        address: check.contract,
+        abi: safeAbi,
+        functionName: "isValidSignature",
+        args: [digest, signature],
+        blockNumber,
+      }),
+    ]);
     return result === ERC1271_MAGIC_VALUE
       ? { ok: true }
       : { ok: false, error: `returned ${result}` };
   } catch (error) {
-    // An RPC failure must never read as "signature invalid": let it fail the page instead.
-    if (!isRevert(error)) throw error;
-    return { ok: false, error: revertReason(error) };
+    // Only the contract's own revert rejects. An RPC failure must never read as "signature
+    // invalid": let it fail the page instead.
+    if (error instanceof CallReverted) return { ok: false, error: error.reason };
+    throw error;
   }
 }
 
 // One member's signature checked alone. Multisig members go through checkSignatures with
-// threshold 1, which also enforces membership.
+// threshold 1, which also enforces membership. A signature the viewer supplied (?sig=) is checked
+// afresh every time and its verdict kept nowhere, as AGENTS.md promises.
 function acceptsOne(
   check: SignatureCheck,
   digest: Hex,
   signature: MemberSignature,
+  source: SignatureSource,
   blockNumber?: bigint
 ) {
   const single: SignatureCheck =
     check.kind === "multisig-1271" ? { kind: "multisig", contract: check.contract } : check;
+  const run = () => accepts(single, digest, [signature], 1, blockNumber);
+  if (source === "supplied") return run();
   const key = `accepts:${single.kind}:${single.contract}:${digest}:${signature.signer}:${signature.signature}:${blockNumber ?? "latest"}`;
-  return cached(key, blockNumber === undefined ? 60_000 : Number.POSITIVE_INFINITY, () =>
-    accepts(single, digest, [signature], 1, blockNumber)
-  );
+  if (blockNumber === undefined) return cached(key, 60_000, run);
+  // At a past block: kept for good once that block is final.
+  return cachedUntil(key, async () => {
+    // The boundary is read before the check: a block at or below it was final when it was read.
+    const final = await isFinalBlock(blockNumber);
+    const value = await run();
+    return { value, ttlMs: final ? FOREVER : 60_000 };
+  });
 }
 
 type Candidate = {
@@ -208,17 +239,17 @@ export async function verifySignatureSet(params: {
             `signed-messages:${member}:${memberHashes.safeMessageHash}:${params.blockNumber ?? "latest"}`,
             60_000,
             () =>
-              l1
-                .readContract({
-                  address: member,
-                  abi: safeAbi,
-                  functionName: "signedMessages",
-                  args: [memberHashes.safeMessageHash],
-                  blockNumber: params.blockNumber,
-                })
-                // A revert means "not approved"; an RPC failure must surface, not read as missing.
-                .catch((error) => {
-                  if (isRevert(error)) return 0n;
+              callFn<bigint>({
+                address: member,
+                abi: safeAbi,
+                functionName: "signedMessages",
+                args: [memberHashes.safeMessageHash],
+                blockNumber: params.blockNumber,
+              })
+                // A definite revert means "not approved"; an RPC failure must surface, not read
+                // as missing.
+                .catch((error: unknown) => {
+                  if (error instanceof CallReverted) return 0n;
                   throw error;
                 })
           );
@@ -239,6 +270,7 @@ export async function verifySignatureSet(params: {
           params.check,
           hashes.digest,
           { signer: member, signature: candidate.signature },
+          candidate.source,
           params.blockNumber
         );
         if (result.ok) {
@@ -354,19 +386,30 @@ export async function simulate(execution: {
   value: string;
 }): Promise<Simulation> {
   const value = BigInt(execution.value);
+  return simulateCall({
+    from: SIMULATION_SENDER,
+    to: execution.to,
+    data: execution.data,
+    value,
+    stateOverride:
+      value > 0n ? [{ address: SIMULATION_SENDER, balance: value + 10n ** 18n }] : undefined,
+  });
+}
+
+/**
+ * eth_call of a transaction. "reverted" only for a definite revert; any other failure is
+ * "skipped", never a verdict on the transaction.
+ */
+export async function simulateCall(request: CallRequest): Promise<Simulation> {
   try {
-    await l1.call({
-      account: SIMULATION_SENDER,
-      to: execution.to,
-      data: execution.data,
-      value,
-      stateOverride:
-        value > 0n ? [{ address: SIMULATION_SENDER, balance: value + 10n ** 18n }] : undefined,
-    });
+    await ethCall(request);
     return { status: "ok" };
   } catch (error) {
-    return isRevert(error)
-      ? { status: "reverted", error: revertReason(error) }
-      : { status: "skipped", reason: `RPC error: ${revertReason(error)}` };
+    return error instanceof CallReverted
+      ? { status: "reverted", error: error.reason }
+      : {
+          status: "skipped",
+          reason: `RPC error: ${error instanceof Error ? error.message : String(error)}`,
+        };
   }
 }

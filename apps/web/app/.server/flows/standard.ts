@@ -14,7 +14,8 @@ import {
 import { type ActionName, buildTypedData, governanceHashes } from "@/common/typed-data";
 import { UPGRADE_STATES, UPGRADE_STATE_LABELS, type UpgradeState } from "@/common/upgrade-states";
 import { type Address, type Hex, decodeEventLog, isAddressEqual, zeroAddress } from "viem";
-import { FOREVER, cached, cachedUntil, seed } from "../cache";
+import { FOREVER, cachedUntil, seed } from "../cache";
+import { CallReverted, callFn, isFinalBlock } from "../chain/call";
 import { IndexIntegrityError, type PuhEvent, puhIndex } from "../chain/puh-index";
 import { type Governance, governance } from "../governance";
 import { findBlockByTimestamp, getLogs } from "../logs";
@@ -27,13 +28,7 @@ import {
   refreshHead,
   safeBlockNumber,
 } from "../rpc";
-import {
-  type SignatureSet,
-  isRevert,
-  revertReason,
-  simulate,
-  verifySignatureSet,
-} from "../signatures";
+import { type SignatureSet, simulate, simulateCall, verifySignatureSet } from "../signatures";
 import {
   type ExecutionView,
   type SetState,
@@ -595,9 +590,13 @@ async function recheckAt(
     };
   }
   const key = `recheck:${contract}:${set.hashes.digest}:${used.signatures.join("")}:${block}`;
-  return cached(key, (await network()).isDevNode ? 0 : 10 * 60_000, () =>
-    recheck(contract, set, used, block)
-  );
+  return cachedUntil(key, async () => {
+    // The boundary is read before the check: a block at or below it was final when it was read.
+    const final = await isFinalBlock(block);
+    const value = await recheck(contract, set, used, block);
+    // Kept for good only when definite (accepted or a definite revert) at a final block.
+    return { value, ttlMs: final && value.accepted !== null ? FOREVER : 0 };
+  });
 }
 
 async function recheck(
@@ -605,9 +604,10 @@ async function recheck(
   set: Pick<SignatureSet, "hashes" | "threshold">,
   used: { signers: readonly Address[]; signatures: readonly Hex[] },
   block: bigint
-): Promise<ApprovalSet["historical"]> {
+): Promise<NonNullable<ApprovalSet["historical"]>> {
   try {
-    await l1.readContract({
+    // checkSignatures returns nothing; callFn requires code at the block for its success to count.
+    await callFn({
       address: contract,
       abi: guardiansAbi,
       functionName: "checkSignatures",
@@ -616,10 +616,11 @@ async function recheck(
     });
     return { block: block.toString(), accepted: true, error: null };
   } catch (error) {
+    // accepted: false only for the contract's own revert; an RPC failure leaves it unknown.
     return {
       block: block.toString(),
-      accepted: isRevert(error) ? false : null,
-      error: revertReason(error),
+      accepted: error instanceof CallReverted ? false : null,
+      error: error instanceof CallReverted ? error.reason : errorMessage(error),
     };
   }
 }
@@ -657,17 +658,12 @@ async function blockAt(timestamp: number) {
 function simulateAs(execution: ExecutionView | Parameters<typeof simulate>[0], executor: Address) {
   // A proposal with an executor can only be executed by it; simulate from that address.
   if (!isAddressEqual(executor, zeroAddress)) {
-    return l1
-      .call({ account: executor, to: execution.to, data: execution.data })
-      .then(() => ({ status: "ok" as const }))
-      .catch((error: unknown) =>
-        isRevert(error)
-          ? { status: "reverted" as const, error: revertReason(error) }
-          : { status: "skipped" as const, reason: `RPC error: ${revertReason(error)}` }
-      );
+    return simulateCall({ from: executor, to: execution.to, data: execution.data });
   }
   return simulate(execution);
 }
+
+const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 function closedReason(state: UpgradeState, needed: string) {
   switch (state) {

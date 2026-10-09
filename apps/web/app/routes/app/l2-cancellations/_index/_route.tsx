@@ -121,8 +121,8 @@ function Vetoable({ proposals }: { proposals: SerializeFrom<L2ProposalView>[] })
               {p.description.split("\n")[0] || "(no description)"}
             </span>
             <span className="text-slate-600 text-xs">
-              {p.governorName} · {p.state} · voting ends {formatTime(p.voteEnd)} (
-              {relativeTime(p.voteEnd, governance.latestBlock.timestamp)})
+              {p.governorName} · {p.state ?? "state unknown"} · voting ends {formatTime(p.voteEnd)}{" "}
+              ({relativeTime(p.voteEnd, governance.latestBlock.timestamp)})
             </span>
           </span>
           <Button variant="secondary" size="sm" asChild>

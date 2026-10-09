@@ -23,6 +23,8 @@ const state = vi.hoisted(() => ({
   history: Promise.resolve() as Promise<void>,
   messages: Promise.resolve({ groups: [], errors: [], anomalies: 0 }) as Promise<Collected>,
   discovery: vi.fn(),
+  // What the historical isValidSignature reads answer instead of the magic value.
+  historical: null as Error | null,
 }));
 // Executed emergency upgrades in the handler's log index: block → id. Blocks are 12 s apart from
 // timestamp 1,700,000,000 except one missed slot; the head is HEAD.
@@ -80,6 +82,7 @@ vi.mock("@/.server/rpc", () => ({
     blockTimeSeconds: 12,
   }),
   latestBlock: async () => HEAD,
+  safeBlockNumber: async () => HEAD.number - 64n,
   blockTimestamps: async (numbers: bigint[]) => {
     state.times(numbers);
     return new Map(numbers.map((n) => [n, blockTime(n)]));
@@ -95,12 +98,24 @@ vi.mock("@/.server/rpc", () => ({
       if (params.functionName === "upgradeState") return state.current;
       if (params.functionName === "upgradeStatus")
         return [0, 0, false, false, params.args[0] === EMERGENCY_ID];
-      if (params.functionName === "isValidSignature") {
-        state.checks.push(params);
-        return ERC1271_MAGIC_VALUE;
-      }
       throw new Error(`Unexpected ${params.functionName}`);
     },
+  },
+}));
+// The historical EIP-1271 checks are direct eth_calls (chain/call.ts).
+vi.mock("@/.server/chain/call", async (original) => ({
+  ...(await original<typeof import("@/.server/chain/call")>()),
+  callFn: async (params: {
+    functionName: string;
+    args: string[];
+    address: string;
+    blockNumber: bigint;
+  }) => {
+    if (params.functionName !== "isValidSignature")
+      throw new Error(`Unexpected ${params.functionName}`);
+    state.checks.push(params);
+    if (state.historical) throw state.historical;
+    return ERC1271_MAGIC_VALUE;
   },
 }));
 vi.mock("@/.server/flows/emergency-event", () => ({
@@ -154,6 +169,7 @@ beforeEach(() => {
   clearCache();
   state.current = UPGRADE_STATES.Done;
   state.checks = [];
+  state.historical = null;
   state.verified = 0;
   state.discovery.mockClear();
   state.scans.mockClear();
@@ -211,6 +227,26 @@ it("keeps JSON waiting for Safe comparisons and preserves the completed response
     expect(role.used?.length).toBeGreaterThan(0);
     expect(role.used?.every((used) => used.matchesSafe === true)).toBe(true);
   }
+});
+
+it("keeps an RPC failure in a historical check unknown, and only a revert false", async () => {
+  const { CallReverted, UpstreamError } = await import("@/.server/chain/call");
+  state.historical = new UpstreamError("internal error (JSON-RPC error -32603)");
+  const failed = await (await loadEmergencyUpgrade(EMERGENCY_ID)).executed;
+  expect(failed?.historical?.checks.map((c) => [c.accepted, c.error])).toEqual(
+    Array(3).fill([null, "internal error (JSON-RPC error -32603)"])
+  );
+  // Not kept: the next view asks again and gets the definite answer.
+  state.historical = new CallReverted("GS026", "0x", 3);
+  const reverted = await (await loadEmergencyUpgrade(EMERGENCY_ID)).executed;
+  expect(reverted?.historical?.checks.map((c) => [c.accepted, c.error])).toEqual(
+    Array(3).fill([false, "GS026"])
+  );
+  expect(state.checks).toHaveLength(6);
+  // A definite answer at a final block is kept for good.
+  await (await loadEmergencyUpgrade(EMERGENCY_ID)).executed;
+  expect(state.checks).toHaveLength(6);
+  release();
 });
 
 it("makes pending payload review available without execution lookup or Safe completion", async () => {

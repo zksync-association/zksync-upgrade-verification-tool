@@ -75,6 +75,20 @@ vi.mock("@/.server/rpc", async (importOriginal) => {
   };
 });
 
+// The archive bisection's upgradeStatus reads are direct eth_calls (chain/call.ts).
+vi.mock("@/.server/chain/call", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/.server/chain/call")>();
+  return {
+    ...actual,
+    callFn: async (params: { functionName: string; args: [Hex]; blockNumber?: bigint }) => {
+      if (params.functionName !== "upgradeStatus") return actual.callFn(params as never);
+      if (params.blockNumber !== undefined) state.archiveReads++;
+      const at = state.executedAt.get(params.args[0].toLowerCase());
+      return [0, 0, false, false, at !== undefined && (params.blockNumber ?? HEAD) >= at];
+    },
+  };
+});
+
 vi.mock("@/.server/governance", () => ({
   governance: async () => ({
     network: { isDevNode: false },

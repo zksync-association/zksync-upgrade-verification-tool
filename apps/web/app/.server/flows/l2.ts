@@ -117,8 +117,11 @@ async function decodeCreated(
         functionName: "state",
         args: [args.proposalId],
       })
-      .then((s) => L2_PROPOSAL_STATES[s] ?? null)
-      .catch(() => null),
+      // null only for a value outside IGovernor.ProposalState. A failed read fails the caller,
+      // whatever its kind: a proposal whose state went unread must neither drop out of what
+      // Guardians can veto nor close its veto. (viem turns Era's code-3 revert and an internal
+      // error -32603 into the same ContractFunctionRevertedError, so no failure here is an answer.)
+      .then((s) => L2_PROPOSAL_STATES[s] ?? null),
     knownGovernors().then(
       (gs) => gs.find((g) => isAddressEqual(g.address, governor))?.name ?? null
     ),
@@ -155,7 +158,10 @@ async function decodeCreated(
   };
 }
 
-/** Proposals on the Token and GovOps governors that Guardians can still veto (Pending or Active). */
+/**
+ * Proposals on the Token and GovOps governors that Guardians can still veto (Pending or Active,
+ * or a state value the app does not know: listed rather than hidden). A failed read fails the list.
+ */
 export async function activeL2Proposals(): Promise<L2ProposalView[]> {
   const client = await l2();
   if (!client) return [];
@@ -175,7 +181,9 @@ export async function activeL2Proposals(): Promise<L2ProposalView[]> {
       return Promise.all(logs.map((log) => decodeCreated(client, g.address, log)));
     })
   );
-  return lists.flat().filter((p) => p.state === "Pending" || p.state === "Active");
+  return lists
+    .flat()
+    .filter((p) => p.state === null || p.state === "Pending" || p.state === "Active");
 }
 
 /** A specific L2 proposal's content, found from its on-chain snapshot time. */
@@ -206,11 +214,18 @@ export async function getL2Proposal(
       to,
       { safeHead: -1n }
     );
-    for (const log of logs) {
-      const view = await decodeCreated(client, governor, log);
-      if (BigInt(view.proposalId) === proposalId) return view;
-    }
-    return null;
+    // Only the matching proposal is read further: another proposal's failed state() read must
+    // not fail this one.
+    const log = logs.find(
+      (l) =>
+        decodeEventLog({
+          abi: l2GovernorAbi,
+          eventName: "ProposalCreated",
+          data: l.data,
+          topics: l.topics,
+        }).args.proposalId === proposalId
+    );
+    return log ? decodeCreated(client, governor, log) : null;
   });
 }
 

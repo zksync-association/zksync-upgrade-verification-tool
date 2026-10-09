@@ -8,6 +8,7 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["test/server/*.{test,spec}.{ts,tsx}"],
-    env: { L1_RPC_URL: "http://127.0.0.1:9", LOG_LEVEL: "error" },
+    // IGNORE_LOCAL_SETTINGS: a developer's saved RPC (apps/web/.cache) must not replace the dummy.
+    env: { L1_RPC_URL: "http://127.0.0.1:9", LOG_LEVEL: "error", IGNORE_LOCAL_SETTINGS: "true" },
   },
 });

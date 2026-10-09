@@ -1,4 +1,11 @@
-import { type LaneOptions, LaneError, RpcError, createLane } from "@/.server/chain/jsonrpc";
+import {
+  type LaneOptions,
+  LaneError,
+  RpcError,
+  createLane,
+  scrubText,
+  secretsOf,
+} from "@/.server/chain/jsonrpc";
 import { lanes, resetRpcClients, rpcGeneration } from "@/.server/rpc";
 import { defaultLogger } from "@config/log.server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -695,6 +702,15 @@ describe("read-only and secret-free", () => {
     expect(short).toMatchObject({ code: 3, data: { revert: "0x08c379a0abcd0000" } });
     // A key is still removed, even from hex.
     expect(long).toMatchObject({ code: 3, data: { revert: "0x00[redacted]00" } });
+  });
+
+  it("removes a whole URL on the configured host, not just the host part", () => {
+    // Redacting the configured origin first would leave "/v3/other-key" behind.
+    const text = scrubText(
+      "logs disabled on http://127.0.0.1:9/v3/other-key-0123456789",
+      secretsOf("http://127.0.0.1:9")
+    );
+    expect(text).toBe("logs disabled on [url]");
   });
 });
 

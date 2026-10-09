@@ -9,6 +9,7 @@ import { safeMessageHashes } from "@/common/safe";
 import type { Eip712Domain } from "@/common/typed-data";
 import { type Abi, type Address, getAddress, isAddressEqual, zeroHash } from "viem";
 import { cached } from "./cache";
+import { callFn, classify } from "./chain/call";
 import { readMemberList } from "./member-list";
 import { type Network, l1, latestBlock, network } from "./rpc";
 
@@ -66,8 +67,39 @@ export type Governance = {
 const read = <T>(address: Address, abi: Abi, functionName: string, args: readonly unknown[] = []) =>
   l1.readContract({ address, abi, functionName, args }) as Promise<T>;
 
+/**
+ * A read whose failure decides something: a contract without eip712Domain(), a Safe without a
+ * getter (member lists confirm the same way, in readMembers). It goes out with the other reads
+ * (through Multicall3); a failed one is asked again directly (chain/call.ts), whose error then
+ * says whether the contract reverted. A failed Multicall3 sub-call carries no error code, and one
+ * that ran out of gas looks like a revert.
+ */
+async function confirmedRead<T>(
+  address: Address,
+  abi: Abi,
+  functionName: string,
+  args: readonly unknown[] = []
+): Promise<T> {
+  try {
+    return await read<T>(address, abi, functionName, args);
+  } catch {
+    return callFn<T>({ address, abi, functionName, args });
+  }
+}
+
+/** The direct read's answer to "is this getter missing?": null on a definite revert. */
+const orNullOnRevert = (error: unknown) => {
+  if (classify(error) === "revert") return null;
+  throw error;
+};
+
 async function readMembers(address: Address, abi: Abi): Promise<Address[]> {
-  return readMemberList((index) => read<Address>(address, abi, "members", [index]));
+  // Batched reads; only the first index that fails is asked again directly. Past the end of the
+  // list every read fails, and one direct answer (a definite revert) is enough.
+  return readMemberList(
+    (index) => read<Address>(address, abi, "members", [index]),
+    (index) => callFn<Address>({ address, abi, functionName: "members", args: [index] })
+  );
 }
 
 async function readDomain(
@@ -77,22 +109,26 @@ async function readDomain(
   chainId: number,
   warnings: string[]
 ): Promise<Eip712Domain> {
-  try {
-    const [, name, version, domainChainId, verifyingContract] = await read<
-      [string, string, string, bigint, Address]
-    >(address, abi, "eip712Domain");
-    if (Number(domainChainId) !== chainId || !isAddressEqual(verifyingContract, address)) {
-      warnings.push(
-        `${fallbackName} at ${address} reports EIP-712 domain chainId ${domainChainId} / ${verifyingContract}`
-      );
-    }
-    return { name, version, chainId, verifyingContract: address };
-  } catch {
+  const domain = await confirmedRead<[string, string, string, bigint, Address]>(
+    address,
+    abi,
+    "eip712Domain"
+  ).catch(orNullOnRevert);
+  // Only a contract that reverts on eip712Domain() gets the assumed domain. An RPC failure fails
+  // the read: a guessed domain would change every digest members are shown.
+  if (!domain) {
     warnings.push(
       `${fallbackName} at ${address} has no eip712Domain(); assuming ("${fallbackName}", "1")`
     );
     return { name: fallbackName, version: "1", chainId, verifyingContract: address };
   }
+  const [, name, version, domainChainId, verifyingContract] = domain;
+  if (Number(domainChainId) !== chainId || !isAddressEqual(verifyingContract, address)) {
+    warnings.push(
+      `${fallbackName} at ${address} reports EIP-712 domain chainId ${domainChainId} / ${verifyingContract}`
+    );
+  }
+  return { name, version, chainId, verifyingContract: address };
 }
 
 export function governance(): Promise<Governance> {
@@ -266,21 +302,25 @@ export function safeInfo(address: Address): Promise<SafeInfo> {
         domainSeparatorMatches: null,
       };
     }
-    const [version, threshold, owners, separator] = await Promise.allSettled([
-      read<string>(address, safeAbi, "VERSION"),
-      read<bigint>(address, safeAbi, "getThreshold"),
-      read<Address[]>(address, safeAbi, "getOwners"),
-      read<`0x${string}`>(address, safeAbi, "domainSeparator"),
+    // A getter the contract does not have (it reverts) reads as null. An RPC failure fails the
+    // read instead: a threshold lost to a flaky RPC would turn a Safe still collecting
+    // signatures into an invalid one.
+    const optional = <T>(functionName: string) =>
+      confirmedRead<T>(address, safeAbi, functionName).catch(orNullOnRevert);
+    const [version, threshold, owners, separator] = await Promise.all([
+      optional<string>("VERSION"),
+      optional<bigint>("getThreshold"),
+      optional<Address[]>("getOwners"),
+      optional<`0x${string}`>("domainSeparator"),
     ]);
     const expected = safeMessageHashes(chainId, address, zeroHash).domainHash;
     return {
       address,
       isContract: true,
-      version: version.status === "fulfilled" ? version.value : null,
-      threshold: threshold.status === "fulfilled" ? Number(threshold.value) : null,
-      owners: owners.status === "fulfilled" ? owners.value.map((o) => getAddress(o)) : [],
-      domainSeparatorMatches:
-        separator.status === "fulfilled" ? separator.value === expected : null,
+      version,
+      threshold: threshold === null ? null : Number(threshold),
+      owners: owners === null ? [] : owners.map((o) => getAddress(o)),
+      domainSeparatorMatches: separator === null ? null : separator === expected,
     };
   });
 }

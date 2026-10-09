@@ -735,8 +735,12 @@ export function scrubber(secrets: readonly string[]): Scrubber {
       : undefined;
   const all = pattern(secrets);
   const long = pattern(secrets.filter((secret) => secret.length >= HEX_SECRET_MIN));
-  const text = (value: string) =>
-    (all ? value.replace(all, "[redacted]") : value).replace(ANY_URL, "[url]");
+  // Whole URLs first: redacting a configured host or origin inside a longer URL first would cut it
+  // short of ANY_URL and leave the rest of its path (a key) behind.
+  const text = (value: string) => {
+    const withoutUrls = value.replace(ANY_URL, "[url]");
+    return all ? withoutUrls.replace(all, "[redacted]") : withoutUrls;
+  };
   const data = (value: unknown, depth = 0): unknown => {
     if (typeof value === "string") {
       if (!HEX.test(value)) return text(value);
