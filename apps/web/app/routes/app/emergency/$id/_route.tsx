@@ -1,4 +1,5 @@
 import { idContent, loaderRevs } from "@/.server/sync/content";
+import { lastShown } from "@/.server/sync/last-shown";
 import { pageLoad, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import {
@@ -24,6 +25,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CallList } from "@/components/verification/calls";
+import { type AsOfBlock, AsOfContent, AsOfNote } from "@/components/verification/as-of";
 import { ExecutionPanel, SimulationResult } from "@/components/verification/execution-panel";
 import { type Refresh, setCurrency } from "@/components/verification/freshness";
 import {
@@ -57,6 +59,9 @@ export const meta = Meta["/app/emergency/:id"];
 
 export function loader({ params, request }: LoaderFunctionArgs) {
   const id = parseId(params.id);
+  // After a pause (no head in memory), the upgrade and its execution as this app last showed
+  // them come first, as of their block, until the current ones replace them (sync/last-shown.ts).
+  const shown = lastShown();
   // The page shows the signatures' first answer at once (possibly from an older block or older
   // Safe copies, labelled) and the strict result after it in the same response. Its sets' keys
   // join the page load's grace as they are found.
@@ -64,11 +69,25 @@ export function loader({ params, request }: LoaderFunctionArgs) {
   const loading = page.run(() =>
     loadEmergencyUpgrade(id, { supplied: suppliedSignatures(request), freshness: "page" })
   );
+  const key = `emergency:${id.toLowerCase()}`;
+  // Only an execution this run's index found is kept: never one from the last run or located
+  // directly.
+  shown.keep(
+    key,
+    loading.then(
+      async (d): Promise<LastShownEmergency> => ({
+        overview: d.overview,
+        execution: await d.executedFirst,
+      })
+    ),
+    ({ execution }) => !execution || provenanceOf(execution) === null
+  );
   return defer({
     watch: page.watch,
     // The upgrade's state and status, for its revision (its sets carry their own).
     revs: loaderRevs([[watchKeys.emergency(id), loading.then((d) => d.status).then(idContent)]]),
     id,
+    lastShown: shown.held<LastShownEmergency>(key),
     detail: loading.then((d) => d.overview),
     // While this run's index reads the history, the execution may come first from the history
     // the last run saved, or be located directly (labelled); executedCheck confirms it against the
@@ -84,6 +103,12 @@ export function loader({ params, request }: LoaderFunctionArgs) {
     ),
   });
 }
+
+/** What the page keeps of an emergency upgrade, to show first after a pause (see the loader). */
+type LastShownEmergency = {
+  overview: EmergencyOverview;
+  execution: EmergencyExecutionFirst | null;
+};
 
 // Opt-in simulation of the execution transaction. Only calls to the Emergency Upgrade Board are
 // accepted, so this is not a general eth_call proxy.
@@ -109,23 +134,86 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function EmergencyPage() {
-  const { id, detail } = useLoaderData<typeof loader>();
+  const { id, detail, lastShown } = useLoaderData<typeof loader>();
+  const reading = (
+    <>
+      <PageHeader
+        back={{ to: $path("/app/emergency"), label: "Emergency upgrades" }}
+        eyebrow="Emergency upgrade"
+        title="Emergency upgrade"
+        id={id}
+      />
+      <LoadingCard label="Reading the emergency upgrade status from L1…" />
+    </>
+  );
+  // After a pause, the upgrade as last shown (as of its block) until the current one replaces
+  // it. The tree is the same either way once the current one is in, so a reload keeps it mounted.
   return (
-    <Suspense
-      fallback={
-        <>
-          <PageHeader
-            back={{ to: $path("/app/emergency"), label: "Emergency upgrades" }}
-            eyebrow="Emergency upgrade"
-            title="Emergency upgrade"
-            id={id}
-          />
-          <LoadingCard label="Reading the emergency upgrade status from L1…" />
-        </>
-      }
-    >
-      <Await resolve={detail}>{(d) => <Detail detail={d} />}</Await>
+    <Suspense fallback={reading}>
+      <Await resolve={lastShown ?? null}>
+        {(held) => (
+          <UntilFresh stale={!!held} fresh={detail}>
+            {(fresh, refresh) =>
+              held && !fresh ? (
+                <HeldDetail held={held} refresh={refresh} />
+              ) : (
+                <Suspense fallback={reading}>
+                  <Await resolve={detail}>{(d) => <Detail detail={d} />}</Await>
+                </Suspense>
+              )
+            }
+          </UntilFresh>
+        )}
+      </Await>
     </Suspense>
+  );
+}
+
+/**
+ * The upgrade and its execution as this app last showed them, read at an older block (after a
+ * pause): under a notice, in no colour, with nothing that waits on the current reads (the
+ * signatures) and nothing to act on, until the current upgrade replaces it.
+ */
+function HeldDetail({
+  held,
+  refresh,
+}: {
+  held: SerializeFrom<LastShownEmergency> & { asOf: AsOfBlock };
+  refresh: Refresh;
+}) {
+  const { executedHistorical } = useLoaderData<typeof loader>();
+  const d = held.overview;
+  const executed = d.state === UPGRADE_STATES.Done;
+  return (
+    <div className="space-y-10">
+      <PageHeader
+        back={{ to: $path("/app/emergency"), label: "Emergency upgrades" }}
+        eyebrow="Emergency upgrade"
+        title="Emergency upgrade"
+        badges={
+          <AsOfContent asOf={held.asOf} className="inline-flex">
+            {executed ? <Badge>Executed</Badge> : <Badge>Not executed</Badge>}
+          </AsOfContent>
+        }
+        id={d.id}
+      />
+      <AsOfNote
+        asOf={held.asOf}
+        refresh={refresh}
+        what={executed ? "The state and the execution below" : "The state above"}
+      />
+      {executed && held.execution && (
+        <AsOfContent asOf={held.asOf}>
+          <ExecutedContent
+            execution={held.execution}
+            id={d.id}
+            check={Promise.resolve(null)}
+            historical={executedHistorical}
+          />
+        </AsOfContent>
+      )}
+      <LoadingCard label="Checking Security Council, Guardian and Foundation signatures at the newest block…" />
+    </div>
   );
 }
 

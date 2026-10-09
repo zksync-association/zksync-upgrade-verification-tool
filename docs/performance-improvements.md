@@ -1,5 +1,268 @@
 # Performance improvements
 
+## October 8: follow the chain only while a page is open
+
+On October 7 the app followed the chain for as long as it ran (`SYNC_MODE=always`), and while someone used it, it
+re-verified at every block every signature set a page had shown in the last ten minutes, one `eth_call` per member,
+executed proposals included. Measured that day with the same Infura key: nobody using the app cost 8.5 L1 requests a
+block (about 2,500 an hour, about 6.1 M Infura credits a day, twice Infura's free plan); with an upgrade page and an
+emergency upgrade page in use it cost 59.2 a block (17,225 an hour, 1.43 M credits an hour), plus about 1,000 Safe
+requests an hour and, while the veto list had been viewed in the last ten minutes, 3,066 ZKsync Era requests an hour.
+An open page never updated itself.
+
+Each signer runs the app on their own machine with their own RPC key, often a free plan, so this work makes three
+changes. What counts as a valid signature is unchanged: the governance contract must accept it in an `eth_call` at
+the current head.
+
+1. **The app follows the chain only while someone uses it.** "In use" means a page of the app open and visible in a
+   browser on this machine: the tab tells the server so every 10 s (and that it left when it is hidden, closed, or
+   nobody has touched it for 30 minutes); a page load counts for 30 s. Nothing else counts: `/api/*` and
+   `/api/status` read on demand, as do curl and agents. Nobody using it, the app sends nothing upstream at all. On
+   the next visit a page first shows what it last showed, labelled with the block it was read at, until the current
+   data replaces it about half a second later.
+2. **While in use, what is on screen is re-read at every block, in as few requests as possible.** Normally one
+   Multicall3 `aggregate3` carries everything a block can change for the pages on screen: governance's values that
+   change (role addresses, freeze state, the soft-freeze threshold and nonces; the members, domains and constants
+   are kept in memory while the contracts' code matches the pinned code), the upgrade states, and the signature
+   checks of the sets on screen. Everything a page shows as current was read at that block, except governance's
+   values that never change (kept as just said), the member Safes' info (owners, threshold, version: up to 5
+   minutes old, read again in a block's aggregate before it expires; pages show it beside each member, and it tells
+   "collecting" from "invalid"; it never decides whether a signature is valid), an upgrade read as executed or
+   expired at a final block (not read again: it cannot change), and what comes from ZKsync Era (read once a minute
+   while a page that shows it is on screen). A signature check in the aggregate counts only when it accepts (and only for plain ECDSA
+   signatures checked by pinned code); anything else is asked again directly, where only a definite revert rejects.
+   The follower's own requests are paced to at most 450 Infura credits a second.
+3. **Safe is asked about what can change what you see, and a button asks at once.** While a set that can still be
+   signed is on screen, the member Safes whose signature is not valid yet are checked every 60 s (one small "newest
+   message" request each, the listing only when it changed; every 5 minutes without a Safe API key), within the
+   hourly budget and the quota Safe reports. **Fetch signatures** on the set reads its Safes now and checks it again;
+   lists fed by Safe have **Check Safe now** and are checked every 5 minutes. Executed or closed sets and valid
+   members are never checked in the background. An open page learns from its next beat that what it shows changed and
+   reloads its data in place, from memory.
+
+### What it costs upstream
+
+Read-only, on mainnet, with the same Infura RPC (10,000-block `eth_getLogs` cap), Safe API key and machine as on
+October 7, measured on October 8 (04:53–06:16 UTC) by `apps/web/test/support/benchmark-sync.ts`, each condition on a
+server of its own, the pages kept on screen by a browser tab that beats as a viewer's does. Requests are counted
+where they leave the server (a batch entry counts one, as providers bill them); credits are an estimate at Infura's
+published weights (`eth_getLogs` 255, `eth_chainId` 5, every other method 80). "Per block": per new L1 block in the
+window.
+
+| On screen | Window | L1 requests a block (an hour) | Infura credits a block (an hour) | Era an hour | Safe an hour |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Nothing: 0–60 minutes after the last tab closed (chain cache on) | 60 min | 0 (0) | 0 (0) | 0 | 0 |
+| Nothing, `SYNC_MODE=always` | 15 min, 75 blocks | 5.32 (1,596) | 601 (180,169) | 0 | 0 |
+| The upgrade page `0x77d5…` (executed) | 20 min, 100 blocks | 5.40 (1,620) | 611 (183,140) | 0 | 0 |
+| The same with `SYNC_HEAD_POLL=late` | 20 min, 98 blocks | 4.71 (1,386) | 556 (163,381) | 0 | 0 |
+| Run A's two pages: that upgrade and the emergency upgrade `0xb166…` (executed) | 15 min, 75 blocks | 6.32 (1,896) | 683 (204,865) | 0 | 0 |
+| `/` | 10 min, 50 blocks | 5.34 (1,602) | 606 (181,694) | 120 | 144 |
+| The veto list | 10 min, 50 blocks | 5.44 (1,632) | 614 (184,089) | 120 | 96 |
+| An open set: the pending emergency upgrade `0x4fa2…` | 10 min, 50 blocks | 5.28 (1,584) | 601 (180,254) | 0 | 138 |
+| The same without a Safe API key | 10 min, 50 blocks | 5.38 (1,614) | 609 (182,653) | 0 | 0 (see below) |
+| Two tabs hidden, or one hidden from its load (after the 30 s a load counts) | 3 min each | 0 | 0 | 0 | 0 |
+
+An agent's JSON session (the AGENTS.md reads: status, the upgrade list, the upgrade and the emergency upgrade) sent
+41 L1 requests (20 POSTs, 3,455 credits) and 3 Era requests for its four answers, and nothing in the ten minutes
+after it; `sync.engine.active` stayed `false` throughout.
+
+What a block costs with the upgrade page on screen: 3.30 head polls (`latest`) and 0.03 `finalized`, one
+`eth_getLogs` for the index tail (1.00), one `aggregate3` (1.05; 71–162 sub-calls: governance's values that change,
+the upgrade states and the three sets' signature checks; the blocks where the member Safes' info was due, every 4 to
+5 minutes, had a second one), and the log-history canary every ten minutes (0.02). No direct signature check, no
+governance round, no `eth_getCode`. Two detail pages add a second `aggregate3` a block (six sets). The most credits
+sent within any one second (sliding, by send time) were 415 with one page and 495 with two, all of them the
+follower's: with two pages, a head poll, the index tail and an aggregate at the start of a block (415), and
+another aggregate 999 ms after the first request (80). The pacer counts a request when it lets it go, which can be a
+few milliseconds before it is sent, so it saw those in two seconds and reports 415 at most
+(`sync.engine.cost.pacer`), within its 450; sent, they came within one second to 495, still under Infura's 500. It
+served each new head 0.23–0.31 s (median) after it saw it, 1.0 s with the two detail pages (their second aggregate
+waits for the pace), and never later than 1.15 s.
+
+Safe, with a key: executed pages cost nothing. The open set's five members whose signature is not valid yet were each
+checked every 127 s, the 60 s stretched by the quota guard (141 background requests an hour allowed, with 33,664 of
+50,000 left in Safe's month): 23 small checks in ten minutes, and no listing read again (nothing changed). `/` checks
+the 17 Safes behind its lists every 7.2 minutes (the 5 minutes stretched the same way), the veto list the 8
+Guardians' Safes every 5 minutes. **Fetch signatures** on the open set made 8 Safe checks and answered in 1.65 s, with
+no RPC request (the set was verified at that head and nothing had changed). Without a key, Safe's public service
+answered the server's first Safe request, the open page's listing read at its load (before the measured window),
+with HTTP 429: this machine's IP had used up its 5,000 requests a month, and Safe asked for a pause of about 12 days.
+The app then paused its Safe requests (`sync.safe.paused` `"cooldown"`). That server had read no Safe at its start
+(without a key the warm-up skips Safe) and had no copies from a last run (`CHAIN_CACHE=0`), so the set's members had
+no Safe data at all (members whose Safe could not be read are `unavailable`; on-chain approvals are still checked),
+and the button reported that Safe did not answer for the 8 members. So the keyless cadence (every 5 minutes) could
+not be measured live, and the watcher's bound held only because nothing was sent (the benchmark now reports that
+check as not evaluated when the watcher was paused and sent nothing in the window; whatever it sent, paused or not,
+is held to the bound, since the watcher reaches its budget and quota pauses by sending); the server tests cover the
+cadence.
+
+Era (the public ZKsync Era RPC): 120 requests an hour while `/` or the veto list is on screen (a head read and an
+index tail a minute), none otherwise. Before: 3,066 an hour while the veto list had been viewed in the last ten
+minutes.
+
+Before and after:
+
+| | October 7 | October 8 | Share |
+| --- | ---: | ---: | ---: |
+| Nobody using the app (the default mode) | 8.5 L1 a block (~2,500 an hour, ~860 credits a block, ~6.1 M a day), ~41 Safe an hour | 0 | 0 |
+| Run A: the upgrade and emergency upgrade pages | 59.2 L1 a block (17,225 an hour), 4,911 credits a block (1.43 M an hour), 989 Safe an hour | 6.32 L1 a block (1,896 an hour), 683 credits a block (205,000 an hour), 0 Safe | 10.7 % of requests, 13.9 % of credits |
+| The October 7 benchmark's in-use condition (C5): 10,887 L1, 3,052 Era (13,939 JSON-RPC) and 510 Safe an hour | | one upgrade page: 1,620 L1, 0 Era, 0 Safe an hour | 14.9 % of L1, 11.6 % of JSON-RPC |
+| The most credits in one second, in use | 4,655 (6,095 with the veto list) | 415–495 | |
+
+On Infura's free plan (3 M credits a day, 500 a second) a page open costs about 183,000 credits an hour, so it
+allows about 16 hours a day of a page open, and nothing is spent while none is. A start still reads the handler's
+whole history (about 117,000 credits with this provider), as before. `SYNC_MODE=always` now costs about 180,000
+credits an hour with nothing on screen (4.3 M a day): it is meant for paid plans.
+
+The aim was a tenth of the in-use traffic. On run A's basis requests fell to 10.7 % (credits to 13.9 %); on the C5
+basis one page is 14.9 % of the L1 requests. What is left a block is the head polls (3.3) and the index tail (1, 255
+credits), besides the one combined read. `SYNC_HEAD_POLL=late` lowers the polls from 3.30 to 2.61 a block (4.71
+requests a block, 1,386 an hour against 1,620; 12.7 % of the C5 basis) and served heads about as soon as `slot`
+(median 0.30 s, p80 0.33 s, at most 1.06 s, against 0.29 s, 0.32 s and 1.05 s: about 10 ms later, measured at other
+heads in a run of its own, not side by side). October 7's rule makes `late` the default only if no head is served
+later than with `slot`, which this does not show, so `slot` stays the default; a run of both on the same heads would
+settle it. Reading the tail only when the handler logged something was not adopted: it would change the rule that
+the history above the finality boundary is read again at every head.
+
+### How long things take
+
+The first run unless said otherwise. JSON: the complete answer. Pages: first bytes · main section · main data ·
+complete, in ms.
+
+After a pause, with no page open (the follower stopped; nothing read ahead). JSON after 90 s and 10 minutes, and
+the pages, from a second run of the `resume` and `idle` conditions on October 8 (08:29–09:32 UTC,
+`--only=resume,idle`, after pages began to show what they last showed, below); JSON after 1 hour from the first run:
+
+| JSON | After 90 s | After 10 minutes | After 1 hour | Warm, right after |
+| --- | ---: | ---: | ---: | ---: |
+| `/api/status` | 438 ms | 467 ms | 527 ms | 2–3 ms |
+| `/api/upgrades` | 557 ms | 552 ms | (321 ms, not a first request) | 2–4 ms |
+| `/api/upgrades?history=all` | 588 ms | 642 ms | (185 ms, not a first request) | 32–36 ms |
+
+After 90 s and after 10 minutes each request came after a pause of its own. After 1 hour (the `json` condition of
+the first run, not run again) the three came one after another, so only `/api/status` was a first request there:
+the aim (the first JSON after a pause within about 1 s of warm) was measured for all three after 90 s and 10
+minutes, and for `/api/status` alone after an hour. Each first request was within 0.65 s of warm. October 7
+(`SYNC_MODE=window`, run B of that day's cost study): 0.77 s and 0.82 s for the first two. Detail JSON reads Safe
+after a pause (above).
+
+A page first sends, with its first bytes, its main data as this app last showed it, labelled "As of block #N ·
+reading the newest block" (the block those reads were made at; the counts on `/` say "As of block #N ·
+re-verifying", the Safe-fed lists "Verified at block #N · re-verifying" with their Safe copies' age). It is shown
+in no colour, with nothing to sign, send or download from it, and the current data replaces it in the same response
+once the newest block and the reads at it are in (0.4–0.5 s, as measured in the first run). Only pages do this, and
+only from this process's memory: what a section showed as current (nothing from the last run's history, nothing
+located directly, no Safe copy older than the page rule allows) is kept for the next page that finds no head in
+memory; never across a settings change, never on a dev node, never for JSON. A page not shown since the app started
+has nothing kept: it sends its frame and sections at once and its data after those reads (the first run: first bytes
+19–36 ms, data 0.4–0.5 s). So the benchmark now shows the six pages once before each pause.
+
+| Page: first bytes · data · complete, in ms | After 90 s (each after its own pause) | After 10 minutes / 1 hour (one after another) |
+| --- | --- | --- |
+| `/` | 30 · 30 (as last shown) · 4,661 | 40 · 41 (as last shown) · 4,532 / 40 · 42 (as last shown) · 5,800 |
+| `/app/proposals` | 30 · 30 (as last shown) · 614 | 15 · 18 · 19 / 19 · 22 · 23 |
+| `/app/proposals/0x77d5…` | 31 · 33 (as last shown) · 916 | 19 · 22 · 400 / 16 · 19 · 416 |
+| `/app/emergency` | 22 · 23 (as last shown) · 674 | 10 · 13 · 14 / 12 · 15 · 15 |
+| `/app/emergency/0xb166…` | 14 · 16 (as last shown) · 808 | 21 · 23 · 361 / 14 · 16 · 1,055 |
+| `/app/l2-cancellations` | 34 · 35 (as last shown) · 2,199 | 11 · 13 · 14 / 9 · 11 · 12 |
+
+After 10 minutes and 1 hour the pages came one after another: only `/` came after the pause, and the others found
+the head it read (the app in use again) and had their current data at once. `/` takes 4.5–5.8 s to complete
+because its current counts read the 17 Safes behind its lists again. On October 7 the follower kept running after a
+pause (`SYNC_MODE=always`), and the same pages had their data within 19–31 ms, at the cost above.
+
+The aim for pages after a pause (each page's last-known data, labelled, in its first flush, first bytes within 50
+ms) was not met by the first run: the pages then waited 0.4–0.5 s for their data, and the review left two ways open
+(pages show what they last showed, labelled with its block, or the aim becomes "frame and sections within 50 ms,
+data in about half a second"). The first was taken, as the aim and the user's decision of October 7 ("pages show
+the last-known data, labelled") describe, and the second run measured it: the benchmark's check of the aim (each
+page's data, current or older and labelled, within 50 ms of its first bytes, the first bytes under 50 ms) holds for
+the six pages after 90 s, after 10 minutes and after 1 hour.
+
+A page open (the follower running): warm, every path read once before; new block, each path the moment the engine
+served a new head.
+
+| | Warm | New block |
+| --- | --- | --- |
+| JSON: status and lists | 1–33 ms | 1–20 ms |
+| JSON: the upgrade and emergency upgrade details | 3–5 ms | 3–20 ms at 3 of 14 blocks, 0.2–2.6 s at 10, 4.8 s at one (Safe read again) |
+| JSON: vetoes, freeze | 1 ms | 378–419 ms (Safe read again) |
+| Pages | 5–9 · 5–10 · 7–13 · 7–19 | 5–13 · 6–13 · 7–17 · 7–198; `/app/emergency` 3,868 (Safe) |
+
+JSON reads Safe again once its copies are older than 60 s, and with only executed sets on screen nothing keeps them
+younger: the detail endpoints took 0.2–2.6 s at most blocks measured 0–1.5 s after the engine saw a new head, and
+`/api/emergency/0xb166…` 4.8 s once (its 16 listings). On October 7 the background sweep kept those copies under
+60 s and the same requests took 4–25 ms (one block 544 ms). Pages show such copies labelled with their age and
+finish when Safe has answered.
+
+A new process with the chain cache (the six pages requested at once as it starts, the cache saved by the idle
+condition's server): first bytes 124–151 ms (six at once while the process starts), data labelled "History from
+last run" at 158–411 ms, complete 0.4–4.4 s; the JSON right after: 3–177 ms.
+
+### Freshness: pages and JSON
+
+JSON (`/api/*`) is unchanged: it answers only with what it read at the current head, Safe copies at most 60 s old,
+governance at most 30 s old and this run's own log history, and it waits for them. It never keeps the follower
+running and never reads what only pages may show. So a JSON detail request reads Safe again whenever its copies are
+older than 60 s (about 4–5 s for the 16–17 member Safes with a key, about 9 s without), also while a page is open.
+
+A page may show first, always labelled, what the app already holds: after a pause, what it last showed ("As of
+block #N · reading the newest block"), Safe copies older than the page allows ("Safe copies from 2m ago ·
+refreshing"), a set's verdict at an older block ("Verified at block #N · re-verifying at #M"), the history the last
+run saved, or an upgrade located directly while the history is read: never in a passing colour, nothing to sign or
+send from it. The current result replaces it in the same response, and an open page then follows each new block by
+itself. That current result is verified at the head as JSON's is, but its Safe copies follow the page rule rather
+than the 60 s one: the copies the watcher keeps checking for the screen are used for as long as their cadence
+(measured up to 127 s with a key under the quota guard, 5 minutes without one), labelled "Safe checked 20s ago · next
+check in 40s"; the copies of members whose signature is valid at the head, and of sets that cannot be signed any
+more, whatever their age, labelled with it; any other copy is read again first. A Safe copy only supplies
+candidates, so an older one can only show fewer signatures than there are.
+
+### Validation
+
+- `corepack pnpm --filter web test`: 193 unit and 998 server tests pass, including the benchmark's own helpers and
+  checks and its tracer (`test/server/benchmark-sync.test.ts`, `upstream-trace.test.ts`: what a trace records, that
+  a request counts in the window it was sent in even when answered later or never, that an answer, an error or a
+  rate limit that comes after that window was dumped is counted in the window it came in, never as a request, and
+  that a trace never holds a URL, host or key), and what pages show after a pause
+  (`test/server/last-shown.test.ts`, `last-shown-pages.test.ts`, `test/unit/as-of.test.tsx`: the six pages' last
+  current data at once with the block it was read at, never a newer block, the current data after it, nothing kept
+  from a stale or unconfirmed answer, across a settings change or on a dev node, JSON never answering from it, and
+  the labels, the absence of colour and of anything to act on). `corepack pnpm typecheck` passes, and Biome is
+  clean on the changed files.
+- `corepack pnpm test:i` (mainnet, read-only): 4 of 4 pass. `corepack pnpm test:fork` (anvil fork): 5 of 5 pass.
+- Playwright (`corepack pnpm --filter web build && cd packages/e2e && corepack pnpm test:web`, Node 20.18.1 and
+  `PW_CHANNEL=chrome`): 15 pass, 2 fail as before this work: `verify.spec.ts:13` and `verify.spec.ts:67` expect
+  executed emergency upgrades on the landing and emergency pages, which show only the last 7 days.
+- The benchmark checked `/api/status` when each server started, after each window in use, after the first request
+  of each JSON pair and at the end of each condition (not during the idle windows or between the pages after a
+  pause, where reading it would itself read the head and governance upstream): no governance warnings or overrides,
+  log history `ok`, the chain cache never `mismatch` (and `verified` on the restarted process). Every answer had
+  status 200 and no server log holds a URL other than the local one. No upstream request failed or was rate limited
+  in a measured window; before its window, the keyless server's first Safe request got HTTP 429, which paused its
+  Safe requests (above). Its checks, evaluated again on the first run's results with the benchmark as corrected
+  after it: nothing upstream while no page was open, hidden or closed; JSON never started the follower; one page
+  under 1,650 L1 requests an hour; Era at most 240 an hour; Safe for the open set within its members × 60 an hour;
+  first JSON after a pause within 1 s of warm; first bytes under 50 ms on the six pages after each pause: these
+  held. The keyless watcher's bound was not evaluated (Safe paused, nothing sent). Pages' data in their first flush
+  after a pause did not hold in the first run (above); the second run (`--only=resume,idle`, after pages began to
+  show what they last showed) passed all of its checks: nothing upstream for the 60 minutes after the use ended,
+  first bytes under 50 ms and each page's data in its first flush on the six pages after 90 s, 10 minutes and 1
+  hour, and the first JSON after a pause within 1 s of warm (its six first requests, after 90 s and 10 minutes).
+- The first run counted the Era requests of servers whose Era RPC was never asked its chain id as "RPC of unknown
+  chain"; the Era figures above are those requests (the benchmark now attributes them to Era itself).
+
+Reproduce from `apps/web` after `corepack pnpm --filter web build`:
+`PW_CHANNEL=chrome corepack pnpm exec tsx test/support/benchmark-sync.ts` (read-only; about 85 minutes; `--only=json,
+upgrade,…` for some conditions, `--scale=0.1` for a short trial run). It starts its own servers on ports 3105–3110,
+each with `test/support/upstream-trace.mjs` (each upstream request's method, block tag, selector, or Safe request
+kind; never a URL, host, query string or key), keeps pages on screen in Chrome tabs, stops on a trust problem, prints
+no URL or key, and writes its results to `.cache/local/benchmark-sync.json` at the repository's root (the servers'
+logs and traces to `.cache/local/benchmark-sync/`). The tables above come from one run of it (October 8,
+04:53–06:16 UTC), for `SYNC_HEAD_POLL=late` from `--only=late` right after it, and for the pages and JSON after a
+pause (90 s and 10 minutes) from `--only=resume,idle` (08:29–09:32 UTC); "October 7" figures are from that day's
+benchmark and cost study.
+
 ## October 6: answers kept ahead of requests, pages that never wait
 
 Before this work every request read what it needed from the RPC and Safe itself. The full upgrade and

@@ -15,6 +15,7 @@ import { FOREVER, cached, cachedUntil, invalidate, peek, replace } from "./cache
 import { type Lane, RpcError, createLane } from "./chain/jsonrpc";
 import { type LimitedHttpOptions, limitedHttp } from "./rpc-transport";
 import { countUpstream } from "./sync/cost";
+import { provideHeads } from "./sync/last-shown";
 import { creditsOf, paceEngineRequest } from "./sync/pacer";
 
 // Public RPCs throttle bursts, so every client funnels requests through a small pool and backs
@@ -1053,3 +1054,12 @@ export function resetRpcClients() {
   l2Lanes?.head.close();
   l2Lanes = undefined;
 }
+
+// A page loader decides, before its reads start, whether it must wait for the newest block, to
+// show what pages last showed until then (sync/last-shown.ts): it reads the head through these.
+provideHeads({
+  servedHeadNow,
+  latestBlock,
+  generation: rpcGeneration,
+  isDevNode: () => resolvedNetwork()?.isDevNode ?? null,
+});

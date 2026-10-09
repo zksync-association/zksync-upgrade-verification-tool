@@ -1,4 +1,5 @@
 import { loaderRevs, upgradeListContent } from "@/.server/sync/content";
+import { lastShown } from "@/.server/sync/last-shown";
 import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { type UpgradeSummary, listStandardUpgrades } from "@/.server/flows/standard";
 import { isUpgradeActive } from "@/common/upgrade-states";
@@ -8,6 +9,7 @@ import { IndexedLoadingCard } from "@/components/sync-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { type AsOfBlock, AsOfContent, AsOfNote } from "@/components/verification/as-of";
 import { UpgradeStateBadge } from "@/components/verification/badges";
 import type { Refresh } from "@/components/verification/freshness";
 import { LastRunNote } from "@/components/verification/last-run";
@@ -24,6 +26,9 @@ export const meta = Meta["/app/proposals"];
 
 export function loader({ request }: LoaderFunctionArgs) {
   const allHistory = new URL(request.url).searchParams.get("history") === "all";
+  // After a pause (no head in memory), the list as this app last showed it comes first, as of its
+  // block, until the current one replaces it (sync/last-shown.ts).
+  const shown = lastShown();
   // While this run re-reads the handler's history, the page may list from the history the last
   // run saved (labelled), and the list from this run's history follows in the same response.
   const list = listStandardUpgrades({ allHistory, freshness: "page" });
@@ -31,6 +36,9 @@ export function loader({ request }: LoaderFunctionArgs) {
     first.fromLastRun ? listStandardUpgrades({ allHistory }) : null
   );
   void freshList.catch(() => {});
+  const shownList = shown.section(watchKeys.upgrades(allHistory), list, freshList, {
+    current: (l) => !l.fromLastRun,
+  });
   return defer({
     watch: watchItems(request, [watchKeys.upgrades(allHistory)]),
     revs: loaderRevs([
@@ -40,8 +48,8 @@ export function loader({ request }: LoaderFunctionArgs) {
       ],
     ]),
     allHistory,
-    list,
-    freshList,
+    list: shownList.first,
+    freshList: shownList.fresh,
   });
 }
 
@@ -92,7 +100,10 @@ export default function Upgrades() {
           }
         >
           {(first) => (
-            <UntilFresh stale={first.fromLastRun === true} fresh={freshList}>
+            <UntilFresh
+              stale={first.fromLastRun === true || first.asOf !== undefined}
+              fresh={freshList}
+            >
               {(fresh, refresh) => (
                 <UpgradeTable
                   result={fresh ?? first}
@@ -113,9 +124,12 @@ function UpgradeTable({
   allHistory,
   refresh = null,
 }: {
-  result: SerializeFrom<Awaited<ReturnType<typeof listStandardUpgrades>>>;
+  result: SerializeFrom<Awaited<ReturnType<typeof listStandardUpgrades>>> & {
+    /** The list as this app last showed it, read at an older block (after a pause). */
+    asOf?: AsOfBlock;
+  };
   allHistory: boolean;
-  /** For a list from the last run's history: where the verified list is. */
+  /** For a list from the last run's history, or as last shown: where the current list is. */
   refresh?: Refresh;
 }) {
   const active = result.upgrades.filter((u) => isUpgradeActive(u.state));
@@ -125,13 +139,20 @@ function UpgradeTable({
   return (
     <div className="space-y-8">
       {result.fromLastRun && <LastRunNote refresh={refresh} what="The upgrades listed below" />}
+      {result.asOf && (
+        <AsOfNote
+          asOf={result.asOf}
+          refresh={refresh}
+          what="The upgrades and states listed below"
+        />
+      )}
       <div className="space-y-3">
         <h2 className="text-[22px] leading-7">In progress</h2>
         <PendingRegion pending={switching}>
           {active.length === 0 ? (
             <EmptyState>No upgrade is waiting for approval or execution.</EmptyState>
           ) : (
-            <UpgradeRows upgrades={active} testId="active-upgrades" />
+            <UpgradeRows upgrades={active} testId="active-upgrades" asOf={result.asOf} />
           )}
         </PendingRegion>
       </div>
@@ -155,7 +176,7 @@ function UpgradeTable({
           {past.length === 0 ? (
             <EmptyState>No finished upgrades in this range.</EmptyState>
           ) : (
-            <UpgradeRows upgrades={past} testId="finished-upgrades" />
+            <UpgradeRows upgrades={past} testId="finished-upgrades" asOf={result.asOf} />
           )}
         </PendingRegion>
       </div>
@@ -166,40 +187,43 @@ function UpgradeTable({
 function UpgradeRows({
   upgrades,
   testId,
-}: { upgrades: SerializeFrom<UpgradeSummary>[]; testId: string }) {
+  asOf,
+}: { upgrades: SerializeFrom<UpgradeSummary>[]; testId: string; asOf?: AsOfBlock }) {
   return (
-    <Card className="divide-y divide-slate-300 overflow-hidden" data-testid={testId}>
-      {upgrades.map((u) => (
-        <Link
-          key={u.id}
-          to={$path("/app/proposals/:id", { id: u.id })}
-          className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 transition-colors hover:bg-brand-25"
-          data-testid="upgrade-row"
-        >
-          {/* On a phone the id takes the whole row and the badges wrap below it. */}
-          <span className="min-w-0 flex-1 basis-full sm:basis-0">
-            <span className="mono block break-all font-medium text-navy-800">{u.id}</span>
-            <span className="text-slate-600 text-xs">
-              Started {formatDay(u.createdAt)} · block {formatNumber(u.blockNumber)} ·{" "}
-              {u.proposal.calls.length} call
-              {u.proposal.calls.length === 1 ? "" : "s"}
-              {!u.idMatches && (
-                <span className="ml-2 font-semibold text-red-800">
-                  id does not match its content
-                </span>
-              )}
+    <AsOfContent asOf={asOf}>
+      <Card className="divide-y divide-slate-300 overflow-hidden" data-testid={testId}>
+        {upgrades.map((u) => (
+          <Link
+            key={u.id}
+            to={$path("/app/proposals/:id", { id: u.id })}
+            className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 transition-colors hover:bg-brand-25"
+            data-testid="upgrade-row"
+          >
+            {/* On a phone the id takes the whole row and the badges wrap below it. */}
+            <span className="min-w-0 flex-1 basis-full sm:basis-0">
+              <span className="mono block break-all font-medium text-navy-800">{u.id}</span>
+              <span className="text-slate-600 text-xs">
+                Started {formatDay(u.createdAt)} · block {formatNumber(u.blockNumber)} ·{" "}
+                {u.proposal.calls.length} call
+                {u.proposal.calls.length === 1 ? "" : "s"}
+                {!u.idMatches && (
+                  <span className="ml-2 font-semibold text-red-800">
+                    id does not match its content
+                  </span>
+                )}
+              </span>
             </span>
-          </span>
-          <span className="flex flex-wrap items-center gap-1.5">
-            {u.approvedBySecurityCouncil && <Flag label="Security Council" />}
-            {u.approvedByGuardians && <Flag label="Guardians" />}
-            {u.legalVetoExtended && <Badge variant="navy">Veto extended</Badge>}
-          </span>
-          <UpgradeStateBadge state={u.state} />
-          <ArrowRight className="h-5 w-5 text-brand-700" />
-        </Link>
-      ))}
-    </Card>
+            <span className="flex flex-wrap items-center gap-1.5">
+              {u.approvedBySecurityCouncil && <Flag label="Security Council" />}
+              {u.approvedByGuardians && <Flag label="Guardians" />}
+              {u.legalVetoExtended && <Badge variant="navy">Veto extended</Badge>}
+            </span>
+            <UpgradeStateBadge state={u.state} />
+            <ArrowRight className="h-5 w-5 text-brand-700" />
+          </Link>
+        ))}
+      </Card>
+    </AsOfContent>
   );
 }
 

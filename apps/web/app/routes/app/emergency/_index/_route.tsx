@@ -1,8 +1,10 @@
 import { emergencyListContent, loaderRevs } from "@/.server/sync/content";
+import { lastShown } from "@/.server/sync/last-shown";
 import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import {
   type EmergencySummary,
+  type ExecutedFirst,
   type PendingEmergencies,
   loadEmergencyList,
 } from "@/.server/flows/emergency";
@@ -15,6 +17,7 @@ import { IndexedLoadingCard } from "@/components/sync-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { type AsOfBlock, AsOfContent, AsOfNote } from "@/components/verification/as-of";
 import { CheckSafeNow } from "@/components/verification/check-safe-now";
 import { ListFreshnessNote, type Refresh } from "@/components/verification/freshness";
 import { LastRunNote } from "@/components/verification/last-run";
@@ -31,6 +34,9 @@ export const meta = Meta["/app/emergency"];
 
 export function loader({ request }: LoaderFunctionArgs) {
   const allHistory = new URL(request.url).searchParams.get("history") === "all";
+  // After a pause (no head in memory), both lists as this app last showed them come first, as of
+  // their block, until the current ones replace them (sync/last-shown.ts).
+  const shown = lastShown();
   // Pending ids come from members' Safe messages: the page lists them at once from the copies held
   // (labelled with their age when older than 60 s, and not kept by the watcher for the screen)
   // and the fresh list after it.
@@ -38,23 +44,39 @@ export function loader({ request }: LoaderFunctionArgs) {
   const pending = loading.pending.then((p) => (p.stale ? loading.freshPending : p));
   // Executions likewise: from the history the last run saved while this run re-reads it
   // (labelled), and the list from this run's history after it. They need no governance read.
+  const key = watchKeys.emergencies(allHistory);
+  // A list as last shown is labelled as one from older Safe copies is (stale, with its block).
+  const shownPending = shown.section(
+    `${key}:pending`,
+    loading.pending,
+    freshAfter(loading.pending, loading.freshPending, (p) => p.stale),
+    { current: (p) => !p.stale, label: (p) => ({ ...p, stale: true }) }
+  );
+  const executed = loading.executedFirst;
+  const freshExecuted = executed.then((first) =>
+    first.fromLastRun
+      ? loading.executed.then((items): ExecutedFirst => ({ items, fromLastRun: false }))
+      : null
+  );
+  void freshExecuted.catch(() => {});
+  const shownExecuted = shown.section(`${key}:executed`, executed, freshExecuted, {
+    current: (e) => !e.fromLastRun,
+  });
   return defer({
-    watch: watchItems(request, [watchKeys.emergencies(allHistory)]),
+    watch: watchItems(request, [key]),
     revs: loaderRevs([
       [
-        watchKeys.emergencies(allHistory),
+        key,
         Promise.all([pending, loading.executed]).then(([p, executed]) =>
           emergencyListContent(p, executed)
         ),
       ],
     ]),
     allHistory,
-    pending: loading.pending,
-    freshPending: freshAfter(loading.pending, loading.freshPending, (p) => p.stale),
-    executed: loading.executedFirst,
-    freshExecuted: loading.executedFirst.then((first) =>
-      first.fromLastRun ? loading.executed : null
-    ),
+    pending: shownPending.first,
+    freshPending: shownPending.fresh,
+    executed: shownExecuted.first,
+    freshExecuted: shownExecuted.fresh,
   });
 }
 
@@ -151,17 +173,29 @@ export default function EmergencyList() {
               }
             >
               {(first) => (
-                <UntilFresh stale={first.fromLastRun} fresh={freshExecuted}>
+                <UntilFresh
+                  stale={first.fromLastRun || first.asOf !== undefined}
+                  fresh={freshExecuted}
+                >
                   {(fresh, refresh) => {
-                    const items = fresh ?? first.items;
+                    const items = (fresh ?? first).items;
+                    // As this app last showed it (after a pause), until the current list is in.
+                    const asOf = fresh ? undefined : first.asOf;
                     return (
                       <PendingRegion pending={switching}>
                         <div className="space-y-3">
                           {!fresh && first.fromLastRun && (
                             <LastRunNote refresh={refresh} what="The executions listed below" />
                           )}
+                          {asOf && (
+                            <AsOfNote
+                              asOf={asOf}
+                              refresh={refresh}
+                              what="The executions listed below"
+                            />
+                          )}
                           {items.length ? (
-                            <Rows items={items} testId="executed-emergencies" />
+                            <Rows items={items} testId="executed-emergencies" asOf={asOf} />
                           ) : (
                             <EmptyState>
                               {allHistory
@@ -187,13 +221,21 @@ function PendingList({
   result,
   refresh,
   allHistory,
-}: { result: SerializeFrom<PendingEmergencies>; refresh: Refresh; allHistory: boolean }) {
+}: {
+  result: SerializeFrom<PendingEmergencies> & {
+    /** The list as this app last showed it, read at an older block (after a pause). */
+    asOf?: AsOfBlock;
+  };
+  refresh: Refresh;
+  allHistory: boolean;
+}) {
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <ListFreshnessNote
           watchKey={allHistory ? "list:emergency:all" : "list:emergency"}
-          set={result}
+          // A list as last shown says the block it was read at, and its Safe copies' age.
+          set={result.asOf ? { ...result, verifiedAtBlock: result.asOf.block } : result}
           refresh={refresh}
           what="The ids and counts below"
         />
@@ -223,40 +265,48 @@ function PendingList({
   );
 }
 
-function Rows({ items, testId }: { items: SerializeFrom<EmergencySummary>[]; testId: string }) {
+function Rows({
+  items,
+  testId,
+  asOf,
+}: { items: SerializeFrom<EmergencySummary>[]; testId: string; asOf?: AsOfBlock }) {
   return (
-    <Card className="divide-y divide-slate-100 overflow-hidden" data-testid={testId}>
-      {items.map((e) => (
-        <div
-          key={e.id}
-          className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 hover:bg-slate-25"
-          data-testid="emergency-row"
-        >
-          <Link to={$path("/app/emergency/:id", { id: e.id })} className="min-w-0 flex-1">
-            <span className="mono block truncate text-slate-950">{e.id}</span>
-            <span className="text-slate-600 text-xs">
-              {e.executed
-                ? `Executed in block ${formatNumber(e.executed.blockNumber)}`
-                : `First signed in Safe ${formatDay(e.firstSeen)}`}
-            </span>
-          </Link>
-          {e.executed ? (
-            <TxLink hash={e.executed.txHash} />
-          ) : (
-            <span
-              className="flex flex-wrap items-center gap-1.5"
-              title="As reported by Safe; open the upgrade to verify each signature on-chain"
-            >
-              <Badge>Security Council {e.reported.securityCouncil}</Badge>
-              <Badge>Guardians {e.reported.guardians}</Badge>
-              <Badge>{e.reported.zkFoundation ? "Foundation signed" : "Foundation pending"}</Badge>
-            </span>
-          )}
-          <Link to={$path("/app/emergency/:id", { id: e.id })} aria-label="Open">
-            <ArrowRight className="h-4 w-4 text-slate-600" />
-          </Link>
-        </div>
-      ))}
-    </Card>
+    <AsOfContent asOf={asOf}>
+      <Card className="divide-y divide-slate-100 overflow-hidden" data-testid={testId}>
+        {items.map((e) => (
+          <div
+            key={e.id}
+            className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 hover:bg-slate-25"
+            data-testid="emergency-row"
+          >
+            <Link to={$path("/app/emergency/:id", { id: e.id })} className="min-w-0 flex-1">
+              <span className="mono block truncate text-slate-950">{e.id}</span>
+              <span className="text-slate-600 text-xs">
+                {e.executed
+                  ? `Executed in block ${formatNumber(e.executed.blockNumber)}`
+                  : `First signed in Safe ${formatDay(e.firstSeen)}`}
+              </span>
+            </Link>
+            {e.executed ? (
+              <TxLink hash={e.executed.txHash} />
+            ) : (
+              <span
+                className="flex flex-wrap items-center gap-1.5"
+                title="As reported by Safe; open the upgrade to verify each signature on-chain"
+              >
+                <Badge>Security Council {e.reported.securityCouncil}</Badge>
+                <Badge>Guardians {e.reported.guardians}</Badge>
+                <Badge>
+                  {e.reported.zkFoundation ? "Foundation signed" : "Foundation pending"}
+                </Badge>
+              </span>
+            )}
+            <Link to={$path("/app/emergency/:id", { id: e.id })} aria-label="Open">
+              <ArrowRight className="h-4 w-4 text-slate-600" />
+            </Link>
+          </div>
+        ))}
+      </Card>
+    </AsOfContent>
   );
 }

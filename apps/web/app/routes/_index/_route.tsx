@@ -5,6 +5,7 @@ import {
   upgradeListContent,
   vetoListContent,
 } from "@/.server/sync/content";
+import { type AsOf, lastShown } from "@/.server/sync/last-shown";
 import { watchItems, watchKeys } from "@/.server/sync/presence";
 import {
   type ExecutedFirst,
@@ -87,12 +88,33 @@ function counted<T extends { source: SummarySource }>(first: Promise<T>, fresh: 
   return { first, fresh: after };
 }
 
+/**
+ * A count as the page shows it (see counted): after a pause (no head in memory), the count as
+ * this app last showed it comes first, as of its block (sync/last-shown.ts), until the current
+ * count replaces it. Only a count from fresh sources is kept.
+ */
+function shownCount<T extends { source: SummarySource }>(
+  shown: ReturnType<typeof lastShown>,
+  key: string,
+  count: { first: Promise<T>; fresh: Promise<T | null> }
+) {
+  return shown.section<T>(`home:${key}`, count.first, count.fresh, {
+    current: (c) => c.source === null,
+    label: (c, asOf: AsOf): T => ({
+      ...c,
+      source: { lastRun: false, safeFetchedAt: null, asOfBlock: asOf.block },
+    }),
+  });
+}
+
 export function loader({ request }: LoaderFunctionArgs) {
+  // Before any read starts: whether the page must wait for the newest block.
+  const shown = lastShown();
   const upgrades = listStandardUpgrades({ allHistory: false, freshness: "page" });
   const emergency = loadEmergencyList({ freshness: "page" });
   const freeze = loadFreezeList({ freshness: "page" });
   const vetoes = loadL2VetoList({ freshness: "page" });
-  const counts = {
+  const fromSources = {
     upgrades: counted(upgrades.then(upgradeCount), () =>
       listStandardUpgrades({ allHistory: false }).then(upgradeCount)
     ),
@@ -108,6 +130,12 @@ export function loader({ request }: LoaderFunctionArgs) {
     vetoes: counted(Promise.all([vetoes.signed, vetoes.vetoable]).then(vetoCount), () =>
       Promise.all([vetoes.freshSigned, vetoes.freshVetoable]).then(vetoCount)
     ),
+  };
+  const counts = {
+    upgrades: shownCount(shown, "upgrades", fromSources.upgrades),
+    emergency: shownCount(shown, "emergency", fromSources.emergency),
+    freeze: shownCount(shown, "freeze", fromSources.freeze),
+    vetoes: shownCount(shown, "vetoes", fromSources.vetoes),
   };
   // What each count was built from, once current (the first answer, or the fresh one after it),
   // for the lists' revisions (sync/revs.ts).

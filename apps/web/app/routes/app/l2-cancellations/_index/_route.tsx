@@ -1,4 +1,5 @@
 import { loaderRevs, vetoListContent } from "@/.server/sync/content";
+import { lastShown } from "@/.server/sync/last-shown";
 import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import type { L2ProposalView } from "@/.server/flows/l2";
@@ -14,6 +15,7 @@ import { EmptyState, LoadingCard, PageHeader } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { type AsOfBlock, AsOfContent } from "@/components/verification/as-of";
 import { SetStateBadge } from "@/components/verification/badges";
 import { CheckSafeNow } from "@/components/verification/check-safe-now";
 import { EraBlockNote, ListFreshnessNote, type Refresh } from "@/components/verification/freshness";
@@ -35,8 +37,18 @@ export function loader({ request }: LoaderFunctionArgs) {
   // proposals from the governors' history the last run saved while this run reads it again
   // (labelled); the fresh lists follow in the response. ZKsync Era is read at the Era head pages
   // read (the Era timer's, at most a minute old, labelled).
+  // After a pause (no head in memory), the signed vetoes as this app last showed them come first,
+  // as of their block, until the current list replaces them (sync/last-shown.ts).
+  const shown = lastShown();
   const loading = loadL2VetoList({ freshness: "page" });
   const signed = loading.signed.then((s) => (s.stale ? loading.freshSigned : s));
+  // A list as last shown is labelled as one from older Safe copies is (stale, with its block).
+  const shownSigned = shown.section(
+    `${watchKeys.vetoes}:signed`,
+    loading.signed,
+    freshAfter(loading.signed, loading.freshSigned, (s) => s.stale),
+    { current: (s) => !s.stale, label: (s) => ({ ...s, stale: true }) }
+  );
   return defer({
     watch: watchItems(request, [watchKeys.vetoes]),
     revs: loaderRevs([
@@ -47,8 +59,8 @@ export function loader({ request }: LoaderFunctionArgs) {
         ),
       ],
     ]),
-    signed: loading.signed,
-    freshSigned: freshAfter(loading.signed, loading.freshSigned, (s) => s.stale),
+    signed: shownSigned.first,
+    freshSigned: shownSigned.fresh,
     vetoable: loading.vetoable,
     freshVetoable: freshAfter(loading.vetoable, loading.freshVetoable, (v) => v.fromLastRun),
   });
@@ -130,13 +142,20 @@ export default function VetoList() {
 function SignedList({
   result,
   refresh,
-}: { result: SerializeFrom<SignedVetoes>; refresh: Refresh }) {
+}: {
+  result: SerializeFrom<SignedVetoes> & {
+    /** The list as this app last showed it, read at an older block (after a pause). */
+    asOf?: AsOfBlock;
+  };
+  refresh: Refresh;
+}) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <ListFreshnessNote
           watchKey="list:vetoes"
-          set={result}
+          // A list as last shown says the block it was read at, and its Safe copies' age.
+          set={result.asOf ? { ...result, verifiedAtBlock: result.asOf.block } : result}
           refresh={refresh}
           what="The vetoes and counts below"
         />
@@ -156,7 +175,7 @@ function SignedList({
             : "No Guardian has signed a veto."}
         </EmptyState>
       ) : (
-        <Vetoes vetoes={result.vetoes} />
+        <Vetoes vetoes={result.vetoes} asOf={result.asOf} />
       )}
     </div>
   );
@@ -188,33 +207,35 @@ function VetoableList({
   );
 }
 
-function Vetoes({ vetoes }: { vetoes: SerializeFrom<VetoSummary>[] }) {
+function Vetoes({ vetoes, asOf }: { vetoes: SerializeFrom<VetoSummary>[]; asOf?: AsOfBlock }) {
   return (
-    <Card className="divide-y divide-slate-100 overflow-hidden" data-testid="vetoes">
-      {vetoes.map((v) => (
-        <Link
-          key={v.digest}
-          to={vetoPath(v)}
-          className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 hover:bg-slate-25"
-          data-testid="veto-row"
-        >
-          <span className="min-w-0 flex-1">
-            <span className="block font-medium text-slate-950">
-              {v.governorName ?? "Unknown governor"} proposal{" "}
-              <span className="mono">{short(v.l2ProposalId)}</span>
+    <AsOfContent asOf={asOf}>
+      <Card className="divide-y divide-slate-100 overflow-hidden" data-testid="vetoes">
+        {vetoes.map((v) => (
+          <Link
+            key={v.digest}
+            to={vetoPath(v)}
+            className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 hover:bg-slate-25"
+            data-testid="veto-row"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block font-medium text-slate-950">
+                {v.governorName ?? "Unknown governor"} proposal{" "}
+                <span className="mono">{short(v.l2ProposalId)}</span>
+              </span>
+              <span className="text-slate-600 text-xs">
+                Nonce {v.nonce} · mint value {formatEth(v.txMintValue)} · signed in{" "}
+                {v.reportedSigners} Safe
+                {v.reportedSigners === 1 ? "" : "s"}
+              </span>
             </span>
-            <span className="text-slate-600 text-xs">
-              Nonce {v.nonce} · mint value {formatEth(v.txMintValue)} · signed in{" "}
-              {v.reportedSigners} Safe
-              {v.reportedSigners === 1 ? "" : "s"}
-            </span>
-          </span>
-          {!v.governorName && <Badge variant="error">Unknown governor</Badge>}
-          <SetStateBadge state={v.state} />
-          <ArrowRight className="h-4 w-4 text-slate-600" />
-        </Link>
-      ))}
-    </Card>
+            {!v.governorName && <Badge variant="error">Unknown governor</Badge>}
+            <SetStateBadge state={v.state} />
+            <ArrowRight className="h-4 w-4 text-slate-600" />
+          </Link>
+        ))}
+      </Card>
+    </AsOfContent>
   );
 }
 

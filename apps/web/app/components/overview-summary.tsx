@@ -1,14 +1,20 @@
 import { useNowSeconds } from "@/components/sync-state";
 import { type Refresh, copiesAge } from "@/components/verification/freshness";
+import { formatNumber } from "@/utils/format";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 /**
  * Where a count's first answer came from when it is not fresh: the history the last run saved
- * (`lastRun`), Safe copies older than 60 s (`safeFetchedAt`, when the oldest was read), or both.
- * null for a fresh count.
+ * (`lastRun`), Safe copies older than 60 s (`safeFetchedAt`, when the oldest was read), or both;
+ * or, after a pause, the count as this app last showed it, read at block `asOfBlock`
+ * (.server/sync/last-shown.ts). null for a fresh count.
  */
-export type SummarySource = { lastRun: boolean; safeFetchedAt: string | null } | null;
+export type SummarySource = {
+  lastRun: boolean;
+  safeFetchedAt: string | null;
+  asOfBlock?: string | null;
+} | null;
 
 /** Discovery failures must not look like a complete, empty proposal list. */
 export function OverviewSummary({
@@ -53,6 +59,7 @@ export function SummaryNote({ source, refresh }: { source: SummarySource; refres
   const now = useNowSeconds();
   if (!source) return null;
   const parts = [
+    source.asOfBlock ? `As of block #${formatNumber(source.asOfBlock)}` : null,
     source.lastRun ? "History from last run" : null,
     source.safeFetchedAt ? `Safe copies from ${copiesAge(source.safeFetchedAt, now)}` : null,
   ].filter(Boolean);

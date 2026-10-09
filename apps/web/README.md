@@ -23,6 +23,14 @@ chain data kept between runs):
 Log scans split ranges the RPC refuses, learn its limit, and cache everything below the safe head (or below the fork
 block on anvil). A canary log flags RPCs that silently return no history.
 
+**Sync** (`app/.server/sync/`): the app follows the chain only while one of its pages is open and visible in a
+browser (`components/presence.tsx` beats to `/resources/presence` every 10 s with the keys of what it shows;
+`sync/presence.ts`). Then the engine follows the head and, at each new block, re-reads what is on screen at that
+block, normally in one Multicall3 call (`sync/snapshot.ts`, `chain/aggregate.ts`, `chain/verdicts.ts`); the Safe
+watcher (`safe/store.ts`) checks the member Safes of open sets on screen; ZKsync Era has a minute timer while an Era
+page is on screen (`sync/era.ts`); and an open page reloads its data from memory when what it shows changed
+(`sync/revs.ts`). With no page open nothing is sent upstream; `/api/*` reads on demand and never counts as use.
+
 **Chain cache** (`app/.server/persist/chain-cache.ts`): the log histories (ProtocolUpgradeHandler, Era governors) up
 to their finality boundary, final block timestamps and members' last Safe listings are saved to
 `.cache/chain/<chainId>-<genesis hash prefix>.json` (atomic write, 0600; at most once a minute when something changed,

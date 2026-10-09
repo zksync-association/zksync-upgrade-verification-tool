@@ -134,6 +134,11 @@ export type FakeL1Options = {
    * an error. Without it the node does not know the method.
    */
   receipt?: (hash: Hex) => Record<string, unknown> | null | FakeRpcError;
+  /**
+   * The node's answer to eth_getTransactionByHash: a transaction, null (unknown), or an error.
+   * Without it the node does not know the method.
+   */
+  transaction?: (hash: Hex) => Record<string, unknown> | null | FakeRpcError;
 };
 
 /** A mined transaction's receipt as a node sends it (eth_getTransactionReceipt). */
@@ -425,6 +430,9 @@ export function fakeL1(options: FakeL1Options) {
       case "eth_getTransactionReceipt":
         if (!options.receipt) return chain.handle(call);
         return options.receipt((call.params as [Hex])[0]);
+      case "eth_getTransactionByHash":
+        if (!options.transaction) return chain.handle(call);
+        return options.transaction((call.params as [Hex])[0]);
       case "anvil_nodeInfo":
       case "hardhat_metadata":
         return new FakeRpcError(-32601, "method not found");
