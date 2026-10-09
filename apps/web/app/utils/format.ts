@@ -49,6 +49,15 @@ export function relativeTime(value: number | string, now: number | string) {
   return delta >= 0 ? "in less than a minute" : "just now";
 }
 
+/** An age in seconds → "12s ago" / "3m ago" / "2h ago" / "4d ago". A negative age (clock skew) is 0. */
+export function formatAge(seconds: number) {
+  const s = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+  if (s < 60) return `${s}s ago`;
+  if (s < 3_600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86_400) return `${Math.floor(s / 3_600)}h ago`;
+  return `${Math.floor(s / 86_400)}d ago`;
+}
+
 export function formatEth(wei: string) {
   return `${formatEther(BigInt(wei))} ETH`;
 }

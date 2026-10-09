@@ -1,14 +1,16 @@
 import { l1 } from "@/.server/rpc";
+import { useStatus } from "@/components/governance-context";
 import { TxLink } from "@/components/hex";
 import { PageHeader } from "@/components/page";
 import { Card } from "@/components/ui/card";
 import { formatEth } from "@/utils/format";
 import { notFound } from "@/utils/http";
 import { Meta } from "@/utils/meta";
+import { requestStatusRevalidation } from "@/utils/revalidation";
 import { type LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData, useRevalidator } from "@remix-run/react";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { Hex } from "viem";
 
 export const meta = Meta["/app/transactions/:hash"];
@@ -30,14 +32,45 @@ export async function loader({ params }: LoaderFunctionArgs) {
   });
 }
 
+const POLL_MS = 4_000;
+// Root status reads at most, once mined, while it is still older than the transaction's block
+// (the server's head can trail the receipt by a moment).
+const STATUS_READS = 3;
+
 export default function Transaction() {
   const { hash, receipt } = useLoaderData<typeof loader>();
+  const { governance } = useStatus();
   const revalidator = useRevalidator();
+  // Until mined, poll for the receipt. These polls leave the app status alone.
   useEffect(() => {
     if (receipt) return;
-    const timer = setInterval(() => revalidator.state === "idle" && revalidator.revalidate(), 4000);
+    const timer = setInterval(
+      () => revalidator.state === "idle" && revalidator.revalidate(),
+      POLL_MS
+    );
     return () => clearInterval(timer);
   }, [receipt, revalidator]);
+
+  // Once mined, the app status other pages read (freeze state and nonces, members, thresholds)
+  // predates the transaction until it is read at or after its block: read it again, right away
+  // and then every poll interval while it still is, a few times at most.
+  const statusBehind =
+    receipt !== null && BigInt(receipt.blockNumber) > BigInt(governance.latestBlock.number);
+  const statusReads = useRef({ hash, count: 0 });
+  if (statusReads.current.hash !== hash) statusReads.current = { hash, count: 0 };
+  useEffect(() => {
+    const reads = statusReads.current;
+    if (!statusBehind || revalidator.state !== "idle" || reads.count >= STATUS_READS) return;
+    const timer = setTimeout(
+      () => {
+        reads.count += 1;
+        requestStatusRevalidation();
+        revalidator.revalidate();
+      },
+      reads.count === 0 ? 0 : POLL_MS
+    );
+    return () => clearTimeout(timer);
+  }, [statusBehind, revalidator]);
 
   return (
     <div className="space-y-6">

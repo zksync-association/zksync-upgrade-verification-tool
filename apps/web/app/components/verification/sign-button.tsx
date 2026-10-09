@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { requestStatusRevalidation } from "@/utils/revalidation";
 import type { SerializeFrom } from "@remix-run/node";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useRevalidator } from "@remix-run/react";
@@ -73,6 +74,8 @@ export function SignButton({
           id: "sign",
         });
         setOpen(false);
+        // Also reads the root status again (revalidation.ts).
+        requestStatusRevalidation();
         revalidator.revalidate();
       },
       onError: (error) => {

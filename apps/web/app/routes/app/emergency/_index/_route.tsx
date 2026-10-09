@@ -1,8 +1,10 @@
 import { type EmergencySummary, loadEmergencyList } from "@/.server/flows/emergency";
 import { EMERGENCY_RECENT_DAYS } from "@/common/emergency";
 import { useStatus } from "@/components/app-shell";
+import { HistoryToggle, PendingRegion, useNavigatingTo } from "@/components/history-toggle";
 import { TxLink } from "@/components/hex";
 import { EmptyState, LoadingCard, PageHeader } from "@/components/page";
+import { IndexedLoadingCard } from "@/components/sync-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -29,6 +31,8 @@ export function loader({ request }: LoaderFunctionArgs) {
 export default function EmergencyList() {
   const { pending, executed, allHistory } = useLoaderData<typeof loader>();
   const { governance } = useStatus();
+  const toggle = allHistory ? $path("/app/emergency") : `${$path("/app/emergency")}?history=all`;
+  const switching = useNavigatingTo(toggle);
   return (
     <div>
       <PageHeader
@@ -73,13 +77,13 @@ export default function EmergencyList() {
                 ? "Executed · full history"
                 : `Executed · last ${EMERGENCY_RECENT_DAYS} days`}
             </h2>
-            <Button variant="secondary" size="sm" asChild>
-              <Link
-                to={allHistory ? $path("/app/emergency") : `${$path("/app/emergency")}?history=all`}
-              >
-                {allHistory ? "Show recent executions" : "Show full history"}
-              </Link>
-            </Button>
+            <HistoryToggle
+              to={toggle}
+              variant="button"
+              pendingLabel={allHistory ? "Loading recent executions…" : "Loading full history…"}
+            >
+              {allHistory ? "Show recent executions" : "Show full history"}
+            </HistoryToggle>
           </div>
           <p className="text-slate-600 text-sm">
             {allHistory
@@ -88,7 +92,7 @@ export default function EmergencyList() {
           </p>
           <Suspense
             fallback={
-              <LoadingCard
+              <IndexedLoadingCard
                 label={
                   allHistory
                     ? "Reading emergency executions since deployment…"
@@ -103,17 +107,19 @@ export default function EmergencyList() {
                 <EmptyState>Execution history could not be read. Refresh to retry.</EmptyState>
               }
             >
-              {(items) =>
-                items.length ? (
-                  <Rows items={items} testId="executed-emergencies" />
-                ) : (
-                  <EmptyState>
-                    {allHistory
-                      ? "No emergency executions found since deployment."
-                      : `No emergency executions in the last ${EMERGENCY_RECENT_DAYS} days.`}
-                  </EmptyState>
-                )
-              }
+              {(items) => (
+                <PendingRegion pending={switching}>
+                  {items.length ? (
+                    <Rows items={items} testId="executed-emergencies" />
+                  ) : (
+                    <EmptyState>
+                      {allHistory
+                        ? "No emergency executions found since deployment."
+                        : `No emergency executions in the last ${EMERGENCY_RECENT_DAYS} days.`}
+                    </EmptyState>
+                  )}
+                </PendingRegion>
+              )}
             </Await>
           </Suspense>
         </section>

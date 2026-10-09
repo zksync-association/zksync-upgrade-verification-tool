@@ -10,6 +10,7 @@ import { isUpgradeActive } from "@/common/upgrade-states";
 import { useStatus } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { OverviewSummary } from "@/components/overview-summary";
+import { indexingLabel, useIndexProgress } from "@/components/sync-state";
 import { Input } from "@/components/ui/input";
 import { Meta } from "@/utils/meta";
 import { type ActionFunctionArgs, defer, json, redirect } from "@remix-run/node";
@@ -138,7 +139,7 @@ export default function Index() {
             title="Protocol upgrades"
             description="L2 decisions started on L1, with Security Council or Guardian approval."
             summary={
-              <Deferred value={data.upgrades}>
+              <Deferred value={data.upgrades} indexed>
                 {(v) => (
                   <OverviewSummary
                     count={v.open}
@@ -156,7 +157,7 @@ export default function Index() {
             title="Emergency upgrades"
             description="Upgrade ids signed by the Council, Guardians, and ZKsync Foundation."
             summary={
-              <Deferred value={data.emergency}>
+              <Deferred value={data.emergency} indexed>
                 {(v) => (
                   <OverviewSummary
                     count={v.pending}
@@ -256,19 +257,18 @@ function FlowRow({
   );
 }
 
+/**
+ * A count, once its sources answered. `indexed`: it is read from the upgrade handler's log index,
+ * so while the index backfills the pending state says so (never a count: the count appears only
+ * once the range it covers is complete).
+ */
 function Deferred<T>({
   value,
+  indexed = false,
   children,
-}: { value: Promise<T> | T; children: (v: T) => ReactNode }) {
+}: { value: Promise<T> | T; indexed?: boolean; children: (v: T) => ReactNode }) {
   return (
-    <Suspense
-      fallback={
-        <span role="status" className="inline-flex flex-col gap-1.5 text-slate-600 text-xs">
-          <span className="h-4 w-28 animate-pulse rounded bg-slate-100" />
-          Reading sources…
-        </span>
-      }
-    >
+    <Suspense fallback={<DeferredPending indexed={indexed} />}>
       <Await
         resolve={value}
         errorElement={
@@ -280,5 +280,15 @@ function Deferred<T>({
         {(v) => children(v as T)}
       </Await>
     </Suspense>
+  );
+}
+
+function DeferredPending({ indexed }: { indexed: boolean }) {
+  const progress = useIndexProgress();
+  return (
+    <span role="status" className="inline-flex flex-col gap-1.5 text-slate-600 text-xs">
+      <span className="h-4 w-28 animate-pulse rounded bg-slate-100" />
+      {indexed && progress.indexing ? indexingLabel(progress, "log history") : "Reading sources…"}
+    </span>
   );
 }

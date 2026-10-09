@@ -1,6 +1,8 @@
 import { type UpgradeSummary, listStandardUpgrades } from "@/.server/flows/standard";
 import { isUpgradeActive } from "@/common/upgrade-states";
-import { EmptyState, LoadingCard, PageHeader } from "@/components/page";
+import { HistoryToggle, PendingRegion, useNavigatingTo } from "@/components/history-toggle";
+import { EmptyState, PageHeader } from "@/components/page";
+import { IndexedLoadingCard } from "@/components/sync-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -41,7 +43,7 @@ export default function Upgrades() {
       </PageHeader>
       <Suspense
         fallback={
-          <LoadingCard label="Reading UpgradeStarted events from the ProtocolUpgradeHandler…" />
+          <IndexedLoadingCard label="Reading UpgradeStarted events from the ProtocolUpgradeHandler…" />
         }
       >
         <Await
@@ -82,15 +84,19 @@ function UpgradeTable({
 }) {
   const active = result.upgrades.filter((u) => isUpgradeActive(u.state));
   const past = result.upgrades.filter((u) => !isUpgradeActive(u.state));
+  const toggle = allHistory ? $path("/app/proposals") : `${$path("/app/proposals")}?history=all`;
+  const switching = useNavigatingTo(toggle);
   return (
     <div className="space-y-8">
       <div className="space-y-3">
         <h2 className="text-[22px] leading-7">In progress</h2>
-        {active.length === 0 ? (
-          <EmptyState>No upgrade is waiting for approval or execution.</EmptyState>
-        ) : (
-          <UpgradeRows upgrades={active} testId="active-upgrades" />
-        )}
+        <PendingRegion pending={switching}>
+          {active.length === 0 ? (
+            <EmptyState>No upgrade is waiting for approval or execution.</EmptyState>
+          ) : (
+            <UpgradeRows upgrades={active} testId="active-upgrades" />
+          )}
+        </PendingRegion>
       </div>
       <div className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
@@ -100,25 +106,21 @@ function UpgradeTable({
               ? "Since the handler was deployed"
               : `Since block ${formatNumber(result.fromBlock)} (45 days)`}{" "}
             ·{" "}
-            {allHistory ? (
-              <Link className="text-brand-600 hover:underline" to={$path("/app/proposals")}>
-                Show recent only
-              </Link>
-            ) : (
-              <Link
-                className="text-brand-600 hover:underline"
-                to={`${$path("/app/proposals")}?history=all`}
-              >
-                Show full history
-              </Link>
-            )}
+            <HistoryToggle
+              to={toggle}
+              pendingLabel={allHistory ? "Loading recent upgrades…" : "Loading full history…"}
+            >
+              {allHistory ? "Show recent only" : "Show full history"}
+            </HistoryToggle>
           </p>
         </div>
-        {past.length === 0 ? (
-          <EmptyState>No finished upgrades in this range.</EmptyState>
-        ) : (
-          <UpgradeRows upgrades={past} testId="finished-upgrades" />
-        )}
+        <PendingRegion pending={switching}>
+          {past.length === 0 ? (
+            <EmptyState>No finished upgrades in this range.</EmptyState>
+          ) : (
+            <UpgradeRows upgrades={past} testId="finished-upgrades" />
+          )}
+        </PendingRegion>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { AppLoading } from "@/components/app-loading";
 import { GeneralErrorBoundary } from "@/components/error-boundary";
 import { WalletProvider } from "@/components/providers/wallet-provider";
 import { useNonce } from "@/utils/nonce-provider";
+import { shouldRevalidateRoot } from "@/utils/revalidation";
 import { type CLIENT_ENV, clientEnv } from "@config/env.server";
 import { type LinksFunction, type LoaderFunctionArgs, defer } from "@remix-run/node";
 import {
@@ -13,6 +14,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  type ShouldRevalidateFunction,
   useLoaderData,
 } from "@remix-run/react";
 import { Suspense } from "react";
@@ -44,6 +46,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export type RootLoader = typeof loader;
+
+// After Refresh, a settings save, a request from the app (signing, a mined transaction, the log
+// index finishing) or once the status in hand is 30 s old; not on every navigation (revalidation.ts).
+export const shouldRevalidate: ShouldRevalidateFunction = shouldRevalidateRoot;
 
 export default function App() {
   const nonce = useNonce();

@@ -2,12 +2,14 @@ import { GovernanceContext, type OkStatus } from "@/components/governance-contex
 import ConnectButton, { WalletOfferContext } from "@/components/connect-button";
 import { AddressLink } from "@/components/hex";
 import Logo from "@/components/logo";
+import { BlockAge, IndexProgressProvider, IndexingPill } from "@/components/sync-state";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
 import { formatNumber } from "@/utils/format";
+import { noteStatusLanded, requestStatusRevalidation } from "@/utils/revalidation";
 import { Link, NavLink, useFetcher, useRevalidator } from "@remix-run/react";
 import { AlertTriangle, Info, RefreshCw, ShieldAlert } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
 
@@ -24,28 +26,38 @@ const NAV = [
 export default function AppShell({ status, children }: { status: OkStatus; children: ReactNode }) {
   // How many Sign / Send buttons are on screen; the header offers to connect only while some are.
   const [walletOffers, setWalletOffers] = useState(0);
+  // A new root status landed: it answers any request to read it again, and its age starts now.
+  useEffect(() => noteStatusLanded(status), [status]);
+  // The log index finished: read the status again, for its log-history check against the index.
+  const { revalidate } = useRevalidator();
+  const readStatusAgain = useCallback(() => {
+    requestStatusRevalidation();
+    revalidate();
+  }, [revalidate]);
   return (
     <GovernanceContext.Provider value={status}>
-      <WalletOfferContext.Provider value={setWalletOffers}>
-        <div className="flex min-h-screen flex-col">
-          <a
-            href="#main-content"
-            className="sr-only z-50 rounded-lg bg-white px-4 py-3 font-semibold text-brand-700 focus:not-sr-only focus:fixed focus:top-2 focus:left-4"
-          >
-            Skip to content
-          </a>
-          <Header status={status} offerWallet={walletOffers > 0} />
-          <Banners status={status} />
-          <main
-            id="main-content"
-            tabIndex={-1}
-            className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:px-6 sm:py-8"
-          >
-            {children}
-          </main>
-          <Footer status={status} />
-        </div>
-      </WalletOfferContext.Provider>
+      <IndexProgressProvider initial={status.sync.index} onSettled={readStatusAgain}>
+        <WalletOfferContext.Provider value={setWalletOffers}>
+          <div className="flex min-h-screen flex-col">
+            <a
+              href="#main-content"
+              className="sr-only z-50 rounded-lg bg-white px-4 py-3 font-semibold text-brand-700 focus:not-sr-only focus:fixed focus:top-2 focus:left-4"
+            >
+              Skip to content
+            </a>
+            <Header status={status} offerWallet={walletOffers > 0} />
+            <Banners status={status} />
+            <main
+              id="main-content"
+              tabIndex={-1}
+              className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:px-6 sm:py-8"
+            >
+              {children}
+            </main>
+            <Footer status={status} />
+          </div>
+        </WalletOfferContext.Provider>
+      </IndexProgressProvider>
     </GovernanceContext.Provider>
   );
 }
@@ -82,9 +94,9 @@ function Header({ status, offerWallet }: { status: OkStatus; offerWallet: boolea
           ))}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          <IndexingPill />
           <span
             className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-2 font-semibold text-navy-800 text-xs"
-            title={`Block ${latestBlock.number} via your RPC`}
             data-testid="network-pill"
           >
             <span
@@ -94,9 +106,7 @@ function Header({ status, offerWallet }: { status: OkStatus; offerWallet: boolea
               )}
             />
             {network.label}
-            <span className="hidden font-mono text-slate-700 lg:inline">
-              #{formatNumber(latestBlock.number)}
-            </span>
+            <BlockAge block={latestBlock} />
           </span>
           <RefreshButton />
           <ConnectButton offer={offerWallet} />
@@ -106,24 +116,29 @@ function Header({ status, offerWallet }: { status: OkStatus; offerWallet: boolea
   );
 }
 
-/** Drops cached Safe and chain answers, then reloads the page data. */
+/**
+ * Drops cached Safe and chain answers, then reloads the page data. The router reloads it once,
+ * by itself, after the POST, and the fetcher stays busy until that pass is done; a second
+ * revalidate() here would load everything again. The click also asks for the root status
+ * (see revalidation.ts), so a navigation that cuts that reload short still reads it.
+ */
 export function RefreshButton() {
   const fetcher = useFetcher<{ refreshed: boolean }>();
-  const revalidator = useRevalidator();
   useEffect(() => {
-    if (fetcher.state === "idle" && fetcher.data) {
-      revalidator.revalidate();
-      if (!fetcher.data.refreshed) toast("Refreshed less than 10 s ago; showing cached Safe data.");
-    }
-  }, [fetcher.state, fetcher.data, revalidator.revalidate]);
-  const busy = fetcher.state !== "idle" || revalidator.state !== "idle";
+    if (fetcher.state === "idle" && fetcher.data && !fetcher.data.refreshed)
+      toast("Refreshed less than 10 s ago; showing cached Safe data.");
+  }, [fetcher.state, fetcher.data]);
+  const busy = fetcher.state !== "idle";
   return (
     <Button
       variant="ghost"
       size="icon"
       aria-label="Refresh data"
       title="Fetch Safe signatures and chain state again"
-      onClick={() => fetcher.submit(null, { method: "POST", action: $path("/resources/refresh") })}
+      onClick={() => {
+        requestStatusRevalidation();
+        fetcher.submit(null, { method: "POST", action: $path("/resources/refresh") });
+      }}
       disabled={busy}
     >
       <RefreshCw className={cn(busy && "animate-spin")} />
