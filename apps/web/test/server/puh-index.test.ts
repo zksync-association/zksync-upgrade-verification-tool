@@ -1,7 +1,8 @@
-import { clearCache } from "@/.server/cache";
+import { clearCache, invalidate } from "@/.server/cache";
 import { IndexClosed } from "@/.server/chain/log-index";
 import { IndexIntegrityError, puhIndex } from "@/.server/chain/puh-index";
-import { resetRpcClients } from "@/.server/rpc";
+import { getLogs, resetLogCaches } from "@/.server/logs";
+import { l1, resetRpcClients } from "@/.server/rpc";
 import { type Address, type Hex, toEventSelector } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -237,4 +238,49 @@ it("reads ids case-insensitively", async () => {
   const first = history.upgrades[0] as (typeof history.upgrades)[number];
   const upper = `0x${first.id.slice(2).toUpperCase()}` as Hex;
   expect((await puhIndex().single("UpgradeStarted", upper))?.args._id).toBe(first.id);
+});
+
+it("marks each event final only when the index answered it from its final range", async () => {
+  const id = `0x${"cd".repeat(32)}` as Hex;
+  const history = puhHistory(DEPLOY, FINAL);
+  const { chain } = upstream({
+    logs: [
+      ...history.logs,
+      { blockNumber: FINAL + 10n, logIndex: 0, topics: [PUH_TOPICS.EmergencyUpgradeExecuted, id] },
+    ],
+  });
+  const events = await puhIndex().events("EmergencyUpgradeExecuted");
+  expect(events).toHaveLength(21);
+  expect(events.slice(0, 20).every((event) => event.final)).toBe(true);
+  // Read from the tail (F, head]: it may still be reorged away.
+  expect(events[20]).toMatchObject({ args: { _id: id }, final: false });
+
+  // The boundary passes it: the next answer promotes it from a fresh read and calls it final.
+  chain.options.head = { number: HEAD + 40n };
+  chain.options.finalized = FINAL + 32n;
+  invalidate("latest-block");
+  expect(await puhIndex().single("EmergencyUpgradeExecuted", id)).toMatchObject({
+    log: { blockNumber: FINAL + 10n },
+    final: true,
+  });
+});
+
+it("starts the history lane's other scans at the cap the index learned", async () => {
+  resetLogCaches();
+  const { chain } = upstream();
+  await puhIndex().startBackfill();
+  expect(puhIndex().status().span).toBe("10000");
+  const before = chain.queries.length;
+  // A fallback topic scan on the same lane: no probe the RPC refuses first.
+  const logs = await getLogs(
+    l1,
+    { address: PUH, topics: [PUH_TOPICS.UpgradeStarted] },
+    DEPLOY,
+    FINAL,
+    { safeHead: FINAL }
+  );
+  expect(logs).toHaveLength(16);
+  const scans = chain.queries.slice(before);
+  expect(scans.length).toBeGreaterThan(400);
+  expect(scans.every((q) => q.to - q.from <= 10_000n)).toBe(true);
 });

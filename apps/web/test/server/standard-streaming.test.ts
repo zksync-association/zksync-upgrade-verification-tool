@@ -1,5 +1,8 @@
+import { clearCache } from "@/.server/cache";
+import { type UpgradeProposal, upgradeProposalId } from "@/common/proposal";
 import { type buildTypedData, governanceHashes } from "@/common/typed-data";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
+import { zeroAddress } from "viem";
 import { beforeEach, expect, it, vi } from "vitest";
 import { APPROVAL_TX, MAINNET, TRANSACTIONS, UPGRADE_ID } from "../support/fixtures";
 
@@ -9,10 +12,32 @@ const state = vi.hoisted(() => ({
   verified: 0,
   discovery: Promise.resolve(null) as Promise<null>,
   execution: Promise.resolve() as Promise<void>,
+  lookups: [] as string[],
+}));
+
+// The upgrade's start, Security Council approval (block 201, APPROVAL_TX) and execution come
+// from the handler's log index.
+const PROPOSAL: UpgradeProposal = { calls: [], executor: zeroAddress, salt: UPGRADE_ID };
+const ID = upgradeProposalId(PROPOSAL);
+vi.mock("@/.server/chain/puh-index", async (original) => ({
+  ...(await original<typeof import("@/.server/chain/puh-index")>()),
+  puhIndex: () => ({
+    single: async (name: string, id: string) => {
+      state.lookups.push(name);
+      if (name === "UpgradeStarted")
+        return {
+          args: { _id: id, _proposal: PROPOSAL },
+          log: { blockNumber: 100n, transactionHash: APPROVAL_TX },
+        };
+      if (name === "UpgradeExecuted") await state.execution;
+      return { args: { _id: id }, log: { blockNumber: 201n, transactionHash: APPROVAL_TX } };
+    },
+  }),
 }));
 
 vi.mock("@/.server/rpc", () => ({
   network: async () => ({ isDevNode: true }),
+  safeBlockNumber: async () => -1n,
   l1: {
     getTransaction: async () => TRANSACTIONS[APPROVAL_TX],
     readContract: async ({
@@ -55,30 +80,18 @@ vi.mock("@/.server/governance", () => ({
   }),
 }));
 
-vi.mock("@/.server/cache", () => ({
-  cached: async (key: string, _ttl: number, compute: () => Promise<unknown>) =>
-    key.startsWith("started:")
-      ? {
-          id: UPGRADE_ID,
-          idMatches: true,
-          txHash: APPROVAL_TX,
-          blockNumber: "100",
-          proposal: {
-            calls: [],
-            salt: UPGRADE_ID,
-            executor: "0x0000000000000000000000000000000000000000",
-          },
-        }
-      : compute(),
+vi.mock("@/.server/logs", async (original) => ({
+  ...(await original<typeof import("@/.server/logs")>()),
+  findBlockByTimestamp: async () => {
+    throw new Error("no timestamp search with the log index");
+  },
+  getLogs: async () => {
+    throw new Error("no log scan with the log index");
+  },
 }));
-vi.mock("@/.server/logs", () => ({ findBlockByTimestamp: async () => 200n }));
 vi.mock("@/.server/flows/l2", () => ({ findL2ProposalForUpgrade: async () => state.discovery }));
 vi.mock("@/.server/flows/common", async (original) => ({
   ...(await original<typeof import("@/.server/flows/common")>()),
-  eventsWithId: async (_address: unknown, _abi: unknown, name: string) => {
-    if (name === "UpgradeExecuted") await state.execution;
-    return [{ log: { transactionHash: APPROVAL_TX, blockNumber: 201n } }];
-  },
   hasArchiveState: async () => true,
   executionFor: async () => null,
 }));
@@ -106,6 +119,8 @@ const { getStandardUpgradeOverview, loadStandardUpgrade, getStandardUpgrade } = 
 );
 let release: () => void;
 beforeEach(() => {
+  clearCache();
+  state.lookups = [];
   state.discovery = Promise.resolve(null);
   state.execution = Promise.resolve();
   state.verified = 0;
@@ -124,7 +139,7 @@ it("shows the core and finishes signature checks while L2 discovery and executio
   state.execution = new Promise((resolve) => {
     releaseExecution = resolve;
   });
-  const loading = await loadStandardUpgrade(UPGRADE_ID);
+  const loading = await loadStandardUpgrade(ID);
   expect(loading.overview.started.idMatches).toBe(true);
   expect(loading.overview).not.toHaveProperty("l2Proposal");
   release();
@@ -133,6 +148,12 @@ it("shows the core and finishes signature checks while L2 discovery and executio
   releaseL2();
   releaseExecution();
   await Promise.all([loading.l2Proposal, loading.execution]);
+  // Every event came from the log index (the log scan and timestamp search mocks throw).
+  expect(state.lookups.sort()).toEqual([
+    "UpgradeApprovedBySecurityCouncil",
+    "UpgradeExecuted",
+    "UpgradeStarted",
+  ]);
 });
 
 it("keeps JSON waiting for execution and L2 discovery after signatures finish", async () => {
@@ -145,7 +166,7 @@ it("keeps JSON waiting for execution and L2 discovery after signatures finish", 
     releaseExecution = resolve;
   });
   let finished = false;
-  const full = getStandardUpgrade(UPGRADE_ID).then((detail) => {
+  const full = getStandardUpgrade(ID).then((detail) => {
     finished = true;
     return detail;
   });
@@ -160,7 +181,7 @@ it("keeps JSON waiting for execution and L2 discovery after signatures finish", 
 });
 
 it("loads proposal data without starting Safe verification", async () => {
-  const overview = await getStandardUpgradeOverview(UPGRADE_ID);
+  const overview = await getStandardUpgradeOverview(ID);
   expect(overview.state).toBe(UPGRADE_STATES.Done);
   expect(overview.started.idMatches).toBe(true);
   expect(state.verified).toBe(0);
@@ -168,7 +189,7 @@ it("loads proposal data without starting Safe verification", async () => {
 });
 
 it("re-checks recorded approvals while current signature checks are still pending", async () => {
-  const loading = await loadStandardUpgrade(UPGRADE_ID);
+  const loading = await loadStandardUpgrade(ID);
   let finished = false;
   const full = loading.sets.then(() => {
     finished = true;
@@ -185,7 +206,7 @@ it("re-checks recorded approvals while current signature checks are still pendin
 
 it("keeps the JSON engine waiting for verified sets and Safe comparisons", async () => {
   let finished = false;
-  const full = getStandardUpgrade(UPGRADE_ID).then((detail) => {
+  const full = getStandardUpgrade(ID).then((detail) => {
     finished = true;
     return detail;
   });

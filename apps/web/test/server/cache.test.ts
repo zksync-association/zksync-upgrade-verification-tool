@@ -57,3 +57,61 @@ it("retries rejected reads and disables caching for zero TTL", async () => {
   expect(await cached("fork", 0, async () => ++count)).toBe(1);
   expect(await cached("fork", 0, async () => ++count)).toBe(2);
 });
+
+it("keeps a result only for the TTL it reports once it arrives", async () => {
+  const { cachedUntil } = await import("@/.server/cache");
+  let resolve!: (value: { value: number; ttlMs: number }) => void;
+  const compute = vi.fn(
+    () =>
+      new Promise<{ value: number; ttlMs: number }>((done) => {
+        resolve = done;
+      })
+  );
+  // Concurrent callers share the read in flight, whatever its TTL turns out to be.
+  const first = cachedUntil("fact", compute);
+  expect(cachedUntil("fact", compute)).toBe(first);
+  resolve({ value: 1, ttlMs: 0 });
+  expect(await first).toBe(1);
+  // A TTL of 0 (e.g. above the finality boundary) keeps nothing.
+  const second = cachedUntil("fact", compute);
+  expect(compute).toHaveBeenCalledTimes(2);
+  resolve({ value: 2, ttlMs: Number.POSITIVE_INFINITY });
+  expect(await second).toBe(2);
+  await vi.advanceTimersByTimeAsync(10 ** 9);
+  expect(await cachedUntil("fact", compute)).toBe(2);
+  expect(compute).toHaveBeenCalledTimes(2);
+
+  await expect(
+    cachedUntil("broken", async () => {
+      throw new Error("offline");
+    })
+  ).rejects.toThrow("offline");
+  expect(await cachedUntil("broken", async () => ({ value: 3, ttlMs: 1000 }))).toBe(3);
+});
+
+it("seeds a known value without waiting on, joining or replacing a live entry", async () => {
+  const { cachedUntil, seed } = await import("@/.server/cache");
+  let reject!: (error: Error) => void;
+  const inFlight = cachedUntil(
+    "start",
+    () =>
+      new Promise<{ value: number; ttlMs: number }>((_, fail) => {
+        reject = fail;
+      })
+  );
+  // Another caller's read is in flight: the seed leaves it alone and returns at once.
+  seed("start", 5, Number.POSITIVE_INFINITY);
+  expect(cachedUntil("start", async () => ({ value: 9, ttlMs: 1000 }))).toBe(inFlight);
+  reject(new Error("still backfilling"));
+  await expect(inFlight).rejects.toThrow("still backfilling");
+  // Once that read is gone, the seed takes and later reads use it.
+  seed("start", 5, Number.POSITIVE_INFINITY);
+  const compute = vi.fn(async () => ({ value: 9, ttlMs: 1000 }));
+  expect(await cachedUntil("start", compute)).toBe(5);
+  expect(compute).not.toHaveBeenCalled();
+  // A live value is never replaced; a TTL <= 0 stores nothing.
+  seed("start", 6, Number.POSITIVE_INFINITY);
+  expect(await cachedUntil("start", compute)).toBe(5);
+  seed("nothing", 1, 0);
+  expect(await cachedUntil("nothing", compute)).toBe(9);
+});

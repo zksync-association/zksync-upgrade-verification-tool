@@ -38,6 +38,48 @@ export function cached<T>(key: string, ttlMs: number, compute: () => Promise<T>)
   return value;
 }
 
+/**
+ * Like cached(), for a result whose lifetime is known only once it arrives: a fact read at or
+ * below the finality boundary is kept for good, the same fact read above it not at all. The
+ * compute returns the value and its TTL; a TTL <= 0 drops the entry once it resolves (concurrent
+ * callers still share the read in flight). Rejections are never cached.
+ */
+export function cachedUntil<T>(
+  key: string,
+  compute: () => Promise<{ value: T; ttlMs: number }>
+): Promise<T> {
+  const hit = store.get(key) as Entry<T> | undefined;
+  if (hit && hit.expiresAt > Date.now()) return hit.value;
+
+  const result = compute();
+  const value = result.then((r) => r.value);
+  const entry = { value, expiresAt: FOREVER };
+  store.set(key, entry);
+  result.then(
+    ({ ttlMs }) => {
+      if (store.get(key) !== entry) return;
+      if (ttlMs > 0) entry.expiresAt = Date.now() + ttlMs;
+      else store.delete(key);
+    },
+    () => {
+      if (store.get(key) === entry) store.delete(key);
+    }
+  );
+  return value;
+}
+
+/**
+ * Stores a value already in hand under `key` for `ttlMs`, unless a live entry (resolved or still
+ * in flight) is there. Never waits on, joins or replaces that entry, so the caller's result never
+ * depends on another caller's read.
+ */
+export function seed<T>(key: string, value: T, ttlMs: number) {
+  if (ttlMs <= 0) return;
+  const hit = store.get(key);
+  if (hit && hit.expiresAt > Date.now()) return;
+  store.set(key, { value: Promise.resolve(value), expiresAt: Date.now() + ttlMs });
+}
+
 export function invalidate(prefix: string) {
   for (const key of store.keys()) {
     if (key.startsWith(prefix)) {

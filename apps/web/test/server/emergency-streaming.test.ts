@@ -18,11 +18,25 @@ const state = vi.hoisted(() => ({
   current: 6,
   checks: [] as { address: string; args: string[]; blockNumber: bigint }[],
   scans: vi.fn(),
+  times: vi.fn(),
   verified: 0,
   history: Promise.resolve() as Promise<void>,
   messages: Promise.resolve({ groups: [], errors: [], anomalies: 0 }) as Promise<Collected>,
   discovery: vi.fn(),
 }));
+// Executed emergency upgrades in the handler's log index: block → id. Blocks are 12 s apart from
+// timestamp 1,700,000,000 except one missed slot; the head is HEAD.
+const HEAD = { number: 26_128_706n, timestamp: 1_700_000_000n + 26_128_706n * 12n + 12n };
+const blockTime = (n: bigint) => 1_700_000_000n + n * 12n + (n > 26_100_000n ? 12n : 0n);
+const WEEK = 7n * 24n * 3600n;
+const EXECUTED: [bigint, `0x${string}`][] = [
+  [21_800_000n, `0x${"e1".repeat(32)}`],
+  [25_766_164n, `0x${"e2".repeat(32)}`],
+  // Just before and exactly at the 7-day cut.
+  [26_078_306n, `0x${"e3".repeat(32)}`],
+  [26_078_307n, `0x${"e4".repeat(32)}`],
+  [26_128_700n, `0x${"e5".repeat(32)}`],
+];
 const boardDomain = {
   name: "EmergencyUpgradeBoard",
   version: "1",
@@ -43,13 +57,33 @@ vi.mock("@/.server/governance", () => ({
     },
   }),
 }));
+vi.mock("@/.server/chain/puh-index", () => ({
+  puhIndex: () => ({
+    events: async (name: string, query?: { fromBlock?: bigint }) => {
+      state.scans(name, query);
+      await state.history;
+      return EXECUTED.filter(([blockNumber]) => blockNumber >= (query?.fromBlock ?? 0n)).map(
+        ([blockNumber, id]) => ({
+          args: { _id: id },
+          log: { blockNumber, transactionHash: `0x${blockNumber.toString(16).padStart(64, "0")}` },
+          final: true,
+        })
+      );
+    },
+  }),
+}));
 vi.mock("@/.server/rpc", () => ({
   network: async () => ({
-    isDevNode: true,
+    isDevNode: false,
     upgradeHandler: MAINNET.upgradeHandler,
     upgradeHandlerDeployBlock: 21_788_382n,
+    blockTimeSeconds: 12,
   }),
-  latestBlock: async () => ({ number: 26_128_706n, timestamp: 1_791_154_800n }),
+  latestBlock: async () => HEAD,
+  blockTimestamps: async (numbers: bigint[]) => {
+    state.times(numbers);
+    return new Map(numbers.map((n) => [n, blockTime(n)]));
+  },
   l1: {
     getTransaction: async () => TRANSACTIONS[EMERGENCY_TX],
     readContract: async (params: {
@@ -81,11 +115,11 @@ vi.mock("@/.server/flows/common", async (original) => ({
 }));
 vi.mock("@/.server/flows/messages", () => ({ collectMessages: async () => state.messages }));
 vi.mock("@/.server/logs", () => ({
-  findBlockByTimestamp: async () => 26_078_306n,
-  getLogs: async (_client: unknown, filter: unknown, from: bigint, to: bigint) => {
-    state.scans(filter, from, to);
-    await state.history;
-    return [];
+  findBlockByTimestamp: async () => {
+    throw new Error("no timestamp search with the log index");
+  },
+  getLogs: async () => {
+    throw new Error("no log scan with the log index");
   },
 }));
 vi.mock("@/.server/signatures", async (original) => ({
@@ -123,6 +157,7 @@ beforeEach(() => {
   state.verified = 0;
   state.discovery.mockClear();
   state.scans.mockClear();
+  state.times.mockClear();
   state.history = Promise.resolve();
   state.messages = Promise.resolve({ groups: [], errors: [], anomalies: 0 });
   state.signatures = new Promise((resolve) => {
@@ -211,14 +246,30 @@ it("classifies pending IDs from current state without waiting for execution hist
   expect(pending.errors).toEqual(["One Safe unavailable"]);
   expect(pending.anomalies).toBe(2);
   await vi.waitFor(() => expect(state.scans).toHaveBeenCalledTimes(1));
-  expect(state.scans.mock.calls[0]?.slice(1)).toEqual([26_078_306n, 26_128_706n]);
+  // Recent index coverage only (twice 7 days of 12 s slots), cut at head − 7 days by timestamp.
+  expect(state.scans.mock.calls[0]).toEqual([
+    "EmergencyUpgradeExecuted",
+    { fromBlock: HEAD.number - (2n * WEEK) / 12n },
+  ]);
   releaseHistory();
-  await loading.executed;
+  const executed = await loading.executed;
+  const cutoff = HEAD.timestamp - WEEK;
+  expect(blockTime(26_078_306n)).toBeLessThan(cutoff);
+  expect(blockTime(26_078_307n)).toBe(cutoff);
+  expect(executed.map((e) => e.executed?.blockNumber)).toEqual(["26128700", "26078307"]);
+  expect(executed.map((e) => e.id)).toEqual([`0x${"e5".repeat(32)}`, `0x${"e4".repeat(32)}`]);
+  // Newest first, one batch of headers.
+  expect(state.times).toHaveBeenCalledTimes(1);
   release();
 });
 
 it("retains deployment-to-head history for the JSON list", async () => {
-  await listEmergencyUpgrades();
-  expect(state.scans.mock.calls[0]?.slice(1)).toEqual([21_788_382n, 26_128_706n]);
+  const list = await listEmergencyUpgrades();
+  expect(state.scans.mock.calls[0]).toEqual(["EmergencyUpgradeExecuted", undefined]);
+  expect(list.executed.map((e) => e.executed?.blockNumber)).toEqual(
+    EXECUTED.map(([block]) => block.toString()).reverse()
+  );
+  // Every execution, without reading a header.
+  expect(state.times).not.toHaveBeenCalled();
   release();
 });

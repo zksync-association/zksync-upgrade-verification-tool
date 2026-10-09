@@ -7,9 +7,10 @@ import {
   createPublicClient,
   hexToBigInt,
   isHex,
+  numberToHex,
 } from "viem";
 import { zksync } from "viem/chains";
-import { FOREVER, cached } from "./cache";
+import { FOREVER, cached, cachedUntil, invalidate } from "./cache";
 import { type Lane, RpcError, createLane } from "./chain/jsonrpc";
 import { type LimitedHttpOptions, limitedHttp } from "./rpc-transport";
 
@@ -243,6 +244,34 @@ export async function safeBlockNumber(): Promise<bigint> {
   return (await chainHead()).safe;
 }
 
+/** Drops the cached head, so the next read asks the node for its newest block. */
+export function refreshHead() {
+  invalidate("latest-block");
+}
+
+/**
+ * Timestamps of L1 blocks, read together (the call lane sends them as one JSON-RPC batch). A
+ * block at or below the finality boundary never changes, so its timestamp is kept for good (not
+ * on dev nodes, which can be rewound).
+ */
+export async function blockTimestamps(numbers: readonly bigint[]): Promise<Map<bigint, bigint>> {
+  const unique = [...new Set(numbers)];
+  if (unique.length === 0) return new Map();
+  const [net, { safe }] = await Promise.all([network(), chainHead()]);
+  const times = await Promise.all(
+    unique.map((n) =>
+      cachedUntil(`block-ts:${net.chainId}:${n}`, async () => {
+        const block = toBlockRef(
+          await lanes().call.request("eth_getBlockByNumber", [numberToHex(n), false])
+        );
+        if (!block || block.number !== n) throw new Error(`The RPC returned no block ${n}`);
+        return { value: block.timestamp, ttlMs: !net.isDevNode && n <= safe ? FOREVER : 0 };
+      })
+    )
+  );
+  return new Map(unique.map((n, i) => [n, times[i] as bigint]));
+}
+
 // Raw JSON-RPC lanes (chain/jsonrpc.ts). `history` carries eth_getLogs backfills, `call` the
 // eth_call/eth_getCode verdict reads. Each lane batches and adapts on its own, so a backfill never
 // queues ahead of a page's reads.
@@ -276,6 +305,17 @@ export async function l2HistoryLane(): Promise<Lane | null> {
     ? createLane({ url: l2RpcUrl, label: "l2-history", maxBatch: 20, maxInFlight: 4 })
     : null;
   return l2History;
+}
+
+/**
+ * The eth_getLogs lane behind a client from this module (`l1`, or the client `l2()` made), so
+ * log scans batch on their own lane instead of the client's shared transport. null for any
+ * other client.
+ */
+export async function historyLaneOf(client: unknown): Promise<Lane | null> {
+  if (client === l1) return lanes().history;
+  if (client && client === l2Client) return l2HistoryLane();
+  return null;
 }
 
 /** Bumped by every settings change. Results computed under an older generation are stale. */

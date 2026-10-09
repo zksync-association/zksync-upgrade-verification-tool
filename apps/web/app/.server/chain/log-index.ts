@@ -19,6 +19,13 @@ export type IndexHead = { head: { number: bigint; hash: Hex }; safe: bigint };
 /** A log the index accepted: mined, from the indexed address, inside the range it was read for. */
 export type IndexedLog = Log<bigint, number, false>;
 
+/**
+ * A query's answer and the boundary it was given at: every log at or below `finalTo` came from
+ * the final range (read at or below the finality boundary, never from an older tail), so it never
+ * changes; a log above it is from this head's tail and may still be reorged away.
+ */
+export type IndexRead = { logs: IndexedLog[]; finalTo: bigint };
+
 export type IndexState = "idle" | "backfilling" | "ready" | "unavailable";
 
 export type IndexStatus = {
@@ -79,6 +86,8 @@ export type LogIndexOptions = {
   retryDelayMs?: number;
   /** After a failed backfill, queries report it for this long before trying again. */
   retryMs?: number;
+  /** Told the block range cap the provider named ("range N exceeds limit of M"), once adopted. */
+  onCap?: (cap: bigint) => void;
 };
 
 export interface LogIndex {
@@ -95,6 +104,8 @@ export interface LogIndex {
   finalRange(): { from: bigint; to: bigint } | null;
   /** Every log in [fromBlock, toBlock], complete, ordered by (blockNumber, logIndex). */
   logs(query?: LogQuery): Promise<IndexedLog[]>;
+  /** As logs(), with the finality boundary the answer was given at (see IndexRead). */
+  read(query?: LogQuery): Promise<IndexRead>;
   /** Drops everything; later results are discarded and queries fail. */
   close(): void;
 }
@@ -316,6 +327,7 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     if (spanIsCap && span !== null && span <= cap) return;
     span = cap;
     spanIsCap = true;
+    if (current()) options.onCap?.(cap);
   }
 
   /**
@@ -759,7 +771,7 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     });
   }
 
-  async function logs(query: LogQuery = {}): Promise<IndexedLog[]> {
+  async function read(query: LogQuery = {}): Promise<IndexRead> {
     ensureCurrent();
     const from = max(query.fromBlock ?? deployBlock, deployBlock);
     const observed = await options.head();
@@ -772,7 +784,7 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
       if (!recent) void startBackfill();
     }
     const to = query.toBlock;
-    if (to !== undefined && to < from) return [];
+    if (to !== undefined && to < from) return { logs: [], finalTo: top };
     // The coverage wait also ends when the tail read fails, so its timer never outlives the query.
     const stop = new AbortController();
     const forward = () => stop.abort(query.signal?.reason ?? new Error("aborted"));
@@ -799,7 +811,8 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     for (const log of own?.logs ?? [])
       if (log.blockNumber > top && log.blockNumber >= from && log.blockNumber <= upper)
         out.push(log);
-    return out;
+    // `final` holds only logs at or below `top`; the tail part only logs above it.
+    return { logs: out, finalTo: top };
   }
 
   return {
@@ -807,7 +820,8 @@ export function createLogIndex(options: LogIndexOptions): LogIndex {
     address,
     deployBlock,
     startBackfill,
-    logs,
+    logs: async (query) => (await read(query)).logs,
+    read,
     finalRange: () => (anchored && bottom <= top ? { from: bottom, to: top } : null),
     status(): IndexStatus {
       const state: IndexState = failure

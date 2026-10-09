@@ -28,6 +28,8 @@ export type FakeChainOptions = {
   head?: { number: bigint; hash?: Hex; timestamp?: bigint };
   /** null: the node does not know the 'finalized' tag. */
   finalized?: bigint | null;
+  /** Block timestamps (default: 12 s per block from 1,700,000,000). */
+  timestampOf?: (n: bigint) => bigint;
 };
 
 export const blockHash = (n: bigint, salt = 0) =>
@@ -70,13 +72,17 @@ export function fakeChain(options: FakeChainOptions) {
       if (call.method === "eth_getBlockByNumber") {
         const tag = call.params[0];
         const head = options.head ?? { number: 0n };
-        if (tag === "latest") return rawBlock(head.number, head.hash, head.timestamp);
+        const time = (n: bigint) => options.timestampOf?.(n);
+        if (tag === "latest")
+          return rawBlock(head.number, head.hash, head.timestamp ?? time(head.number));
         if (tag === "finalized") {
           if (options.finalized === null)
             return new FakeRpcError(-32602, "invalid block tag: finalized");
-          return rawBlock(options.finalized ?? head.number - 80n);
+          const n = options.finalized ?? head.number - 80n;
+          return rawBlock(n, undefined, time(n));
         }
-        return rawBlock(BigInt(tag as string));
+        const n = BigInt(tag as string);
+        return rawBlock(n, undefined, time(n));
       }
       if (call.method !== "eth_getLogs") return new FakeRpcError(-32601, "method not found");
       const filter = call.params[0] as Record<string, unknown>;
@@ -89,12 +95,23 @@ export function fakeChain(options: FakeChainOptions) {
       if (options.cap !== undefined && to - from > options.cap)
         return new FakeRpcError(-32602, `range ${to - from} exceeds limit of ${options.cap}`);
       const address = String(filter.address).toLowerCase();
+      // Topic positions as eth_getLogs reads them: null matches anything, a list is an OR.
+      const topics = (filter.topics ?? []) as (string | string[] | null)[];
+      const matches = (log: ChainLog) =>
+        topics.every((wanted, i) => {
+          if (wanted === null) return true;
+          const actual = log.topics[i]?.toLowerCase();
+          return (Array.isArray(wanted) ? wanted : [wanted]).some(
+            (t) => t.toLowerCase() === actual
+          );
+        });
       return options.logs
         .filter(
           (log) =>
             log.blockNumber >= from &&
             log.blockNumber <= to &&
-            (log.address ?? options.address).toLowerCase() === address
+            (log.address ?? options.address).toLowerCase() === address &&
+            matches(log)
         )
         .map((log) => rawLog(options, log));
     },

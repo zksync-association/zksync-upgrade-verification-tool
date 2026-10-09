@@ -14,10 +14,19 @@ import {
 import { type ActionName, buildTypedData, governanceHashes } from "@/common/typed-data";
 import { UPGRADE_STATES, UPGRADE_STATE_LABELS, type UpgradeState } from "@/common/upgrade-states";
 import { type Address, type Hex, decodeEventLog, isAddressEqual, zeroAddress } from "viem";
-import { cached } from "../cache";
+import { FOREVER, cached, cachedUntil, seed } from "../cache";
+import { IndexIntegrityError, type PuhEvent, puhIndex } from "../chain/puh-index";
 import { type Governance, governance } from "../governance";
 import { findBlockByTimestamp, getLogs } from "../logs";
-import { l1, latestBlock, network, safeBlockNumber } from "../rpc";
+import {
+  type Network,
+  blockTimestamps,
+  l1,
+  latestBlock,
+  network,
+  refreshHead,
+  safeBlockNumber,
+} from "../rpc";
 import {
   type SignatureSet,
   isRevert,
@@ -37,6 +46,7 @@ import {
   hasArchiveState,
   topicOf,
 } from "./common";
+import { type Located, indexCannotAnswer, locateEvent } from "./indexed";
 import { findL2ProposalForUpgrade } from "./l2";
 import { defaultLogger } from "@config/log.server";
 
@@ -99,13 +109,13 @@ export type StartedUpgrade = {
   txHash: Hex;
 };
 
-function decodeStarted(log: Awaited<ReturnType<typeof getLogs>>[number]): StartedUpgrade {
-  const { args } = decodeEventLog({
-    abi: upgradeHandlerAbi,
-    eventName: "UpgradeStarted",
-    data: log.data,
-    topics: log.topics,
-  });
+function startedFrom({
+  args,
+  log,
+}: {
+  args: PuhEvent<"UpgradeStarted">["args"];
+  log: { blockNumber: bigint | null; transactionHash: Hex | null };
+}): StartedUpgrade {
   const proposal = fromAbi(args._proposal);
   return {
     id: args._id,
@@ -115,6 +125,25 @@ function decodeStarted(log: Awaited<ReturnType<typeof getLogs>>[number]): Starte
     txHash: log.transactionHash as Hex,
   };
 }
+
+function decodeStarted(log: Awaited<ReturnType<typeof getLogs>>[number]): StartedUpgrade {
+  const { args } = decodeEventLog({
+    abi: upgradeHandlerAbi,
+    eventName: "UpgradeStarted",
+    data: log.data,
+    topics: log.topics,
+  });
+  return startedFrom({ args, log });
+}
+
+const startedKey = (id: Hex) => `started:${id.toLowerCase()}`;
+
+/**
+ * A start the index answered from its final range never changes; one from the unfinalized tail is
+ * read again, even once the boundary has passed it. Dev nodes can be rewound.
+ */
+const startedTtl = (event: { final: boolean }, net: Pick<Network, "isDevNode">) =>
+  !net.isDevNode && event.final ? FOREVER : 0;
 
 export type UpgradeSummary = StartedUpgrade & {
   state: UpgradeState;
@@ -133,19 +162,14 @@ export async function listStandardUpgrades({ allHistory }: { allHistory: boolean
     allHistory || windowStart < net.upgradeHandlerDeployBlock
       ? net.upgradeHandlerDeployBlock
       : windowStart;
-  const logs = await getLogs(
-    l1,
-    { address: net.upgradeHandler, topics: [topicOf(upgradeHandlerAbi, "UpgradeStarted")] },
-    from
-  );
+  // Complete from `from` to the head, or an error: never a partial list.
+  const events = await puhIndex().events("UpgradeStarted", { fromBlock: from });
   const upgrades = await Promise.all(
-    logs.map(async (log): Promise<UpgradeSummary> => {
-      const started = decodeStarted(log);
-      await cached(
-        `started:${started.id}`,
-        net.isDevNode ? 0 : Number.POSITIVE_INFINITY,
-        async () => started
-      );
+    events.map(async (event): Promise<UpgradeSummary> => {
+      const started = startedFrom(event);
+      // The detail page then needs no lookup for a final start. Only seeded: the list never
+      // waits on (or fails with) a detail lookup of the same id in flight.
+      seed(startedKey(started.id), started, startedTtl(event, net));
       const { state, status } = await readStatus(started.id);
       return {
         ...started,
@@ -165,7 +189,85 @@ export async function listStandardUpgrades({ allHistory }: { allHistory: boolean
   };
 }
 
-/** The UpgradeStarted event for `id`, found from the on-chain creation timestamp (no full scan). */
+/**
+ * The UpgradeStarted event for `id` from the handler's log index, kept for good once the index
+ * answers it from its final range; null when the complete index has none.
+ */
+function indexedStart(id: Hex): Promise<StartedUpgrade | null> {
+  return cachedUntil(startedKey(id), () => readStart(id));
+}
+
+async function readStart(id: Hex): Promise<{ value: StartedUpgrade | null; ttlMs: number }> {
+  const [net, event] = await Promise.all([network(), puhIndex().single("UpgradeStarted", id)]);
+  return event
+    ? { value: startedFrom(event), ttlMs: startedTtl(event, net) }
+    : { value: null, ttlMs: 0 };
+}
+
+/**
+ * The start of an upgrade the contract knows (creationTimestamp != 0). From the log index; the
+ * legacy lookup only when the index cannot answer. A complete index without the event is an
+ * error, never "not found".
+ */
+async function startedUpgrade(
+  id: Hex,
+  status: Status,
+  net: { isDevNode: boolean },
+  indexed: Promise<StartedUpgrade | null>
+): Promise<StartedUpgrade> {
+  let started: StartedUpgrade | null;
+  try {
+    started = await indexed;
+    if (!started) {
+      // The status may come from a newer block than the head the index answered at (the head
+      // is cached for 4 s): look once more at the newest head before calling the index wrong.
+      // Read directly, not through the cache, which could hand back another request's lookup
+      // still answering at the old head.
+      refreshHead();
+      const again = await readStart(id);
+      if (again.value) seed(startedKey(id), again.value, again.ttlMs);
+      started = again.value;
+    }
+  } catch (error) {
+    if (!indexCannotAnswer(error, net)) throw error;
+    started = await findStarted(id, status.creationTimestamp);
+    if (!started) {
+      // The contract knows the upgrade: an error (502), never "not found" (404).
+      throw new Error(
+        `Upgrade ${id} exists on-chain but its UpgradeStarted log was not returned by the RPC. Use an RPC that serves logs.`
+      );
+    }
+    return started;
+  }
+  if (started) return started;
+  throw await missingStart(id, status);
+}
+
+/** Why the complete index has no UpgradeStarted for an upgrade the contract knows. */
+async function missingStart(id: Hex, status: Status): Promise<Error> {
+  const index = puhIndex().status();
+  const created = BigInt(status.creationTimestamp);
+  if (index.finalizedTo !== null && index.deployBlock !== null) {
+    const final = BigInt(index.finalizedTo);
+    if (final >= BigInt(index.deployBlock)) {
+      const finalTime = (await blockTimestamps([final])).get(final);
+      // Created no later than a block the index holds as final: the log must be in it.
+      if (finalTime !== undefined && created <= finalTime) {
+        return new IndexIntegrityError(
+          `ProtocolUpgradeHandler reports upgrade ${id} as created at ${created}, at or before final block ${final}, but its complete log history from block ${index.deployBlock} has no UpgradeStarted event for it. The RPC's logs and state disagree.`
+        );
+      }
+    }
+  }
+  return new Error(
+    `Upgrade ${id} exists on-chain, but its UpgradeStarted log is not in the ProtocolUpgradeHandler logs up to block ${index.headTo ?? "?"} yet. Try again in a moment.`
+  );
+}
+
+/**
+ * Legacy lookup, when the log index cannot answer: the UpgradeStarted event for `id`, found from
+ * the on-chain creation timestamp (no full scan).
+ */
 async function findStarted(id: Hex, creationTimestamp: number): Promise<StartedUpgrade | null> {
   const net = await network();
   const head = await latestBlock();
@@ -271,6 +373,9 @@ export async function getStandardUpgradeOverview(id: Hex): Promise<StandardUpgra
 }
 
 export async function getStandardUpgradeCore(id: Hex): Promise<StandardUpgradeCore> {
+  // The start event is looked up while governance and the status are read.
+  const indexed = indexedStart(id);
+  void indexed.catch(() => {});
   const [gov, { state, status }] = await Promise.all([
     timedRead(id, "governance", governance),
     timedRead(id, "status", () => readStatus(id)),
@@ -279,15 +384,8 @@ export async function getStandardUpgradeCore(id: Hex): Promise<StandardUpgradeCo
     throw new UpgradeNotFound(`ProtocolUpgradeHandler has no standard upgrade ${id}`);
   }
   const started = await timedRead(id, "started-event", () =>
-    cached(`started:${id}`, gov.network.isDevNode ? 0 : Number.POSITIVE_INFINITY, () =>
-      findStarted(id, status.creationTimestamp)
-    )
+    startedUpgrade(id, status, gov.network, indexed)
   );
-  if (!started) {
-    throw new UpgradeNotFound(
-      `Upgrade ${id} exists on-chain but its UpgradeStarted log was not returned by the RPC. Use an RPC that serves logs.`
-    );
-  }
 
   const vetoDays = BigInt(
     status.guardiansExtendedLegalVeto ? 7 : gov.network.standardLegalVetoDays
@@ -326,14 +424,10 @@ async function getUpgradeExecution(d: StandardUpgradeCore) {
     execute = { ...execution, simulation: await simulateAs(execution, started.proposal.executor) };
   }
   if (state === UPGRADE_STATES.Done) {
-    const events = await eventsWithId(
-      gov.upgradeHandler,
-      upgradeHandlerAbi,
-      "UpgradeExecuted",
-      id,
-      BigInt(started.blockNumber)
+    const executed = await locateEvent("UpgradeExecuted", id, gov.network, () =>
+      legacyEvent(gov.upgradeHandler, "UpgradeExecuted", id, BigInt(started.blockNumber))
     );
-    executedTx = (events[0]?.log.transactionHash ?? null) as Hex | null;
+    executedTx = executed?.transactionHash ?? null;
   }
   return { execute, executedTx };
 }
@@ -350,7 +444,10 @@ function approvalSpecs(d: StandardUpgradeCore) {
     group: "securityCouncil" | "guardians";
     threshold: number;
     state: SetState;
-    event: string;
+    event:
+      | "UpgradeApprovedBySecurityCouncil"
+      | "UpgradeApprovedByGuardians"
+      | "UpgradeLegalVetoExtended";
   }[] = [
     {
       key: "securityCouncil",
@@ -416,26 +513,27 @@ async function getRecordedApprovals(d: StandardUpgradeCore): Promise<RecordedApp
         let historical: ApprovalSet["historical"] = null;
         let state = spec.state;
         if (spec.state.status === "done") {
-          // The Security Council approval time is on-chain, so its event is found without a scan.
-          const near =
-            spec.key === "securityCouncil" && status.securityCouncilApprovalTimestamp
-              ? await blockAt(status.securityCouncilApprovalTimestamp)
-              : null;
-          const events = await eventsWithId(
-            gov.upgradeHandler,
-            upgradeHandlerAbi,
-            spec.event,
-            id,
-            near ?? BigInt(started.blockNumber),
-            near === null ? undefined : near + 16n
-          );
-          const txHash = (events[0]?.log.transactionHash ?? null) as Hex | null;
+          const event = await locateEvent(spec.event, id, gov.network, async () => {
+            // The Security Council approval time is on-chain, so its event is found without a scan.
+            const near =
+              spec.key === "securityCouncil" && status.securityCouncilApprovalTimestamp
+                ? await blockAt(status.securityCouncilApprovalTimestamp)
+                : null;
+            return legacyEvent(
+              gov.upgradeHandler,
+              spec.event,
+              id,
+              near ?? BigInt(started.blockNumber),
+              near === null ? undefined : near + 16n
+            );
+          });
+          const txHash = event?.transactionHash ?? null;
           state = { ...spec.state, txHash };
           const call = txHash ? await callTo(txHash, contract.address) : null;
           const decoded = call ? decodeApprovalCall(call.data) : null;
-          if (decoded && txHash) {
+          if (decoded && event) {
             used = decoded;
-            const block = (events[0]?.log.blockNumber ?? 1n) - 1n;
+            const block = event.blockNumber - 1n;
             historical = await recheckAt(
               contract.address,
               {
@@ -524,6 +622,24 @@ async function recheck(
       error: revertReason(error),
     };
   }
+}
+
+/**
+ * Legacy lookup, when the log index cannot answer: an id's event by scanning [fromBlock, toBlock
+ * ?? head].
+ */
+async function legacyEvent(
+  handler: Address,
+  name: string,
+  id: Hex,
+  fromBlock: bigint,
+  toBlock?: bigint
+): Promise<Located | null> {
+  const events = await eventsWithId(handler, upgradeHandlerAbi, name, id, fromBlock, toBlock);
+  const log = events[0]?.log;
+  return log?.transactionHash && log.blockNumber !== null
+    ? { transactionHash: log.transactionHash, blockNumber: log.blockNumber }
+    : null;
 }
 
 async function blockAt(timestamp: number) {

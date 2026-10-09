@@ -8,6 +8,7 @@ import {
   encodeEventTopics,
   isAddressEqual,
 } from "viem";
+import { seedLogSpan } from "../logs";
 import { type Network, chainHead, lanes, network, rpcGeneration } from "../rpc";
 import { scrubText, secretsOf } from "./jsonrpc";
 import {
@@ -28,6 +29,12 @@ export type PuhEventName = ContractEventName<typeof upgradeHandlerAbi>;
 export type PuhEvent<N extends PuhEventName = PuhEventName> = {
   args: DecodeEventLogReturnType<typeof upgradeHandlerAbi, N>["args"];
   log: IndexedLog;
+  /**
+   * The index answered with this event from its final range (at or below the finality boundary
+   * at answer time), so it never changes and may be kept for good. False for an event from the
+   * unfinalized tail, even when the boundary has passed its block since.
+   */
+  final: boolean;
 };
 
 export type PuhIndexStatus = Omit<IndexStatus, "deployBlock"> & { deployBlock: string | null };
@@ -104,17 +111,20 @@ export class PuhIndex {
     ].join(":");
     if (this.#built?.key !== key) {
       this.#built?.index.close();
+      const history = lanes().history;
       this.#built = {
         key,
         net,
         index: createLogIndex({
           label: "ProtocolUpgradeHandler",
-          lane: lanes().history,
+          lane: history,
           address: net.upgradeHandler,
           deployBlock: net.upgradeHandlerDeployBlock,
           head: chainHead,
           isCurrent: this.#current,
           describeError: describe,
+          // Other scans on the same lane (logs.ts fallbacks) start at the provider's cap.
+          onCap: (cap) => seedLogSpan(history, cap),
         }),
       };
     }
@@ -149,7 +159,8 @@ export class PuhIndex {
     const topic0 = topicOf(name);
     const wanted = id?.toLowerCase();
     const out: PuhEvent<N>[] = [];
-    for (const log of await this.logs(query)) {
+    const { logs, finalTo } = await (await this.#index()).index.read(query);
+    for (const log of logs) {
       if (log.topics[0]?.toLowerCase() !== topic0) continue;
       if (wanted !== undefined && log.topics[1]?.toLowerCase() !== wanted) continue;
       const { args } = decodeEventLog({
@@ -158,7 +169,7 @@ export class PuhIndex {
         topics: log.topics,
         data: log.data,
       });
-      out.push({ args: args as PuhEvent<N>["args"], log });
+      out.push({ args: args as PuhEvent<N>["args"], log, final: log.blockNumber <= finalTo });
     }
     return out;
   }

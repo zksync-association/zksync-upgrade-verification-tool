@@ -16,9 +16,10 @@ import { type ActionName, buildTypedData, governanceHashes } from "@/common/type
 import { UPGRADE_STATES } from "@/common/upgrade-states";
 import { type Address, type Hex, decodeAbiParameters, decodeFunctionData, getAddress } from "viem";
 import { cached } from "../cache";
+import { type PuhEvent, puhIndex } from "../chain/puh-index";
 import { type Governance, governance } from "../governance";
 import { findBlockByTimestamp, getLogs } from "../logs";
-import { l1, latestBlock, network, safeBlockNumber } from "../rpc";
+import { type Network, blockTimestamps, l1, latestBlock, network } from "../rpc";
 import { type SignatureSet, isRevert, revertReason, verifySignatureSet } from "../signatures";
 import {
   type UsedSignature,
@@ -42,9 +43,50 @@ const EMERGENCY_ACTIONS = [
 
 type Executed = { id: Hex; txHash: Hex; blockNumber: bigint };
 
-/** Full history is opt-in for pages; the JSON list retains it by default. */
+// Headers read per round when cutting the recent window by timestamp (one JSON-RPC batch).
+const TIMESTAMP_BATCH = 20;
+
+/**
+ * Executed emergency upgrades, oldest first, from the handler's log index (complete from the
+ * deployment to the head, or an error). Full history is opt-in for pages; the JSON list retains
+ * it by default.
+ */
 async function executedEmergencies({ allHistory = true } = {}): Promise<Executed[]> {
   const net = await network();
+  if (net.isDevNode) return legacyExecutedEmergencies(net, allHistory);
+  const toExecuted = ({ args, log }: PuhEvent<"EmergencyUpgradeExecuted">): Executed => ({
+    id: args._id,
+    txHash: log.transactionHash,
+    blockNumber: log.blockNumber,
+  });
+  if (allHistory) return (await puhIndex().events("EmergencyUpgradeExecuted")).map(toExecuted);
+  // The recent window: executed in a block with timestamp >= head − 7 days. A slot holds at most
+  // one block, so those blocks are within the last 7 days / block time; twice that is asked of
+  // the index, so the window needs only recent coverage (not the whole backfill). The cut itself
+  // is by timestamp: the newest executions are read first, a batch at a time, until one is older.
+  const head = await latestBlock();
+  const recentSeconds = BigInt(EMERGENCY_RECENT_DAYS * 24 * 60 * 60);
+  const cutoff = head.timestamp - recentSeconds;
+  const below = head.number - (2n * recentSeconds) / BigInt(net.blockTimeSeconds);
+  const fromBlock = below > net.upgradeHandlerDeployBlock ? below : net.upgradeHandlerDeployBlock;
+  const executed = (await puhIndex().events("EmergencyUpgradeExecuted", { fromBlock })).map(
+    toExecuted
+  );
+  let end = executed.length;
+  while (end > 0) {
+    const start = Math.max(0, end - TIMESTAMP_BATCH);
+    const times = await blockTimestamps(executed.slice(start, end).map((e) => e.blockNumber));
+    for (let i = end - 1; i >= start; i--) {
+      const time = times.get((executed[i] as Executed).blockNumber) as bigint;
+      if (time < cutoff) return executed.slice(i + 1);
+    }
+    end = start;
+  }
+  return executed;
+}
+
+/** Dev nodes (which can be rewound) keep the direct scan from the recent window's first block. */
+async function legacyExecutedEmergencies(net: Network, allHistory: boolean): Promise<Executed[]> {
   const head = await latestBlock();
   const recentFrom = allHistory
     ? net.upgradeHandlerDeployBlock
@@ -53,7 +95,7 @@ async function executedEmergencies({ allHistory = true } = {}): Promise<Executed
         head.timestamp - BigInt(EMERGENCY_RECENT_DAYS * 24 * 60 * 60),
         net.upgradeHandlerDeployBlock,
         head.number,
-        net.isDevNode ? null : { key: String(net.chainId), safeHead: await safeBlockNumber() }
+        null
       );
   const logs = await getLogs(
     l1,

@@ -1,6 +1,16 @@
-import { LogsUnavailableError, findBlockByTimestamp, getLogs, merge } from "@/.server/logs";
+import {
+  LogsUnavailableError,
+  findBlockByTimestamp,
+  getLogs,
+  merge,
+  resetLogCaches,
+  seedLogSpan,
+} from "@/.server/logs";
+import { l1, lanes, resetRpcClients } from "@/.server/rpc";
 import { type PublicClient, numberToHex } from "viem";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fakeChain, spreadLogs } from "../support/fake-chain";
+import { fakeJsonRpc } from "../support/fake-jsonrpc";
 
 const ADDRESS = "0x0000000000000000000000000000000000000001";
 const TOPIC = `0x${"aa".repeat(32)}` as const;
@@ -117,11 +127,13 @@ describe("getLogs", () => {
       getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 0n, 10n, { safeHead: -1n });
     const first = scan();
     const second = scan();
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 5));
     expect(request).toHaveBeenCalledTimes(1);
     complete([]);
     await Promise.all([first, second]);
     const third = scan();
-    expect(request).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2));
     complete([]);
     await third;
   });
@@ -142,22 +154,40 @@ describe("getLogs", () => {
     expect(calls.length).toBeLessThanOrEqual(4 + 17);
   });
 
-  it("caches finalized ranges and only fetches the new tail afterwards", async () => {
-    const { client, calls } = fakeLogsClient({ logBlocks: [10n, 900n], maxRange: 1_000_000n });
-    await getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 0n, 1_000n, { safeHead: 800n });
-    expect(calls).toEqual([
-      [0n, 800n],
-      [801n, 1_000n],
-    ]);
-    calls.length = 0;
-    const logs = await getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 0n, 1_200n, {
-      safeHead: 1_100n,
+  it("caches finalized ranges and reads the newest gap and the tail as one range", async () => {
+    const { client, calls } = fakeLogsClient({
+      logBlocks: [10n, 900n, 1_150n],
+      maxRange: 1_000_000n,
     });
+    const filter: Parameters<typeof getLogs>[1] = { address: ADDRESS, topics: [TOPIC] };
+    expect(
+      (await getLogs(client, filter, 0n, 1_000n, { safeHead: 800n })).map((l) => l.blockNumber)
+    ).toEqual([10n, 900n]);
+    expect(calls).toEqual([[0n, 1_000n]]);
+    calls.length = 0;
+    const logs = await getLogs(client, filter, 0n, 1_200n, { safeHead: 1_100n });
+    expect(calls).toEqual([[801n, 1_200n]]);
+    expect(logs.map((l) => l.blockNumber)).toEqual([10n, 900n, 1_150n]);
+    // Only the finalized part was kept: the tail above 1,100 is read again.
+    calls.length = 0;
+    expect(
+      (await getLogs(client, filter, 0n, 1_200n, { safeHead: 1_100n })).map((l) => l.blockNumber)
+    ).toEqual([10n, 900n, 1_150n]);
+    expect(calls).toEqual([[1_101n, 1_200n]]);
+  });
+
+  it("keeps an older gap apart from the tail", async () => {
+    const { client, calls } = fakeLogsClient({ logBlocks: [50n, 650n], maxRange: 1_000_000n });
+    const filter: Parameters<typeof getLogs>[1] = { address: ADDRESS, topics: [TOPIC] };
+    await getLogs(client, filter, 100n, 600n, { safeHead: 600n });
+    calls.length = 0;
+    const logs = await getLogs(client, filter, 0n, 700n, { safeHead: 600n });
+    // [0, 99] is a gap below cached [100, 600]; the tail (600, 700] is not adjacent to it.
     expect(calls).toEqual([
-      [801n, 1_100n],
-      [1_101n, 1_200n],
+      [0n, 99n],
+      [601n, 700n],
     ]);
-    expect(logs.map((l) => l.blockNumber)).toEqual([10n, 900n]);
+    expect(logs.map((l) => l.blockNumber)).toEqual([50n, 650n]);
   });
 
   it("does not cache anything on dev nodes (safe head -1)", async () => {
@@ -191,6 +221,42 @@ describe("getLogs", () => {
       { from: 0n, to: 30n },
       { from: 40n, to: 50n },
     ]);
+  });
+});
+
+describe("getLogs on the app's L1 client", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function upstream() {
+    resetRpcClients();
+    resetLogCaches();
+    // Infura-like: to − from above 10,000 is refused with the cap named.
+    const chain = fakeChain({ address: ADDRESS, logs: spreadLogs(5, 0n, 99_999n), cap: 10_000n });
+    const fake = fakeJsonRpc({ handle: (call) => chain.handle(call) });
+    vi.stubGlobal("fetch", fake.fetch);
+    return { chain, fake };
+  }
+
+  it("sends chunks through the history lane, batched, after one probe", async () => {
+    const { chain, fake } = upstream();
+    const logs = await getLogs(l1, { address: ADDRESS, topics: [] }, 0n, 99_999n, {
+      safeHead: -1n,
+    });
+    expect(logs).toHaveLength(5);
+    // The refused probe, the first chunk alone, then the other nine in one POST.
+    expect(chain.ranges()).toHaveLength(11);
+    expect(fake.sizes()).toEqual([1, 1, 9]);
+    expect(lanes().history.stats().requests).toBe(11);
+  });
+
+  it("starts at a cap the log index already learned on the same lane", async () => {
+    const { chain, fake } = upstream();
+    seedLogSpan(lanes().history, 10_000n);
+    await getLogs(l1, { address: ADDRESS, topics: [] }, 0n, 99_999n, { safeHead: -1n });
+    expect(chain.ranges().every(([from, to]) => to - from + 1n <= 10_000n)).toBe(true);
+    expect(fake.sizes()).toEqual([1, 9]);
   });
 });
 
