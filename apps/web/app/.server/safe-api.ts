@@ -102,7 +102,7 @@ export function safeClientGeneration(): number {
   return clientGeneration;
 }
 
-let cooldown: { until: number; error: SafeApiError } | null = null;
+let cooldown: { until: number; error: SafeApiError; exhausted: boolean } | null = null;
 const failures = new Map<string, { until: number; error: SafeApiError }>();
 
 function checkCooldown() {
@@ -114,6 +114,11 @@ function checkCooldown() {
 /** When the current rate-limit / quota cooldown ends, or null when there is none. */
 export function safeCooldownUntil(): number | null {
   return cooldown && Date.now() < cooldown.until ? cooldown.until : null;
+}
+
+/** The current cooldown is for the service's monthly quota (used up), not a short rate limit. */
+export function safeQuotaExhausted(): boolean {
+  return !!cooldown && Date.now() < cooldown.until && cooldown.exhausted;
 }
 
 // The pacer: requests start one at a time, at least minIntervalMs() apart on the public service,
@@ -187,11 +192,11 @@ function rejectWaiting(error: Error) {
   for (const waiter of rejected) waiter.reject(error);
 }
 
-function pauseRequests(ms: number, message: string): SafeApiError {
+function pauseRequests(ms: number, message: string, exhausted = false): SafeApiError {
   // An older in-flight response must not shorten a quota cooldown established by another request.
   if (cooldown && cooldown.until >= Date.now() + ms) return cooldown.error;
   const error = new SafeApiError(message);
-  cooldown = { until: Date.now() + ms, error };
+  cooldown = { until: Date.now() + ms, error, exhausted };
   // Release requests waiting for a slot: they should fail promptly, not keep queueing.
   rejectWaiting(error);
   return error;
@@ -295,7 +300,8 @@ async function getJson(
         Math.max(wait, 1_000),
         exhausted
           ? "Safe Transaction Service monthly quota exhausted. Signature copies are unavailable until the quota resets or service access is updated."
-          : "Safe Transaction Service is temporarily rate limited. Signature copies are unavailable; retry after the cooldown."
+          : "Safe Transaction Service is temporarily rate limited. Signature copies are unavailable; retry after the cooldown.",
+        exhausted
       );
     }
     if (!response.ok) {

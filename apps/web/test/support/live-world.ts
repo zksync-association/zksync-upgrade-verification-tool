@@ -81,7 +81,7 @@ const SC_DOMAIN = {
   verifyingContract: L1.securityCouncil,
 };
 const G_DOMAIN = { name: "Guardians", version: "1", chainId: 1, verifyingContract: L1.guardians };
-const EUB_DOMAIN = {
+export const EUB_DOMAIN = {
   name: "EmergencyUpgradeBoard",
   version: "1",
   chainId: 1,
@@ -231,13 +231,50 @@ export function liveWorld(options: Omit<FakeL1Options, "head" | "logs" | "upgrad
   });
 
   const safeRequests: string[] = [];
+  /** Member Safes (lower case) whose every request to Safe answers HTTP 500. */
+  const safeFailing = new Set<string>();
+  /**
+   * `member` signs the typed data in its Safe with `signature` (ECDSA, accepted by the contracts):
+   * Safe's listing for it gets the message, with `modified` now. With `listed`, the message carries
+   * its typed data as Safe files it, so the lists built from Safe messages (pending emergency
+   * upgrades, freeze requests, vetoes) find it.
+   */
+  const signInSafe = (
+    member: Address,
+    typedData: SignatureSetParams["typedData"],
+    signature: Hex,
+    { listed = false }: { listed?: boolean } = {}
+  ) => {
+    const { digest } = governanceHashes(typedData);
+    const at = new Date(Date.now()).toISOString();
+    const confirmation = { owner: zeroAddress, signature, signatureType: "EOA" };
+    const list = listings.get(member.toLowerCase()) ?? [];
+    list.push({
+      created: at,
+      modified: at,
+      safe: member,
+      messageHash: safeMessageHashes(1, member, digest).safeMessageHash,
+      message: listed ? JSON.parse(JSON.stringify(typedData)) : {},
+      confirmations: [confirmation, confirmation],
+      preparedSignature: signature,
+    });
+    listings.set(member.toLowerCase(), list);
+    signatures.add(`${member}:${signature}`.toLowerCase());
+  };
   vi.stubGlobal("fetch", async (input: unknown, init?: RequestInit) => {
     const url = String(input);
     if (url.startsWith("https://api.safe.global/")) {
       safeRequests.push(url);
       const safe = /\/safes\/(0x[0-9a-fA-F]{40})\/messages\//.exec(url)?.[1]?.toLowerCase();
-      const results = (safe && listings.get(safe)) || [];
-      return Response.json({ count: results.length, results });
+      if (safe && safeFailing.has(safe)) return new Response("Server error", { status: 500 });
+      const all = [...((safe && listings.get(safe)) || [])];
+      // Ordered and paged as Safe does (newest first by creation, or by modification).
+      const query = new URL(url).searchParams;
+      const by = query.get("ordering") === "-modified" ? "modified" : "created";
+      all.sort((a, b) => (a[by] < b[by] ? 1 : a[by] > b[by] ? -1 : 0));
+      const offset = Number(query.get("offset") ?? 0);
+      const results = all.slice(offset, offset + Number(query.get("limit") ?? 100));
+      return Response.json({ count: all.length, results });
     }
     return fake.fetch(input as string, init);
   });
@@ -251,6 +288,8 @@ export function liveWorld(options: Omit<FakeL1Options, "head" | "logs" | "upgrad
     emergencyId,
     sets,
     safeRequests,
+    safeFailing,
+    signInSafe,
     /**
      * A new head, timestamped a second before now (call it every 12 s of the fake clock), with
      * 'finalized' FINAL_LAG behind it.

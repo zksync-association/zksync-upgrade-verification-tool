@@ -8,17 +8,28 @@ import { act, render } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The transaction page after Send. Its 4 s polls for the receipt leave the root status alone;
-// once the receipt is in, the status other pages read (freeze state and nonces, members,
-// thresholds) predates the transaction, so the page reads it again until it is at least as new
-// as the transaction's block, a few times at most.
+// The transaction page after Send. It polls nothing for the receipt: the sync engine reads it
+// once per new block while the page is on screen, and the tab's beat says when it changed (the
+// page then reloads). Once the receipt is in, the status other pages read (freeze state and
+// nonces, members, thresholds) predates the transaction, so the page reads it again until it is
+// at least as new as the transaction's block, a few times at most.
 
 type Receipt = { status: string; blockNumber: string; from: string; to: string; fee: string };
+type Answer = { receipt: Receipt | null; unread: boolean };
 const page = vi.hoisted(() => ({
-  data: { hash: `0x${"ab".repeat(32)}`, receipt: null as Receipt | null },
+  data: {
+    hash: `0x${"ab".repeat(32)}`,
+    receipt: { receipt: null, unread: false } as Answer,
+    followed: true as boolean,
+  },
   revalidator: { state: "idle", revalidate: vi.fn() },
 }));
 vi.mock("@/.server/rpc", () => ({ l1: {} }));
+vi.mock("@/.server/sync/receipt", () => ({
+  pageReceipt: vi.fn(),
+  receiptContent: vi.fn(),
+  receiptFollowed: vi.fn(),
+}));
 vi.mock("@remix-run/react", async (importOriginal) => ({
   // Await: the receipt is deferred (here already in hand, so it renders at once).
   ...(await importOriginal<typeof import("@remix-run/react")>()),
@@ -65,7 +76,7 @@ function view(block: string) {
       expect(rootRead).toBe(newStatusBlock !== undefined);
       page.revalidator = { ...page.revalidator, state: "loading" };
       rendered.rerender(ui(first));
-      page.data = { ...page.data, receipt };
+      page.data = { ...page.data, receipt: { receipt, unread: false } };
       page.revalidator = { ...page.revalidator, state: "idle" };
       const next = newStatusBlock ? status(newStatusBlock) : first;
       if (newStatusBlock) noteStatusLanded(next);
@@ -81,7 +92,7 @@ const revalidate = () => page.revalidator.revalidate;
 beforeEach(() => {
   vi.useFakeTimers();
   resetStatusRevalidation();
-  page.data = { ...page.data, receipt: null };
+  page.data = { ...page.data, receipt: { receipt: null, unread: false }, followed: true };
   page.revalidator = { state: "idle", revalidate: vi.fn() };
 });
 afterEach(() => {
@@ -89,24 +100,25 @@ afterEach(() => {
 });
 
 describe("the transaction page and the root status", () => {
-  it("polls for the receipt without reading the status", async () => {
+  it("polls nothing while waiting for the receipt, visible or not", async () => {
     view("100");
-    await act(() => vi.advanceTimersByTimeAsync(8_000));
-    expect(revalidate()).toHaveBeenCalledTimes(2);
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
     expect(shouldRevalidateRoot(toggle)).toBe(false);
+    await act(() => vi.advanceTimersByTimeAsync(60 * 60_000));
+    expect(revalidate()).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("checked at each new block");
   });
 
-  it("reads the status once when the receipt arrives, and stops once it covers the block", async () => {
+  it("reads the status once when the receipt arrives (the beat's reload), and stops once it covers the block", async () => {
     const v = view("100");
-    await act(() => vi.advanceTimersByTimeAsync(4_000));
-    expect(revalidate()).toHaveBeenCalledTimes(1); // the poll that finds the receipt
+    // The reload the beat asked for (it changed), with the receipt.
     await v.revalidated(mined("101"));
-    expect(revalidate()).toHaveBeenCalledTimes(2);
+    expect(revalidate()).toHaveBeenCalledTimes(1);
     // That revalidation reads the root (see revalidated()).
     await v.revalidated(mined("101"), "101");
     expect(shouldRevalidateRoot(toggle)).toBe(false);
     await act(() => vi.advanceTimersByTimeAsync(60_000));
-    expect(revalidate()).toHaveBeenCalledTimes(2);
+    expect(revalidate()).toHaveBeenCalledTimes(1);
   });
 
   it("tries again while the server's status still trails the receipt, three reads at most", async () => {
@@ -128,53 +140,32 @@ describe("the transaction page and the root status", () => {
   });
 
   it("leaves the status alone for a transaction mined before it was read", async () => {
-    page.data = { ...page.data, receipt: mined("99") };
+    page.data = { ...page.data, receipt: { receipt: mined("99"), unread: false } };
     view("100");
     await act(() => vi.advanceTimersByTimeAsync(20_000));
     expect(revalidate()).not.toHaveBeenCalled();
     expect(shouldRevalidateRoot(toggle)).toBe(false);
   });
 
-  it("polls only while the tab is visible", async () => {
-    let visibility: DocumentVisibilityState = "visible";
-    Object.defineProperty(document, "visibilityState", {
-      configurable: true,
-      get: () => visibility,
-    });
-    try {
-      view("100");
-      await act(() => vi.advanceTimersByTimeAsync(8_000));
-      expect(revalidate()).toHaveBeenCalledTimes(2);
-      await act(async () => {
-        visibility = "hidden";
-        document.dispatchEvent(new Event("visibilitychange"));
-      });
-      await act(() => vi.advanceTimersByTimeAsync(10 * 60_000));
-      expect(revalidate()).toHaveBeenCalledTimes(2);
-      await act(async () => {
-        visibility = "visible";
-        document.dispatchEvent(new Event("visibilitychange"));
-      });
-      await act(() => vi.advanceTimersByTimeAsync(4_000));
-      expect(revalidate()).toHaveBeenCalledTimes(3);
-    } finally {
-      visibility = "visible";
-    }
+  it("says when the receipt could not be read, never that the transaction is not mined", async () => {
+    page.data = { ...page.data, receipt: { receipt: null, unread: true } };
+    view("100");
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(document.body.textContent).toContain("Could not read the transaction receipt");
+    expect(document.body.textContent).not.toContain("Waiting for the transaction to be mined");
   });
 
-  it("stops after 30 minutes without a receipt, and says so", async () => {
+  it("asks for a reload where nothing reads the receipt again (a dev node, SYNC_MODE=off)", async () => {
+    page.data = { ...page.data, followed: false };
     view("100");
-    await act(() => vi.advanceTimersByTimeAsync(30 * 60_000));
-    const polls = revalidate().mock.calls.length;
-    expect(polls).toBeGreaterThanOrEqual(449);
-    expect(polls).toBeLessThanOrEqual(450);
-    await act(() => vi.advanceTimersByTimeAsync(60 * 60_000));
-    expect(revalidate()).toHaveBeenCalledTimes(polls);
-    expect(document.body.textContent).toContain("Stopped checking after 30 minutes");
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(document.body.textContent).toContain("Waiting for the transaction to be mined");
+    expect(document.body.textContent).toContain("reload the page to check again");
+    expect(document.body.textContent).not.toContain("checked at each new block");
   });
 
   it("reads it right away when the transaction was already mined on arrival (a fast chain)", async () => {
-    page.data = { ...page.data, receipt: mined("101") };
+    page.data = { ...page.data, receipt: { receipt: mined("101"), unread: false } };
     view("100");
     await act(() => vi.advanceTimersByTimeAsync(0));
     expect(revalidate()).toHaveBeenCalledTimes(1);

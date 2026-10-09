@@ -22,7 +22,7 @@ const state = vi.hoisted(() => ({
     timestamp: 1n,
   } as { number: bigint; hash: Hex; parentHash: Hex; timestamp: bigint },
   // The head is cached (servedHead answers without asking the node).
-  served: true,
+  served: true as boolean | "reading",
   devNode: false,
   // `${signer}:${signature}` the contract accepts.
   valid: new Set<string>(),
@@ -43,7 +43,14 @@ vi.mock("@/.server/rpc", () => ({
     safeTxServiceUrl: "https://safe-tx.example.test",
   }),
   latestBlock: async () => state.head,
-  servedHead: () => (state.served ? Promise.resolve(state.head) : null),
+  // "reading": a head read is in flight (after a pause) and has not answered yet.
+  servedHead: () =>
+    state.served === "reading"
+      ? new Promise(() => {})
+      : state.served
+        ? Promise.resolve(state.head)
+        : null,
+  servedHeadNow: () => (state.served === true ? state.head : null),
   safeBlockNumber: async () => 1_000n,
   rpcGeneration: () => 1,
   lanes: () => ({ call: state.lane }),
@@ -235,11 +242,13 @@ describe("a page's first answer for a signature set", () => {
     release();
     const fresh = await streamed.fresh;
     expect(fresh).toMatchObject({ stale: false, verifiedAtBlock: "1100" });
-    expect(Date.now() - Date.parse(fresh.safeFetchedAt as string)).toBeLessThan(60_000);
     expect(statuses(fresh)).toEqual(["valid", "valid"]);
     expect(fresh.thresholdCheck.status).toBe("met");
-    // Only the fresh result asked Safe (one listing per member).
-    expect(state.sent.length - sent).toBe(2);
+    // The page rule: the member whose signature is valid from its older copy keeps that copy
+    // (labelled with its age); the member that is not was read again. Only the page's own result
+    // asked Safe, for that one listing.
+    expect(fresh.safeFetchedAt).toBe(iso(listed[0]?.fetchedAt as number));
+    expect(state.sent.length - sent).toBe(1);
   });
 
   it("is the set's last result at its older block while the head moved on, never reported as fresh; JSON waits", async () => {
@@ -286,12 +295,27 @@ describe("a page's first answer for a signature set", () => {
     const page = streamSignatureSet({ ...params }, "page");
     const [first, fresh] = await Promise.all([page.immediate, page.fresh]);
     expect(first).toBe(fresh);
-    // The page's copy of the strict result, with the key the page reports while it shows the
-    // set; JSON's (the kept result) has none.
-    expect(first).toEqual({ ...strict, watch: { key: expect.stringMatching(SET_KEY), rev: null } });
+    // The page's own result: the same verdicts from the same copies, with the key the page
+    // reports while it shows the set, its content's revision and how its copies are kept; JSON's
+    // (the kept strict result) has none of them.
+    expect(first).toEqual({
+      ...strict,
+      watch: { key: expect.stringMatching(SET_KEY), rev: expect.stringMatching(/^[1-9]\d*$/) },
+      safeCheck: expect.objectContaining({ state: "off" }),
+    });
     expect(strict.watch).toBeUndefined();
     expect(first.stale).toBe(false);
     expect(state.sent.length).toBe(sent);
+  });
+
+  it("says nothing of Safe checks for an open set whose members are all valid: none is checked", async () => {
+    signInSafe(MEMBERS[0], SIG_A);
+    signInSafe(MEMBERS[1], SIG_B);
+    const fresh = await streamSignatureSet({ ...params }, "page").fresh;
+    expect(statuses(fresh)).toEqual(["valid", "valid"]);
+    // The page then shows its copies' age, not "Safe not checked yet".
+    expect(fresh.safeCheck).toBeNull();
+    expect(fresh.safeFetchedAt).not.toBeNull();
   });
 
   it("is the fresh result when no Safe listing is held (a fresh process): nothing older to show", async () => {
@@ -323,6 +347,22 @@ describe("a page's first answer for a signature set", () => {
     const release = holdSafe();
     const first = await firstSignatureSet({ ...params }, verifySignatureSet({ ...params }));
     expect(first).toMatchObject({ stale: true, verifiedAtBlock: "1100", reverifyingAt: null });
+    release();
+  });
+
+  it("with a last result, never waits for a head read in flight (after a pause): the first flush carries it, labelled", async () => {
+    signInSafe(MEMBERS[0], SIG_A);
+    await verifySignatureSet({ ...params });
+    later(10 * 60_000);
+    state.served = "reading";
+    const release = holdSafe();
+    const first = await settlesWithin(
+      firstSignatureSet({ ...params }, new Promise<never>(() => {})),
+      50
+    );
+    expect(first).toBe(true);
+    const answer = await firstSignatureSet({ ...params }, new Promise<never>(() => {}));
+    expect(answer).toMatchObject({ stale: true, verifiedAtBlock: "1100", reverifyingAt: null });
     release();
   });
 

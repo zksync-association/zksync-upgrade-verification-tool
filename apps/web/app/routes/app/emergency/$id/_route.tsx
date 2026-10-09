@@ -1,3 +1,4 @@
+import { idContent, loaderRevs } from "@/.server/sync/content";
 import { pageLoad, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import {
@@ -15,6 +16,7 @@ import { emergencyExecution } from "@/common/execution";
 import { type PayloadCheck, checkEmergencyPayload, decodeCall } from "@/common/proposal";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
 import { Hash, TxLink } from "@/components/hex";
+import { useLive } from "@/components/presence";
 import { Check, EmptyState, Facts, LoadingCard, PageHeader, Section } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CallList } from "@/components/verification/calls";
 import { ExecutionPanel, SimulationResult } from "@/components/verification/execution-panel";
-import type { Refresh } from "@/components/verification/freshness";
+import { type Refresh, setCurrency } from "@/components/verification/freshness";
 import {
   LastRunCheck,
   LastRunText,
@@ -33,6 +35,7 @@ import {
 import { SignatureSetCard } from "@/components/verification/signature-set";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { UpgradeFile } from "@/components/verification/upgrade-file";
+import { formatNumber } from "@/utils/format";
 import { badRequest } from "@/utils/http";
 import { Meta } from "@/utils/meta";
 import { forgetPayload, loadPayload, savePayload } from "@/utils/payload-storage";
@@ -63,6 +66,8 @@ export function loader({ params, request }: LoaderFunctionArgs) {
   );
   return defer({
     watch: page.watch,
+    // The upgrade's state and status, for its revision (its sets carry their own).
+    revs: loaderRevs([[watchKeys.emergency(id), loading.then((d) => d.status).then(idContent)]]),
     id,
     detail: loading.then((d) => d.overview),
     // While this run's index reads the history, the execution may come first from the history
@@ -388,10 +393,15 @@ function SignatureSections({
   refresh: Refresh;
 }) {
   const executed = d.state === UPGRADE_STATES.Done;
+  const live = useLive();
   // A stale first answer (an older block, or old Safe copies) never makes a transaction to send.
-  const metNow = (r: (typeof d.roles)[number]) =>
+  const metLoaded = (r: (typeof d.roles)[number]) =>
     r.set.thresholdCheck.status === "met" && r.set.stale !== true;
-  const allMet = d.roles.every(metNow);
+  // A set the app did not verify at the head it serves now is not met now (see setCurrency).
+  const behindAt = (r: (typeof d.roles)[number]) => setCurrency(r.set, live).behind;
+  const metNow = (r: (typeof d.roles)[number]) => metLoaded(r) && behindAt(r) === null;
+  const allMet = d.roles.every(metLoaded);
+  const behind = d.roles.map(behindAt).find((at) => at !== null) ?? null;
   const zkf = d.roles.find((r) => r.key === "zkFoundation");
   const execution = useMemo(() => {
     if (executed || !check?.ok || !allMet || !zkf?.set.valid[0]) return null;
@@ -442,6 +452,9 @@ function SignatureSections({
               execution={execution}
               toLabel="EmergencyUpgradeBoard"
               extra={<SimulateButton execution={execution} />}
+              blockedReason={
+                behind === null ? null : `Not verified at block #${formatNumber(behind)} yet.`
+              }
             />
           ) : (
             <Card className="p-6 text-slate-950 text-sm">
@@ -455,6 +468,9 @@ function SignatureSections({
                       {r.title}: {r.set.valid.length} of {r.set.threshold}
                       {r.set.stale &&
                         ` (at block #${r.set.verifiedAtBlock ?? "?"}, checking again)`}
+                      {!r.set.stale &&
+                        behindAt(r) !== null &&
+                        ` (at block #${setCurrency(r.set, live).block ?? "?"}, not verified at #${behindAt(r)} yet)`}
                     </Check>
                   </li>
                 ))}

@@ -143,6 +143,13 @@ vi.mock("@/.server/signatures", () => ({
     members: [],
     stale: false,
   }),
+  // A page's current result (the same here).
+  verifyPageSignatureSet: async () => ({
+    thresholdCheck: { status: "met" },
+    valid: [{ signer: SIGNER, signature: "0xaa" }],
+    members: [],
+    stale: false,
+  }),
   // A page's first answer: met at an older block (stale), or the fresh result.
   firstSignatureSet: async (_params: unknown, fresh: Promise<unknown>) =>
     sets.firstStale

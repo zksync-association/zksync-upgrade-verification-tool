@@ -404,12 +404,40 @@ function readHeads(finalized: boolean, joinWithout: boolean): HeadRead {
  * the one it asked for, or the last real answer: never newer than the true boundary).
  */
 function heads(): Promise<Heads> {
-  return cached(HEAD_KEY, HEAD_TTL_MS, async () => {
+  const read = cached(HEAD_KEY, HEAD_TTL_MS, async () => {
     const flight = readHeads(true, true);
     const { heads: read } = await flight.answer;
     noteHead(read.latest, flight.generation, flight.read);
     return read;
   });
+  trackHeads();
+  return read;
+}
+
+// What each head read stored under HEAD_KEY resolved to, by its promise: a caller that must not
+// wait (a page's first answer) takes the head in memory, never one still being read.
+const settledHeads = new WeakMap<Promise<Heads>, Heads>();
+const trackedHeads = new WeakSet<Promise<Heads>>();
+
+function trackHeads() {
+  const stored = peek<Heads>(HEAD_KEY);
+  if (!stored || trackedHeads.has(stored)) return;
+  trackedHeads.add(stored);
+  stored.then(
+    (read) => {
+      settledHeads.set(stored, read);
+    },
+    () => {}
+  );
+}
+
+/**
+ * The head requests read right now when it is already in memory, at once: null when none is
+ * cached or its read has not answered yet (never waits, never asks the node).
+ */
+export function servedHeadNow(): BlockRef | null {
+  const stored = peek<Heads>(HEAD_KEY);
+  return stored ? settledHeads.get(stored)?.latest ?? null : null;
 }
 
 /** A head the sync engine read: what the node said, and how to serve it. */
@@ -454,6 +482,11 @@ function publishHeads(heads: Heads, readGeneration: number, read: number, ttlMs:
   if (readGeneration !== generation || ttlMs <= 0 || !supersedes(heads.latest, read)) return false;
   noteHead(heads.latest, readGeneration, read);
   replace(HEAD_KEY, heads, ttlMs);
+  const stored = peek<Heads>(HEAD_KEY);
+  if (stored) {
+    trackedHeads.add(stored);
+    settledHeads.set(stored, heads);
+  }
   return true;
 }
 
@@ -833,16 +866,25 @@ let newestL2Head: NewestHead | null = null;
 
 type L2HeadRead = { at: L2Head; read: number; readGeneration: number };
 
-async function readL2Head(lane: Lane): Promise<L2HeadRead> {
+// The newest Era head read under the current settings (by a request or the sync engine), with
+// when the node answered: what pages use while it is recent enough (pageL2ChainHead).
+let lastL2Read: { at: L2Head; generation: number } | null = null;
+
+async function readL2Head(lane: Lane, withFinalized = true): Promise<L2HeadRead> {
   const readGeneration = generation;
   const read = ++l2HeadReads;
+  // 'finalized' is skipped only when a finalized block is known already (finality only moves
+  // forward, so that one is a deeper boundary).
+  const askFinalized = withFinalized || knownL2Finalized?.generation !== readGeneration;
   // One JSON-RPC batch: both answers describe the same moment.
   const [latest, finalized] = await Promise.all([
     lane.request<unknown>("eth_getBlockByNumber", ["latest", false]),
-    lane.request<unknown>("eth_getBlockByNumber", ["finalized", false]).then(
-      (raw) => ({ block: toBlockRef(raw) }),
-      (error: unknown) => ({ error })
-    ),
+    askFinalized
+      ? lane.request<unknown>("eth_getBlockByNumber", ["finalized", false]).then(
+          (raw) => ({ block: toBlockRef(raw) }),
+          (error: unknown) => ({ error })
+        )
+      : Promise.resolve({ skipped: true as const }),
   ]);
   const answeredAt = Date.now();
   const head = toBlockRef(latest);
@@ -869,7 +911,13 @@ async function readL2Head(lane: Lane): Promise<L2HeadRead> {
       : new Error("The ZKsync Era RPC returned no finalized block");
   }
   newestL2Head = withHead(newestL2Head, head, readGeneration, read);
-  return { at: { head, safe, answeredAt }, read, readGeneration };
+  const at = { head, safe, answeredAt };
+  if (
+    readGeneration === generation &&
+    !(lastL2Read?.generation === generation && lastL2Read.at.head.number > head.number)
+  )
+    lastL2Read = { at, generation };
+  return { at, read, readGeneration };
 }
 
 /**
@@ -889,13 +937,32 @@ export async function l2ChainHead(): Promise<L2Head | null> {
  * another block at this height named by a later read): then the head served stays. Resolves with
  * the node's answer either way; null without an L2 RPC.
  */
-export async function refreshL2ChainHead(): Promise<L2Head | null> {
+export async function refreshL2ChainHead({
+  withFinalized = true,
+}: { withFinalized?: boolean } = {}): Promise<L2Head | null> {
   const lane = await l2HeadLane();
   if (!lane) return null;
-  const { at, read, readGeneration } = await readL2Head(lane);
+  const { at, read, readGeneration } = await readL2Head(lane, withFinalized);
   if (readGeneration === generation && supersedesHead(newestL2Head, at.head, read))
     replace(L2_HEAD_KEY, at, HEAD_TTL_MS - (Date.now() - at.answeredAt));
   return at;
+}
+
+/**
+ * For pages (never JSON): the newest Era head read under the current settings, while the node
+ * answered it at most `maxAgeMs` ago (sync/era.ts reads one every minute while a page showing Era
+ * is on screen), else l2ChainHead(). Pages label what they show with its block and age.
+ */
+export async function pageL2ChainHead(maxAgeMs: number): Promise<L2Head | null> {
+  const known = lastL2Read;
+  if (known && known.generation === generation && Date.now() - known.at.answeredAt <= maxAgeMs)
+    return known.at;
+  return l2ChainHead();
+}
+
+/** The newest Era head read under the current settings (number, when answered), or null. */
+export function lastL2Head(): L2Head | null {
+  return lastL2Read?.generation === generation ? lastL2Read.at : null;
 }
 
 // ZKsync Era lanes: `history` carries the governor index's eth_getLogs, `head` Era's
@@ -965,6 +1032,7 @@ export function resetRpcClients() {
   knownFinalized = null;
   knownL2Finalized = null;
   newestL2Head = null;
+  lastL2Read = null;
   tagUnsupported = null;
   newestHead = null;
   rereading = null;

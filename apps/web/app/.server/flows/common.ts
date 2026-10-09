@@ -24,6 +24,7 @@ import {
   type StreamedSet,
   firstSignatureSet,
   simulate,
+  verifyPageSignatureSet,
   verifySignatureSet,
   watchSignatureSet,
 } from "../signatures";
@@ -37,28 +38,32 @@ export type ExecutionView = Execution & { simulation: Simulation };
 
 /**
  * A signature set for a flow. "strict" (JSON): the strict result, once (`immediate` is `fresh`).
- * "page": the strict result is started first, and the page's first answer beside it (see
- * firstSignatureSet: a labelled stale set, or the strict result); both carry the key the page
- * reports while it shows the set (`watch`, see watchSignatureSet), which JSON never gets.
+ * "page": the page's result (verifyPageSignatureSet: verified at the head from Safe copies under
+ * the page rule, with its key, revision and how its copies are kept) is started first, and the
+ * page's first answer beside it (see firstSignatureSet: a labelled stale set, or that result);
+ * both carry the key the page reports while it shows the set (`watch`, see watchSignatureSet),
+ * which JSON never gets.
  */
 export function streamSignatureSet(params: SignatureSetParams, freshness: Freshness): StreamedSet {
-  const strict = verifySignatureSet(params);
-  if (freshness !== "page") return { immediate: strict, fresh: strict };
+  if (freshness !== "page") {
+    const strict = verifySignatureSet(params);
+    return { immediate: strict, fresh: strict };
+  }
   const watch = watchSignatureSet(params);
+  const fresh = verifyPageSignatureSet(params);
   // Registered before anything else waits on it: known by the time a first answer that is the
-  // strict result resolves.
-  let strictSet: SignatureSet | null = null;
-  strict.then(
+  // page's result resolves.
+  let freshSet: SignatureSet | null = null;
+  fresh.then(
     (set) => {
-      strictSet = set;
+      freshSet = set;
     },
     () => {}
   );
-  const fresh = strict.then((set) => ({ ...set, watch }));
-  // A first answer that is the strict result is the page's fresh result itself (one object); an
-  // earlier one is copied, never waiting for the strict result.
-  const immediate = firstSignatureSet(params, strict).then((set) =>
-    set === strictSet ? fresh : { ...set, watch }
+  // A first answer that is the page's result is that result itself (one object); an earlier one
+  // is copied (without a revision: it is not the content the key stands for), never waiting for it.
+  const immediate = firstSignatureSet(params, fresh).then((set) =>
+    set === freshSet ? fresh : { ...set, watch }
   );
   // Callers attach their handlers to what they use; neither may go unhandled meanwhile.
   void immediate.catch(() => {});
@@ -95,18 +100,20 @@ export async function freshAfter<T>(
 
 /**
  * What the signature set adds up to on-chain right now: a ready transaction or why not. Its
- * simulation is kept per head unless it carries a signature the viewer supplied.
+ * simulation is kept per head unless it carries a signature the viewer supplied; for a page
+ * (`page`), such a kept one is simulated again at each new head while the page shows it.
  */
 export async function executionFor(
   set: SignatureSet,
   state: SetState,
-  build: (valid: MemberSignature[]) => Execution | null
+  build: (valid: MemberSignature[]) => Execution | null,
+  { page = false }: { page?: boolean } = {}
 ): Promise<ExecutionView | null> {
   if (state.status !== "open" || set.thresholdCheck.status !== "met") return null;
   const execution = build(set.valid);
   if (!execution) return null;
   const keep = set.members.every((m) => m.status !== "valid" || m.source !== "supplied");
-  return { ...execution, simulation: await simulate(execution, { keep }) };
+  return { ...execution, simulation: await simulate(execution, { keep, page: keep && page }) };
 }
 
 export function topicOf(abi: readonly unknown[], name: string): Hex {

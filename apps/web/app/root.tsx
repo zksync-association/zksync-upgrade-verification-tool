@@ -1,4 +1,5 @@
 import { appStatus, shellChain } from "@/.server/status";
+import { statusRevs } from "@/.server/sync/content";
 import { watchItems, watchKeys } from "@/.server/sync/presence";
 import AppShell, { AppFrame, StatusProblem } from "@/components/app-shell";
 import { GeneralErrorBoundary } from "@/components/error-boundary";
@@ -49,14 +50,17 @@ export const links: LinksFunction = () => [
 export function loader({ request }: LoaderFunctionArgs) {
   const cookies = request.headers.get("Cookie");
   const wagmiCookie = cookies ? parseWagmiCookie(cookies, "wagmi.store") : undefined;
+  // Governance at the head pages read (the sync engine reads it there at each block).
+  const status = appStatus({ freshness: "page" });
   return defer({
     env: clientEnv,
     wagmiCookie,
     watch: watchItems(request, [watchKeys.status]),
     presence: { awayMs: serverEnv.SYNC_AWAY_MS },
     chain: shellChain(),
-    // Governance at the head pages read (the sync engine reads it there at each block).
-    status: appStatus({ freshness: "page" }),
+    status,
+    // The status's revision, so an open tab learns when it changed (sync/revs.ts).
+    revs: statusRevs(status),
   });
 }
 

@@ -1,3 +1,4 @@
+import { l2Content, loaderRevs } from "@/.server/sync/content";
 import { pageLoad, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import { type VetoDetail, loadL2Veto } from "@/.server/flows/l2-veto";
@@ -10,6 +11,7 @@ import { Check, EmptyState, Facts, LoadingCard, PageHeader, Section } from "@/co
 import { Badge } from "@/components/ui/badge";
 import { CallList } from "@/components/verification/calls";
 import { SetStateBadge } from "@/components/verification/badges";
+import { EraBlockNote } from "@/components/verification/freshness";
 import { SignatureSetCard } from "@/components/verification/signature-set";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { formatEth, formatTime } from "@/utils/format";
@@ -32,6 +34,15 @@ export function loader({ params, request }: LoaderFunctionArgs) {
   );
   return defer({
     watch: page.watch,
+    // The L2 proposal's key: its Era block label follows what the beats say about it.
+    eraKey: watchKeys.l2(veto.l2GovernorAddress, veto.l2ProposalId),
+    // The L2 proposal as the page shows it, for its revision (the Era timer notes it too).
+    revs: loaderRevs([
+      [
+        watchKeys.l2(veto.l2GovernorAddress, veto.l2ProposalId),
+        loading.fresh.then((d) => (d.l2Error === null ? l2Content(d.l2Proposal, null) : undefined)),
+      ],
+    ]),
     veto,
     detail: loading.first,
     fresh: freshAfter(loading.first, loading.fresh, (d) => d.set.stale === true),
@@ -61,7 +72,7 @@ export default function VetoPage() {
 
 function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
   const { governance } = useStatus();
-  const { fresh } = useLoaderData<typeof loader>();
+  const { fresh, eraKey } = useLoaderData<typeof loader>();
   const p = d.params;
   const l2 = d.l2Proposal;
   return (
@@ -87,18 +98,21 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
           {
             label: "L2 proposal",
             value: l2 ? (
-              <span className="space-x-2">
-                <span>{l2.state ?? "state unknown"}</span>
-                <span className="text-slate-600">
-                  voting {formatTime(l2.voteStart)} → {formatTime(l2.voteEnd)}
+              <span className="block space-y-1">
+                <span className="space-x-2">
+                  <span>{l2.state ?? "state unknown"}</span>
+                  <span className="text-slate-600">
+                    voting {formatTime(l2.voteStart)} → {formatTime(l2.voteEnd)}
+                  </span>
+                  {governance.network.tallyUrl && (
+                    <ExternalAnchor
+                      href={`${governance.network.tallyUrl}/proposal/${p.l2ProposalId}`}
+                    >
+                      Tally
+                    </ExternalAnchor>
+                  )}
                 </span>
-                {governance.network.tallyUrl && (
-                  <ExternalAnchor
-                    href={`${governance.network.tallyUrl}/proposal/${p.l2ProposalId}`}
-                  >
-                    Tally
-                  </ExternalAnchor>
-                )}
+                <EraBlockNote watchKey={eraKey} fallback={d.eraHead ?? null} />
               </span>
             ) : d.l2Error ? (
               <span className="text-amber-900" data-testid="l2-error">

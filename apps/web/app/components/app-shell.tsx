@@ -12,10 +12,16 @@ import {
 } from "@/components/governance-context";
 import { AddressLink } from "@/components/hex";
 import Logo from "@/components/logo";
-import { BlockAge, IndexProgressProvider, IndexingPill } from "@/components/sync-state";
+import { useLive } from "@/components/presence";
+import {
+  BlockAge,
+  IndexProgressProvider,
+  IndexingPill,
+  useNowSeconds,
+} from "@/components/sync-state";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
-import { formatNumber } from "@/utils/format";
+import { formatAge, formatNumber } from "@/utils/format";
 import { noteStatusLanded, requestStatusRevalidation } from "@/utils/revalidation";
 import { Link, NavLink, useFetcher, useRevalidator } from "@remix-run/react";
 import { AlertTriangle, Info, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
@@ -172,8 +178,11 @@ function HomeLink() {
   return (
     <Link to="/" className="flex shrink-0 items-center gap-3" aria-label="Home">
       <Logo className="h-6 w-auto" />
-      <span className="hidden h-5 w-px bg-slate-200 sm:block" />
-      <span className="hidden font-medium text-[15px] text-slate-950 sm:block">Governance</span>
+      {/* Not beside the links on narrower desktops (md to xl): they would not all fit. */}
+      <span className="hidden h-5 w-px bg-slate-200 sm:block md:hidden xl:block" />
+      <span className="hidden font-medium text-[15px] text-slate-950 sm:block md:hidden xl:block">
+        Governance
+      </span>
     </Link>
   );
 }
@@ -182,7 +191,9 @@ function Nav() {
   return (
     <nav
       aria-label="Governance navigation"
-      className="-mx-2 order-last flex w-full min-w-0 flex-wrap items-center gap-1 md:order-none md:w-auto md:flex-1 md:flex-nowrap"
+      // From md up the links share one row with the network pill and the wallet button: when they
+      // do not all fit, the links scroll within the navigation rather than run under the pill.
+      className="-mx-2 order-last flex w-full min-w-0 flex-wrap items-center gap-1 md:order-none md:w-auto md:flex-1 md:flex-nowrap md:overflow-x-auto"
     >
       {NAV.map((item) => (
         <NavLink
@@ -203,36 +214,87 @@ function Nav() {
   );
 }
 
+/** The newer of the status's block and the head the last beat named (the engine serves). */
+function newerBlock(
+  status: { number: string; timestamp: string },
+  beat: { number: string; timestamp: string } | null
+) {
+  return beat && BigInt(beat.number) > BigInt(status.number) ? beat : status;
+}
+
+/**
+ * What the tab's live updates are doing, when it is worth saying: reloading after a change,
+ * catching up after a pause, or paused (away, or the server not answering). Nothing otherwise.
+ * It floats over the bottom of the page, outside the header and the page's flow: appearing and
+ * going, it never moves the page (or the header's height on a phone) and never covers the
+ * navigation. It takes no clicks: whatever is under it stays usable.
+ */
+function LiveNote() {
+  const live = useLive();
+  const now = useNowSeconds();
+  let text: string | null = null;
+  if (live.away) text = "Updates paused while you're away";
+  else if (live.failing)
+    text =
+      live.lastBeatAt && now !== null
+        ? `Updates paused · last checked ${formatAge(now - live.lastBeatAt / 1000)}`
+        : "Updates paused";
+  else if (live.updating) text = "Updating…";
+  else if (live.catchingUp) text = "Checking for changes…";
+  if (!text) return null;
+  return (
+    <div className="pointer-events-none fixed right-4 bottom-4 z-30 flex max-w-[calc(100vw-2rem)] justify-end sm:right-6">
+      <span
+        role="status"
+        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-700 text-xs shadow-[0_8px_16px_-4px_rgba(10,26,102,0.16)]"
+        data-testid="live-note"
+      >
+        {(live.updating || live.catchingUp) && !live.away && !live.failing && (
+          <Loader2 aria-hidden className="h-3.5 w-3.5 shrink-0 motion-safe:animate-spin" />
+        )}
+        <span>{text}</span>
+      </span>
+    </div>
+  );
+}
+
 function Header({ offerWallet, wallet }: { offerWallet: boolean; wallet: boolean }) {
   const chain = useChain();
+  const live = useLive();
   return (
-    <header className="sticky top-0 z-40 border-slate-300 border-b bg-white">
-      <HeaderRow>
-        <HomeLink />
-        <Nav />
-        {/* On a phone the group may wrap onto a second line rather than widen the page. */}
-        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
-          <WithStatus
-            fallback={<NetworkPill chain={chain} />}
-            problem={() => <NetworkPill chain={chain} unavailable />}
-          >
-            {(status) => (
-              <>
-                <IndexingPill fallback={status.sync.index} />
-                <NetworkPill
-                  chain={status.governance.network}
-                  block={status.governance.latestBlock}
-                />
-              </>
+    <>
+      <header className="sticky top-0 z-40 border-slate-300 border-b bg-white">
+        <HeaderRow>
+          <HomeLink />
+          <Nav />
+          {/* On a phone the group may wrap onto a second line rather than widen the page. */}
+          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+            <WithStatus
+              fallback={<NetworkPill chain={chain} />}
+              problem={() => <NetworkPill chain={chain} unavailable />}
+            >
+              {(status) => (
+                <>
+                  <IndexingPill fallback={status.sync.index} />
+                  <NetworkPill
+                    chain={status.governance.network}
+                    block={newerBlock(status.governance.latestBlock, live.head)}
+                  />
+                </>
+              )}
+            </WithStatus>
+            <RefreshButton />
+            {wallet && (
+              <WithStatus fallback={null}>{() => <ConnectButton offer={offerWallet} />}</WithStatus>
             )}
-          </WithStatus>
-          <RefreshButton />
-          {wallet && (
-            <WithStatus fallback={null}>{() => <ConnectButton offer={offerWallet} />}</WithStatus>
-          )}
-        </div>
-      </HeaderRow>
-    </header>
+          </div>
+        </HeaderRow>
+      </header>
+      {/* Once the status is read (before, the checking banner floats there). */}
+      <WithStatus fallback={null} problem={() => null}>
+        {() => <LiveNote />}
+      </WithStatus>
+    </>
   );
 }
 

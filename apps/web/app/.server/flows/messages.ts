@@ -10,10 +10,11 @@ import { type Address, type Hex, isAddressEqual } from "viem";
 import { network } from "../rpc";
 import { SafeApiError, type SafeMessage } from "../safe-api";
 import {
-  SAFE_LISTING_MAX_AGE_MS,
   type SafeSnapshot,
   heldSafeListing,
   listSafeMessages,
+  listSafeMessagesForPage,
+  pageSafeListing,
 } from "../safe/store";
 
 // Freeze requests, L2 vetoes and emergency upgrades exist only as messages members signed in their
@@ -44,7 +45,11 @@ export type Collected = {
   anomalies: number;
   /** When the oldest listing read was fetched (ISO time), or null when none was. */
   safeFetchedAt?: string | null;
-  /** Some listing was older than 60 s (only collectHeldMessages', for a page's first answer). */
+  /**
+   * Some listing was older than a page may use as current (only collectHeldMessages', for a
+   * page's first answer): more than 60 s old and not kept by the watcher for the screen, or read
+   * by the last run.
+   */
   stale?: boolean;
 };
 
@@ -117,13 +122,23 @@ const sameDomain = (a: Eip712Domain, b: Eip712Domain) =>
   a.chainId === b.chainId &&
   isAddressEqual(a.verifyingContract, b.verifyingContract);
 
-/** The governance messages in members' Safe listings (at most 60 s old, read when older). */
+/**
+ * The governance messages in members' Safe listings: at most 60 s old, read when older; with
+ * `page` (a page's list, never JSON), also a copy the watcher keeps checking for the lists on
+ * screen (safe/store.ts pageSafeListing), labelled with its age.
+ */
 export function collectMessages(
   safes: Address[],
   actions: readonly ActionName[],
-  domain: Eip712Domain
+  domain: Eip712Domain,
+  { page = false }: { page?: boolean } = {}
 ): Promise<Collected> {
-  return collectFrom(safes, actions, domain, listSafeMessages);
+  return collectFrom(
+    safes,
+    actions,
+    domain,
+    page ? (safe) => listSafeMessagesForPage(safe, "list") : listSafeMessages
+  );
 }
 
 /**
@@ -142,11 +157,12 @@ export async function collectHeldMessages(
     if (!listing) return null;
     held.set(safe.toLowerCase(), listing);
   }
-  const now = Date.now();
-  // A listing the last run read (kept on disk) is stale whatever its age.
-  const stale = [...held.values()].some(
-    (listing) => listing.fromLastRun || now - listing.fetchedAt > SAFE_LISTING_MAX_AGE_MS
-  );
+  // A listing the last run read (kept on disk) is stale whatever its age; another one when a page
+  // could not use it as current (pageSafeListing).
+  const stale = safes.some((safe) => {
+    const listing = held.get(safe.toLowerCase());
+    return !listing || listing.fromLastRun || pageSafeListing(safe, "list") === null;
+  });
   const collected = await collectFrom(safes, actions, domain, async (safe) => {
     const listing = held.get(safe.toLowerCase());
     if (!listing) throw new Error(`No listing held for ${safe}`);

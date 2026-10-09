@@ -1,5 +1,12 @@
 import type { SignatureSet } from "@/.server/signatures";
-import { freshnessLabels } from "@/components/verification/freshness";
+import { INITIAL_LIVE, type LiveState, LiveStateProvider } from "@/components/presence";
+import { SimulationResult } from "@/components/verification/execution-panel";
+import {
+  EraBlockNote,
+  freshnessLabels,
+  newerCheck,
+  setCurrency,
+} from "@/components/verification/freshness";
 import { SignatureSetCard } from "@/components/verification/signature-set";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
@@ -465,5 +472,282 @@ describe("SignatureSetCard with a stale first answer", () => {
     expect(within(rows[0] as HTMLElement).getByText(/Verified/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Connect your Safe to sign/ })).toBeInTheDocument();
     expect(screen.getByRole("progressbar").innerHTML).toContain("bg-green-700");
+  });
+});
+
+describe("labels that follow the tab's beats", () => {
+  const live = (value: Partial<LiveState>) => ({ ...INITIAL_LIVE, ...value });
+  const head = (n: string) => ({ number: n, hash: "0x01", timestamp: "1" });
+  const shown = (simulation: Record<string, unknown>, state: Partial<LiveState>) =>
+    render(
+      <LiveStateProvider value={live(state)}>
+        <SimulationResult simulation={simulation as never} />
+      </LiveStateProvider>
+    );
+
+  it("a simulation shows as current (in green) only at the head the app serves; one from an older block is said as of it", () => {
+    const sim = { status: "ok", atBlock: "100", watch: { key: "sim:01", rev: "1" } };
+    let view = shown(sim, { head: head("100") });
+    expect(screen.getByTestId("simulation-ok")).toHaveTextContent("Simulated at block #100");
+    view.unmount();
+    // A new head served, and this result was not simulated there (yet, or its read failed).
+    view = shown(sim, { head: head("101") });
+    expect(screen.queryByTestId("simulation-ok")).not.toBeInTheDocument();
+    expect(screen.getByTestId("simulation-earlier")).toHaveTextContent(
+      /Simulated at block #100: .* Not simulated at block #101 yet/
+    );
+    view.unmount();
+    // Simulated again at the served head with the same result (the beat says so).
+    view = shown(sim, { head: head("101"), simulatedAt: { "sim:01": "101" } });
+    expect(screen.getByTestId("simulation-ok")).toHaveTextContent("Simulated at block #101");
+    view.unmount();
+    // Before the first beat (no served head known): as loaded.
+    view = shown(sim, {});
+    expect(screen.getByTestId("simulation-ok")).toBeInTheDocument();
+    view.unmount();
+    // A dev node ('latest'): as before.
+    view = shown({ status: "ok" }, { head: head("101") });
+    expect(screen.getByTestId("simulation-ok")).toHaveTextContent("against the latest block");
+    view.unmount();
+    // Not followed (a page's own one-off simulation): asks to simulate again.
+    view = shown({ status: "ok", atBlock: "100" }, { head: head("102") });
+    expect(screen.getByTestId("simulation-earlier")).toHaveTextContent("Simulate it again");
+    view.unmount();
+    // A revert names its block, and says when it is not the current one.
+    view = shown(
+      { status: "reverted", error: "Protocol frozen", atBlock: "100", watch: sim.watch },
+      { head: head("101") }
+    );
+    expect(screen.getByTestId("simulation-reverted")).toHaveTextContent(
+      /block #100: it would revert with Protocol frozen \(not simulated at the current block yet\)/
+    );
+  });
+
+  it("the Era block label names the newer of the page's own Era head and the beat's for that item, never another item's", () => {
+    const at = (n: string) => ({ number: n, readAt: new Date().toISOString() });
+    let view = render(
+      <LiveStateProvider value={live({ eraAt: { "l2:a:1": at("7100") } })}>
+        <EraBlockNote watchKey="l2:a:1" fallback={at("7000")} />
+      </LiveStateProvider>
+    );
+    expect(screen.getByTestId("era-block")).toHaveTextContent("ZKsync Era block #7,100");
+    view.unmount();
+    view = render(
+      <LiveStateProvider value={live({ eraAt: { "l2:b:2": at("7200") } })}>
+        <EraBlockNote watchKey="l2:a:1" fallback={at("7000")} />
+      </LiveStateProvider>
+    );
+    expect(screen.getByTestId("era-block")).toHaveTextContent("ZKsync Era block #7,000");
+    view.unmount();
+    // The beat's head for this item is older than the page's own (a reload since): the page's.
+    render(
+      <LiveStateProvider value={live({ eraAt: { "l2:a:1": at("6900") } })}>
+        <EraBlockNote watchKey="l2:a:1" fallback={at("7000")} />
+      </LiveStateProvider>
+    );
+    expect(screen.getByTestId("era-block")).toHaveTextContent("ZKsync Era block #7,000");
+  });
+
+  it("the Safe check label shows the newer of the beat's report and the page's own (after Fetch signatures, a reload)", () => {
+    const check = (secondsAgoChecked: number | null) => ({
+      state: "watching" as const,
+      checkedAt:
+        secondsAgoChecked === null
+          ? null
+          : new Date(Date.now() - secondsAgoChecked * 1000).toISOString(),
+      nextAt: new Date(Date.now() + 50_000).toISOString(),
+      cadenceMs: 60_000,
+      reason: null,
+    });
+    expect(newerCheck(check(30), check(2))?.checkedAt).toBe(check(2).checkedAt);
+    expect(newerCheck(check(2), check(30))?.checkedAt).toBe(check(2).checkedAt);
+    expect(newerCheck(check(null), check(5))?.checkedAt).toBe(check(5).checkedAt);
+    expect(newerCheck(null, check(5))).not.toBeNull();
+    expect(newerCheck(undefined, null)).toBeNull();
+    // On the card: the reloaded set's own check (2 s ago) over the last beat's (30 s ago).
+    const open = {
+      ...(set as unknown as Record<string, unknown>),
+      verifiedAtBlock: "1005",
+      watch: { key: "set:01", rev: "1" },
+      safeCheck: check(2),
+    } as never;
+    render(
+      <LiveStateProvider value={live({ checked: { "set:01": check(30) } })}>
+        <SignatureSetCard title="Council" set={open} state={{ status: "open" }} />
+      </LiveStateProvider>
+    );
+    expect(screen.getByTestId("set-freshness")).toHaveTextContent(/Safe checked [1-3]s ago/);
+  });
+});
+
+describe("a set the app did not verify at the head it serves now (a beat says which head it was)", () => {
+  const live = (value: Partial<LiveState>) => ({ ...INITIAL_LIVE, ...value });
+  const head = (n: string) => ({ number: n, hash: "0x01", timestamp: "1" });
+  const metAt = (block: string, watch: { key: string; rev: string | null } | undefined) =>
+    ({
+      ...(set as unknown as Record<string, unknown>),
+      valid: [
+        { signer: MEMBER_A, signature: "0xaa" },
+        { signer: MEMBER_B, signature: "0xbb" },
+      ],
+      members: [member(MEMBER_A, "valid"), member(MEMBER_B, "valid"), member(MEMBER_C, "missing")],
+      thresholdCheck: { status: "met", checkedWith: "checkSignatures" },
+      verifiedAtBlock: block,
+      safeFetchedAt: new Date().toISOString(),
+      stale: false,
+      watch,
+      safeCheck: null,
+    }) as never;
+  const execution = {
+    to: MEMBER_A,
+    data: "0x1234",
+    value: "0",
+    functionName: "approve",
+    simulation: { status: "ok", atBlock: "1000" },
+  } as never;
+  const card = (shown: never, state: Partial<LiveState>) =>
+    render(
+      <LiveStateProvider value={live(state)}>
+        <SignatureSetCard
+          title="Council"
+          set={shown}
+          state={{ status: "open" }}
+          execution={execution}
+        />
+      </LiveStateProvider>
+    );
+  const watch = { key: "set:01", rev: "7" };
+
+  it("setCurrency: current at the served head, or at a newer block the beats name for the content shown; behind otherwise", () => {
+    const at = (block: string, w = watch as { key: string; rev: string | null } | undefined) => ({
+      verifiedAtBlock: block,
+      watch: w,
+    });
+    // Before the first beat: as loaded.
+    expect(setCurrency(at("1000"), { head: null })).toEqual({ block: "1000", behind: null });
+    expect(setCurrency(at("1000"), { head: head("1000") })).toEqual({
+      block: "1000",
+      behind: null,
+    });
+    // A newer head served, and the beat names no newer block for this content.
+    expect(setCurrency(at("1000"), { head: head("1003"), verifiedAt: {} })).toEqual({
+      block: "1000",
+      behind: "1003",
+    });
+    // Verified again there with the same content.
+    const again = { "set:01": { rev: "7", block: "1003" } };
+    expect(setCurrency(at("1000"), { head: head("1003"), verifiedAt: again })).toEqual({
+      block: "1003",
+      behind: null,
+    });
+    // Named for other content (a revision the tab no longer shows): not this content's block.
+    expect(
+      setCurrency(at("1000", { key: "set:01", rev: "6" }), {
+        head: head("1003"),
+        verifiedAt: again,
+      })
+    ).toEqual({ block: "1000", behind: "1003" });
+    // A page with a signature from its URL (no revision): never named, behind once a head passes.
+    expect(
+      setCurrency(at("1000", { key: "set:01", rev: null }), {
+        head: head("1001"),
+        verifiedAt: again,
+      })
+    ).toEqual({ block: "1000", behind: "1001" });
+    // A dev node ('latest': no block), and a stale first answer (it says so itself): never.
+    expect(setCurrency({ verifiedAtBlock: null, watch }, { head: head("9") })).toEqual({
+      block: null,
+      behind: null,
+    });
+    expect(
+      setCurrency({ verifiedAtBlock: "1000", stale: true, watch }, { head: head("1003") })
+    ).toMatchObject({ behind: null });
+  });
+
+  it("behind: as of its block, in no passing colour, with nothing to sign or send, and a way to check again", () => {
+    wallet.address = MEMBER_C;
+    card(metAt("1000", watch), { head: head("1003"), verifiedAt: {} });
+    expect(screen.getByTestId("set-stale")).toHaveTextContent(
+      "Verified at block #1,000 · not re-verified at #1,003"
+    );
+    expect(screen.getByTestId("set-stale")).toHaveTextContent("checked again at each new block");
+    expect(screen.queryByTestId("threshold-met")).not.toBeInTheDocument();
+    expect(screen.getByTestId("threshold-stale")).toHaveTextContent(
+      "At block #1,000 the threshold was met"
+    );
+    expect(screen.getByRole("progressbar").innerHTML).not.toContain("bg-green-700");
+    const rows = screen.getAllByTestId("member-row");
+    expect(within(rows[0] as HTMLElement).getByText(/Valid at #1,000/)).toBeInTheDocument();
+    for (const row of rows) expect(row.className).not.toMatch(/bg-(green|red)-50/);
+    // Sign and Send stay (a dialog open in them would too), disabled, saying why.
+    expect(screen.getByTestId("sign-button")).toBeDisabled();
+    expect(screen.getAllByText(/Not verified at block #1,003 yet/).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("send-transaction")).toBeDisabled();
+    expect(screen.getByTestId("send-blocked")).toHaveTextContent(
+      "Not verified at block #1,003 yet"
+    );
+    // An open set of Safes: Fetch signatures verifies it at the current head.
+    expect(screen.getByTestId("fetch-signatures")).toBeInTheDocument();
+  });
+
+  it("verified again at the served head with the same content: current, named at that head", () => {
+    wallet.address = MEMBER_C;
+    card(metAt("1000", watch), {
+      head: head("1003"),
+      verifiedAt: { "set:01": { rev: "7", block: "1003" } },
+    });
+    expect(screen.queryByTestId("set-stale")).not.toBeInTheDocument();
+    expect(screen.getByTestId("set-freshness")).toHaveTextContent("Verified at block #1,003");
+    expect(screen.getByTestId("threshold-met")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar").innerHTML).toContain("bg-green-700");
+    expect(screen.getByTestId("sign-button")).toBeEnabled();
+    expect(screen.queryByTestId("send-blocked")).not.toBeInTheDocument();
+  });
+
+  it("a page with a signature from its URL is never followed: once a newer head is served it says so, and offers to check again", () => {
+    card(metAt("1000", { key: "set:01", rev: null }), { head: head("1001") });
+    expect(screen.getByTestId("set-stale")).toHaveTextContent(
+      "Verified at block #1,000 · not re-verified at #1,001"
+    );
+    expect(screen.getByTestId("set-stale")).toHaveTextContent(
+      "Check again to verify them at the current block"
+    );
+    expect(screen.queryByTestId("threshold-met")).not.toBeInTheDocument();
+  });
+
+  it("a set that can no longer be signed, behind: no passing colour either, and Check again", () => {
+    render(
+      <LiveStateProvider value={live({ head: head("1003") })}>
+        <SignatureSetCard
+          title="Council"
+          set={metAt("1000", watch)}
+          state={{ status: "closed", detail: "Closed" }}
+        />
+      </LiveStateProvider>
+    );
+    expect(screen.queryByTestId("threshold-met")).not.toBeInTheDocument();
+    expect(screen.getByTestId("check-again")).toBeInTheDocument();
+    expect(screen.queryByTestId("fetch-signatures")).not.toBeInTheDocument();
+  });
+
+  it("the Safe check label: paused with the tab's updates, never a countdown then", () => {
+    const check = {
+      state: "watching" as const,
+      checkedAt: new Date(Date.now() - 50_000).toISOString(),
+      nextAt: new Date(Date.now() + 70_000).toISOString(),
+      cadenceMs: 120_000,
+      reason: null,
+    };
+    const open = {
+      ...(metAt("1000", watch) as Record<string, unknown>),
+      safeCheck: check,
+    } as never;
+    const view = card(open, { head: head("1000"), failing: true });
+    expect(screen.getByTestId("set-freshness")).toHaveTextContent(
+      /Safe checked (49|50)s ago · checks paused \(updates paused\)/
+    );
+    view.unmount();
+    card(open, { head: head("1000") });
+    expect(screen.getByTestId("set-freshness")).toHaveTextContent(/next check in/);
   });
 });

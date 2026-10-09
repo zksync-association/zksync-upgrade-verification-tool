@@ -1,3 +1,4 @@
+import { loaderRevs, upgradeListContent } from "@/.server/sync/content";
 import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { type UpgradeSummary, listStandardUpgrades } from "@/.server/flows/standard";
 import { isUpgradeActive } from "@/common/upgrade-states";
@@ -32,6 +33,12 @@ export function loader({ request }: LoaderFunctionArgs) {
   void freshList.catch(() => {});
   return defer({
     watch: watchItems(request, [watchKeys.upgrades(allHistory)]),
+    revs: loaderRevs([
+      [
+        watchKeys.upgrades(allHistory),
+        Promise.all([list, freshList]).then(([first, fresh]) => upgradeListContent(fresh ?? first)),
+      ],
+    ]),
     allHistory,
     list,
     freshList,

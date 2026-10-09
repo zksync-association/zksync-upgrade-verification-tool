@@ -1838,10 +1838,12 @@ describe("live engine", () => {
     for (const member of SC_MEMBERS.slice(0, 2)) safe.sign(member);
     safe.show();
     expect((await settle(safe.view())).members[2]?.status).toBe("missing");
-    // The listings the page read were new to the store: the set they were read for already has
-    // its result at this head.
+    // The listings the page read were new to the store: the set is verified again as pages show
+    // it, from the verdicts already read at this head (nothing more upstream).
+    const before = fake.posts.length;
     await until(() => signatureSetsStatus().lastRun?.trigger === "safe");
-    expect(signatureSetsStatus().lastRun).toMatchObject({ verified: 0, reused: 1 });
+    expect(signatureSetsStatus().lastRun).toMatchObject({ sets: 1, failed: 0 });
+    expect(fake.posts.length).toBe(before);
 
     // The third member signs, and its listing is read again (as the sweep does before a listing
     // turns 60 s old) with a new version: the set is verified again at the head being served,
@@ -1851,7 +1853,8 @@ describe("live engine", () => {
     const requested = safe.requests.length;
     invalidate(`safe:list:${(SC_MEMBERS[2] as Hex).toLowerCase()}`);
     await settle(listSafeMessages(SC_MEMBERS[2] as Hex));
-    await until(() => signatureSetsStatus().lastRun?.verified === 1);
+    // The change settles (100 ms) and the set is verified again.
+    await vi.advanceTimersByTimeAsync(1_000);
     expect(signatureSetsStatus().lastRun).toMatchObject({
       trigger: "safe",
       block: HEAD.toString(),
@@ -1863,7 +1866,7 @@ describe("live engine", () => {
 
     const posts = fake.posts.length;
     const requests = safe.requests.length;
-    const set = await safe.view();
+    const set = await settle(safe.view());
     expect(set.members.map((m) => m.status)).toEqual(["valid", "valid", "valid"]);
     expect(set.thresholdCheck.status).toBe("met");
     expect(fake.posts.length).toBe(posts);
@@ -1921,12 +1924,13 @@ describe("live engine", () => {
     expect(status).toMatchObject({ active: true, head: { number: HEAD.toString() } });
     // JSON-safe as served.
     expect(JSON.parse(JSON.stringify(status))).toEqual(status);
-    // The page load also started the Safe store's sweep, which runs while the engine does: on
-    // the public Safe service without a key it never reads in the background; with one, it has
-    // nothing to do yet (no set on screen).
+    // The page load also started the Safe store's watcher, which runs while the engine does and
+    // someone uses the app: it has nothing to check yet (no set or list on screen).
+    await vi.advanceTimersByTimeAsync(100);
     expect(safeStoreStatus()).toMatchObject({
       sweeping: false,
-      paused: process.env.SAFE_API_KEY ? null : "keyless-public-service",
+      paused: null,
+      watched: { safes: 0, lists: 0 },
     });
 
     // Settings change: the old engine retires at its next wake and the new one starts (the app is

@@ -143,7 +143,9 @@ export function loadFreezeList({ freshness = "strict" }: { freshness?: Freshness
   const fresh = gov.then(async (g) =>
     freezeListFrom(
       g,
-      await collectMessages(g.securityCouncil.members, FREEZE_ACTIONS, g.securityCouncil.domain)
+      await collectMessages(g.securityCouncil.members, FREEZE_ACTIONS, g.securityCouncil.domain, {
+        page: freshness === "page",
+      })
     )
   );
   const first =
@@ -162,6 +164,21 @@ export function loadFreezeList({ freshness = "strict" }: { freshness?: Freshness
       : fresh;
   for (const promise of [first, fresh]) void promise.catch(() => {});
   return { first, fresh };
+}
+
+/**
+ * For the sync engine: the freeze list as a page shows it, from the Safe copies held under the
+ * page rule (never asking Safe) and governance at the head pages read; null when a member Safe's
+ * copy is not one a page would use as current (the page then reads it itself).
+ */
+export async function heldFreezeList(): Promise<FreezeList | null> {
+  const gov = await governanceFor("page");
+  const collected = await collectHeldMessages(
+    gov.securityCouncil.members,
+    FREEZE_ACTIONS,
+    gov.securityCouncil.domain
+  );
+  return collected && !collected.stale ? freezeListFrom(gov, collected) : null;
 }
 
 /** The strict list (JSON). */
@@ -211,6 +228,8 @@ export function loadFreezeRequest(
         check: { kind: "multisig", contract: gov.securityCouncil.address },
         supplied,
         open: state.status === "open",
+        // Closed from validUntil on (see freezeState): a page showing it then reloads.
+        openUntil: BigInt(params.validUntil),
       },
       freshness
     );
@@ -218,13 +237,17 @@ export function loadFreezeRequest(
   });
   const fresh = started.then(async ({ gov, state, streamed }): Promise<FreezeDetail> => {
     const set = await streamed.fresh;
-    const execution = await executionFor(set, state, (valid) =>
-      freezeExecution(
-        params.action,
-        gov.securityCouncil.address,
-        { validUntil: params.validUntil, threshold: params.threshold },
-        valid
-      )
+    const execution = await executionFor(
+      set,
+      state,
+      (valid) =>
+        freezeExecution(
+          params.action,
+          gov.securityCouncil.address,
+          { validUntil: params.validUntil, threshold: params.threshold },
+          valid
+        ),
+      { page: freshness === "page" }
     );
     return { params, set, state, execution, governance: gov };
   });

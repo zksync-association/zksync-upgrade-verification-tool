@@ -1,6 +1,6 @@
+import { INITIAL_LIVE, LiveStateProvider } from "@/components/presence";
 import {
   BlockAge,
-  IDLE_POLLS,
   IndexProgressProvider,
   type IndexStatusView,
   IndexedLoadingCard,
@@ -43,8 +43,6 @@ function index(overrides: Partial<IndexStatusView> = {}): IndexStatusView {
     ...overrides,
   };
 }
-
-const okStatus = (i: IndexStatusView) => ({ ok: true, sync: { index: i } });
 
 describe("indexProgress", () => {
   it("is not indexing once ready, unavailable or idle", () => {
@@ -143,7 +141,7 @@ describe("the indexing state never renders a 0", () => {
   });
 });
 
-describe("IndexProgressProvider polling", () => {
+describe("IndexProgressProvider (fed by the tab's beats)", () => {
   const fetch = vi.fn();
   beforeEach(() => {
     vi.useFakeTimers();
@@ -155,239 +153,77 @@ describe("IndexProgressProvider polling", () => {
     vi.unstubAllGlobals();
   });
 
-  const answer = (body: unknown) => Promise.resolve({ json: () => Promise.resolve(body) });
-  const pollOnce = () => act(() => vi.advanceTimersByTimeAsync(2_000));
-
-  it("never polls while the tab is hidden, and goes on once it is visible again", async () => {
-    let visibility: DocumentVisibilityState = "visible";
-    Object.defineProperty(document, "visibilityState", {
-      configurable: true,
-      get: () => visibility,
-    });
-    try {
-      fetch.mockImplementation(() =>
-        answer(okStatus(index({ chunks: { done: 200, total: 435 } })))
-      );
-      render(
-        <IndexProgressProvider initial={index({ chunks: { done: 40, total: 435 } })}>
-          <IndexingPill />
-        </IndexProgressProvider>
-      );
-      await pollOnce();
-      expect(fetch).toHaveBeenCalledTimes(1);
-      // Hidden: each read of the status can reach the RPC, so none is made.
-      await act(async () => {
-        visibility = "hidden";
-        document.dispatchEvent(new Event("visibilitychange"));
-      });
-      await act(() => vi.advanceTimersByTimeAsync(5 * 60_000));
-      expect(fetch).toHaveBeenCalledTimes(1);
-      await act(async () => {
-        visibility = "visible";
-        document.dispatchEvent(new Event("visibilitychange"));
-      });
-      await pollOnce();
-      expect(fetch).toHaveBeenCalledTimes(2);
-    } finally {
-      visibility = "visible";
-    }
-  });
-
-  it("polls /api/status while backfilling, and stops once ready", async () => {
-    fetch
-      .mockReturnValueOnce(answer(okStatus(index({ chunks: { done: 200, total: 435 } }))))
-      .mockReturnValueOnce(answer(okStatus(index({ state: "ready" }))));
-    render(
-      <IndexProgressProvider initial={index({ chunks: { done: 40, total: 435 } })}>
+  /** The provider under what the last beat said about the index (null: no beat yet). */
+  const view = (
+    initial: IndexStatusView | null,
+    beat: IndexStatusView | null,
+    onSettled?: () => void
+  ) => (
+    <LiveStateProvider value={{ ...INITIAL_LIVE, index: beat as never }}>
+      <IndexProgressProvider initial={initial} onSettled={onSettled}>
         <IndexingPill />
       </IndexProgressProvider>
-    );
+    </LiveStateProvider>
+  );
+
+  it("shows the root status's progress, then each beat's, and asks nothing of its own", async () => {
+    const first = index({ chunks: { done: 40, total: 435 } });
+    const shown = render(view(first, null));
     expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 9%");
-    await pollOnce();
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch.mock.calls[0]?.[0]).toBe("/api/status");
+    shown.rerender(view(first, index({ chunks: { done: 200, total: 435 } })));
     expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 45%");
-    await pollOnce();
-    expect(screen.queryByTestId("index-progress")).not.toBeInTheDocument();
-    await act(() => vi.advanceTimersByTimeAsync(20_000));
-    expect(fetch).toHaveBeenCalledTimes(2);
-  });
-
-  it("keeps the last progress through a failed poll and polls again", async () => {
-    fetch
-      .mockImplementationOnce(() => Promise.reject(new Error("offline")))
-      .mockReturnValueOnce(answer({ error: "upstream" }))
-      .mockReturnValueOnce(answer(okStatus(index({ chunks: { done: 300, total: 435 } }))));
-    render(
-      <IndexProgressProvider initial={index({ chunks: { done: 40, total: 435 } })}>
-        <IndexingPill />
-      </IndexProgressProvider>
-    );
-    await pollOnce();
-    await pollOnce();
-    expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 9%");
-    await pollOnce();
-    expect(fetch).toHaveBeenCalledTimes(3);
-    expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 68%");
-  });
-
-  it.each(["ready", "unavailable"] as const)(
-    "never polls once the index is %s (an idle tab stays idle)",
-    async (state) => {
-      const onSettled = vi.fn();
-      render(
-        <IndexProgressProvider initial={index({ state })} onSettled={onSettled}>
-          <IndexingPill />
-        </IndexProgressProvider>
-      );
-      await act(() => vi.advanceTimersByTimeAsync(60_000));
-      expect(fetch).not.toHaveBeenCalled();
-      expect(onSettled).not.toHaveBeenCalled();
-    }
-  );
-
-  it.each(["ready", "unavailable"] as const)(
-    "reports once that the index settled (%s), so the root status is read again",
-    async (state) => {
-      const onSettled = vi.fn();
-      fetch
-        .mockReturnValueOnce(answer(okStatus(index({ chunks: { done: 200, total: 435 } }))))
-        .mockReturnValueOnce(answer(okStatus(index({ state }))));
-      render(
-        <IndexProgressProvider
-          initial={index({ chunks: { done: 40, total: 435 } })}
-          onSettled={onSettled}
-        >
-          <IndexingPill />
-        </IndexProgressProvider>
-      );
-      await pollOnce();
-      expect(onSettled).not.toHaveBeenCalled();
-      await pollOnce();
-      expect(onSettled).toHaveBeenCalledTimes(1);
-      await act(() => vi.advanceTimersByTimeAsync(60_000));
-      expect(fetch).toHaveBeenCalledTimes(2);
-      expect(onSettled).toHaveBeenCalledTimes(1);
-    }
-  );
-
-  it("polls while the backfill has not started yet (the root status read right after a settings save)", async () => {
-    const onSettled = vi.fn();
-    fetch
-      .mockReturnValueOnce(answer(okStatus(index({ state: "idle" }))))
-      .mockReturnValueOnce(answer(okStatus(index({ chunks: { done: 100, total: 435 } }))))
-      .mockReturnValueOnce(answer(okStatus(index({ state: "ready" }))));
-    render(
-      <IndexProgressProvider initial={index({ state: "idle" })} onSettled={onSettled}>
-        <IndexingPill />
-      </IndexProgressProvider>
-    );
-    expect(screen.queryByTestId("index-progress")).not.toBeInTheDocument();
-    await pollOnce();
-    await pollOnce();
-    expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 22%");
-    await pollOnce();
-    expect(screen.queryByTestId("index-progress")).not.toBeInTheDocument();
-    expect(onSettled).toHaveBeenCalledTimes(1);
-  });
-
-  it("stops polling an index that stays idle (nothing started its backfill), until a new root status", async () => {
-    const idle = () => answer(okStatus(index({ state: "idle" })));
-    fetch.mockImplementation(idle);
-    const view = render(
-      <IndexProgressProvider initial={index({ state: "idle" })}>
-        <IndexingPill />
-      </IndexProgressProvider>
-    );
-    for (let i = 0; i < 3 * IDLE_POLLS; i++) await pollOnce();
-    expect(fetch).toHaveBeenCalledTimes(IDLE_POLLS);
-    // A new root status (Refresh, a settings save) gives it another few polls.
-    view.rerender(
-      <IndexProgressProvider initial={index({ state: "idle" })}>
-        <IndexingPill />
-      </IndexProgressProvider>
-    );
-    for (let i = 0; i < 3 * IDLE_POLLS; i++) await pollOnce();
-    expect(fetch).toHaveBeenCalledTimes(2 * IDLE_POLLS);
-  });
-
-  it("keeps polling a backfill that started after a few idle polls", async () => {
-    fetch
-      .mockReturnValueOnce(answer(okStatus(index({ state: "idle" }))))
-      .mockReturnValueOnce(answer(okStatus(index({ state: "idle" }))))
-      .mockReturnValue(answer(okStatus(index({ chunks: { done: 100, total: 435 } }))));
-    render(
-      <IndexProgressProvider initial={index({ state: "idle" })}>
-        <IndexingPill />
-      </IndexProgressProvider>
-    );
-    for (let i = 0; i < IDLE_POLLS + 5; i++) await pollOnce();
-    expect(fetch).toHaveBeenCalledTimes(IDLE_POLLS + 5);
-    expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 22%");
-  });
-
-  it("does not poll before the root status is in this browser", async () => {
-    render(
-      <IndexProgressProvider initial={null}>
-        <IndexingPill />
-      </IndexProgressProvider>
-    );
-    for (let i = 0; i < 5; i++) await pollOnce();
+    await act(() => vi.advanceTimersByTimeAsync(10 * 60_000));
+    // No /api/status poll, visible or not: the beats (which stop while hidden) carry it.
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("does not report a settled index from a poll sent before a newer root status", async () => {
+  it("reports once that the index settled (ready or unavailable), so the root status is read again", async () => {
+    for (const settled of [
+      index({ state: "ready" }),
+      index({ state: "unavailable", error: "x" }),
+    ]) {
+      const onSettled = vi.fn();
+      const first = index({ chunks: { done: 40, total: 435 } });
+      const shown = render(view(first, null, onSettled));
+      shown.rerender(view(first, index({ chunks: { done: 300, total: 435 } }), onSettled));
+      expect(onSettled).not.toHaveBeenCalled();
+      shown.rerender(view(first, settled, onSettled));
+      expect(onSettled).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId("index-progress")).not.toBeInTheDocument();
+      // Further beats saying the same: nothing more.
+      shown.rerender(view(first, { ...settled }, onSettled));
+      expect(onSettled).toHaveBeenCalledTimes(1);
+      shown.unmount();
+    }
+  });
+
+  it("reports nothing when the root status already had the index settled", () => {
     const onSettled = vi.fn();
-    let resolve: (value: unknown) => void = () => {};
-    fetch.mockReturnValueOnce(
-      new Promise((r) => {
-        resolve = r;
-      })
-    );
-    const view = render(
-      <IndexProgressProvider
-        initial={index({ chunks: { done: 40, total: 435 } })}
-        onSettled={onSettled}
-      >
-        <IndexingPill />
-      </IndexProgressProvider>
-    );
-    await pollOnce();
-    view.rerender(
-      <IndexProgressProvider initial={index({ state: "ready" })} onSettled={onSettled}>
-        <IndexingPill />
-      </IndexProgressProvider>
-    );
-    await act(async () =>
-      resolve({ json: () => Promise.resolve(okStatus(index({ state: "ready" }))) })
-    );
+    const ready = index({ state: "ready" });
+    const shown = render(view(ready, null, onSettled));
+    shown.rerender(view(ready, { ...ready }, onSettled));
     expect(onSettled).not.toHaveBeenCalled();
   });
 
-  it("drops a poll's late answer once a newer root status arrived", async () => {
-    let resolve: (value: unknown) => void = () => {};
-    fetch.mockReturnValueOnce(
-      new Promise((r) => {
-        resolve = r;
-      })
-    );
+  it("follows a backfill that starts after the root status (read right after a settings save)", () => {
+    const onSettled = vi.fn();
+    const idle = index({ state: "idle" });
+    const shown = render(view(idle, null, onSettled));
+    shown.rerender(view(idle, index({ chunks: { done: 10, total: 435 } }), onSettled));
+    expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 2%");
+    shown.rerender(view(idle, index({ state: "ready" }), onSettled));
+    expect(onSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it("takes a newer root status over what the beats said", () => {
     const first = index({ chunks: { done: 40, total: 435 } });
-    const view = render(
-      <IndexProgressProvider initial={first}>
-        <IndexingPill />
-      </IndexProgressProvider>
-    );
-    await pollOnce();
-    expect(fetch).toHaveBeenCalledTimes(1);
-    // Refresh: the root status is newer than the poll still out.
-    view.rerender(
-      <IndexProgressProvider initial={index({ chunks: { done: 400, total: 435 } })}>
-        <IndexingPill />
-      </IndexProgressProvider>
-    );
-    expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 91%");
-    await act(async () => resolve({ json: () => Promise.resolve(okStatus(first)) }));
-    expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 91%");
+    const shown = render(view(first, index({ chunks: { done: 200, total: 435 } })));
+    expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 45%");
+    // Refresh: a new root status (the beat in hand is the same object as before).
+    const beat = index({ chunks: { done: 200, total: 435 } });
+    shown.rerender(view(first, beat));
+    shown.rerender(view(index({ chunks: { done: 100, total: 435 } }), beat));
+    expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 22%");
   });
 });
 

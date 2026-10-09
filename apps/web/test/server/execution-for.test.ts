@@ -51,13 +51,20 @@ describe("executionFor", () => {
     ]);
     const execution = await executionFor(set, { status: "open" }, build);
     expect(execution?.simulation).toEqual({ status: "ok" });
-    expect(asked).toEqual([{ keep: true }]);
+    expect(asked).toEqual([{ keep: true, page: false }]);
+    // For a page: simulated again at each new head while it shows it.
+    await executionFor(set, { status: "open" }, build, { page: true });
+    expect(asked.at(-1)).toEqual({ keep: true, page: true });
   });
 
-  it("never keeps it when a supplied signature is in the transaction", async () => {
+  it("never keeps it when a supplied signature is in the transaction, nor has a page simulate it again", async () => {
     const set = setOf([member(1, "valid", "safe"), member(2, "valid", "supplied")]);
     await executionFor(set, { status: "open" }, build);
-    expect(asked).toEqual([{ keep: false }]);
+    await executionFor(set, { status: "open" }, build, { page: true });
+    expect(asked).toEqual([
+      { keep: false, page: false },
+      { keep: false, page: false },
+    ]);
   });
 
   it("does not simulate a set that is not open or below its threshold", async () => {

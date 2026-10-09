@@ -2,7 +2,7 @@ import type { MemberResult } from "@/.server/signatures";
 import { type GovernanceTypedData, type SignerGroup, toSignable } from "@/common/typed-data";
 import { GROUP_LABEL, useConnectedGroups, useOfferWallet } from "@/components/connect-button";
 import { Hash } from "@/components/hex";
-import { usePresence } from "@/components/presence";
+import { useHoldUpdates, usePresence } from "@/components/presence";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,6 +24,8 @@ import { useSignTypedData } from "wagmi";
 // Signing is a request to the connected member Safe (this app opened inside Safe{Wallet}, or
 // WalletConnect). The Safe files the message in its Transaction Service; this page then picks it
 // up from there and checks it on-chain like every other signature. Nothing is posted to this app.
+// While the dialog is open or the wallet request is pending, the page's data is not reloaded (the
+// hashes being compared never change under the signer); a reload that waits says so.
 
 export function SignButton({
   typedData,
@@ -43,6 +45,7 @@ export function SignButton({
   const revalidator = useRevalidator();
   const { signTypedData, isPending } = useSignTypedData();
   const presence = usePresence();
+  const waiting = useHoldUpdates(open || isPending);
 
   const member = address
     ? members.find((m) => isAddressEqual(m.member as `0x${string}`, address))
@@ -144,6 +147,11 @@ export function SignButton({
             <p className="text-amber-900 text-sm">
               The connected account is not a Safe. This page only picks up signatures that a member
               Safe files with Safe's service.
+            </p>
+          )}
+          {waiting && (
+            <p className="text-slate-600 text-xs" role="status" data-testid="update-held">
+              New data · applies when you close this
             </p>
           )}
           <div className="flex justify-end gap-2">

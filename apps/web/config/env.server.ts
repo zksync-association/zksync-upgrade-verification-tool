@@ -40,13 +40,18 @@ const baseEnv = createEnv({
     SYNC_MODE: z.enum(["window", "always", "off"]).default("window"),
     SYNC_KEEPWARM_MS: z.coerce.number().int().min(0).default(30_000),
     SYNC_AWAY_MS: z.coerce.number().int().min(0).default(1_800_000),
-    // While the engine runs, the member Safes of the signature sets on screen have their message
-    // listings re-checked before they turn 60 s old; with SYNC_MODE=always every member Safe is
-    // also checked at an interval paced by the Safe quota left (10-20 minutes with a key). Only
-    // with SAFE_API_KEY or a self-hosted Safe service, and at most SYNC_SAFE_HOURLY_BUDGET
-    // background requests an hour. SYNC_SAFE_ACTIVE_MS is no longer used (what is on screen
-    // decides).
-    SYNC_SAFE_ACTIVE_MS: z.coerce.number().int().min(0).default(300_000),
+    // While a page showing a signature set that can still be signed is on screen, the member Safes
+    // of that set whose signature is not valid yet are asked every SYNC_SAFE_WATCH_MS whether
+    // their messages changed (one small request each, the listing only when it did), one Safe at
+    // a time; the Safes behind lists on screen (pending emergency upgrades, freeze requests,
+    // vetoes) every SYNC_SAFE_LIST_WATCH_MS. Without SAFE_API_KEY on Safe's public service (2
+    // requests/s, 5,000 a month per IP) at most every SYNC_SAFE_WATCH_KEYLESS_MS (0: only on
+    // request). Never more than SYNC_SAFE_HOURLY_BUDGET such requests an hour, slower when Safe
+    // reports little quota left, paused below 10 % of it. Nothing while nobody uses the app.
+    // SYNC_SAFE_ACTIVE_MS is gone (ignored, with a warning at start).
+    SYNC_SAFE_WATCH_MS: z.coerce.number().int().min(1_000).default(60_000),
+    SYNC_SAFE_LIST_WATCH_MS: z.coerce.number().int().min(1_000).default(300_000),
+    SYNC_SAFE_WATCH_KEYLESS_MS: z.coerce.number().int().min(0).default(300_000),
     SYNC_SAFE_HOURLY_BUDGET: z.coerce.number().int().min(0).default(1_200),
     // A signature set's checks at a head go out in one Multicall3 aggregate3 with the head's other
     // reads, and only positives are taken from it (ECDSA-only candidates on pinned contracts;

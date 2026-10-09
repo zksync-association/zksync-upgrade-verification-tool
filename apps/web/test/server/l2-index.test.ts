@@ -4,13 +4,16 @@ import { indexedL2Governors, l2GovernorIndex } from "@/.server/chain/l2-index";
 import { createLogIndex } from "@/.server/chain/log-index";
 import {
   activeL2Proposals,
+  activeL2ProposalsAnswer,
   findL2ProposalForUpgrade,
   getL2Proposal,
   notStartedUpgrades,
-  refreshVetoableL2,
 } from "@/.server/flows/l2";
+import { eraPass } from "@/.server/sync/era";
 import { listL2Vetoes, loadL2VetoList } from "@/.server/flows/l2-veto";
-import { l2ChainHead, l2HistoryLane, resetRpcClients } from "@/.server/rpc";
+import { l2ChainHead, l2HistoryLane, lastL2Head, resetRpcClients } from "@/.server/rpc";
+import { currentRev } from "@/.server/sync/revs";
+import { type BeatAnswer, action as beatAction } from "@/routes/resources+/presence";
 import { l2GovernorAbi } from "@/common/abis";
 import {
   type Address,
@@ -108,6 +111,7 @@ vi.mock("@/.server/rpc", async (importOriginal) => {
 });
 
 const GOV = {
+  latestBlock: { number: "26000000", hash: "0x01", timestamp: "1" },
   guardians: {
     address: GUARDIANS,
     nonce: "0",
@@ -227,9 +231,17 @@ function scenario(): EraProposal[] {
   ];
 }
 
+// Era's eth_call failing (an RPC error), while `calls` is set.
+const eraFaults = { calls: false };
+
 function upstream(proposals = scenario(), chain: Parameters<typeof fakeEra>[1] = {}) {
   const era = fakeEra(proposals, chain);
-  const fake = fakeJsonRpc({ handle: (call) => era.handle(call) });
+  const fake = fakeJsonRpc({
+    handle: (call) =>
+      eraFaults.calls && call.method === "eth_call"
+        ? new FakeRpcError(-32603, "internal error")
+        : era.handle(call),
+  });
   vi.stubGlobal("fetch", async (input: unknown, init?: RequestInit) => {
     const url = String(input);
     if (!url.startsWith(ERA_URL)) throw new Error("only the fake Era is reachable here");
@@ -249,7 +261,26 @@ function settings(net: Record<string, unknown>) {
   state.network = net;
 }
 
+/** A tab's beat with these items, through the route: its answer. */
+async function tabBeat(items: { key: string; rev: string | null }[]) {
+  const response = (await beatAction({
+    request: new Request("http://localhost:3000/resources/presence", {
+      method: "POST",
+      headers: { "content-type": "application/json", "sec-fetch-site": "same-origin" },
+      body: JSON.stringify({
+        tab: "0f8c6c55-2a51-4d0c-9a64-2a1d2f6b9e11",
+        reason: "interval",
+        items,
+      }),
+    }),
+    params: {},
+    context: {},
+  } as never)) as Response;
+  return (await response.json()) as BeatAnswer;
+}
+
 beforeEach(() => {
+  eraFaults.calls = false;
   settings(MAINNET);
   state.l1Reads = 0;
   state.upgradeStates = new Map([
@@ -614,6 +645,21 @@ describe("the flows on the index", () => {
     ]);
   });
 
+  it("ask Era for an upgrade's log proof once: the Era timer's minute reads of the startable list keep it", async () => {
+    const { era } = upstream();
+    const first = await notStartedUpgrades({ page: true });
+    expect(first.filter((u) => u.ok)).toHaveLength(1);
+    const proofs = era.count("zks_getL2ToL1LogProof");
+    expect(proofs).toBeGreaterThanOrEqual(1);
+    // Three newer Era heads (each read anew: the list is kept per Era head).
+    for (let next = 1; next <= 3; next++) {
+      era.setHead(HEAD + BigInt(next));
+      expect(await eraPass(["list:startable"])).not.toBeNull();
+      expect(await notStartedUpgrades({ page: true })).toEqual(first);
+    }
+    expect(era.count("zks_getL2ToL1LogProof")).toBe(proofs);
+  });
+
   it("find an upgrade's L2 proposal without the batch, without searching headers", async () => {
     const { era } = upstream();
     const one = era.proposals.find((p) => p.description === "upgrade one") as EraProposal;
@@ -684,27 +730,108 @@ describe("the flows on the index", () => {
     expect(methods.filter((m) => m === "eth_getBlockByNumber")).toHaveLength(2); // latest, finalized
   });
 
-  it("are refreshed by the sync engine (while an Era page is on screen: the engine decides)", async () => {
+  it("are read by the Era timer while an Era page is on screen: a page after it answers from memory", async () => {
     const { era, fake } = upstream();
     // A page views the vetoable list.
-    await activeL2Proposals();
+    await activeL2ProposalsAnswer({ page: true });
     // The next Era head (a block later, so the 24-day window drops its first block).
     era.setHead(HEAD + 2n);
-    expect(await refreshVetoableL2()).toBe(true);
-    // The request after the refresh: everything from memory, at the refreshed head.
+    expect(await eraPass(["list:vetoes"])).not.toBeNull();
+    // A page after the timer's read: everything from memory, at the head it read (labelled).
     const posts = fake.posts.length;
-    const listed = await activeL2Proposals();
+    const listed = await activeL2ProposalsAnswer({ page: true });
     expect(fake.posts.length).toBe(posts);
-    expect(listed.map((p) => p.description)).toEqual(["in the tail", "pending on GovOps"]);
+    expect(listed.proposals.map((p) => p.description)).toEqual([
+      "in the tail",
+      "pending on GovOps",
+    ]);
+    expect(listed.eraHead?.number).toBe((HEAD + 2n).toString());
     expect((await l2GovernorIndex().read()).head.head.number).toBe(HEAD + 2n);
   });
 
-  it("the engine's refresh takes the Guardians' address from pages' governance, never JSON's full read", async () => {
+  it("C-4: a minute's read of the vetoable list costs Era's head, the index tail and the states: at most 4 requests", async () => {
+    const { era, fake } = upstream();
+    // The first read (the page's): the backfill and the window's block headers, once.
+    await activeL2ProposalsAnswer({ page: true });
+    expect(await eraPass(["list:vetoes"])).not.toBeNull();
+    for (let minute = 1; minute <= 3; minute++) {
+      era.setHead(HEAD + BigInt(minute * 60));
+      const posts = fake.posts.length;
+      const pass = await eraPass(["list:vetoes"]);
+      expect(pass?.at.head.number).toBe(HEAD + BigInt(minute * 60));
+      // Era's head ('latest'; 'finalized' every 32 reads), the tail, the states: in batches.
+      expect(fake.posts.length - posts).toBeLessThanOrEqual(4);
+      const sent = fake.posts.slice(posts).flatMap((p) => p.calls.map((c) => c.method));
+      expect(sent.filter((m) => m === "eth_getBlockByNumber")).toHaveLength(1);
+      expect(sent.filter((m) => m === "eth_getLogs")).toHaveLength(1);
+      expect(sent.filter((m) => m === "eth_call")).toHaveLength(pass?.proposals.length ?? -1);
+    }
+  });
+
+  it("a tab's beat names, for each Era item, the Era head its content was read at: never a newer one whose reads failed", async () => {
+    const { era } = upstream();
+    await activeL2ProposalsAnswer({ page: true });
+    const key = `l2:${T.toLowerCase()}:${proposalIdOf("the window's first block")}`;
+    expect(await eraPass([key])).not.toBeNull();
+    const item = { key, rev: currentRev(key) };
+    expect(item.rev).not.toBeNull();
+    const first = await tabBeat([item]);
+    const read = first.eraAt[key];
+    expect(read?.number).toBe(lastL2Head()?.head.number.toString());
+    // A minute later Era's head moved, and its state() reads fail: the content is not read there.
+    era.setHead(HEAD + 60n);
+    eraFaults.calls = true;
+    await eraPass([key]);
+    expect(lastL2Head()?.head.number).toBe(HEAD + 60n);
+    const failed = await tabBeat([item]);
+    expect(failed.changed).toEqual([]);
+    expect(failed.eraAt[key]).toEqual(read);
+    expect(failed.era).toEqual(read);
+    // Era answers again: the same content, read at the newer head.
+    eraFaults.calls = false;
+    era.setHead(HEAD + 120n);
+    await eraPass([key]);
+    const again = await tabBeat([item]);
+    expect(again.changed).toEqual([]);
+    expect(again.eraAt[key]?.number).toBe((HEAD + 120n).toString());
+    // A tab showing other content (another revision) is told nothing about its Era head.
+    expect((await tabBeat([{ key, rev: "999999" }])).eraAt).toEqual({});
+  });
+
+  it("S-24: a proposal's state changing on Era moves its l2: key's revision through the Era timer's pass; the same state at a newer Era head keeps it", async () => {
+    const { era } = upstream();
+    await activeL2ProposalsAnswer({ page: true });
+    const key = `l2:${T.toLowerCase()}:${proposalIdOf("the window's first block")}`;
+    expect(await eraPass([key])).not.toBeNull();
+    const first = currentRev(key);
+    expect(first).not.toBeNull();
+    // A minute later, nothing changed on Era: the same revision.
+    era.setHead(HEAD + 60n);
+    await eraPass([key]);
+    expect(currentRev(key)).toBe(first);
+    // The proposal is canceled on Era (state() says so; no log the index reads yet).
+    const target = era.proposals.find((p) => p.description === "the window's first block");
+    expect(target).toBeDefined();
+    (target as { state: number | Error }).state = 2;
+    era.setHead(HEAD + 120n);
+    const pass = await eraPass([key]);
+    expect(pass?.proposals.find((p) => p.description === "the window's first block")?.state).toBe(
+      "Canceled"
+    );
+    const canceled = currentRev(key);
+    expect(canceled).not.toBe(first);
+    // Read again at the next minute with the same state: kept.
+    era.setHead(HEAD + 180n);
+    await eraPass([key]);
+    expect(currentRev(key)).toBe(canceled);
+  });
+
+  it("the Era timer takes the Guardians' address from pages' governance, never JSON's full read", async () => {
     upstream();
     await activeL2Proposals();
     reads.json = 0;
     reads.page = 0;
-    expect(await refreshVetoableL2()).toBe(true);
+    expect(await eraPass(["list:vetoes"])).not.toBeNull();
     expect(reads.json).toBe(0);
     expect(reads.page).toBeGreaterThan(0);
   });
@@ -756,9 +883,9 @@ describe("the flows on the index", () => {
     expect((await activeL2Proposals()).map((p) => p.description)).toContain("fresh");
     expect(await getL2Proposal(T, id)).toMatchObject({ description: "fresh" });
 
-    // The engine's refresh is answered by an Era backend a few blocks behind.
+    // The Era timer's read is answered by an Era backend a few blocks behind.
     era.setHead(HEAD);
-    expect(await refreshVetoableL2()).toBe(true);
+    expect(await eraPass(["list:vetoes"])).not.toBeNull();
     era.setHead(HEAD + 5n);
     // Requests keep the head already served, from memory.
     const posts = fake.posts.length;
@@ -767,16 +894,16 @@ describe("the flows on the index", () => {
     expect(await getL2Proposal(T, id)).toMatchObject({ description: "fresh" });
     expect(fake.posts.length).toBe(posts);
 
-    // A newer Era head from the engine is served.
+    // A newer Era head from the timer is served.
     era.setHead(HEAD + 7n);
-    expect(await refreshVetoableL2()).toBe(true);
+    expect(await eraPass(["list:vetoes"])).not.toBeNull();
     expect((await l2ChainHead())?.head.number).toBe(HEAD + 7n);
     // So is another block at that height, named by a later read (a reorg)...
     era.setHead(HEAD + 7n, { salt: 3 });
-    expect(await refreshVetoableL2()).toBe(true);
+    expect(await eraPass(["list:vetoes"])).not.toBeNull();
     expect((await l2ChainHead())?.head.hash).toBe(blockHash(HEAD + 7n, 3));
     // ...and the same block named again (served for another 4 s).
-    expect(await refreshVetoableL2()).toBe(true);
+    expect(await eraPass(["list:vetoes"])).not.toBeNull();
     expect((await l2ChainHead())?.head.hash).toBe(blockHash(HEAD + 7n, 3));
   });
 
@@ -787,8 +914,8 @@ describe("the flows on the index", () => {
     // Nothing would be final: the index would re-read every governor log at each Era head.
     expect(era.chain.queries.length).toBeGreaterThan(0);
     for (const query of era.chain.queries) expect(query.from).toBeGreaterThanOrEqual(START_FROM);
-    // And the engine has nothing to refresh ahead of requests.
-    expect(await refreshVetoableL2()).toBe(false);
+    // And the Era timer has nothing to read ahead of pages.
+    expect(await eraPass(["list:vetoes"])).toBeNull();
 
     // The answers of the on-demand path.
     settings(UNPINNED);

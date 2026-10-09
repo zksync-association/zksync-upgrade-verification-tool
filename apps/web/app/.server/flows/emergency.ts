@@ -44,6 +44,7 @@ import { directLookupHelps, emergencyEventDirectly, firstAnswer } from "./direct
 import { firstFromHeld } from "./held";
 import { type Collected, collectHeldMessages, collectMessages } from "./messages";
 import { type EmergencyEvent, findEmergencyEvent } from "./emergency-event";
+import { noteListedEmergencyIds } from "../sync/listed-ids";
 import { currentUpgradeStatus } from "../upgrade-status";
 
 // Emergency upgrades sign only the id = keccak256(abi.encode(calls, executor, salt)); Safe never
@@ -211,6 +212,9 @@ async function pendingFrom(collected: Collected): Promise<PendingEmergencies> {
       entry.reported.zkFoundation = n > 0;
     if (!entry.firstSeen || group.firstSeen < entry.firstSeen) entry.firstSeen = group.firstSeen;
   }
+  // While a list of them is on screen, the engine reads these ids' states in each head's snapshot
+  // (sync/listed-ids.ts), so the reads below find them at the head.
+  noteListedEmergencyIds([...byId.values()].map((entry) => entry.id));
   // Concurrent current-state calls are batched by the RPC client. No archive or log scan needed.
   const entries = await Promise.all(
     [...byId.values()].map(async (entry) => {
@@ -275,7 +279,9 @@ export function loadEmergencyList({
     ],
   }));
   const freshPending = signers.then(({ safes, domain }) =>
-    collectMessages(safes, EMERGENCY_ACTIONS, domain).then(pendingFrom)
+    collectMessages(safes, EMERGENCY_ACTIONS, domain, { page: freshness === "page" }).then(
+      pendingFrom
+    )
   );
   const pending =
     freshness === "page"
@@ -290,6 +296,43 @@ export function loadEmergencyList({
   for (const promise of [signers, pending, freshPending, executedFirst, executed])
     void promise.catch(() => {});
   return { pending, freshPending, executedFirst, executed };
+}
+
+/**
+ * For the sync engine: the emergency list as a page shows it, from the Safe copies held under the
+ * page rule (never asking Safe), governance at the head pages read and this run's log index; null
+ * when a member Safe's copy is not one a page would use as current.
+ */
+export async function heldEmergencyList({
+  allHistory = false,
+}: { allHistory?: boolean } = {}): Promise<{
+  pending: PendingEmergencies;
+  executed: EmergencySummary[];
+} | null> {
+  const gov = await governanceFor("page");
+  const collected = await collectHeldMessages(
+    [
+      ...gov.securityCouncil.members,
+      ...gov.guardians.members,
+      gov.emergencyUpgradeBoard.zkFoundation,
+    ],
+    EMERGENCY_ACTIONS,
+    gov.emergencyUpgradeBoard.domain
+  );
+  if (!collected || collected.stale) return null;
+  const [pending, executed] = await Promise.all([
+    pendingFrom(collected),
+    executedEmergencies({ allHistory }),
+  ]);
+  return {
+    pending,
+    executed: executed
+      .map((event) => ({
+        ...summary(event.id),
+        executed: { txHash: event.txHash, blockNumber: event.blockNumber.toString() },
+      }))
+      .reverse(),
+  };
 }
 
 export async function listRecentEmergencyUpgrades() {
@@ -704,7 +747,17 @@ export async function loadEmergencyUpgrade(
     first,
   ])
     void pending?.catch(() => {});
-  return { overview, executed, executedFirst, executedHistorical, executedCheck, detail, first };
+  return {
+    overview,
+    executed,
+    executedFirst,
+    executedHistorical,
+    executedCheck,
+    detail,
+    first,
+    // The upgrade's state and status at the head, as read for this answer (a page's revision).
+    status,
+  };
 }
 
 /** JSON retains the complete verification result, including comparisons with Safe's copies. */

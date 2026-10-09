@@ -7,18 +7,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const engine = vi.hoisted(() => ({
   wakes: 0,
+  signed: [] as string[],
   view: { head: null as unknown, catchingUp: false },
+  /** The handler's log index state the beat reports. */
+  index: "backfilling",
 }));
 vi.mock("@/.server/sync/engine", () => ({
   wakeSync: () => {
     engine.wakes++;
   },
+  noteSigned: (safe: string) => {
+    engine.signed.push(safe);
+  },
   syncView: () => engine.view,
+  listSafeChecks: () => ({}),
 }));
 vi.mock("@/.server/chain/puh-index", () => ({
   puhIndex: () => ({
     status: () => ({
-      state: "backfilling",
+      state: engine.index,
       chunks: { done: 100, total: 400 },
       deployBlock: "1",
       finalizedTo: "2",
@@ -313,12 +320,24 @@ describe("POST /resources/presence", () => {
     expect(status).toBe(200);
     expect(body).toEqual({
       changed: [],
+      // Keys sent without a revision (none rendered yet) are neither changed nor unknown.
       unknown: [],
       catchingUp: true,
       head: { number: "26129107", hash: `0x${"ab".repeat(32)}`, timestamp: "1790000000" },
       checked: {},
-      index: { state: "backfilling", percent: 25 },
-      nextMs: 10_000,
+      verifiedAt: {},
+      eraAt: {},
+      era: null,
+      simulatedAt: {},
+      index: {
+        state: "backfilling",
+        chunks: { done: 100, total: 400 },
+        deployBlock: "1",
+        finalizedTo: "2",
+        coveredFrom: "2",
+      },
+      // Catching up (and backfilling): beat again soon, for the header's state.
+      nextMs: 2_000,
     });
     expect(presence().status()).toMatchObject({ inUse: true, reason: "tab", keys: 2 });
     expect(engine.wakes).toBe(1);
@@ -327,6 +346,21 @@ describe("POST /resources/presence", () => {
     await post(beatRequest(beat([], "leave")));
     expect(presence().inUse()).toBe(false);
     expect(engine.wakes).toBe(1);
+    // Settled (caught up, the index ready): every 10 s again.
+    engine.view = { ...engine.view, catchingUp: false };
+    engine.index = "ready";
+    try {
+      expect((await post(beatRequest(beat(["status"], "interval")))).body).toMatchObject({
+        nextMs: 10_000,
+      });
+      // Still backfilling: every 2 s.
+      engine.index = "backfilling";
+      expect((await post(beatRequest(beat(["status"], "interval")))).body).toMatchObject({
+        nextMs: 2_000,
+      });
+    } finally {
+      engine.index = "backfilling";
+    }
   });
 
   it("refuses a cross-origin beat or one that is not JSON (403), recording nothing", async () => {

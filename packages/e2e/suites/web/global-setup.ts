@@ -31,6 +31,10 @@ export default async function globalSetup() {
       // The fork above, not an RPC saved in apps/web/.cache/local-settings.json (and nothing the
       // suite saves through the settings page lands in that file).
       IGNORE_LOCAL_SETTINGS: "true",
+      // Open sets' member Safes asked about every 3 s (live-updates.spec.ts), without the hourly
+      // budget stretching that (the mock Safe API is local).
+      SYNC_SAFE_WATCH_MS: "3000",
+      SYNC_SAFE_HOURLY_BUDGET: "1000000",
     },
   });
   for (let i = 0; ; i++) {

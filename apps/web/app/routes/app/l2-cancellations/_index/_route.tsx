@@ -1,3 +1,4 @@
+import { loaderRevs, vetoListContent } from "@/.server/sync/content";
 import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import type { L2ProposalView } from "@/.server/flows/l2";
@@ -14,7 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SetStateBadge } from "@/components/verification/badges";
-import { FreshnessNote, type Refresh } from "@/components/verification/freshness";
+import { CheckSafeNow } from "@/components/verification/check-safe-now";
+import { EraBlockNote, ListFreshnessNote, type Refresh } from "@/components/verification/freshness";
 import { LastRunNote } from "@/components/verification/last-run";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { formatEth, formatTime, relativeTime } from "@/utils/format";
@@ -29,11 +31,22 @@ export const meta = Meta["/app/l2-cancellations"];
 
 export function loader({ request }: LoaderFunctionArgs) {
   // Each list streams on its own: the vetoes from the Guardians' Safe copies held (labelled with
-  // their age when older than 60 s), the vetoable proposals from the governors' history the last
-  // run saved while this run reads it again (labelled); the fresh lists follow in the response.
+  // their age when older than 60 s and not kept by the watcher for the screen), the vetoable
+  // proposals from the governors' history the last run saved while this run reads it again
+  // (labelled); the fresh lists follow in the response. ZKsync Era is read at the Era head pages
+  // read (the Era timer's, at most a minute old, labelled).
   const loading = loadL2VetoList({ freshness: "page" });
+  const signed = loading.signed.then((s) => (s.stale ? loading.freshSigned : s));
   return defer({
     watch: watchItems(request, [watchKeys.vetoes]),
+    revs: loaderRevs([
+      [
+        watchKeys.vetoes,
+        Promise.all([signed, loading.freshVetoable]).then(([s, vetoable]) =>
+          vetoable.l2Error === null ? vetoListContent(s, vetoable) : undefined
+        ),
+      ],
+    ]),
     signed: loading.signed,
     freshSigned: freshAfter(loading.signed, loading.freshSigned, (s) => s.stale),
     vetoable: loading.vetoable,
@@ -120,7 +133,15 @@ function SignedList({
 }: { result: SerializeFrom<SignedVetoes>; refresh: Refresh }) {
   return (
     <div className="space-y-3">
-      <FreshnessNote set={result} refresh={refresh} what="The vetoes and counts below" />
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <ListFreshnessNote
+          watchKey="list:vetoes"
+          set={result}
+          refresh={refresh}
+          what="The vetoes and counts below"
+        />
+        {!result.stale && <CheckSafeNow watchKey="list:vetoes" />}
+      </div>
       {(result.errors.length > 0 || result.anomalies > 0) && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-sm">
           The list may be incomplete. {result.errors.join("; ")}
@@ -148,6 +169,9 @@ function VetoableList({
   return (
     <div className="space-y-3">
       {result.fromLastRun && <LastRunNote refresh={refresh} what="The proposals listed below" />}
+      {!result.fromLastRun && !result.l2Error && (
+        <EraBlockNote watchKey="list:vetoes" fallback={result.eraHead ?? null} />
+      )}
       {result.l2Error ? (
         <EmptyState>
           <span className="block text-amber-900" data-testid="vetoable-unavailable">

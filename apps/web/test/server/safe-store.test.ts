@@ -1,13 +1,15 @@
 import type { SafeMessage } from "@/.server/safe-api";
-import type { SafeGroups, SafeSweepDriver, SignerGroupName } from "@/.server/safe/store";
+import type { SafeWatchDriver } from "@/.server/safe/store";
 import { type Address, type Hex, getAddress } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The Safe snapshot store: listings served while at most 60 s old (from the answer's arrival),
-// older ones read again for the request ahead of background work, and the background sweep that
-// keeps the listings of the member Safes of the signature sets on screen fresh with one small
-// change check per Safe, within its hourly budget, never keyless on the public service and never
-// during a cooldown. Driven by a fake Safe Transaction Service and fake timers.
+// older ones read again for the request ahead of background work, and the watcher that asks Safe
+// about the member Safes the screen depends on (an open set's members not valid yet every minute,
+// a list's sources every 5 minutes), one small change check per Safe, one Safe at a time, within
+// its hourly budget and the quota Safe reports, slower without a key, never during a cooldown and
+// never while nobody uses the app; the viewer's own Safe read after they sign; "Fetch signatures";
+// and the copies a page may use. Driven by a fake Safe Transaction Service and fake timers.
 
 const net = vi.hoisted(() => ({
   chainId: 1,
@@ -38,7 +40,6 @@ const W = [1, 2, 3, 4, 5].map((n) => address(0x100 + n)) as [
   Address,
   Address,
 ];
-const G = [1, 2].map((n) => address(0x200 + n));
 
 type Sent = { at: number; safe: string | null; kind: "listing" | "newest" | "message" };
 
@@ -50,6 +51,8 @@ function fakeSafe() {
     latencyMs: 0,
     /** Answer 429 with this Retry-After (seconds) while set. */
     limited: null as number | null,
+    /** With `limited`: the 429 is for the monthly quota (none remaining). */
+    exhausted: false,
     /** Safes (lowercase) whose every request answers HTTP 500. */
     failing: new Set<string>(),
     headers: {} as Record<string, string>,
@@ -104,10 +107,18 @@ function fakeSafe() {
       if (service.latencyMs > 0)
         await new Promise((resolve) => setTimeout(resolve, service.latencyMs));
       if (service.limited !== null)
-        return new Response("Rate limited", {
-          status: 429,
-          headers: { "retry-after": String(service.limited), "x-ratelimit-remaining": "50" },
-        });
+        return service.exhausted
+          ? new Response("Monthly quota exceeded", {
+              status: 429,
+              headers: {
+                "x-ratelimit-remaining": "0",
+                "x-ratelimit-reset": String(service.limited),
+              },
+            })
+          : new Response("Rate limited", {
+              status: 429,
+              headers: { "retry-after": String(service.limited), "x-ratelimit-remaining": "50" },
+            });
       if (list && service.failing.has((list[1] as string).toLowerCase()))
         return new Response("Server error", { status: 500 });
       if (list) {
@@ -131,56 +142,40 @@ function fakeSafe() {
   return service;
 }
 
-async function load({ key = "test-key", budget }: { key?: string; budget?: number } = {}) {
+async function load({
+  key = "test-key",
+  budget,
+  keylessMs,
+}: { key?: string; budget?: number; keylessMs?: number } = {}) {
   vi.resetModules();
   // An empty value also keeps dotenv from setting one.
   vi.stubEnv("SAFE_API_KEY", key);
   if (budget !== undefined) vi.stubEnv("SYNC_SAFE_HOURLY_BUDGET", String(budget));
+  if (keylessMs !== undefined) vi.stubEnv("SYNC_SAFE_WATCH_KEYLESS_MS", String(keylessMs));
   cache = await import("@/.server/cache");
   api = await import("@/.server/safe-api");
   store = await import("@/.server/safe/store");
 }
 
 /**
- * The sync engine's side of the sweep: active while `on`, groups as given, and a set of each group
- * in `screen.groups` on screen (default: of every group given members).
+ * The engine's side of the watcher: in use while `activity.on`; `screen.set` are members of open
+ * sets on screen not valid yet, `screen.list` the Safes lists on screen collect from.
  */
-function driver(
-  groups: Partial<SafeGroups>,
-  activity = { on: true },
-  screen: { groups?: SignerGroupName[] } = {}
-): SafeSweepDriver {
-  const all: SafeGroups = { securityCouncil: [], guardians: [], zkFoundation: [], ...groups };
-  const shown = () =>
-    screen.groups ?? (Object.keys(all) as SignerGroupName[]).filter((g) => all[g].length > 0);
+function watcher(
+  screen: { set?: readonly Address[]; list?: readonly Address[] },
+  activity = { on: true }
+): SafeWatchDriver {
   return {
     active: () => activity.on,
-    onScreen: () => shown().map((group) => ({ group, members: all[group] })),
-    groups: async () => all,
+    watched: () => [
+      ...(screen.set ?? []).map((safe) => ({ safe, kind: "set" as const })),
+      ...(screen.list ?? []).map((safe) => ({ safe, kind: "list" as const })),
+    ],
   };
 }
 
-/** What the engine's side of a sweep says: active, someone using the app, what is on screen. */
-type Controls = {
-  activity: { on: boolean; viewing: boolean };
-  screen: { groups: SignerGroupName[] };
-};
-
-/**
- * The engine in SYNC_MODE=always: always active, viewing while `viewing`, and every governance
- * member Safe swept at the quota-paced interval.
- */
-function alwaysDriver(
-  groups: Partial<SafeGroups>,
-  activity = { viewing: false },
-  screen: { groups?: SignerGroupName[] } = {}
-): SafeSweepDriver {
-  return {
-    ...driver(groups, { on: true }, screen),
-    viewing: () => activity.viewing,
-    baseline: () => true,
-  };
-}
+/** `n` member Safes. */
+const safes = (n: number, base = 0x300) => Array.from({ length: n }, (_, i) => address(base + i));
 
 // Safe's public service with a key, early in its period (as measured: 50,000 a month).
 const QUOTA_HEADERS = {
@@ -206,7 +201,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  store?.stopSafeSweep();
+  store?.stopSafeWatch();
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -289,18 +284,13 @@ describe("listings on the request path", () => {
       version: listing.version,
       fetchedAt: listing.fetchedAt,
     });
-    // Never a read; and with no set on screen the sweep keeps nothing fresh.
+    // Never a read; and with nothing on screen the watcher checks nothing.
     expect(safe.sent).toHaveLength(1);
-    store.startSafeSweep(
-      driver(
-        { securityCouncil: [A], guardians: [], zkFoundation: [] },
-        { on: true },
-        { groups: [] }
-      )
-    );
-    await vi.advanceTimersByTimeAsync(5_000);
-    expect(store.safeStoreStatus().groups).toEqual([]);
-    store.stopSafeSweep();
+    store.startSafeWatch(watcher({}));
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(safe.sent).toHaveLength(1);
+    expect(store.safeStoreStatus().watched).toMatchObject({ safes: 0, lists: 0 });
+    store.stopSafeWatch();
     // A refresh drops it like any other listing.
     cache.invalidate("safe:");
     expect(store.heldSafeListing(A)).toBeNull();
@@ -370,38 +360,32 @@ describe("listings on the request path", () => {
     expect(safe.sent).toHaveLength(1);
   });
 
-  it("at 61 s reads only the stale Safes, ahead of the sweep's queued reads", async () => {
+  it("at 61 s reads only the stale Safes, ahead of the watcher's checks", async () => {
     await load(); // with a key: 220 ms between requests
     const safe = fakeSafe();
     for (const s of [A, B, ...W]) safe.add(s, 1);
-    // A page asked for A, for a Security Council member (W1), and 30 s later for B.
+    // A page asked for A, for an open set's member (W1), and 30 s later for B.
     await within(1_000, store.listSafeMessages(W[0]));
     await within(1_000, store.listSafeMessages(A));
     await vi.advanceTimersByTimeAsync(28_000);
     await within(1_000, store.listSafeMessages(B));
     await vi.advanceTimersByTimeAsync(61_000 - (Date.now() - NOW) + 1_500);
 
-    // The sweep queues its five reads (W1's change check, the other members' listings) ...
+    // The watcher starts its first check (W1's copy is over a minute old) ...
     const since = Date.now();
-    store.startSafeSweep(driver({ securityCouncil: W }));
+    store.startSafeWatch(watcher({ set: W }));
     await vi.advanceTimersByTimeAsync(1);
     expect(background(safe, since)).toHaveLength(1);
     // ... and a page needs A (61 s old) and B (31 s old).
     const [a, b] = [store.listSafeMessages(A), store.listSafeMessages(B)];
-    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(1_000);
     expect((await a).fetchedAt).toBeGreaterThan(since);
     expect((await b).fetchedAt).toBeLessThan(since);
-
-    const sent = background(safe, since).map((s) => [s.kind, s.safe]);
-    expect(sent).toEqual([
+    // A went at once; B was not read; the watcher's next check waits its turn (one at a time).
+    expect(background(safe, since).map((s) => [s.kind, s.safe])).toEqual([
       ["newest", W[0].toLowerCase()],
-      // A goes next, before the sweep's queued listings; B is not read at all.
       ["listing", A.toLowerCase()],
-      ...W.slice(1).map((s) => ["listing", s.toLowerCase()]),
     ]);
-    const starts = background(safe, since).map((s) => s.at);
-    for (let i = 1; i < starts.length; i++)
-      expect((starts[i] as number) - (starts[i - 1] as number)).toBeGreaterThanOrEqual(220);
   });
 
   it("shares a background read a request needs, moving it ahead of the other background reads", async () => {
@@ -476,138 +460,315 @@ describe("listings on the request path", () => {
   });
 });
 
-describe("the background sweep", () => {
-  it("keeps the listings of a set on screen fresh with one change check per Safe, never re-reading unchanged listings", async () => {
+describe("the watcher", () => {
+  /** A page read these Safes' listings (at request priority); returns when it had them all. */
+  async function pageRead(service: ReturnType<typeof fakeSafe>, members: readonly Address[]) {
+    for (const m of members) if (!service.lists.has(m.toLowerCase())) service.add(m, 1);
+    let done = false;
+    const read = Promise.all(members.map((m) => store.listSafeMessages(m))).finally(() => {
+      done = true;
+    });
+    while (!done) await vi.advanceTimersByTimeAsync(50);
+    await read;
+    await vi.advanceTimersByTimeAsync(1);
+    return Date.now();
+  }
+
+  it("C-2: an open set's 16 members not valid yet are each asked about every minute, one Safe at a time, with one small request (the listing only when it changed)", async () => {
     await load();
     const safe = fakeSafe();
-    for (const n of [1, 2, 3]) safe.add(W[0], n);
-    safe.add(W[1], 1);
-    const first = await store.listSafeMessages(W[0]);
-    await within(1_000, store.listSafeMessages(W[1]));
-    // A council set is on screen; no Guardians set is.
-    store.startSafeSweep(
-      driver(
-        { securityCouncil: [W[0], W[1]], guardians: G },
-        { on: true },
-        {
-          groups: ["securityCouncil"],
-        }
-      )
-    );
-
-    // Ten minutes in use: every listing a page reads is at most 60 s old, without a request.
-    for (let t = 0; t < 10; t++) {
-      await vi.advanceTimersByTimeAsync(61_000);
-      const before = safe.sent.length;
-      const listing = await store.listSafeMessages(W[0]);
-      expect(safe.sent.length).toBe(before);
-      expect(Date.now() - listing.fetchedAt).toBeLessThanOrEqual(60_000);
-      expect(listing.version).toBe(first.version);
-    }
-    // After the first listings, only change checks, each Safe about every 50 s.
-    expect(safe.count("listing")).toBe(2);
-    const checks = safe.sent.filter((s) => s.kind === "newest" && s.safe === W[0].toLowerCase());
-    expect(checks.length).toBeGreaterThanOrEqual(11);
-    expect(checks.length).toBeLessThanOrEqual(13);
+    const members = safes(16);
+    await pageRead(safe, members);
+    const since = Date.now();
+    store.startSafeWatch(watcher({ set: members }));
+    await vi.advanceTimersByTimeAsync(3_600_000);
+    const checks = background(safe, since);
+    // Change checks only (nothing changed): no listing read again.
+    expect(checks.every((s) => s.kind === "newest")).toBe(true);
+    expect(safe.count("listing")).toBe(16);
+    // At most 16 x 60 in the hour.
+    expect(checks.length).toBeLessThanOrEqual(16 * 60);
+    expect(checks.length).toBeGreaterThanOrEqual(16 * 57);
+    // One Safe at a time: starts 60 s / 16 = 3.75 s apart.
     for (let i = 1; i < checks.length; i++)
-      expect((checks[i] as Sent).at - (checks[i - 1] as Sent).at).toBeLessThan(60_000);
-    // No Guardians set was on screen: not swept.
-    expect(safe.sent.some((s) => G.some((g) => g.toLowerCase() === s.safe))).toBe(false);
+      expect((checks[i] as Sent).at - (checks[i - 1] as Sent).at).toBeGreaterThanOrEqual(3_750);
+    // Once spread (after the first round), each Safe is asked about every minute.
+    for (const m of members) {
+      const at = checks.filter((s) => s.safe === m.toLowerCase()).map((s) => s.at);
+      const gaps = at.slice(2).map((t, i) => t - (at[i + 1] as number));
+      for (const gap of gaps) expect(gap).toBeLessThanOrEqual(64_000);
+    }
+    // A page may use every copy without asking Safe: each was confirmed within its bound.
+    for (const m of members) expect(store.pageSafeListing(m, "set")).not.toBeNull();
     expect(store.safeStoreStatus()).toMatchObject({
       sweeping: true,
-      groups: ["securityCouncil"],
       paused: null,
-      lastError: null,
+      watched: {
+        safes: 16,
+        lists: 0,
+        keyless: false,
+        cadenceMs: { set: 60_000, list: 300_000 },
+        effectiveCadenceMs: { set: 60_000 },
+      },
+      budgetUsedThisHour: expect.any(Number),
     });
+    expect(store.safeStoreStatus().budgetUsedThisHour).toBeLessThanOrEqual(16 * 60);
   });
 
-  it("re-reads a listing when a confirmation bumps a message's modified time, or a message is added", async () => {
+  it("C-2: stretches the cadence when Safe reports little quota left, and never spends above the hourly budget", async () => {
+    // The guard: T_eff = T x max(1, demand / allowance), allowance = min(budget, (remaining -
+    // 20 % of limit) / (hours to reset x 0.25)).
+    await load();
+    const now = Date.now();
+    const base = { set: 60_000, list: 300_000 };
+    const measured = { limit: 50_000, remaining: 37_783, resetAt: now + 678 * 3_600_000 };
+    const t = store.watchCadence({ set: 16, list: 0 }, base, measured, now, 1_200);
+    // (37,783 - 10,000) / (678 h x 0.25) = 163.9 an hour: 16 Safes about every 5.9 minutes.
+    expect(t.allowancePerHour).toBeCloseTo(163.9, 0);
+    expect(t.set / 1000).toBeCloseTo((16 * 3_600) / 163.9, -1);
+    // 8 Safes: 480 an hour wanted, 163.9 allowed: every 2.9 minutes.
+    expect(
+      store.watchCadence({ set: 8, list: 0 }, base, measured, now, 1_200).set / 1000
+    ).toBeCloseTo((8 * 3_600) / 163.9, -1);
+    // Without quota headers, the budget alone: 16 at 60 s fit 1,200; 25 do not (75 s).
+    const none = { limit: null, remaining: null, resetAt: null };
+    expect(store.watchCadence({ set: 16, list: 0 }, base, none, now, 1_200).set).toBe(60_000);
+    expect(store.watchCadence({ set: 25, list: 0 }, base, none, now, 1_200).set).toBe(75_000);
+    // Lists and sets share the allowance.
+    const both = store.watchCadence({ set: 16, list: 17 }, base, none, now, 1_000);
+    expect(both.set).toBeCloseTo((60_000 * (960 + 204)) / 1_000, 0);
+    expect(both.list).toBeCloseTo((300_000 * (960 + 204)) / 1_000, 0);
+    // Nothing left above the reserve, or no budget: none at all.
+    const low = { limit: 50_000, remaining: 9_000, resetAt: now + 3_600_000 };
+    expect(store.watchCadence({ set: 1, list: 0 }, base, low, now, 1_200).set).toBe(
+      Number.POSITIVE_INFINITY
+    );
+    expect(store.watchCadence({ set: 1, list: 0 }, base, none, now, 0).set).toBe(
+      Number.POSITIVE_INFINITY
+    );
+
+    // Live, with Safe's quota early in its period (49,113 of 50,000 left, ~29.8 days to reset):
+    // 16 Safes about every 4.4 minutes.
+    const safe = fakeSafe();
+    safe.headers = QUOTA_HEADERS;
+    const members = safes(16);
+    await pageRead(safe, members);
+    const since = Date.now();
+    store.startSafeWatch(watcher({ set: members }));
+    await vi.advanceTimersByTimeAsync(3_600_000);
+    const effective = store.safeStoreStatus().watched?.effectiveCadenceMs.set as number;
+    expect(effective / 1000).toBeGreaterThan(250);
+    expect(effective / 1000).toBeLessThan(280);
+    // The status says why: the allowance the quota leaves, under the budget.
+    const allowance = store.safeStoreStatus().watched?.allowancePerHour as number;
+    expect(allowance).toBeLessThan(1_200);
+    expect(Math.abs(allowance - (16 * 3_600_000) / effective)).toBeLessThanOrEqual(1);
+    expect(background(safe, since).length).toBeLessThanOrEqual(
+      Math.ceil((16 * 3_600_000) / effective) + 1
+    );
+
+    // A budget of 4 an hour: 3 Safes each every 45 minutes, never more than 4 in an hour; a
+    // page still reads at once.
+    store.stopSafeWatch();
+    await load({ budget: 4 });
+    const limited = fakeSafe();
+    const start = await pageRead(limited, W.slice(0, 3));
+    store.startSafeWatch(watcher({ set: W.slice(0, 3) }));
+    await vi.advanceTimersByTimeAsync(3 * 3_600_000);
+    expect(store.safeStoreStatus()).toMatchObject({
+      watched: { effectiveCadenceMs: { set: 45 * 60_000 } },
+      budgetPerHour: 4,
+    });
+    const sent = background(limited, start).map((s) => s.at);
+    expect(sent.length).toBeGreaterThanOrEqual(9);
+    for (const at of sent)
+      expect(sent.filter((t) => t > at - 3_600_000 && t <= at).length).toBeLessThanOrEqual(4);
+    const before = limited.sent.length;
+    await within(1_000, store.listSafeMessages(W[2], {}));
+    expect(limited.sent.length).toBeLessThanOrEqual(before + 1);
+  });
+
+  it("asks nothing about Safes the screen does not depend on (valid members, sets that can no longer be signed), and nothing while nobody uses the app", async () => {
+    await load();
+    const safe = fakeSafe();
+    await pageRead(safe, [A, B]);
+    const activity = { on: false };
+    // B's member is valid (or its set closed): the engine does not name it.
+    const screen = { set: [A] as Address[] };
+    store.startSafeWatch(watcher(screen, activity));
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(safe.sent).toHaveLength(2);
+    expect(store.safeStoreStatus()).toMatchObject({
+      sweeping: false,
+      paused: "idle",
+      watched: null,
+    });
+
+    // Someone uses the app: the engine starts the watcher; A's copy is ten minutes old, asked
+    // about at once; B never.
+    activity.on = true;
+    const since = Date.now();
+    store.startSafeWatch(watcher(screen, activity));
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(background(safe, since).map((s) => [s.kind, s.safe])).toEqual([
+      ["newest", A.toLowerCase()],
+    ]);
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(safe.sent.some((s) => s.safe === B.toLowerCase() && s.at >= since)).toBe(false);
+
+    // A's member signs and becomes valid: the engine stops naming it; nothing more is asked.
+    screen.set = [];
+    const after = Date.now();
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(background(safe, after)).toEqual([]);
+
+    // Nobody uses the app any more: the watcher stops (no timer), and sends nothing.
+    screen.set = [A];
+    activity.on = false;
+    const idle = Date.now();
+    await vi.advanceTimersByTimeAsync(6 * 3_600_000);
+    expect(background(safe, idle)).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("asks at once about a Safe newly on screen whose copy is older than its cadence, and not before it is due otherwise", async () => {
+    await load();
+    const safe = fakeSafe();
+    await pageRead(safe, [A]);
+    await vi.advanceTimersByTimeAsync(40_000);
+    await pageRead(safe, [B]);
+    const screen = { set: [B] as Address[] };
+    store.startSafeWatch(watcher(screen));
+    const since = Date.now();
+    await vi.advanceTimersByTimeAsync(30_000);
+    // B's copy is 30 s old: not due yet.
+    expect(background(safe, since)).toEqual([]);
+    // A set showing A (a minute old) comes on screen: asked about at once (the engine nudges).
+    screen.set = [A, B];
+    store.nudgeSafeWatch();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(background(safe, since).map((s) => s.safe)).toEqual([A.toLowerCase()]);
+  });
+
+  it("plans again at once when a set comes on screen: its label right after uses the set's cadence, not the lists' the last plan had", async () => {
+    await load({ budget: 30 });
+    const safe = fakeSafe();
+    const lists = safes(17, 0x400);
+    const members = safes(16, 0x500);
+    await pageRead(safe, [...lists, ...members]);
+    const screen = { set: [] as Address[], list: lists };
+    store.startSafeWatch(watcher(screen));
+    await vi.advanceTimersByTimeAsync(1_000);
+    // Only lists on screen: the budget stretches their cadence (and the set's would be shorter).
+    const listOnly = store.safeStoreStatus().watched?.effectiveCadenceMs;
+    expect(listOnly?.list).toBeGreaterThan(300_000);
+    // An open set's 16 members come on screen (a page load nudges the watcher): the label the
+    // page computes right after names the cadence the new plan gives them.
+    screen.set = members;
+    store.nudgeSafeWatch();
+    const check = store.safeCheckOf(members);
+    const replanned = store.safeStoreStatus().watched;
+    expect(replanned?.safes).toBe(16);
+    expect(check.cadenceMs).toBe(replanned?.effectiveCadenceMs.set);
+    expect(check.cadenceMs).not.toBe(listOnly?.set);
+    expect(Date.parse(check.nextAt as string) - Date.now()).toBeLessThanOrEqual(
+      replanned?.effectiveCadenceMs.set as number
+    );
+  });
+
+  it("re-reads a listing when a confirmation bumps a message's modified time, or a message is added: a new version, listeners told", async () => {
     await load();
     const safe = fakeSafe();
     for (const n of [1, 2, 3]) safe.add(A, n);
     const first = await store.listSafeMessages(A);
-    store.startSafeSweep(driver({ zkFoundation: [A] }));
-    await vi.advanceTimersByTimeAsync(55_000);
+    const changed: string[] = [];
+    store.onSafeListingChange((s) => changed.push(s));
+    store.startSafeWatch(watcher({ set: [A] }));
+    await vi.advanceTimersByTimeAsync(61_000);
     expect(safe.count("listing")).toBe(1);
     expect(safe.count("newest")).toBe(1);
 
-    // An owner confirms an older message: it becomes the newest by modification.
     safe.confirm(A, 2);
-    await vi.advanceTimersByTimeAsync(50_000);
+    await vi.advanceTimersByTimeAsync(61_000);
     expect(safe.count("listing")).toBe(2);
     const confirmed = await store.listSafeMessages(A);
-    expect(
-      confirmed.messages.find((m) => m.messageHash === messageHash(2))?.confirmations
-    ).toHaveLength(2);
     expect(confirmed.version).not.toBe(first.version);
+    expect(changed).toEqual([A.toLowerCase()]);
 
-    // A new message raises the count.
     safe.add(A, 4);
-    await vi.advanceTimersByTimeAsync(50_000);
+    await vi.advanceTimersByTimeAsync(61_000);
     expect(safe.count("listing")).toBe(3);
-    const added = await store.listSafeMessages(A);
-    expect(added.messages).toHaveLength(4);
-    expect(added.version).not.toBe(confirmed.version);
+    expect((await store.listSafeMessages(A)).messages).toHaveLength(4);
+    expect(changed).toHaveLength(2);
 
-    // Nothing new: change checks only, the version stays.
-    await vi.advanceTimersByTimeAsync(150_000);
+    await vi.advanceTimersByTimeAsync(5 * 61_000);
     expect(safe.count("listing")).toBe(3);
-    expect((await store.listSafeMessages(A)).version).toBe(added.version);
-    expect(safe.count("listing")).toBe(3);
+    expect(changed).toHaveLength(2);
   });
 
-  it("never sweeps the public service without a key (a self-hosted one is fine)", async () => {
+  it("checks the Safes behind lists on screen every 5 minutes", async () => {
+    await load();
+    const safe = fakeSafe();
+    const sources = safes(17);
+    await pageRead(safe, sources);
+    const since = Date.now();
+    store.startSafeWatch(watcher({ list: sources }));
+    await vi.advanceTimersByTimeAsync(3_600_000);
+    const checks = background(safe, since);
+    expect(checks.length).toBeLessThanOrEqual(17 * 12);
+    expect(checks.length).toBeGreaterThanOrEqual(17 * 10);
+    expect(store.safeStoreStatus().watched).toMatchObject({
+      safes: 0,
+      lists: 17,
+      effectiveCadenceMs: { list: 300_000 },
+    });
+    // A list's page may use those copies (5 minutes' cadence); a set's needs its own watch.
+    expect(store.pageSafeListing(sources[0] as Address, "list")).not.toBeNull();
+  });
+
+  it("without a key on Safe's public service checks every 5 minutes (SYNC_SAFE_WATCH_KEYLESS_MS), or never with 0; a self-hosted service as with a key", async () => {
     await load({ key: "" });
     const safe = fakeSafe();
-    safe.add(W[0], 1);
-    await store.listSafeMessages(W[0]);
-    store.startSafeSweep(driver({ securityCouncil: W }));
-    await vi.advanceTimersByTimeAsync(10 * 60_000);
-    expect(safe.sent).toHaveLength(1);
+    const members = safes(16);
+    await pageRead(safe, members);
+    const since = Date.now();
+    store.startSafeWatch(watcher({ set: members }));
+    await vi.advanceTimersByTimeAsync(3_600_000);
+    const checks = background(safe, since);
+    // At most 16 x 12 (each Safe every 5 minutes), 550 ms apart at least (2 requests/s).
+    expect(checks.length).toBeLessThanOrEqual(16 * 12);
+    expect(checks.length).toBeGreaterThanOrEqual(16 * 11);
+    expect(store.safeStoreStatus()).toMatchObject({
+      paused: null,
+      watched: { keyless: true, cadenceMs: { set: 300_000 }, effectiveCadenceMs: { set: 300_000 } },
+    });
+
+    store.stopSafeWatch();
+    await load({ key: "", keylessMs: 0 });
+    const off = fakeSafe();
+    await pageRead(off, [A]);
+    const before = off.sent.length;
+    store.startSafeWatch(watcher({ set: [A] }));
+    await vi.advanceTimersByTimeAsync(30 * 60_000);
+    expect(off.sent).toHaveLength(before);
     expect(store.safeStoreStatus()).toMatchObject({
       sweeping: false,
       paused: "keyless-public-service",
-      budgetUsedThisHour: 0,
     });
+    // Only on request: a page (and Fetch signatures) still reads it.
+    await within(1_000, store.listSafeMessages(A));
+    expect(off.sent).toHaveLength(before + 1);
+    store.stopSafeWatch();
 
-    store.stopSafeSweep();
-    net.safeTxServiceUrl = "http://127.0.0.1:18546";
-    await store.listSafeMessages(W[0]);
-    store.startSafeSweep(driver({ securityCouncil: W }));
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(safe.count("listing", W[1])).toBe(1);
-    expect(store.safeStoreStatus()).toMatchObject({ sweeping: true, paused: null });
-  });
-
-  it("stops at the hourly budget (the request path still reads), and resumes as the hour rolls on", async () => {
-    await load({ budget: 4 });
-    const safe = fakeSafe();
-    for (const s of W.slice(0, 3)) safe.add(s, 1);
-    for (const s of W.slice(0, 3)) await within(1_000, store.listSafeMessages(s));
+    // A self-hosted service has no such limits: every minute.
+    net.safeTxServiceUrl = "https://safe.example.org";
+    await load({ key: "" });
+    const own = fakeSafe();
+    await pageRead(own, [A]);
     const start = Date.now();
-    store.startSafeSweep(driver({ securityCouncil: W.slice(0, 3) }));
-    await vi.advanceTimersByTimeAsync(30 * 60_000);
-    // The requests above were a page's; the sweep sent four of its own, then paused.
-    expect(background(safe, start)).toHaveLength(4);
-    expect(store.safeStoreStatus()).toMatchObject({
-      sweeping: false,
-      paused: "budget",
-      budgetUsedThisHour: 4,
-      budgetPerHour: 4,
-    });
-    // A page still reads what it needs, at once.
-    const before = safe.sent.length;
-    await within(1_000, store.listSafeMessages(W[2]));
-    expect(safe.sent.length).toBe(before + 1);
-
-    // An hour after the first background requests the budget has room again; a page views the
-    // group again (the last view was 31 min ago), and the sweep resumes within the budget.
-    await vi.advanceTimersByTimeAsync(31 * 60_000);
-    await within(1_000, store.listSafeMessages(W[0]));
-    const resumed = Date.now();
-    await vi.advanceTimersByTimeAsync(2 * 60_000);
-    expect(background(safe, resumed).length).toBeGreaterThan(0);
-    expect(store.safeStoreStatus().budgetUsedThisHour).toBeLessThanOrEqual(4);
+    store.startSafeWatch(watcher({ set: [A] }));
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(background(own, start).length).toBeGreaterThanOrEqual(9);
   });
 
   it("pauses while the service's quota is below 10 %", async () => {
@@ -616,24 +777,24 @@ describe("the background sweep", () => {
     safe.headers = { "x-ratelimit-limit": "1000", "x-ratelimit-remaining": "99" };
     safe.add(A, 1);
     await store.listSafeMessages(A);
-    store.startSafeSweep(driver({ securityCouncil: [A] }));
+    store.startSafeWatch(watcher({ set: [A] }));
     await vi.advanceTimersByTimeAsync(5 * 60_000);
     expect(safe.sent).toHaveLength(1);
     expect(store.safeStoreStatus()).toMatchObject({ sweeping: false, paused: "quota" });
   });
 
-  it("on a 429 stops for the cooldown; a stale listing is then unavailable, never empty", async () => {
+  it("on a 429 stops for the cooldown; a copy then shows unavailable, never empty, and keeps its age", async () => {
     await load();
     const safe = fakeSafe();
     safe.add(A, 1);
-    await store.listSafeMessages(A);
-    store.startSafeSweep(driver({ securityCouncil: [A] }));
-    await vi.advanceTimersByTimeAsync(55_000);
+    const read = await store.listSafeMessages(A);
+    store.startSafeWatch(watcher({ set: [A] }));
+    await vi.advanceTimersByTimeAsync(61_000);
     expect(safe.count("newest")).toBe(1);
 
     // Retry-After: 30 s.
     safe.limited = 30;
-    await vi.advanceTimersByTimeAsync(50_000);
+    await vi.advanceTimersByTimeAsync(61_000);
     const limitedAt = (safe.sent.at(-1) as Sent).at;
     expect(safe.count("newest")).toBe(2);
     expect(store.safeStoreStatus()).toMatchObject({
@@ -641,33 +802,80 @@ describe("the background sweep", () => {
       paused: "cooldown",
       lastError: expect.stringContaining("rate limited"),
     });
+    // The failed check left the copy's age as it was.
+    expect(store.heldSafeListing(A)?.fetchedAt).toBeLessThan(limitedAt);
+    expect(store.heldSafeListing(A)?.version).toBe(read.version);
 
-    // 70 s after the last good answer, during the cooldown: the listing cannot be read. The
-    // lookup fails (a member shows as unavailable) instead of finding no message (missing).
-    await vi.advanceTimersByTimeAsync(20_000);
+    // During the cooldown the listing cannot be read: unavailable, never "no message".
+    await vi.advanceTimersByTimeAsync(5_000);
     await expect(store.findSafeMessage(A, messageHash(1))).rejects.toThrow("rate limited");
-    const { collectMessages } = await import("@/.server/flows/messages");
-    const collected = await collectMessages([A], ["ExecuteEmergencyUpgradeSecurityCouncil"], {
-      name: "EmergencyUpgradeBoard",
-      version: "1",
-      chainId: 1,
-      verifyingContract: B,
-    });
-    expect(collected.groups).toEqual([]);
-    expect(collected.errors).toEqual([expect.stringContaining("rate limited")]);
-    // Nothing was sent during the cooldown.
     expect(safe.sent.filter((s) => s.at > limitedAt)).toEqual([]);
 
-    // After it, the sweep picks up again.
+    // After it, checks pick up again.
     safe.limited = null;
-    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.advanceTimersByTimeAsync(90_000);
     const resumed = safe.sent.filter((s) => s.at > limitedAt);
     expect(resumed.length).toBeGreaterThan(0);
     expect((resumed[0] as Sent).at).toBeGreaterThanOrEqual(limitedAt + 30_000);
-    expect(await store.findSafeMessage(A, messageHash(1))).toMatchObject({
-      messageHash: messageHash(1),
-    });
     expect(store.safeStoreStatus()).toMatchObject({ sweeping: true, lastError: null });
+  });
+
+  it("says when Safe's monthly quota is used up (not a short rate limit), also before the watcher plans again", async () => {
+    await load();
+    const safe = fakeSafe();
+    safe.add(A, 1);
+    await store.listSafeMessages(A);
+    store.startSafeWatch(watcher({ set: [A] }));
+    await vi.advanceTimersByTimeAsync(61_000);
+    safe.limited = 3_600;
+    safe.exhausted = true;
+    await vi.advanceTimersByTimeAsync(61_000);
+    expect(store.safeCheckOf([A])).toMatchObject({ state: "paused", reason: "quota-exhausted" });
+    // Nobody uses the app, then someone does again: before the watcher's next look, the label
+    // still says why.
+    store.stopSafeWatch();
+    expect(store.safeCheckOf([A])).toMatchObject({ state: "paused", reason: "quota-exhausted" });
+  });
+
+  it("names a Safe's check by its turn in the queue, not by when its copy came due (several due at once)", async () => {
+    await load();
+    const safe = fakeSafe();
+    const safes = W.slice(0, 4);
+    await pageRead(safe, safes);
+    store.startSafeWatch(watcher({ set: safes }));
+    // A minute on, all four are due at once: checked one at a time, 15 s apart (the first just
+    // now). The other three wait their turns, about 15, 30 and 45 s away: never all "now".
+    await vi.advanceTimersByTimeAsync(60_500);
+    const next = safes.map((s) => Date.parse(store.safeCheckOf([s]).nextAt as string) - Date.now());
+    const sorted = [...next].sort((a, b) => a - b);
+    expect(sorted.slice(0, 3).map((ms) => Math.round(ms / 15_000))).toEqual([1, 2, 3]);
+    // The one just checked: its next minute.
+    expect(sorted[3]).toBeGreaterThan(45_000);
+  });
+
+  it("backs off a Safe whose reads keep failing while it is watched (15 s x 2^n, at most 5 min), so it cannot take the others' turns", async () => {
+    await load();
+    const safe = fakeSafe();
+    await pageRead(safe, [A, B]);
+    safe.failing.add(A.toLowerCase());
+    store.startSafeWatch(watcher({ set: [A, B] }));
+    await vi.advanceTimersByTimeAsync(30 * 60_000);
+    const failed = safe.sent.filter((s) => s.safe === A.toLowerCase() && s.kind === "newest");
+    const gaps = failed.slice(1).map((s, i) => s.at - (failed[i] as Sent).at);
+    // Later and later (never before its turn: one Safe at a time, 30 s apart for two), then
+    // every 5 minutes.
+    expect(gaps.slice(-3).map((g) => Math.round(g / 10_000) * 10)).toEqual([300, 300, 300]);
+    expect(failed.length).toBeLessThanOrEqual(12);
+    // B goes on as usual, about every minute.
+    expect(safe.sent.filter((s) => s.safe === B.toLowerCase()).length).toBeGreaterThanOrEqual(25);
+    expect(store.safeStoreStatus()).toMatchObject({
+      failingSafes: 1,
+      lastError: expect.stringContaining("HTTP 500"),
+    });
+    // Answering again: as usual.
+    safe.failing.clear();
+    await vi.advanceTimersByTimeAsync(6 * 60_000);
+    expect(store.safeStoreStatus()).toMatchObject({ failingSafes: 0, lastError: null });
   });
 
   it("drops a background answer that arrives after a settings change", async () => {
@@ -675,9 +883,9 @@ describe("the background sweep", () => {
     const safe = fakeSafe();
     safe.add(A, 1);
     const first = await store.listSafeMessages(A);
-    store.startSafeSweep(driver({ securityCouncil: [A] }));
+    store.startSafeWatch(watcher({ set: [A] }));
     safe.latencyMs = 1_000;
-    await vi.advanceTimersByTimeAsync(50_500);
+    await vi.advanceTimersByTimeAsync(60_500);
     expect(safe.count("newest")).toBe(1);
     api.resetSafeClient();
     await vi.advanceTimersByTimeAsync(1_000);
@@ -685,292 +893,240 @@ describe("the background sweep", () => {
     expect(first.version).toBeGreaterThan(0);
   });
 
-  it("sweeps only the Safes of sets on screen, at once when one leaves the screen, and stops when the app is idle", async () => {
-    await load();
-    const safe = fakeSafe();
-    safe.add(A, 1);
-    await store.listSafeMessages(A);
-    const activity = { on: true };
-    const screen: { groups: SignerGroupName[] } = { groups: ["guardians"] };
-    store.startSafeSweep(driver({ guardians: [A] }, activity, screen));
-    await vi.advanceTimersByTimeAsync(4 * 60_000);
-    const swept = safe.count("newest");
-    expect(swept).toBeGreaterThan(3);
-    // The Guardians set left the screen: no more sweeping from the next wake on (no grace).
-    screen.groups = [];
-    await vi.advanceTimersByTimeAsync(10_000);
-    const settled = safe.count("newest");
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
-    expect(safe.count("newest")).toBe(settled);
-    expect(store.safeStoreStatus()).toMatchObject({ sweeping: false, groups: [] });
-    // A request's read is not a set on screen: still nothing in the background.
-    await vi.advanceTimersByTimeAsync(2 * 60_000);
-    await within(1_000, store.listSafeMessages(A));
-    const read = safe.sent.length;
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
-    expect(safe.sent.length).toBe(read);
-
-    // On screen again: swept again, until the engine goes idle.
-    screen.groups = ["guardians"];
-    await vi.advanceTimersByTimeAsync(2 * 60_000);
-    expect(safe.count("newest")).toBeGreaterThan(settled);
-    activity.on = false;
-    await vi.advanceTimersByTimeAsync(10_000);
-    const idle = safe.sent.length;
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
-    expect(safe.sent.length).toBe(idle);
-    expect(store.safeStoreStatus()).toMatchObject({ sweeping: false, paused: "idle" });
-  });
-
-  it.each([
-    [
-      "the last tab leaves",
-      (c: Controls) => {
-        c.activity.viewing = false;
-      },
-    ],
-    [
-      "the set leaves the screen",
-      (c: Controls) => {
-        c.screen.groups = [];
-      },
-    ],
-    [
-      "the engine stops",
-      (c: Controls) => {
-        c.activity.on = false;
-      },
-    ],
-  ])(
-    "sends none of the reads it already queued once %s; a request still reads",
-    async (_name, end) => {
-      await load();
-      const safe = fakeSafe();
-      // 16 member Safes on screen (an upgrade's council), each answer 150 ms away: the sweep
-      // queues 16 reads, of which the pacer sends two at a time, 220 ms apart.
-      safe.latencyMs = 150;
-      const members = Array.from({ length: 16 }, (_, i) => address(0x300 + i));
-      const controls: Controls = {
-        activity: { on: true, viewing: true },
-        screen: { groups: ["securityCouncil"] },
-      };
-      store.startSafeSweep({
-        ...driver({ securityCouncil: members }, controls.activity, controls.screen),
-        viewing: () => controls.activity.viewing,
-      });
-      for (let waited = 0; safe.sent.length === 0; waited += 10) {
-        if (waited > 5_000) throw new Error("the sweep sent nothing");
-        await vi.advanceTimersByTimeAsync(10);
-      }
-      const endedAt = Date.now();
-      end(controls);
-      await vi.advanceTimersByTimeAsync(60_000);
-      // Only what was already out when it ended: nothing sent after it.
-      expect(safe.sent.filter((s) => s.at > endedAt)).toEqual([]);
-      expect(safe.sent.length).toBeLessThan(members.length);
-      expect(store.safeStoreStatus().budgetUsedThisHour).toBe(safe.sent.length);
-      // A page's request still reads a Safe whose background read was dropped.
-      const listed = await within(1_000, store.listSafeMessages(members[15] as Address));
-      expect(listed.messages).toEqual([]);
-      expect(safe.count(undefined, members[15])).toBe(1);
-    }
-  );
-
-  it("never sweeps on a dev node", async () => {
-    await load();
+  it("on a dev node asks only while the engine's side says someone uses the app (Safe is not the chain)", async () => {
     net.isDevNode = true;
-    const safe = fakeSafe();
-    safe.add(A, 1);
-    await store.listSafeMessages(A);
-    store.startSafeSweep(driver({ securityCouncil: [A] }));
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
-    expect(safe.sent).toHaveLength(1);
-    expect(store.safeStoreStatus()).toMatchObject({ sweeping: false, paused: "dev-node" });
-  });
-
-  it("with little budget left, checks the most overdue listings first, and only as many as fit", async () => {
-    await load({ budget: 3 });
-    const safe = fakeSafe();
-    for (const s of W) safe.add(s, 1);
-    // A page read the members one second apart, the last one first.
-    for (const s of [...W].reverse()) await within(1_000, store.listSafeMessages(s));
-    await vi.advanceTimersByTimeAsync(58_000);
-    // All five are due at once, with room for three requests.
-    const since = Date.now();
-    store.startSafeSweep(driver({ securityCouncil: W }));
-    await vi.advanceTimersByTimeAsync(5_000);
-    expect(background(safe, since).map((s) => [s.kind, s.safe])).toEqual(
-      [W[4], W[3], W[2]].map((s) => ["newest", s.toLowerCase()])
-    );
-    expect(store.safeStoreStatus()).toMatchObject({ paused: "budget", budgetUsedThisHour: 3 });
-  });
-
-  it("keeps 17 member Safes fresh within the default budget, checking each later than 50 s when it must", async () => {
     await load();
     const safe = fakeSafe();
-    safe.latencyMs = 100;
-    const members = Array.from({ length: 17 }, (_, i) => address(0x300 + i));
-    for (const s of members) safe.add(s, 1);
-    store.startSafeSweep(
-      driver({
-        securityCouncil: members.slice(0, 8),
-        guardians: members.slice(8, 16),
-        zkFoundation: members.slice(16),
-      })
-    );
-    // A page reads every member's listing every 10 s, for two hours.
-    for (let t = 0; t < 720; t++) {
-      const at = Date.now();
-      const page = Promise.all(members.map((s) => store.listSafeMessages(s)));
-      await vi.advanceTimersByTimeAsync(10_000);
-      if (t > 0)
-        for (const listing of await page)
-          expect(listing.fetchedAt).toBeGreaterThanOrEqual(at - 60_000);
-    }
-    // Only the first page read listings; the sweep's change checks did the rest, spaced to fit
-    // 95 % of the budget (17 x 3600 s / 1140 = 53.7 s), never pausing on it.
-    expect(safe.count("listing")).toBe(17);
-    const checks = safe.sent.filter(
-      (s) => s.kind === "newest" && s.safe === members[5]?.toLowerCase()
-    );
-    for (let i = 1; i < checks.length; i++) {
-      const gap = (checks[i] as Sent).at - (checks[i - 1] as Sent).at;
-      expect(gap).toBeGreaterThanOrEqual(53_685);
-      expect(gap).toBeLessThan(55_000);
-    }
-    const status = store.safeStoreStatus();
-    expect(status).toMatchObject({ sweeping: true, paused: null, failingSafes: 0 });
-    expect(status.budgetUsedThisHour).toBeLessThanOrEqual(1_140);
-  });
-
-  it("backs off member Safes whose reads keep failing, so they cannot use up the budget the others need", async () => {
-    await load(); // the default budget
-    const safe = fakeSafe();
-    safe.latencyMs = 100;
-    const council = Array.from({ length: 8 }, (_, i) => address(0x300 + i));
-    const guardians = Array.from({ length: 8 }, (_, i) => address(0x400 + i));
-    const foundation = [address(0x500)];
-    const members = [...council, ...guardians, ...foundation];
-    for (const s of members) safe.add(s, 1);
-    // As seen live: two members' listings answer HTTP 500, every time.
-    const failing = [council[7], guardians[7]] as Address[];
-    for (const s of failing) safe.failing.add(s.toLowerCase());
-    const healthy = members.filter((s) => !failing.includes(s));
-    store.startSafeSweep(driver({ securityCouncil: council, guardians, zkFoundation: foundation }));
-    // A page reads every member's listing (as the emergency page does), once a minute for an hour.
-    for (let minute = 0; minute < 60; minute++) {
-      const at = Date.now();
-      const page = Promise.allSettled(members.map((s) => store.listSafeMessages(s)));
-      await vi.advanceTimersByTimeAsync(60_000);
-      for (const [i, result] of (await page).entries()) {
-        if (failing.includes(members[i] as Address)) {
-          expect(result.status).toBe("rejected");
-          continue;
-        }
-        expect(result.status).toBe("fulfilled");
-        const listing = (result as PromiseFulfilledResult<{ fetchedAt: number }>).value;
-        expect(listing.fetchedAt).toBeGreaterThanOrEqual(at - 60_000);
-      }
-    }
-    // The healthy Safes' listings were read once, by the first page: never again on demand.
-    expect(healthy.reduce((n, s) => n + safe.count("listing", s), 0)).toBe(healthy.length);
-    // The failing ones: the page's own reads (one a minute) and a few retries in the first minutes.
-    for (const s of failing) expect(safe.count(undefined, s)).toBeLessThanOrEqual(64);
-    const status = store.safeStoreStatus();
-    expect(status).toMatchObject({
-      sweeping: true,
-      paused: null,
-      failingSafes: 2,
-      lastError: expect.stringContaining("HTTP 500"),
-    });
-    expect(status.budgetUsedThisHour).toBeLessThan(1_140);
-  });
-
-  it("retries a failing Safe 15 s, 30 s, 60 s ... apart (at most 5 min), and as usual once it answers", async () => {
-    await load();
-    const safe = fakeSafe();
-    safe.add(A, 1);
-    safe.add(B, 1);
-    safe.failing.add(B.toLowerCase());
-    await store.listSafeMessages(A);
-    const failed = expect(store.listSafeMessages(B)).rejects.toThrow("HTTP 500");
-    await vi.advanceTimersByTimeAsync(1_000);
-    await failed;
-    store.startSafeSweep(driver({ securityCouncil: [A, B] }));
-    // A page views A once a minute, keeping the group (and so B) swept.
-    const view = async (minutes: number) => {
-      for (let m = 0; m < minutes; m++) {
-        await vi.advanceTimersByTimeAsync(60_000);
-        await store.listSafeMessages(A);
-      }
-    };
-    for (let m = 0; m < 60; m++) {
-      await view(1);
-      // A succeeding all along does not hide B's failure.
-      expect(store.safeStoreStatus()).toMatchObject({
-        failingSafes: 1,
-        lastError: expect.stringContaining("HTTP 500"),
-      });
-    }
-    const tries = safe.sent.filter((s) => s.safe === B.toLowerCase()).map((s) => s.at);
-    const gaps = tries.slice(1).map((at, i) => at - (tries[i] as number));
-    expect(gaps.length).toBeGreaterThan(8);
-    for (const [i, gap] of gaps.entries()) {
-      const backoff = Math.min(300_000, 15_000 * 2 ** i);
-      expect(gap).toBeGreaterThanOrEqual(backoff);
-      expect(gap).toBeLessThan(backoff + 1_000);
-    }
-    // About 17 tries in the hour, against 240 at a flat 15 s; A was kept fresh by change checks.
-    expect(tries.length).toBeLessThanOrEqual(20);
-    expect(safe.count("listing", A)).toBe(1);
-
-    // B answers again: read at its next retry, then checked like A (about every 50 s).
-    safe.failing.clear();
-    await view(5);
-    expect(store.safeStoreStatus()).toMatchObject({ failingSafes: 0, lastError: null });
-    const since = Date.now();
-    await view(5);
-    const checks = background(safe, since).filter((s) => s.safe === B.toLowerCase());
-    expect(checks.every((s) => s.kind === "newest")).toBe(true);
-    expect(checks.length).toBeGreaterThanOrEqual(5);
-    expect(checks.length).toBeLessThanOrEqual(7);
-  });
-
-  it("puts nothing on screen through the boot warm-up", async () => {
-    await load();
-    const safe = fakeSafe();
-    for (const s of W) safe.add(s, 1);
-    await within(5_000, Promise.all(W.map((s) => store.warmSafeListing(s))));
-    expect(safe.count("listing")).toBe(W.length);
-    const screen: { groups: SignerGroupName[] } = { groups: [] };
-    store.startSafeSweep(driver({ securityCouncil: W }, { on: true }, screen));
+    await pageRead(safe, [A]);
+    const activity = { on: false };
+    store.startSafeWatch(watcher({ set: [A] }, activity));
     await vi.advanceTimersByTimeAsync(10 * 60_000);
-    expect(safe.sent).toHaveLength(W.length);
-    expect(store.safeStoreStatus()).toMatchObject({ sweeping: false, groups: [] });
-
-    // A page shows a council set: the group is swept from then on.
-    screen.groups = ["securityCouncil"];
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(safe.count("newest", W[1])).toBeGreaterThan(0);
-    expect(safe.count("listing", W[1])).toBe(1);
-    expect(store.safeStoreStatus()).toMatchObject({
-      sweeping: true,
-      groups: ["securityCouncil"],
-    });
+    expect(safe.sent).toHaveLength(1);
+    expect(store.safeStoreStatus()).toMatchObject({ sweeping: false, paused: "idle" });
+    activity.on = true;
+    store.startSafeWatch(watcher({ set: [A] }, activity));
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(safe.count("newest", A)).toBe(1);
   });
 
   it("reports its state JSON-safe, without the service URL", async () => {
     await load();
     const safe = fakeSafe();
-    safe.add(A, 1);
-    await store.listSafeMessages(A);
-    store.startSafeSweep(driver({ securityCouncil: [A] }));
-    await vi.advanceTimersByTimeAsync(120_000);
+    await pageRead(safe, [A]);
+    store.startSafeWatch(watcher({ set: [A], list: [B] }));
+    await vi.advanceTimersByTimeAsync(5_000);
     const status = store.safeStoreStatus();
     expect(JSON.parse(JSON.stringify(status))).toEqual(status);
     expect(JSON.stringify(status)).not.toContain("safe.global");
-    expect(Date.now() - Date.parse(status.oldestFetchedAt as string)).toBeLessThanOrEqual(60_000);
-    expect(status).toMatchObject({ sweeping: true, groups: ["securityCouncil"] });
+    expect(status).toMatchObject({ groups: [], baseline: null, watched: { safes: 1, lists: 1 } });
+  });
+});
+
+describe("the copies a page may use (the page rule)", () => {
+  it("any copy at most 60 s old; one the watcher keeps checking within its cadence (10 s more once it confirmed it); never the last run's", async () => {
+    await load();
+    const safe = fakeSafe();
+    safe.add(A, 1);
+    safe.add(B, 1);
+    await store.listSafeMessages(A);
+    await within(1_000, store.listSafeMessages(B));
+    // Not watched: only while at most 60 s old.
+    await vi.advanceTimersByTimeAsync(60_000 - (Date.now() - NOW));
+    expect(store.pageSafeListing(A, "set")).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(store.pageSafeListing(A, "set")).toBeNull();
+    expect(store.pageSafeListing(A, "list")).toBeNull();
+
+    // Watched (A as an open set's member, B behind a list), its checks failing: a copy read
+    // before the Safe was watched counts only within the cadence (60 s for A, so not any more;
+    // 5 min for B), never twice it.
+    safe.failing.add(A.toLowerCase());
+    safe.failing.add(B.toLowerCase());
+    store.startSafeWatch(watcher({ set: [A], list: [B] }));
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(store.pageSafeListing(A, "set")).toBeNull();
+    expect(store.pageSafeListing(B, "list")).not.toBeNull();
+    // A copy a list's watch keeps is not one a set's page may use.
+    expect(store.pageSafeListing(B, "set")).toBeNull();
+    const read = store.heldSafeListing(B)?.fetchedAt as number;
+    await vi.advanceTimersByTimeAsync(read + 300_000 - Date.now());
+    expect(store.pageSafeListing(B, "list")).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(store.pageSafeListing(B, "list")).toBeNull();
+    // A page then reads it at request priority, as JSON would.
+    safe.failing.clear();
+    const before = safe.sent.length;
+    await within(1_000, store.listSafeMessagesForPage(B, "list"));
+    expect(safe.sent.length).toBe(before + 1);
+
+    // A copy confirmed while the Safe is watched: within its cadence and 10 s (the check that
+    // replaces it is under way), here with that check failing; then read again as JSON would.
+    const confirmed = (await within(1_000, store.listSafeMessagesForPage(A, "set"))).fetchedAt;
+    safe.failing.add(A.toLowerCase());
+    await vi.advanceTimersByTimeAsync(confirmed + 70_000 - Date.now());
+    expect(store.pageSafeListing(A, "set")?.fetchedAt).toBe(confirmed);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(store.pageSafeListing(A, "set")).toBeNull();
+    // A copy B's watcher confirmed (its checks answer again): 5 min and 10 s.
+    const listed = store.pageSafeListing(B, "list")?.fetchedAt as number;
+    safe.failing.add(B.toLowerCase());
+    await vi.advanceTimersByTimeAsync(listed + 310_000 - Date.now());
+    expect(store.pageSafeListing(B, "list")?.fetchedAt).toBe(listed);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(store.pageSafeListing(B, "list")).toBeNull();
+
+    // Nobody uses the app: the watcher stops; only copies at most 60 s old count.
+    safe.failing.clear();
+    await within(1_000, store.listSafeMessagesForPage(B, "list"));
+    store.stopSafeWatch();
+    expect(store.pageSafeListing(B, "list")).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(61_000);
+    expect(store.pageSafeListing(B, "list")).toBeNull();
+
+    // The last run's copies: never (only a page's labelled first answer uses them).
+    const kept = { safe: W[0], messages: [], complete: true, fetchedAt: Date.now() };
+    expect(store.holdLastRunListings([kept])).toBe(1);
+    expect(store.pageSafeListing(W[0], "set")).toBeNull();
+  });
+
+  it("keeps every watched copy within its cadence when many come due together (a page read them all at once): the first checks start early, one at a time, none late", async () => {
+    await load();
+    const safe = fakeSafe();
+    safe.latencyMs = 400;
+    const members = safes(16);
+    for (const [i, member] of members.entries()) safe.add(member, i + 1);
+    // An open set's 16 members come on screen (watched), and the page's request reads them all
+    // at once.
+    store.startSafeWatch(watcher({ set: members }));
+    await within(
+      10_000,
+      Promise.all(members.map((member) => store.listSafeMessagesForPage(member, "set")))
+    );
+    const from = safe.sent.length;
+    let worst = 0;
+    for (let t = 0; t < 600; t++) {
+      await vi.advanceTimersByTimeAsync(1_000);
+      for (const member of members) {
+        const copy = store.heldSafeListing(member) as { fetchedAt: number };
+        worst = Math.max(worst, Date.now() - copy.fetchedAt);
+        expect(store.pageSafeListing(member, "set")).not.toBeNull();
+      }
+    }
+    // Within the cadence and the 10 s a copy confirmed while watched may run over (a check's
+    // answer); at the cadence's pace, about one check each a minute (the first round a little
+    // sooner than due), one small request each.
+    expect(worst).toBeLessThanOrEqual(60_000 + 10_000);
+    const checks = safe.sent.slice(from);
+    expect(checks.every((s) => s.kind === "newest")).toBe(true);
+    expect(checks.length).toBeGreaterThanOrEqual(16 * 9);
+    expect(checks.length).toBeLessThanOrEqual(16 * 11);
+  });
+});
+
+describe("the viewer's own signature (a burst of reads)", () => {
+  it("reads the Safe at once, every 5 s for 30 s, then every 15 s up to 2 min: 13 reads at most, without a key too", async () => {
+    await load({ key: "" });
+    const safe = fakeSafe();
+    safe.add(A, 1);
+    const start = Date.now();
+    expect(store.safeBurst(A, () => true)).toBe(true);
+    // One burst at a time per Safe.
+    expect(store.safeBurst(A, () => true)).toBe(false);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    const reads = safe.sent.filter((s) => s.safe === A.toLowerCase());
+    expect(reads.map((s) => (s.at - start) / 1_000)).toEqual([
+      0, 5, 10, 15, 20, 25, 30, 45, 60, 75, 90, 105, 120,
+    ]);
+    expect(reads.every((s) => s.kind === "listing")).toBe(true);
+    expect(store.safeStoreStatus().bursts).toBe(0);
+    expect(store.burstsRunning()).toBe(0);
+  });
+
+  it("stops at the first new version of the listing (the signature arrived)", async () => {
+    await load();
+    const safe = fakeSafe();
+    safe.add(A, 1);
+    await store.listSafeMessages(A);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const start = Date.now();
+    store.safeBurst(A, () => true);
+    await vi.advanceTimersByTimeAsync(12_000);
+    safe.confirm(A, 1);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(safe.sent.filter((s) => s.at >= start).map((s) => (s.at - start) / 1_000)).toEqual([
+      0, 5, 10, 15,
+    ]);
+    expect(store.heldSafeListing(A)?.messages[0]?.confirmations).toHaveLength(2);
+  });
+
+  it("counts toward the hourly budget, stops when it is spent, and when nobody uses the app", async () => {
+    await load({ budget: 3 });
+    const safe = fakeSafe();
+    safe.add(A, 1);
+    store.safeBurst(A, () => true);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(safe.sent).toHaveLength(3);
+    expect(store.safeStoreStatus().budgetUsedThisHour).toBe(3);
+
+    await load();
+    const other = fakeSafe();
+    other.add(B, 1);
+    const use = { on: true };
+    store.safeBurst(B, () => use.on);
+    await vi.advanceTimersByTimeAsync(7_000);
+    use.on = false;
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(other.sent).toHaveLength(2);
+  });
+});
+
+describe("Fetch signatures (checkSafesNow)", () => {
+  it("asks about each Safe now, at a request's priority, whatever its copy's age: unchanged, its copy is confirmed (newer)", async () => {
+    await load();
+    const safe = fakeSafe();
+    for (const s of W) safe.add(s, 1);
+    for (const s of W) await within(1_000, store.listSafeMessages(s));
+    await vi.advanceTimersByTimeAsync(30_000);
+    // Background reads queued (the boot warm-up's, say) wait behind it.
+    const warm = [A, B].map((s) => {
+      safe.add(s, 1);
+      return store.warmSafeListing(s);
+    });
+    const since = Date.now();
+    const check = store.checkSafesNow(W.slice(0, 3));
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(await check).toEqual({ checked: 3, failed: [] });
+    await Promise.all(warm);
+    const order = safe.sent.filter((s) => s.at >= since).map((s) => s.safe);
+    // The warm-up's first read may already have started; the check's three go before the rest.
+    expect(order.indexOf(B.toLowerCase())).toBeGreaterThan(order.indexOf(W[2].toLowerCase()));
+    for (const s of W.slice(0, 3)) {
+      expect(safe.count("newest", s)).toBe(1);
+      expect(Date.now() - (store.heldSafeListing(s)?.fetchedAt ?? 0)).toBeLessThanOrEqual(5_000);
+    }
+  });
+
+  it("joins a read in flight, asks about a copy however recent, and names the Safes Safe did not answer for", async () => {
+    await load();
+    const safe = fakeSafe();
+    for (const s of [A, B, W[0]]) safe.add(s, 1);
+    await within(1_000, store.listSafeMessages(B));
+    safe.latencyMs = 500;
+    const reading = store.listSafeMessages(A);
+    await vi.advanceTimersByTimeAsync(10);
+    safe.failing.add(W[0].toLowerCase());
+    const sent = safe.sent.length;
+    const check = store.checkSafesNow([A, B, W[0]]);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await reading;
+    expect(await check).toEqual({ checked: 2, failed: [W[0]] });
+    // A joined the read in flight; B (read a moment ago) and W1 were asked (W1 failed).
+    expect(
+      safe.sent
+        .slice(sent)
+        .map((s) => s.safe)
+        .sort()
+    ).toEqual([B.toLowerCase(), W[0].toLowerCase()].sort());
   });
 });
 
@@ -1035,8 +1191,8 @@ describe("background reads (warm-up, precomputing)", () => {
       messageHash: messageHash(501),
     });
 
-    // Nothing on screen: the sweep leaves A's group alone.
-    store.startSafeSweep(driver({ securityCouncil: [A] }, { on: true }, { groups: [] }));
+    // Nothing on screen: the watcher leaves A alone.
+    store.startSafeWatch(watcher({}));
     await vi.advanceTimersByTimeAsync(2 * 60_000);
     expect(safe.count("newest")).toBe(0);
     expect(safe.count("listing", A)).toBe(5);
@@ -1046,162 +1202,5 @@ describe("background reads (warm-up, precomputing)", () => {
       messageHash: messageHash(1),
     });
     expect(safe.count("message")).toBe(1);
-  });
-});
-
-describe("the quota-paced sweep of every governance Safe (SYNC_MODE=always)", () => {
-  const HOUR = 3_600_000;
-  const MIN = 60_000;
-
-  it("spreads what is left of the period's quota above a 20 % reserve over the time to its reset", async () => {
-    await load();
-    const now = Date.now();
-    const interval = (safes: number, q: Parameters<Store["idleSweepIntervalMs"]>[1]) =>
-      store.idleSweepIntervalMs(safes, q, now);
-    // No quota headers: every 15 minutes.
-    expect(interval(17, { limit: null, remaining: null, resetAt: null })).toBe(15 * MIN);
-    expect(interval(17, { limit: 50_000, remaining: 49_113, resetAt: null })).toBe(15 * MIN);
-    // As measured (17 member Safes, 49,113 of 50,000 left, 2,577,504 s to the reset):
-    // 17 x 2,577,504 s / (49,113 - 10,000) = 1,120.3 s.
-    expect(interval(17, { limit: 50_000, remaining: 49_113, resetAt: now + 2_577_504_000 })).toBe(
-      Math.ceil((17 * 2_577_504_000) / 39_113)
-    );
-    expect(
-      interval(17, { limit: 50_000, remaining: 49_113, resetAt: now + 2_577_504_000 }) / MIN
-    ).toBeCloseTo(18.67, 1);
-    // Close to the reset with plenty left: never more often than every 10 minutes.
-    expect(interval(17, { limit: 50_000, remaining: 40_000, resetAt: now + HOUR })).toBe(10 * MIN);
-    // Little left: rarer (17 x 10 days / 1,000 = 4.08 h).
-    expect(interval(17, { limit: 50_000, remaining: 11_000, resetAt: now + 10 * 24 * HOUR })).toBe(
-      Math.ceil((17 * 10 * 24 * HOUR) / 1_000)
-    );
-    // Nothing left above the reserve (or nothing at all): a round costs the whole time to the
-    // reset, so no Safe is checked again before it.
-    for (const remaining of [10_000, 9_000, 0])
-      expect(
-        interval(17, { limit: 50_000, remaining, resetAt: now + 6 * HOUR })
-      ).toBeGreaterThanOrEqual(6 * HOUR);
-    // The reported period has ended: what was left then says nothing about now.
-    expect(interval(17, { limit: 50_000, remaining: 0, resetAt: now - 1 })).toBe(15 * MIN);
-  });
-
-  it("while idle, change-checks every member Safe once per interval (10 minutes early in the period)", async () => {
-    await load();
-    const safe = fakeSafe();
-    safe.headers = QUOTA_HEADERS;
-    const council = W.slice(0, 3);
-    for (const s of [...council, ...G, A]) safe.add(s, 1);
-    store.startSafeSweep(
-      alwaysDriver({ securityCouncil: council, guardians: G, zkFoundation: [A] })
-    );
-    await vi.advanceTimersByTimeAsync(HOUR + 30_000);
-    // Each Safe: one listing at first, then a change check every 10 minutes (6 x 2,577,504 s /
-    // 39,113 = 6.6 minutes is below the floor).
-    for (const s of [...council, ...G, A]) {
-      expect(safe.count("listing", s)).toBe(1);
-      const checks = safe.sent.filter((x) => x.kind === "newest" && x.safe === s.toLowerCase());
-      expect(checks).toHaveLength(6);
-      const starts = [
-        (safe.sent.find((x) => x.safe === s.toLowerCase()) as Sent).at,
-        ...checks.map((c) => c.at),
-      ];
-      for (let i = 1; i < starts.length; i++) {
-        expect((starts[i] as number) - (starts[i - 1] as number)).toBeGreaterThanOrEqual(10 * MIN);
-        expect((starts[i] as number) - (starts[i - 1] as number)).toBeLessThan(10 * MIN + 6_000);
-      }
-    }
-    expect(store.safeStoreStatus()).toMatchObject({
-      sweeping: true,
-      groups: [],
-      baseline: { safes: 6, intervalMs: 10 * MIN },
-      paused: null,
-    });
-    // About 36 background requests in the hour for 6 Safes (17 Safes at ~19 minutes: ~55).
-    expect(store.safeStoreStatus().budgetUsedThisHour).toBeLessThanOrEqual(6 * 7);
-  });
-
-  it("without quota headers checks every 15 minutes; never sweeps idle in window mode", async () => {
-    await load();
-    const safe = fakeSafe();
-    for (const s of [A, B]) safe.add(s, 1);
-    store.startSafeSweep(alwaysDriver({ securityCouncil: [A, B] }));
-    await vi.advanceTimersByTimeAsync(HOUR + 30_000);
-    expect(safe.count("newest", A)).toBe(4);
-    expect(store.safeStoreStatus().baseline).toEqual({ safes: 2, intervalMs: 15 * MIN });
-
-    // The same engine in window mode, idle (not viewing, no baseline): nothing.
-    store.stopSafeSweep();
-    const since = Date.now();
-    store.startSafeSweep({ ...driver({ securityCouncil: [A, B] }), viewing: () => false });
-    await vi.advanceTimersByTimeAsync(HOUR);
-    expect(background(safe, since)).toEqual([]);
-    expect(store.safeStoreStatus()).toMatchObject({ sweeping: false, baseline: null });
-  });
-
-  it("while viewing keeps the Safes of the sets on screen under 60 s old, and the others at the interval", async () => {
-    await load();
-    const safe = fakeSafe();
-    safe.headers = QUOTA_HEADERS;
-    for (const s of [...W, ...G]) safe.add(s, 1);
-    // A page shows a council set.
-    await within(1_000, store.listSafeMessages(W[0]));
-    store.startSafeSweep(
-      alwaysDriver(
-        { securityCouncil: W, guardians: G },
-        { viewing: true },
-        {
-          groups: ["securityCouncil"],
-        }
-      )
-    );
-    await vi.advanceTimersByTimeAsync(4 * MIN);
-    // The council about every 50 s; the Guardians once (their listing), then not yet again.
-    expect(safe.count("newest", W[1])).toBeGreaterThanOrEqual(4);
-    for (const g of G) {
-      expect(safe.count("listing", g)).toBe(1);
-      expect(safe.count("newest", g)).toBe(0);
-    }
-    expect(store.safeStoreStatus()).toMatchObject({
-      groups: ["securityCouncil"],
-      baseline: { safes: 7, intervalMs: 10 * MIN },
-    });
-  });
-
-  it("never spends more than SYNC_SAFE_HOURLY_BUDGET", async () => {
-    await load({ budget: 4 });
-    const safe = fakeSafe();
-    const members = Array.from({ length: 6 }, (_, i) => address(0x600 + i));
-    for (const s of members) safe.add(s, 1);
-    store.startSafeSweep(alwaysDriver({ securityCouncil: members }));
-    await vi.advanceTimersByTimeAsync(55 * MIN);
-    expect(safe.sent).toHaveLength(4);
-    expect(store.safeStoreStatus()).toMatchObject({ paused: "budget", budgetUsedThisHour: 4 });
-  });
-
-  it("pauses below 10 % of the quota only until the reported period ends", async () => {
-    await load();
-    const safe = fakeSafe();
-    safe.headers = {
-      "x-ratelimit-limit": "1000",
-      "x-ratelimit-remaining": "99",
-      "x-ratelimit-reset": "120",
-    };
-    for (const s of [A, B]) safe.add(s, 1);
-    // A page's read reports the quota: below 10 %, its period ends in 2 minutes.
-    await within(1_000, store.listSafeMessages(A));
-    const since = Date.now();
-    store.startSafeSweep(alwaysDriver({ securityCouncil: [A, B] }));
-    await vi.advanceTimersByTimeAsync(110_000);
-    expect(background(safe, since)).toEqual([]);
-    expect(store.safeStoreStatus().paused).toBe("quota");
-    // The period ends; the next answers report the new one.
-    safe.headers = {
-      "x-ratelimit-limit": "1000",
-      "x-ratelimit-remaining": "1000",
-      "x-ratelimit-reset": "2592000",
-    };
-    await vi.advanceTimersByTimeAsync(20_000);
-    expect(background(safe, since).map((x) => x.safe)).toContain(B.toLowerCase());
-    expect(store.safeStoreStatus()).toMatchObject({ paused: null, sweeping: true });
   });
 });

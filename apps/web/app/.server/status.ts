@@ -10,6 +10,7 @@ import { type SafeStoreStatus, safeStoreStatus } from "./safe/store";
 import { quota } from "./safe-api";
 import { type SignatureSetsStatus, signatureSetsStatus } from "./signatures";
 import { type SyncEngineStatus, syncEngineStatus } from "./sync/engine";
+import { type EraWatchStatus, eraWatchStatus } from "./sync/era";
 import { type SnapshotStatus, snapshotStatus } from "./sync/snapshot";
 import { type PresenceStatus, presence } from "./sync/presence";
 
@@ -25,9 +26,11 @@ import { type PresenceStatus, presence } from "./sync/presence";
  * a source of answers of its own): with SYNC_MODE=window (the default) only while the app is in
  * use, so `engine.active` is false in a session that only reads JSON; with "always" for as long as
  * the server runs, doing less while nobody uses the app (`engine.cost.mode` "idle"). `safe` is the
- * Safe listing store's background sweep, which keeps the listings of the member Safes of the sets
- * on screen under 60 s old while the app is in use and, with SYNC_MODE=always, checks every member
- * Safe at a quota-paced interval (listings are never served older than 60 s, sweep or not).
+ * Safe listing store's watcher, which while the app is in use asks Safe about the member Safes of
+ * the open sets on screen whose signature is not valid yet (every SYNC_SAFE_WATCH_MS) and those
+ * behind lists on screen (every SYNC_SAFE_LIST_WATCH_MS), within the quota; JSON still uses Safe
+ * copies at most 60 s old. `l2` is the ZKsync Era timer (a read a minute while an Era page is on
+ * screen).
  * `signatures` is the engine's precompute, at each new head, of the signature sets on screen;
  * results are the on-chain verdicts at that head, from Safe listings at most 60 s old. `l2Index`
  * is the ZKsync
@@ -48,6 +51,7 @@ export type SyncStatus = {
   signatures: SignatureSetsStatus;
   cache: ChainCacheStatus;
   snapshot: SnapshotStatus | null;
+  l2: EraWatchStatus;
 };
 
 export type AppStatus =
@@ -114,6 +118,7 @@ export async function appStatus({
         signatures: signatureSetsStatus(),
         cache: chainCacheStatus(),
         snapshot: snapshotStatus(),
+        l2: eraWatchStatus(),
       },
     };
   } catch (error) {

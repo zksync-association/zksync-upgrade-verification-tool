@@ -129,7 +129,33 @@ export type FakeL1Options = {
   aggregateError?: (block: string) => FakeRpcError | undefined;
   /** An address's code at a block tag ("latest" or hex; undefined: FAKE_CODE), or an error. */
   code?: (address: Address, block: string) => Hex | FakeRpcError | undefined;
+  /**
+   * The node's answer to eth_getTransactionReceipt: a receipt (fakeReceipt), null (not mined), or
+   * an error. Without it the node does not know the method.
+   */
+  receipt?: (hash: Hex) => Record<string, unknown> | null | FakeRpcError;
 };
+
+/** A mined transaction's receipt as a node sends it (eth_getTransactionReceipt). */
+export function fakeReceipt(hash: Hex, block: bigint, status: "success" | "reverted" = "success") {
+  const hex = (n: bigint) => `0x${n.toString(16)}`;
+  return {
+    transactionHash: hash,
+    transactionIndex: "0x0",
+    blockHash: blockHash(block),
+    blockNumber: hex(block),
+    from: "0x0000000000000000000000000000000000000001",
+    to: "0x0000000000000000000000000000000000000002",
+    cumulativeGasUsed: "0x5208",
+    gasUsed: "0x5208",
+    effectiveGasPrice: "0x3b9aca00",
+    contractAddress: null,
+    logs: [],
+    logsBloom: `0x${"00".repeat(256)}`,
+    status: status === "success" ? "0x1" : "0x0",
+    type: "0x2",
+  };
+}
 
 /** FakeL1Options.answer's way to answer a call with these exact bytes (e.g. "0x"). */
 export class RawAnswer {
@@ -396,6 +422,9 @@ export function fakeL1(options: FakeL1Options) {
           result: [results] as never,
         });
       }
+      case "eth_getTransactionReceipt":
+        if (!options.receipt) return chain.handle(call);
+        return options.receipt((call.params as [Hex])[0]);
       case "anvil_nodeInfo":
       case "hardhat_metadata":
         return new FakeRpcError(-32601, "method not found");

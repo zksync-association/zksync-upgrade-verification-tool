@@ -8,6 +8,11 @@ import type { Refresh } from "./freshness";
  * refresh "pending" until `fresh` resolves, then the fresh value renders in its place; when `fresh`
  * fails, the stale one stays with refresh "failed". `fresh` resolving to null (nothing was stale
  * after all) keeps the first answer.
+ *
+ * The tree is the same either way (a Suspense around an Await, which renders at once for a value
+ * that is not a promise): when a reload of the page turns a stale first answer into a current one
+ * (or back), React keeps what is inside mounted, so an expanded member row, an open details panel
+ * or an open Sign dialog stay as they were.
  */
 export function UntilFresh<T>({
   stale,
@@ -18,11 +23,10 @@ export function UntilFresh<T>({
   fresh: Promise<T | null> | T | null;
   children: (fresh: T | null, refresh: Refresh) => ReactNode;
 }) {
-  if (!stale) return <>{children(null, null)}</>;
   return (
-    <Suspense fallback={children(null, "pending")}>
-      <Await resolve={fresh} errorElement={children(null, "failed")}>
-        {(value) => children((value ?? null) as T | null, null)}
+    <Suspense fallback={children(null, stale ? "pending" : null)}>
+      <Await resolve={stale ? fresh : null} errorElement={children(null, "failed")}>
+        {(value) => children(stale ? ((value ?? null) as T | null) : null, null)}
       </Await>
     </Suspense>
   );

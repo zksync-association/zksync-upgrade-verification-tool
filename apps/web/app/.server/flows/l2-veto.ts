@@ -17,7 +17,7 @@ import {
   type L2ProposalView,
   type VetoableAnswer,
   activeL2ProposalsAnswer,
-  getL2Proposal,
+  getL2ProposalAnswer,
   knownGovernors,
 } from "./l2";
 import { firstFromHeld } from "./held";
@@ -94,6 +94,8 @@ export type VetoableProposals = {
    * again (pages only); the list from this run's history follows. Always false in JSON.
    */
   fromLastRun: boolean;
+  /** The Era head the states were read at (block, when Era answered), for a page's label. */
+  eraHead?: { number: string; readAt: string } | null;
 };
 
 async function signedFrom(gov: Governance, collected: Collected): Promise<SignedVetoes> {
@@ -126,8 +128,13 @@ async function signedFrom(gov: Governance, collected: Collected): Promise<Signed
 
 async function vetoableFrom(answer: Promise<VetoableAnswer>): Promise<VetoableProposals> {
   try {
-    const { proposals, provisional } = await answer;
-    return { vetoable: proposals, l2Error: null, fromLastRun: provisional };
+    const { proposals, provisional, eraHead } = await answer;
+    return {
+      vetoable: proposals,
+      l2Error: null,
+      fromLastRun: provisional,
+      ...(eraHead !== undefined ? { eraHead } : {}),
+    };
   } catch (error) {
     return { vetoable: [], l2Error: await l2ErrorText(error), fromLastRun: false };
   }
@@ -148,7 +155,9 @@ export function loadL2VetoList({ freshness = "strict" }: { freshness?: Freshness
   const freshSigned = gov.then(async (g) =>
     signedFrom(
       g,
-      await collectMessages(g.guardians.members, ["CancelL2GovernorProposal"], g.guardians.domain)
+      await collectMessages(g.guardians.members, ["CancelL2GovernorProposal"], g.guardians.domain, {
+        page,
+      })
     )
   );
   const signed = page
@@ -168,19 +177,43 @@ export function loadL2VetoList({ freshness = "strict" }: { freshness?: Freshness
   // (kept in memory by the sync engine at each head), never JSON's full read for a page.
   const answerGov = () => gov;
   // The first answer may use the last run's history; one that failed there is this run's to give.
+  // A page answers at the Era head pages read (the Era timer's, sync/era.ts); JSON at Era's head.
   const firstVetoable = page
-    ? activeL2ProposalsAnswer({ provisional: true, gov: answerGov }).then(
+    ? activeL2ProposalsAnswer({ provisional: true, gov: answerGov, page }).then(
         (answer) => answer,
-        () => activeL2ProposalsAnswer({ gov: answerGov })
+        () => activeL2ProposalsAnswer({ gov: answerGov, page })
       )
     : activeL2ProposalsAnswer({ gov: answerGov });
   const vetoable = vetoableFrom(firstVetoable);
   const freshVetoable = vetoable.then((first) =>
-    first.fromLastRun ? vetoableFrom(activeL2ProposalsAnswer({ gov: answerGov })) : first
+    first.fromLastRun ? vetoableFrom(activeL2ProposalsAnswer({ gov: answerGov, page })) : first
   );
   for (const promise of [gov, signed, freshSigned, vetoable, freshVetoable])
     void promise.catch(() => {});
   return { signed, freshSigned, vetoable, freshVetoable, governance: gov };
+}
+
+/**
+ * For the sync engine: the veto list as a page shows it, from the Guardians' Safe copies held
+ * under the page rule (never asking Safe), governance at the head pages read and ZKsync Era at the
+ * Era head pages read; null when a member Safe's copy is not one a page would use as current.
+ */
+export async function heldVetoList(): Promise<{
+  signed: SignedVetoes;
+  vetoable: VetoableProposals;
+} | null> {
+  const gov = await governanceFor("page");
+  const collected = await collectHeldMessages(
+    gov.guardians.members,
+    ["CancelL2GovernorProposal"],
+    gov.guardians.domain
+  );
+  if (!collected || collected.stale) return null;
+  const [signed, vetoable] = await Promise.all([
+    signedFrom(gov, collected),
+    vetoableFrom(activeL2ProposalsAnswer({ gov: async () => gov, page: true })),
+  ]);
+  return { signed, vetoable };
 }
 
 /** The strict lists together (JSON). */
@@ -210,6 +243,8 @@ export type VetoDetail = {
   l2Proposal: L2ProposalView | null;
   /** Why the L2 proposal was not read: no L2 RPC, or the read failed. null when it was read. */
   l2Error: string | null;
+  /** The Era head the L2 proposal's state was read at (block, when Era answered), or null. */
+  eraHead: { number: string; readAt: string } | null;
   governorKnown: boolean;
   governance: Governance;
 };
@@ -221,16 +256,24 @@ export type VetoDetail = {
  */
 async function readL2Proposal(
   params: VetoParams,
-  gov: Governance
-): Promise<{ l2Proposal: L2ProposalView | null; l2Error: string | null }> {
+  gov: Governance,
+  page = false
+): Promise<{
+  l2Proposal: L2ProposalView | null;
+  l2Error: string | null;
+  eraHead: VetoDetail["eraHead"];
+}> {
   try {
-    if (!(await l2())) return { l2Proposal: null, l2Error: "No ZKsync Era RPC is configured" };
-    const l2Proposal = await getL2Proposal(params.l2GovernorAddress, BigInt(params.l2ProposalId), {
-      gov: async () => gov,
-    });
-    return { l2Proposal, l2Error: null };
+    if (!(await l2()))
+      return { l2Proposal: null, l2Error: "No ZKsync Era RPC is configured", eraHead: null };
+    const { proposal, eraHead } = await getL2ProposalAnswer(
+      params.l2GovernorAddress,
+      BigInt(params.l2ProposalId),
+      { gov: async () => gov, page }
+    );
+    return { l2Proposal: proposal, l2Error: null, eraHead };
   } catch (error) {
-    return { l2Proposal: null, l2Error: await l2ErrorText(error) };
+    return { l2Proposal: null, l2Error: await l2ErrorText(error), eraHead: null };
   }
 }
 
@@ -270,8 +313,8 @@ export function loadL2Veto(
 ): { first: Promise<VetoDetail>; fresh: Promise<VetoDetail> } {
   const started = (async () => {
     const gov = await governanceFor(freshness);
-    const [{ l2Proposal, l2Error }, governors] = await Promise.all([
-      readL2Proposal(params, gov),
+    const [{ l2Proposal, l2Error, eraHead }, governors] = await Promise.all([
+      readL2Proposal(params, gov, freshness === "page"),
       knownGovernors(),
     ]);
     const state = vetoState(gov, params, l2Proposal);
@@ -295,6 +338,7 @@ export function loadL2Veto(
       state,
       l2Proposal,
       l2Error,
+      eraHead,
       governorKnown: governors.some(
         (g) => g.kind !== "protocol" && isAddressEqual(g.address, params.l2GovernorAddress)
       ),
@@ -305,21 +349,25 @@ export function loadL2Veto(
   const fresh = started.then(async ({ gov, base, streamed }): Promise<VetoDetail> => {
     const set = await streamed.fresh;
     const { l2Proposal, state } = base;
-    const execution = await executionFor(set, state, (valid) =>
-      l2Proposal?.idMatchesLocal
-        ? cancelL2Execution(
-            gov.guardians.address,
-            l2Proposal,
-            {
-              to: params.l2GovernorAddress,
-              l2GasLimit: params.l2GasLimit,
-              l2GasPerPubdataByteLimit: params.l2GasPerPubdataByteLimit,
-              refundRecipient: params.refundRecipient,
-              txMintValue: params.txMintValue,
-            },
-            valid
-          )
-        : null
+    const execution = await executionFor(
+      set,
+      state,
+      (valid) =>
+        l2Proposal?.idMatchesLocal
+          ? cancelL2Execution(
+              gov.guardians.address,
+              l2Proposal,
+              {
+                to: params.l2GovernorAddress,
+                l2GasLimit: params.l2GasLimit,
+                l2GasPerPubdataByteLimit: params.l2GasPerPubdataByteLimit,
+                refundRecipient: params.refundRecipient,
+                txMintValue: params.txMintValue,
+              },
+              valid
+            )
+          : null,
+      { page: freshness === "page" }
     );
     return { ...base, set, execution };
   });

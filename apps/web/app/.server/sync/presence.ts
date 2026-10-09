@@ -59,8 +59,8 @@ const REASONS: ReadonlySet<string> = new Set<PresenceReason>([
 
 /**
  * Something a page renders, named by the server (page loaders issue these; never /api/* JSON):
- * `status`, `list:<kind>`, `upgrade:<id>`, `emergency:<id>`, `set:<hash>`, `l2:<governor>:<id>`,
- * `tx:<hash>`. `rev` is null until the server tracks revisions.
+ * `status`, `list:<kind>`, `upgrade:<id>`, `emergency:<id>`, `set:<hash>`, `sim:<hash>`,
+ * `l2:<governor>:<id>`, `tx:<hash>`. `rev` is null until the server tracks revisions.
  */
 export type WatchItem = { key: string; rev: string | null };
 
@@ -132,9 +132,12 @@ export function requestInfo(request: Request): RequestInfo {
 // `Purpose: prefetch`, Firefox `X-Moz: prefetch`, Safari's previews `X-Purpose: preview`.
 const PREFETCH = /\b(?:prefetch|prerender|preview)\b/i;
 
+/** POSTs a page sends when its viewer asks for something now (Refresh, Fetch signatures). */
+const VIEWER_POSTS = new Set(["/resources/refresh", "/resources/safe-check"]);
+
 /**
  * Whether a request is a page load: a GET of a page or a page's data (`?_data=`), or the Refresh
- * button's POST /resources/refresh, from this app's own pages or typed in (Sec-Fetch-Site
+ * and Fetch signatures buttons' POSTs, from this app's own pages or typed in (Sec-Fetch-Site
  * same-origin, none, or no such header), and not a prefetch. Never /api/* or the beat itself.
  * Paths match as the router matches them: case aside, with or without a trailing slash.
  */
@@ -149,7 +152,7 @@ export function isPageLoad(info: RequestInfo): boolean {
   if (site && site !== "same-origin" && site !== "none") return false;
   const method = info.method.toUpperCase();
   if (method === "GET") return true;
-  return method === "POST" && path === "/resources/refresh";
+  return method === "POST" && VIEWER_POSTS.has(path);
 }
 
 /**
@@ -382,3 +385,5 @@ export const watchKeys = {
     `l2:${governor.toLowerCase()}:${proposalId.toString()}`,
   tx: (hash: string) => `tx:${hash.toLowerCase()}`,
 } as const;
+// (Signature sets' keys, `set:…`, and simulations', `sim:…`, are made where they are verified:
+// signatures.ts.)

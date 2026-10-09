@@ -16,6 +16,7 @@ import {
   snapshotUpgradeStatus,
 } from "../upgrade-status";
 import type { Tick } from "./engine";
+import { listedIds } from "./listed-ids";
 import { presence } from "./presence";
 
 // The sync engine's per-block snapshot (it replaces the old status step): at each served head,
@@ -30,7 +31,7 @@ import { presence } from "./presence";
 //   expired without approval, as read at a final block), and of the ids on screen: upgradeState
 //   moves with the block's timestamp.
 // The ids are those known at the head before (the handler's log index can only add ids at a new
-// head) and those on screen, so they go out at once; ids the index finds in this head's tail are
+// head) and those on screen (a pending emergency upgrade a list shows included), so they go out at once; ids the index finds in this head's tail are
 // read right after. An aggregate answered for another block, or a failed sub-call, leaves that
 // value unknown at the head: nothing is stored for it (requests at that head read it themselves;
 // nothing older stands in for it), and sync.snapshot lists it.
@@ -89,10 +90,14 @@ export function resetSnapshotStatus() {
   last = null;
 }
 
-/** The upgrade and emergency upgrade ids pages on screen show. */
+/**
+ * The upgrade and emergency upgrade ids pages on screen show: those of the detail pages, and the
+ * pending emergency upgrades a list on screen shows (from members' Safe messages, not in the index).
+ */
 function idsOnScreen(): Map<string, Hex> {
-  const ids = new Map<string, Hex>();
-  for (const key of presence().onScreen()) {
+  const keys = presence().onScreen();
+  const ids = listedIds(keys);
+  for (const key of keys) {
     const match = /^(?:upgrade|emergency):(0x[0-9a-f]{64})$/.exec(key);
     if (match) ids.set(match[1] as string, match[1] as Hex);
   }

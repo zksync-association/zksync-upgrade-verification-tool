@@ -125,6 +125,11 @@ vi.mock("@/.server/safe/store", async () => {
     // Read just now (a listing at most 60 s old, or a lookup by hash).
     fetchedAt: state.byHash ? null : Date.now(),
   });
+  // The listing a page may use: one at most 60 s old (incomplete: none that can answer).
+  const listing = () =>
+    state.listingFresh && !state.safeApiDown && !state.byHash
+      ? { messages: [], complete: true, fetchedAt: Date.now(), version: state.listingVersion }
+      : null;
   return {
     SAFE_LISTING_MAX_AGE_MS: 60_000,
     // A page's first answer is not under test here: no listing is held.
@@ -138,6 +143,24 @@ vi.mock("@/.server/safe/store", async () => {
     peekSafeMessage: (_safe: string, hash: string) =>
       state.listingFresh && !state.safeApiDown && !state.byHash ? answer(hash) : null,
     freshListingVersion: () => (state.listingFresh ? state.listingVersion : null),
+    // Pages' copies (signatures.ts pageSource): only a listing at most 60 s old is held here, and
+    // no watcher keeps anything older.
+    heldSafeListing: () => listing(),
+    pageSafeListing: () => listing(),
+    safeListingVersion: () => (state.listingFresh ? state.listingVersion : null),
+    answerFromListing: (held: { version: number; fetchedAt: number }, hash: string) => ({
+      message: state.safeMessages.get(hash) ?? null,
+      version: held.version,
+      fetchedAt: held.fetchedAt,
+    }),
+    safeCheckOf: () => ({
+      state: "off",
+      checkedAt: null,
+      nextAt: null,
+      cadenceMs: null,
+      reason: null,
+    }),
+    nudgeSafeWatch: () => {},
     onSafeListingChange: (listener: (safe: string) => void) => {
       state.listeners.add(listener);
       return () => state.listeners.delete(listener);
@@ -1156,8 +1179,9 @@ describe("simulate", () => {
       let reply: unknown = "0x";
       const fake = fakeCallLane(() => reply);
       state.lane = fake.lane;
-      expect(await simulate(execution, { keep: true })).toEqual({ status: "ok" });
-      expect(await simulate(execution, { keep: true })).toEqual({ status: "ok" });
+      // Labelled with the block it was simulated at.
+      expect(await simulate(execution, { keep: true })).toEqual({ status: "ok", atBlock: "1100" });
+      expect(await simulate(execution, { keep: true })).toEqual({ status: "ok", atBlock: "1100" });
       expect(fake.calls().map((c) => c.params[1])).toEqual(["0x44c"]);
       // Without keep (a supplied signature in it): at 'latest', every time.
       await simulate(execution);
@@ -1165,7 +1189,7 @@ describe("simulate", () => {
 
       state.head = { ...state.head, ...H2 };
       reply = revertWith("Protocol frozen");
-      const reverted = { status: "reverted", error: "Protocol frozen" };
+      const reverted = { status: "reverted", error: "Protocol frozen", atBlock: "1101" };
       expect(await simulate(execution, { keep: true })).toEqual(reverted);
       expect(await simulate(execution, { keep: true })).toEqual(reverted);
       expect(fake.calls()).toHaveLength(3);
@@ -1174,7 +1198,7 @@ describe("simulate", () => {
       reply = internalError();
       expect(await simulate(execution, { keep: true })).toMatchObject({ status: "skipped" });
       reply = "0x";
-      expect(await simulate(execution, { keep: true })).toEqual({ status: "ok" });
+      expect(await simulate(execution, { keep: true })).toEqual({ status: "ok", atBlock: "1102" });
       expect(fake.calls()).toHaveLength(5);
     });
 
@@ -1184,7 +1208,7 @@ describe("simulate", () => {
         notFound-- > 0 ? new FakeRpcError(-32000, "header not found") : "0x"
       );
       state.lane = fake.lane;
-      expect(await simulate(execution, { keep: true })).toEqual({ status: "ok" });
+      expect(await simulate(execution, { keep: true })).toMatchObject({ status: "ok" });
       expect(fake.calls()).toHaveLength(2);
       await simulate({ ...execution, value: "7" }, { keep: true });
       await simulate({ ...execution, data: "0x5678" }, { keep: true });

@@ -1,6 +1,7 @@
 import { watchItems, watchKeys } from "@/.server/sync/presence";
-import { notStartedUpgrades } from "@/.server/flows/l2";
+import { type NotStartedUpgrade, notStartedUpgrades } from "@/.server/flows/l2";
 import { network } from "@/.server/rpc";
+import { loaderRevs, startableContent } from "@/.server/sync/content";
 import { simulate } from "@/.server/signatures";
 import { upgradeHandlerAbi } from "@/common/abis";
 import { decodeUpgradeProposal, upgradeProposalId } from "@/common/proposal";
@@ -19,9 +20,11 @@ export const meta = Meta["/app/proposals/new"];
 
 // Executed ZkProtocolGovernor proposals (last 30 days on ZKsync Era) whose L1 upgrade has not
 // been started yet, with the startUpgrade transaction ready to send. Anyone can start an upgrade.
-async function startable() {
+// Read at the Era head pages read (the Era timer's, at most a minute old), and the simulation at
+// the L1 head (kept for it).
+async function startable(found: Promise<NotStartedUpgrade[]>) {
   const { upgradeHandler } = await network();
-  const items = await notStartedUpgrades();
+  const items = await found;
   return Promise.all(
     items.map(async (item) => {
       if (!item.ok) return { ...item, execution: null, idMatches: null };
@@ -49,14 +52,22 @@ async function startable() {
       return {
         ...item,
         idMatches: upgradeProposalId(proposal) === item.l1ProposalId,
-        execution: { ...execution, simulation: await simulate(execution) },
+        execution: {
+          ...execution,
+          simulation: await simulate(execution, { keep: true, page: true }),
+        },
       };
     })
   );
 }
 
 export function loader({ request }: LoaderFunctionArgs) {
-  return defer({ watch: watchItems(request, [watchKeys.startable]), items: startable() });
+  const found = notStartedUpgrades({ page: true });
+  return defer({
+    watch: watchItems(request, [watchKeys.startable]),
+    revs: loaderRevs([[watchKeys.startable, found.then(startableContent)]]),
+    items: startable(found),
+  });
 }
 
 export default function StartUpgrade() {

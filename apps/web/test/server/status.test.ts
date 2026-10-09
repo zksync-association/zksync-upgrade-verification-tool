@@ -59,16 +59,35 @@ const L2_INDEX = vi.hoisted(() => ({
   ],
 }));
 
-// What the Safe store's sweep reports (safe-store.test.ts covers how).
+// What the Safe store's watcher reports (safe-store.test.ts covers how).
 const SAFE = vi.hoisted(() => ({
   sweeping: true,
-  groups: ["securityCouncil", "guardians"],
+  groups: [],
+  baseline: null,
+  watched: {
+    safes: 16,
+    lists: 0,
+    keyless: false,
+    cadenceMs: { set: 60_000, list: 300_000 },
+    effectiveCadenceMs: { set: 60_000, list: 300_000 },
+    allowancePerHour: 1_200,
+    nextCheckAt: "2026-10-06T07:00:03.000Z",
+  },
   oldestFetchedAt: "2026-10-06T06:59:12.000Z",
   budgetUsedThisHour: 40,
   budgetPerHour: 1200,
+  bursts: 0,
   paused: null,
   lastError: null,
   failingSafes: 0,
+}));
+
+// What the ZKsync Era timer reports (era.test.ts covers how).
+const L2 = vi.hoisted(() => ({
+  onScreen: 1,
+  eraBlock: "72350600",
+  readAt: "2026-10-06T06:59:30.000Z",
+  boundaries: 0,
 }));
 
 // What the signature-set precompute reports (signatures.test.ts covers how).
@@ -121,6 +140,7 @@ vi.mock("@/.server/sync/engine", () => ({ syncEngineStatus: () => ENGINE }));
 vi.mock("@/.server/safe/store", () => ({ safeStoreStatus: () => SAFE }));
 vi.mock("@/.server/signatures", () => ({ signatureSetsStatus: () => SIGNATURES }));
 vi.mock("@/.server/persist/chain-cache", () => ({ chainCacheStatus: () => CACHE }));
+vi.mock("@/.server/sync/era", () => ({ eraWatchStatus: () => L2 }));
 
 const { appStatus, logHistoryStatus } = await import("@/.server/status");
 const { ConfigError } = await import("@/.server/rpc");
@@ -134,7 +154,7 @@ beforeEach(() => {
 });
 
 describe("appStatus", () => {
-  it("adds sync.index, sync.l2Index, sync.presence, sync.engine, sync.safe, sync.signatures, sync.cache and sync.snapshot next to the fields it always had", async () => {
+  it("adds sync.index, sync.l2Index, sync.presence, sync.engine, sync.safe, sync.signatures, sync.cache, sync.snapshot and sync.l2 next to the fields it always had", async () => {
     const status = await appStatus();
     expect(status).toEqual({
       ok: true,
@@ -165,6 +185,7 @@ describe("appStatus", () => {
         cache: CACHE,
         // No per-block snapshot yet (the engine has not run).
         snapshot: null,
+        l2: L2,
       },
     });
     // JSON-safe as served: strings and numbers only.

@@ -1,3 +1,10 @@
+import {
+  emergencyListContent,
+  freezeListContent,
+  loaderRevs,
+  upgradeListContent,
+  vetoListContent,
+} from "@/.server/sync/content";
 import { watchItems, watchKeys } from "@/.server/sync/presence";
 import {
   type ExecutedFirst,
@@ -102,6 +109,30 @@ export function loader({ request }: LoaderFunctionArgs) {
       Promise.all([vetoes.freshSigned, vetoes.freshVetoable]).then(vetoCount)
     ),
   };
+  // What each count was built from, once current (the first answer, or the fresh one after it),
+  // for the lists' revisions (sync/revs.ts).
+  const currentList = upgrades.then((first) =>
+    first.fromLastRun ? listStandardUpgrades({ allHistory: false }) : first
+  );
+  const currentPending = emergency.pending.then((p) => (p.stale ? emergency.freshPending : p));
+  const currentFreeze = freeze.first.then((f) => (f.stale ? freeze.fresh : f));
+  const currentSigned = vetoes.signed.then((v) => (v.stale ? vetoes.freshSigned : v));
+  const revs = loaderRevs([
+    [watchKeys.upgrades(false), currentList.then(upgradeListContent)],
+    [
+      watchKeys.emergencies(false),
+      Promise.all([currentPending, emergency.executed]).then(([pending, executed]) =>
+        emergencyListContent(pending, executed)
+      ),
+    ],
+    [watchKeys.freezes, currentFreeze.then(freezeListContent)],
+    [
+      watchKeys.vetoes,
+      Promise.all([currentSigned, vetoes.freshVetoable]).then(([signed, vetoable]) =>
+        vetoable.l2Error === null ? vetoListContent(signed, vetoable) : undefined
+      ),
+    ],
+  ]);
   return defer({
     watch: watchItems(request, [
       watchKeys.upgrades(false),
@@ -109,6 +140,7 @@ export function loader({ request }: LoaderFunctionArgs) {
       watchKeys.freezes,
       watchKeys.vetoes,
     ]),
+    revs,
     upgrades: counts.upgrades.first,
     upgradesFresh: counts.upgrades.fresh,
     emergency: counts.emergency.first,

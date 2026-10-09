@@ -43,20 +43,34 @@ import {
   verdictCounts,
 } from "./chain/verdicts";
 import { type SafeInfo, safeInfo, safeInfoKey } from "./governance";
-import { type BlockRef, latestBlock, network, rpcGeneration, servedHead } from "./rpc";
+import {
+  type BlockRef,
+  latestBlock,
+  network,
+  rpcGeneration,
+  servedHead,
+  servedHeadNow,
+} from "./rpc";
 import {
   SAFE_LISTING_MAX_AGE_MS,
+  type SafeCheck,
   type SafeMessageLookup,
+  type SafeSnapshot,
+  answerFromListing,
   freshListingVersion,
+  heldSafeListing,
   listSafeMessages,
   lookupSafeMessage,
+  nudgeSafeWatch,
   onSafeListingChange,
+  pageSafeListing,
   peekHeldSafeMessage,
-  peekSafeMessage,
+  safeCheckOf,
 } from "./safe/store";
 import { SafeApiError, safeWalletUrl } from "./safe-api";
 import { asEngineWork, requestJoinsEngineWork } from "./sync/pacer";
 import { type WatchItem, onPageLoad, presence } from "./sync/presence";
+import { noteContent, touchRev } from "./sync/revs";
 
 // The verification core. A signature counts only if the contract that will consume it accepts it in
 // an eth_call: Multisig.checkSignatures for council/guardian members, and the Safe's own
@@ -85,10 +99,17 @@ import { type WatchItem, onPageLoad, presence } from "./sync/presence";
 //
 // Pages may show a first answer before that result (see firstSignatureSet): the set's last result,
 // labelled with the block it was verified at, or a verification at the head from Safe listings
-// older than 60 s, labelled with their age (`stale: true` either way). The strict result always
-// follows in the same response and replaces it. JSON only ever gets the strict result. Safe data
-// is candidate input only, so old copies can only show fewer signatures than there are, never
-// make one count; an old verdict is shown as of its block, never as current.
+// older than 60 s, labelled with their age (`stale: true` either way). The page's own result
+// always follows in the same response and replaces it. JSON only ever gets the strict result.
+//
+// A page's result (verifyPageSignatureSet, kept apart from JSON's: its own memo, never read for
+// JSON) is verified at the head like JSON's, from Safe copies under the page rule instead of the
+// 60 s one: a member's copy the watcher keeps checking for the screen (safe/store.ts
+// pageSafeListing), any copy of a member whose signature from it is valid at the head, and any
+// copy for a set that can no longer be signed; any other copy is read again first, as for JSON.
+// Each carries its age (`safeFetchedAt`) and how the copies are kept (`safeCheck`). Safe data is
+// candidate input only, so old copies can only show fewer signatures than there are, never make
+// one count; an old verdict is shown as of its block, never as current.
 
 export type SignatureCheck =
   // SecurityCouncil / Guardians actions: checkSignatures(digest, signers, signatures, threshold)
@@ -154,9 +175,15 @@ export type SignatureSet = {
   /**
    * Pages only (never /api/* JSON): the key the page reports while it shows this set (see
    * watchSignatureSet), the same for every answer of the set and never derived from a supplied
-   * signature.
+   * signature, with the revision of the content shown (sync/revs.ts; null for a first answer and
+   * whenever a supplied signature is in it).
    */
   watch?: WatchItem;
+  /**
+   * Pages only: how the Safe copies of the members whose signature is not valid yet are kept while
+   * the set can still be signed (checked every N s, paused, only on request); null otherwise.
+   */
+  safeCheck?: SafeCheck | null;
 };
 
 /**
@@ -373,10 +400,18 @@ export type SignatureSetParams = {
   blockNumber?: bigint;
   /** The set's state is open (it can still be signed and executed). Default false. */
   open?: boolean;
+  /**
+   * With `open`: the Unix time (s) from which it can no longer be (a freeze request's
+   * validUntil). At a head at or past it, a page showing it is told to reload (it then shows the
+   * set closed) and its members are no longer watched.
+   */
+  openUntil?: bigint;
 };
 
 /** A set to verify, without supplied signatures, and the identity results are kept under. */
-type SetSpec = Omit<SignatureSetParams, "supplied" | "blockNumber" | "open"> & { key: string };
+type SetSpec = Omit<SignatureSetParams, "supplied" | "blockNumber" | "open" | "openUntil"> & {
+  key: string;
+};
 
 function specOf(params: SignatureSetParams): SetSpec {
   const { action, signerGroup, typedData, members, threshold, check } = params;
@@ -405,25 +440,9 @@ class NeedsSafeRead extends Error {
 
 const fromSafe: SafeSource = (member, hash) => lookupSafeMessage(member, hash);
 
-const fromStore: SafeSource = async (member, hash) => {
-  const found = peekSafeMessage(member, hash);
-  if (!found) throw new NeedsSafeRead(`No listing at most 60 s old answers for ${member}`);
-  return found;
-};
-
 /** A page's first answer: the listing held, whatever its age (never asks Safe). */
 const fromHeld: SafeSource = async (member, hash) => {
   const found = peekHeldSafeMessage(member, hash);
-  if (!found) throw new NeedsSafeRead(`No listing held answers for ${member}`);
-  return found;
-};
-
-/**
- * A precompute of a set that can no longer be signed: the listing served (at most 60 s old) when
- * there is one, else the listing held, whatever its age (never asks Safe).
- */
-const fromAnyHeld: SafeSource = async (member, hash) => {
-  const found = peekSafeMessage(member, hash) ?? peekHeldSafeMessage(member, hash);
   if (!found) throw new NeedsSafeRead(`No listing held answers for ${member}`);
   return found;
 };
@@ -455,7 +474,7 @@ export async function verifySignatureSet(params: SignatureSetParams): Promise<Si
   // Supplied signatures are checked afresh every time, and nothing about them is kept.
   if (supplied.length > 0)
     return (await computeSet(params, supplied, { kind: "head", head }, fromSafe)).set;
-  return memoized(specOf(params), head, false);
+  return memoized(specOf(params), head);
 }
 
 /**
@@ -465,15 +484,25 @@ export async function verifySignatureSet(params: SignatureSetParams): Promise<Si
  * sets then find them (or join the reads in flight); these are the listings the sets would read,
  * no others (only member Safes that are contracts, only listings older than 60 s). Never rejects.
  */
-export function prefetchSafeListings(members: readonly Address[]) {
-  for (const member of new Map(members.map((m) => [m.toLowerCase(), m])).values())
+export function prefetchSafeListings(
+  members: readonly Address[],
+  { page = false }: { page?: boolean } = {}
+) {
+  for (const member of new Map(members.map((m) => [m.toLowerCase(), m])).values()) {
+    // A page reads only Safes it has no copy of (or only the last run's): any other copy may serve
+    // it under the page rule (decided per set, see pageSource), which reads what it must itself.
+    if (page) {
+      const held = heldSafeListing(member);
+      if (held && !held.fromLastRun) continue;
+    }
     void safeInfo(member)
       .then((info) => (info.isContract ? listSafeMessages(member) : null))
       .catch(() => {});
+  }
 }
 
 async function computeSet(
-  params: Omit<SignatureSetParams, "supplied" | "blockNumber" | "open">,
+  params: Omit<SignatureSetParams, "supplied" | "blockNumber" | "open" | "openUntil">,
   supplied: MemberSignature[],
   pin: Pin,
   source: SafeSource,
@@ -731,12 +760,10 @@ type MemoEntry = {
   kept: Computed | null;
   /** FOREVER while in flight. */
   expiresAt: number;
-  /** Computed by a precompute (from held listings only). */
-  background: boolean;
 };
 
-// A set's result at one head, while every listing and Safe info it came from is still the one
-// served.
+// A set's result at one head (JSON's, strict), while every listing and Safe info it came from is
+// still the one served.
 const memo = new Map<string, MemoEntry>();
 const MEMO_TTL_MS = 60_000;
 const MEMO_SWEEP_MS = 60_000;
@@ -750,11 +777,10 @@ const memoKey = (spec: SetSpec, head: BlockRef) => `verify:${spec.key}:${head.ha
  * served (so at most 60 s old), and each member's Safe info is still the cached entry it read.
  * Then computing it again at the same head would give the same set.
  *
- * A set computed from a copy older than 60 s or from the last run's (`staleCopies`: the engine's
- * "held" precompute of a set that can no longer be signed) never stands: an unchanged re-read of
- * a listing keeps its version, so the version check alone would let it through to JSON (and to a
- * page's fresh result) with its old `safeFetchedAt` and `stale: false`. Pages show it only as a
- * labelled first answer (lastResults); every reader here computes from copies at most 60 s old.
+ * A set computed from a copy older than 60 s or from the last run's (`staleCopies`: a page's
+ * result under the page rule) never stands: an unchanged re-read of a listing keeps its version,
+ * so the version check alone would let it through to JSON with its old `safeFetchedAt` and
+ * `stale: false`. Every reader here computes from copies at most 60 s old.
  * For the same reason a kept set stands only while the oldest copy it used is at most 60 s old
  * (its `safeFetchedAt`), even when that listing was re-read unchanged since: computed again, it
  * takes the copy just read (and the verdicts already read at this head).
@@ -783,24 +809,15 @@ function sweepMemo() {
 }
 
 /**
- * The set at `head`: the result kept for it while that still stands, the computation in flight
- * for it (taken once it stands for what is served when it ends), or a new one. A request computes
- * with Safe's listings (read when older than 60 s); a precompute (`background`) only with listings
- * the store holds, and fails with NeedsSafeRead otherwise. A request that shared a precompute's
- * computation which failed computes on its own.
+ * JSON's set at `head`: the result kept for it while that still stands, the computation in flight
+ * for it, or a page's in flight at this head (the engine's, see resolvePageSet: taken once it
+ * stands, which a result from copies at most 60 s old does), or a new one with Safe's listings
+ * (read when older than 60 s). A request that shared a computation which failed computes on its
+ * own.
  */
-async function memoized(spec: SetSpec, head: BlockRef, background: boolean): Promise<SignatureSet> {
-  return (await resolveSet(spec, head, background)).set;
+async function memoized(spec: SetSpec, head: BlockRef): Promise<SignatureSet> {
+  return (await resolveSet(spec, head)).set;
 }
-
-/**
- * Which Safe listings a computation may use: "safe" reads Safe for a listing older than 60 s (a
- * request); "store" only listings at most 60 s old the store holds (the engine's precompute of
- * an open set); "held" whatever the store holds, of any age (the engine's precompute of a set
- * that can no longer be signed: its result, labelled with the copies' age, is only a page's first
- * answer, and no strict reader takes it, see stands()).
- */
-type ListingSource = "safe" | "store" | "held";
 
 // Computations in flight one call may wait for before computing on its own: the one it found,
 // and one another caller started when that one no longer stood.
@@ -809,18 +826,21 @@ const MAX_JOINS = 2;
 /** memoized(), and whether this call computed the set (not a result kept or in flight). */
 async function resolveSet(
   spec: SetSpec,
-  head: BlockRef,
-  background: boolean,
-  listings: ListingSource = background ? "store" : "safe"
+  head: BlockRef
 ): Promise<{ set: SignatureSet; computed: boolean }> {
   const key = memoKey(spec, head);
   for (let joins = 0; joins < MAX_JOINS; joins++) {
     const found = memo.get(key);
     if (holds(found)) return answered(found.kept);
-    if (!found || found.kept !== null || found.expiresAt <= Date.now()) break;
+    const page = found ? null : pageInFlight(spec, head);
+    const inFlight =
+      found && found.kept === null && found.expiresAt > Date.now()
+        ? found.promise
+        : page?.promise ?? null;
+    if (!inFlight) break;
     // A request waiting on the engine's computation: the engine's paced reads go now.
-    if (!background && found.background) requestJoinsEngineWork(found.promise);
-    const shared = await found.promise.then(
+    if (page?.engine) requestJoinsEngineWork(inFlight);
+    const shared = await inFlight.then(
       (computed) => ({ ok: true as const, computed }),
       (error: unknown) => ({ ok: false as const, error })
     );
@@ -829,11 +849,11 @@ async function resolveSet(
       // or turned 60 s old, or a Safe's info been read again, while it was computed. Otherwise
       // this call reads them itself, as it would have without it.
       if (stands(shared.computed)) return answered(shared.computed);
-    } else if (background || !found.background) {
+    } else if (found) {
       throw shared.error;
     }
   }
-  const computed = await compute(key, spec, head, background, listings);
+  const computed = await compute(key, spec, head);
   return { set: computed.set, computed: true };
 }
 
@@ -841,18 +861,11 @@ function answered(computed: Computed) {
   return { set: computed.set, computed: false };
 }
 
-function compute(
-  key: string,
-  spec: SetSpec,
-  head: BlockRef,
-  background: boolean,
-  listings: ListingSource
-): Promise<Computed> {
-  const source = listings === "safe" ? fromSafe : listings === "store" ? fromStore : fromAnyHeld;
+function compute(key: string, spec: SetSpec, head: BlockRef): Promise<Computed> {
   // The last valid set, for the threshold check's guess (see computeSet).
   const guess = lastResults.get(spec.key)?.set.valid;
-  const computed = computeSet(spec, [], { kind: "head", head }, source, guess);
-  const entry: MemoEntry = { promise: computed, kept: null, expiresAt: FOREVER, background };
+  const computed = computeSet(spec, [], { kind: "head", head }, fromSafe, guess);
+  const entry: MemoEntry = { promise: computed, kept: null, expiresAt: FOREVER };
   sweepMemo();
   memo.set(key, entry);
   // Registered before anyone else can wait on it, so callers that joined it see the outcome.
@@ -860,7 +873,7 @@ function compute(
     (result) => {
       // Dropped meanwhile (settings change, refresh): never put back.
       if (memo.get(key) !== entry) return;
-      remember(spec, head, result);
+      remember(spec, head.number, result);
       // Kept only when every message came from a listing version (a lookup by hash or a Safe
       // failure has no version to tell when it no longer stands).
       if (result.byHash || result.set.safeApiError !== null) {
@@ -877,6 +890,364 @@ function compute(
   return computed;
 }
 
+// ---- a page's result (pages only; never read for JSON) ----
+
+/**
+ * Who computes a page's result: a request (reads Safe for a copy outside the page rule) or the
+ * sync engine (never asks Safe: such a set is left to the next request).
+ */
+type PageReader = "request" | "engine";
+
+/**
+ * Where a page's computation takes each member's message (see the top of this file): a copy under
+ * the page rule; for a set that can no longer be signed, any copy held; for one that can, any copy
+ * held provisionally (`provisional`: used only when the member's signature from it is valid at
+ * the head, checked after the members are). Otherwise, and for the members in `strict`, Safe is
+ * read as for JSON (a request) or the set is left to the next request (the engine). Never a copy
+ * the last run read.
+ */
+function pageSource(open: boolean, reader: PageReader, strict: ReadonlySet<string> = new Set()) {
+  const provisional = new Set<string>();
+  const held = (member: Address): SafeSnapshot | null => {
+    const listing = heldSafeListing(member);
+    return listing && !listing.fromLastRun ? listing : null;
+  };
+  const source: SafeSource = async (member, hash) => {
+    const key = member.toLowerCase();
+    if (!strict.has(key)) {
+      const listing = pageSafeListing(member, "set") ?? (open ? null : held(member));
+      const answer = listing ? answerFromListing(listing, hash) : null;
+      if (answer) return answer;
+      if (!listing && open) {
+        const any = held(member);
+        const early = any ? answerFromListing(any, hash) : null;
+        if (early) {
+          provisional.add(key);
+          return early;
+        }
+      }
+    }
+    if (reader === "engine") throw new NeedsSafeRead(`No copy under the page rule for ${member}`);
+    return lookupSafeMessage(member, hash);
+  };
+  return { source, provisional };
+}
+
+/**
+ * A page's computation of the set at `head`: members from pageSource; a member that used a copy
+ * provisionally and is not valid from it is computed again from Safe (a request; the verdicts
+ * already read at this head are not read again) or leaves the set to the next request (the
+ * engine).
+ */
+async function computePage(
+  spec: SetSpec,
+  head: BlockRef,
+  open: boolean,
+  reader: PageReader
+): Promise<Computed> {
+  const guess = lastResults.get(spec.key)?.set.valid;
+  const pin: Pin = { kind: "head", head };
+  const first = pageSource(open, reader);
+  const computed = await computeSet(spec, [], pin, first.source, guess);
+  const redo = new Set(
+    [...first.provisional].filter(
+      (key) => computed.set.members.find((m) => m.member.toLowerCase() === key)?.status !== "valid"
+    )
+  );
+  if (redo.size === 0) return computed;
+  if (reader === "engine") {
+    recheckMembers(spec, head, redo);
+    throw new NeedsSafeRead("A member's older copy no longer counts");
+  }
+  return computeSet(spec, [], pin, pageSource(open, reader, redo).source, guess);
+}
+
+// Members of an open set whose copy the page rule no longer covers and whose signature from it is
+// not valid at a head the engine verified (it never asks Safe, so it leaves the set): watched at
+// once (watchedSetMembers), until a result of the set at that head or a later one (a request's, or
+// the engine's from the copy the watcher just confirmed) says what they are. By set spec key.
+type Recheck = { members: Map<string, Address>; block: bigint };
+const rechecks = new Map<string, Recheck>();
+
+/**
+ * The engine found these members (lower case) not valid from copies it may use only while they
+ * are (computePage): the watcher checks their Safes now, and when the set's last result, which
+ * pages show, has one of them valid, that is no longer what the set is: its revision changes at
+ * once, so a page showing it reloads (a request reads the Safe and gives the result at the head).
+ */
+function recheckMembers(spec: SetSpec, head: BlockRef, redo: ReadonlySet<string>) {
+  const entry = rechecks.get(spec.key) ?? {
+    members: new Map<string, Address>(),
+    block: head.number,
+  };
+  if (head.number > entry.block) entry.block = head.number;
+  let added = false;
+  for (const member of spec.members) {
+    const key = member.toLowerCase();
+    if (!redo.has(key) || entry.members.has(key)) continue;
+    entry.members.set(key, member);
+    added = true;
+  }
+  rechecks.delete(spec.key);
+  rechecks.set(spec.key, entry);
+  while (rechecks.size > PAGE_SETS_LIMIT) rechecks.delete(rechecks.keys().next().value as string);
+  const shown = lastResults.get(spec.key)?.set;
+  if (shown?.members.some((m) => m.status === "valid" && redo.has(m.member.toLowerCase())))
+    touchRev(setKeyOf(spec));
+  if (added) nudgeSafeWatch();
+}
+
+/** The members of an open set the watcher checks: not valid in its last result, or rechecked. */
+function watchedMembersOf(spec: SetSpec): Address[] {
+  const latest = lastResults.get(spec.key)?.set;
+  const members = latest ? notValid(spec, latest) : [...spec.members];
+  for (const member of rechecks.get(spec.key)?.members.values() ?? [])
+    if (!members.some((m) => isAddressEqual(m, member))) members.push(member);
+  return members;
+}
+
+/**
+ * A kept page result stands for what is held now: every member's message came from a listing
+ * version that is still the one held (any age, never the last run's), each copy is still under
+ * the page rule (a member valid in it: any age; a set that can no longer be signed: any age), no
+ * Safe failure or lookup by hash, and each member's Safe info is still the cached entry it read.
+ */
+function standsForPage(computed: Computed, open: boolean): boolean {
+  if (computed.byHash || computed.set.safeApiError !== null) return false;
+  for (const [safe, version] of computed.listings) {
+    const listing = heldSafeListing(safe as Address);
+    if (!listing || listing.fromLastRun || listing.version !== version) return false;
+    if (!open) continue;
+    const member = computed.set.members.find((m) => m.member.toLowerCase() === safe);
+    if (member?.status === "valid") continue;
+    if (!pageSafeListing(safe as Address, "set")) return false;
+  }
+  for (const [key, info] of computed.infos) if (peek(key) !== info) return false;
+  return true;
+}
+
+type PageEntry = {
+  promise: Promise<Computed>;
+  /** Once resolved and kept: what it computed. null while in flight. */
+  kept: Computed | null;
+  /** FOREVER while in flight. */
+  expiresAt: number;
+  /** Computed by the sync engine (a request joining it hurries its paced reads). */
+  engine: boolean;
+};
+
+// A page's result at one head, kept apart from JSON's (never read on the JSON path): `open` is
+// part of the key, as the page rule depends on it.
+const pageMemo = new Map<string, PageEntry>();
+
+const pageMemoKey = (spec: SetSpec, head: BlockRef, open: boolean) =>
+  `verify-page:${open ? "open" : "done"}:${spec.key}:${head.hash.toLowerCase()}`;
+
+function sweepPageMemo() {
+  const now = Date.now();
+  for (const [key, entry] of pageMemo) if (entry.expiresAt <= now) pageMemo.delete(key);
+}
+
+/** The listing versions a result came from, as one number: higher for newer copies. */
+const orderOf = (computed: Computed) => Math.max(0, ...computed.listings.values());
+
+/**
+ * The set as a page shows it now: the kept result, its copies' age updated to when Safe last
+ * confirmed them (the same listing versions, confirmed since by the watcher), with the key it is
+ * reported under, its content's revision (sync/revs.ts) and how its copies are kept.
+ */
+function pageAnswer(
+  spec: SetSpec,
+  head: BlockRef,
+  open: boolean,
+  computed: Computed
+): SignatureSet {
+  let oldest: number | null = null;
+  for (const safe of computed.listings.keys()) {
+    const at = heldSafeListing(safe as Address)?.fetchedAt;
+    if (at !== undefined && (oldest === null || at < oldest)) oldest = at;
+  }
+  const watch = noteContent(
+    setKeyOf(spec),
+    { head: head.number, order: orderOf(computed) },
+    setContent(computed.set)
+  );
+  return {
+    ...computed.set,
+    safeFetchedAt: oldest === null ? computed.set.safeFetchedAt : new Date(oldest).toISOString(),
+    stale: false,
+    watch,
+    safeCheck: open ? watchedCheck(spec, computed.set) : null,
+  };
+}
+
+/** The members whose signature is not valid in this result (Safes the watcher checks). */
+function notValid(spec: SetSpec, set: SignatureSet): Address[] {
+  return spec.members.filter(
+    (member) => set.members.find((m) => isAddressEqual(m.member, member))?.status !== "valid"
+  );
+}
+
+/**
+ * How the watcher keeps the copies of an open set's members not valid yet, or null when every
+ * member is valid (nothing is checked: the page shows its copies' age instead).
+ */
+function watchedCheck(spec: SetSpec, set: SignatureSet): SafeCheck | null {
+  const members = notValid(spec, set);
+  return members.length > 0 ? safeCheckOf(members) : null;
+}
+
+/**
+ * What a set's revision is a digest of: everything the page shows of it but the labels (the block
+ * it was verified at, the copies' age), which change at every head without anything else doing so.
+ */
+export function setContent(set: SignatureSet) {
+  return {
+    action: set.action,
+    signerGroup: set.signerGroup,
+    digest: set.hashes.digest,
+    check: set.check,
+    threshold: set.threshold,
+    members: set.members.map((m) => ({
+      member: m.member,
+      status: m.status,
+      source: m.source,
+      signature: m.signature,
+      confirmations: m.confirmations,
+      signedAt: m.signedAt,
+      error: m.error,
+      owners: m.owners,
+      safe: m.safe,
+    })),
+    valid: set.valid,
+    thresholdCheck: set.thresholdCheck,
+    safeApiError: set.safeApiError,
+  };
+}
+
+/**
+ * The set at `head` as a page shows it: the page result kept for it while that still stands, the
+ * computation in flight for it (taken once it stands), or a new one (see computePage).
+ */
+async function resolvePageSet(
+  spec: SetSpec,
+  head: BlockRef,
+  open: boolean,
+  reader: PageReader
+): Promise<{ set: SignatureSet; computed: Computed; fresh: boolean }> {
+  const key = pageMemoKey(spec, head, open);
+  for (let joins = 0; joins < MAX_JOINS; joins++) {
+    const found = pageMemo.get(key);
+    if (found?.kept && found.expiresAt > Date.now() && standsForPage(found.kept, open))
+      return { set: pageAnswer(spec, head, open, found.kept), computed: found.kept, fresh: false };
+    if (!found || found.kept !== null || found.expiresAt <= Date.now()) break;
+    if (reader === "request" && found.engine) requestJoinsEngineWork(found.promise);
+    const shared = await found.promise.then(
+      (computed) => ({ ok: true as const, computed }),
+      (error: unknown) => ({ ok: false as const, error })
+    );
+    if (shared.ok) {
+      if (standsForPage(shared.computed, open))
+        return {
+          set: pageAnswer(spec, head, open, shared.computed),
+          computed: shared.computed,
+          fresh: false,
+        };
+    } else if (reader === "engine" || !found.engine) {
+      throw shared.error;
+    }
+  }
+  const computing = computePage(spec, head, open, reader);
+  const entry: PageEntry = {
+    promise: computing,
+    kept: null,
+    expiresAt: FOREVER,
+    engine: reader === "engine",
+  };
+  sweepPageMemo();
+  pageMemo.set(key, entry);
+  computing.then(
+    (result) => {
+      if (pageMemo.get(key) !== entry) return;
+      remember(spec, head.number, result);
+      if (result.byHash || result.set.safeApiError !== null) {
+        pageMemo.delete(key);
+        return;
+      }
+      entry.kept = result;
+      entry.expiresAt = Date.now() + MEMO_TTL_MS;
+      // From copies at most 60 s old only (none provisional, none older: stands() checks that,
+      // as for any strict result), it is exactly what JSON's strict computation at this head
+      // gives: JSON's memo takes it too, so JSON at a head the engine verified asks nothing more.
+      const strictKey = memoKey(spec, head);
+      const existing = memo.get(strictKey);
+      const replaceable = !existing || (existing.kept !== null && !holds(existing));
+      if (replaceable && stands(result))
+        memo.set(strictKey, {
+          promise: Promise.resolve(result),
+          kept: result,
+          expiresAt: Date.now() + MEMO_TTL_MS,
+        });
+    },
+    () => {
+      if (pageMemo.get(key) === entry) pageMemo.delete(key);
+    }
+  );
+  const computed = await computing;
+  return { set: pageAnswer(spec, head, open, computed), computed, fresh: true };
+}
+
+/**
+ * The set as a page shows it (`freshness: "page"`; never for JSON): verified at the head, from
+ * Safe copies under the page rule (see the top of this file), with its key, revision and how its
+ * copies are kept. Supplied signatures (?sig=), a past block and dev nodes get the strict result,
+ * keyed by the base set and with no revision (nothing about a supplied signature is kept).
+ */
+export async function verifyPageSignatureSet(params: SignatureSetParams): Promise<SignatureSet> {
+  const supplied = params.supplied ?? [];
+  const spec = specOf(params);
+  const net = await network();
+  if (supplied.length > 0 || params.blockNumber !== undefined) {
+    const set = await verifySignatureSet(params);
+    return { ...set, watch: { key: setKeyOf(spec), rev: null }, safeCheck: null };
+  }
+  if (net.isDevNode) {
+    // At 'latest', as JSON: its content's revision (its listings' versions order it), so a page
+    // learns when a member Safe's listing changed (see noteListingChange).
+    const computed = await computeSet(spec, [], { kind: "latest" }, fromSafe);
+    // What the Safe watcher asks about follows it (watchedMembersOf): a member valid now is not
+    // watched any more, as on a live chain (block 0: every result at 'latest' replaces the last).
+    remember(spec, 0n, computed);
+    const watch = noteContent(
+      setKeyOf(spec),
+      { head: 0n, order: orderOf(computed) },
+      setContent(computed.set)
+    );
+    return {
+      ...computed.set,
+      watch,
+      safeCheck: params.open ? watchedCheck(spec, computed.set) : null,
+    };
+  }
+  const head = await latestBlock();
+  return (await resolvePageSet(spec, head, params.open === true, "request")).set;
+}
+
+/** A page's computation of this set at `head` in flight (either rule), or null. */
+function pageInFlight(spec: SetSpec, head: BlockRef): PageEntry | null {
+  for (const open of [true, false]) {
+    const found = pageMemo.get(pageMemoKey(spec, head, open));
+    if (found && found.kept === null && found.expiresAt > Date.now()) return found;
+  }
+  return null;
+}
+
+/** A page result at `head` already stands for this set (a page's fresh answer needs nothing more). */
+function pageHolds(spec: SetSpec, head: BlockRef, open: boolean): boolean {
+  const found = pageMemo.get(pageMemoKey(spec, head, open));
+  return !!found?.kept && found.expiresAt > Date.now() && standsForPage(found.kept, open);
+}
+
 // ---- a page's first answer ----
 
 // The last strict result of each set (a request's or a precompute's, never one with a supplied
@@ -887,14 +1258,17 @@ const LAST_RESULT_FOR_MS = 24 * 60 * 60_000;
 type LastResult = { set: SignatureSet; block: bigint; storedAt: number };
 const lastResults = new Map<string, LastResult>();
 
-function remember(spec: SetSpec, head: BlockRef, computed: Computed) {
+function remember(spec: SetSpec, block: bigint, computed: Computed) {
   // A result Safe could not answer for leaves the last one it did answer for.
   if (computed.set.safeApiError !== null) return;
   // Never replaced by one verified at an older block (computations can end out of order).
   const previous = lastResults.get(spec.key);
-  if (previous && previous.block > head.number) return;
+  if (previous && previous.block > block) return;
+  // Members rechecked since a head this result is not older than: it says what they are now.
+  const recheck = rechecks.get(spec.key);
+  if (recheck && block >= recheck.block) rechecks.delete(spec.key);
   lastResults.delete(spec.key);
-  lastResults.set(spec.key, { set: computed.set, block: head.number, storedAt: Date.now() });
+  lastResults.set(spec.key, { set: computed.set, block, storedAt: Date.now() });
   while (lastResults.size > LAST_RESULTS_LIMIT)
     lastResults.delete(lastResults.keys().next().value as string);
 }
@@ -908,10 +1282,10 @@ function lastResult(key: string): LastResult | null {
 }
 
 /**
- * A page's first answer for a set (`freshness: "page"`), while `fresh` (verifySignatureSet's strict
+ * A page's first answer for a set (`freshness: "page"`), while `fresh` (verifyPageSignatureSet's
  * result for the same params) is computed. It never waits on Safe:
- * - the result kept at the head served now, while it still stands: that IS the fresh result, so
- *   `fresh` itself is the answer;
+ * - the page result kept at the head served now, while it still stands: that IS the fresh result,
+ *   so `fresh` itself is the answer;
  * - else the set's last strict result, at the block it was verified at;
  * - else a verification at the head from the Safe listings held, whatever their age.
  * The last two are labelled (`stale: true`, `verifiedAtBlock`, `safeFetchedAt`, `reverifyingAt`)
@@ -935,7 +1309,7 @@ export async function firstSignatureSet(
   );
   let early: SignatureSet | null = null;
   try {
-    early = await earlyAnswer(specOf(params));
+    early = await earlyAnswer(specOf(params), params.open === true);
   } catch {
     // A read it needed failed (the head, a verdict): the fresh result answers, or says why not.
   }
@@ -943,16 +1317,21 @@ export async function firstSignatureSet(
 }
 
 /** firstSignatureSet's stale answer, or null when the answer is the fresh result. */
-async function earlyAnswer(spec: SetSpec): Promise<SignatureSet | null> {
+async function earlyAnswer(spec: SetSpec, open: boolean): Promise<SignatureSet | null> {
   if ((await network()).isDevNode) return null;
-  // The head served now, without asking the node (a read of it in flight is waited for).
-  const served = servedHead();
-  let head = served ? await served.catch(() => null) : null;
-  if (head && holds(memo.get(memoKey(spec, head)))) return null;
+  // The head served now, without asking the node. With a last result to show, never waiting for a
+  // read of it in flight (after a pause, the first flush then carries that result, labelled, while
+  // the head is read); without one, a read in flight is waited for.
   const last = lastResult(spec.key);
+  const served = last ? null : servedHead();
+  let head = last ? servedHeadNow() : served ? await served.catch(() => null) : null;
+  // A result at the head already stands (the page's, or JSON's from copies at most 60 s old, which
+  // the page rule takes too): the page's own comes at once, without Safe.
+  const current = (at: BlockRef) => pageHolds(spec, at, open) || holds(memo.get(memoKey(spec, at)));
+  if (head && current(head)) return null;
   if (last) return asFirstAnswer(last.set, head);
   head ??= await latestBlock();
-  if (holds(memo.get(memoKey(spec, head)))) return null;
+  if (current(head)) return null;
   let computed: Computed;
   try {
     computed = await computeSet(spec, [], { kind: "head", head }, fromHeld);
@@ -964,7 +1343,13 @@ async function earlyAnswer(spec: SetSpec): Promise<SignatureSet | null> {
 }
 
 function asFirstAnswer(set: SignatureSet, head: BlockRef | null): SignatureSet {
-  return { ...set, stale: true, reverifyingAt: head ? head.number.toString() : null };
+  return {
+    ...set,
+    stale: true,
+    reverifyingAt: head ? head.number.toString() : null,
+    watch: undefined,
+    safeCheck: null,
+  };
 }
 
 // The sets pages show, by the key each page reports while it shows one (watchSignatureSet): at
@@ -975,7 +1360,7 @@ function asFirstAnswer(set: SignatureSet, head: BlockRef | null): SignatureSet {
 const PAGE_SETS_LIMIT = 256;
 const PAGE_SET_FOR_MS = 24 * 60 * 60_000;
 const PRECOMPUTE_LIMIT = 64;
-type PageSet = { spec: SetSpec; shownAt: number; open: boolean };
+type PageSet = { spec: SetSpec; shownAt: number; open: boolean; openUntil?: bigint };
 const pageSets = new Map<string, PageSet>();
 
 /** A set's page key: `set:` and the first 16 bytes of sha256 of its spec key, in hex. */
@@ -993,11 +1378,49 @@ function setKeyOf(spec: SetSpec): string {
 export function watchSignatureSet(params: SignatureSetParams): WatchItem {
   const spec = specOf(params);
   const key = setKeyOf(spec);
+  const before = pageSets.get(key);
   pageSets.delete(key);
-  pageSets.set(key, { spec, shownAt: Date.now(), open: params.open === true });
+  pageSets.set(key, {
+    spec,
+    shownAt: Date.now(),
+    open: params.open === true,
+    openUntil: params.open === true ? params.openUntil : undefined,
+  });
   while (pageSets.size > PAGE_SETS_LIMIT) pageSets.delete(pageSets.keys().next().value as string);
   onPageLoad(key);
+  // A set newly on screen, or one that can be signed again: its members' Safes are looked at now.
+  if (!before || before.open !== (params.open === true)) nudgeSafeWatch();
   return { key, rev: null };
+}
+
+/**
+ * "Fetch signatures": the set shown under this page key verified again at the head served now,
+ * as a page shows it (after its members' Safes were just read, see safe/store.ts checkSafesNow),
+ * and its revision; null when no page showed the key in the last 24 hours.
+ */
+export async function reverifyPageSet(key: string): Promise<SignatureSet | null> {
+  const entry = pageSets.get(key);
+  if (!entry || Date.now() - entry.shownAt > PAGE_SET_FOR_MS) return null;
+  const { key: _key, ...params } = entry.spec;
+  return verifyPageSignatureSet({ ...params, open: entry.open });
+}
+
+/**
+ * How the Safe copies of the set shown under this page key are kept now (see onScreenSafeChecks),
+ * for the answer to "Fetch signatures"; null when it cannot be signed or no member is left to sign.
+ */
+export function pageSetSafeCheck(key: string): SafeCheck | null {
+  const entry = pageSets.get(key);
+  if (!entry?.open || Date.now() - entry.shownAt > PAGE_SET_FOR_MS) return null;
+  const members = watchedMembersOf(entry.spec);
+  return members.length > 0 ? safeCheckOf(members) : null;
+}
+
+/** The set shown under this page key, while pages showed it in the last 24 hours. */
+export function pageSetOf(key: string): { members: readonly Address[]; open: boolean } | null {
+  const entry = pageSets.get(key);
+  if (!entry || Date.now() - entry.shownAt > PAGE_SET_FOR_MS) return null;
+  return { members: entry.spec.members, open: entry.open };
 }
 
 /** The sets pages showed in the last 24 hours that are on screen now, most recent first. */
@@ -1025,7 +1448,7 @@ function precomputeSpecs(): SetSpec[] {
  * The signer group and member Safes of each set on screen (their Safe info is kept fresh while
  * the app is in use); with `openOnly`, of the sets on screen that can still be signed (the Safe
  * store keeps their listings fresh while the app is in use; a set that can no longer be signed is
- * verified from the listings held, whatever their age, see ListingSource).
+ * verified from the listings held, whatever their age, see pageSource).
  */
 export function onScreenSigners({ openOnly = false }: { openOnly?: boolean } = {}): {
   group: SignerGroup;
@@ -1034,6 +1457,36 @@ export function onScreenSigners({ openOnly = false }: { openOnly?: boolean } = {
   return precomputeEntries()
     .filter((entry) => !openOnly || entry.open)
     .map(({ spec }) => ({ group: spec.signerGroup, members: spec.members }));
+}
+
+/**
+ * The member Safes the Safe watcher checks for the signature sets on screen: of each set that can
+ * still be signed, the members whose signature is not valid in its latest result (all of them
+ * before it has one), and those the engine found no longer valid from a copy it could not use
+ * (recheckMembers). Asked again at every look, so a member whose signature stops being valid, or
+ * a set that can be signed again, is watched again as soon as its result says so.
+ */
+export function watchedSetMembers(): Address[] {
+  const safes = new Map<string, Address>();
+  for (const { spec, open } of precomputeEntries()) {
+    if (!open) continue;
+    for (const member of watchedMembersOf(spec)) safes.set(member.toLowerCase(), member);
+  }
+  return [...safes.values()];
+}
+
+/**
+ * For a tab's beat: how the Safe copies of each set on screen that can still be signed are kept
+ * (see SafeCheck), by the set's page key. Sets with no member left to sign are not named.
+ */
+export function onScreenSafeChecks(): Record<string, SafeCheck> {
+  const checks: Record<string, SafeCheck> = {};
+  for (const { spec, open } of precomputeEntries()) {
+    if (!open) continue;
+    const members = watchedMembersOf(spec);
+    if (members.length > 0) checks[setKeyOf(spec)] = safeCheckOf(members);
+  }
+  return checks;
 }
 
 // Sets verified at once: their checks go out together in the head's aggregate3
@@ -1061,22 +1514,28 @@ export type PrecomputeRun = {
 
 let lastRun: PrecomputeRun | null = null;
 
-// settings changes and dev-node refreshes (clearCache) drop kept results, the sets' last results
-// and the sets pages showed alike; an invalidate() covering "verify:" drops the results.
+// settings changes and dev-node refreshes (clearCache) drop kept results (JSON's and pages'), the
+// sets' last results and the sets pages showed alike; an invalidate() covering "verify:" drops the
+// results.
 linkStore("verify:", (prefix) => {
   memo.clear();
+  pageMemo.clear();
   lastResults.clear();
+  rechecks.clear();
   if (prefix === null) {
     pageSets.clear();
+    simulations.clear();
     lastRun = null;
   }
 });
 
 /**
  * Verifies at `head` the sets on screen (see precomputeSpecs; only those with a member in `safes`,
- * when given), so the next request at that head finds them. Only Safe listings the store holds (at
- * most 60 s old) are used; a set that would need Safe is left to the request. `viewing` (default
- * true) only labels the run. Never rejects; failures leave nothing kept.
+ * when given), as pages show them (resolvePageSet: the page result, never JSON's), so the next
+ * page request or reload at that head finds them, and notes each one's content for its revision
+ * (sync/revs.ts) once it is in memory. Only Safe copies the store holds under the page rule are
+ * used; a set that would need Safe is left to the request. `viewing` (default true) only labels the
+ * run. Never rejects; failures leave nothing kept.
  */
 export async function precomputeSignatureSets(
   head: BlockRef,
@@ -1086,6 +1545,14 @@ export async function precomputeSignatureSets(
   const current = options.current ?? (() => true);
   const safes = options.safes;
   const viewing = options.viewing ?? true;
+  // A set that can be signed only until a time (a freeze request's validUntil) cannot be at a
+  // head past it: the page showing it is told to reload (it then shows the set closed), and its
+  // members are no longer watched.
+  for (const entry of precomputeEntries())
+    if (entry.open && entry.openUntil !== undefined && head.timestamp >= entry.openUntil) {
+      entry.open = false;
+      touchRev(setKeyOf(entry.spec));
+    }
   const entries = precomputeEntries().filter(
     ({ spec }) => !safes || spec.members.some((m) => safes.has(m.toLowerCase()))
   );
@@ -1109,8 +1576,8 @@ export async function precomputeSignatureSets(
           return;
         }
         try {
-          const { computed } = await resolveSet(spec, head, true, open ? "store" : "held");
-          if (computed) run.verified++;
+          const { fresh } = await resolvePageSet(spec, head, open, "engine");
+          if (fresh) run.verified++;
           else run.reused++;
         } catch (error) {
           if (error instanceof NeedsSafeRead) run.skipped++;
@@ -1121,6 +1588,8 @@ export async function precomputeSignatureSets(
   );
   run.ms = Date.now() - started;
   if (current()) lastRun = run;
+  // Members whose signature became valid (or stopped being valid) change what is watched.
+  if (run.verified > 0) nudgeSafeWatch();
   return run;
 }
 
@@ -1132,6 +1601,11 @@ export type SignatureWatchDriver = {
   viewing?: () => boolean;
   /** The head requests read now, without asking the node; null when none is cached. */
   head: () => Promise<BlockRef> | null;
+  /**
+   * A dev node someone is using: sets are verified at 'latest' on each request, never ahead of
+   * one, so a page showing a set whose member's listing changed is just told to reload.
+   */
+  readsAtLatest?: () => boolean;
 };
 
 let driver: SignatureWatchDriver | null = null;
@@ -1161,12 +1635,16 @@ export function stopSignatureWatch() {
 }
 
 function noteListingChange(safe: Address) {
-  if (!driver?.active()) return;
   const key = safe.toLowerCase();
-  const wanted = precomputeSpecs().some((spec) =>
+  const affected = precomputeSpecs().filter((spec) =>
     spec.members.some((m) => m.toLowerCase() === key)
   );
-  if (!wanted) return;
+  if (affected.length === 0) return;
+  if (!driver?.active()) {
+    // A dev node: nothing is verified ahead of requests; the pages showing it reload.
+    if (driver?.readsAtLatest?.()) for (const spec of affected) touchRev(setKeyOf(spec));
+    return;
+  }
   changed.add(key);
   scheduleRecheck();
 }
@@ -1256,10 +1734,22 @@ function describeCheck(check: SignatureCheck, threshold: number) {
   }
 }
 
-export type Simulation =
+export type Simulation = (
   | { status: "ok" }
   | { status: "reverted"; error: string }
-  | { status: "skipped"; reason: string };
+  | { status: "skipped"; reason: string }
+) & {
+  /**
+   * The block it was simulated at (decimal), when it was simulated at a head (kept); absent at
+   * 'latest' (a dev node, or a transaction with a signature the viewer supplied).
+   */
+  atBlock?: string;
+  /**
+   * Pages only: the key it is simulated again under at each new head while it is on screen
+   * (`sim:…`), and the revision of its result (sync/revs.ts).
+   */
+  watch?: WatchItem;
+};
 
 // A funded stand-in sender, so payable calls (the L2 veto forwards txMintValue) can be simulated.
 const SIMULATION_SENDER: Address = "0x000000000000000000000000000000000000dEaD";
@@ -1272,6 +1762,12 @@ export type SimulateOptions = {
    * 'latest' every time, and nothing about it is kept.
    */
   keep?: boolean;
+  /**
+   * For a page (with `keep`): the result carries the key the sync engine simulates it again under
+   * at each new head while the page shows it (watchSimulation), so the page learns when the
+   * result changes and never shows one from an older block as current.
+   */
+  page?: boolean;
 };
 
 /** eth_call of the execution transaction against the latest state. Nothing is sent. */
@@ -1303,7 +1799,7 @@ export async function simulate(
  */
 export async function simulateCall(
   request: CallRequest,
-  { keep = false }: SimulateOptions = {}
+  { keep = false, page = false }: SimulateOptions = {}
 ): Promise<Simulation> {
   if (keep && request.blockNumber === undefined) {
     let head: BlockRef | null;
@@ -1312,9 +1808,94 @@ export async function simulateCall(
     } catch (error) {
       return skipped(error);
     }
-    if (head) return simulateAtHead(request, head);
+    if (head) {
+      const simulation = {
+        ...(await simulateAtHead(request, head)),
+        atBlock: head.number.toString(),
+      };
+      return page ? watchSimulation(request, head, simulation) : simulation;
+    }
   }
   return simulateAt(request);
+}
+
+// The simulations pages show (keep: no supplied signature), by key, for the sync engine to
+// simulate again at each new head while their key is on screen: at most 64, the least recently
+// shown first, each for 24 hours. Only pages register them (JSON never does).
+const SIMULATIONS_LIMIT = 64;
+const SIMULATION_FOR_MS = 24 * 60 * 60_000;
+const simulations = new Map<string, { request: CallRequest; shownAt: number }>();
+
+/** A simulation's page key: `sim:` and the first 16 bytes of sha256 of the call, in hex. */
+function simulationKeyOf(request: CallRequest): string {
+  const overrides = (request.stateOverride ?? [])
+    .map(({ address, balance }) => `${address.toLowerCase()}=${balance}`)
+    .join(",");
+  const identity = [
+    request.from?.toLowerCase() ?? "",
+    request.to.toLowerCase(),
+    request.value ?? 0n,
+    request.data.toLowerCase(),
+    overrides,
+  ].join("|");
+  return `sim:${createHash("sha256").update(identity).digest("hex").slice(0, 32)}`;
+}
+
+/** What a simulation's revision is a digest of: its outcome (an RPC failure's text left out). */
+export const simulationContent = (simulation: Simulation) =>
+  simulation.status === "reverted"
+    ? { status: simulation.status, error: simulation.error }
+    : { status: simulation.status };
+
+/**
+ * A page shows this simulation (at `head`): it is registered under its key for the engine to
+ * simulate again at each new head while the key is on screen (put on screen for the page load's
+ * grace at once), and its result noted for the key's revision.
+ */
+function watchSimulation(request: CallRequest, head: BlockRef, simulation: Simulation): Simulation {
+  const key = simulationKeyOf(request);
+  simulations.delete(key);
+  simulations.set(key, { request, shownAt: Date.now() });
+  while (simulations.size > SIMULATIONS_LIMIT)
+    simulations.delete(simulations.keys().next().value as string);
+  onPageLoad(key);
+  const watch = noteContent(key, { head: head.number }, simulationContent(simulation));
+  return { ...simulation, watch };
+}
+
+/**
+ * The sync engine's step at a new head (before it is served): every simulation a page on screen
+ * shows, simulated at `head` (one eth_call each, kept for the head: requests at it ask nothing
+ * more), its result noted for its revision. An RPC failure notes nothing: the page keeps its
+ * result, labelled with the older block it was simulated at, never shown as current. Never
+ * rejects.
+ */
+export async function resimulateOnScreen(
+  head: BlockRef,
+  keys: Iterable<string>,
+  current: () => boolean = () => true
+): Promise<{ noted: number; skipped: number }> {
+  const tally = { noted: 0, skipped: 0 };
+  const now = Date.now();
+  await Promise.all(
+    [...keys]
+      .filter((key) => key.startsWith("sim:"))
+      .map(async (key) => {
+        const entry = simulations.get(key);
+        if (!entry || now - entry.shownAt > SIMULATION_FOR_MS || !current()) {
+          tally.skipped++;
+          return;
+        }
+        const simulation = await simulateAtHead(entry.request, head).catch(skipped);
+        if (simulation.status === "skipped" || !current()) {
+          tally.skipped++;
+          return;
+        }
+        noteContent(key, { head: head.number }, simulationContent(simulation));
+        tally.noted++;
+      })
+  );
+  return tally;
 }
 
 function simulateAtHead(request: CallRequest, head: BlockRef): Promise<Simulation> {

@@ -1,8 +1,8 @@
 import type { OkStatus } from "@/components/governance-context";
 import { LoadingCard } from "@/components/page";
+import { useLive } from "@/components/presence";
 import { cn } from "@/utils/cn";
 import { formatAge, formatNumber, formatTime } from "@/utils/format";
-import { useDocumentVisible } from "@/utils/visibility";
 import { Loader2 } from "lucide-react";
 import {
   type ReactNode,
@@ -13,7 +13,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { $path } from "remix-routes";
 
 // What the header says about the data behind the page: the block the app status was read at and
 // how long ago that block was mined (by this browser's clock), and whether the
@@ -73,32 +72,21 @@ export function useIndexProgress(): IndexProgress {
   return useContext(IndexProgressContext).progress;
 }
 
-const POLL_MS = 2_000;
-// About 5 minutes of polling; after that the label keeps its last value until Refresh.
-const MAX_POLLS = 150;
-/**
- * Polls of an index that has not started (idle) after a root status, at most: enough to see the
- * backfill a settings save starts, never forever (with SYNC_MODE=off and PREWARM=0 it stays idle
- * until a page reads it, and every poll would read through to the RPC).
- */
-export const IDLE_POLLS = 5;
-
 /** Not settled yet: the backfill has not started (e.g. right after a settings save) or runs. */
 const unsettled = (index: IndexStatusView) =>
   index.state === "idle" || index.state === "backfilling";
 
 /**
  * Provides the index progress from the root status (`initial`; null until it is in this
- * browser), and while the index is backfilling polls /api/status for fresher progress; while it
- * has not started (idle), only IDLE_POLLS times in a row. Never otherwise, and never while the tab
- * is hidden (it resumes when shown): an idle or hidden tab must not poll (each read of the status
- * can reach the RPC), and the server does not count these reads as use. A failed poll keeps the
- * last value.
+ * browser), and fresher progress from the tab's beats (components/presence.tsx: each answer
+ * carries the index's state), which this asks nothing for: no request of its own, and nothing
+ * while the tab is hidden (it does not beat then).
  *
- * `onSettled` runs once when a poll finds the index ready or unavailable. The root status is not
- * read again on its own, and it holds what the finished index changes: the log-history check
- * against the index (no opinion until it is ready) behind the "Your RPC may not serve old logs"
- * banner, warnings and `sync.index`. The app shell reads the root status again there.
+ * `onSettled` runs once when a beat finds the index ready or unavailable after it was not. The
+ * root status is not read again on its own, and it holds what the finished index changes: the
+ * log-history check against the index (no opinion until it is ready) behind the "Your RPC may not
+ * serve old logs" banner, warnings and `sync.index`. The app shell reads the root status again
+ * there.
  */
 export function IndexProgressProvider({
   initial,
@@ -109,58 +97,27 @@ export function IndexProgressProvider({
   onSettled?: () => void;
   children: ReactNode;
 }) {
+  const beat = useLive().index as IndexStatusView | null;
   const [index, setIndex] = useState(initial);
-  const [polls, setPolls] = useState(0);
-  // Polls in a row that found the index idle.
-  const [idlePolls, setIdlePolls] = useState(0);
-  // A newer root status (Refresh, settings) replaces whatever polling found, and late answers
-  // to polls sent before it are dropped.
-  const epoch = useRef(0);
+  // A newer root status (Refresh, settings) replaces whatever the beats said.
   useEffect(() => {
-    epoch.current += 1;
     setIndex(initial);
-    setPolls(0);
-    setIdlePolls(0);
   }, [initial]);
   const settled = useRef(onSettled);
   useEffect(() => {
     settled.current = onSettled;
   }, [onSettled]);
+  const shown = useRef(index);
+  shown.current = index;
+  useEffect(() => {
+    if (!beat) return;
+    const before = shown.current;
+    setIndex(beat);
+    // The index finished since the status in hand: the shell reads the status again, once.
+    if (before && unsettled(before) && !unsettled(beat)) settled.current?.();
+  }, [beat]);
 
   const value = useMemo(() => ({ progress: indexProgress(index), known: index !== null }), [index]);
-  const visible = useDocumentVisible();
-  const polling =
-    visible &&
-    index !== null &&
-    (index.state === "backfilling" || (index.state === "idle" && idlePolls < IDLE_POLLS));
-  useEffect(() => {
-    if (!polling || polls >= MAX_POLLS) return;
-    const sent = epoch.current;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const response = await fetch($path("/api/status"), {
-          headers: { accept: "application/json" },
-        });
-        const body = (await response.json()) as Partial<OkStatus> | null;
-        if (!cancelled && sent === epoch.current && body?.ok && body.sync?.index) {
-          const next = body.sync.index;
-          setIndex(next);
-          setIdlePolls((n) => (next.state === "idle" ? n + 1 : 0));
-          // Polling stops here (the index is settled), so this runs once per root status.
-          if (!unsettled(next)) settled.current?.();
-        }
-      } catch {
-        // Keep the last known progress; the next poll tries again.
-      }
-      if (!cancelled) setPolls((n) => n + 1);
-    }, POLL_MS);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [polling, polls]);
-
   return <IndexProgressContext.Provider value={value}>{children}</IndexProgressContext.Provider>;
 }
 
@@ -206,7 +163,8 @@ export function useNowSeconds(intervalMs = 1_000): number | null {
 
 /**
  * "block #N · 12s ago". The age needs the browser's clock, so the server (and hydration) render
- * only the block; the block number is hidden on narrow screens, the age is not.
+ * only the block; the block number is hidden below 2xl (the header's row is crowded there: the
+ * links would not fit beside it), the age is not.
  */
 export function BlockAge({
   block,
@@ -223,10 +181,10 @@ export function BlockAge({
       title={`Block ${block.number}, mined ${formatTime(block.timestamp)}, read through your RPC. Refresh to read a newer one.`}
       data-testid="block-age"
     >
-      <span className="hidden lg:inline">block #{formatNumber(block.number)}</span>
+      <span className="hidden 2xl:inline">block #{formatNumber(block.number)}</span>
       {age && (
         <>
-          <span className="hidden lg:inline"> · </span>
+          <span className="hidden 2xl:inline"> · </span>
           {age}
         </>
       )}

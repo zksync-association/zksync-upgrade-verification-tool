@@ -1,4 +1,10 @@
-import { l1 } from "@/.server/rpc";
+import { loaderRevs } from "@/.server/sync/content";
+import {
+  type ReceiptAnswer,
+  pageReceipt,
+  receiptContent,
+  receiptFollowed,
+} from "@/.server/sync/receipt";
 import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { useStatus } from "@/components/governance-context";
 import { TxLink } from "@/components/hex";
@@ -8,51 +14,46 @@ import { formatEth } from "@/utils/format";
 import { notFound } from "@/utils/http";
 import { Meta } from "@/utils/meta";
 import { requestStatusRevalidation } from "@/utils/revalidation";
-import { useDocumentVisible } from "@/utils/visibility";
 import { type LoaderFunctionArgs, defer } from "@remix-run/node";
 import { Await, useLoaderData, useRevalidator } from "@remix-run/react";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import type { Hex } from "viem";
 
 export const meta = Meta["/app/transactions/:hash"];
 
-// Receipt read on the server through the app's RPC, polled until mined (while the tab is visible,
-// for at most 30 minutes). Deferred: the page is sent before the RPC answers.
+// Receipt read on the server through the app's RPC. While the page is on screen and the
+// transaction is not mined (or mined in a block that is not final yet), the sync engine reads the
+// receipt once per new block, and the page reloads (from memory) when it changed: the page itself
+// polls nothing. A receipt found in a final block is kept (sync/receipt.ts); a later read that
+// fails never turns the page back into "waiting", a read that fails is said as such, and one that
+// no longer finds a receipt found before (a reorg) says it could not be read, never "not mined".
+// Deferred: the page is sent before the RPC answers.
 export function loader({ params, request }: LoaderFunctionArgs) {
   const hash = params.hash ?? "";
   if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) throw notFound();
-  const receipt: Promise<Receipt> = l1
-    .getTransactionReceipt({ hash: hash as Hex })
-    .then((receipt) => ({
-      status: receipt.status,
-      blockNumber: receipt.blockNumber.toString(),
-      from: receipt.from,
-      to: receipt.to,
-      fee: (receipt.gasUsed * receipt.effectiveGasPrice).toString(),
-    }))
-    .catch(() => null);
-  return defer({ watch: watchItems(request, [watchKeys.tx(hash)]), hash, receipt });
+  const receipt = pageReceipt(hash as Hex);
+  return defer({
+    watch: watchItems(request, [watchKeys.tx(hash)]),
+    revs: loaderRevs([[watchKeys.tx(hash), receipt.then(receiptContent)]]),
+    hash,
+    receipt,
+    // Read again at each new block while the page is open (not on a dev node, not when the app
+    // does not follow the chain): the waiting text says which.
+    followed: receiptFollowed(),
+  });
 }
 
-/** The receipt, once mined; null while it is not (or could not be read). */
-type Receipt = {
-  status: "success" | "reverted";
-  blockNumber: string;
-  from: string;
-  to: string | null;
-  fee: string;
-} | null;
+/** The receipt, once mined; null while it is not, or when it could not be read (`unread`). */
+type Receipt = NonNullable<ReceiptAnswer["receipt"]> | null;
 
-const POLL_MS = 4_000;
-// A hash that is never mined (a Safe transaction hash pasted here, say) is not polled forever.
-export const RECEIPT_POLL_FOR_MS = 30 * 60_000;
+const STATUS_READ_MS = 4_000;
 // Root status reads at most, once mined, while it is still older than the transaction's block
 // (the server's head can trail the receipt by a moment).
 const STATUS_READS = 3;
 
 export default function Transaction() {
-  const { hash, receipt } = useLoaderData<typeof loader>();
+  const { hash, receipt, followed } = useLoaderData<typeof loader>();
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Transaction" title="Transaction" id={hash} />
@@ -66,36 +67,33 @@ export default function Transaction() {
         }
       >
         <Await resolve={receipt}>
-          {(receipt) => <TransactionStatus hash={hash} receipt={receipt as Receipt} />}
+          {(answer) => (
+            <TransactionStatus
+              hash={hash}
+              receipt={answer.receipt as Receipt}
+              unread={answer.unread}
+              followed={followed}
+            />
+          )}
         </Await>
       </Suspense>
     </div>
   );
 }
 
-function TransactionStatus({ hash, receipt }: { hash: string; receipt: Receipt }) {
+function TransactionStatus({
+  hash,
+  receipt,
+  unread,
+  followed,
+}: {
+  hash: string;
+  receipt: Receipt;
+  unread: boolean;
+  followed: Promise<boolean> | boolean;
+}) {
   const { governance } = useStatus();
   const revalidator = useRevalidator();
-  const visible = useDocumentVisible();
-  // Until mined, poll for the receipt: only while the tab is visible (a hidden tab asks nothing),
-  // and for at most 30 minutes after the page started waiting for this hash. These polls leave
-  // the app status alone.
-  const waiting = useRef<{ hash: string; since: number } | null>(null);
-  const [gaveUp, setGaveUp] = useState<string | null>(null);
-  useEffect(() => {
-    if (receipt || !visible || gaveUp === hash) return;
-    if (waiting.current?.hash !== hash) waiting.current = { hash, since: Date.now() };
-    const { since } = waiting.current;
-    const timer = setInterval(() => {
-      if (Date.now() - since >= RECEIPT_POLL_FOR_MS) {
-        clearInterval(timer);
-        setGaveUp(hash);
-        return;
-      }
-      if (revalidator.state === "idle") revalidator.revalidate();
-    }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [receipt, revalidator, visible, hash, gaveUp]);
 
   // Once mined, the app status other pages read (freeze state and nonces, members, thresholds)
   // predates the transaction until it is read at or after its block: read it again, right away
@@ -113,7 +111,7 @@ function TransactionStatus({ hash, receipt }: { hash: string; receipt: Receipt }
         requestStatusRevalidation();
         revalidator.revalidate();
       },
-      reads.count === 0 ? 0 : POLL_MS
+      reads.count === 0 ? 0 : STATUS_READ_MS
     );
     return () => clearTimeout(timer);
   }, [statusBehind, revalidator]);
@@ -122,12 +120,28 @@ function TransactionStatus({ hash, receipt }: { hash: string; receipt: Receipt }
     <Card className="p-6">
       {!receipt ? (
         <p className="flex items-center gap-2 text-slate-950">
-          <Clock className="h-5 w-5 text-slate-600" />{" "}
-          {gaveUp === hash
-            ? "Stopped checking after 30 minutes without a receipt. Reload the page to check again."
-            : "Waiting for the transaction to be mined…"}{" "}
-          If you sent it from a Safe, this may be a Safe transaction hash; follow it in Safe{"{"}
-          Wallet{"}"}.
+          <Clock className="h-5 w-5 text-slate-600" />
+          <span>
+            {unread
+              ? "Could not read the transaction receipt through your RPC"
+              : "Waiting for the transaction to be mined"}{" "}
+            <Suspense fallback={null}>
+              <Await resolve={followed} errorElement={<>(reload the page to check again)</>}>
+                {(followed) =>
+                  followed
+                    ? "(checked at each new block while this page is open)"
+                    : "(reload the page to check again)"
+                }
+              </Await>
+            </Suspense>
+            .{" "}
+            {!unread && (
+              <>
+                If you sent it from a Safe, this may be a Safe transaction hash; follow it in Safe
+                {"{"}Wallet{"}"}.
+              </>
+            )}
+          </span>
         </p>
       ) : (
         <div className="space-y-4">

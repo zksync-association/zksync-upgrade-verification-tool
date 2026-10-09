@@ -19,6 +19,7 @@ import {
   l2HeadLane,
   l2HistoryLane,
   network,
+  pageL2ChainHead,
   rpcGeneration,
 } from "../rpc";
 import { scrubText, secretsOf } from "./jsonrpc";
@@ -148,11 +149,22 @@ export function isIndexedL2Governor(net: GovernorNetwork, governor: Address | nu
  * history (on an Era RPC that caps block ranges, thousands of eth_getLogs per head), where an
  * on-demand scan reads only its window. Rejects when Era's head cannot be read.
  */
-export async function l2IndexHead(net: GovernorNetwork): Promise<L2Head | null> {
+export async function l2IndexHead(
+  net: GovernorNetwork,
+  { page = false }: { page?: boolean } = {}
+): Promise<L2Head | null> {
   if (!indexedL2Governors(net)) return null;
-  const at = await l2ChainHead();
+  // A page (never JSON) answers at the newest Era head read in the last ERA_PAGE_MAX_AGE_MS
+  // (sync/era.ts reads one every minute while such a page is on screen), labelled with its age.
+  const at = page ? await pageL2ChainHead(ERA_PAGE_MAX_AGE_MS) : await l2ChainHead();
   return at && at.safe >= 0n ? at : null;
 }
+
+/**
+ * How old an Era head a page answers at may be: the Era timer's minute (sync/era.ts) and a margin
+ * for its read. JSON keeps Era's head at most 4 s old.
+ */
+export const ERA_PAGE_MAX_AGE_MS = 75_000;
 
 /** One line of error text with every part of the configured RPC URLs removed. */
 function describe(error: unknown, l2Url: string | null = null): string {

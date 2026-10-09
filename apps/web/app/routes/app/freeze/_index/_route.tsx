@@ -1,3 +1,4 @@
+import { freezeListContent, loaderRevs } from "@/.server/sync/content";
 import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import { type FreezeList, type FreezeSummary, loadFreezeList } from "@/.server/flows/freeze";
@@ -19,7 +20,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SetStateBadge } from "@/components/verification/badges";
-import { FreshnessNote, type Refresh } from "@/components/verification/freshness";
+import { CheckSafeNow } from "@/components/verification/check-safe-now";
+import { ListFreshnessNote, type Refresh } from "@/components/verification/freshness";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { cn } from "@/utils/cn";
 import { formatTime, relativeTime } from "@/utils/format";
@@ -33,10 +35,13 @@ export const meta = Meta["/app/freeze"];
 
 export function loader({ request }: LoaderFunctionArgs) {
   // Requests come from Security Council members' Safe messages: the page lists them at once from
-  // the copies held (labelled with their age when older than 60 s) and the fresh list after it.
+  // the copies held (labelled with their age when older than 60 s, and not kept by the watcher
+  // for the screen) and the fresh list after it.
   const loading = loadFreezeList({ freshness: "page" });
+  const current = loading.first.then((list) => (list.stale ? loading.fresh : list));
   return defer({
     watch: watchItems(request, [watchKeys.freezes]),
+    revs: loaderRevs([[watchKeys.freezes, current.then(freezeListContent)]]),
     list: loading.first,
     freshList: freshAfter(loading.first, loading.fresh, (list) => list.stale),
   });
@@ -140,7 +145,15 @@ function Requests({ result, refresh }: { result: SerializeFrom<FreezeList>; refr
   const rest = result.requests.filter((r) => r.state.status !== "open");
   return (
     <div className="space-y-8">
-      <FreshnessNote set={result} refresh={refresh} what="The requests and counts below" />
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <ListFreshnessNote
+          watchKey="list:freeze"
+          set={result}
+          refresh={refresh}
+          what="The requests and counts below"
+        />
+        {!result.stale && <CheckSafeNow watchKey="list:freeze" />}
+      </div>
       {(result.errors.length > 0 || result.anomalies > 0) && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-sm">
           The list may be incomplete. {result.errors.join("; ")}

@@ -1,3 +1,4 @@
+import { emergencyListContent, loaderRevs } from "@/.server/sync/content";
 import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import {
@@ -14,7 +15,8 @@ import { IndexedLoadingCard } from "@/components/sync-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { FreshnessNote, type Refresh } from "@/components/verification/freshness";
+import { CheckSafeNow } from "@/components/verification/check-safe-now";
+import { ListFreshnessNote, type Refresh } from "@/components/verification/freshness";
 import { LastRunNote } from "@/components/verification/last-run";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { formatDay, formatNumber } from "@/utils/format";
@@ -30,12 +32,22 @@ export const meta = Meta["/app/emergency"];
 export function loader({ request }: LoaderFunctionArgs) {
   const allHistory = new URL(request.url).searchParams.get("history") === "all";
   // Pending ids come from members' Safe messages: the page lists them at once from the copies held
-  // (labelled with their age when older than 60 s) and the fresh list after it.
+  // (labelled with their age when older than 60 s, and not kept by the watcher for the screen)
+  // and the fresh list after it.
   const loading = loadEmergencyList({ allHistory, freshness: "page" });
+  const pending = loading.pending.then((p) => (p.stale ? loading.freshPending : p));
   // Executions likewise: from the history the last run saved while this run re-reads it
   // (labelled), and the list from this run's history after it. They need no governance read.
   return defer({
     watch: watchItems(request, [watchKeys.emergencies(allHistory)]),
+    revs: loaderRevs([
+      [
+        watchKeys.emergencies(allHistory),
+        Promise.all([pending, loading.executed]).then(([p, executed]) =>
+          emergencyListContent(p, executed)
+        ),
+      ],
+    ]),
     allHistory,
     pending: loading.pending,
     freshPending: freshAfter(loading.pending, loading.freshPending, (p) => p.stale),
@@ -90,7 +102,11 @@ export default function EmergencyList() {
               {(first) => (
                 <UntilFresh stale={first.stale} fresh={freshPending}>
                   {(fresh, refresh) => (
-                    <PendingList result={fresh ?? first} refresh={fresh ? null : refresh} />
+                    <PendingList
+                      result={fresh ?? first}
+                      refresh={fresh ? null : refresh}
+                      allHistory={allHistory}
+                    />
                   )}
                 </UntilFresh>
               )}
@@ -170,10 +186,21 @@ export default function EmergencyList() {
 function PendingList({
   result,
   refresh,
-}: { result: SerializeFrom<PendingEmergencies>; refresh: Refresh }) {
+  allHistory,
+}: { result: SerializeFrom<PendingEmergencies>; refresh: Refresh; allHistory: boolean }) {
   return (
     <div className="space-y-8">
-      <FreshnessNote set={result} refresh={refresh} what="The ids and counts below" />
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <ListFreshnessNote
+          watchKey={allHistory ? "list:emergency:all" : "list:emergency"}
+          set={result}
+          refresh={refresh}
+          what="The ids and counts below"
+        />
+        {!result.stale && (
+          <CheckSafeNow watchKey={allHistory ? "list:emergency:all" : "list:emergency"} />
+        )}
+      </div>
       {(result.errors.length > 0 || result.anomalies > 0) && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-sm">
           The pending list may be incomplete. {result.errors.join("; ")}

@@ -431,7 +431,9 @@ export async function loadStandardUpgrade(
   // backfill there), instead of after it.
   const overview = await getStandardUpgradeCore(id, {
     onExists: (gov) =>
-      prefetchSafeListings([...gov.securityCouncil.members, ...gov.guardians.members]),
+      prefetchSafeListings([...gov.securityCouncil.members, ...gov.guardians.members], {
+        page: freshness === "page",
+      }),
     freshness,
   });
   // A page may show a start from the last run's history (`fromLastRun`) or located directly
@@ -451,7 +453,7 @@ export async function loadStandardUpgrade(
     verified.map((set) => evidenceFor(set, records))
   );
   const execution = confirmed.then((core) =>
-    timedRead(id, "execution", () => getUpgradeExecution(core))
+    timedRead(id, "execution", () => getUpgradeExecution(core, freshness === "page"))
   );
   const l2Proposal = confirmed.then((core) =>
     timedRead(id, "l2-discovery", () =>
@@ -588,13 +590,16 @@ export async function getStandardUpgradeCore(
   };
 }
 
-async function getUpgradeExecution(d: StandardUpgradeCore) {
+async function getUpgradeExecution(d: StandardUpgradeCore, page = false) {
   const { governance: gov, started, state, id } = d;
   let execute: ExecutionView | null = null;
   let executedTx: Hex | null = null;
   if (state === UPGRADE_STATES.Ready) {
     const execution = executeUpgradeExecution(gov.upgradeHandler, started.proposal);
-    execute = { ...execution, simulation: await simulateAs(execution, started.proposal.executor) };
+    execute = {
+      ...execution,
+      simulation: await simulateAs(execution, started.proposal.executor, page),
+    };
   }
   if (state === UPGRADE_STATES.Done) {
     const executed = await locateEvent("UpgradeExecuted", id, gov.network, () =>
@@ -761,8 +766,11 @@ function streamStandardUpgradeSets(
     const fresh = streamed.fresh.then(async (set) =>
       approval(
         set,
-        await executionFor(set, spec.state, (valid) =>
-          approvalExecution(spec.action, contract.address, id, valid)
+        await executionFor(
+          set,
+          spec.state,
+          (valid) => approvalExecution(spec.action, contract.address, id, valid),
+          { page: freshness === "page" }
         )
       )
     );
@@ -852,13 +860,21 @@ async function legacyEvent(
     : null;
 }
 
-function simulateAs(execution: ExecutionView | Parameters<typeof simulate>[0], executor: Address) {
+function simulateAs(
+  execution: ExecutionView | Parameters<typeof simulate>[0],
+  executor: Address,
+  page = false
+) {
   // The proposal comes from its UpgradeStarted log: nothing the viewer supplied, so the answer is
-  // kept per head. A proposal with an executor can only be executed by it; simulate from there.
+  // kept per head (and, for a page, simulated again at each new head while it shows it). A
+  // proposal with an executor can only be executed by it; simulate from there.
   if (!isAddressEqual(executor, zeroAddress)) {
-    return simulateCall({ from: executor, to: execution.to, data: execution.data }, { keep: true });
+    return simulateCall(
+      { from: executor, to: execution.to, data: execution.data },
+      { keep: true, page }
+    );
   }
-  return simulate(execution, { keep: true });
+  return simulate(execution, { keep: true, page });
 }
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));

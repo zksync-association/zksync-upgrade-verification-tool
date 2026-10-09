@@ -1,11 +1,12 @@
 import type { Simulation } from "@/.server/signatures";
 import { useOfferWallet } from "@/components/connect-button";
+import { useHoldUpdates, useLive, useWatchItem } from "@/components/presence";
 import { AddressLink, CopyButton } from "@/components/hex";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
-import { formatEth } from "@/utils/format";
+import { formatEth, formatNumber } from "@/utils/format";
 import { useNavigate } from "@remix-run/react";
-import { CheckCircle2, MinusCircle, Send, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, MinusCircle, Send, XCircle } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
@@ -20,15 +21,55 @@ export type ExecutionLike = {
   simulation?: Simulation | null;
 };
 
+/**
+ * The block a simulation's result was last read at, and whether that is the head the app serves
+ * now. A page's simulation (`watch`) is simulated again at each new head while it is on screen:
+ * the beats name the newest block its result was read at, while the page shows the current
+ * result. Before the first beat, on a dev node ('latest') and where nothing follows the chain,
+ * the block it was read at is all there is.
+ */
+export function simulationFreshness(
+  simulation: Pick<Simulation, "atBlock" | "watch">,
+  live: { head: { number: string } | null; simulatedAt?: Record<string, string> }
+): { block: string | null; current: boolean } {
+  const at = simulation.atBlock ?? null;
+  const again = simulation.watch ? live.simulatedAt?.[simulation.watch.key] : undefined;
+  const block = again && at !== null && BigInt(again) > BigInt(at) ? again : at;
+  const served = live.head?.number ?? null;
+  return { block, current: block === null || served === null || BigInt(block) >= BigInt(served) };
+}
+
 export function SimulationResult({ simulation }: { simulation: Simulation }) {
-  if (simulation.status === "ok") {
+  useWatchItem(simulation.watch);
+  const live = useLive();
+  const { block, current } = simulationFreshness(simulation, live);
+  const against = block === null ? "against the latest block" : `at block #${formatNumber(block)}`;
+  if (simulation.status === "ok" && current) {
     return (
       <p
         className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-100 px-3 py-2 font-semibold text-green-900 text-sm"
         data-testid="simulation-ok"
       >
-        <CheckCircle2 className="h-4 w-4" /> Simulated against the latest block: the transaction
-        would succeed.
+        <CheckCircle2 className="h-4 w-4 shrink-0" /> Simulated {against}: the transaction would
+        succeed.
+      </p>
+    );
+  }
+  if (simulation.status === "ok") {
+    // A result from a block before the one served now: said as of that block, never in a passing
+    // colour (the next block's simulation replaces it).
+    return (
+      <p
+        className="flex items-start gap-2 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-slate-800 text-sm"
+        data-testid="simulation-earlier"
+      >
+        <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>
+          Simulated {against}: the transaction would have succeeded there.{" "}
+          {simulation.watch
+            ? `Not simulated at block #${formatNumber(live.head?.number ?? "")} yet; the result there replaces this one.`
+            : "Simulate it again for the current block."}
+        </span>
       </p>
     );
   }
@@ -40,8 +81,8 @@ export function SimulationResult({ simulation }: { simulation: Simulation }) {
       >
         <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
-          Simulated against the latest block: it would revert with{" "}
-          <span className="mono">{simulation.error}</span>
+          Simulated {against}: it would revert with <span className="mono">{simulation.error}</span>
+          {!current && " (not simulated at the current block yet)"}
         </span>
       </p>
     );
@@ -59,12 +100,19 @@ export function ExecutionPanel({
   title = "Ready to execute",
   note,
   extra,
+  blockedReason = null,
 }: {
   execution: ExecutionLike;
   toLabel?: string;
   title?: string;
   note?: ReactNode;
   extra?: ReactNode;
+  /**
+   * Why the transaction is not offered to send now (the signatures it carries were not verified
+   * at the head served now); null when it is. The panel stays (a Safe transaction hash it shows
+   * included); only sending waits.
+   */
+  blockedReason?: string | null;
 }) {
   useOfferWallet();
   const { isConnected, connector } = useAccount();
@@ -74,6 +122,9 @@ export function ExecutionPanel({
   // and execute there; what comes back is its safeTxHash, not a transaction hash.
   const viaSafe = connector?.id === "safe";
   const [safeTxHash, setSafeTxHash] = useState<Hex | null>(null);
+  // While the wallet request is pending, or the Safe transaction hash is shown (until dismissed),
+  // the page's data is not reloaded: this panel, and what it shows, stay as they are.
+  const waiting = useHoldUpdates(isPending || safeTxHash !== null);
 
   const send = () => {
     toast.loading(
@@ -114,13 +165,19 @@ export function ExecutionPanel({
             size="sm"
             onClick={send}
             loading={isPending}
-            disabled={!isConnected}
-            title={isConnected ? undefined : "Connect a wallet to send"}
+            disabled={!isConnected || (blockedReason !== null && !isPending)}
+            title={blockedReason ?? (isConnected ? undefined : "Connect a wallet to send")}
+            data-testid="send-transaction"
           >
             <Send /> {viaSafe ? "Create Safe transaction" : "Send transaction"}
           </Button>
         </div>
       </div>
+      {blockedReason && (
+        <p className="text-slate-700 text-xs" role="status" data-testid="send-blocked">
+          {blockedReason} Sending waits until the signatures are verified at the current block.
+        </p>
+      )}
       <p className="text-slate-950 text-sm">
         {note ??
           "Anyone can send this transaction: the contract checks the signatures, not the sender."}
@@ -148,14 +205,26 @@ export function ExecutionPanel({
       </dl>
       {execution.simulation && <SimulationResult simulation={execution.simulation} />}
       {safeTxHash && (
-        <p
-          className="rounded-lg bg-green-50 px-3 py-2 text-green-900 text-sm"
+        <div
+          className="space-y-2 rounded-lg bg-green-50 px-3 py-2 text-green-900 text-sm"
           data-testid="safe-tx-created"
         >
-          Your Safe has the transaction (safeTxHash{" "}
-          <span className="mono break-all">{safeTxHash}</span>). Its owners confirm and execute it
-          in Safe{"{"}Wallet{"}"}.
-        </p>
+          <p>
+            Your Safe has the transaction (safeTxHash{" "}
+            <span className="mono break-all">{safeTxHash}</span>). Its owners confirm and execute it
+            in Safe{"{"}Wallet{"}"}.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            {waiting && (
+              <span className="text-slate-700 text-xs" role="status" data-testid="update-held">
+                New data · applies when you close this
+              </span>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => setSafeTxHash(null)}>
+              Close
+            </Button>
+          </div>
+        </div>
       )}
       {extra}
     </div>

@@ -1,5 +1,19 @@
-import { BEAT_MS, Beater, PresenceProvider, useWatchKey } from "@/components/presence";
-import { act, render } from "@testing-library/react";
+import {
+  BEAT_MS,
+  Beater,
+  PresenceProvider,
+  RELOAD_GAP_MS,
+  Reloader,
+  UNKNOWN_EVERY_MS,
+  useHoldUpdates,
+  useLive,
+  useSafeCheck,
+  useWatchItem,
+  useWatchKey,
+} from "@/components/presence";
+import { ListFreshnessNote } from "@/components/verification/freshness";
+import { act, render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // A tab's beats (components/presence.tsx): every 10 s while visible, at once on load, on a change
@@ -8,16 +22,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // tab's id, a reason and the server's keys, never the page's URL.
 
 const loaderData = vi.hoisted(() => ({ matches: [] as { data: unknown }[] }));
+// The router: reloads (revalidate) and whether one, or a navigation, is running.
+const router = vi.hoisted(() => ({
+  revalidate: (() => {}) as () => void,
+  state: "idle" as "idle" | "loading",
+  navigation: "idle" as "idle" | "loading",
+}));
 vi.mock("@remix-run/react", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@remix-run/react")>()),
   useMatches: () => loaderData.matches,
+  useRevalidator: () => ({ revalidate: router.revalidate, state: router.state }),
+  useNavigation: () => ({ state: router.navigation }),
 }));
 
 type Sent = { at: number; body: Record<string, unknown>; keepalive: boolean };
 
 function server({ ok = true, nextMs }: { ok?: boolean; nextMs?: number } = {}) {
   const sent: Sent[] = [];
-  const state = { ok, nextMs };
+  const state = {
+    ok,
+    nextMs,
+    /** The next answers' extra fields (changed keys, the head, ...). */
+    answer: {} as Record<string, unknown>,
+  };
   const fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
     sent.push({
       at: Date.now(),
@@ -25,7 +52,12 @@ function server({ ok = true, nextMs }: { ok?: boolean; nextMs?: number } = {}) {
       keepalive: init?.keepalive === true,
     });
     if (!state.ok) return new Response("down", { status: 503 });
-    return Response.json({ changed: [], unknown: [], nextMs: state.nextMs ?? BEAT_MS });
+    return Response.json({
+      changed: [],
+      unknown: [],
+      nextMs: state.nextMs ?? BEAT_MS,
+      ...state.answer,
+    });
   });
   const beats = () => sent.filter((s) => s.body.reason !== "leave");
   const leaves = () => sent.filter((s) => s.body.reason === "leave");
@@ -45,6 +77,9 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(START);
   visibility = "visible";
+  router.revalidate = () => {};
+  router.state = "idle";
+  router.navigation = "idle";
   Object.defineProperty(document, "visibilityState", {
     configurable: true,
     get: () => visibility,
@@ -325,6 +360,392 @@ describe("PresenceProvider", () => {
     view.unmount();
     await act(() => vi.advanceTimersByTimeAsync(0));
     expect(up.leaves()).toHaveLength(1);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("Reloader (reloading a page after the server said its content changed)", () => {
+  function reloader() {
+    const reloads: number[] = [];
+    const held: boolean[] = [];
+    let statusReads = 0;
+    const state = { idle: true };
+    const r = new Reloader({
+      revalidate: () => reloads.push(Date.now() - START),
+      idle: () => state.idle,
+      statusChanged: () => {
+        statusReads++;
+      },
+      onHeld: (h) => held.push(h),
+    });
+    return { r, reloads, held, state, statusReads: () => statusReads };
+  }
+
+  it("reloads at once for a change, merges changes, and at most once every 5 s", async () => {
+    const { r, reloads } = reloader();
+    r.noteAnswer({ changed: ["set:01"] });
+    expect(reloads).toEqual([0]);
+    // Two more changes within the 5 s: one reload, at the end of the gap.
+    await vi.advanceTimersByTimeAsync(1_000);
+    r.noteAnswer({ changed: ["set:01"] });
+    await vi.advanceTimersByTimeAsync(1_000);
+    r.noteAnswer({ changed: ["upgrade:0xab", "set:02"] });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(reloads).toEqual([0, RELOAD_GAP_MS]);
+    // Nothing changed: no reload.
+    r.noteAnswer({ changed: [], unknown: [] });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(reloads).toHaveLength(2);
+    r.stop();
+  });
+
+  it("reloads for a key the server does not know at most once a minute (a restart), and reads the root status for a status change", async () => {
+    const { r, reloads, statusReads } = reloader();
+    r.noteAnswer({ unknown: ["list:upgrades"] });
+    await vi.advanceTimersByTimeAsync(10_000);
+    r.noteAnswer({ unknown: ["list:upgrades"] });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(reloads).toEqual([0]);
+    await vi.advanceTimersByTimeAsync(UNKNOWN_EVERY_MS);
+    r.noteAnswer({ unknown: ["list:upgrades"] });
+    expect(reloads).toHaveLength(2);
+    expect(statusReads()).toBe(0);
+    await vi.advanceTimersByTimeAsync(10_000);
+    r.noteAnswer({ changed: ["status"] });
+    expect(reloads).toHaveLength(3);
+    expect(statusReads()).toBe(1);
+    r.stop();
+  });
+
+  it("waits for a navigation or another reload to end", async () => {
+    const { r, reloads, state } = reloader();
+    state.idle = false;
+    r.noteAnswer({ changed: ["set:01"] });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(reloads).toEqual([]);
+    expect(r.waiting).toBe(true);
+    state.idle = true;
+    r.tryReload();
+    expect(reloads).toEqual([30_000]);
+    expect(r.waiting).toBe(false);
+  });
+
+  it("holds while the viewer is in the middle of something (a Sign dialog), says so, and reloads once released", async () => {
+    const { r, reloads, held } = reloader();
+    const release = r.hold();
+    r.noteAnswer({ changed: ["set:01"] });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(reloads).toEqual([]);
+    expect(held).toEqual([true]);
+    // A second hold (a wallet request) keeps it waiting.
+    const second = r.hold();
+    release();
+    expect(reloads).toEqual([]);
+    second();
+    expect(reloads).toEqual([60_000]);
+    expect(held.at(-1)).toBe(false);
+    // Released twice: no harm.
+    second();
+    expect(reloads).toHaveLength(1);
+  });
+
+  it("reloads at once when the viewer asked (Fetch signatures), still never under a hold", async () => {
+    const { r, reloads } = reloader();
+    r.noteAnswer({ changed: ["set:01"] });
+    await vi.advanceTimersByTimeAsync(1_000);
+    r.force();
+    expect(reloads).toEqual([0, 1_000]);
+    const release = r.hold();
+    r.force();
+    expect(reloads).toHaveLength(2);
+    release();
+    expect(reloads).toEqual([0, 1_000, 1_000]);
+  });
+});
+
+describe("a list fed by Safe (ListFreshnessNote)", () => {
+  it("shows when the beats say its Safes were checked, moving with each check without reloading the page", async () => {
+    const up = server();
+    vi.stubGlobal("fetch", up.fetch);
+    const revalidate = vi.fn();
+    router.revalidate = revalidate;
+    loaderData.matches = [{ data: { watch: [{ key: "list:vetoes", rev: "4" }] } }];
+    const loadedAt = new Date(START - 10 * 60_000).toISOString();
+    render(
+      <PresenceProvider awayMs={0}>
+        <ListFreshnessNote watchKey="list:vetoes" set={{ safeFetchedAt: loadedAt }} />
+      </PresenceProvider>
+    );
+    // Before a beat answered: the age of the copies the page loaded with.
+    expect(screen.getByTestId("set-freshness")).toHaveTextContent("Safe copies from 10m ago");
+    up.state.answer = {
+      checked: {
+        "list:vetoes": {
+          state: "watching",
+          checkedAt: new Date(START - 20_000).toISOString(),
+          nextAt: new Date(START + 280_000).toISOString(),
+          cadenceMs: 300_000,
+          reason: null,
+        },
+      },
+    };
+    await act(() => vi.advanceTimersByTimeAsync(BEAT_MS));
+    expect(screen.getByTestId("set-freshness")).toHaveTextContent(
+      /^Safe checked \d+s ago · next check in 4m$/
+    );
+    // Nothing changed in the list: no reload.
+    expect(revalidate).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("reloads and a hidden tab", () => {
+  it("never reloads while the tab is hidden (a reload is a page load the server counts as use): one waiting goes once it is visible again", async () => {
+    const up = server({ nextMs: 2_000 });
+    vi.stubGlobal("fetch", up.fetch);
+    const revalidate = vi.fn();
+    router.revalidate = revalidate;
+    loaderData.matches = [
+      { data: { watch: [{ key: "set:01", rev: null }], revs: [{ key: "set:01", rev: "1" }] } },
+    ];
+    render(
+      <PresenceProvider awayMs={0}>
+        <span />
+      </PresenceProvider>
+    );
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    up.state.answer = { changed: ["set:01"] };
+    // The first change reloads at once; the next, 2 s later, waits for the 5 s gap.
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(revalidate).toHaveBeenCalledTimes(1);
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(revalidate).toHaveBeenCalledTimes(1);
+    // The tab is hidden before the gap ends: nothing reloads while it is.
+    up.state.answer = { changed: [] };
+    await act(async () => setVisibility("hidden"));
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    expect(revalidate).toHaveBeenCalledTimes(1);
+    // Back: the waiting reload goes.
+    await act(async () => setVisibility("visible"));
+    await act(() => vi.advanceTimersByTimeAsync(100));
+    expect(revalidate).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("Check Safe now on a list: the label says the check at once", () => {
+  it("applies the check's answer to what the label shows, without waiting for the next beat", async () => {
+    const up = server();
+    const check = (ago: number) => ({
+      state: "watching",
+      checkedAt: new Date(Date.now() - ago).toISOString(),
+      nextAt: new Date(Date.now() + 300_000 - ago).toISOString(),
+      cadenceMs: 300_000,
+      reason: null,
+    });
+    const fetch = vi.fn(async (url: unknown, init?: RequestInit) =>
+      String(url).endsWith("/resources/safe-check")
+        ? Response.json({ key: "list:vetoes", rev: "4", checked: 3, failed: 0, check: check(0) })
+        : up.fetch(url as string, init)
+    );
+    vi.stubGlobal("fetch", fetch);
+    loaderData.matches = [{ data: { watch: [{ key: "list:vetoes", rev: "4" }] } }];
+    up.state.answer = { checked: { "list:vetoes": check(90_000) } };
+    let press: (() => Promise<void>) | null = null;
+    function Press() {
+      press = useSafeCheck("list:vetoes").run;
+      return null;
+    }
+    render(
+      <PresenceProvider awayMs={0}>
+        <Press />
+        <ListFreshnessNote watchKey="list:vetoes" set={{}} />
+      </PresenceProvider>
+    );
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    expect(screen.getByTestId("set-freshness")).toHaveTextContent(/^Safe checked 1m ago/);
+    await act(async () => {
+      await (press as unknown as () => Promise<void>)();
+    });
+    // At once (the next beat is 10 s away): the check just made.
+    expect(screen.getByTestId("set-freshness")).toHaveTextContent(/^Safe checked [0-1]s ago/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("PresenceProvider: revisions and reloads", () => {
+  function Item({ item }: { item: { key: string; rev: string | null } | null }) {
+    useWatchItem(item);
+    return null;
+  }
+
+  it("beats each key with the revision rendered: the loaders' (deferred), and those the items register", async () => {
+    const up = server();
+    vi.stubGlobal("fetch", up.fetch);
+    let resolve!: (items: unknown) => void;
+    const revs = new Promise((r) => {
+      resolve = r;
+    });
+    loaderData.matches = [
+      { data: { watch: [{ key: "status", rev: null }], revs } },
+      {
+        data: {
+          watch: [{ key: "upgrade:0xab", rev: null }],
+          revs: [{ key: "upgrade:0xab", rev: "5" }],
+        },
+      },
+    ];
+    render(
+      <PresenceProvider awayMs={0}>
+        <Item item={{ key: "set:01", rev: "7" }} />
+        <Item item={{ key: "set:01", rev: "7" }} />
+      </PresenceProvider>
+    );
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    const items = (s: Sent) => s.body.items as { key: string; rev: string | null }[];
+    expect(items(up.beats().at(-1) as Sent)).toEqual([
+      { key: "set:01", rev: "7" },
+      { key: "status", rev: null },
+      { key: "upgrade:0xab", rev: "5" },
+    ]);
+    // The root's revision arrives: the next beat carries it.
+    await act(async () => resolve([{ key: "status", rev: "3" }]));
+    await act(() => vi.advanceTimersByTimeAsync(BEAT_MS));
+    expect(items(up.beats().at(-1) as Sent)).toContainEqual({ key: "status", rev: "3" });
+    // Never any part of the URL.
+    expect(JSON.stringify(up.sent)).not.toContain("?sig=");
+    vi.unstubAllGlobals();
+  });
+
+  it("reloads the page once when the server says its content changed, says so while it runs, and carries the head, the index and Era from the answer", async () => {
+    const up = server();
+    vi.stubGlobal("fetch", up.fetch);
+    const revalidate = vi.fn();
+    router.revalidate = revalidate;
+    loaderData.matches = [
+      { data: { watch: [{ key: "set:01", rev: null }], revs: [{ key: "set:01", rev: "1" }] } },
+    ];
+    function Live() {
+      const live = useLive();
+      return (
+        <p data-testid="live">
+          {live.head?.number ?? "-"}|{live.eraAt["l2:0x01:1"]?.number ?? "-"}|
+          {live.updating ? "updating" : "idle"}
+        </p>
+      );
+    }
+    const view = render(
+      <PresenceProvider awayMs={0}>
+        <Live />
+      </PresenceProvider>
+    );
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    expect(revalidate).not.toHaveBeenCalled();
+    up.state.answer = {
+      changed: ["set:01"],
+      head: { number: "101", hash: "0x01", timestamp: "1" },
+      eraAt: { "l2:0x01:1": { number: "7000", readAt: new Date(START).toISOString() } },
+    };
+    await act(() => vi.advanceTimersByTimeAsync(BEAT_MS));
+    expect(revalidate).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("live")).toHaveTextContent("101|7000|updating");
+    // The reload runs, then ends with the new revision: no further reload.
+    router.state = "loading";
+    view.rerender(
+      <PresenceProvider awayMs={0}>
+        <Live />
+      </PresenceProvider>
+    );
+    up.state.answer = { changed: [] };
+    router.state = "idle";
+    loaderData.matches = [
+      { data: { watch: [{ key: "set:01", rev: null }], revs: [{ key: "set:01", rev: "2" }] } },
+    ];
+    view.rerender(
+      <PresenceProvider awayMs={0}>
+        <Live />
+      </PresenceProvider>
+    );
+    await act(() => vi.advanceTimersByTimeAsync(3 * BEAT_MS));
+    expect(revalidate).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("live")).toHaveTextContent("101|-|idle");
+    vi.unstubAllGlobals();
+  });
+
+  it("holds a reload while a Sign dialog is open, showing that new data waits, and applies it on close", async () => {
+    const up = server();
+    vi.stubGlobal("fetch", up.fetch);
+    const revalidate = vi.fn();
+    router.revalidate = revalidate;
+    loaderData.matches = [{ data: { revs: [{ key: "set:01", rev: "1" }] } }];
+    function Dialog({ open }: { open: boolean }) {
+      const waiting = useHoldUpdates(open);
+      return waiting ? <p>New data · applies when you close this</p> : null;
+    }
+    const ui = (open: boolean) => (
+      <PresenceProvider awayMs={0}>
+        <Dialog open={open} />
+      </PresenceProvider>
+    );
+    const view = render(ui(true));
+    up.state.answer = { changed: ["set:01"] };
+    await act(() => vi.advanceTimersByTimeAsync(3 * BEAT_MS));
+    expect(revalidate).not.toHaveBeenCalled();
+    expect(screen.getByText("New data · applies when you close this")).toBeInTheDocument();
+    up.state.answer = {};
+    view.rerender(ui(false));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(revalidate).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("New data · applies when you close this")).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it("Fetch signatures: asks the server to read the Safes now, then reloads the page at once; a second press while it runs does nothing", async () => {
+    const posts: unknown[] = [];
+    let answer!: (r: Response) => void;
+    const beats = server();
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      if (url !== "/resources/safe-check") return beats.fetch(url, init);
+      posts.push(JSON.parse(String(init?.body)));
+      return new Promise<Response>((r) => {
+        answer = r;
+      });
+    });
+    const revalidate = vi.fn();
+    router.revalidate = revalidate;
+    let check!: ReturnType<typeof useSafeCheck>;
+    function Button() {
+      check = useSafeCheck("set:01");
+      return <p data-testid="check">{check.running ? "running" : check.error ?? "idle"}</p>;
+    }
+    render(
+      <PresenceProvider awayMs={0}>
+        <Button />
+      </PresenceProvider>
+    );
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    await act(async () => {
+      void check.run();
+      void check.run();
+    });
+    expect(posts).toEqual([{ key: "set:01" }]);
+    expect(screen.getByTestId("check")).toHaveTextContent("running");
+    await act(async () =>
+      answer(Response.json({ key: "set:01", rev: "9", checked: 8, failed: 0 }))
+    );
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.getByTestId("check")).toHaveTextContent("idle");
+    expect(revalidate).toHaveBeenCalledTimes(1);
+    // The app does not answer at all (stopped, offline): said so, not the browser's text.
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      if (url !== "/resources/safe-check") return beats.fetch(url, init);
+      throw new TypeError("Failed to fetch");
+    });
+    await act(async () => {
+      await check.run();
+    });
+    expect(screen.getByTestId("check")).toHaveTextContent("the app is not answering; try again");
+    expect(revalidate).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
   });
 });

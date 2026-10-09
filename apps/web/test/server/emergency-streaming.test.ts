@@ -171,31 +171,35 @@ vi.mock("@/.server/logs", () => ({
     throw new Error("no log scan with the log index");
   },
 }));
+/** The current result of a set (JSON's strict one, and a page's: the same here). */
+async function currentSet(params: {
+  action: string;
+  typedData: ReturnType<typeof buildTypedData>;
+  threshold: number;
+}) {
+  state.verified++;
+  await state.signatures;
+  const members = messagesFor(params.action, EMERGENCY_ID).map((message) => ({
+    member: message.safe,
+    source: "safe",
+    signature: message.preparedSignature,
+  }));
+  return {
+    ...params,
+    hashes: governanceHashes(params.typedData),
+    members,
+    valid: [],
+    thresholdCheck: { status: "below", threshold: params.threshold, valid: 0 },
+    safeApiError: null,
+    verifiedAtBlock: HEAD.number.toString(),
+    stale: false,
+  };
+}
+
 vi.mock("@/.server/signatures", async (original) => ({
   ...(await original<typeof import("@/.server/signatures")>()),
-  verifySignatureSet: async (params: {
-    action: string;
-    typedData: ReturnType<typeof buildTypedData>;
-    threshold: number;
-  }) => {
-    state.verified++;
-    await state.signatures;
-    const members = messagesFor(params.action, EMERGENCY_ID).map((message) => ({
-      member: message.safe,
-      source: "safe",
-      signature: message.preparedSignature,
-    }));
-    return {
-      ...params,
-      hashes: governanceHashes(params.typedData),
-      members,
-      valid: [],
-      thresholdCheck: { status: "below", threshold: params.threshold, valid: 0 },
-      safeApiError: null,
-      verifiedAtBlock: HEAD.number.toString(),
-      stale: false,
-    };
-  },
+  verifySignatureSet: currentSet,
+  verifyPageSignatureSet: currentSet,
   // A stale first answer comes at once (the fresh one waits for `state.signatures`).
   firstSignatureSet: async (
     params: { action: string; typedData: ReturnType<typeof buildTypedData>; threshold: number },

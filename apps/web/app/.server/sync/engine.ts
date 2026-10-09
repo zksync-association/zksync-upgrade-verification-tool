@@ -4,7 +4,6 @@ import type { Address, Hex } from "viem";
 import { cached, remainingMs, replace } from "../cache";
 import { allowPinChecksWhen } from "../chain/pins";
 import { puhIndex } from "../chain/puh-index";
-import { refreshVetoableL2 } from "../flows/l2";
 import {
   GOVERNANCE_KEY,
   GOVERNANCE_TTL_MS,
@@ -23,19 +22,34 @@ import {
   type PolledHead,
   network,
   pollHead,
+  resolvedNetwork,
   rpcGeneration,
   servedHead,
 } from "../rpc";
-import { type SafeSweepDriver, startSafeSweep, stopSafeSweep } from "../safe/store";
+import {
+  type SafeCheck,
+  type SafeWatchDriver,
+  type WatchedSafe,
+  nudgeSafeWatch,
+  safeBurst,
+  safeCheckOf,
+  startSafeWatch,
+  stopSafeWatch,
+} from "../safe/store";
 import {
   type SignatureWatchDriver,
   onScreenSigners,
+  pageSetOf,
   precomputeSignatureSets,
+  resimulateOnScreen,
   startSignatureWatch,
   stopSignatureWatch,
+  watchedSetMembers,
 } from "../signatures";
 import { type RequestInfo, isL2Key, isPageLoad, presence, readKeepWarmFrom } from "./presence";
 import { type UpstreamCost, upstreamCost } from "./cost";
+import { noteOnScreenContent } from "./content-engine";
+import { startEraWatch, stopEraWatch } from "./era";
 import { pageGovernance } from "../page-governance";
 import { asEngineWork, creditsOf, pacer, readRateFrom } from "./pacer";
 import { snapshotState, snapshotStep } from "./snapshot";
@@ -57,6 +71,11 @@ import { snapshotState, snapshotStep } from "./snapshot";
 // read at most every second block (never past its 30 s). Either way what is on screen (the
 // signature sets, their member Safes, ZKsync Era) is read only while it is. JSON (/api/*) and
 // /api/status never count as use: they read on demand.
+//
+// After each served head, what is on screen is digested from memory (sync/content.ts), so an open
+// page whose content changed learns it from its next beat (sync/revs.ts) and reloads from memory.
+// The member Safes the screen depends on are checked by the Safe store's watcher, ZKsync Era by
+// the Era timer (sync/era.ts); both run only while someone uses the app.
 //
 // A new head is served (published as the cached head) once what requests at it need has been
 // read (the index tail, upgrade states, and the signature sets on screen, verified at
@@ -949,10 +968,6 @@ const SAFE_INFO_REFRESH_BEFORE_MS = 60_000;
 const GOVERNANCE_IDLE_MARGIN_MS = 4_000;
 // ...and when no block comes in time, it is read again this long before it runs out.
 const GOVERNANCE_KEEPALIVE_LEAD_MS = 3_000;
-// While the vetoable L2 proposals are being viewed, Era is read again this long after the last
-// read (an L1 tick's, or this loop's), so its head (served for 4 s) never runs out between L1
-// blocks.
-const L2_REFRESH_MS = 3_000;
 
 export type GovernancePlan = {
   /** Someone is using the app: read at every block. */
@@ -1080,21 +1095,6 @@ export function liveSteps(): TickStep[] {
     keepAlive = timer;
   };
 
-  // Era between L1 blocks: re-armed by every refresh, stopped by the first that has nothing to
-  // do (no Era page on screen, or nobody using the app), fails, or finds the engine stopped.
-  let l2Timer: ReturnType<typeof setTimeout> | null = null;
-  const followL2 = (tick: Tick) => {
-    if (l2Timer) clearTimeout(l2Timer);
-    const timer = setTimeout(async () => {
-      if (l2Timer === timer) l2Timer = null;
-      if (!tick.inUse() || !l2OnScreen()) return;
-      const refreshed = await refreshVetoableL2().catch(() => false);
-      if (refreshed && tick.inUse() && l2Timer === null) followL2(tick);
-    }, L2_REFRESH_MS);
-    (timer as { unref?: () => void }).unref?.();
-    l2Timer = timer;
-  };
-
   return [
     // (a) The handler's log index reads the tail for this head now, before any request asks.
     {
@@ -1165,26 +1165,85 @@ export function liveSteps(): TickStep[] {
     // (e) The signature sets on screen, verified at this head before it is served, so the first
     // request at it finds them.
     signaturesStep(),
-    // (f) ZKsync Era, while an Era page is on screen (the vetoable proposals, a veto, the
-    // upgrades that can start): Era's head, the L2 governor index's tail at it and the vetoable
-    // proposals' states, read now and then every 3 s until the next L1 block, so requests find
-    // them in memory (Era's head is served for 4 s).
+    // (f) The simulations pages on screen show (a transaction ready to send), simulated at this
+    // head before it is served (one eth_call each, kept for the head), so a page never shows a
+    // result from an older block as current, and learns from its next beat when it changed.
     {
-      name: "l2",
+      name: "simulations",
+      beforePublish: true,
       run: async (tick) => {
-        if (!tick.viewing) throw new StepSkipped("idle");
-        if (!l2OnScreen()) throw new StepSkipped("no ZKsync Era page on screen");
-        if (!(await refreshVetoableL2())) throw new StepSkipped("no L2 governor indexed");
-        if (tick.current()) followL2(tick);
+        if (!tick.viewing) throw new StepSkipped("nothing on screen");
+        const keys = [...presence().onScreen()].filter((key) => key.startsWith("sim:"));
+        if (keys.length === 0) return;
+        await resimulateOnScreen(tick.head, keys, () => tick.current() && tick.inUse());
+      },
+    },
+    // (g) Once the head is served: what is on screen, digested from memory at it (the signature
+    // sets were in (e), the simulations in (f)), so a tab whose content changed learns it from its
+    // next beat; and the Safes behind the lists on screen, for the Safe watcher. ZKsync Era has
+    // its own timer (sync/era.ts).
+    {
+      name: "content",
+      run: async (tick) => {
+        if (!tick.viewing) throw new StepSkipped("nothing on screen");
+        // An Era page that came on screen since the last wake: its timer starts (idempotent).
+        startEraWatch(eraWatch);
+        if (!(await tick.served())) throw new StepSkipped("head replaced before it was served");
+        await refreshListSafes();
+        const keys = [...presence().onScreen()].filter(
+          (key) => !key.startsWith("set:") && !key.startsWith("sim:") && !isL2Key(key)
+        );
+        if (presence().onScreen().has("list:vetoes")) keys.push("list:vetoes");
+        await noteOnScreenContent(tick.head, keys, () => tick.current() && tick.inUse());
       },
     },
   ];
 }
 
-/** A page showing something on ZKsync Era is on screen. */
-function l2OnScreen(): boolean {
-  for (const key of presence().onScreen()) if (isL2Key(key)) return true;
-  return false;
+// The member Safes of governance's signer groups, from the last governance pages read (the lists
+// on screen collect from them).
+let groupSafes: { council: Address[]; guardians: Address[]; foundation: Address } | null = null;
+
+/** Reads (from memory, at the served head) the signer groups' Safes the lists collect from. */
+async function refreshListSafes(): Promise<void> {
+  try {
+    const gov = await pageGovernance();
+    groupSafes = {
+      council: gov.securityCouncil.members,
+      guardians: gov.guardians.members,
+      foundation: gov.emergencyUpgradeBoard.zkFoundation,
+    };
+  } catch {
+    // Kept as it was: the next tick reads it again.
+  }
+}
+
+/** The Safes the lists on screen collect from (emergency ids, freeze requests, vetoes). */
+function listSafes(keys: ReadonlySet<string>): Address[] {
+  const groups = groupSafes;
+  if (!groups) return [];
+  const safes: Address[] = [];
+  if ([...keys].some((key) => key.startsWith("list:emergency")))
+    safes.push(...groups.council, ...groups.guardians, groups.foundation);
+  if (keys.has("list:freeze")) safes.push(...groups.council);
+  if (keys.has("list:vetoes")) safes.push(...groups.guardians);
+  return safes;
+}
+
+/**
+ * For each list key a tab shows (pending emergency upgrades, freeze requests, vetoes): how the
+ * Safes it collects from are kept ("Safe checked 2m ago · next check in 3m"). A check that finds
+ * nothing new changes no list, so the page does not reload; the beat's answer moves the label.
+ */
+export function listSafeChecks(keys: readonly string[]): Record<string, SafeCheck> {
+  const checks: Record<string, SafeCheck> = {};
+  for (const key of keys) {
+    if (!key.startsWith("list:emergency") && key !== "list:freeze" && key !== "list:vetoes")
+      continue;
+    const safes = listSafes(new Set([key]));
+    if (safes.length > 0) checks[key] = safeCheckOf(safes, "list");
+  }
+  return checks;
 }
 
 /** The member Safes of the signature sets on screen, each once. */
@@ -1276,38 +1335,78 @@ function engine(): SyncEngine {
   return next;
 }
 
-// The Safe store's background sweep runs while the engine does (safe/store.ts decides what, and
-// whether this Safe service may be read in the background at all): the member Safes of the
-// signature sets on screen and, with SYNC_MODE=always, every governance member Safe at the
-// quota-paced interval.
-// Only the sets on screen that can still be signed: a set that can no longer be signed is
-// verified from the listings held (signatures.ts), so its members' Safes are not read for it.
-const safeSweep: SafeSweepDriver = {
-  active: () => instance !== null && instance.generation === rpcGeneration() && instance.active,
-  viewing: () => presence().inUse(),
-  onScreen: () => onScreenSigners({ openOnly: true }),
-  baseline: () => instance?.mode === "always",
-  groups: async () => {
-    const gov = await pageGovernance();
-    return {
-      securityCouncil: gov.securityCouncil.members,
-      guardians: gov.guardians.members,
-      zkFoundation: [gov.emergencyUpgradeBoard.zkFoundation],
-    };
+/** The engine follows the chain for the current settings. */
+const engineActive = () =>
+  instance !== null && instance.generation === rpcGeneration() && instance.active;
+
+/**
+ * A dev node (anvil, hardhat): the engine does not follow it (requests read at 'latest'), but the
+ * Safe watcher still runs while someone uses the app, so a signature filed in Safe still reaches
+ * an open page (never with SYNC_MODE=off).
+ */
+const devNodeInUse = () =>
+  env.SYNC_MODE !== "off" && resolvedNetwork()?.isDevNode === true && presence().inUse();
+
+// The Safe store's watcher runs while the engine does and someone uses the app (safe/store.ts
+// decides how often, within the quota): the members of the signature sets on screen that can
+// still be signed whose signature is not valid yet, and the Safes the lists on screen collect
+// from. Nothing for a set that can no longer be signed, or a member already valid.
+const safeWatch: SafeWatchDriver = {
+  active: () => (engineActive() && presence().inUse()) || devNodeInUse(),
+  watched: () => {
+    const watched: WatchedSafe[] = watchedSetMembers().map((safe) => ({ safe, kind: "set" }));
+    for (const safe of listSafes(presence().onScreen())) watched.push({ safe, kind: "list" });
+    return watched;
   },
 };
 
 // The signature sets on screen are verified again at the served head when a member Safe's
-// listing changes, while the engine runs.
+// listing changes, while the engine runs (on a dev node, their pages are told to reload).
 const signatureWatch: SignatureWatchDriver = {
-  active: safeSweep.active,
+  active: engineActive,
   viewing: () => presence().inUse(),
   head: servedHead,
+  readsAtLatest: devNodeInUse,
 };
 
+// ZKsync Era, while an Era page is on screen (sync/era.ts).
+const eraWatch = {
+  active: () => engineActive() && presence().inUse(),
+  keys: () => presence().onScreen(),
+};
+
+let warnedActiveMs = false;
+
 function startDrivers() {
-  startSafeSweep(safeSweep);
+  if (!warnedActiveMs && process.env.SYNC_SAFE_ACTIVE_MS !== undefined) {
+    warnedActiveMs = true;
+    log.warn(
+      "SYNC_SAFE_ACTIVE_MS is no longer used and is ignored: the Safes of what is on screen are checked (SYNC_SAFE_WATCH_MS, SYNC_SAFE_LIST_WATCH_MS)"
+    );
+  }
+  startSafeWatch(safeWatch);
   startSignatureWatch(signatureWatch);
+  startEraWatch(eraWatch);
+  // The lists on screen may have changed: the Safes they collect from, read from memory.
+  if (groupSafes === null && engineActive()) void refreshListSafes().then(nudgeSafeWatch);
+}
+
+/**
+ * The viewer just signed for this member Safe (a tab's "signed" beat): its listing is read now and
+ * a few times over the next two minutes, until the signature shows up (safe/store.ts safeBurst).
+ * Only for a member of a signature set on screen. Never throws.
+ */
+export function noteSigned(safe: Address) {
+  try {
+    const lower = safe.toLowerCase();
+    const onScreen = [...presence().onScreen()].some((key) =>
+      pageSetOf(key)?.members.some((member) => member.toLowerCase() === lower)
+    );
+    if (!onScreen) return;
+    safeBurst(safe, () => presence().inUse());
+  } catch (error) {
+    log.warn({ error: errorKind(error) }, "sync signed note failed");
+  }
 }
 
 /**
@@ -1383,6 +1482,8 @@ export function syncView(): { head: BlockRef | null; catchingUp: boolean } {
 export function stopSync() {
   instance?.stop();
   instance = null;
-  stopSafeSweep();
+  groupSafes = null;
+  stopSafeWatch();
   stopSignatureWatch();
+  stopEraWatch();
 }

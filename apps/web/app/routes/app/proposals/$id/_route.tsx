@@ -1,3 +1,4 @@
+import { idContent, loaderRevs } from "@/.server/sync/content";
 import { pageLoad, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import { type StandardUpgradeCore, loadStandardUpgrade } from "@/.server/flows/standard";
@@ -40,6 +41,8 @@ export function loader({ params, request }: LoaderFunctionArgs) {
   );
   return defer({
     watch: page.watch,
+    // The upgrade's state and status, for its revision (its sets carry their own).
+    revs: loaderRevs([[watchKeys.upgrade(id), loading.then((d) => idContent(d.overview))]]),
     id,
     detail: loading.then((d) => d.overview),
     // A start found in the history the last run saved, or located directly while this run's
@@ -426,12 +429,17 @@ function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeCore> }) {
                           refresh={s === first ? refresh : null}
                         />
                       );
-                      // The recorded evidence is compared with the strict result's Safe copies.
-                      if (s.state.status !== "done" || s.set.stale) return card();
+                      // The recorded evidence is compared with the current result's Safe copies.
+                      // The same tree whether or not there is evidence to wait for (an Await of
+                      // null renders at once), so a reload that changes that keeps the card (and
+                      // what is open in it) mounted.
+                      const evidenceFor = s.state.status === "done" && !s.set.stale;
                       return (
                         <Suspense fallback={card()}>
-                          <Await resolve={setEvidence} errorElement={card()}>
-                            {(merged) => card(merged.find((e) => e.key === s.key) ?? s)}
+                          <Await resolve={evidenceFor ? setEvidence : null} errorElement={card()}>
+                            {(merged) =>
+                              card((evidenceFor ? merged?.find((e) => e.key === s.key) : null) ?? s)
+                            }
                           </Await>
                         </Suspense>
                       );

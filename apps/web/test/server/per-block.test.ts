@@ -21,6 +21,7 @@ import {
   firstSignatureSet,
   precomputeSignatureSets,
   signatureSetsStatus,
+  verifyPageSignatureSet,
   verifySignatureSet,
   watchSignatureSet,
 } from "@/.server/signatures";
@@ -585,13 +586,13 @@ describe("sets verified by the engine from Safe copies older than 60 s", () => {
    * JSON asks for the council's approval set (re-reading its member Safes: unchanged) and for the
    * council's emergency set (the same member Safes, the same head).
    */
-  async function jsonAfterHeldPrecompute(w: LiveWorld) {
+  async function jsonAfterHeldPrecompute(w: LiveWorld, verified = 6) {
     showPages(w);
     const head = await settle(latestBlock());
     const before = w.safeRequests.length;
     const run = await settle(precomputeSignatureSets(head));
-    expect(run).toMatchObject({ sets: 6, verified: 6, failed: 0 });
-    // From the copies held, whatever their age: no Safe request.
+    // From the copies held, whatever their age (never the last run's): no Safe request.
+    expect(run).toMatchObject({ sets: 6, verified, skipped: 6 - verified, failed: 0 });
     expect(w.safeRequests.length).toBe(before);
     const approval = await settle(verifySignatureSet(w.sets[0] as SignatureSetParams));
     const emergency = await settle(verifySignatureSet(w.sets[3] as SignatureSetParams));
@@ -609,12 +610,18 @@ describe("sets verified by the engine from Safe copies older than 60 s", () => {
       expect(set.stale).toBe(false);
       expect(set.thresholdCheck.status).toBe("met");
     }
-    // A page's first answer for a set the engine verified that way: labelled with the copies' age.
+    // A page's result for a set the engine verified that way (one that can no longer be signed):
+    // current at the head, from the copies held, labelled with their age; no Safe request.
+    const before = w.safeRequests.length;
+    const page = await settle(verifyPageSignatureSet(w.sets[4] as SignatureSetParams));
+    expect(page.stale).toBe(false);
+    expect(Date.now() - Date.parse(page.safeFetchedAt ?? "")).toBeGreaterThan(60_000);
+    expect(w.safeRequests.length).toBe(before);
+    // Its first answer is that result itself.
     const first = await settle(
-      firstSignatureSet(w.sets[4] as SignatureSetParams, new Promise<never>(() => {}))
+      firstSignatureSet(w.sets[4] as SignatureSetParams, Promise.resolve(page))
     );
-    expect(first.stale).toBe(true);
-    expect(Date.now() - Date.parse(first.safeFetchedAt ?? "")).toBeGreaterThan(60_000);
+    expect(first).toBe(page);
   });
 
   it("…nor a kept result whose copies turned 60 s old since, its listings re-read unchanged by another set", async () => {
@@ -650,7 +657,8 @@ describe("sets verified by the engine from Safe copies older than 60 s", () => {
       holdLastRunListings(kept.map(({ version: _, ...l }) => ({ ...l, fetchedAt: twoDaysAgo })))
     ).toBeGreaterThan(0);
     await backfilled();
-    const { approval, emergency } = await jsonAfterHeldPrecompute(w);
+    // The engine verifies none of them from the last run's copies: pages read them first.
+    const { approval, emergency } = await jsonAfterHeldPrecompute(w, 0);
     for (const set of [approval, emergency]) {
       expect(Date.now() - Date.parse(set.safeFetchedAt ?? "")).toBeLessThanOrEqual(60_000);
       expect(set.stale).toBe(false);

@@ -6,9 +6,10 @@ import "@testing-library/jest-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 // The app shell with the log index still backfilling when the root status was read. The root is
-// not read again on its own, so when the index's poll finds it finished, the shell asks for the
-// root status once: it carries the log-history check against the index ("Your RPC may not serve
-// old logs"), which had no opinion while the index was backfilling.
+// not read again on its own, so when a beat's answer (components/presence.tsx) shows the index
+// finished, the shell asks for the root status once: it carries the log-history check against the
+// index ("Your RPC may not serve old logs"), which had no opinion while the index was
+// backfilling. Nothing is polled: the beats carry the index's state.
 
 const router = vi.hoisted(() => ({ revalidate: vi.fn() }));
 vi.mock("@remix-run/react", () => ({
@@ -24,6 +25,16 @@ vi.mock("@/components/connect-button", async () => {
 });
 
 const { default: AppShell } = await import("@/components/app-shell");
+const { INITIAL_LIVE, LiveStateProvider } = await import("@/components/presence");
+
+/** The shell, with what the tab's last beat said about the index (null: no beat yet). */
+function shell(root: OkStatus, beat: Record<string, unknown> | null = null) {
+  return (
+    <LiveStateProvider value={{ ...INITIAL_LIVE, index: beat as never }}>
+      <AppShell status={root}>page</AppShell>
+    </LiveStateProvider>
+  );
+}
 
 const ADDRESS = "0x0000000000000000000000000000000000000001";
 const READY = {
@@ -65,7 +76,6 @@ function status(
   } as unknown as OkStatus;
 }
 
-const answer = (body: unknown) => Promise.resolve({ json: () => Promise.resolve(body) });
 const fetch = vi.fn();
 
 beforeEach(() => {
@@ -81,18 +91,21 @@ afterEach(() => {
 });
 
 const toggle = { defaultShouldRevalidate: true };
-// One poll per act: React renders (and schedules the next poll) when the act ends.
-const pollOnce = () => act(() => vi.advanceTimersByTimeAsync(2_000));
 
-it("reads the root status once when the index finishes, and shows the log-history banner it brings", async () => {
-  fetch.mockReturnValue(answer(status(READY, { status: "missing", blockNumber: "20500000" })));
+it("reads the root status once when a beat shows the index finished, and shows the log-history banner it brings", async () => {
   const backfilling = status({ ...READY, state: "backfilling", chunks: { done: 40, total: 435 } });
-  const view = render(<AppShell status={backfilling}>page</AppShell>);
+  const view = render(shell(backfilling));
   expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 9%");
   expect(shouldRevalidateRoot(toggle)).toBe(false); // the status just landed
 
-  await pollOnce();
-  expect(fetch).toHaveBeenCalledTimes(1);
+  // A beat: further along.
+  view.rerender(
+    shell(backfilling, { ...READY, state: "backfilling", chunks: { done: 300, total: 435 } })
+  );
+  expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 68%");
+  expect(router.revalidate).not.toHaveBeenCalled();
+  // A beat: ready.
+  view.rerender(shell(backfilling, READY));
   expect(screen.queryByTestId("index-progress")).not.toBeInTheDocument();
   expect(router.revalidate).toHaveBeenCalledTimes(1);
   // That revalidation (and any navigation until the new status lands) reads the root.
@@ -100,27 +113,23 @@ it("reads the root status once when the index finishes, and shows the log-histor
   expect(shouldRevalidateRoot(toggle)).toBe(true);
 
   // The root's new status: the index check found the canary missing.
-  view.rerender(
-    <AppShell status={status(READY, { status: "missing", blockNumber: "20500000" })}>page</AppShell>
-  );
+  view.rerender(shell(status(READY, { status: "missing", blockNumber: "20500000" }), READY));
   expect(screen.getByText("Your RPC may not serve old logs.")).toBeInTheDocument();
   expect(shouldRevalidateRoot(toggle)).toBe(false);
   await act(() => vi.advanceTimersByTimeAsync(60_000));
-  expect(fetch).toHaveBeenCalledTimes(1);
+  // Nothing polled, and the root read once.
+  expect(fetch).not.toHaveBeenCalled();
   expect(router.revalidate).toHaveBeenCalledTimes(1);
 });
 
 it("does the same when the root status was read before the backfill started (a settings save)", async () => {
-  fetch
-    .mockReturnValueOnce(answer(status({ ...READY, state: "idle", chunks: { done: 0, total: 0 } })))
-    .mockReturnValueOnce(answer(status({ ...READY, state: "backfilling" })))
-    .mockReturnValueOnce(answer(status(READY)));
-  render(<AppShell status={status({ ...READY, state: "idle" })}>page</AppShell>);
-  await pollOnce();
-  await pollOnce();
+  const idle = status({ ...READY, state: "idle", chunks: { done: 0, total: 0 } });
+  const view = render(shell(idle));
+  view.rerender(shell(idle, { ...READY, state: "idle", chunks: { done: 0, total: 0 } }));
+  view.rerender(shell(idle, { ...READY, state: "backfilling" }));
   expect(router.revalidate).not.toHaveBeenCalled();
-  await pollOnce();
-  expect(fetch).toHaveBeenCalledTimes(3);
+  view.rerender(shell(idle, READY));
+  expect(fetch).not.toHaveBeenCalled();
   expect(router.revalidate).toHaveBeenCalledTimes(1);
 });
 
@@ -139,4 +148,31 @@ it("notes every new root status as landed, and only new ones", () => {
   expect(shouldRevalidateRoot(toggle)).toBe(true);
   view.rerender(<AppShell status={status(READY)}>page</AppShell>);
   expect(shouldRevalidateRoot(toggle)).toBe(false);
+});
+
+it("shows what live updates do in a floating note outside the header: the header and the page never move for it, nor does it cover the navigation", () => {
+  for (const state of [
+    { updating: true },
+    { catchingUp: true },
+    { away: true },
+    { failing: true, lastBeatAt: Date.now() - 90_000 },
+  ]) {
+    const view = render(
+      <LiveStateProvider value={{ ...INITIAL_LIVE, ...state }}>
+        <AppShell status={status(READY)}>page</AppShell>
+      </LiveStateProvider>
+    );
+    const note = screen.getByTestId("live-note");
+    expect(note.closest("header")).toBeNull();
+    const floating = note.parentElement as HTMLElement;
+    expect(floating.className).toContain("fixed");
+    expect(floating.className).toContain("pointer-events-none");
+    // The header holds no live state that comes and goes.
+    const header = document.querySelector("header") as HTMLElement;
+    expect(header.textContent).not.toMatch(/Updating|Checking for changes|Updates paused/);
+    view.unmount();
+  }
+  // Nothing to say: no note.
+  render(<AppShell status={status(READY)}>page</AppShell>);
+  expect(screen.queryByTestId("live-note")).not.toBeInTheDocument();
 });

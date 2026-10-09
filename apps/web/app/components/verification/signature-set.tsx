@@ -4,16 +4,24 @@ import { AddressLink, CopyButton, ExternalAnchor, Hash, TxLink } from "@/compone
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/utils/cn";
-import { useWatchKey } from "@/components/presence";
+import { useLive, usePresence, useSafeCheck, useWatchItem } from "@/components/presence";
+import { Button } from "@/components/ui/button";
 import { formatNumber } from "@/utils/format";
 import type { SerializeFrom } from "@remix-run/node";
-import { AlertTriangle, CheckCircle2, ChevronDown, ShieldCheck, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  RefreshCw,
+  ShieldCheck,
+  XCircle,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { isAddressEqual } from "viem";
 import { useAccount } from "wagmi";
 import { MemberStatusBadge, SetStateBadge } from "./badges";
 import { ExecutionPanel } from "./execution-panel";
-import { FreshnessNote, type Refresh } from "./freshness";
+import { FreshnessNote, type Refresh, newerCheck, setCurrency } from "./freshness";
 import { SignButton } from "./sign-button";
 
 type Serialized<T> = SerializeFrom<T>;
@@ -42,13 +50,21 @@ export function SignatureSetCard({
   /** For a stale first answer (`set.stale`): where the fresh result is (see UntilFresh). */
   refresh?: Refresh;
 }) {
-  // On screen while shown: the engine verifies the set again at each new block.
-  useWatchKey(set.watch?.key);
+  // On screen while shown, with the revision of what is shown: the engine verifies the set again
+  // at each new block, and the page reloads when the content changed.
+  useWatchItem(set.watch);
+  const live = useLive();
   const valid = set.valid.length;
   const met = set.thresholdCheck.status === "met";
-  // A page's first answer from an older block or old Safe copies: every verdict is shown as of its
-  // block, nothing in a passing colour, and nothing to sign or send from it.
-  const staleAt = set.stale ? set.verifiedAtBlock ?? "?" : null;
+  // The newest block the content shown was verified at, and the head served now when the set was
+  // not verified there (its reads failed, it needs Safe, or a ?sig= page that is never followed).
+  const { block: verifiedAt, behind } = setCurrency(set, live);
+  // A page's first answer from an older block or old Safe copies, or a result behind the head
+  // served: every verdict is shown as of its block, nothing in a passing colour, and nothing to
+  // sign or send from it (a Sign dialog already open stays, disabled buttons say why).
+  const staleAt = set.stale ? set.verifiedAtBlock ?? "?" : behind !== null ? verifiedAt : null;
+  const notCurrent = behind === null ? null : `Not verified at block #${formatNumber(behind)} yet.`;
+  const followed = set.watch?.rev !== null && set.watch?.rev !== undefined;
   const unavailable = set.members.filter((m) => m.status === "unavailable").length;
   const incomplete =
     set.thresholdCheck.status === "below" && (unavailable > 0 || !!set.safeApiError);
@@ -105,12 +121,36 @@ export function SignatureSetCard({
         {state.status === "done" && (
           <DoneSummary state={state} used={used} historical={historical} />
         )}
-        <FreshnessNote
-          set={set}
-          // Only a stale set is being checked again; a fresh one beside it is not.
-          refresh={staleAt === null ? null : refresh}
-          what="The statuses and counts on this card"
-        />
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          {/* On a phone the label has its own line and the buttons the next, whatever the label
+              says (a shorter one after an update never pulls them up beside it). */}
+          <div className="min-w-0 basis-full sm:basis-auto">
+            <FreshnessNote
+              set={
+                behind === null
+                  ? { ...set, verifiedAtBlock: verifiedAt }
+                  : { ...set, verifiedAtBlock: verifiedAt, stale: true, reverifyingAt: behind }
+              }
+              // Only a stale set is being checked again; a fresh one beside it is not.
+              refresh={behind !== null ? "behind" : staleAt === null ? null : refresh}
+              followed={followed}
+              what="The statuses and counts on this card"
+              check={
+                staleAt === null && state.status === "open" && set.safeCheck !== null
+                  ? newerCheck(set.watch ? live.checked[set.watch.key] : null, set.safeCheck)
+                  : null
+              }
+            />
+          </div>
+          {state.status === "open" &&
+          (staleAt === null || behind !== null) &&
+          set.watch &&
+          set.members.some((m) => m.safe.isContract) ? (
+            <FetchSignatures watchKey={set.watch.key} />
+          ) : (
+            behind !== null && <CheckAgain />
+          )}
+        </div>
         <ThresholdLine set={set} state={state} incomplete={incomplete} staleAt={staleAt} />
         {set.safeApiError && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 text-sm">
@@ -131,21 +171,81 @@ export function SignatureSetCard({
       </details>
 
       <div className="space-y-4 border-slate-200 border-t px-4 py-5 sm:px-6">
-        {execution && <ExecutionPanel execution={execution} toLabel={executionToLabel} />}
+        {execution && (
+          <ExecutionPanel
+            execution={execution}
+            toLabel={executionToLabel}
+            blockedReason={notCurrent}
+          />
+        )}
         <SignedData set={set} />
-        {state.status === "open" && staleAt === null && (
+        {state.status === "open" && (staleAt === null || behind !== null) && (
           <div className="flex flex-wrap items-center gap-3">
             <SignButton
               typedData={set.typedData}
               signerGroup={set.signerGroup}
               members={set.members}
-              disabledReason={null}
+              disabledReason={notCurrent}
             />
           </div>
         )}
         {footer}
       </div>
     </Card>
+  );
+}
+
+/**
+ * "Fetch signatures": reads the set's member Safes now and checks the signatures again at the
+ * current block; the card updates in place. Safe is also asked on its own every minute or so while
+ * the set is on screen (the label beside says when).
+ */
+function FetchSignatures({ watchKey }: { watchKey: string }) {
+  const check = useSafeCheck(watchKey);
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {check.error && (
+        <span className="text-amber-900 text-xs" role="status">
+          Could not fetch: {check.error}
+        </span>
+      )}
+      {!check.error && check.failed > 0 && (
+        <span className="text-amber-900 text-xs" role="status">
+          Safe did not answer for {check.failed} member{check.failed === 1 ? "" : "s"}
+        </span>
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => void check.run()}
+        loading={check.running}
+        disabled={check.running}
+        title="Read the members' Safe signatures now and check them again on-chain"
+        data-testid="fetch-signatures"
+      >
+        {!check.running && <RefreshCw />}
+        {check.running ? "Fetching signatures…" : "Fetch signatures"}
+      </Button>
+    </span>
+  );
+}
+
+/**
+ * For a result behind the head served (see setCurrency): reloads the page's data now, which
+ * verifies the set at the current head (a page with a signature from its URL included).
+ */
+function CheckAgain() {
+  const { reload } = usePresence();
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={reload}
+      title="Check the signatures again at the current block"
+      data-testid="check-again"
+    >
+      <RefreshCw /> Check again
+    </Button>
   );
 }
 
