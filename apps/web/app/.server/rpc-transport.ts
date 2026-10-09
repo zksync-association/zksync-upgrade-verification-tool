@@ -22,10 +22,15 @@ export type LimitedHttpOptions = {
   onRequest?: (method: string) => void;
   /**
    * Asked before a request is made: a promise to wait for first (the sync engine's credit pacer,
-   * for the engine's own requests), or null to send it at once.
+   * for the engine's own requests), or null to send it at once. A wait that rejects fails the
+   * request unsent (the engine's work once it may no longer send, sync/pacer.ts).
    */
   pace?: (method: string) => Promise<void> | null;
+  /** The in-flight limit to share with another transport (default: one of its own, maxInFlight). */
+  limit?: ConcurrencyLimit;
 };
+
+export type ConcurrencyLimit = ReturnType<typeof concurrencyLimit>;
 
 /** Batch read-only JSON-RPC traffic, with a per-client fallback for providers rejecting batches. */
 export function limitedHttp(url: string, options: LimitedHttpOptions): Transport {
@@ -37,7 +42,7 @@ export function limitedHttp(url: string, options: LimitedHttpOptions): Transport
       // Counting never fails a request.
     }
   };
-  const limit = concurrencyLimit(maxInFlight);
+  const limit = options.limit ?? concurrencyLimit(maxInFlight);
   let acceptsBatch: boolean | undefined = options.batch === false ? false : undefined;
   const batchUnavailable = () => acceptsBatch === false;
   const httpOptions = { timeout: 10_000, retryCount: 0 };

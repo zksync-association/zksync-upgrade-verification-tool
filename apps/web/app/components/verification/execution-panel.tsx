@@ -3,6 +3,7 @@ import { useOfferWallet } from "@/components/connect-button";
 import { useHoldUpdates, useLive, useWatchItem } from "@/components/presence";
 import { AddressLink, CopyButton } from "@/components/hex";
 import { Button } from "@/components/ui/button";
+import { usePageNotCurrent } from "@/components/verification/content-currency";
 import { cn } from "@/utils/cn";
 import { formatEth, formatNumber } from "@/utils/format";
 import { useNavigate } from "@remix-run/react";
@@ -125,6 +126,16 @@ export function ExecutionPanel({
   // While the wallet request is pending, or the Safe transaction hash is shown (until dismissed),
   // the page's data is not reloaded: this panel, and what it shows, stay as they are.
   const waiting = useHoldUpdates(isPending || safeTxHash !== null);
+  // The signatures it carries not verified at the head served, or the page's own item (an
+  // upgrade's state) not read there (verification/content-currency.tsx): sending waits.
+  const page = usePageNotCurrent();
+  const blocked =
+    blockedReason !== null
+      ? {
+          reason: blockedReason,
+          waits: "Sending waits until the signatures are verified at the current block.",
+        }
+      : page;
 
   const send = () => {
     toast.loading(
@@ -165,17 +176,17 @@ export function ExecutionPanel({
             size="sm"
             onClick={send}
             loading={isPending}
-            disabled={!isConnected || (blockedReason !== null && !isPending)}
-            title={blockedReason ?? (isConnected ? undefined : "Connect a wallet to send")}
+            disabled={!isConnected || (blocked !== null && !isPending)}
+            title={blocked?.reason ?? (isConnected ? undefined : "Connect a wallet to send")}
             data-testid="send-transaction"
           >
             <Send /> {viaSafe ? "Create Safe transaction" : "Send transaction"}
           </Button>
         </div>
       </div>
-      {blockedReason && (
+      {blocked && (
         <p className="text-slate-700 text-xs" role="status" data-testid="send-blocked">
-          {blockedReason} Sending waits until the signatures are verified at the current block.
+          {blocked.reason} {blocked.waits}
         </p>
       )}
       <p className="text-slate-950 text-sm">

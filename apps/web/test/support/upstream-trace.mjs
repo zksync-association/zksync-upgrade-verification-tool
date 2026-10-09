@@ -30,9 +30,12 @@ export function hostId(host) {
   return createHash("sha256").update(String(host)).digest("hex").slice(0, 6);
 }
 
+// The named block tags: any other string is recorded as "other", never copied.
+const NAMED_TAGS = new Set(["latest", "finalized", "safe", "pending", "earliest"]);
+
 function blockTag(value) {
   if (typeof value === "string") {
-    if (!/^0x[0-9a-f]+$/i.test(value)) return value;
+    if (!/^0x[0-9a-f]+$/i.test(value)) return NAMED_TAGS.has(value) ? value : "other";
     const n = Number(BigInt(value));
     return Number.isSafeInteger(n) ? n : "number";
   }

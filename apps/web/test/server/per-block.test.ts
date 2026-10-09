@@ -80,7 +80,17 @@ beforeEach(() => {
   overrideCodePinsForTests(FAKE_PINS);
 });
 
+// The engines a test started: stopped after it, whatever happened in it (a test that timed out
+// leaves its engine following the fake chain, counting into the next test's world otherwise),
+// and the test's own loops told to stop (`ended`: its body runs on after a timeout).
+const engines: { stop(): void }[] = [];
+let testRun = 0;
+/** For a test's loop: whether the test it belongs to has ended (timed out). */
+const endedSince = (run: number) => () => run !== testRun;
+
 afterEach(() => {
+  testRun++;
+  for (const engine of engines.splice(0)) engine.stop();
   stopSync();
   overrideCodePinsForTests(undefined);
   resetPresence();
@@ -148,6 +158,7 @@ async function following(w: LiveWorld, warmBlocks = 3) {
   for (const set of w.sets) await settle(verifySignatureSet(set));
   showPages(w);
   const engine = liveEngine();
+  engines.push(engine);
   engine.resume();
   await until(() => engine.status().ticks >= 1);
   for (let i = 0; i < warmBlocks; i++) {
@@ -161,9 +172,11 @@ async function following(w: LiveWorld, warmBlocks = 3) {
 describe("C-1: two executed detail pages on screen, 200 quiet blocks", () => {
   it("per block: at most 4 head polls, one eth_getLogs, one aggregate3 at the head, no direct verdict, no governance round, no Safe", async () => {
     const w = liveWorld();
+    const ended = endedSince(testRun);
     const engine = await following(w);
     const blocks: ReturnType<typeof costOf>[] = [];
     for (let b = 0; b < 200; b++) {
+      if (ended()) return;
       const from = mark(w);
       const head = w.nextBlock();
       await vi.advanceTimersByTimeAsync(SLOT_MS);
@@ -195,7 +208,8 @@ describe("C-1: two executed detail pages on screen, 200 quiet blocks", () => {
     });
     expect(signatureSetsStatus().perBlock?.fast).toBeGreaterThan(0);
     expect(snapshotStatus()).toMatchObject({ governance: "split", unknown: [] });
-  });
+    // 200 blocks of the live engine: about 4 s on its own, longer under load.
+  }, 30_000);
 });
 
 /** Runs the engine one block on (a beat keeps the pages on screen), and returns the new head. */
@@ -388,6 +402,7 @@ describe("SYNC_MODE=always, nothing on screen", () => {
     // the first idle ticks keep JSON's governance alive.
     await backfilled();
     const engine = liveEngine({ mode: "always" });
+    engines.push(engine);
     // As the module's engine allows them: while it follows the chain.
     const previous = allowPinChecksWhen(() => engine.active);
     try {

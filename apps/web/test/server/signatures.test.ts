@@ -80,6 +80,8 @@ const state = vi.hoisted(() => ({
   delay: 0,
   // Every listing is incomplete: messages are looked up by their hash (no listing version).
   byHash: false,
+  // Safe answers nothing now (a rate-limit or monthly-quota cooldown).
+  safeCooling: false,
 }));
 
 vi.mock("@/.server/rpc", () => ({
@@ -114,7 +116,14 @@ vi.mock("@/.server/governance", async () => {
 
 vi.mock("@/.server/safe-api", () => {
   class SafeApiError extends Error {}
-  return { SafeApiError, safeWalletUrl: async () => null };
+  return {
+    SafeApiError,
+    safeWalletUrl: async () => null,
+    safeCooldownError: () =>
+      state.safeCooling
+        ? new SafeApiError("Safe Transaction Service: rate limit, cooling down")
+        : null,
+  };
 });
 // A Safe snapshot store whose every listing is complete, has one version and is fresh or not.
 vi.mock("@/.server/safe/store", async () => {
@@ -137,6 +146,9 @@ vi.mock("@/.server/safe/store", async () => {
     lookupSafeMessage: async (_safe: string, hash: string) => {
       state.lookups++;
       if (state.safeApiDown) throw new SafeApiError("Safe Transaction Service returned HTTP 503");
+      // During a cooldown Safe is not asked: every read fails at once.
+      if (state.safeCooling)
+        throw new SafeApiError("Safe Transaction Service: rate limit, cooling down");
       return answer(hash);
     },
     // A listing that cannot answer (incomplete) is no answer for a precompute.
@@ -304,6 +316,7 @@ beforeEach(() => {
   state.combined = 0;
   state.delay = 0;
   state.byHash = false;
+  state.safeCooling = false;
   resetPresence();
   stopSignatureWatch();
   state.listeners.clear();
@@ -635,6 +648,29 @@ describe("kept per head, and precomputed", () => {
     expect(state.lookups).toBe(lookups + MEMBERS.length);
     // The verdicts at this head were kept: only the listings were looked at again.
     expect(posts()).toBe(sent);
+  });
+
+  it("while Safe is cooling down, verifies an on-screen set at each head with its members unavailable, never missing", async () => {
+    twoSigned();
+    shown();
+    await run();
+    state.listingFresh = false;
+    state.safeCooling = true;
+    const head = nextHead();
+    // Not left behind the head: a request would fail for these members the same way, asking nothing.
+    expect(await precomputeSignatureSets(head)).toMatchObject({ sets: 1, verified: 1, skipped: 0 });
+    expect(state.lookups).toBe(MEMBERS.length);
+    // A request at that head gives the same: unavailable, never missing.
+    const set = await run();
+    expect(set.members.every((m) => m.status === "unavailable")).toBe(true);
+    expect(set.members.some((m) => m.status === "missing")).toBe(false);
+    // Once the cooldown ends, the older copies no longer count: the set goes back to the request.
+    state.safeCooling = false;
+    expect(await precomputeSignatureSets(nextHead())).toMatchObject({
+      sets: 1,
+      verified: 0,
+      skipped: 1,
+    });
   });
 
   it("a new listing version: the kept result no longer stands, and the watch verifies it again at the served head", async () => {

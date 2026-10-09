@@ -13,12 +13,26 @@ import { AsyncLocalStorage } from "node:async_hooks";
 // that someone is awaiting. While a request waits on the engine's work (a read both share, kept
 // in cache.ts while in flight; a signature set the engine is verifying), the engine's work goes
 // unpaced (hurry): a request is never held up by the engine's pace.
+//
+// The engine's work goes out only while the engine may send (allowEngineWorkWhen, set by
+// sync/engine.ts: someone uses the app or the engine follows the chain, under the settings it was
+// asked under). Engine work that would wait while it may not, or whose wait ends once it may no
+// longer (use ended, the engine paused or stopped, the settings changed), is never sent: its wait
+// rejects with EngineWorkDropped (R-D3: nothing is read once use has ended). A wait a request
+// hurried along is a request's, and always goes. The engine's work remembers the settings
+// generation it started under: none of it goes out under later settings, a retry of a request
+// dropped here (viem retries unknown errors) included.
 
-const engineWork = new AsyncLocalStorage<boolean>();
+// The settings generation the engine's work started under (asEngineWork); false for a request's.
+const engineWork = new AsyncLocalStorage<number | false>();
 
-/** Runs `work` as the sync engine's own (paced) work. */
+/**
+ * Runs `work` as the sync engine's own (paced) work, under the settings generation now (or the one
+ * the engine's work around it started under).
+ */
 export function asEngineWork<T>(work: () => T): T {
-  return engineWork.run(true, work);
+  const outer = engineWork.getStore();
+  return engineWork.run(typeof outer === "number" ? outer : sendRule.generation(), work);
 }
 
 /** Runs `work` as a request's (never paced), e.g. a backfill the engine happened to start. */
@@ -28,7 +42,7 @@ export function asRequestWork<T>(work: () => T): T {
 
 /** Whether the code running now is the sync engine's own work (see asEngineWork). */
 export function isEngineWork(): boolean {
-  return engineWork.getStore() === true;
+  return typeof engineWork.getStore() === "number";
 }
 
 /** Infura's published credit weight of one JSON-RPC request (an estimate for other providers). */
@@ -37,6 +51,24 @@ export function creditsOf(method: string): number {
   if (method === "eth_chainId") return 5;
   return 80;
 }
+
+/**
+ * The engine's work was not sent: it waited its turn and, by then, the engine could no longer send
+ * (see the top). Not a failure of the data source.
+ */
+export class EngineWorkDropped extends Error {
+  override name = "EngineWorkDropped";
+}
+
+/** When the engine's own work may be sent (see the top). */
+export type EngineSendRule = {
+  /** Whether it may be sent now. */
+  allowed: () => boolean;
+  /** The settings generation now: work that waited across a settings change is never sent. */
+  generation: () => number;
+};
+
+const ALWAYS: EngineSendRule = { allowed: () => true, generation: () => 0 };
 
 export type PacerStatus = {
   /** Credits a second the engine's work may use (0: unpaced). */
@@ -52,21 +84,34 @@ export type PacerStatus = {
   queued: number;
   /** Engine requests let go unpaced because a request waited on the engine's work. */
   expedited: number;
+  /** Engine requests never sent: the engine could no longer send when their turn came. */
+  dropped: number;
 };
 
 const WINDOW_MS = 1_000;
 
-type Waiter = { credits: number; resolve: () => void; since: number };
+type Waiter = {
+  credits: number;
+  resolve: () => void;
+  reject: (error: Error) => void;
+  since: number;
+  /** The settings generation it was asked under. */
+  generation: number;
+};
 
 /**
  * A sliding one-second window of credits: take(c) resolves once c more credits keep the last
  * second's total within the rate (at once when they do; null then, so the caller need not wait a
  * turn of the event loop). A take larger than the whole rate goes out alone in an empty second.
- * Waiters go in order.
+ * Waiters go in order. While `rule` does not allow the engine to send, a take rejects at once,
+ * and a waiter whose turn comes then (or whose settings generation passed) rejects instead of
+ * going (EngineWorkDropped); so does a take for work started under other settings, hurried or
+ * not. drop() rejects every waiter now.
  */
 export class CreditPacer {
   readonly #rate: () => number;
   readonly #now: () => number;
+  readonly #rule: () => EngineSendRule;
   #sent: { at: number; credits: number }[] = [];
   #waiting: Waiter[] = [];
   #timer: ReturnType<typeof setTimeout> | null = null;
@@ -74,31 +119,67 @@ export class CreditPacer {
   #waited = 0;
   #maxWaitMs = 0;
   #expedited = 0;
+  #dropped = 0;
   // Requests waiting on the engine's work now: while any does, nothing waits here.
   #hurry = 0;
 
-  constructor(rate: number | (() => number), now: () => number = Date.now) {
+  constructor(
+    rate: number | (() => number),
+    now: () => number = Date.now,
+    rule: () => EngineSendRule = () => ALWAYS
+  ) {
     this.#rate = typeof rate === "function" ? rate : () => rate;
     this.#now = now;
+    this.#rule = rule;
   }
 
-  /** Waits (when needed) until `credits` more fit in the last second, then counts them. */
-  take(credits: number): Promise<void> | null {
+  /**
+   * Waits (when needed) until `credits` more fit in the last second, then counts them. `started`:
+   * the settings generation the work was started under (default: the current one); work started
+   * under other settings is never sent.
+   */
+  take(credits: number, started?: number): Promise<void> | null {
     const rate = this.#rate();
     if (!(rate > 0) || !(credits > 0)) return null;
+    const rule = this.#rule();
+    const generation = started ?? rule.generation();
+    if (generation !== rule.generation()) {
+      this.#dropped++;
+      return Promise.reject(dropped());
+    }
     if (this.#hurry > 0) {
       this.#expedited++;
       this.#count(credits);
       return null;
     }
+    if (!rule.allowed()) {
+      this.#dropped++;
+      return Promise.reject(dropped());
+    }
     if (this.#waiting.length === 0 && this.#fits(credits, rate)) {
       this.#count(credits);
       return null;
     }
-    return new Promise<void>((resolve) => {
-      this.#waiting.push({ credits, resolve, since: this.#now() });
+    return new Promise<void>((resolve, reject) => {
+      this.#waiting.push({ credits, resolve, reject, since: this.#now(), generation });
       this.#arm();
     });
+  }
+
+  /**
+   * Rejects every waiting engine request now (EngineWorkDropped): the engine paused or stopped,
+   * so none of them is sent (R-D3).
+   */
+  drop() {
+    if (this.#waiting.length === 0) return;
+    const waiting = this.#waiting;
+    this.#waiting = [];
+    if (this.#timer) clearTimeout(this.#timer);
+    this.#timer = null;
+    for (const waiter of waiting) {
+      this.#dropped++;
+      waiter.reject(dropped());
+    }
   }
 
   /** Counts credits sent without waiting (they still hold up later takes). */
@@ -144,6 +225,7 @@ export class CreditPacer {
       maxWaitMs: this.#maxWaitMs,
       queued: this.#waiting.length,
       expedited: this.#expedited,
+      dropped: this.#dropped,
     };
   }
 
@@ -158,6 +240,7 @@ export class CreditPacer {
     this.#waited = 0;
     this.#maxWaitMs = 0;
     this.#expedited = 0;
+    this.#dropped = 0;
     this.#hurry = 0;
     for (const waiter of waiting) waiter.resolve();
   }
@@ -200,8 +283,16 @@ export class CreditPacer {
 
   #drain() {
     const rate = this.#rate();
+    const rule = this.#rule();
     while (this.#waiting.length > 0) {
       const next = this.#waiting[0] as Waiter;
+      // Its turn came once the engine could no longer send it: never sent.
+      if (!rule.allowed() || rule.generation() !== next.generation) {
+        this.#waiting.shift();
+        this.#dropped++;
+        next.reject(dropped());
+        continue;
+      }
       if (rate > 0 && !this.#fits(next.credits, rate)) break;
       this.#waiting.shift();
       const waitedMs = this.#now() - next.since;
@@ -218,6 +309,8 @@ export class CreditPacer {
 // module reads no environment itself.
 const DEFAULT_CREDITS_PER_SECOND = 450;
 let rate: () => number = () => DEFAULT_CREDITS_PER_SECOND;
+// Unset (no engine in this process, e.g. a script): the engine's work may always be sent.
+let sendRule: EngineSendRule = ALWAYS;
 let instance: CreditPacer | null = null;
 
 /** Where the pacer reads SYNC_CREDITS_PER_SECOND from (the sync engine, at its start). */
@@ -225,10 +318,27 @@ export function readRateFrom(read: () => number) {
   rate = read;
 }
 
+/** When the engine's own work may be sent (sync/engine.ts; see the top); returns the last rule. */
+export function allowEngineWorkWhen(rule: EngineSendRule): EngineSendRule {
+  const previous = sendRule;
+  sendRule = rule;
+  return previous;
+}
+
 /** The process's pacer for engine work. */
 export function pacer(): CreditPacer {
-  instance ??= new CreditPacer(() => rate());
+  instance ??= new CreditPacer(
+    () => rate(),
+    Date.now,
+    () => sendRule
+  );
   return instance;
+}
+
+function dropped(): EngineWorkDropped {
+  return new EngineWorkDropped(
+    "Not sent: the sync engine could no longer send it (use ended, or the settings changed)"
+  );
 }
 
 /**
@@ -236,7 +346,17 @@ export function pacer(): CreditPacer {
  * when the code running is the engine's own work; null for a request's.
  */
 export function paceEngineRequest(method: string): Promise<void> | null {
-  return isEngineWork() ? pacer().take(creditsOf(method)) : null;
+  const started = engineWork.getStore();
+  return typeof started === "number" ? pacer().take(creditsOf(method), started) : null;
+}
+
+/**
+ * For a client only the engine's own work uses (rpc.ts): every request it sends is the engine's,
+ * however it was scheduled (a Multicall3 batch's timer, a retry).
+ */
+export function paceAsEngine(method: string): Promise<void> | null {
+  const started = engineWork.getStore();
+  return pacer().take(creditsOf(method), typeof started === "number" ? started : undefined);
 }
 
 /**

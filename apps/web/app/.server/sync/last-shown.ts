@@ -148,6 +148,11 @@ export function lastShown() {
    * the page shows them: when no head is in memory and the section showed something before, that
    * comes first (`label`led, with `asOf`) and the current answer after it; otherwise `first` and
    * `fresh` as they are. The current answer (fresh, else first) is kept when `current` says so.
+   *
+   * `early` (a section fed by Safe, whose fresh answer waits on Safe's reads): the held answer is
+   * replaced by the current first answer as soon as it is in (labelled with its older Safe copies
+   * by itself), and that by the fresh one (`after`, see UntilFresh); otherwise the held answer
+   * stays until the fresh one is in. Without a held answer `after` is null.
    */
   function section<T>(
     key: string,
@@ -156,20 +161,32 @@ export function lastShown() {
     {
       current,
       label = (value) => value,
-    }: { current: (value: T) => boolean; label?: (value: T, asOf: AsOf) => T }
-  ): { first: Promise<T & { asOf?: AsOf }>; fresh: Promise<(T & { asOf?: AsOf }) | null> } {
+      early = false,
+    }: {
+      current: (value: T) => boolean;
+      label?: (value: T, asOf: AsOf) => T;
+      early?: boolean;
+    }
+  ): {
+    first: Promise<T & { asOf?: AsOf }>;
+    fresh: Promise<(T & { asOf?: AsOf }) | null>;
+    after: Promise<(T & { asOf?: AsOf }) | null>;
+  } {
     const answer = Promise.all([first, fresh]).then(([f, r]) => r ?? f);
     keep(key, answer, current);
     const shown = held<T>(key);
+    type Shown = T & { asOf?: AsOf };
     const result = {
-      first: shown.then((s): Promise<T & { asOf?: AsOf }> | (T & { asOf?: AsOf }) =>
-        s ? { ...label(s, s.asOf), asOf: s.asOf } : (first as Promise<T & { asOf?: AsOf }>)
+      first: shown.then((s): Promise<Shown> | Shown =>
+        s ? { ...label(s, s.asOf), asOf: s.asOf } : (first as Promise<Shown>)
       ),
       // (Never with `asOf`: typed as `first` is, so a page renders either with the same code.)
-      fresh: shown.then((s) => (s ? answer : fresh)) as Promise<(T & { asOf?: AsOf }) | null>,
+      fresh: shown.then((s) => (s ? (early ? first : answer) : fresh)) as Promise<Shown | null>,
+      after: shown.then((s) => (s && early ? fresh : null)) as Promise<Shown | null>,
     };
     void result.first.catch(() => {});
     void result.fresh.catch(() => {});
+    void result.after.catch(() => {});
     return result;
   }
 

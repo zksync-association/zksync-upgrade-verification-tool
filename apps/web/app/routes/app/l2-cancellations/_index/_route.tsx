@@ -47,7 +47,9 @@ export function loader({ request }: LoaderFunctionArgs) {
     `${watchKeys.vetoes}:signed`,
     loading.signed,
     freshAfter(loading.signed, loading.freshSigned, (s) => s.stale),
-    { current: (s) => !s.stale, label: (s) => ({ ...s, stale: true }) }
+    // Fed by Safe: after a pause, the current list (from older Safe copies, labelled) replaces
+    // the one last shown as soon as it is in, and the fresh one replaces that.
+    { current: (s) => !s.stale, label: (s) => ({ ...s, stale: true }), early: true }
   );
   return defer({
     watch: watchItems(request, [watchKeys.vetoes]),
@@ -61,13 +63,15 @@ export function loader({ request }: LoaderFunctionArgs) {
     ]),
     signed: shownSigned.first,
     freshSigned: shownSigned.fresh,
+    signedAfter: shownSigned.after,
     vetoable: loading.vetoable,
     freshVetoable: freshAfter(loading.vetoable, loading.freshVetoable, (v) => v.fromLastRun),
   });
 }
 
 export default function VetoList() {
-  const { signed, freshSigned, vetoable, freshVetoable } = useLoaderData<typeof loader>();
+  const { signed, freshSigned, signedAfter, vetoable, freshVetoable } =
+    useLoaderData<typeof loader>();
   return (
     <div className="space-y-8">
       <PageHeader eyebrow="Guardians" title="Guardian veto">
@@ -102,10 +106,13 @@ export default function VetoList() {
               }
             >
               {(first) => (
-                <UntilFresh stale={first.stale} fresh={freshSigned}>
-                  {(fresh, refresh) => (
-                    <SignedList result={fresh ?? first} refresh={fresh ? null : refresh} />
-                  )}
+                <UntilFresh
+                  stale={first.stale}
+                  fresh={freshSigned}
+                  after={signedAfter}
+                  staleOf={(s) => s.stale}
+                >
+                  {(fresh, refresh) => <SignedList result={fresh ?? first} refresh={refresh} />}
                 </UntilFresh>
               )}
             </Await>

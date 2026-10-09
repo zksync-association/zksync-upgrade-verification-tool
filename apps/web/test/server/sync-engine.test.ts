@@ -66,7 +66,12 @@ beforeEach(() => {
   resetPresence({ keepWarmMs: 600_000 });
 });
 
+// The engines a test started: stopped after it, whatever happened in it (a test that timed out
+// would leave its engine following the fake chain into the next test otherwise).
+const engines: { stop(): void }[] = [];
+
 afterEach(() => {
+  for (const engine of engines.splice(0)) engine.stop();
   stopSync();
   resetPresence();
   vi.useRealTimers();
@@ -148,7 +153,7 @@ function stubEngine(
 ) {
   // SYNC_KEEPWARM_MS for this test.
   if (keepWarmMs !== undefined) resetPresence({ keepWarmMs });
-  return new SyncEngine({
+  const engine = new SyncEngine({
     mode: "window",
     inUse: () => presence().inUse(),
     generation: 1,
@@ -158,6 +163,8 @@ function stubEngine(
     steps: [],
     ...options,
   });
+  engines.push(engine);
+  return engine;
 }
 
 /** Seconds of the fake clock, as a block timestamp. */
@@ -378,7 +385,8 @@ describe("activity window", () => {
     expect(seen.length).toBeGreaterThan(later);
     expect(seen.slice(later).every((s) => !s.viewing)).toBe(true);
     engine.stop();
-  });
+    // A simulated day of 2 s polls: about 1 s alone, longer when the suite runs under load.
+  }, 30_000);
 
   it("is off on a dev node: requests read on demand", async () => {
     const { chain, pollHead } = stubChain({ timestamp: nowSeconds() });

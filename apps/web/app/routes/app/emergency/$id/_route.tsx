@@ -26,6 +26,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CallList } from "@/components/verification/calls";
 import { type AsOfBlock, AsOfContent, AsOfNote } from "@/components/verification/as-of";
+import {
+  NotReReadNote,
+  PageCurrency,
+  useContentCurrency,
+} from "@/components/verification/content-currency";
 import { ExecutionPanel, SimulationResult } from "@/components/verification/execution-panel";
 import { type Refresh, setCurrency } from "@/components/verification/freshness";
 import {
@@ -48,7 +53,7 @@ import {
   defer,
   json,
 } from "@remix-run/node";
-import { Await, useFetcher, useLoaderData } from "@remix-run/react";
+import { Await, useAsyncError, useFetcher, useLoaderData } from "@remix-run/react";
 import { CheckCircle2, FileJson, Upload, XCircle } from "lucide-react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { $path } from "remix-routes";
@@ -152,7 +157,12 @@ export default function EmergencyPage() {
     <Suspense fallback={reading}>
       <Await resolve={lastShown ?? null}>
         {(held) => (
-          <UntilFresh stale={!!held} fresh={detail}>
+          <UntilFresh
+            stale={!!held}
+            fresh={detail}
+            // The current read failed: the page's error, as without the upgrade as last shown.
+            failed={held ? <Rethrow /> : undefined}
+          >
             {(fresh, refresh) =>
               held && !fresh ? (
                 <HeldDetail held={held} refresh={refresh} />
@@ -167,6 +177,11 @@ export default function EmergencyPage() {
       </Await>
     </Suspense>
   );
+}
+
+/** Hands the deferred read's error to the route's error boundary (as an Await without one does). */
+function Rethrow(): null {
+  throw useAsyncError();
 }
 
 /**
@@ -209,6 +224,7 @@ function HeldDetail({
             id={d.id}
             check={Promise.resolve(null)}
             historical={executedHistorical}
+            download={false}
           />
         </AsOfContent>
       )}
@@ -235,22 +251,29 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
     const stored = loadPayload(d.id);
     if (stored) setCheck(checkEmergencyPayload(stored, d.id as Hex, board as Hex));
   }, [d.id, board, executed]);
+  // Its state as the beats name it: one not read again at the head served now is shown as of its
+  // block, in no colour, and nothing is signed or sent from the page until it is.
+  const watchKey = `emergency:${d.id.toLowerCase()}`;
+  const { behind } = useContentCurrency(watchKey);
 
-  return (
+  const page = (
     <div className="space-y-10">
       <PageHeader
         back={{ to: $path("/app/emergency"), label: "Emergency upgrades" }}
         eyebrow="Emergency upgrade"
         title="Emergency upgrade"
         badges={
-          executed ? (
-            <Badge variant="success">Executed</Badge>
-          ) : (
-            <Badge variant="warning">Not executed</Badge>
-          )
+          <AsOfContent asOf={null} stale={behind !== null} className="inline-flex">
+            {executed ? (
+              <Badge variant="success">Executed</Badge>
+            ) : (
+              <Badge variant="warning">Not executed</Badge>
+            )}
+          </AsOfContent>
         }
         id={d.id}
       />
+      <NotReReadNote watchKey={watchKey} what="Its state, and whether it was executed," />
 
       {executed ? (
         <Suspense
@@ -266,12 +289,17 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
           >
             {(execution) =>
               execution ? (
-                <ExecutedContent
-                  execution={execution}
-                  id={d.id}
-                  check={executedCheck}
-                  historical={executedHistorical}
-                />
+                // Not re-read at the head served now: as of its block, in no colour, and
+                // nothing to download from it.
+                <AsOfContent asOf={null} stale={behind !== null}>
+                  <ExecutedContent
+                    execution={execution}
+                    id={d.id}
+                    check={executedCheck}
+                    historical={executedHistorical}
+                    download={behind === null}
+                  />
+                </AsOfContent>
               ) : (
                 <EmptyState>
                   No emergency execution event was found for this id. The completed state alone does
@@ -318,6 +346,11 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
       </Suspense>
     </div>
   );
+  return (
+    <PageCurrency watchKey={watchKey} what="The emergency upgrade's state">
+      {page}
+    </PageCurrency>
+  );
 }
 
 /** Where the execution's calls came from, while this run's log index has not confirmed it yet. */
@@ -341,6 +374,7 @@ function ExecutedContent({
   id,
   check,
   historical,
+  download = true,
 }: {
   execution: SerializeFrom<EmergencyExecutionFirst>;
   id: string;
@@ -348,6 +382,11 @@ function ExecutedContent({
   check: Promise<unknown>;
   /** The board's checks re-run at the block before this execution. */
   historical: Promise<SerializeFrom<EmergencyHistorical> | null>;
+  /**
+   * Offer the upgrade file (to copy or download); never from the view held after a pause (as of
+   * an older block: nothing to sign, send or download from it), as on the upgrade page.
+   */
+  download?: boolean;
 }) {
   const provenance = provenanceOf(execution);
   return (
@@ -399,7 +438,9 @@ function ExecutedContent({
         ]}
       />
       <CallList calls={execution.calls} />
-      <UpgradeFile proposal={execution.proposal} name={`emergency-${id.slice(0, 10)}`} />
+      {download && (
+        <UpgradeFile proposal={execution.proposal} name={`emergency-${id.slice(0, 10)}`} />
+      )}
     </Section>
   );
 }

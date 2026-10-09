@@ -176,3 +176,56 @@ it("shows what live updates do in a floating note outside the header: the header
   render(<AppShell status={status(READY)}>page</AppShell>);
   expect(screen.queryByTestId("live-note")).not.toBeInTheDocument();
 });
+
+it("names the served head only over a status read there too; otherwise the status's own block, with a banner saying it was not re-read", () => {
+  const root = status(READY);
+  const own = root.governance.latestBlock;
+  const served = { number: "21000070", hash: "0x01", timestamp: "1790000072" };
+  const pill = () => screen.getByTestId("block-age").getAttribute("title") ?? "";
+  // The status was read again at the served head: the header names that head.
+  const current = render(
+    <LiveStateProvider
+      value={{
+        ...INITIAL_LIVE,
+        head: served,
+        notedAt: { status: { rev: "1", block: served.number } },
+      }}
+    >
+      <AppShell status={root}>page</AppShell>
+    </LiveStateProvider>
+  );
+  expect(pill()).toContain(`Block ${served.number}`);
+  expect(screen.queryByTestId("status-not-reread")).not.toBeInTheDocument();
+  expect(screen.getByTestId("network-dot")).toHaveClass("bg-green-500");
+  current.unmount();
+  // Not read again since its own block: the header names that block (its age grows), never the
+  // newer head over it, and a banner says the trust checks are as of it.
+  const behind = render(
+    <LiveStateProvider
+      value={{
+        ...INITIAL_LIVE,
+        head: served,
+        notedAt: { status: { rev: "1", block: own.number } },
+      }}
+    >
+      <AppShell status={root}>page</AppShell>
+    </LiveStateProvider>
+  );
+  expect(pill()).toContain(`Block ${own.number}`);
+  expect(screen.getByTestId("status-not-reread")).toHaveTextContent(
+    "Status not re-read since block #21,000,064."
+  );
+  expect(screen.getByTestId("status-not-reread")).toHaveTextContent("#21,000,070");
+  // Never in a passing colour over it.
+  expect(screen.getByTestId("network-dot")).not.toHaveClass("bg-green-500");
+  expect(screen.getByTestId("network-pill")).toHaveAttribute("data-stale", "true");
+  behind.unmount();
+  // Before the first beat, or for a status the beats do not name (a reload on its way): its own.
+  render(
+    <LiveStateProvider value={{ ...INITIAL_LIVE, head: served }}>
+      <AppShell status={root}>page</AppShell>
+    </LiveStateProvider>
+  );
+  expect(pill()).toContain(`Block ${own.number}`);
+  expect(screen.queryByTestId("status-not-reread")).not.toBeInTheDocument();
+});

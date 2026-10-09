@@ -446,6 +446,190 @@ describe("a set the engine could not verify at the served head (D2: current at M
   });
 });
 
+describe("every item on screen says the head its content was noted at (notedAt), like sets", () => {
+  it("the status, an upgrade's state, a list and a receipt: named at the served head while read there; behind it, at the block last read, while the head's reads fail; nothing for content the tab no longer shows", async () => {
+    const failing = { on: false };
+    const hash: Hex = `0x${"7e".repeat(32)}`;
+    const w = liveWorld({
+      // Every contract read fails (an RPC fault), and so does the receipt's.
+      aggregateError: () => (failing.on ? new FakeRpcError(-32603, "internal error") : undefined),
+      inject: () => (failing.on ? new FakeRpcError(-32603, "internal error") : undefined),
+      receipt: () =>
+        failing.on ? new FakeRpcError(-32603, "internal error") : fakeReceipt(hash, HEAD - 2n),
+    });
+    w.upgrades.set(ID.toLowerCase(), {
+      state: UPGRADE_STATES.LegalVetoPeriod,
+      status: [1_790_000_000, 0, false, false, false],
+    });
+    await backfilled();
+    noteRequest(pageGet(`/app/proposals/${ID}`));
+    const head = await settle(latestBlock());
+    const loaded = await settle(appStatus({ freshness: "page" }));
+    if (!loaded.ok) throw new Error(loaded.error);
+    const items = [
+      noteContent(
+        "status",
+        { head: BigInt(loaded.governance.latestBlock.number) },
+        statusContent(loaded)
+      ),
+      noteContent(
+        watchKeys.upgrade(ID),
+        { head: head.number },
+        idContent(await settle(currentUpgradeStatus(ID)))
+      ),
+      noteContent(
+        watchKeys.tx(hash),
+        { head: head.number },
+        receiptContent(await settle(pageReceipt(hash)))
+      ),
+    ];
+    beat(items);
+    await until(() => syncEngineStatus().ticks >= 1);
+    let answer = await beatThroughRoute(items);
+    for (let i = 0; i < 3; i++) {
+      w.nextBlock();
+      await vi.advanceTimersByTimeAsync(SLOT_MS);
+      answer = await beatThroughRoute(items);
+      expect(answer.changed).toEqual([]);
+      for (const item of items)
+        expect(answer.notedAt[item.key]).toEqual({ rev: item.rev, block: answer.head?.number });
+    }
+    const lastGood = answer.head?.number as string;
+    // The upgrade's legal veto ends at the next block, and every read fails from now on: none
+    // of it is read again at the new heads, and the tab is told so (never the old as current).
+    w.upgrades.set(ID.toLowerCase(), {
+      state: UPGRADE_STATES.Waiting,
+      status: [1_790_000_000, 0, false, false, false],
+    });
+    failing.on = true;
+    for (let i = 0; i < 4; i++) {
+      w.nextBlock();
+      await vi.advanceTimersByTimeAsync(SLOT_MS);
+      answer = await beatThroughRoute(items);
+      expect(answer.changed).toEqual([]);
+      expect(BigInt(answer.head?.number as string)).toBeGreaterThan(BigInt(lastGood));
+      for (const item of items)
+        expect(answer.notedAt[item.key]).toEqual({ rev: item.rev, block: lastGood });
+    }
+    // A tab showing other content than the current: nothing named for it.
+    const other = await beatThroughRoute(items.map((item) => ({ key: item.key, rev: "0" })));
+    expect(other.notedAt).toEqual({});
+    // The reads answer again: the upgrade's new state is learnt (the tab reloads), the rest is
+    // named at the head again.
+    failing.on = false;
+    w.nextBlock();
+    await vi.advanceTimersByTimeAsync(SLOT_MS);
+    answer = await beatThroughRoute(items);
+    expect(answer.changed).toEqual([watchKeys.upgrade(ID)]);
+    expect(answer.notedAt.status).toEqual({ rev: items[0]?.rev, block: answer.head?.number });
+    expect(answer.notedAt[watchKeys.tx(hash)]).toEqual({
+      rev: items[2]?.rev,
+      block: answer.head?.number,
+    });
+  });
+
+  it("a beat while the content pass at a new head runs names the head before it (for 2 s at most), so nothing reads as not re-read only because its pass had not finished", async () => {
+    const hash: Hex = `0x${"7f".repeat(32)}`;
+    // The receipt (above the finality boundary: read at each head) answers slowly when asked to.
+    const slow = { ms: 0 };
+    const w = liveWorld({
+      receipt: () => fakeReceipt(hash, HEAD - 2n),
+      delayMs: (post) =>
+        post.calls.some((call) => call.method === "eth_getTransactionReceipt") ? slow.ms : 0,
+    });
+    await backfilled();
+    noteRequest(pageGet(`/app/transactions/${hash}`));
+    const head = await settle(latestBlock());
+    const item = noteContent(
+      watchKeys.tx(hash),
+      { head: head.number },
+      receiptContent(await settle(pageReceipt(hash)))
+    );
+    beat([item]);
+    await until(() => syncEngineStatus().ticks >= 1);
+    await nextBlock(w, item);
+    const before = (await beatThroughRoute([item])).head?.number as string;
+    /** A new block, run until the engine serves it; then the tab beats at once. */
+    const served = async () => {
+      w.nextBlock();
+      const next = w.head().toString();
+      await until(
+        () => syncEngineStatus().head?.number === next && !!syncEngineStatus().head?.servedAt,
+        13_000
+      );
+      return next;
+    };
+    // The content pass at the new head takes 1 s (the receipt's read): meanwhile the beat names
+    // the head before it, at which the receipt was read; then the new one.
+    slow.ms = 1_000;
+    let next = await served();
+    let answer = await beatThroughRoute([item]);
+    expect(answer.head?.number).toBe(before);
+    expect(answer.notedAt[item.key]?.block).toBe(before);
+    await vi.advanceTimersByTimeAsync(1_200);
+    answer = await beatThroughRoute([item]);
+    expect(answer.head?.number).toBe(next);
+    expect(answer.notedAt[item.key]?.block).toBe(next);
+    // A pass slower than 2 s: the new head is named after 2 s, and the receipt as of the block
+    // before it until its read there is done.
+    await vi.advanceTimersByTimeAsync(SLOT_MS);
+    slow.ms = 6_000;
+    const previous = (await beatThroughRoute([item])).head?.number as string;
+    next = await served();
+    expect((await beatThroughRoute([item])).head?.number).toBe(previous);
+    await vi.advanceTimersByTimeAsync(2_100);
+    answer = await beatThroughRoute([item]);
+    expect(answer.head?.number).toBe(next);
+    expect(answer.notedAt[item.key]?.block).toBe(previous);
+    await vi.advanceTimersByTimeAsync(5_000);
+    answer = await beatThroughRoute([item]);
+    expect(answer.notedAt[item.key]?.block).toBe(next);
+  });
+});
+
+describe("an open set while Safe answers nothing (this IP's monthly quota used up)", () => {
+  it("is verified at every served head as a request would give it (members Safe cannot answer for unavailable, never missing), so the beat never leaves it behind the head", async () => {
+    const w = liveWorld();
+    const params = openSet();
+    w.signInSafe(SC_MEMBERS[0] as Address, params.typedData, ecdsa(811));
+    const first = await openPage(params);
+    expect(first.members.map((m) => m.status)).toEqual(["valid", "missing", "missing"]);
+    let item = first.watch as { key: string; rev: string };
+    for (let i = 0; i < 2; i++) await nextBlock(w, item);
+    // Safe's quota is used up: the watcher's next check gets a 429, and from then on every
+    // request to Safe fails at once until the quota resets.
+    w.safeQuota.exhausted = true;
+    const behind: string[] = [];
+    let reloads = 0;
+    for (let i = 0; i < 15; i++) {
+      w.nextBlock();
+      await vi.advanceTimersByTimeAsync(SLOT_MS);
+      let answer = await beatThroughRoute([item]);
+      if (answer.changed.includes(item.key)) {
+        // The content changed (the members now unavailable): the tab reloads, from memory.
+        reloads++;
+        const reloaded = await settle(verifyPageSignatureSet(params));
+        expect(reloaded.members.map((m) => m.status)).toEqual([
+          "valid",
+          "unavailable",
+          "unavailable",
+        ]);
+        item = reloaded.watch as { key: string; rev: string };
+        answer = await beatThroughRoute([item]);
+      }
+      const at = answer.verifiedAt[item.key]?.block;
+      if (at !== answer.head?.number) behind.push(answer.head?.number as string);
+    }
+    expect(reloads).toBe(1);
+    expect(behind).toEqual([]);
+    // The label says why Safe is not checked.
+    expect((await beatThroughRoute([item])).checked[item.key]).toMatchObject({
+      state: "paused",
+      reason: "quota-exhausted",
+    });
+  });
+});
+
 describe("R-D4: JSON never answers with a page's result from a copy older than 60 s", () => {
   it("a page result the engine computed from a watched copy past 60 s (the page rule) is not JSON's at the same head: JSON reads that Safe itself", async () => {
     const w = liveWorld();
@@ -1027,6 +1211,58 @@ describe("Fetch signatures (POST /resources/safe-check)", () => {
   });
 });
 
+describe("an open set's page next to a list fed by Safe (two visible tabs)", () => {
+  it("the set's members stay within the page bound while the list's Safes are watched too, so the beat never reports the set behind while nothing changed", async () => {
+    const w = liveWorld();
+    const params = openSet();
+    w.signInSafe(SC_MEMBERS[0] as Address, params.typedData, ecdsa(901));
+    await backfilled();
+    // Tab two: the emergency list (the Safes of the Council, the Guardians and the Foundation).
+    noteRequest(pageGet("/app/emergency"));
+    const key = watchKeys.emergencies(false);
+    const head = await settle(latestBlock());
+    const list = loadEmergencyList({ freshness: "page" });
+    const [pending, executed] = await settle(Promise.all([list.freshPending, list.executed]));
+    const listItem = noteContent(
+      key,
+      { head: head.number },
+      emergencyListContent(pending, executed)
+    );
+    // Tab one: the open set.
+    noteRequest(pageGet(`/app/proposals/${ID}`));
+    watchSignatureSet(params);
+    const set = await settle(verifyPageSignatureSet(params));
+    const setItem = set.watch as { key: string; rev: string };
+    presence().beat({ tab: "tab-two-under-test", reason: "interval", items: [listItem] });
+    presence().beat({ tab: "tab-one-under-test", reason: "interval", items: [setItem] });
+    await until(() => syncEngineStatus().ticks >= 1);
+    const tabBeat = async (tab: string, items: { key: string; rev: string | null }[]) => {
+      const response = (await beatAction({
+        request: new Request("http://localhost/resources/presence", {
+          method: "POST",
+          headers: { "content-type": "application/json", "sec-fetch-site": "same-origin" },
+          body: JSON.stringify({ tab, reason: "interval", items }),
+        }),
+        params: {},
+        context: {},
+      } as never)) as Response;
+      return (await response.json()) as BeatAnswer;
+    };
+    const behind: number[] = [];
+    for (let i = 0; i < 100; i++) {
+      w.nextBlock();
+      await vi.advanceTimersByTimeAsync(SLOT_MS);
+      await tabBeat("tab-two-under-test", [listItem]);
+      const answer = await tabBeat("tab-one-under-test", [setItem]);
+      expect(answer.changed).toEqual([]);
+      const at = answer.verifiedAt[setItem.key]?.block;
+      if (!at || BigInt(at) < BigInt(answer.head?.number as string)) behind.push(i);
+    }
+    expect(behind).toEqual([]);
+    expect(safeStoreStatus().watched).toMatchObject({ safes: 2, lists: 5 });
+  });
+});
+
 describe("a list fed by Safe on screen (the veto list)", () => {
   it("each beat's answer says when its Safes were checked and when they are next, moving with every check although the list stays the same (no reload)", async () => {
     const w = liveWorld();
@@ -1068,7 +1304,11 @@ describe("a list fed by Safe on screen (the veto list)", () => {
     // equal timestamps make ambiguous).
     expect(cost.checks).toBe(G_MEMBERS.length);
     expect(cost.listings).toBeLessThanOrEqual(1);
-    expect(Date.parse(check?.checkedAt as string) - first).toBeGreaterThanOrEqual(290_000);
+    // Copies read together are checked again spread over one cadence (safe/store.ts checkQueue):
+    // the oldest one is now one checked since, at least a cadence / count later.
+    expect(Date.parse(check?.checkedAt as string) - first).toBeGreaterThanOrEqual(
+      300_000 / G_MEMBERS.length - 1_000
+    );
     expect(Date.parse(check?.nextAt as string) - Date.now()).toBeLessThanOrEqual(300_000);
     // Nobody looks any more: the answer for a list nobody shows is not given.
     presence().beat({ tab: "tab-under-test", reason: "leave", items: [] });

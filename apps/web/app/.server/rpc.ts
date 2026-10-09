@@ -11,12 +11,12 @@ import {
   numberToHex,
 } from "viem";
 import { zksync } from "viem/chains";
-import { FOREVER, cached, cachedUntil, invalidate, peek, replace } from "./cache";
+import { FOREVER, cached, cachedUntil, concurrencyLimit, invalidate, peek, replace } from "./cache";
 import { type Lane, RpcError, createLane } from "./chain/jsonrpc";
 import { type LimitedHttpOptions, limitedHttp } from "./rpc-transport";
 import { countUpstream } from "./sync/cost";
 import { provideHeads } from "./sync/last-shown";
-import { creditsOf, paceEngineRequest } from "./sync/pacer";
+import { creditsOf, isEngineWork, paceAsEngine, paceEngineRequest } from "./sync/pacer";
 
 // Public RPCs throttle bursts, so every client funnels requests through a small pool and backs
 // off on 429 (viem retries rate-limit errors with exponential delay: 0.5, 1, 2, 4, 8 s).
@@ -58,8 +58,22 @@ const L2_TRANSPORT: LimitedHttpOptions = {
   onRequest: () => countL2(),
 };
 
-let transport = limitedHttp(env.L1_RPC_URL, L1_TRANSPORT);
+// The sync engine's own reads through viem go through clients of their own, on the same
+// connections (one in-flight limit): a request's read never shares a Multicall3 call with the
+// engine's (so it never waits for the engine's pace), and every request those clients send is the
+// engine's, paced and dropped once the engine may no longer send (sync/pacer.ts), however viem
+// scheduled it (a Multicall3 batch's timer, a retry).
+const engineOf = (options: LimitedHttpOptions, limit: ReturnType<typeof concurrencyLimit>) => ({
+  ...options,
+  limit,
+  pace: paceAsEngine,
+});
+
+let l1Limit = concurrencyLimit(L1_TRANSPORT.maxInFlight);
+let transport = limitedHttp(env.L1_RPC_URL, { ...L1_TRANSPORT, limit: l1Limit });
+let engineTransport = limitedHttp(env.L1_RPC_URL, engineOf(L1_TRANSPORT, l1Limit));
 let direct = createPublicClient({ transport });
+let engineDirect = createPublicClient({ transport: engineTransport });
 const makeBatched = (transport: Transport) =>
   createPublicClient({
     chain: {
@@ -76,12 +90,23 @@ const makeBatched = (transport: Transport) =>
   });
 
 let batched = makeBatched(transport);
+let engineBatched = makeBatched(engineTransport);
 let useMulticall = false;
 
-/** L1 client: batched through Multicall3 once the chain is known to have it. */
+/**
+ * L1 client: batched through Multicall3 once the chain is known to have it; the engine's own
+ * client for the engine's work (see engineOf).
+ */
 export const l1 = new Proxy({} as PublicClient, {
   get: (_, property) => {
-    const client = (useMulticall ? batched : direct) as unknown as Record<PropertyKey, unknown>;
+    const engine = isEngineWork();
+    const client = (useMulticall
+      ? engine
+        ? engineBatched
+        : batched
+      : engine
+        ? engineDirect
+        : direct) as unknown as Record<PropertyKey, unknown>;
     return client[property];
   },
 });
@@ -89,17 +114,28 @@ export const l1 = new Proxy({} as PublicClient, {
 // Its own connections, and no JSON-RPC batching (viem batches per URL across clients): a slow
 // 'latest' read on `l1` (governance, Safe info) never shares a POST with a head's state read, so
 // it cannot hold that read up (nor, through the sync engine's state step, the next heads' reads).
-let stateTransport = limitedHttp(env.L1_RPC_URL, L1_STATE_TRANSPORT);
+let stateLimit = concurrencyLimit(L1_STATE_TRANSPORT.maxInFlight);
+let stateTransport = limitedHttp(env.L1_RPC_URL, { ...L1_STATE_TRANSPORT, limit: stateLimit });
+let stateEngineTransport = limitedHttp(env.L1_RPC_URL, engineOf(L1_STATE_TRANSPORT, stateLimit));
 let stateDirect = createPublicClient({ transport: stateTransport });
 let stateBatched = makeBatched(stateTransport);
+let stateEngineDirect = createPublicClient({ transport: stateEngineTransport });
+let stateEngineBatched = makeBatched(stateEngineTransport);
 
-/** L1 client for contract state at a pinned block (upgrade states); Multicall3 as `l1`. */
+/**
+ * L1 client for contract state at a pinned block (upgrade states); Multicall3 as `l1`, and the
+ * engine's own client for the engine's work as `l1`.
+ */
 export const l1State = new Proxy({} as PublicClient, {
   get: (_, property) => {
-    const client = (useMulticall ? stateBatched : stateDirect) as unknown as Record<
-      PropertyKey,
-      unknown
-    >;
+    const engine = isEngineWork();
+    const client = (useMulticall
+      ? engine
+        ? stateEngineBatched
+        : stateBatched
+      : engine
+        ? stateEngineDirect
+        : stateDirect) as unknown as Record<PropertyKey, unknown>;
     return client[property];
   },
 });
@@ -1038,12 +1074,20 @@ export function resetRpcClients() {
   newestHead = null;
   rereading = null;
   headInFlight = null;
-  transport = limitedHttp(env.L1_RPC_URL, L1_TRANSPORT);
+  l1Limit = concurrencyLimit(L1_TRANSPORT.maxInFlight);
+  transport = limitedHttp(env.L1_RPC_URL, { ...L1_TRANSPORT, limit: l1Limit });
+  engineTransport = limitedHttp(env.L1_RPC_URL, engineOf(L1_TRANSPORT, l1Limit));
   direct = createPublicClient({ transport });
+  engineDirect = createPublicClient({ transport: engineTransport });
   batched = makeBatched(transport);
-  stateTransport = limitedHttp(env.L1_RPC_URL, L1_STATE_TRANSPORT);
+  engineBatched = makeBatched(engineTransport);
+  stateLimit = concurrencyLimit(L1_STATE_TRANSPORT.maxInFlight);
+  stateTransport = limitedHttp(env.L1_RPC_URL, { ...L1_STATE_TRANSPORT, limit: stateLimit });
+  stateEngineTransport = limitedHttp(env.L1_RPC_URL, engineOf(L1_STATE_TRANSPORT, stateLimit));
   stateDirect = createPublicClient({ transport: stateTransport });
   stateBatched = makeBatched(stateTransport);
+  stateEngineDirect = createPublicClient({ transport: stateEngineTransport });
+  stateEngineBatched = makeBatched(stateEngineTransport);
   useMulticall = false;
   l2Client = undefined;
   l1Lanes?.history.close();

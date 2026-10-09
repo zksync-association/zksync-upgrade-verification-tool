@@ -1002,10 +1002,11 @@ export function formatWindow(label: string, w: WindowSummary): string {
   const errors = Object.keys({
     ...w.l1.errors,
     ...w.l1.httpErrors,
+    ...w.era.errors,
     ...w.era.httpErrors,
     ...w.safe.httpErrors,
   }).length
-    ? ` · errors ${JSON.stringify({ l1: { ...w.l1.errors, ...w.l1.httpErrors }, era: w.era.httpErrors, safe: w.safe.httpErrors })}`
+    ? ` · errors ${JSON.stringify({ l1: { ...w.l1.errors, ...w.l1.httpErrors }, era: { ...w.era.errors, ...w.era.httpErrors }, safe: w.safe.httpErrors })}`
     : "";
   const unknown = w.unknownRpc > 0 ? ` · RPC of unknown chain ${w.unknownRpc}` : "";
   const inFlight = w.inFlight > 0 ? ` · ${w.inFlight} unanswered at the end` : "";

@@ -516,28 +516,30 @@ describe("the watcher", () => {
   });
 
   it("C-2: stretches the cadence when Safe reports little quota left, and never spends above the hourly budget", async () => {
-    // The guard: T_eff = T x max(1, demand / allowance), allowance = min(budget, (remaining -
-    // 20 % of limit) / (hours to reset x 0.25)).
+    // The guard: T_eff = T x max(1, demand / (0.8 x allowance)), allowance = min(budget,
+    // (remaining - 20 % of limit) / (hours to reset x 0.25)): planned at 80 % of what it may
+    // use, the rest is room to catch up.
     await load();
     const now = Date.now();
     const base = { set: 60_000, list: 300_000 };
     const measured = { limit: 50_000, remaining: 37_783, resetAt: now + 678 * 3_600_000 };
     const t = store.watchCadence({ set: 16, list: 0 }, base, measured, now, 1_200);
-    // (37,783 - 10,000) / (678 h x 0.25) = 163.9 an hour: 16 Safes about every 5.9 minutes.
+    // (37,783 - 10,000) / (678 h x 0.25) = 163.9 an hour, 131.1 planned: 16 Safes about every
+    // 7.3 minutes.
     expect(t.allowancePerHour).toBeCloseTo(163.9, 0);
-    expect(t.set / 1000).toBeCloseTo((16 * 3_600) / 163.9, -1);
-    // 8 Safes: 480 an hour wanted, 163.9 allowed: every 2.9 minutes.
+    expect(t.set / 1000).toBeCloseTo((16 * 3_600) / (0.8 * 163.9), -1);
+    // 8 Safes: 480 an hour wanted, 131.1 planned: every 3.7 minutes.
     expect(
       store.watchCadence({ set: 8, list: 0 }, base, measured, now, 1_200).set / 1000
-    ).toBeCloseTo((8 * 3_600) / 163.9, -1);
-    // Without quota headers, the budget alone: 16 at 60 s fit 1,200; 25 do not (75 s).
+    ).toBeCloseTo((8 * 3_600) / (0.8 * 163.9), -1);
+    // Without quota headers, the budget alone: 16 at 60 s fit 80 % of 1,200; 25 do not (94 s).
     const none = { limit: null, remaining: null, resetAt: null };
     expect(store.watchCadence({ set: 16, list: 0 }, base, none, now, 1_200).set).toBe(60_000);
-    expect(store.watchCadence({ set: 25, list: 0 }, base, none, now, 1_200).set).toBe(75_000);
+    expect(store.watchCadence({ set: 25, list: 0 }, base, none, now, 1_200).set).toBe(93_750);
     // Lists and sets share the allowance.
     const both = store.watchCadence({ set: 16, list: 17 }, base, none, now, 1_000);
-    expect(both.set).toBeCloseTo((60_000 * (960 + 204)) / 1_000, 0);
-    expect(both.list).toBeCloseTo((300_000 * (960 + 204)) / 1_000, 0);
+    expect(both.set).toBeCloseTo((60_000 * (960 + 204)) / 800, 0);
+    expect(both.list).toBeCloseTo((300_000 * (960 + 204)) / 800, 0);
     // Nothing left above the reserve, or no budget: none at all.
     const low = { limit: 50_000, remaining: 9_000, resetAt: now + 3_600_000 };
     expect(store.watchCadence({ set: 1, list: 0 }, base, low, now, 1_200).set).toBe(
@@ -548,7 +550,7 @@ describe("the watcher", () => {
     );
 
     // Live, with Safe's quota early in its period (49,113 of 50,000 left, ~29.8 days to reset):
-    // 16 Safes about every 4.4 minutes.
+    // 218.5 an hour allowed, 174.8 planned: 16 Safes about every 5.5 minutes.
     const safe = fakeSafe();
     safe.headers = QUOTA_HEADERS;
     const members = safes(16);
@@ -557,18 +559,20 @@ describe("the watcher", () => {
     store.startSafeWatch(watcher({ set: members }));
     await vi.advanceTimersByTimeAsync(3_600_000);
     const effective = store.safeStoreStatus().watched?.effectiveCadenceMs.set as number;
-    expect(effective / 1000).toBeGreaterThan(250);
-    expect(effective / 1000).toBeLessThan(280);
+    expect(effective / 1000).toBeGreaterThan(315);
+    expect(effective / 1000).toBeLessThan(345);
     // The status says why: the allowance the quota leaves, under the budget.
     const allowance = store.safeStoreStatus().watched?.allowancePerHour as number;
     expect(allowance).toBeLessThan(1_200);
-    expect(Math.abs(allowance - (16 * 3_600_000) / effective)).toBeLessThanOrEqual(1);
-    expect(background(safe, since).length).toBeLessThanOrEqual(
-      Math.ceil((16 * 3_600_000) / effective) + 1
-    );
+    expect(Math.abs(0.8 * allowance - (16 * 3_600_000) / effective)).toBeLessThanOrEqual(1);
+    // Within the allowance; about the planned rate (the copies read together are checked again
+    // spread over the first cadence, some of them early).
+    const checks = background(safe, since).length;
+    expect(checks).toBeLessThanOrEqual(allowance);
+    expect(checks).toBeLessThanOrEqual(Math.ceil((16 * 3_600_000) / effective) + 16);
 
-    // A budget of 4 an hour: 3 Safes each every 45 minutes, never more than 4 in an hour; a
-    // page still reads at once.
+    // A budget of 4 an hour: 3 Safes each every 56 minutes (80 % of 4 an hour), never more than
+    // 4 in an hour; a page still reads at once.
     store.stopSafeWatch();
     await load({ budget: 4 });
     const limited = fakeSafe();
@@ -576,7 +580,7 @@ describe("the watcher", () => {
     store.startSafeWatch(watcher({ set: W.slice(0, 3) }));
     await vi.advanceTimersByTimeAsync(3 * 3_600_000);
     expect(store.safeStoreStatus()).toMatchObject({
-      watched: { effectiveCadenceMs: { set: 45 * 60_000 } },
+      watched: { effectiveCadenceMs: { set: 56.25 * 60_000 } },
       budgetPerHour: 4,
     });
     const sent = background(limited, start).map((s) => s.at);
@@ -758,6 +762,15 @@ describe("the watcher", () => {
     // Only on request: a page (and Fetch signatures) still reads it.
     await within(1_000, store.listSafeMessages(A));
     expect(off.sent).toHaveLength(before + 1);
+    expect(store.safeCheckOf([A])).toMatchObject({ state: "on-request" });
+    // A request that finds Safe's monthly quota used up: the card says so, not "only on request".
+    await vi.advanceTimersByTimeAsync(61_000);
+    off.limited = 3_600;
+    off.exhausted = true;
+    await expect(within(1_000, store.listSafeMessages(A))).rejects.toThrow();
+    expect(store.safeCheckOf([A])).toMatchObject({ state: "paused", reason: "quota-exhausted" });
+    off.limited = null;
+    off.exhausted = false;
     store.stopSafeWatch();
 
     // A self-hosted service has no such limits: every minute.
@@ -1020,6 +1033,104 @@ describe("the copies a page may use (the page rule)", () => {
     expect(checks.every((s) => s.kind === "newest")).toBe(true);
     expect(checks.length).toBeGreaterThanOrEqual(16 * 9);
     expect(checks.length).toBeLessThanOrEqual(16 * 11);
+  });
+
+  // An open set's members and the Safes behind a list on screen at once (the set's page and the
+  // emergency list in two tabs), every copy read together by the pages: the list's Safes come due
+  // together, and must not hold the set's members (60 s) past their bound, nor the other way round.
+  const MIXED = [
+    { name: "no quota headers (the budget alone)", sets: 5, lists: 17, headers: {} },
+    { name: "Safe's quota early in its period", sets: 5, lists: 17, headers: QUOTA_HEADERS },
+    {
+      name: "a mainnet-like 149 an hour",
+      sets: 5,
+      lists: 17,
+      headers: {
+        "x-ratelimit-limit": "50000",
+        "x-ratelimit-remaining": "32350",
+        "x-ratelimit-reset": "2160000",
+      },
+    },
+    { name: "16 set and 17 list Safes, quota early", sets: 16, lists: 17, headers: QUOTA_HEADERS },
+    // A Safe whose reads keep failing is retried sooner than its cadence at first (15 s, 30 s, ...
+    // at most 5 min), which the plan does not count: its retries take only starts no kept copy
+    // needs, so the healthy copies stay within their bound.
+    {
+      name: "two list Safes failing, quota early",
+      sets: 5,
+      lists: 17,
+      headers: QUOTA_HEADERS,
+      failing: 2,
+      minutes: 60,
+    },
+    {
+      name: "three list Safes failing, 16 set Safes, quota early",
+      sets: 16,
+      lists: 17,
+      headers: QUOTA_HEADERS,
+      failing: 3,
+      minutes: 60,
+    },
+  ];
+  for (const mixed of MIXED)
+    it(`set and list Safes watched together (${mixed.name}): no healthy copy outside its page bound for ${mixed.minutes ?? 30} minutes, within the allowance`, async () => {
+      await load();
+      const safe = fakeSafe();
+      safe.latencyMs = 400;
+      safe.headers = mixed.headers;
+      const sets = safes(mixed.sets, 0x300);
+      const lists = safes(mixed.lists, 0x500);
+      for (const [i, member] of [...sets, ...lists].entries()) safe.add(member, i + 1);
+      store.startSafeWatch(watcher({ set: sets, list: lists }));
+      await vi.advanceTimersByTimeAsync(100);
+      await within(
+        10_000,
+        Promise.all([
+          ...sets.map((member) => store.listSafeMessagesForPage(member, "set")),
+          ...lists.map((member) => store.listSafeMessagesForPage(member, "list")),
+        ])
+      );
+      const failing = lists.slice(0, mixed.failing ?? 0);
+      for (const member of failing) safe.failing.add(member.toLowerCase());
+      const healthy = lists.slice(failing.length);
+      const minutes = mixed.minutes ?? 30;
+      const from = safe.sent.length;
+      const misses = { set: 0, list: 0 };
+      for (let t = 0; t < minutes * 60; t++) {
+        await vi.advanceTimersByTimeAsync(1_000);
+        for (const member of sets) if (store.pageSafeListing(member, "set") === null) misses.set++;
+        for (const member of healthy)
+          if (store.pageSafeListing(member, "list") === null) misses.list++;
+      }
+      expect(misses).toEqual({ set: 0, list: 0 });
+      const watched = store.safeStoreStatus().watched;
+      // Planned at 80 % of the allowance, never above it in any hour's share.
+      const allowance = watched?.allowancePerHour as number;
+      expect(safe.sent.length - from).toBeLessThanOrEqual((allowance * minutes) / 60);
+    });
+
+  it("set Safes with two of them failing and Fetch signatures on half of them every 3 minutes: the healthy copies stay within their bound", async () => {
+    await load();
+    const safe = fakeSafe();
+    safe.latencyMs = 400;
+    const members = safes(16, 0x300);
+    for (const [i, member] of members.entries()) safe.add(member, i + 1);
+    store.startSafeWatch(watcher({ set: members }));
+    await vi.advanceTimersByTimeAsync(100);
+    await within(
+      10_000,
+      Promise.all(members.map((member) => store.listSafeMessagesForPage(member, "set")))
+    );
+    safe.failing.add((members[0] as Address).toLowerCase());
+    safe.failing.add((members[1] as Address).toLowerCase());
+    const healthy = members.slice(2);
+    let misses = 0;
+    for (let t = 0; t < 30 * 60; t++) {
+      await vi.advanceTimersByTimeAsync(1_000);
+      if (t % 180 === 0) void store.checkSafesNow(members.slice(8));
+      for (const member of healthy) if (store.pageSafeListing(member, "set") === null) misses++;
+    }
+    expect(misses).toBe(0);
   });
 });
 

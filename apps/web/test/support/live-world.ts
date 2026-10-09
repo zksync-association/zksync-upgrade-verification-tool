@@ -233,6 +233,8 @@ export function liveWorld(options: Omit<FakeL1Options, "head" | "logs" | "upgrad
   const safeRequests: string[] = [];
   /** Member Safes (lower case) whose every request to Safe answers HTTP 500. */
   const safeFailing = new Set<string>();
+  /** While `exhausted`, Safe answers every request 429: this IP's monthly quota is used up. */
+  const safeQuota = { exhausted: false };
   /**
    * `member` signs the typed data in its Safe with `signature` (ECDSA, accepted by the contracts):
    * Safe's listing for it gets the message, with `modified` now. With `listed`, the message carries
@@ -265,6 +267,11 @@ export function liveWorld(options: Omit<FakeL1Options, "head" | "logs" | "upgrad
     const url = String(input);
     if (url.startsWith("https://api.safe.global/")) {
       safeRequests.push(url);
+      if (safeQuota.exhausted)
+        return new Response("Monthly quota exceeded", {
+          status: 429,
+          headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "86400" },
+        });
       const safe = /\/safes\/(0x[0-9a-fA-F]{40})\/messages\//.exec(url)?.[1]?.toLowerCase();
       if (safe && safeFailing.has(safe)) return new Response("Server error", { status: 500 });
       const all = [...((safe && listings.get(safe)) || [])];
@@ -289,6 +296,7 @@ export function liveWorld(options: Omit<FakeL1Options, "head" | "logs" | "upgrad
     sets,
     safeRequests,
     safeFailing,
+    safeQuota,
     signInSafe,
     /**
      * A new head, timestamped a second before now (call it every 12 s of the fake clock), with

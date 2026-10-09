@@ -64,6 +64,21 @@ describe("describeCall", () => {
     });
     expect(describeCall({})).toEqual({ m: "?" });
   });
+
+  it("copies only the named block tags (latest, finalized, safe, pending, earliest); any other text is 'other'", () => {
+    for (const tag of ["latest", "finalized", "safe", "pending", "earliest"])
+      expect(describeCall({ method: "eth_getBlockByNumber", params: [tag, false] })).toEqual({
+        m: "eth_getBlockByNumber",
+        tag,
+      });
+    const secret = "blk-private-request-text";
+    const call = describeCall({ method: "eth_call", params: [{ to: SAFE, data: "0x" }, secret] });
+    expect(call).toEqual({ m: "eth_call", sel: "none", tag: "other" });
+    expect(JSON.stringify(call)).not.toContain("blk-");
+    expect(
+      describeCall({ method: "eth_getLogs", params: [{ fromBlock: secret, toBlock: "latest" }] })
+    ).toEqual({ m: "eth_getLogs", tag: "other..latest" });
+  });
 });
 
 describe("safeRequest", () => {

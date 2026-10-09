@@ -97,7 +97,8 @@ export type LaneOptions = {
   onSend?: (requests: number, methods: readonly string[]) => void;
   /**
    * Asked as a request is made: a promise to wait for before it joins the queue (the sync
-   * engine's credit pacer, for the engine's own requests), or null to queue it at once.
+   * engine's credit pacer, for the engine's own requests), or null to queue it at once. A wait
+   * that rejects drops the request unsent ("aborted").
    */
   pace?: (method: string) => Promise<void> | null;
   /**
@@ -637,7 +638,15 @@ export function createLane(options: LaneOptions): Lane {
       } catch {
         // Pacing never fails a request.
       }
-      return wait ? wait.then(() => enqueue<T>(method, params)) : enqueue<T>(method, params);
+      // A wait that rejects: the request is dropped unsent (the sync engine's work once it may no
+      // longer send, sync/pacer.ts), an "aborted" LaneError like a reset's.
+      return wait
+        ? wait.then(
+            () => enqueue<T>(method, params),
+            () =>
+              Promise.reject(new LaneError("aborted", label, method, "dropped before it was sent"))
+          )
+        : enqueue<T>(method, params);
     },
     stats: () => ({
       label,

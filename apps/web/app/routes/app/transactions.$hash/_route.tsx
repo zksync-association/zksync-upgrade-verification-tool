@@ -10,6 +10,8 @@ import { useStatus } from "@/components/governance-context";
 import { TxLink } from "@/components/hex";
 import { PageHeader } from "@/components/page";
 import { Card } from "@/components/ui/card";
+import { AsOfContent } from "@/components/verification/as-of";
+import { NotReReadNote, useContentCurrency } from "@/components/verification/content-currency";
 import { formatEth } from "@/utils/format";
 import { notFound } from "@/utils/http";
 import { Meta } from "@/utils/meta";
@@ -54,9 +56,13 @@ const STATUS_READS = 3;
 
 export default function Transaction() {
   const { hash, receipt, followed } = useLoaderData<typeof loader>();
+  // A receipt not read again at the head served now: as of its block, in no colour.
+  const stale = useContentCurrency(`tx:${hash.toLowerCase()}`).behind !== null;
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Transaction" title="Transaction" id={hash} />
+      {/* A receipt not read again at the head served now: as of its block. */}
+      <NotReReadNote watchKey={`tx:${hash.toLowerCase()}`} what="The receipt's status below" />
       <Suspense
         fallback={
           <Card className="p-6">
@@ -68,12 +74,14 @@ export default function Transaction() {
       >
         <Await resolve={receipt}>
           {(answer) => (
-            <TransactionStatus
-              hash={hash}
-              receipt={answer.receipt as Receipt}
-              unread={answer.unread}
-              followed={followed}
-            />
+            <AsOfContent asOf={null} stale={stale}>
+              <TransactionStatus
+                hash={hash}
+                receipt={answer.receipt as Receipt}
+                unread={answer.unread}
+                followed={followed}
+              />
+            </AsOfContent>
           )}
         </Await>
       </Suspense>

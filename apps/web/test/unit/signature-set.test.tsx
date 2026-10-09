@@ -1,5 +1,10 @@
 import type { SignatureSet } from "@/.server/signatures";
 import { INITIAL_LIVE, type LiveState, LiveStateProvider } from "@/components/presence";
+import {
+  NotReReadNote,
+  PageCurrency,
+  contentCurrency,
+} from "@/components/verification/content-currency";
 import { SimulationResult } from "@/components/verification/execution-panel";
 import {
   EraBlockNote,
@@ -728,6 +733,100 @@ describe("a set the app did not verify at the head it serves now (a beat says wh
     expect(screen.queryByTestId("threshold-met")).not.toBeInTheDocument();
     expect(screen.getByTestId("check-again")).toBeInTheDocument();
     expect(screen.queryByTestId("fetch-signatures")).not.toBeInTheDocument();
+  });
+
+  it("the page's own item (an upgrade's state) not read again at the served head: labelled as of its block, and its sets' Sign and Send wait, saying why", () => {
+    wallet.address = MEMBER_C;
+    const page = (notedAt: LiveState["notedAt"]) =>
+      render(
+        <LiveStateProvider
+          value={live({
+            head: head("1003"),
+            verifiedAt: { "set:01": { rev: "7", block: "1003" } },
+            notedAt,
+          })}
+        >
+          <PageCurrency watchKey="upgrade:0x01" what="The upgrade's state">
+            <NotReReadNote watchKey="upgrade:0x01" what="The state and timeline below" />
+            <SignatureSetCard
+              title="Council"
+              set={metAt("1000", watch)}
+              state={{ status: "open" }}
+              execution={execution}
+            />
+          </PageCurrency>
+        </LiveStateProvider>
+      );
+    const behind = page({ "upgrade:0x01": { rev: "3", block: "1001" } });
+    expect(screen.getByTestId("not-reread")).toHaveTextContent(
+      "As of block #1,001 · not re-read at #1,003"
+    );
+    expect(screen.getByTestId("sign-button")).toBeDisabled();
+    expect(screen.getByTestId("sign-blocked")).toHaveTextContent(
+      "The upgrade's state was not read at block #1,003 yet."
+    );
+    expect(screen.getByTestId("send-transaction")).toBeDisabled();
+    expect(screen.getByTestId("send-blocked")).toHaveTextContent(
+      "The upgrade's state was not read at block #1,003 yet. Sending waits until it is read at the current block."
+    );
+    behind.unmount();
+    // Read again at the served head: nothing to say, and the set's own currency decides.
+    page({ "upgrade:0x01": { rev: "3", block: "1003" } });
+    expect(screen.queryByTestId("not-reread")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sign-button")).toBeEnabled();
+    expect(screen.queryByTestId("send-blocked")).not.toBeInTheDocument();
+  });
+
+  it("behind because Safe cannot be read (its monthly quota used up): the label keeps the reason and offers Fetch signatures, never 'checked again at each new block'; the Sign button says why, as text", () => {
+    wallet.address = undefined;
+    const paused = {
+      state: "paused" as const,
+      checkedAt: new Date(Date.now() - 300_000).toISOString(),
+      nextAt: null,
+      cadenceMs: null,
+      reason: "quota-exhausted",
+    };
+    const open = {
+      ...(metAt("1000", watch) as Record<string, unknown>),
+      safeCheck: paused,
+    } as never;
+    card(open, { head: head("1003"), verifiedAt: {} });
+    const label = screen.getByTestId("set-stale");
+    expect(label).toHaveTextContent(
+      "Verified at block #1,000 · not re-verified at #1,003 · Safe unavailable (Safe's monthly quota used up)"
+    );
+    expect(label).toHaveTextContent("Fetch signatures to retry");
+    expect(label).not.toHaveTextContent("checked again at each new block");
+    expect(screen.getByTestId("fetch-signatures")).toBeInTheDocument();
+    // Not connected: the reason is said beside the button, not only as its tooltip.
+    expect(screen.getByTestId("sign-blocked")).toHaveTextContent(
+      "Not verified at block #1,003 yet."
+    );
+  });
+
+  it("contentCurrency: behind only for an item the beats name at a block before the served head", () => {
+    const noted = { "list:upgrades": { rev: "2", block: "1001" } };
+    expect(contentCurrency("list:upgrades", { head: null, notedAt: noted })).toEqual({
+      block: "1001",
+      behind: null,
+    });
+    expect(contentCurrency("list:upgrades", { head: head("1001"), notedAt: noted })).toEqual({
+      block: "1001",
+      behind: null,
+    });
+    expect(contentCurrency("list:upgrades", { head: head("1002"), notedAt: noted })).toEqual({
+      block: "1001",
+      behind: "1002",
+    });
+    // Not named (a reload on its way, no revision yet, a dev node): nothing said.
+    expect(contentCurrency("list:freeze", { head: head("1002"), notedAt: noted })).toEqual({
+      block: null,
+      behind: null,
+    });
+    expect(contentCurrency(null, { head: head("1002"), notedAt: noted })).toEqual({
+      block: null,
+      behind: null,
+    });
   });
 
   it("the Safe check label: paused with the tab's updates, never a countdown then", () => {

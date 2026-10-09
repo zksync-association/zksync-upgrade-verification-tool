@@ -326,6 +326,7 @@ describe("POST /resources/presence", () => {
       head: { number: "26129107", hash: `0x${"ab".repeat(32)}`, timestamp: "1790000000" },
       checked: {},
       verifiedAt: {},
+      notedAt: {},
       eraAt: {},
       era: null,
       simulatedAt: {},

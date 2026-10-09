@@ -4,6 +4,7 @@ import { GROUP_LABEL, useConnectedGroups, useOfferWallet } from "@/components/co
 import { Hash } from "@/components/hex";
 import { useHoldUpdates, usePresence } from "@/components/presence";
 import { Button } from "@/components/ui/button";
+import { usePageNotCurrent } from "@/components/verification/content-currency";
 import {
   Dialog,
   DialogContent,
@@ -52,7 +53,10 @@ export function SignButton({
     : undefined;
   const isMember = groups.includes(signerGroup);
 
-  let reason = disabledReason;
+  // The page's own item (an upgrade's state) not read at the head served: signing waits too.
+  const page = usePageNotCurrent();
+  const blocked = disabledReason ?? page?.reason ?? null;
+  let reason = blocked;
   if (!reason && address && !known) reason = "Reading the governance roles…";
   if (!reason && address && !isMember)
     reason = `The connected account is not a ${GROUP_LABEL[signerGroup]} member Safe.`;
@@ -60,15 +64,23 @@ export function SignButton({
 
   if (!address) {
     return (
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={openConnectModal}
-        disabled={!!disabledReason}
-        title={disabledReason ?? undefined}
-      >
-        <PenLine /> Connect your Safe to sign
-      </Button>
+      <>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={openConnectModal}
+          disabled={!!blocked}
+          title={blocked ?? undefined}
+        >
+          <PenLine /> Connect your Safe to sign
+        </Button>
+        {/* Said, not only as a tooltip (a phone has none). */}
+        {blocked && (
+          <span className="text-slate-600 text-xs" data-testid="sign-blocked">
+            {blocked}
+          </span>
+        )}
+      </>
     );
   }
 
@@ -103,7 +115,11 @@ export function SignButton({
       >
         <PenLine /> Sign as {member?.label ?? GROUP_LABEL[signerGroup]}
       </Button>
-      {reason && <span className="text-slate-600 text-xs">{reason}</span>}
+      {reason && (
+        <span className="text-slate-600 text-xs" data-testid="sign-blocked">
+          {reason}
+        </span>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>

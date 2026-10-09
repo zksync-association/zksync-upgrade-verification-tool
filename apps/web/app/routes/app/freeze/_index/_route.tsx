@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SetStateBadge } from "@/components/verification/badges";
 import { CheckSafeNow } from "@/components/verification/check-safe-now";
+import { NotReReadNote, useContentCurrency } from "@/components/verification/content-currency";
 import { ListFreshnessNote, type Refresh } from "@/components/verification/freshness";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { cn } from "@/utils/cn";
@@ -143,8 +144,14 @@ function ProtocolFacts({
 function Requests({ result, refresh }: { result: SerializeFrom<FreezeList>; refresh: Refresh }) {
   const open = result.requests.filter((r) => r.state.status === "open");
   const rest = result.requests.filter((r) => r.state.status !== "open");
+  // The list as the beats name it: one not read again at the head served now is shown as of its
+  // block, in no colour.
+  const stale = useContentCurrency(result.stale ? null : "list:freeze").behind !== null;
   return (
     <div className="space-y-8">
+      {!result.stale && (
+        <NotReReadNote watchKey="list:freeze" what="The requests and their states below" />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <ListFreshnessNote
           watchKey="list:freeze"
@@ -170,22 +177,35 @@ function Requests({ result, refresh }: { result: SerializeFrom<FreezeList>; refr
               : "No open freeze request."}
           </EmptyState>
         ) : (
-          <Rows requests={open} testId="open-freezes" />
+          <Rows requests={open} testId="open-freezes" stale={stale} />
         )}
       </div>
       {rest.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-[22px] leading-7">Past</h2>
-          <Rows requests={rest} testId="past-freezes" />
+          <Rows requests={rest} testId="past-freezes" stale={stale} />
         </div>
       )}
     </div>
   );
 }
 
-function Rows({ requests, testId }: { requests: SerializeFrom<FreezeSummary>[]; testId: string }) {
+function Rows({
+  requests,
+  testId,
+  stale = false,
+}: {
+  requests: SerializeFrom<FreezeSummary>[];
+  testId: string;
+  /** Not read again at the head served now (content-currency.tsx). */
+  stale?: boolean;
+}) {
   return (
-    <Card className="divide-y divide-slate-100 overflow-hidden" data-testid={testId}>
+    <Card
+      className={cn("divide-y divide-slate-100 overflow-hidden", stale && "grayscale")}
+      data-testid={testId}
+      data-stale={stale ? "true" : undefined}
+    >
       {requests.map((r) => (
         <Link
           key={r.digest}

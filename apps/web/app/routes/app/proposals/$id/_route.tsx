@@ -18,6 +18,11 @@ import {
 } from "@/components/verification/last-run";
 import { SignatureSetCard } from "@/components/verification/signature-set";
 import { type AsOfBlock, AsOfContent, AsOfNote } from "@/components/verification/as-of";
+import {
+  NotReReadNote,
+  PageCurrency,
+  useContentCurrency,
+} from "@/components/verification/content-currency";
 import { UpgradeStateBadge } from "@/components/verification/badges";
 import type { Refresh } from "@/components/verification/freshness";
 import { Timeline } from "@/components/verification/timeline";
@@ -94,7 +99,13 @@ export default function UpgradePage() {
           {(first) => (
             // After a pause, the upgrade as last shown (as of its block) until the current one
             // replaces it.
-            <UntilFresh stale={first.asOf !== undefined} fresh={freshDetail}>
+            <UntilFresh
+              stale={first.asOf !== undefined}
+              fresh={freshDetail}
+              // The current read failed: its own error (not found, an integrity error), as
+              // without the upgrade as last shown, never that upgrade with a generic note.
+              failed={first.asOf !== undefined ? <DetailError id={id} /> : undefined}
+            >
               {(fresh, refresh) => (
                 <Detail
                   detail={fresh ?? first}
@@ -186,25 +197,32 @@ function Detail({
   };
   const now = Number(governance.latestBlock.timestamp);
   const anyone = d.started.proposal.executor.toLowerCase() === zeroAddress;
+  // The upgrade's state as the beats name it: one not read again at the head served now is shown
+  // as of its block, in no colour, and nothing is signed or sent from the page until it is.
+  const watchKey = `upgrade:${d.id.toLowerCase()}`;
+  const { behind } = useContentCurrency(asOf ? null : watchKey);
+  const stale = behind !== null;
 
-  return (
+  const page = (
     <div className="space-y-10">
       <PageHeader
         back={{ to: $path("/app/proposals"), label: "Upgrades" }}
         eyebrow="Protocol upgrade"
         title="Upgrade"
         badges={
-          <AsOfContent asOf={asOf} className="inline-flex">
+          <AsOfContent asOf={asOf} stale={stale} className="inline-flex">
             <UpgradeStateBadge state={d.state} />
           </AsOfContent>
         }
         id={d.id}
       />
-      {asOf && (
+      {asOf ? (
         <AsOfNote asOf={asOf} refresh={refresh} what="The state, timeline and calls below" />
+      ) : (
+        <NotReReadNote watchKey={watchKey} what="The state and timeline below" />
       )}
 
-      <AsOfContent asOf={asOf} className="space-y-10">
+      <AsOfContent asOf={asOf} stale={stale} className="space-y-10">
         <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
           <Facts
             items={[
@@ -356,7 +374,8 @@ function Detail({
           }
         >
           <CallList calls={d.calls} labels={labels} />
-          {!asOf && (
+          {/* Nothing to download from a state as of an older block (held, or not re-read). */}
+          {!asOf && !stale && (
             <UpgradeFile proposal={d.started.proposal} name={`upgrade-${d.id.slice(0, 10)}`} />
           )}
         </Section>
@@ -550,5 +569,10 @@ function Detail({
         </>
       )}
     </div>
+  );
+  return (
+    <PageCurrency watchKey={watchKey} what="The upgrade's state">
+      {page}
+    </PageCurrency>
   );
 }

@@ -82,15 +82,19 @@ export function AsOfNote({
  */
 export function AsOfContent({
   asOf,
+  stale = false,
   className,
   children,
 }: {
   asOf: AsOfBlock | null | undefined;
+  /** Not current for another reason (not read again at the head served, content-currency.tsx). */
+  stale?: boolean;
   className?: string;
   children: ReactNode;
 }) {
+  const dim = !!asOf || stale;
   return (
-    <div className={cn(className, asOf && "grayscale")} data-stale={asOf ? "true" : undefined}>
+    <div className={cn(className, dim && "grayscale")} data-stale={dim ? "true" : undefined}>
       {children}
     </div>
   );

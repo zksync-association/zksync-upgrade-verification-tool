@@ -23,6 +23,7 @@ import { isUpgradeActive } from "@/common/upgrade-states";
 import { useChain } from "@/components/governance-context";
 import { Button } from "@/components/ui/button";
 import { OverviewSummary, type SummarySource, SummaryNote } from "@/components/overview-summary";
+import { notReReadHeadline, useContentCurrency } from "@/components/verification/content-currency";
 import { indexingLabel, useIndexProgress } from "@/components/sync-state";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { Input } from "@/components/ui/input";
@@ -96,7 +97,12 @@ function counted<T extends { source: SummarySource }>(first: Promise<T>, fresh: 
 function shownCount<T extends { source: SummarySource }>(
   shown: ReturnType<typeof lastShown>,
   key: string,
-  count: { first: Promise<T>; fresh: Promise<T | null> }
+  count: { first: Promise<T>; fresh: Promise<T | null> },
+  /**
+   * Fed by Safe: after a pause, the current count (from older Safe copies, labelled) replaces the
+   * one last shown as soon as it is in, and the fresh count replaces that.
+   */
+  early = false
 ) {
   return shown.section<T>(`home:${key}`, count.first, count.fresh, {
     current: (c) => c.source === null,
@@ -104,6 +110,7 @@ function shownCount<T extends { source: SummarySource }>(
       ...c,
       source: { lastRun: false, safeFetchedAt: null, asOfBlock: asOf.block },
     }),
+    early,
   });
 }
 
@@ -133,9 +140,9 @@ export function loader({ request }: LoaderFunctionArgs) {
   };
   const counts = {
     upgrades: shownCount(shown, "upgrades", fromSources.upgrades),
-    emergency: shownCount(shown, "emergency", fromSources.emergency),
-    freeze: shownCount(shown, "freeze", fromSources.freeze),
-    vetoes: shownCount(shown, "vetoes", fromSources.vetoes),
+    emergency: shownCount(shown, "emergency", fromSources.emergency, true),
+    freeze: shownCount(shown, "freeze", fromSources.freeze, true),
+    vetoes: shownCount(shown, "vetoes", fromSources.vetoes, true),
   };
   // What each count was built from, once current (the first answer, or the fresh one after it),
   // for the lists' revisions (sync/revs.ts).
@@ -173,10 +180,13 @@ export function loader({ request }: LoaderFunctionArgs) {
     upgradesFresh: counts.upgrades.fresh,
     emergency: counts.emergency.first,
     emergencyFresh: counts.emergency.fresh,
+    emergencyAfter: counts.emergency.after,
     freeze: counts.freeze.first,
     freezeFresh: counts.freeze.fresh,
+    freezeAfter: counts.freeze.after,
     vetoes: counts.vetoes.first,
     vetoesFresh: counts.vetoes.fresh,
+    vetoesAfter: counts.vetoes.after,
   });
 }
 
@@ -276,7 +286,12 @@ export default function Index() {
             title="Protocol upgrades"
             description="L2 decisions started on L1, with Security Council or Guardian approval."
             summary={
-              <Deferred value={data.upgrades} fresh={data.upgradesFresh} indexed>
+              <Deferred
+                value={data.upgrades}
+                fresh={data.upgradesFresh}
+                indexed
+                watchKey={"list:upgrades"}
+              >
                 {(v, note) => (
                   <OverviewSummary
                     count={v.open}
@@ -295,7 +310,13 @@ export default function Index() {
             title="Emergency upgrades"
             description="Upgrade ids signed by the Council, Guardians, and ZKsync Foundation."
             summary={
-              <Deferred value={data.emergency} fresh={data.emergencyFresh} indexed>
+              <Deferred
+                value={data.emergency}
+                fresh={data.emergencyFresh}
+                after={data.emergencyAfter}
+                indexed
+                watchKey={"list:emergency"}
+              >
                 {(v, note) => (
                   <OverviewSummary
                     count={v.pending}
@@ -315,7 +336,12 @@ export default function Index() {
             title="Freeze requests"
             description="Council requests to freeze, unfreeze, or change the soft-freeze threshold."
             summary={
-              <Deferred value={data.freeze} fresh={data.freezeFresh}>
+              <Deferred
+                value={data.freeze}
+                fresh={data.freezeFresh}
+                after={data.freezeAfter}
+                watchKey={"list:freeze"}
+              >
                 {(v, note) => (
                   <OverviewSummary
                     count={v.open}
@@ -334,7 +360,7 @@ export default function Index() {
             title="Guardian veto"
             description="Guardian cancellations of Token or GovOps proposals before execution."
             summary={
-              <Deferred value={data.vetoes} fresh={data.vetoesFresh}>
+              <Deferred value={data.vetoes} fresh={data.vetoesFresh} after={data.vetoesAfter}>
                 {(v, note) => (
                   <OverviewSummary
                     count={v.open}
@@ -407,14 +433,30 @@ function FlowRow({
 function Deferred<T extends { source: SummarySource }>({
   value,
   fresh,
+  after,
   indexed = false,
+  watchKey,
   children,
 }: {
   value: Promise<T> | T;
   fresh: Promise<T | null> | T | null;
+  /** After a pause: what replaces a `fresh` count that is not fresh yet (see UntilFresh). */
+  after?: Promise<T | null> | T | null;
   indexed?: boolean;
+  /**
+   * The list the count is built from: a current count not read again at the head served now
+   * says so (content-currency.tsx).
+   */
+  watchKey?: string;
   children: (v: T, note: ReactNode) => ReactNode;
 }) {
+  const { block, behind } = useContentCurrency(watchKey);
+  const notReRead =
+    block !== null && behind !== null ? (
+      <p className="text-amber-900 text-xs" data-testid="not-reread">
+        {notReReadHeadline(block, behind)}
+      </p>
+    ) : null;
   return (
     <Suspense fallback={<DeferredPending indexed={indexed} />}>
       <Await
@@ -428,12 +470,18 @@ function Deferred<T extends { source: SummarySource }>({
         {(first) => {
           const v = first as T;
           return (
-            <UntilFresh stale={v.source !== null} fresh={fresh as Promise<T | null>}>
-              {(freshValue, refresh) =>
-                freshValue
-                  ? children(freshValue, null)
-                  : children(v, <SummaryNote source={v.source} refresh={refresh} />)
-              }
+            <UntilFresh
+              stale={v.source !== null}
+              fresh={fresh as Promise<T | null>}
+              after={after as Promise<T | null> | undefined}
+              staleOf={(c) => c.source !== null}
+            >
+              {(freshValue, refresh) => {
+                const shown = freshValue ?? v;
+                return shown.source === null
+                  ? children(shown, notReRead)
+                  : children(shown, <SummaryNote source={shown.source} refresh={refresh} />);
+              }}
             </UntilFresh>
           );
         }}

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { type AsOfBlock, AsOfContent, AsOfNote } from "@/components/verification/as-of";
+import { NotReReadNote, useContentCurrency } from "@/components/verification/content-currency";
 import { UpgradeStateBadge } from "@/components/verification/badges";
 import type { Refresh } from "@/components/verification/freshness";
 import { LastRunNote } from "@/components/verification/last-run";
@@ -136,6 +137,11 @@ function UpgradeTable({
   const past = result.upgrades.filter((u) => !isUpgradeActive(u.state));
   const toggle = allHistory ? $path("/app/proposals") : `${$path("/app/proposals")}?history=all`;
   const switching = useNavigatingTo(toggle);
+  // The list as the beats name it: one not read again at the head served now is shown as of its
+  // block, in no colour.
+  const watchKey = allHistory ? "list:upgrades:all" : "list:upgrades";
+  const labelled = result.fromLastRun || result.asOf !== undefined;
+  const stale = useContentCurrency(labelled ? null : watchKey).behind !== null;
   return (
     <div className="space-y-8">
       {result.fromLastRun && <LastRunNote refresh={refresh} what="The upgrades listed below" />}
@@ -146,13 +152,21 @@ function UpgradeTable({
           what="The upgrades and states listed below"
         />
       )}
+      {!labelled && (
+        <NotReReadNote watchKey={watchKey} what="The upgrades and states listed below" />
+      )}
       <div className="space-y-3">
         <h2 className="text-[22px] leading-7">In progress</h2>
         <PendingRegion pending={switching}>
           {active.length === 0 ? (
             <EmptyState>No upgrade is waiting for approval or execution.</EmptyState>
           ) : (
-            <UpgradeRows upgrades={active} testId="active-upgrades" asOf={result.asOf} />
+            <UpgradeRows
+              upgrades={active}
+              testId="active-upgrades"
+              asOf={result.asOf}
+              stale={stale}
+            />
           )}
         </PendingRegion>
       </div>
@@ -176,7 +190,12 @@ function UpgradeTable({
           {past.length === 0 ? (
             <EmptyState>No finished upgrades in this range.</EmptyState>
           ) : (
-            <UpgradeRows upgrades={past} testId="finished-upgrades" asOf={result.asOf} />
+            <UpgradeRows
+              upgrades={past}
+              testId="finished-upgrades"
+              asOf={result.asOf}
+              stale={stale}
+            />
           )}
         </PendingRegion>
       </div>
@@ -188,9 +207,16 @@ function UpgradeRows({
   upgrades,
   testId,
   asOf,
-}: { upgrades: SerializeFrom<UpgradeSummary>[]; testId: string; asOf?: AsOfBlock }) {
+  stale = false,
+}: {
+  upgrades: SerializeFrom<UpgradeSummary>[];
+  testId: string;
+  asOf?: AsOfBlock;
+  /** Not read again at the head served now (content-currency.tsx). */
+  stale?: boolean;
+}) {
   return (
-    <AsOfContent asOf={asOf}>
+    <AsOfContent asOf={asOf} stale={stale}>
       <Card className="divide-y divide-slate-300 overflow-hidden" data-testid={testId}>
         {upgrades.map((u) => (
           <Link

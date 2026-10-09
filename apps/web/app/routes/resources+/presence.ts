@@ -8,6 +8,7 @@ import { listSafeChecks, noteSigned, syncView, wakeSync } from "@/.server/sync/e
 import {
   BEAT_EVERY_MS,
   PRESENCE_LIMITS,
+  isL2Key,
   isOwnBeat,
   parseBeat,
   presence,
@@ -51,6 +52,16 @@ export type BeatAnswer = {
    * its block, never as current (components/verification/freshness.tsx setCurrency).
    */
   verifiedAt: Record<string, { rev: string; block: string }>;
+  /**
+   * For each item of the tab other than ZKsync Era's (the root status, an upgrade's state, a list,
+   * a transaction's receipt, a set, a simulation) whose content is the current one (its revision,
+   * repeated here): the newest head that content was noted at (read there, or read again there
+   * with the same result). An item named at a block before `head` was not read again at the head
+   * served now (its reads failed, or what it needs is not in memory there): the page shows it as
+   * of that block, never as current (components/verification/content-currency.tsx). Era items
+   * have `eraAt`.
+   */
+  notedAt: Record<string, { rev: string; block: string }>;
   /**
    * For each ZKsync Era item of the tab whose content is the current one (its revision): the Era
    * head that content was last read at. A head whose reads failed is never named.
@@ -125,6 +136,7 @@ function answer(items: Parameters<typeof compareRevs>[0]): BeatAnswer {
       ...listSafeChecks(items.filter((item) => isCurrent(items, item.key)).map((item) => item.key)),
     },
     verifiedAt: verifiedAt(items),
+    notedAt: notedAt(items),
     eraAt,
     era,
     simulatedAt: simulatedAt(items),
@@ -152,6 +164,19 @@ function verifiedAt(
     if (!key.startsWith("set:") || rev === null || rev !== currentRev(key)) continue;
     const head = notedHead(key);
     // A dev node's sets are read at 'latest' (noted at 0): no block to name.
+    if (head !== null && head > 0n) at[key] = { rev, block: head.toString() };
+  }
+  return at;
+}
+
+function notedAt(
+  items: Parameters<typeof compareRevs>[0]
+): Record<string, { rev: string; block: string }> {
+  const at: Record<string, { rev: string; block: string }> = {};
+  for (const { key, rev } of items) {
+    if (isL2Key(key) || rev === null || rev !== currentRev(key)) continue;
+    const head = notedHead(key);
+    // A dev node's content is read at 'latest' (noted at 0): no block to name.
     if (head !== null && head > 0n) at[key] = { rev, block: head.toString() };
   }
   return at;

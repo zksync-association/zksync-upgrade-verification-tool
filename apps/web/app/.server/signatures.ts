@@ -67,7 +67,7 @@ import {
   peekHeldSafeMessage,
   safeCheckOf,
 } from "./safe/store";
-import { SafeApiError, safeWalletUrl } from "./safe-api";
+import { SafeApiError, safeCooldownError, safeWalletUrl } from "./safe-api";
 import { asEngineWork, requestJoinsEngineWork } from "./sync/pacer";
 import { type WatchItem, onPageLoad, presence } from "./sync/presence";
 import { noteContent, touchRev } from "./sync/revs";
@@ -927,7 +927,15 @@ function pageSource(open: boolean, reader: PageReader, strict: ReadonlySet<strin
         }
       }
     }
-    if (reader === "engine") throw new NeedsSafeRead(`No copy under the page rule for ${member}`);
+    if (reader === "engine") {
+      // Safe answers nothing now (a rate-limit or monthly-quota cooldown): a request would fail
+      // for this member with this same error without asking anything, so the engine's result is
+      // the request's: the member unavailable (never missing), on-chain approvals still checked.
+      // The set is then verified at every head while it lasts, rather than left behind each one.
+      const cooling = safeCooldownError();
+      if (cooling) throw cooling;
+      throw new NeedsSafeRead(`No copy under the page rule for ${member}`);
+    }
     return lookupSafeMessage(member, hash);
   };
   return { source, provisional };
@@ -955,7 +963,9 @@ async function computePage(
     )
   );
   if (redo.size === 0) return computed;
-  if (reader === "engine") {
+  // While Safe answers nothing (a cooldown), the engine gives these members as a request would:
+  // unavailable (see pageSource).
+  if (reader === "engine" && !safeCooldownError()) {
     recheckMembers(spec, head, redo);
     throw new NeedsSafeRead("A member's older copy no longer counts");
   }

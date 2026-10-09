@@ -118,6 +118,38 @@ export function EraBlockNote({
   );
 }
 
+// Why Safe cannot be read now, for a set left behind the head served (see safeUnavailableReason).
+const UNAVAILABLE: Record<string, string> = {
+  quota: "Safe quota low",
+  budget: "hourly budget used",
+  cooldown: "Safe rate limit",
+  "quota-exhausted": "Safe's monthly quota used up",
+};
+
+/**
+ * For an open set not verified at the head served because its Safe copies cannot be used there
+ * (the checks paused, Safe only read on request without a key, or Safe not answering for some
+ * members): why, for its label ("Safe unavailable (Safe's monthly quota used up)"). null when
+ * none of that applies (its reads failed for another reason: it is checked again at each block).
+ */
+export function safeUnavailableReason(
+  check: SafeCheck | null | undefined,
+  unavailable: number
+): string | null {
+  if (check?.state === "paused") {
+    const why = UNAVAILABLE[check.reason ?? ""] ?? "checks paused";
+    // Safe itself answers nothing during a cooldown; below the quota floor or over the hourly
+    // budget only the background checks wait (Fetch signatures still reads).
+    return check.reason === "cooldown" || check.reason === "quota-exhausted"
+      ? `Safe unavailable (${why})`
+      : `Safe checks paused (${why})`;
+  }
+  if (check?.state === "on-request") return "Safe read only on request (no Safe key)";
+  if (unavailable > 0)
+    return `Safe did not answer for ${unavailable} member${unavailable === 1 ? "" : "s"}`;
+  return null;
+}
+
 const PAUSED: Record<string, string> = {
   quota: "checks paused (Safe quota low)",
   budget: "checks paused (hourly budget used)",
@@ -186,6 +218,7 @@ export function FreshnessNote({
   what = "Statuses below",
   check = null,
   followed = true,
+  safeReason = null,
 }: {
   set: Labelled;
   refresh?: Refresh;
@@ -197,6 +230,12 @@ export function FreshnessNote({
    * (false: a page with a signature from its URL, verified only when it loads).
    */
   followed?: boolean;
+  /**
+   * For a result behind the head because its Safe copies cannot be used now (see
+   * safeUnavailableReason): said in the label, with Fetch signatures to retry, not that it is
+   * checked again at each block.
+   */
+  safeReason?: string | null;
 }) {
   const now = useNowSeconds();
   const { away, failing } = useLive();
@@ -211,7 +250,10 @@ export function FreshnessNote({
     ) : null;
   }
   // The block first when there is one (a verdict), else the copies' age (a list from Safe).
-  const headline = labels.verified ?? labels.copies ?? "An earlier result";
+  const unavailable = refresh === "behind" && followed && safeReason ? safeReason : null;
+  const headline = [labels.verified ?? labels.copies ?? "An earlier result", unavailable]
+    .filter(Boolean)
+    .join(" · ");
   const asOf = labels.verified ? "that block and those Safe copies" : "those Safe copies";
   return (
     <div
@@ -234,9 +276,11 @@ export function FreshnessNote({
           {what} are as of {asOf}, not the current state.
           {refresh === "pending" && " The current check replaces them when it arrives."}
           {refresh === "behind" &&
-            (followed
-              ? " They are checked again at each new block and update here once that succeeds."
-              : " Check again to verify them at the current block.")}
+            (unavailable
+              ? " Fetch signatures to retry; they update here once Safe answers."
+              : followed
+                ? " They are checked again at each new block and update here once that succeeds."
+                : " Check again to verify them at the current block.")}
         </span>
         {labels.failed && <span className="block font-medium">{labels.failed}</span>}
       </span>

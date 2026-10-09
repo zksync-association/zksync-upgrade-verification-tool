@@ -20,11 +20,12 @@ import {
   useNowSeconds,
 } from "@/components/sync-state";
 import { Button } from "@/components/ui/button";
+import { contentCurrency, useContentCurrency } from "@/components/verification/content-currency";
 import { cn } from "@/utils/cn";
 import { formatAge, formatNumber } from "@/utils/format";
 import { noteStatusLanded, requestStatusRevalidation } from "@/utils/revalidation";
 import { Link, NavLink, useFetcher, useRevalidator } from "@remix-run/react";
-import { AlertTriangle, Info, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
+import { AlertTriangle, Clock, Info, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { type ReactNode, Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
@@ -214,12 +215,23 @@ function Nav() {
   );
 }
 
-/** The newer of the status's block and the head the last beat named (the engine serves). */
-function newerBlock(
+/**
+ * The block the header names: the head the last beat named (the engine serves) when the status
+ * this tab shows was read there too (the beats' notedAt for "status"); otherwise the status's own
+ * block, whose age then grows. Never a block newer than the status it sits over.
+ */
+export function headerBlock(
   status: { number: string; timestamp: string },
-  beat: { number: string; timestamp: string } | null
+  live: {
+    head: { number: string; timestamp: string } | null;
+    notedAt?: Record<string, { rev: string; block: string }>;
+  }
 ) {
-  return beat && BigInt(beat.number) > BigInt(status.number) ? beat : status;
+  const { head } = live;
+  const { block, behind } = contentCurrency("status", live);
+  if (!head || block === null || behind !== null || BigInt(head.number) <= BigInt(status.number))
+    return status;
+  return head;
 }
 
 /**
@@ -278,7 +290,8 @@ function Header({ offerWallet, wallet }: { offerWallet: boolean; wallet: boolean
                   <IndexingPill fallback={status.sync.index} />
                   <NetworkPill
                     chain={status.governance.network}
-                    block={newerBlock(status.governance.latestBlock, live.head)}
+                    block={headerBlock(status.governance.latestBlock, live)}
+                    notReRead={contentCurrency("status", live).behind !== null}
                   />
                 </>
               )}
@@ -306,21 +319,29 @@ function NetworkPill({
   chain,
   block,
   unavailable = false,
+  notReRead = false,
 }: {
   chain: Pick<ChainView, "label" | "isDevNode"> | null;
   block?: { number: string; timestamp: string };
   unavailable?: boolean;
+  /**
+   * The status under it was not read again at the head served now (TrustBanners says so): its
+   * own block, never in a passing colour.
+   */
+  notReRead?: boolean;
 }) {
   return (
     <span
       className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-slate-50 px-2 py-2 font-semibold text-navy-800 text-xs"
       data-testid="network-pill"
+      data-stale={notReRead ? "true" : undefined}
     >
       <span
         className={cn(
           "h-2 w-2 shrink-0 rounded-full",
-          !block ? "bg-slate-300" : chain?.isDevNode ? "bg-amber-500" : "bg-green-500"
+          !block ? "bg-slate-300" : chain?.isDevNode || notReRead ? "bg-amber-500" : "bg-green-500"
         )}
+        data-testid="network-dot"
       />
       <span className="truncate">{chain?.label ?? "Connecting"}</span>
       {block ? (
@@ -442,6 +463,23 @@ function Banners() {
 function TrustBanners({ status }: { status: OkStatus }) {
   const { governance, logHistory } = status;
   const items: ReactNode[] = [];
+  // The status not read again at the head served now: what the banners say (and that none shows)
+  // is as of its block.
+  const { block, behind } = useContentCurrency("status");
+  if (block !== null && behind !== null) {
+    items.push(
+      <Banner key="not-reread" tone="warning" icon={Clock} testId="status-not-reread">
+        <p>
+          <span className="font-semibold">
+            Status not re-read since block #{formatNumber(block)}.
+          </span>{" "}
+          The governance contracts, trust anchors and log history could not be read again at block #
+          {formatNumber(behind)}: the warnings here, and that none is shown, are as of block #
+          {formatNumber(block)}. This updates once they are read again.
+        </p>
+      </Banner>
+    );
+  }
   if (governance.warnings.length > 0) {
     items.push(
       <Banner key="warnings" tone="error" icon={ShieldAlert}>

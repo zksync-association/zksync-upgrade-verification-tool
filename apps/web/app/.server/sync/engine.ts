@@ -51,7 +51,7 @@ import { type UpstreamCost, upstreamCost } from "./cost";
 import { noteOnScreenContent } from "./content-engine";
 import { startEraWatch, stopEraWatch } from "./era";
 import { pageGovernance } from "../page-governance";
-import { asEngineWork, creditsOf, pacer, readRateFrom } from "./pacer";
+import { allowEngineWorkWhen, asEngineWork, creditsOf, pacer, readRateFrom } from "./pacer";
 import { snapshotState, snapshotStep } from "./snapshot";
 
 // The sync engine follows the chain head and, on every new block, refills the same cache entries
@@ -439,6 +439,18 @@ class HeadClock {
   }
 }
 
+/** What a tab's beat is told about the heads served (SyncEngine.view). */
+export type EngineView = {
+  /** The newest head served, or null before the first. */
+  head: BlockRef | null;
+  /** When it was served (ms since the epoch), or null. */
+  servedAt: number | null;
+  /** The head served before it, or null. */
+  previous: BlockRef | null;
+  /** The engine has just started and is still reading the blocks it missed. */
+  catchingUp: boolean;
+};
+
 export class SyncEngine {
   readonly generation: number;
   readonly #options: SyncEngineOptions;
@@ -467,8 +479,11 @@ export class SyncEngine {
   #lastFailed = "";
   #polls = 0;
   #ticks = 0;
-  // The newest head served, and whether one was served since the engine last started.
+  // The newest head served (and when), the one served before it, and whether one was served
+  // since the engine last started.
   #lastServed: BlockRef | null = null;
+  #lastServedAt: number | null = null;
+  #previousServed: BlockRef | null = null;
   #servedSinceStart = false;
   readonly #clock: HeadClock;
 
@@ -511,8 +526,13 @@ export class SyncEngine {
    * For a tab's beat, from memory: the newest head served (null before the first), and whether
    * the engine has just started and not served a head yet (the missed blocks are being read).
    */
-  view(): { head: BlockRef | null; catchingUp: boolean } {
-    return { head: this.#lastServed, catchingUp: this.#running && !this.#servedSinceStart };
+  view(): EngineView {
+    return {
+      head: this.#lastServed,
+      servedAt: this.#lastServedAt,
+      previous: this.#previousServed,
+      catchingUp: this.#running && !this.#servedSinceStart,
+    };
   }
 
   /** Stops for good: no more polls or ticks, and results still in flight are dropped. */
@@ -521,6 +541,8 @@ export class SyncEngine {
     this.#running = false;
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
+    // The engine's work still waiting its turn is never sent (R-D3).
+    pacer().drop();
     for (const lane of this.#lanes) lane.queued = null;
     const seen = this.#observed;
     if (seen?.deadline) clearTimeout(seen.deadline);
@@ -649,6 +671,9 @@ export class SyncEngine {
     this.#running = false;
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
+    // The engine's work still waiting its turn is never sent (R-D3: nothing is read once use
+    // has ended).
+    pacer().drop();
     // The head after the pause is found by a poll sent at no particular moment: no sign either
     // way about the clock (see #observe), and no clock confirmations until a poll proves it.
     if (this.#observed) this.#observed.slotConfirm = false;
@@ -690,7 +715,12 @@ export class SyncEngine {
     // made: a request reading the head meanwhile reads it itself, never behind this wait.
     const wait = this.#options.pacePoll?.(withFinalized) ?? null;
     if (wait) {
-      await wait;
+      try {
+        await wait;
+      } catch {
+        // Dropped unsent: the engine may no longer send (sync/pacer.ts).
+        return;
+      }
       // Use may have ended while the poll waited its turn: then it is never sent (R-D3).
       if (!this.#running || !this.#current() || !this.#active()) return;
     }
@@ -746,7 +776,11 @@ export class SyncEngine {
       // The node named the same head again: a real confirmation, once it is served (for 4 s
       // from this answer).
       seen.polled = polled;
-      if (seen.published && polled.publish()) seen.confirmedAt = polled.answeredAt;
+      if (seen.published && polled.publish()) {
+        seen.confirmedAt = polled.answeredAt;
+        // Resumed at the head served before the pause: nothing was missed.
+        this.#servedSinceStart = true;
+      }
       return;
     }
     // Below the head being followed, or below a head a request read (a lagging backend): not
@@ -840,7 +874,10 @@ export class SyncEngine {
     if (served) {
       observation.confirmedAt = observation.polled.answeredAt;
       observation.servedAt = this.#now();
+      if (this.#lastServed && this.#lastServed.hash !== observation.polled.head.hash)
+        this.#previousServed = this.#lastServed;
       this.#lastServed = observation.polled.head;
+      this.#lastServedAt = observation.servedAt;
       this.#servedSinceStart = true;
       this.#clock.noteServed(observation.polled.head, observation.observedAt, observation.servedAt);
     }
@@ -907,7 +944,10 @@ export class SyncEngine {
       .then(
         () => {},
         (error: unknown) => {
-          if (!(error instanceof StepSkipped)) run.failed.set(i, errorKind(error));
+          // Use ended while it ran: what it had not sent yet was dropped (sync/pacer.ts), and
+          // nothing it read is shown; not a failure of the data source.
+          if (error instanceof StepSkipped || !this.#active()) return;
+          run.failed.set(i, errorKind(error));
         }
       )
       .then(() => {
@@ -1185,16 +1225,20 @@ export function liveSteps(): TickStep[] {
     {
       name: "content",
       run: async (tick) => {
-        if (!tick.viewing) throw new StepSkipped("nothing on screen");
-        // An Era page that came on screen since the last wake: its timer starts (idempotent).
-        startEraWatch(eraWatch);
-        if (!(await tick.served())) throw new StepSkipped("head replaced before it was served");
-        await refreshListSafes();
-        const keys = [...presence().onScreen()].filter(
-          (key) => !key.startsWith("set:") && !key.startsWith("sim:") && !isL2Key(key)
-        );
-        if (presence().onScreen().has("list:vetoes")) keys.push("list:vetoes");
-        await noteOnScreenContent(tick.head, keys, () => tick.current() && tick.inUse());
+        try {
+          if (!tick.viewing) throw new StepSkipped("nothing on screen");
+          // An Era page that came on screen since the last wake: its timer starts (idempotent).
+          startEraWatch(eraWatch);
+          if (!(await tick.served())) throw new StepSkipped("head replaced before it was served");
+          await refreshListSafes();
+          const keys = [...presence().onScreen()].filter(
+            (key) => !key.startsWith("set:") && !key.startsWith("sim:") && !isL2Key(key)
+          );
+          if (presence().onScreen().has("list:vetoes")) keys.push("list:vetoes");
+          await noteOnScreenContent(tick.head, keys, () => tick.current() && tick.inUse());
+        } finally {
+          contentPassedAt = tick.head.hash;
+        }
       },
     },
   ];
@@ -1303,13 +1347,21 @@ readRateFrom(() => env.SYNC_CREDITS_PER_SECOND);
 
 let instance: SyncEngine | null = null;
 
-// The one-time check of governance's pinned code (governance.ts pinsChecked) reads only while
-// someone uses the app or the engine follows the chain (R-D3: nothing reads once use has ended).
-allowPinChecksWhen(
-  () =>
+/** Someone uses the app, or the engine follows the chain under the current settings. */
+function engineMaySend(): boolean {
+  return (
     presence().inUse() ||
     (instance !== null && instance.generation === rpcGeneration() && instance.active)
-);
+  );
+}
+
+// The one-time check of governance's pinned code (governance.ts pinsChecked) reads only while
+// someone uses the app or the engine follows the chain (R-D3: nothing reads once use has ended).
+allowPinChecksWhen(engineMaySend);
+
+// The same for the engine's own work: what waits its turn in the credit pacer past that (or past
+// a settings change) is dropped unsent, and none starts meanwhile (sync/pacer.ts).
+allowEngineWorkWhen({ allowed: engineMaySend, generation: rpcGeneration });
 
 /** The engine for the current settings; a settings change retires the old one. */
 function engine(): SyncEngine {
@@ -1469,19 +1521,37 @@ export function syncEngineStatus(): SyncEngineStatus {
   };
 }
 
+// The head whose content pass (the "content" step) last finished.
+let contentPassedAt: string | null = null;
+// How long after a head is served a beat may still name the one before it, while the content
+// pass at the new head runs (from memory; a receipt's read at most).
+const CONTENT_PASS_GRACE_MS = 2_000;
+
 /**
  * For a tab's beat, from memory: the newest head the engine served, and whether it has just
- * started and is still reading the blocks it missed. Never asks the node.
+ * started and is still reading the blocks it missed. A head is named once the content pass at it
+ * is done (what is on screen noted there, sync/content-engine.ts), or 2 s after it was served:
+ * until then the head before it, so no item of a tab reads as not re-read at a head only because
+ * its pass had not finished. Never asks the node.
  */
 export function syncView(): { head: BlockRef | null; catchingUp: boolean } {
-  if (instance && instance.generation === rpcGeneration()) return instance.view();
-  return { head: null, catchingUp: false };
+  if (!instance || instance.generation !== rpcGeneration())
+    return { head: null, catchingUp: false };
+  const { head, servedAt, previous, catchingUp } = instance.view();
+  const passing =
+    head !== null &&
+    previous !== null &&
+    contentPassedAt !== head.hash &&
+    servedAt !== null &&
+    Date.now() - servedAt < CONTENT_PASS_GRACE_MS;
+  return { head: passing ? previous : head, catchingUp };
 }
 
 /** Stops the engine (tests, shutdown). The next use starts a new one. */
 export function stopSync() {
   instance?.stop();
   instance = null;
+  contentPassedAt = null;
   groupSafes = null;
   stopSafeWatch();
   stopSignatureWatch();

@@ -12,6 +12,7 @@ import {
 } from "@/.server/chain/aggregate";
 import { latestBlock, resetRpcClients } from "@/.server/rpc";
 import { asEngineWork, pacer, readRateFrom, resetPacer } from "@/.server/sync/pacer";
+import { presence, resetPresence } from "@/.server/sync/presence";
 import { guardiansAbi, upgradeHandlerAbi } from "@/common/abis";
 import { encodeFunctionData, numberToHex, zeroHash } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,6 +36,7 @@ beforeEach(() => {
 afterEach(() => {
   readRateFrom(() => 0);
   resetPacer();
+  resetPresence();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -192,6 +194,9 @@ describe("aggregates at a head", () => {
   it("the engine's own aggregate keeps its pace; one a request added to goes at once", async () => {
     const fake = node();
     const head = await settle(latestBlock());
+    // Someone uses the app: the engine's work may be sent (sync/pacer.ts).
+    resetPresence({ keepWarmMs: 60_000 });
+    presence().beat({ tab: "t", reason: "load", items: [] });
     readRateFrom(() => 100);
     // The pace is spent: the next engine request waits about a second.
     pacer().take(100);
@@ -210,5 +215,33 @@ describe("aggregates at a head", () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(fake.aggregates).toHaveLength(2);
     await settle(mixed);
+  });
+
+  it("the engine's own aggregate whose turn comes once use has ended is never sent (R-D3), and is not the provider's failure", async () => {
+    const fake = node();
+    const head = await settle(latestBlock());
+    resetPresence({ keepWarmMs: 60_000 });
+    presence().beat({ tab: "t", reason: "load", items: [] });
+    readRateFrom(() => 100);
+    pacer().take(100);
+    const waiting = asEngineWork(() => aggregateAt(head, nonce));
+    void waiting.catch(() => {});
+    await vi.advanceTimersByTimeAsync(100);
+    expect(pacer().status().queued).toBe(1);
+    // The last tab leaves while the aggregate waits its turn.
+    presence().beat({ tab: "t", reason: "leave", items: [] });
+    expect(presence().inUse()).toBe(false);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(waiting).rejects.toBeInstanceOf(AggregateDropped);
+    expect(fake.aggregates).toHaveLength(0);
+    expect(pacer().status()).toMatchObject({ queued: 0, dropped: 1 });
+    expect(aggregateStatus().failures).toBe(0);
+    // Nor does one start meanwhile; a request's own goes at once, as ever.
+    await expect(settle(asEngineWork(() => aggregateAt(head, state(1))))).rejects.toBeInstanceOf(
+      AggregateDropped
+    );
+    expect(fake.aggregates).toHaveLength(0);
+    await settle(aggregateAt(head, state(2)));
+    expect(fake.aggregates).toHaveLength(1);
   });
 });

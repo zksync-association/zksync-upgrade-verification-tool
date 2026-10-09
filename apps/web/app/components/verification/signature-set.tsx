@@ -21,7 +21,13 @@ import { isAddressEqual } from "viem";
 import { useAccount } from "wagmi";
 import { MemberStatusBadge, SetStateBadge } from "./badges";
 import { ExecutionPanel } from "./execution-panel";
-import { FreshnessNote, type Refresh, newerCheck, setCurrency } from "./freshness";
+import {
+  FreshnessNote,
+  type Refresh,
+  newerCheck,
+  safeUnavailableReason,
+  setCurrency,
+} from "./freshness";
 import { SignButton } from "./sign-button";
 
 type Serialized<T> = SerializeFrom<T>;
@@ -68,6 +74,18 @@ export function SignatureSetCard({
   const unavailable = set.members.filter((m) => m.status === "unavailable").length;
   const incomplete =
     set.thresholdCheck.status === "below" && (unavailable > 0 || !!set.safeApiError);
+  // How the copies of its members not valid yet are kept (an open set): the newer of the beat's
+  // report and the page's own.
+  const safeCheck =
+    state.status === "open" && set.safeCheck !== null
+      ? newerCheck(set.watch ? live.checked[set.watch.key] : null, set.safeCheck)
+      : null;
+  // Fetch signatures is offered (an open set of Safes, followed, that can still be signed).
+  const fetchable =
+    state.status === "open" &&
+    (staleAt === null || behind !== null) &&
+    !!set.watch &&
+    set.members.some((m) => m.safe.isContract);
   return (
     <Card
       data-testid={testId}
@@ -121,10 +139,11 @@ export function SignatureSetCard({
         {state.status === "done" && (
           <DoneSummary state={state} used={used} historical={historical} />
         )}
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          {/* On a phone the label has its own line and the buttons the next, whatever the label
-              says (a shorter one after an update never pulls them up beside it). */}
-          <div className="min-w-0 basis-full sm:basis-auto">
+        <div className="flex flex-col-reverse gap-x-3 gap-y-2 sm:flex-row sm:items-start sm:justify-between">
+          {/* The buttons keep their place whatever the label says or how tall it grows (a card
+              that falls behind the head and catches up again never moves them): first on a
+              phone, the label below them; at the top right from sm up. */}
+          <div className="min-w-0 sm:flex-1">
             <FreshnessNote
               set={
                 behind === null
@@ -135,17 +154,15 @@ export function SignatureSetCard({
               refresh={behind !== null ? "behind" : staleAt === null ? null : refresh}
               followed={followed}
               what="The statuses and counts on this card"
-              check={
-                staleAt === null && state.status === "open" && set.safeCheck !== null
-                  ? newerCheck(set.watch ? live.checked[set.watch.key] : null, set.safeCheck)
-                  : null
+              check={staleAt === null ? safeCheck : null}
+              // Behind because Safe cannot be read now: said, with Fetch signatures to retry (only
+              // where that button is).
+              safeReason={
+                behind !== null && fetchable ? safeUnavailableReason(safeCheck, unavailable) : null
               }
             />
           </div>
-          {state.status === "open" &&
-          (staleAt === null || behind !== null) &&
-          set.watch &&
-          set.members.some((m) => m.safe.isContract) ? (
+          {fetchable && set.watch ? (
             <FetchSignatures watchKey={set.watch.key} />
           ) : (
             behind !== null && <CheckAgain />
@@ -203,17 +220,8 @@ export function SignatureSetCard({
 function FetchSignatures({ watchKey }: { watchKey: string }) {
   const check = useSafeCheck(watchKey);
   return (
-    <span className="flex flex-wrap items-center gap-2">
-      {check.error && (
-        <span className="text-amber-900 text-xs" role="status">
-          Could not fetch: {check.error}
-        </span>
-      )}
-      {!check.error && check.failed > 0 && (
-        <span className="text-amber-900 text-xs" role="status">
-          Safe did not answer for {check.failed} member{check.failed === 1 ? "" : "s"}
-        </span>
-      )}
+    // The button first, what the last press found below it: the button never moves for it.
+    <span className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
       <Button
         variant="outline"
         size="sm"
@@ -226,6 +234,16 @@ function FetchSignatures({ watchKey }: { watchKey: string }) {
         {!check.running && <RefreshCw />}
         {check.running ? "Fetching signatures…" : "Fetch signatures"}
       </Button>
+      {check.error && (
+        <span className="text-amber-900 text-xs" role="status">
+          Could not fetch: {check.error}
+        </span>
+      )}
+      {!check.error && check.failed > 0 && (
+        <span className="text-amber-900 text-xs" role="status">
+          Safe did not answer for {check.failed} member{check.failed === 1 ? "" : "s"}
+        </span>
+      )}
     </span>
   );
 }

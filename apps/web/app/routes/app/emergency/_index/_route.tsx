@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { type AsOfBlock, AsOfContent, AsOfNote } from "@/components/verification/as-of";
+import { NotReReadNote, useContentCurrency } from "@/components/verification/content-currency";
 import { CheckSafeNow } from "@/components/verification/check-safe-now";
 import { ListFreshnessNote, type Refresh } from "@/components/verification/freshness";
 import { LastRunNote } from "@/components/verification/last-run";
@@ -50,7 +51,9 @@ export function loader({ request }: LoaderFunctionArgs) {
     `${key}:pending`,
     loading.pending,
     freshAfter(loading.pending, loading.freshPending, (p) => p.stale),
-    { current: (p) => !p.stale, label: (p) => ({ ...p, stale: true }) }
+    // Fed by Safe: after a pause, the current list (from older Safe copies, labelled) replaces
+    // the one last shown as soon as it is in, and the fresh one replaces that.
+    { current: (p) => !p.stale, label: (p) => ({ ...p, stale: true }), early: true }
   );
   const executed = loading.executedFirst;
   const freshExecuted = executed.then((first) =>
@@ -75,16 +78,21 @@ export function loader({ request }: LoaderFunctionArgs) {
     allHistory,
     pending: shownPending.first,
     freshPending: shownPending.fresh,
+    pendingAfter: shownPending.after,
     executed: shownExecuted.first,
     freshExecuted: shownExecuted.fresh,
   });
 }
 
 export default function EmergencyList() {
-  const { pending, freshPending, executed, freshExecuted, allHistory } =
+  const { pending, freshPending, pendingAfter, executed, freshExecuted, allHistory } =
     useLoaderData<typeof loader>();
   const toggle = allHistory ? $path("/app/emergency") : `${$path("/app/emergency")}?history=all`;
   const switching = useNavigatingTo(toggle);
+  // The list as the beats name it: one not read again at the head served now is shown as of its
+  // block, in no colour.
+  const watchKey = allHistory ? "list:emergency:all" : "list:emergency";
+  const stale = useContentCurrency(watchKey).behind !== null;
   return (
     <div>
       <PageHeader
@@ -108,6 +116,7 @@ export default function EmergencyList() {
         </p>
       </PageHeader>
       <div className="space-y-8">
+        <NotReReadNote watchKey={watchKey} what="The pending ids, counts and executions below" />
         <section className="space-y-3" aria-labelledby="pending-emergencies-heading">
           <h2 id="pending-emergencies-heading" className="text-[22px] leading-7">
             Pending
@@ -122,12 +131,18 @@ export default function EmergencyList() {
               }
             >
               {(first) => (
-                <UntilFresh stale={first.stale} fresh={freshPending}>
+                <UntilFresh
+                  stale={first.stale}
+                  fresh={freshPending}
+                  after={pendingAfter}
+                  staleOf={(p) => p.stale}
+                >
                   {(fresh, refresh) => (
                     <PendingList
                       result={fresh ?? first}
-                      refresh={fresh ? null : refresh}
+                      refresh={refresh}
                       allHistory={allHistory}
+                      stale={stale}
                     />
                   )}
                 </UntilFresh>
@@ -195,7 +210,12 @@ export default function EmergencyList() {
                             />
                           )}
                           {items.length ? (
-                            <Rows items={items} testId="executed-emergencies" asOf={asOf} />
+                            <Rows
+                              items={items}
+                              testId="executed-emergencies"
+                              asOf={asOf}
+                              stale={stale}
+                            />
                           ) : (
                             <EmptyState>
                               {allHistory
@@ -221,6 +241,7 @@ function PendingList({
   result,
   refresh,
   allHistory,
+  stale = false,
 }: {
   result: SerializeFrom<PendingEmergencies> & {
     /** The list as this app last showed it, read at an older block (after a pause). */
@@ -228,6 +249,8 @@ function PendingList({
   };
   refresh: Refresh;
   allHistory: boolean;
+  /** Not read again at the head served now (content-currency.tsx). */
+  stale?: boolean;
 }) {
   return (
     <div className="space-y-8">
@@ -258,7 +281,7 @@ function PendingList({
               : "No pending emergency upgrades were found in members' Safe messages."}
           </EmptyState>
         ) : (
-          <Rows items={result.pending} testId="pending-emergencies" />
+          <Rows items={result.pending} testId="pending-emergencies" stale={stale} />
         )}
       </div>
     </div>
@@ -269,9 +292,15 @@ function Rows({
   items,
   testId,
   asOf,
-}: { items: SerializeFrom<EmergencySummary>[]; testId: string; asOf?: AsOfBlock }) {
+  stale = false,
+}: {
+  items: SerializeFrom<EmergencySummary>[];
+  testId: string;
+  asOf?: AsOfBlock;
+  stale?: boolean;
+}) {
   return (
-    <AsOfContent asOf={asOf}>
+    <AsOfContent asOf={asOf} stale={stale}>
       <Card className="divide-y divide-slate-100 overflow-hidden" data-testid={testId}>
         {items.map((e) => (
           <div

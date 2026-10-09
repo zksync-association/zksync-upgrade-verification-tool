@@ -43,10 +43,14 @@ import {
 //
 // Pages (never JSON) may use a copy the watcher keeps checking without reading Safe again, while
 // it is within the watcher's cadence for it (pageSafeListing); JSON keeps the 60 s rule above.
-// The watcher starts each check by the time its copy turns one cadence old (earlier when many come
-// due together), so a page finds every watched copy within that bound. A Safe whose reads keep
-// failing is retried less and less often. Requests read on demand as without the watcher; a
-// member whose listing cannot be read shows as unavailable, never as missing.
+// The watcher starts each check by the time its copy turns one cadence old, so a page finds every
+// watched copy within that bound: it plans at 80 % of the rate it may use (checks may start a
+// quarter faster than planned, to catch up), and copies read together (a page, Fetch signatures)
+// are checked again spread over one cadence rather than all at once, so neither kind of Safe holds
+// the other's checks up. A Safe whose reads keep failing is retried less and less often, and only
+// in a start no kept copy needs (its retries are not in the plan). Requests read on demand as
+// without the watcher; a member whose listing cannot be read shows as unavailable, never as
+// missing.
 
 /** A listing is served for this long after Safe's answer arrived. */
 export const SAFE_LISTING_MAX_AGE_MS = 60_000;
@@ -54,6 +58,10 @@ export const SAFE_LISTING_MAX_AGE_MS = 60_000;
 const WATCH_RECHECK_MS = 5_000;
 // Checks start at least this far apart, whatever the cadence.
 const WATCH_MIN_SPACING_MS = 250;
+// The watcher plans its checks at this share of the rate it may use (the quota guard stretches
+// cadences until the demand fits it), and lets checks start at the full rate: the rest is room to
+// catch up when checks come due together, so none starts after its copy's cadence.
+export const WATCH_UTILISATION = 0.8;
 // After a Safe's reads failed n times in a row, the watcher waits 15 s x 2^(n-1), at most 5 min,
 // before reading it again (safe-api remembers a failed path for 15 s); a success resets it. Pages
 // are not held back: a request that needs the Safe still reads it.
@@ -679,9 +687,11 @@ export function baseWatchCadence(keyless: boolean): WatchCadence {
  * The quota guard. `counts` Safes of each kind checked at `base` cost counts × 3,600 s / base
  * requests an hour; the guard allows min(SYNC_SAFE_HOURLY_BUDGET, (remaining − 20 % of limit) /
  * (hours to the quota's reset × 0.25)) (the budget alone without quota headers, or once the
- * reported period ended), and stretches every cadence by the same factor when the demand is
- * above it: T_eff = T × max(1, demand / allowance), which for one kind is max(T, N × 3,600 s /
- * allowance). Infinity when nothing is allowed (no budget, nothing left above the reserve).
+ * reported period ended), and the watcher plans at 80 % of it (WATCH_UTILISATION), stretching
+ * every cadence by the same factor when the demand is above that: T_eff = T × max(1, demand /
+ * (0.8 × allowance)), which for one kind is max(T, N × 3,600 s / (0.8 × allowance)). Checks then
+ * start at most at the allowance's rate (makePlan). Infinity when nothing is allowed (no budget,
+ * nothing left above the reserve).
  */
 export function watchCadence(
   counts: Record<WatchKind, number>,
@@ -699,7 +709,7 @@ export function watchCadence(
   }
   if (!(allowance > 0))
     return { set: Number.POSITIVE_INFINITY, list: Number.POSITIVE_INFINITY, allowancePerHour: 0 };
-  const factor = Math.max(1, demand / allowance);
+  const factor = Math.max(1, demand / (WATCH_UTILISATION * allowance));
   return { set: base.set * factor, list: base.list * factor, allowancePerHour: allowance };
 }
 
@@ -711,7 +721,10 @@ type WatchPlan = {
   effective: WatchCadence;
   safes: Map<string, WatchedSafe>;
   counts: Record<WatchKind, number>;
-  /** Checks start at least this far apart: the planned rate, one Safe at a time. */
+  /**
+   * Checks start at least this far apart, one Safe at a time: 80 % of the planned interval, so
+   * they can catch up (WATCH_UTILISATION), and never faster than the allowance.
+   */
   spacingMs: number;
   /** Why checks wait right now (cooldown, quota, budget), or null. */
   paused: string | null;
@@ -804,33 +817,84 @@ function dueAt(key: string, kind: WatchKind, effective: WatchCadence, now: numbe
   return Math.max(confirmed, failures.get(key)?.retryAt ?? 0);
 }
 
+type Queued = { key: string; safe: Address; kind: WatchKind; due: number; startBy: number };
+
+/** The Safe's own reads failed (not merely a service cooldown): it waits for its retry time. */
+function retrying(key: string): boolean {
+  return (failures.get(key)?.inRow ?? 0) > 0;
+}
+
 /**
- * The Safes due for a check, the soonest first, each with the latest time its check may start so
- * that it and every one due after it start by their due times, one at a time `spacingMs` apart
- * (`startBy`): when many come due together (copies a page just read, all at once), the first ones
- * start early, so none starts late and every copy stays within its cadence.
+ * The Safes due for a check. `kept`: the copies the watcher keeps for the screen, the soonest
+ * first, each with the latest time its check may start so that it and every one due after it
+ * start by their due times, one at a time `spacingMs` apart (`startBy`). Copies confirmed together
+ * (a page or Fetch signatures read them at once) would come due together and hold each other, and
+ * the other kind's, up for as long as the bunch takes: so a kind's due times are kept at least its
+ * cadence / its count apart, the earlier ones of a bunch checked early (never late: no copy goes
+ * past its cadence). After one cadence the checks are evenly spaced and stay so (each Safe is
+ * still checked once a cadence). `retries`: Safes whose reads keep failing, the soonest retry
+ * first (`due`); a retry is not planned in the demand (it comes sooner than the cadence at first),
+ * so it takes only a start no kept copy needs (watchOnce), never holding a copy past its bound.
  */
-function checkQueue(
-  current: WatchPlan,
-  now: number
-): { key: string; safe: Address; due: number; startBy: number }[] {
-  const queue: { key: string; safe: Address; due: number; startBy: number }[] = [];
+function checkQueue(current: WatchPlan, now: number): { kept: Queued[]; retries: Queued[] } {
+  const kept: Queued[] = [];
+  const retries: Queued[] = [];
   for (const [key, watched] of current.safes)
     if (!reads.has(key))
-      queue.push({
+      (retrying(key) ? retries : kept).push({
         key,
         safe: watched.safe,
+        kind: watched.kind,
         due: dueAt(key, watched.kind, current.effective, now),
         startBy: 0,
       });
-  queue.sort((a, b) => a.due - b.due);
+  kept.sort((a, b) => a.due - b.due);
+  retries.sort((a, b) => a.due - b.due);
+  for (const kind of ["set", "list"] as const) {
+    const cadence = current.effective[kind];
+    const count = current.counts[kind];
+    if (!Number.isFinite(cadence) || count < 2) continue;
+    const gap = cadence / count;
+    const spread = kept.filter((entry) => entry.kind === kind);
+    for (let i = spread.length - 2; i >= 0; i--) {
+      const entry = spread[i] as Queued;
+      entry.due = Math.min(entry.due, (spread[i + 1] as Queued).due - gap);
+    }
+  }
+  kept.sort((a, b) => a.due - b.due);
   let next = Number.POSITIVE_INFINITY;
-  for (let i = queue.length - 1; i >= 0; i--) {
-    const entry = queue[i] as (typeof queue)[number];
+  for (let i = kept.length - 1; i >= 0; i--) {
+    const entry = kept[i] as Queued;
     next = Math.min(entry.due, next - current.spacingMs);
     entry.startBy = next;
   }
-  return queue;
+  for (const entry of retries) entry.startBy = entry.due;
+  return { kept, retries };
+}
+
+/**
+ * The check to start now, or when to look again: a kept copy's check by its `startBy`; a retry
+ * once its time came, only in a start that leaves the next kept check its own by its `startBy`.
+ * One at a time, no earlier than `notBefore` (the spacing after the last start).
+ */
+function nextCheck(
+  queue: { kept: Queued[]; retries: Queued[] },
+  spacingMs: number,
+  notBefore: number,
+  now: number
+): { start: Queued | null; at: number } {
+  const first = queue.kept[0];
+  const keptAt = first ? Math.max(first.startBy, notBefore) : Number.POSITIVE_INFINITY;
+  if (first && keptAt <= now) return { start: first, at: now };
+  const retry = queue.retries[0];
+  if (retry) {
+    const retryAt = Math.max(retry.due, notBefore, now);
+    if (!first || retryAt + spacingMs <= first.startBy)
+      return retryAt <= now
+        ? { start: retry, at: now }
+        : { start: null, at: Math.min(keptAt, retryAt) };
+  }
+  return { start: null, at: keptAt };
 }
 
 /**
@@ -863,7 +927,7 @@ function makePlan(
     (counts.list > 0 ? counts.list * (HOUR_MS / effective.list) : 0);
   const spacingMs =
     perHour > 0 && Number.isFinite(HOUR_MS / perHour)
-      ? Math.max(WATCH_MIN_SPACING_MS, HOUR_MS / perHour)
+      ? Math.max(WATCH_MIN_SPACING_MS, (WATCH_UTILISATION * HOUR_MS) / perHour)
       : WATCH_RECHECK_MS;
   const paused =
     blocked !== null || safes.size === 0
@@ -924,20 +988,21 @@ async function watchOnce(current: SafeWatchDriver): Promise<number> {
   const { safes, spacingMs, paused } = plan;
   if (blocked !== null || safes.size === 0 || paused !== null) return WATCH_RECHECK_MS;
 
-  // The Safe due first, and when its check must start for none to start late (checkQueue).
-  const first = checkQueue(plan, now)[0];
   // One Safe at a time: the next start no earlier than the spacing after the last one (a clock
-  // stepped back never holds it up for longer than that).
+  // stepped back never holds it up for longer than that). The Safe due first, when its check must
+  // start for none to start late, or a retry in a start no kept copy needs (checkQueue).
   if (lastStartAt > now) lastStartAt = now;
-  const notBefore = lastStartAt + spacingMs;
+  const { start: first, at: startAt } = nextCheck(
+    checkQueue(plan, now),
+    spacingMs,
+    lastStartAt + spacingMs,
+    now
+  );
   if (!first) {
-    plan.nextAt = null;
-    return WATCH_RECHECK_MS;
-  }
-  const startAt = Math.max(first.startBy, notBefore);
-  if (startAt > now) {
-    plan.nextAt = startAt;
-    return Math.max(WATCH_MIN_SPACING_MS, Math.min(WATCH_RECHECK_MS, startAt - now));
+    plan.nextAt = Number.isFinite(startAt) ? startAt : null;
+    return Number.isFinite(startAt)
+      ? Math.max(WATCH_MIN_SPACING_MS, Math.min(WATCH_RECHECK_MS, startAt - now))
+      : WATCH_RECHECK_MS;
   }
   // A read under way sends at least one more request: only as many as the budget has room for.
   if (env.SYNC_SAFE_HOURLY_BUDGET - budgetUsed(now) - backgroundReads() <= 0) {
@@ -1049,8 +1114,12 @@ export function safeCheckOf(safes: readonly Address[], kind: WatchKind = "set"):
   // Safe's monthly quota used up is said as such, not as a short pause.
   const why = (reason: string) =>
     reason === "cooldown" && safeQuotaExhausted() ? "quota-exhausted" : reason;
-  if (current?.blocked === "keyless-public-service")
-    return { state: "on-request", checkedAt, nextAt: null, cadenceMs: null, reason: null };
+  if (current?.blocked === "keyless-public-service") {
+    // Without a key Safe is read only on request, and not even then during a cooldown: say why.
+    return safeCooldownUntil() !== null
+      ? { state: "paused", checkedAt, nextAt: null, cadenceMs: null, reason: why("cooldown") }
+      : { state: "on-request", checkedAt, nextAt: null, cadenceMs: null, reason: null };
+  }
   if (!current || current.blocked !== null) {
     // Not planned yet (the watcher plans again as use resumes): a cooldown still says why.
     const cooling = current === null && safeCooldownUntil() !== null;
@@ -1097,16 +1166,20 @@ export function safeCheckOf(safes: readonly Address[], kind: WatchKind = "set"):
 /**
  * When the watcher would start each watched Safe's check (ms since the epoch), as watchOnce does:
  * one at a time, at least the spacing apart, the one due first first, each by the time it must
- * start for none to start late (checkQueue's `startBy`).
+ * start for none to start late (checkQueue's `startBy`); a retry at its time at the earliest (it
+ * takes a start no kept copy needs).
  */
 function plannedStarts(current: WatchPlan, now: number): Map<string, number> {
   const starts = new Map<string, number>();
-  let free = Math.max(now, Math.min(lastStartAt, now) + current.spacingMs);
-  for (const { key, startBy } of checkQueue(current, now)) {
+  const first = Math.max(now, Math.min(lastStartAt, now) + current.spacingMs);
+  let free = first;
+  const { kept, retries } = checkQueue(current, now);
+  for (const { key, startBy } of kept) {
     const start = Math.max(startBy, free);
     starts.set(key, start);
     free = start + current.spacingMs;
   }
+  for (const { key, due } of retries) starts.set(key, Math.max(due, first));
   return starts;
 }
 

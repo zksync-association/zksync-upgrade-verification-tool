@@ -116,6 +116,14 @@ export function safeCooldownUntil(): number | null {
   return cooldown && Date.now() < cooldown.until ? cooldown.until : null;
 }
 
+/**
+ * The error every request to Safe fails with right now (a rate-limit or monthly-quota cooldown:
+ * nothing is sent until it ends), or null when there is no cooldown.
+ */
+export function safeCooldownError(): SafeApiError | null {
+  return cooldown && Date.now() < cooldown.until ? cooldown.error : null;
+}
+
 /** The current cooldown is for the service's monthly quota (used up), not a short rate limit. */
 export function safeQuotaExhausted(): boolean {
   return !!cooldown && Date.now() < cooldown.until && cooldown.exhausted;

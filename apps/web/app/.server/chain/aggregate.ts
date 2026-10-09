@@ -13,6 +13,7 @@ import {
 import { type BlockRef, lanes, rpcGeneration } from "../rpc";
 import { asEngineWork, asRequestWork, isEngineWork } from "../sync/pacer";
 import { UpstreamError, isUnknownBlock } from "./call";
+import { LaneError } from "./jsonrpc";
 
 // Reads at one block, gathered into as few Multicall3 aggregate3 calls as possible: whatever is
 // asked at the same head within a few milliseconds (the sync engine's per-block snapshot, the
@@ -46,8 +47,9 @@ export class AnsweredOtherBlock extends AggregateFailed {
 }
 
 /**
- * The settings changed while the aggregate was out: what it read is for another data source and
- * is dropped. Not a failure of the provider (nothing to learn about it from this).
+ * The settings changed while the aggregate was out (what it read is for another data source), or
+ * it was never sent (the engine's own aggregate once the engine could no longer send,
+ * sync/pacer.ts): dropped. Not a failure of the provider (nothing to learn about it from this).
  */
 export class AggregateDropped extends AggregateFailed {
   override name = "AggregateDropped";
@@ -254,6 +256,10 @@ async function readAggregate(
       answer = await lanes().call.request<unknown>("eth_call", params);
     }
   } catch (error) {
+    // Never sent (the engine's work once it may no longer send, sync/pacer.ts; a reset lane): not
+    // the provider's failure (the verdict breaker does not count it, chain/verdicts.ts).
+    if (error instanceof LaneError && error.kind === "aborted")
+      throw new AggregateDropped(`aggregate3 at block ${head.number}: not sent`, { cause: error });
     stats.failures++;
     // Lane errors carry no URL (chain/jsonrpc.ts scrubs them).
     const message = error instanceof Error ? error.message : String(error);

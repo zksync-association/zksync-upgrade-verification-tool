@@ -820,6 +820,27 @@ describe("summarizeTrace", () => {
     expect(summarizeTrace(trace, 120_000).inFlight).toBe(0);
   });
 
+  it("prints the JSON-RPC error codes of ZKsync Era's entries too (a rate limit there shows)", () => {
+    const w = summarizeTrace(
+      {
+        chains: { a: 1, b: 324 },
+        events: [
+          {
+            kind: "rpc",
+            at: 10,
+            host: "b",
+            calls: [call("eth_call", { sel: "0x3e4f49e6" })],
+            errors: { "-32005": 1 },
+            status: 200,
+          },
+        ],
+      },
+      60_000
+    );
+    expect(w.era.errors).toEqual({ "-32005": 1 });
+    expect(formatWindow("veto", w)).toContain('"era":{"-32005":1}');
+  });
+
   it("prints a window as one line, without a URL", () => {
     const line = formatWindow("upgrade", summarizeTrace(trace, 120_000));
     expect(line).toContain("10 blocks");

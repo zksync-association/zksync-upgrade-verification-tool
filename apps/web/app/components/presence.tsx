@@ -74,6 +74,11 @@ export type BeatAnswer = {
    * verified at. A set not named, or named at a block before `head`, is not current.
    */
   verifiedAt: Record<string, { rev: string; block: string }>;
+  /**
+   * By item other than Era's (its key): the newest head its content (as the tab shows it, `rev`)
+   * was noted at. One named at a block before `head` was not read again there: not current.
+   */
+  notedAt: Record<string, { rev: string; block: string }>;
   /** By Era item: the Era head its content (as the tab shows it) was last read at. */
   eraAt: Record<string, { number: string; readAt: string }>;
   era: { number: string; readAt: string } | null;
@@ -553,6 +558,11 @@ export type LiveState = {
    */
   verifiedAt: BeatAnswer["verifiedAt"];
   /**
+   * By item other than Era's (its key): the newest head the content the tab shows (`rev`) was
+   * noted at (see verification/content-currency.tsx).
+   */
+  notedAt: BeatAnswer["notedAt"];
+  /**
    * By Era item (its key): the ZKsync Era head the content the tab shows was last read at (only
    * while the tab shows the current content).
    */
@@ -580,6 +590,7 @@ const INITIAL: LiveState = {
   index: null,
   checked: {},
   verifiedAt: {},
+  notedAt: {},
   eraAt: {},
   simulatedAt: {},
   catchingUp: false,
@@ -840,6 +851,7 @@ export function PresenceProvider({ awayMs, children }: { awayMs: number; childre
           index: answer.index ?? s.index,
           checked: answer.checked ?? {},
           verifiedAt: answer.verifiedAt ?? {},
+          notedAt: answer.notedAt ?? {},
           eraAt: answer.eraAt ?? {},
           simulatedAt: answer.simulatedAt ?? {},
           catchingUp: answer.catchingUp === true,

@@ -209,6 +209,44 @@ describe("a section after a pause", () => {
     expect(await settle(after.fresh)).toEqual({ stale: false });
   });
 
+  it("a section fed by Safe (`early`): the current first answer replaces the held one as soon as it is in, the fresh one after it; without a held one, as ever", async () => {
+    const w = liveWorld();
+    await backfilled();
+    const current = (stale: boolean) => atHead().then((value) => ({ ...value, stale }));
+    await settle(
+      lastShown().section("safe-fed", current(false), Promise.resolve(null), {
+        current: (v) => !v.stale,
+        early: true,
+      }).first
+    );
+    await pause(w);
+    // The Safe re-read the fresh answer waits on takes a while.
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const freshAnswer = gate.then(() => ({ block: "fresh", stale: false }));
+    const shown = lastShown().section("safe-fed", current(true), freshAnswer, {
+      current: (v) => !v.stale,
+      label: (v) => ({ ...v, stale: true }),
+      early: true,
+    });
+    expect((await settlesAtOnce(shown.first))?.value).toMatchObject({
+      stale: true,
+      asOf: { block: HEAD.toString() },
+    });
+    // The current first answer (at the newest block, from older copies) while Safe is read.
+    expect(await settle(shown.fresh)).toEqual({ block: (HEAD + 1n).toString(), stale: true });
+    release();
+    expect(await settle(shown.after)).toEqual({ block: "fresh", stale: false });
+    // A head in memory: no held answer, and nothing after.
+    const live = lastShown().section("safe-fed", current(true), Promise.resolve(null), {
+      current: (v) => !v.stale,
+      early: true,
+    });
+    expect(await settle(live.after)).toBeNull();
+  });
+
   it("forgets everything on a settings change, and keeps a bounded number of sections", async () => {
     const w = liveWorld();
     await backfilled();
