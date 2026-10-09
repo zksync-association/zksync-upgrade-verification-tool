@@ -194,6 +194,18 @@ async function warmListings(
 let running: { generation: number; run: Promise<void> } | null = null;
 
 /**
+ * Reads which chain the RPC is on (network(): one batched call, kept for the settings generation),
+ * for the server to call before it starts listening: the app shell (and the wallet set up for
+ * that chain) then never waits for it on the first page. Unlike prewarm(), not turned off by
+ * PREWARM=0: it is the same read every request needs first. Never rejects; logs its timing only.
+ */
+export async function readNetwork(): Promise<void> {
+  await step("boot", "network-before-listen", network, {
+    details: (net) => ({ chainId: net.chainId }),
+  });
+}
+
+/**
  * Warms network(), then together governance(), the log-history canary and the
  * ProtocolUpgradeHandler log index backfill, and once governance is in (with SAFE_API_KEY or a
  * self-hosted service) the governance Safes' message listings, while the backfill runs; beside all

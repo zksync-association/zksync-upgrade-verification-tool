@@ -3,12 +3,16 @@ import { type StandardUpgradeCore, loadStandardUpgrade } from "@/.server/flows/s
 import { parseId } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
-import { useStatus } from "@/components/app-shell";
 import { AddressLink, ExternalAnchor, Hash, TxLink } from "@/components/hex";
 import { Check, EmptyState, Facts, LoadingCard, PageHeader, Section } from "@/components/page";
 import { CallList } from "@/components/verification/calls";
 import { ExecutionPanel } from "@/components/verification/execution-panel";
-import { LastRunCheck, LastRunText } from "@/components/verification/last-run";
+import {
+  LastRunCheck,
+  LastRunText,
+  type Provenance,
+  provenanceOf,
+} from "@/components/verification/last-run";
 import { SignatureSetCard } from "@/components/verification/signature-set";
 import { UpgradeStateBadge } from "@/components/verification/badges";
 import { Timeline } from "@/components/verification/timeline";
@@ -35,7 +39,8 @@ export function loader({ params, request }: LoaderFunctionArgs) {
   return defer({
     id,
     detail: loading.then((d) => d.overview),
-    // A start found in the history the last run saved (labelled) is confirmed against this run's.
+    // A start found in the history the last run saved, or located directly while this run's
+    // index reads the history (labelled), is confirmed against this run's index.
     startedCheck: loading.then((d) => d.startedCheck),
     evidence: loading.then((d) => d.evidence),
     sets: loading.then((d) => d.sets),
@@ -73,6 +78,22 @@ export default function UpgradePage() {
   );
 }
 
+/** Where the calls came from, while this run's log index has not confirmed their start yet. */
+const CALLS_SOURCE: Record<Provenance, { pending: string; failed: string }> = {
+  "last-run": {
+    pending:
+      "Decoded from the UpgradeStarted event in the history saved by the last run (re-verifying; checked against the id above). The handler executes these calls in order when the upgrade runs.",
+    failed:
+      "Decoded from the UpgradeStarted event in the history saved by the last run, which the chain's current history did not confirm. Do not rely on these calls; reload the page.",
+  },
+  direct: {
+    pending:
+      "Decoded from the UpgradeStarted event, located directly from the upgrade's creation time while the history index is verifying (checked against the id above). The handler executes these calls in order when the upgrade runs.",
+    failed:
+      "Decoded from an UpgradeStarted event located directly, which the handler's complete log history did not confirm. Do not rely on these calls; reload the page.",
+  },
+};
+
 function DetailError({ id }: { id: string }) {
   const error = useAsyncError() as Error;
   const notFound = error?.message?.includes("no standard upgrade");
@@ -107,7 +128,10 @@ function DetailError({ id }: { id: string }) {
 function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeCore> }) {
   const { sets, freshSets, evidence, setEvidence, execution, l2Proposal, startedCheck } =
     useLoaderData<typeof loader>();
-  const { governance } = useStatus();
+  // The governance the upgrade was read with (the same reads as the app status): the page
+  // never waits on the root status for it.
+  const governance = d.governance;
+  const provenance = provenanceOf(d.started);
   const labels = {
     [governance.upgradeHandler.toLowerCase()]: "ProtocolUpgradeHandler",
     [governance.securityCouncil.address.toLowerCase()]: "SecurityCouncil",
@@ -138,7 +162,7 @@ function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeCore> }) {
                     <span>{formatTime(d.status.creationTimestamp)}</span>
                     <TxLink hash={d.started.txHash} />
                   </span>
-                  {d.started.fromLastRun && <LastRunCheck check={startedCheck} />}
+                  {provenance && <LastRunCheck check={startedCheck} source={provenance} />}
                 </span>
               ),
             },
@@ -266,13 +290,13 @@ function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeCore> }) {
       <Section
         title={`What the upgrade does · ${d.calls.length} call${d.calls.length === 1 ? "" : "s"}`}
         description={
-          // A start from the last run's history says so until this run's history confirms it
-          // (the same transaction, block and proposal), then reads as any other.
+          // A start from the last run's history, or located directly, says so until this run's
+          // history confirms it (the same transaction, block and proposal), then reads as any other.
           <LastRunText
-            check={d.started.fromLastRun ? startedCheck : null}
-            pending="Decoded from the UpgradeStarted event in the history saved by the last run (re-verifying; checked against the id above). The handler executes these calls in order when the upgrade runs."
+            check={provenance ? startedCheck : null}
+            pending={CALLS_SOURCE[provenance ?? "last-run"].pending}
             confirmed="Decoded from the UpgradeStarted event. The handler executes these calls in order when the upgrade runs."
-            failed="Decoded from the UpgradeStarted event in the history saved by the last run, which the chain's current history did not confirm. Do not rely on these calls; reload the page."
+            failed={CALLS_SOURCE[provenance ?? "last-run"].failed}
           />
         }
       >

@@ -1,6 +1,6 @@
 import { type DraftCallCheck, checkDraftCalls } from "@/.server/flows/emergency-draft";
 import { upgradeProposalId } from "@/common/proposal";
-import { useStatus } from "@/components/app-shell";
+import { WithStatus } from "@/components/governance-context";
 import { CopyButton, Hash } from "@/components/hex";
 import { PageHeader, Section } from "@/components/page";
 import { Button } from "@/components/ui/button";
@@ -67,37 +67,10 @@ type Built =
     };
 
 export default function NewEmergency() {
-  const { governance } = useStatus();
-  const board = governance.emergencyUpgradeBoard.address as Hex;
-  const navigate = useNavigate();
   const fetcher = useFetcher<typeof action>();
   const [title, setTitle] = useState("");
   const [salt, setSalt] = useState<string>(`0x${"0".repeat(64)}`);
   const [calls, setCalls] = useState<Draft[]>(() => [emptyCall()]);
-
-  const built = useMemo((): Built => {
-    const fail = (error: string): Built => ({ ok: false, error });
-    if (!/^0x[0-9a-fA-F]{64}$/.test(salt))
-      return fail("Salt must be 32 bytes (0x + 64 hex characters).");
-    const parsed = [];
-    for (const [i, c] of calls.entries()) {
-      if (!isAddress(c.target)) return fail(`Call ${i + 1}: target is not an address.`);
-      if (!isHex(c.data) || c.data.length % 2 !== 0)
-        return fail(`Call ${i + 1}: calldata must be 0x-prefixed hex bytes.`);
-      let value: bigint;
-      try {
-        value = parseEther(c.valueEth || "0");
-      } catch {
-        return fail(`Call ${i + 1}: value is not a number of ETH.`);
-      }
-      parsed.push({ target: getAddress(c.target), value: value.toString(), data: c.data as Hex });
-    }
-    const id = upgradeProposalId({ calls: parsed, executor: board, salt: salt as Hex });
-    const payload = { ...(title ? { title } : {}), executor: board, salt, calls: parsed };
-    return { ok: true, id, payload };
-  }, [calls, salt, title, board]);
-
-  const json = built.ok ? JSON.stringify(built.payload, null, 2) : "";
   const update = (i: number, patch: Partial<Draft>) =>
     setCalls(calls.map((c, j) => (j === i ? { ...c, ...patch } : c)));
 
@@ -193,72 +166,141 @@ export default function NewEmergency() {
           </Button>
         </Card>
 
-        <div className="space-y-4">
-          <Card className="space-y-3 p-6">
-            <p className="font-medium text-slate-950">Upgrade id</p>
-            {built.ok ? (
-              <Hash value={built.id} />
-            ) : (
-              <p className="text-red-800 text-sm">{built.error}</p>
-            )}
-            <p className="text-slate-600 text-xs">
-              keccak256(abi.encode(calls, executor = Emergency Upgrade Board, salt)). This is what
-              members sign.
-            </p>
-          </Card>
-          <Section title="Next" className="space-y-3">
-            <div className="flex flex-col gap-2">
-              <Button
-                disabled={!built.ok}
-                onClick={() => {
-                  if (built.ok) {
-                    savePayload(built.id, built.payload);
-                    navigate($path("/app/emergency/:id", { id: built.id }));
-                  }
-                }}
-              >
-                Continue to signing
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={!built.ok}
-                onClick={() => {
-                  const blob = new Blob([json], { type: "application/json" });
-                  const a = document.createElement("a");
-                  a.href = URL.createObjectURL(blob);
-                  a.download = `emergency-${built.ok ? built.id.slice(0, 10) : "payload"}.json`;
-                  a.click();
-                }}
-              >
-                <Download /> Download payload.json
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={!built.ok}
-                loading={fetcher.state !== "idle"}
-                onClick={() =>
-                  built.ok &&
-                  fetcher.submit(
-                    { calls: built.payload.calls },
-                    { method: "POST", encType: "application/json" }
-                  )
-                }
-              >
-                Check calls via your RPC
-              </Button>
-            </div>
-          </Section>
-          {json && (
-            <div className="relative">
-              <pre className="mono max-h-64 overflow-auto rounded-xl border border-slate-200 bg-white p-3">
-                {json}
-              </pre>
-              <CopyButton value={json} className="absolute top-2 right-2" label="Copy payload" />
-            </div>
+        {/* The form renders at once; the id (hashed with the Emergency Upgrade Board as executor)
+            and the payload need the board's address from the root status, and fill in once it
+            is read. */}
+        <WithStatus fallback={<PayloadPending />}>
+          {({ governance }) => (
+            <Payload
+              board={governance.emergencyUpgradeBoard.address as Hex}
+              title={title}
+              salt={salt}
+              calls={calls}
+              fetcher={fetcher}
+            />
           )}
-        </div>
+        </WithStatus>
       </div>
     </div>
+  );
+}
+
+/** The upgrade id and payload of the calls drafted, with the board as executor. */
+function Payload({
+  board,
+  title,
+  salt,
+  calls,
+  fetcher,
+}: {
+  board: Hex;
+  title: string;
+  salt: string;
+  calls: Draft[];
+  fetcher: ReturnType<typeof useFetcher<typeof action>>;
+}) {
+  const navigate = useNavigate();
+  const built = useMemo((): Built => {
+    const fail = (error: string): Built => ({ ok: false, error });
+    if (!/^0x[0-9a-fA-F]{64}$/.test(salt))
+      return fail("Salt must be 32 bytes (0x + 64 hex characters).");
+    const parsed = [];
+    for (const [i, c] of calls.entries()) {
+      if (!isAddress(c.target)) return fail(`Call ${i + 1}: target is not an address.`);
+      if (!isHex(c.data) || c.data.length % 2 !== 0)
+        return fail(`Call ${i + 1}: calldata must be 0x-prefixed hex bytes.`);
+      let value: bigint;
+      try {
+        value = parseEther(c.valueEth || "0");
+      } catch {
+        return fail(`Call ${i + 1}: value is not a number of ETH.`);
+      }
+      parsed.push({ target: getAddress(c.target), value: value.toString(), data: c.data as Hex });
+    }
+    const id = upgradeProposalId({ calls: parsed, executor: board, salt: salt as Hex });
+    const payload = { ...(title ? { title } : {}), executor: board, salt, calls: parsed };
+    return { ok: true, id, payload };
+  }, [calls, salt, title, board]);
+  const json = built.ok ? JSON.stringify(built.payload, null, 2) : "";
+
+  return (
+    <div className="space-y-4">
+      <Card className="space-y-3 p-6">
+        <p className="font-medium text-slate-950">Upgrade id</p>
+        {built.ok ? (
+          <Hash value={built.id} />
+        ) : (
+          <p className="text-red-800 text-sm">{built.error}</p>
+        )}
+        <p className="text-slate-600 text-xs">
+          keccak256(abi.encode(calls, executor = Emergency Upgrade Board, salt)). This is what
+          members sign.
+        </p>
+      </Card>
+      <Section title="Next" className="space-y-3">
+        <div className="flex flex-col gap-2">
+          <Button
+            disabled={!built.ok}
+            onClick={() => {
+              if (built.ok) {
+                savePayload(built.id, built.payload);
+                navigate($path("/app/emergency/:id", { id: built.id }));
+              }
+            }}
+          >
+            Continue to signing
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={!built.ok}
+            onClick={() => {
+              const blob = new Blob([json], { type: "application/json" });
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(blob);
+              a.download = `emergency-${built.ok ? built.id.slice(0, 10) : "payload"}.json`;
+              a.click();
+            }}
+          >
+            <Download /> Download payload.json
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={!built.ok}
+            loading={fetcher.state !== "idle"}
+            onClick={() =>
+              built.ok &&
+              fetcher.submit(
+                { calls: built.payload.calls },
+                { method: "POST", encType: "application/json" }
+              )
+            }
+          >
+            Check calls via your RPC
+          </Button>
+        </div>
+      </Section>
+      {json && (
+        <div className="relative">
+          <pre className="mono max-h-64 overflow-auto rounded-xl border border-slate-200 bg-white p-3">
+            {json}
+          </pre>
+          <CopyButton value={json} className="absolute top-2 right-2" label="Copy payload" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** In place of the id and the payload while the board's address is read. */
+function PayloadPending() {
+  return (
+    <Card className="space-y-3 p-6" data-testid="payload-pending">
+      <p className="font-medium text-slate-950">Upgrade id</p>
+      <p role="status" className="text-slate-600 text-sm">
+        Reading the Emergency Upgrade Board's address, the executor the id is hashed with…
+      </p>
+      <div aria-hidden className="h-4 w-full rounded bg-slate-100 motion-safe:animate-pulse" />
+    </Card>
   );
 }
 

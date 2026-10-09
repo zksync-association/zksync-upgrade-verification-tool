@@ -3,11 +3,33 @@ import { AlertTriangle, Loader2 } from "lucide-react";
 import { Suspense } from "react";
 import type { Refresh } from "./freshness";
 
-// Data from the history the app kept from its last run (.server/persist/chain-cache.ts), shown on
-// a page while this run reads the chain again. It is always labelled as such; the verified answer
-// replaces it in the same response (or says it could not be read).
+// Data a page shows before this run's log index has confirmed it, always labelled as such:
+// - "last-run": from the history the app kept from its last run (.server/persist/chain-cache.ts),
+//   while this run reads the chain again;
+// - "direct": located directly (from an upgrade's creation time, or an emergency upgrade's state
+//   over archive blocks) while this run's index is still reading the handler's history.
+// The confirmed answer replaces it in the same response (or says it could not be confirmed).
 
 export const LAST_RUN_LABEL = "History from last run · re-verifying";
+export const DIRECT_LABEL = "Located directly · history index verifying";
+
+/** Where an unconfirmed item came from. */
+export type Provenance = "last-run" | "direct";
+
+export const PROVENANCE_LABEL: Record<Provenance, string> = {
+  "last-run": LAST_RUN_LABEL,
+  direct: DIRECT_LABEL,
+};
+
+/** Which provenance an item from the server carries, or null once confirmed by this run's index. */
+export function provenanceOf(item: {
+  fromLastRun?: boolean;
+  locatedDirectly?: boolean;
+}): Provenance | null {
+  if (item.fromLastRun) return "last-run";
+  if (item.locatedDirectly) return "direct";
+  return null;
+}
 
 /**
  * A notice above a list taken from the last run's history: re-verifying while the verified list
@@ -49,10 +71,10 @@ export function LastRunNote({ refresh, what }: { refresh: Refresh; what: string 
 }
 
 /**
- * Text that says where something came from, for an item found in the last run's history: `pending`
- * while this run's history is checked (`check`), `confirmed` once it has confirmed it, `failed` when
- * it did not (or could not be read). Without a check (found in this run's history): `confirmed`.
- * Inline, for a sentence such as a section's description.
+ * Text that says where something came from, for an item this run's index has not confirmed yet:
+ * `pending` while it is checked (`check`), `confirmed` once it has been, `failed` when it was not
+ * (or could not be read). Without a check (found in this run's index): `confirmed`. Inline, for a
+ * sentence such as a section's description.
  */
 export function LastRunText({
   check,
@@ -76,16 +98,32 @@ export function LastRunText({
 }
 
 /**
- * For one item found in the last run's history (an upgrade's start): a line while this run
- * confirms it, nothing once it has, and an alert when this run's history says otherwise (or
- * could not be read).
+ * For one item this run's index has not confirmed yet (an upgrade's start, an emergency upgrade's
+ * execution): a line saying where it came from while it is checked, nothing once it is confirmed,
+ * and an alert when the index says otherwise (or could not be read).
  */
-export function LastRunCheck({ check }: { check: Promise<unknown> }) {
+export function LastRunCheck({
+  check,
+  source = "last-run",
+  what = "start",
+}: {
+  check: Promise<unknown>;
+  source?: Provenance;
+  what?: "start" | "execution";
+}) {
+  const mismatch =
+    source === "last-run"
+      ? `The chain's history could not confirm this ${what} from the last run. Reload the page.`
+      : `The handler's complete log history could not confirm this ${what}, which was located directly. Do not rely on it; reload the page.`;
   return (
     <Suspense
       fallback={
-        <span className="block text-amber-900 text-xs" data-testid="last-run-check">
-          {LAST_RUN_LABEL}
+        <span
+          className="block text-amber-900 text-xs"
+          data-testid="last-run-check"
+          data-source={source}
+        >
+          {PROVENANCE_LABEL[source]}
         </span>
       }
     >
@@ -97,7 +135,7 @@ export function LastRunCheck({ check }: { check: Promise<unknown> }) {
             className="block font-medium text-red-800 text-xs"
             data-testid="last-run-mismatch"
           >
-            The chain's history could not confirm this start from the last run. Reload the page.
+            {mismatch}
           </span>
         }
       >

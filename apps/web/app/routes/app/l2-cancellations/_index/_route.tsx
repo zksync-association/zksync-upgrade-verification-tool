@@ -1,12 +1,21 @@
+import { freshAfter } from "@/.server/flows/common";
 import type { L2ProposalView } from "@/.server/flows/l2";
-import { type VetoSummary, listL2Vetoes } from "@/.server/flows/l2-veto";
+import {
+  type SignedVetoes,
+  type VetoSummary,
+  type VetoableProposals,
+  loadL2VetoList,
+} from "@/.server/flows/l2-veto";
 import { vetoPath } from "@/common/veto";
-import { useStatus } from "@/components/app-shell";
+import { WithStatus } from "@/components/governance-context";
 import { EmptyState, LoadingCard, PageHeader } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SetStateBadge } from "@/components/verification/badges";
+import { FreshnessNote, type Refresh } from "@/components/verification/freshness";
+import { LastRunNote } from "@/components/verification/last-run";
+import { UntilFresh } from "@/components/verification/until-fresh";
 import { formatEth, formatTime, relativeTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type SerializeFrom, defer } from "@remix-run/node";
@@ -18,61 +27,137 @@ import { $path } from "remix-routes";
 export const meta = Meta["/app/l2-cancellations"];
 
 export function loader() {
-  return defer({ list: listL2Vetoes() });
+  // Each list streams on its own: the vetoes from the Guardians' Safe copies held (labelled with
+  // their age when older than 60 s), the vetoable proposals from the governors' history the last
+  // run saved while this run reads it again (labelled); the fresh lists follow in the response.
+  const loading = loadL2VetoList({ freshness: "page" });
+  return defer({
+    signed: loading.signed,
+    freshSigned: freshAfter(loading.signed, loading.freshSigned, (s) => s.stale),
+    vetoable: loading.vetoable,
+    freshVetoable: freshAfter(loading.vetoable, loading.freshVetoable, (v) => v.fromLastRun),
+  });
 }
 
 export default function VetoList() {
-  const { list } = useLoaderData<typeof loader>();
-  const { governance } = useStatus();
+  const { signed, freshSigned, vetoable, freshVetoable } = useLoaderData<typeof loader>();
   return (
     <div className="space-y-8">
       <PageHeader eyebrow="Guardians" title="Guardian veto">
+        {/* The threshold and nonce come from the root status; the lists do not wait for it. */}
         <p className="max-w-3xl text-slate-950">
-          {governance.guardians.thresholds.cancelL2Proposal} of{" "}
-          {governance.guardians.members.length} Guardians can cancel a proposal on the ZKsync Era
-          Token or GovOps governor before it executes. The veto is sent from L1 as an L1 → L2
-          transaction; its gas parameters and nonce are part of what Guardians sign. Next nonce:{" "}
-          <span className="mono">{governance.guardians.nonce}</span>.
+          <WithStatus fallback="Guardians can cancel a proposal on the ZKsync Era Token or GovOps governor before it executes.">
+            {({ governance }) =>
+              `${governance.guardians.thresholds.cancelL2Proposal} of ${governance.guardians.members.length} Guardians can cancel a proposal on the ZKsync Era Token or GovOps governor before it executes.`
+            }
+          </WithStatus>{" "}
+          The veto is sent from L1 as an L1 → L2 transaction; its gas parameters and nonce are part
+          of what Guardians sign.{" "}
+          <WithStatus fallback={null}>
+            {({ governance }) => (
+              <>
+                Next nonce: <span className="mono">{governance.guardians.nonce}</span>.
+              </>
+            )}
+          </WithStatus>
         </p>
       </PageHeader>
-      <Suspense
-        fallback={
-          <LoadingCard label="Collecting vetoes from Guardian Safes and active proposals from ZKsync Era…" />
-        }
-      >
-        <Await resolve={list}>{(result) => <Lists result={result} />}</Await>
-      </Suspense>
+      <div className="space-y-8">
+        <section className="space-y-3" aria-labelledby="signed-vetoes-heading">
+          <h2 id="signed-vetoes-heading" className="text-[22px] leading-7">
+            Vetoes signed in Safe
+          </h2>
+          <Suspense fallback={<LoadingCard label="Collecting vetoes from Guardian Safes…" />}>
+            <Await
+              resolve={signed}
+              errorElement={
+                <EmptyState>Signed vetoes could not be checked. Refresh to retry.</EmptyState>
+              }
+            >
+              {(first) => (
+                <UntilFresh stale={first.stale} fresh={freshSigned}>
+                  {(fresh, refresh) => (
+                    <SignedList result={fresh ?? first} refresh={fresh ? null : refresh} />
+                  )}
+                </UntilFresh>
+              )}
+            </Await>
+          </Suspense>
+        </section>
+        <section className="space-y-3" aria-labelledby="vetoable-heading">
+          <h2 id="vetoable-heading" className="text-[22px] leading-7">
+            L2 proposals that can still be vetoed
+          </h2>
+          <Suspense
+            fallback={<LoadingCard label="Reading active proposals from ZKsync Era governors…" />}
+          >
+            <Await
+              resolve={vetoable}
+              errorElement={
+                <EmptyState>Vetoable proposals could not be read. Refresh to retry.</EmptyState>
+              }
+            >
+              {(first) => (
+                <UntilFresh stale={first.fromLastRun} fresh={freshVetoable}>
+                  {(fresh, refresh) => (
+                    <VetoableList result={fresh ?? first} refresh={fresh ? null : refresh} />
+                  )}
+                </UntilFresh>
+              )}
+            </Await>
+          </Suspense>
+        </section>
+      </div>
     </div>
   );
 }
 
-function Lists({ result }: { result: SerializeFrom<Awaited<ReturnType<typeof listL2Vetoes>>> }) {
+function SignedList({
+  result,
+  refresh,
+}: { result: SerializeFrom<SignedVetoes>; refresh: Refresh }) {
   return (
-    <div className="space-y-8">
-      {result.errors.length > 0 && (
+    <div className="space-y-3">
+      <FreshnessNote set={result} refresh={refresh} what="The vetoes and counts below" />
+      {(result.errors.length > 0 || result.anomalies > 0) && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-sm">
-          Some Safes could not be read: {result.errors.join("; ")}
+          The list may be incomplete. {result.errors.join("; ")}
+          {result.anomalies > 0 &&
+            ` ${result.anomalies} messages had unexpected hashes and were excluded.`}
         </p>
       )}
-      <div className="space-y-3">
-        <h2 className="text-[22px] leading-7">Vetoes signed in Safe</h2>
-        {result.vetoes.length === 0 ? (
-          <EmptyState>No Guardian has signed a veto.</EmptyState>
-        ) : (
-          <Vetoes vetoes={result.vetoes} />
-        )}
-      </div>
-      <div className="space-y-3">
-        <h2 className="text-[22px] leading-7">L2 proposals that can still be vetoed</h2>
-        {result.l2Error && (
-          <p className="text-amber-800 text-sm">ZKsync Era RPC: {result.l2Error}</p>
-        )}
-        {result.vetoable.length === 0 ? (
-          <EmptyState>No Token or GovOps governor proposal is pending or active.</EmptyState>
-        ) : (
-          <Vetoable proposals={result.vetoable} />
-        )}
-      </div>
+      {result.vetoes.length === 0 ? (
+        <EmptyState>
+          {result.errors.length > 0 || result.anomalies > 0
+            ? "No veto was found in the available messages."
+            : "No Guardian has signed a veto."}
+        </EmptyState>
+      ) : (
+        <Vetoes vetoes={result.vetoes} />
+      )}
+    </div>
+  );
+}
+
+function VetoableList({
+  result,
+  refresh,
+}: { result: SerializeFrom<VetoableProposals>; refresh: Refresh }) {
+  return (
+    <div className="space-y-3">
+      {result.fromLastRun && <LastRunNote refresh={refresh} what="The proposals listed below" />}
+      {result.l2Error ? (
+        <EmptyState>
+          <span className="block text-amber-900" data-testid="vetoable-unavailable">
+            Vetoable proposals could not be read, which does not mean there are none.
+          </span>
+          <span className="block text-amber-800 text-sm">ZKsync Era RPC: {result.l2Error}</span>
+        </EmptyState>
+      ) : result.vetoable.length === 0 ? (
+        <EmptyState>No Token or GovOps governor proposal is pending or active.</EmptyState>
+      ) : (
+        <Vetoable proposals={result.vetoable} />
+      )}
     </div>
   );
 }
@@ -108,7 +193,6 @@ function Vetoes({ vetoes }: { vetoes: SerializeFrom<VetoSummary>[] }) {
 }
 
 function Vetoable({ proposals }: { proposals: SerializeFrom<L2ProposalView>[] }) {
-  const { governance } = useStatus();
   return (
     <Card className="divide-y divide-slate-100 overflow-hidden" data-testid="vetoable">
       {proposals.map((p) => (
@@ -121,8 +205,13 @@ function Vetoable({ proposals }: { proposals: SerializeFrom<L2ProposalView>[] })
               {p.description.split("\n")[0] || "(no description)"}
             </span>
             <span className="text-slate-600 text-xs">
-              {p.governorName} · {p.state ?? "state unknown"} · voting ends {formatTime(p.voteEnd)}{" "}
-              ({relativeTime(p.voteEnd, governance.latestBlock.timestamp)})
+              {p.governorName} · {p.state ?? "state unknown"} · voting ends {formatTime(p.voteEnd)}
+              {/* How far off, by the head the root status was read at: once it is. */}
+              <WithStatus fallback={null}>
+                {({ governance }) =>
+                  ` (${relativeTime(p.voteEnd, governance.latestBlock.timestamp)})`
+                }
+              </WithStatus>
             </span>
           </span>
           <Button variant="secondary" size="sm" asChild>

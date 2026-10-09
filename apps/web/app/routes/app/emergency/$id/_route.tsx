@@ -1,7 +1,8 @@
 import { freshAfter } from "@/.server/flows/common";
 import {
   type EmergencyDetail,
-  type EmergencyExecution,
+  type EmergencyExecutionFirst,
+  type EmergencyHistorical,
   type EmergencyOverview,
   loadEmergencyUpgrade,
 } from "@/.server/flows/emergency";
@@ -12,7 +13,6 @@ import { simulate } from "@/.server/signatures";
 import { emergencyExecution } from "@/common/execution";
 import { type PayloadCheck, checkEmergencyPayload, decodeCall } from "@/common/proposal";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
-import { useStatus } from "@/components/app-shell";
 import { Hash, TxLink } from "@/components/hex";
 import { Check, EmptyState, Facts, LoadingCard, PageHeader, Section } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { CallList } from "@/components/verification/calls";
 import { ExecutionPanel, SimulationResult } from "@/components/verification/execution-panel";
 import type { Refresh } from "@/components/verification/freshness";
+import {
+  LastRunCheck,
+  LastRunText,
+  type Provenance,
+  provenanceOf,
+} from "@/components/verification/last-run";
 import { SignatureSetCard } from "@/components/verification/signature-set";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { UpgradeFile } from "@/components/verification/upgrade-file";
@@ -56,7 +62,14 @@ export function loader({ params, request }: LoaderFunctionArgs) {
   return defer({
     id,
     detail: loading.then((d) => d.overview),
-    executed: loading.then((d) => d.executed),
+    // While this run's index reads the history, the execution may come first from the history
+    // the last run saved, or be located directly (labelled); executedCheck confirms it against the
+    // index.
+    executed: loading.then((d) => d.executedFirst),
+    executedCheck: loading.then((d) => d.executedCheck),
+    // The board's re-checks at the block before the execution shown (archive reads): its calls
+    // never wait for them.
+    executedHistorical: loading.then((d) => d.executedHistorical),
     verified: loading.then((d) => d.first),
     verifiedFresh: loading.then((d) =>
       freshAfter(d.first, d.detail, (first) => first.roles.some((r) => r.set.stale === true))
@@ -109,9 +122,15 @@ export default function EmergencyPage() {
 }
 
 function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
-  const { executed: execution, verified, verifiedFresh } = useLoaderData<typeof loader>();
-  const { governance } = useStatus();
-  const board = governance.emergencyUpgradeBoard.address;
+  const {
+    executed: execution,
+    executedCheck,
+    executedHistorical,
+    verified,
+    verifiedFresh,
+  } = useLoaderData<typeof loader>();
+  // The governance this upgrade was read with: the page never waits on the root status for it.
+  const board = d.governance.emergencyUpgradeBoard.address;
   const executed = d.state === UPGRADE_STATES.Done;
   const [check, setCheck] = useState<PayloadCheck | null>(null);
 
@@ -151,7 +170,12 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
           >
             {(execution) =>
               execution ? (
-                <ExecutedContent execution={execution} id={d.id} />
+                <ExecutedContent
+                  execution={execution}
+                  id={d.id}
+                  check={executedCheck}
+                  historical={executedHistorical}
+                />
               ) : (
                 <EmptyState>
                   No emergency execution event was found for this id. The completed state alone does
@@ -200,18 +224,61 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
   );
 }
 
+/** Where the execution's calls came from, while this run's log index has not confirmed it yet. */
+const EXECUTION_SOURCE: Record<Provenance, { pending: string; failed: string }> = {
+  "last-run": {
+    pending:
+      "Rebuilt from the executeEmergencyUpgrade calldata of the execution transaction in the history saved by the last run (re-verifying), and hashed again with the board as executor.",
+    failed:
+      "Rebuilt from an execution transaction in the history saved by the last run, which the chain's current history did not confirm. Do not rely on these calls; reload the page.",
+  },
+  direct: {
+    pending:
+      "Rebuilt from the executeEmergencyUpgrade calldata of the execution transaction, located directly from archive state while the history index is verifying, and hashed again with the board as executor.",
+    failed:
+      "Rebuilt from an execution transaction located directly, which the handler's complete log history did not confirm. Do not rely on these calls; reload the page.",
+  },
+};
+
 function ExecutedContent({
   execution,
   id,
-}: { execution: SerializeFrom<EmergencyExecution>; id: string }) {
+  check,
+  historical,
+}: {
+  execution: SerializeFrom<EmergencyExecutionFirst>;
+  id: string;
+  /** For an execution from the last run's history or located directly: its confirmation. */
+  check: Promise<unknown>;
+  /** The board's checks re-run at the block before this execution. */
+  historical: Promise<SerializeFrom<EmergencyHistorical> | null>;
+}) {
+  const provenance = provenanceOf(execution);
   return (
     <Section
       title="What it did"
-      description="Rebuilt from the executeEmergencyUpgrade calldata of the execution transaction, and hashed again with the board as executor."
+      description={
+        // An execution from the last run's history, or located directly, says so until this
+        // run's history confirms it (the same transaction and block), then reads as any other.
+        <LastRunText
+          check={provenance ? check : null}
+          pending={EXECUTION_SOURCE[provenance ?? "last-run"].pending}
+          confirmed="Rebuilt from the executeEmergencyUpgrade calldata of the execution transaction, and hashed again with the board as executor."
+          failed={EXECUTION_SOURCE[provenance ?? "last-run"].failed}
+        />
+      }
     >
       <Facts
         items={[
-          { label: "Executed in", value: <TxLink hash={execution.txHash} /> },
+          {
+            label: "Executed in",
+            value: (
+              <span className="block space-y-1">
+                <TxLink hash={execution.txHash} />
+                {provenance && <LastRunCheck check={check} source={provenance} what="execution" />}
+              </span>
+            ),
+          },
           { label: "Salt", value: <Hash value={execution.proposal.salt} /> },
           {
             label: "Calls and salt match the id",
@@ -224,28 +291,85 @@ function ExecutedContent({
           },
           {
             label: "Board's checks before execution",
-            value: execution.historical ? (
-              <span className="flex flex-col gap-0.5">
-                {execution.historical.checks.map((c) => (
-                  <Check key={c.role} ok={c.accepted}>
-                    {c.role}{" "}
-                    {c.accepted === true
-                      ? "accepted"
-                      : c.accepted === false
-                        ? `rejected (${c.error})`
-                        : `not checked (${c.error})`}
-                  </Check>
-                ))}
-              </span>
-            ) : (
-              <span className="text-slate-600">{execution.historicalUnavailable}</span>
+            value: (
+              <BoardChecks
+                historical={historical}
+                block={BigInt(execution.blockNumber) - 1n}
+                check={provenance ? check : null}
+              />
             ),
+            testId: "board-checks",
           },
         ]}
       />
       <CallList calls={execution.calls} />
       <UpgradeFile proposal={execution.proposal} name={`emergency-${id.slice(0, 10)}`} />
     </Section>
+  );
+}
+
+/**
+ * The board's three checks re-run at the block before the execution (archive reads), streamed
+ * after its calls. For an execution this run's index has not confirmed yet (`check` pending), they
+ * are the checks of that unconfirmed transaction, and say so until it is confirmed.
+ */
+function BoardChecks({
+  historical,
+  block,
+  check,
+}: {
+  historical: Promise<SerializeFrom<EmergencyHistorical> | null>;
+  block: bigint;
+  check: Promise<unknown> | null;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <span role="status" className="text-slate-600">
+          Re-running the board's checks at block {block.toString()}…
+        </span>
+      }
+    >
+      <Await
+        resolve={historical}
+        errorElement={
+          <span className="text-slate-600">
+            The board's checks could not be re-run. Refresh to retry.
+          </span>
+        }
+      >
+        {(h) =>
+          h?.historical ? (
+            <span className="flex flex-col gap-0.5">
+              {h.historical.checks.map((c) => (
+                <Check key={c.role} ok={c.accepted}>
+                  {c.role}{" "}
+                  {c.accepted === true
+                    ? "accepted"
+                    : c.accepted === false
+                      ? `rejected (${c.error})`
+                      : `not checked (${c.error})`}
+                </Check>
+              ))}
+              {check && (
+                <span className="text-amber-900 text-xs" data-testid="board-checks-unconfirmed">
+                  <LastRunText
+                    check={check}
+                    pending="At the block before this execution, which the history index has not confirmed yet."
+                    confirmed=""
+                    failed=""
+                  />
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className="text-slate-600">
+              {h?.historicalUnavailable ?? "The board's checks were not re-run."}
+            </span>
+          )
+        }
+      </Await>
+    </Suspense>
   );
 }
 

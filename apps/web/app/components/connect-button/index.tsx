@@ -1,4 +1,4 @@
-import { useStatus } from "@/components/governance-context";
+import { useStatusIfRead } from "@/components/governance-context";
 import Avatar from "@/components/connect-button/avatar";
 import { Button } from "@/components/ui/button";
 import type { SignerGroup } from "@/common/typed-data";
@@ -15,11 +15,21 @@ const GROUP_LABEL: Record<SignerGroup, string> = {
   zkFoundation: "ZKsync Foundation",
 };
 
-/** Which signer groups the connected account is a member Safe of (read from chain via the root loader). */
-export function useConnectedGroups(): { address: Address | undefined; groups: SignerGroup[] } {
+/**
+ * Which signer groups the connected account is a member Safe of (read from chain via the root
+ * loader). Never waits for the root status: until it is read (or when it could not be), `known` is
+ * false and `groups` is empty.
+ */
+export function useConnectedGroups(): {
+  address: Address | undefined;
+  groups: SignerGroup[];
+  known: boolean;
+} {
   const { address } = useAccount();
-  const { governance } = useStatus();
-  if (!address) return { address, groups: [] };
+  const status = useStatusIfRead();
+  if (!status) return { address, groups: [], known: false };
+  const { governance } = status;
+  if (!address) return { address, groups: [], known: true };
   const groups: SignerGroup[] = [];
   if (governance.securityCouncil.members.some((m) => isAddressEqual(m as Address, address)))
     groups.push("securityCouncil");
@@ -27,7 +37,7 @@ export function useConnectedGroups(): { address: Address | undefined; groups: Si
     groups.push("guardians");
   if (isAddressEqual(governance.emergencyUpgradeBoard.zkFoundation as Address, address))
     groups.push("zkFoundation");
-  return { address, groups };
+  return { address, groups, known: true };
 }
 
 export const WalletOfferContext = createContext<Dispatch<SetStateAction<number>> | null>(null);

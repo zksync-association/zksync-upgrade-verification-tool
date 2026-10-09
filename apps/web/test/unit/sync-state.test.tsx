@@ -1,5 +1,6 @@
 import {
   BlockAge,
+  IDLE_POLLS,
   IndexProgressProvider,
   type IndexStatusView,
   IndexedLoadingCard,
@@ -106,6 +107,15 @@ describe("the indexing state never renders a 0", () => {
     const word = screen.getByText("Indexing", { exact: false, selector: "span.sr-only" });
     expect(word).toHaveClass("sm:not-sr-only");
     expect(screen.getByRole("status")).toHaveTextContent("Indexing 36%");
+  });
+
+  it("shows the root status's progress until the provider has its own (on the server)", () => {
+    const html = renderToString(
+      <IndexProgressProvider initial={null}>
+        <IndexingPill fallback={index({ chunks: { done: 160, total: 435 } })} />
+      </IndexProgressProvider>
+    );
+    expect(html).toContain("36%");
   });
 
   it("shows nothing once the index is ready", () => {
@@ -244,6 +254,51 @@ describe("IndexProgressProvider polling", () => {
     await pollOnce();
     expect(screen.queryByTestId("index-progress")).not.toBeInTheDocument();
     expect(onSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops polling an index that stays idle (nothing started its backfill), until a new root status", async () => {
+    const idle = () => answer(okStatus(index({ state: "idle" })));
+    fetch.mockImplementation(idle);
+    const view = render(
+      <IndexProgressProvider initial={index({ state: "idle" })}>
+        <IndexingPill />
+      </IndexProgressProvider>
+    );
+    for (let i = 0; i < 3 * IDLE_POLLS; i++) await pollOnce();
+    expect(fetch).toHaveBeenCalledTimes(IDLE_POLLS);
+    // A new root status (Refresh, a settings save) gives it another few polls.
+    view.rerender(
+      <IndexProgressProvider initial={index({ state: "idle" })}>
+        <IndexingPill />
+      </IndexProgressProvider>
+    );
+    for (let i = 0; i < 3 * IDLE_POLLS; i++) await pollOnce();
+    expect(fetch).toHaveBeenCalledTimes(2 * IDLE_POLLS);
+  });
+
+  it("keeps polling a backfill that started after a few idle polls", async () => {
+    fetch
+      .mockReturnValueOnce(answer(okStatus(index({ state: "idle" }))))
+      .mockReturnValueOnce(answer(okStatus(index({ state: "idle" }))))
+      .mockReturnValue(answer(okStatus(index({ chunks: { done: 100, total: 435 } }))));
+    render(
+      <IndexProgressProvider initial={index({ state: "idle" })}>
+        <IndexingPill />
+      </IndexProgressProvider>
+    );
+    for (let i = 0; i < IDLE_POLLS + 5; i++) await pollOnce();
+    expect(fetch).toHaveBeenCalledTimes(IDLE_POLLS + 5);
+    expect(screen.getByTestId("index-progress")).toHaveTextContent("Indexing 22%");
+  });
+
+  it("does not poll before the root status is in this browser", async () => {
+    render(
+      <IndexProgressProvider initial={null}>
+        <IndexingPill />
+      </IndexProgressProvider>
+    );
+    for (let i = 0; i < 5; i++) await pollOnce();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("does not report a settled index from a poll sent before a newer root status", async () => {

@@ -10,6 +10,7 @@ import getPort, { portNumbers } from "get-port";
 import { env, safeWalletOrigins } from "@config/env.server";
 import { cspNonce } from "@server/middlewares/csp-nonce";
 import { patchBigintToJSON } from "@server/utils/bigint";
+import { beforeListening, bounded } from "./boot";
 import { logger } from "./middlewares/logger";
 import { rateLimit } from "./middlewares/rate-limit";
 import { removeTrailingSlash } from "./middlewares/remove-trailing-slash";
@@ -82,6 +83,7 @@ async function getBuild() {
 
 // What the app build's entry module exports for the server (app/entry.server.tsx).
 type AppEntry = {
+  readNetwork?: () => Promise<void>;
   prewarm?: (reason: "boot") => Promise<void>;
   startSync?: () => void;
   touchSync?: (path?: string) => void;
@@ -165,24 +167,38 @@ async function checkRpc() {
   return known ?? `chain ${chainId}`;
 }
 
-// How long the start waits for the chain cache to be checked before warming up without it (it is
-// still seeded when the check completes later).
+// How long the start waits for the chain cache to be checked before it listens anyway (it is still
+// seeded when the check completes later; a page that may answer from it waits for it meanwhile).
+// Also the bound on saving it at shutdown.
 const CHAIN_CACHE_LOAD_WAIT_MS = 3_000;
 
-// Loads the chain cache kept from the last run (public chain and Safe data, re-verified against
-// the chain: CHAIN_CACHE=0 turns it off), then warms the caches a first page needs (network,
-// governance, the handler's log index, Safe listings) through the app build's own modules, so
-// requests share them, and starts the sync engine. PREWARM=0 turns the warm-up off (the build's
-// prewarm() checks), SYNC_MODE=off the engine. Logs step names and timings only, and never stops
-// the server.
+// How long the start waits for the app to read which chain the RPC is on before it listens anyway
+// (the first page's shell then waits for that read instead).
+const NETWORK_READ_WAIT_MS = 3_000;
+
+// Before the server listens, through the app build's own modules and together: the chain the RPC
+// is on (the first page's app shell and its wallet never wait for it), and the chain cache kept
+// from the last run (public chain and Safe data, re-verified against the chain; CHAIN_CACHE=0
+// turns it off), so a page opened at liftoff answers from it at once. Bounded; never stops the
+// server.
+async function prepareBeforeListening() {
+  try {
+    await beforeListening(await appEntry(), {
+      networkMs: NETWORK_READ_WAIT_MS,
+      chainCacheMs: CHAIN_CACHE_LOAD_WAIT_MS,
+    });
+  } catch {
+    // The first page reads them instead.
+  }
+}
+
+// Warms the caches a first page needs (network, governance, the handler's log index, Safe
+// listings) through the app build's own modules, so requests share them, and starts the sync
+// engine. PREWARM=0 turns the warm-up off (the build's prewarm() checks), SYNC_MODE=off the
+// engine. Logs step names and timings only, and never stops the server.
 async function prewarmApp() {
   try {
-    const { prewarm, startSync, loadChainCache } = await appEntry();
-    if (loadChainCache)
-      await Promise.race([
-        loadChainCache(),
-        new Promise((resolve) => setTimeout(resolve, CHAIN_CACHE_LOAD_WAIT_MS).unref()),
-      ]);
+    const { prewarm, startSync } = await appEntry();
     startSync?.();
     await prewarm?.("boot");
   } catch {
@@ -194,11 +210,7 @@ async function prewarmApp() {
 async function saveAppCache() {
   try {
     const { saveChainCache } = await appEntry();
-    if (saveChainCache)
-      await Promise.race([
-        saveChainCache(),
-        new Promise((resolve) => setTimeout(resolve, CHAIN_CACHE_LOAD_WAIT_MS).unref()),
-      ]);
+    await bounded(saveChainCache, CHAIN_CACHE_LOAD_WAIT_MS);
   } catch {
     // Nothing is lost: the next start reads everything from the chain.
   }
@@ -208,6 +220,7 @@ async function startServer() {
   try {
     const chain = await checkRpc();
     console.log(`Reading governance from ${chain} through L1_RPC_URL.`);
+    await prepareBeforeListening();
 
     const server = app.listen(portToUse, env.SERVER_HOST, () => {
       if (!portAvailable) {

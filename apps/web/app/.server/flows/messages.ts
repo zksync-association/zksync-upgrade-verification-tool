@@ -51,6 +51,39 @@ export type Collected = {
 /** A Safe's listing as collected: its messages, and when Safe's answer arrived (when known). */
 type Listing = { messages: SafeMessage[]; fetchedAt?: number };
 
+/** A message read as one of ours: its typed data and digest, and whether Safe filed it right. */
+type Reading = { typedData: GovernanceTypedData; digest: Hex; filed: boolean } | null;
+
+// What each message read as, per Safe and chain, keyed by the message object the Safe store
+// holds: a listing that has not changed keeps its objects, so the typed data is parsed and hashed
+// once instead of on every page (that work ran before a page's first bytes were sent). The store
+// replaces the objects when it reads a listing again, and dropped ones are collected with them.
+const readings = new WeakMap<SafeMessage, Map<string, Reading>>();
+
+function readMessage(message: SafeMessage, safe: Address, chainId: number): Reading {
+  const key = `${chainId}:${safe.toLowerCase()}`;
+  let bySafe = readings.get(message);
+  const known = bySafe?.get(key);
+  if (known !== undefined) return known;
+  const typedData = parseGovernanceTypedData(message.message, chainId);
+  let reading: Reading = null;
+  if (typedData) {
+    const { digest } = governanceHashes(typedData);
+    const expected = safeMessageHashes(chainId, safe, digest).safeMessageHash;
+    reading = {
+      typedData,
+      digest,
+      filed: expected.toLowerCase() === message.messageHash.toLowerCase(),
+    };
+  }
+  if (!bySafe) {
+    bySafe = new Map();
+    readings.set(message, bySafe);
+  }
+  bySafe.set(key, reading);
+  return reading;
+}
+
 const sameDomain = (a: Eip712Domain, b: Eip712Domain) =>
   a.name === b.name &&
   a.version === b.version &&
@@ -114,17 +147,16 @@ async function collectFrom(
         if (typeof fetchedAt === "number" && (oldest === null || fetchedAt < oldest))
           oldest = fetchedAt;
         for (const message of messages) {
-          const typedData = parseGovernanceTypedData(message.message, chainId);
+          const reading = readMessage(message, safe, chainId);
           if (
-            !typedData ||
-            !actions.includes(typedData.primaryType) ||
-            !sameDomain(typedData.domain, domain)
+            !reading ||
+            !actions.includes(reading.typedData.primaryType) ||
+            !sameDomain(reading.typedData.domain, domain)
           ) {
             continue;
           }
-          const { digest } = governanceHashes(typedData);
-          const expected = safeMessageHashes(chainId, safe, digest).safeMessageHash;
-          if (expected.toLowerCase() !== message.messageHash.toLowerCase()) {
+          const { typedData, digest } = reading;
+          if (!reading.filed) {
             anomalies++;
             continue;
           }

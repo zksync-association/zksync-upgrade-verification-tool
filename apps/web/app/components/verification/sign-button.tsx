@@ -36,7 +36,7 @@ export function SignButton({
   disabledReason: string | null;
 }) {
   useOfferWallet();
-  const { address, groups } = useConnectedGroups();
+  const { address, groups, known } = useConnectedGroups();
   const { openConnectModal } = useConnectModal();
   const [open, setOpen] = useState(false);
   const revalidator = useRevalidator();
@@ -48,6 +48,7 @@ export function SignButton({
   const isMember = groups.includes(signerGroup);
 
   let reason = disabledReason;
+  if (!reason && address && !known) reason = "Reading the governance roles…";
   if (!reason && address && !isMember)
     reason = `The connected account is not a ${GROUP_LABEL[signerGroup]} member Safe.`;
   if (!reason && member?.status === "valid") reason = "Your Safe's signature is already verified.";

@@ -204,6 +204,11 @@ export class SeedExpectation {
     });
   }
 
+  /** Whether a seed may still come. */
+  get pending(): boolean {
+    return this.#pending !== null;
+  }
+
   /** Resolves once no seed is expected any more, or after `ms`. */
   wait(ms = SEED_WAIT_MS): Promise<void> {
     const pending = this.#pending;

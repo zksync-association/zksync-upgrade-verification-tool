@@ -19,6 +19,7 @@ import { FOREVER, cached } from "../cache";
 import {
   type L2GovernorEvent,
   eventsInWindow,
+  eventsInWindowAnswer,
   isIndexedL2Governor,
   l2GovernorIndex,
   l2IndexHead,
@@ -212,14 +213,17 @@ async function idOnL1(created: Created): Promise<bigint | null> {
 /**
  * The proposal a ProposalCreated log of `governor` describes, with its state read now. `at`: the
  * Era head the request answers at; the state read is then shared by requests at that head.
+ * `fromLastRun`: the log comes from the history the last run saved, not read in this run yet; what
+ * it says is decoded for this answer only, never kept for the log at that place.
  */
 async function viewOf(
   client: PublicClient,
   governor: Address,
   log: CreatedLog,
-  at: L2Head | null
+  at: L2Head | null,
+  { fromLastRun = false }: { fromLastRun?: boolean } = {}
 ): Promise<L2ProposalView> {
-  const created = await createdOf(log);
+  const created = fromLastRun ? decodeCreated(log) : await createdOf(log);
   const readState = () =>
     client
       .readContract({
@@ -266,16 +270,24 @@ const proposalKey = (governor: Address, id: bigint) => `${governor.toLowerCase()
 const isVetoable = (p: L2ProposalView) =>
   p.state === null || p.state === "Pending" || p.state === "Active";
 
+/** Vetoable proposals, and whether part of them came from the history the last run saved. */
+export type VetoableAnswer = { proposals: L2ProposalView[]; provisional: boolean };
+
 /**
  * Indexed governors' proposals created in the last 24 days, except those the index shows
  * executed or canceled (final states: their state() would only confirm it), at Era head `at`.
+ * `provisional` (pages only): the index may answer from the history the last run saved, and the
+ * window from the block times it saved, while this run reads them again (the answer says so);
+ * states are always read at `at`.
  */
 async function recentFromIndex(
   client: PublicClient,
   governors: readonly Address[],
-  at: L2Head
-): Promise<L2ProposalView[]> {
-  const { head, events } = await l2GovernorIndex().read({ head: at });
+  at: L2Head,
+  provisional = false
+): Promise<VetoableAnswer> {
+  const read = await l2GovernorIndex().read({ head: at, provisional });
+  const { head, events } = read;
   const closed = new Set(
     events
       .filter((e) => e.eventName !== "ProposalCreated")
@@ -287,13 +299,17 @@ async function recentFromIndex(
       governors.some((g) => isAddressEqual(g, e.governor)) &&
       !closed.has(proposalKey(e.governor, e.proposalId))
   );
-  const recent = await eventsInWindow(created, head.head.timestamp - VETO_WINDOW);
-  return Promise.all(
-    recent.map((e) => {
+  const since = head.head.timestamp - VETO_WINDOW;
+  const recent = provisional
+    ? await eventsInWindowAnswer(created, since)
+    : { events: await eventsInWindow(created, since), provisional: false };
+  const proposals = await Promise.all(
+    recent.events.map((e) => {
       const governor = governors.find((g) => isAddressEqual(g, e.governor)) ?? e.governor;
-      return viewOf(client, governor, e.log, head);
+      return viewOf(client, governor, e.log, head, { fromLastRun: e.provisional });
     })
   );
+  return { proposals, provisional: read.provisional || recent.provisional };
 }
 
 /** A replaced governor's proposals created in the last 24 days (scanned on demand). */
@@ -311,30 +327,45 @@ const VETO_INTEREST_MS = 10 * 60_000;
  * or a state value the app does not know: listed rather than hidden). A failed read fails the list.
  */
 export async function activeL2Proposals(): Promise<L2ProposalView[]> {
+  return (await activeL2ProposalsAnswer()).proposals;
+}
+
+/**
+ * activeL2Proposals, and whether the answer used the history the last run saved: with
+ * `provisional` (a page's first answer), the indexed governors' events may come from it while this
+ * run reads them again (see recentFromIndex); without it (JSON, and a page's fresh answer), never.
+ */
+export async function activeL2ProposalsAnswer({
+  provisional = false,
+}: { provisional?: boolean } = {}): Promise<VetoableAnswer> {
   vetoInterestAt = Date.now();
   const client = await l2();
-  if (!client) return [];
+  if (!client) return { proposals: [], provisional: false };
   const [net, all] = await Promise.all([network(), knownGovernors()]);
   const governors = all.filter((g) => g.kind !== "protocol");
   const at = governors.some((g) => isIndexedL2Governor(net, g.address))
     ? await l2IndexHead(net)
     : null;
   const indexed = at ? governors.filter((g) => isIndexedL2Governor(net, g.address)) : [];
-  const lists = await Promise.all([
+  const [fromIndex, ...scanned] = await Promise.all([
     at && indexed.length > 0
       ? recentFromIndex(
           client,
           indexed.map((g) => g.address),
-          at
+          at,
+          provisional
         )
-      : [],
+      : { proposals: [], provisional: false },
     ...governors.filter((g) => !indexed.includes(g)).map((g) => recentFromScan(client, g.address)),
   ]);
-  const found = lists.flat();
+  const found = [...(fromIndex?.proposals ?? []), ...scanned.flat()];
   // Per governor, in the order above; each governor's oldest first.
-  return governors
-    .flatMap((g) => found.filter((p) => isAddressEqual(p.governor, g.address)))
-    .filter(isVetoable);
+  return {
+    proposals: governors
+      .flatMap((g) => found.filter((p) => isAddressEqual(p.governor, g.address)))
+      .filter(isVetoable),
+    provisional: fromIndex?.provisional ?? false,
+  };
 }
 
 /**

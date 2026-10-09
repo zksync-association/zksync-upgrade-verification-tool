@@ -4,7 +4,7 @@ import { type PuhIndexStatus, puhIndex } from "./chain/puh-index";
 import { type Governance, governance } from "./governance";
 import { type LogHistoryStatus, checkLogHistory } from "./logs";
 import { type ChainCacheStatus, chainCacheStatus } from "./persist/chain-cache";
-import { ConfigError, l1, network } from "./rpc";
+import { ConfigError, type Network, l1, network, resolvedNetwork } from "./rpc";
 import { type SafeStoreStatus, safeStoreStatus } from "./safe/store";
 import { quota } from "./safe-api";
 import { type SignatureSetsStatus, signatureSetsStatus } from "./signatures";
@@ -52,6 +52,29 @@ export type AppStatus =
       sync: SyncStatus;
     }
   | { ok: false; error: string; hint: string };
+
+/**
+ * What the app shell needs before anything else is read: which chain the RPC is on (the wallet
+ * is set up for it, explorer links point at it). Public, from network() alone: no governance,
+ * no verdict. In hand at once once network() has answered under the current settings (it is
+ * read before the server starts listening, and kept); otherwise a promise of it.
+ */
+export type ShellChain = Pick<
+  Network,
+  "chainId" | "label" | "isDevNode" | "explorerUrl" | "l2ExplorerUrl"
+>;
+
+export function shellChain(): ShellChain | Promise<ShellChain> {
+  const chain = ({ chainId, label, isDevNode, explorerUrl, l2ExplorerUrl }: Network) => ({
+    chainId,
+    label,
+    isDevNode,
+    explorerUrl,
+    l2ExplorerUrl,
+  });
+  const known = resolvedNetwork();
+  return known ? chain(known) : network().then(chain);
+}
 
 export async function appStatus(): Promise<AppStatus> {
   try {

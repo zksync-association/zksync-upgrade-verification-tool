@@ -1,4 +1,4 @@
-import { GovernanceContext } from "@/components/governance-context";
+import { ChainContext, GovernanceContext } from "@/components/governance-context";
 import { cn } from "@/utils/cn";
 import { shortHex } from "@/utils/format";
 import { Check, Copy, ExternalLink } from "lucide-react";
@@ -75,8 +75,11 @@ export function ShortHash({ value, className }: { value: string; className?: str
 }
 
 export function useExplorer() {
+  // The chain the app shell was set up for (known before the status is read), or the network of
+  // a status in hand.
+  const chain = useContext(ChainContext);
   const status = useContext(GovernanceContext);
-  const network = status?.governance.network ?? null;
+  const network = chain ?? status?.governance.network ?? null;
   return {
     address: (a: string) => (network?.explorerUrl ? `${network.explorerUrl}/address/${a}` : null),
     tx: (h: string) => (network?.explorerUrl ? `${network.explorerUrl}/tx/${h}` : null),

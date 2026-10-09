@@ -163,7 +163,8 @@ function UpgradeRows({
           className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 transition-colors hover:bg-brand-25"
           data-testid="upgrade-row"
         >
-          <span className="min-w-0 flex-1">
+          {/* On a phone the id takes the whole row and the badges wrap below it. */}
+          <span className="min-w-0 flex-1 basis-full sm:basis-0">
             <span className="mono block break-all font-medium text-navy-800">{u.id}</span>
             <span className="text-slate-600 text-xs">
               Started {formatDay(u.createdAt)} · block {formatNumber(u.blockNumber)} ·{" "}

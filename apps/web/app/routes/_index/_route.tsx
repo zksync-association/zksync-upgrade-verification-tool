@@ -1,16 +1,21 @@
-import { listRecentEmergencyUpgrades } from "@/.server/flows/emergency";
+import {
+  type ExecutedFirst,
+  type PendingEmergencies,
+  loadEmergencyList,
+} from "@/.server/flows/emergency";
 import { EMERGENCY_RECENT_DAYS } from "@/common/emergency";
-import { listFreezeRequests } from "@/.server/flows/freeze";
-import { listL2Vetoes } from "@/.server/flows/l2-veto";
-import { listStandardUpgrades } from "@/.server/flows/standard";
+import { type FreezeList, loadFreezeList } from "@/.server/flows/freeze";
+import { type SignedVetoes, type VetoableProposals, loadL2VetoList } from "@/.server/flows/l2-veto";
+import { type UpgradeList, listStandardUpgrades } from "@/.server/flows/standard";
 import { network, l1 } from "@/.server/rpc";
 import { bytes32Pattern } from "@/.server/request";
 import { upgradeHandlerAbi } from "@/common/abis";
 import { isUpgradeActive } from "@/common/upgrade-states";
-import { useStatus } from "@/components/app-shell";
+import { useChain } from "@/components/governance-context";
 import { Button } from "@/components/ui/button";
-import { OverviewSummary } from "@/components/overview-summary";
+import { OverviewSummary, type SummarySource, SummaryNote } from "@/components/overview-summary";
 import { indexingLabel, useIndexProgress } from "@/components/sync-state";
+import { UntilFresh } from "@/components/verification/until-fresh";
 import { Input } from "@/components/ui/input";
 import { Meta } from "@/utils/meta";
 import { type ActionFunctionArgs, defer, json, redirect } from "@remix-run/node";
@@ -22,26 +27,83 @@ import type { Hex } from "viem";
 
 export const meta = Meta["/"];
 
+// Each count is answered first from what the app holds now (the history the last run saved while
+// this run reads it again, Safe copies of any age), labelled with where it came from, and the
+// count from fresh sources follows in the same response (see each flow's page freshness).
+
+/** Where a first answer came from, or null when it is fresh. */
+const sourceOf = (
+  lastRun: boolean,
+  safe: { stale: boolean; safeFetchedAt: string | null } | null
+) =>
+  lastRun || safe?.stale
+    ? { lastRun, safeFetchedAt: safe?.stale ? safe.safeFetchedAt ?? null : null }
+    : null;
+
+const upgradeCount = (r: UpgradeList) => ({
+  open: r.upgrades.filter((u) => isUpgradeActive(u.state)).length,
+  total: r.upgrades.length,
+  source: sourceOf(r.fromLastRun === true, null),
+});
+
+const emergencyCount = ([pending, executed]: [PendingEmergencies, ExecutedFirst]) => ({
+  pending: pending.pending.length,
+  executed: executed.items.length,
+  incomplete: pending.errors.length > 0 || pending.anomalies > 0,
+  source: sourceOf(executed.fromLastRun, pending),
+});
+
+const freezeCount = (r: FreezeList) => ({
+  open: r.requests.filter((q) => q.state.status === "open").length,
+  incomplete: r.errors.length > 0 || r.anomalies > 0,
+  source: sourceOf(false, r),
+});
+
+const vetoCount = ([signed, vetoable]: [SignedVetoes, VetoableProposals]) => ({
+  open: signed.vetoes.filter((v) => v.state.status === "open").length,
+  vetoable: vetoable.vetoable.length,
+  incomplete: signed.errors.length > 0 || signed.anomalies > 0 || vetoable.l2Error !== null,
+  source: sourceOf(vetoable.fromLastRun, signed),
+});
+
+/** A count's first answer, and the fresh count after it when the first one was not fresh. */
+function counted<T extends { source: SummarySource }>(first: Promise<T>, fresh: () => Promise<T>) {
+  const after = first.then((f) => (f.source ? fresh() : null));
+  void after.catch(() => {});
+  return { first, fresh: after };
+}
+
 export function loader() {
+  const upgrades = listStandardUpgrades({ allHistory: false, freshness: "page" });
+  const emergency = loadEmergencyList({ freshness: "page" });
+  const freeze = loadFreezeList({ freshness: "page" });
+  const vetoes = loadL2VetoList({ freshness: "page" });
+  const counts = {
+    upgrades: counted(upgrades.then(upgradeCount), () =>
+      listStandardUpgrades({ allHistory: false }).then(upgradeCount)
+    ),
+    emergency: counted(
+      Promise.all([emergency.pending, emergency.executedFirst]).then(emergencyCount),
+      () =>
+        Promise.all([
+          emergency.freshPending,
+          emergency.executed.then((items) => ({ items, fromLastRun: false })),
+        ]).then(emergencyCount)
+    ),
+    freeze: counted(freeze.first.then(freezeCount), () => freeze.fresh.then(freezeCount)),
+    vetoes: counted(Promise.all([vetoes.signed, vetoes.vetoable]).then(vetoCount), () =>
+      Promise.all([vetoes.freshSigned, vetoes.freshVetoable]).then(vetoCount)
+    ),
+  };
   return defer({
-    upgrades: listStandardUpgrades({ allHistory: false }).then((r) => ({
-      open: r.upgrades.filter((u) => isUpgradeActive(u.state)).length,
-      total: r.upgrades.length,
-    })),
-    emergency: listRecentEmergencyUpgrades().then((r) => ({
-      pending: r.pending.length,
-      executed: r.executed.length,
-      incomplete: r.errors.length > 0 || r.anomalies > 0,
-    })),
-    freeze: listFreezeRequests().then((r) => ({
-      open: r.requests.filter((q) => q.state.status === "open").length,
-      incomplete: r.errors.length > 0 || r.anomalies > 0,
-    })),
-    vetoes: listL2Vetoes().then((r) => ({
-      open: r.vetoes.filter((v) => v.state.status === "open").length,
-      vetoable: r.vetoable.length,
-      incomplete: r.errors.length > 0 || r.anomalies > 0 || r.l2Error !== null,
-    })),
+    upgrades: counts.upgrades.first,
+    upgradesFresh: counts.upgrades.fresh,
+    emergency: counts.emergency.first,
+    emergencyFresh: counts.emergency.fresh,
+    freeze: counts.freeze.first,
+    freezeFresh: counts.freeze.fresh,
+    vetoes: counts.vetoes.first,
+    vetoesFresh: counts.vetoes.fresh,
   });
 }
 
@@ -67,14 +129,16 @@ export default function Index() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
-  const { governance } = useStatus();
+  // The chain the RPC is on, known before anything else is read: the page never waits for the
+  // root status.
+  const chain = useChain();
 
   return (
     <div className="space-y-8">
       <header className="space-y-2">
         <h1 className="text-[32px] leading-10 tracking-tight">Governance review</h1>
         <p className="max-w-3xl text-slate-700 text-sm leading-6">
-          Review proposals on {governance.network.label}, inspect their calls, and compare the
+          Review proposals on {chain?.label ?? "this network"}, inspect their calls, and compare the
           hashes your Safe signs. Signatures count only after the contract accepts them.
         </p>
       </header>
@@ -139,12 +203,13 @@ export default function Index() {
             title="Protocol upgrades"
             description="L2 decisions started on L1, with Security Council or Guardian approval."
             summary={
-              <Deferred value={data.upgrades} indexed>
-                {(v) => (
+              <Deferred value={data.upgrades} fresh={data.upgradesFresh} indexed>
+                {(v, note) => (
                   <OverviewSummary
                     count={v.open}
                     label="in progress"
                     detail={`${v.total} upgrade${v.total === 1 ? "" : "s"} in the last 45 days`}
+                    note={note}
                   />
                 )}
               </Deferred>
@@ -157,13 +222,14 @@ export default function Index() {
             title="Emergency upgrades"
             description="Upgrade ids signed by the Council, Guardians, and ZKsync Foundation."
             summary={
-              <Deferred value={data.emergency} indexed>
-                {(v) => (
+              <Deferred value={data.emergency} fresh={data.emergencyFresh} indexed>
+                {(v, note) => (
                   <OverviewSummary
                     count={v.pending}
                     label="pending"
                     detail={`${v.executed} executions in the last ${EMERGENCY_RECENT_DAYS} days`}
                     incomplete={v.incomplete}
+                    note={note}
                   />
                 )}
               </Deferred>
@@ -176,12 +242,13 @@ export default function Index() {
             title="Freeze requests"
             description="Council requests to freeze, unfreeze, or change the soft-freeze threshold."
             summary={
-              <Deferred value={data.freeze}>
-                {(v) => (
+              <Deferred value={data.freeze} fresh={data.freezeFresh}>
+                {(v, note) => (
                   <OverviewSummary
                     count={v.open}
                     label="open for signatures"
                     incomplete={v.incomplete}
+                    note={note}
                   />
                 )}
               </Deferred>
@@ -194,13 +261,14 @@ export default function Index() {
             title="Guardian veto"
             description="Guardian cancellations of Token or GovOps proposals before execution."
             summary={
-              <Deferred value={data.vetoes}>
-                {(v) => (
+              <Deferred value={data.vetoes} fresh={data.vetoesFresh}>
+                {(v, note) => (
                   <OverviewSummary
                     count={v.open}
                     label="open vetoes"
                     incomplete={v.incomplete}
                     detail={v.incomplete ? undefined : `${v.vetoable} L2 proposals can be vetoed`}
+                    note={note}
                   />
                 )}
               </Deferred>
@@ -260,13 +328,20 @@ function FlowRow({
 /**
  * A count, once its sources answered. `indexed`: it is read from the upgrade handler's log index,
  * so while the index backfills the pending state says so (never a count: the count appears only
- * once the range it covers is complete).
+ * once the range it covers is complete). A first count that is not fresh (`source`) says where it
+ * came from (`note`) until `fresh` replaces it.
  */
-function Deferred<T>({
+function Deferred<T extends { source: SummarySource }>({
   value,
+  fresh,
   indexed = false,
   children,
-}: { value: Promise<T> | T; indexed?: boolean; children: (v: T) => ReactNode }) {
+}: {
+  value: Promise<T> | T;
+  fresh: Promise<T | null> | T | null;
+  indexed?: boolean;
+  children: (v: T, note: ReactNode) => ReactNode;
+}) {
   return (
     <Suspense fallback={<DeferredPending indexed={indexed} />}>
       <Await
@@ -277,7 +352,18 @@ function Deferred<T>({
           </span>
         }
       >
-        {(v) => children(v as T)}
+        {(first) => {
+          const v = first as T;
+          return (
+            <UntilFresh stale={v.source !== null} fresh={fresh as Promise<T | null>}>
+              {(freshValue, refresh) =>
+                freshValue
+                  ? children(freshValue, null)
+                  : children(v, <SummaryNote source={v.source} refresh={refresh} />)
+              }
+            </UntilFresh>
+          );
+        }}
       </Await>
     </Suspense>
   );

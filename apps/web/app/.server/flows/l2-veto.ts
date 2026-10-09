@@ -12,8 +12,15 @@ import {
   firstOrFresh,
   streamSignatureSet,
 } from "./common";
-import { type L2ProposalView, activeL2Proposals, getL2Proposal, knownGovernors } from "./l2";
-import { collectMessages } from "./messages";
+import {
+  type L2ProposalView,
+  type VetoableAnswer,
+  activeL2ProposalsAnswer,
+  getL2Proposal,
+  knownGovernors,
+} from "./l2";
+import { firstFromHeld } from "./held";
+import { type Collected, collectHeldMessages, collectMessages } from "./messages";
 
 // A Guardians veto signs the L2 proposal id plus the L1 → L2 transaction parameters and a nonce.
 // The proposal's targets/calldatas/description are needed to execute, and come from the L2
@@ -62,13 +69,34 @@ export type VetoSummary = VetoParams & {
   governorName: string | null;
 };
 
-export async function listL2Vetoes() {
-  const gov = await governance();
-  const [collected, governors, vetoable] = await Promise.all([
-    collectMessages(gov.guardians.members, ["CancelL2GovernorProposal"], gov.guardians.domain),
-    knownGovernors(),
-    activeL2Proposals().catch((error: Error) => error),
-  ]);
+/** The vetoes Guardians signed in their Safes, each with its state at the head. */
+export type SignedVetoes = {
+  vetoes: VetoSummary[];
+  errors: string[];
+  anomalies: number;
+  /** When the oldest Safe listing the vetoes came from was read (ISO time), or null. */
+  safeFetchedAt: string | null;
+  /**
+   * A page's first answer from Safe listings older than 60 s (see loadL2VetoList); the fresh list
+   * follows. Always false for the fresh list (and so in JSON).
+   */
+  stale: boolean;
+};
+
+/** The L2 proposals Guardians can still veto, or why they could not be read. */
+export type VetoableProposals = {
+  vetoable: L2ProposalView[];
+  /** Why the list could not be read (then `vetoable` is empty and says nothing). null when read. */
+  l2Error: string | null;
+  /**
+   * A page's first answer from the governors' history the last run saved, while this run reads it
+   * again (pages only); the list from this run's history follows. Always false in JSON.
+   */
+  fromLastRun: boolean;
+};
+
+async function signedFrom(gov: Governance, collected: Collected): Promise<SignedVetoes> {
+  const governors = await knownGovernors();
   const vetoes: VetoSummary[] = collected.groups.map((group) => {
     const m = group.typedData.message as Record<keyof VetoParams, string>;
     const params: VetoParams = {
@@ -88,10 +116,82 @@ export async function listL2Vetoes() {
   });
   return {
     vetoes,
-    vetoable: vetoable instanceof Error ? [] : vetoable,
-    l2Error: vetoable instanceof Error ? await l2ErrorText(vetoable) : null,
     errors: collected.errors,
     anomalies: collected.anomalies,
+    safeFetchedAt: collected.safeFetchedAt ?? null,
+    stale: collected.stale === true,
+  };
+}
+
+async function vetoableFrom(answer: Promise<VetoableAnswer>): Promise<VetoableProposals> {
+  try {
+    const { proposals, provisional } = await answer;
+    return { vetoable: proposals, l2Error: null, fromLastRun: provisional };
+  } catch (error) {
+    return { vetoable: [], l2Error: await l2ErrorText(error), fromLastRun: false };
+  }
+}
+
+/**
+ * The vetoes signed in Guardians' Safes and the L2 proposals they can still veto, independently.
+ * `freshSigned` is the list from Safe listings at most 60 s old and `freshVetoable` the list from
+ * this run's history of the governors. With `freshness: "page"`, `signed` is the page's first
+ * answer (from the listings held, whatever their age, when one is older than 60 s: `stale`; see
+ * firstFromHeld) and `vetoable` likewise (from the history the last run saved while this run reads
+ * it again: `fromLastRun`); otherwise each is its fresh list. States are always read at the head.
+ */
+export function loadL2VetoList({ freshness = "strict" }: { freshness?: Freshness } = {}) {
+  const page = freshness === "page";
+  const gov = governance();
+  const freshSigned = gov.then(async (g) =>
+    signedFrom(
+      g,
+      await collectMessages(g.guardians.members, ["CancelL2GovernorProposal"], g.guardians.domain)
+    )
+  );
+  const signed = page
+    ? gov.then((g) =>
+        firstFromHeld(
+          collectHeldMessages(
+            g.guardians.members,
+            ["CancelL2GovernorProposal"],
+            g.guardians.domain
+          ),
+          freshSigned,
+          (collected) => signedFrom(g, collected)
+        )
+      )
+    : freshSigned;
+  // The first answer may use the last run's history; one that failed there is this run's to give.
+  const firstVetoable = page
+    ? activeL2ProposalsAnswer({ provisional: true }).then(
+        (answer) => answer,
+        () => activeL2ProposalsAnswer()
+      )
+    : activeL2ProposalsAnswer();
+  const vetoable = vetoableFrom(firstVetoable);
+  const freshVetoable = vetoable.then((first) =>
+    first.fromLastRun ? vetoableFrom(activeL2ProposalsAnswer()) : first
+  );
+  for (const promise of [gov, signed, freshSigned, vetoable, freshVetoable])
+    void promise.catch(() => {});
+  return { signed, freshSigned, vetoable, freshVetoable, governance: gov };
+}
+
+/** The strict lists together (JSON). */
+export async function listL2Vetoes() {
+  const loading = loadL2VetoList();
+  const [gov, signed, { vetoable, l2Error }] = await Promise.all([
+    loading.governance,
+    loading.freshSigned,
+    loading.freshVetoable,
+  ]);
+  return {
+    vetoes: signed.vetoes,
+    vetoable,
+    l2Error,
+    errors: signed.errors,
+    anomalies: signed.anomalies,
     governance: gov,
   };
 }

@@ -212,6 +212,17 @@ export class PuhIndex {
     this.#seedComing.expect(until);
   }
 
+  /**
+   * Whether the history the last run saved can answer a page while this run's backfill re-reads
+   * it: one is seeded and not verified yet (handed to the index or waiting for it to be built), or
+   * the chain cache that may hold one is still being loaded.
+   */
+  hasLastRunHistory(): boolean {
+    if (!this.#current()) return false;
+    if (this.#seed || this.#seedComing.pending) return true;
+    return this.#built?.index.status().provisional?.state === "provisional";
+  }
+
   /** Drops a seeded history still awaiting verification (the chain cache was found wrong). */
   dropProvisional() {
     this.#seed = null;

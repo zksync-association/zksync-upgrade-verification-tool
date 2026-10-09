@@ -1,5 +1,15 @@
-import { GovernanceContext, type OkStatus } from "@/components/governance-context";
 import ConnectButton, { WalletOfferContext } from "@/components/connect-button";
+import {
+  type ChainView,
+  type OkStatus,
+  type RootStatus,
+  StatusBoundary,
+  type StatusProblemValue,
+  type StatusSource,
+  StatusSourceContext,
+  WithStatus,
+  useChain,
+} from "@/components/governance-context";
 import { AddressLink } from "@/components/hex";
 import Logo from "@/components/logo";
 import { BlockAge, IndexProgressProvider, IndexingPill } from "@/components/sync-state";
@@ -8,12 +18,17 @@ import { cn } from "@/utils/cn";
 import { formatNumber } from "@/utils/format";
 import { noteStatusLanded, requestStatusRevalidation } from "@/utils/revalidation";
 import { Link, NavLink, useFetcher, useRevalidator } from "@remix-run/react";
-import { AlertTriangle, Info, RefreshCw, ShieldAlert } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { AlertTriangle, Info, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
+import { type ReactNode, Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
 
 export { useStatus } from "@/components/governance-context";
+
+// The app shell renders at once, before the root status (governance, trust anchors, log history)
+// is read: the header, the navigation and each page's own skeletons are in the first bytes of the
+// response. What the status says (the block and its age, banners, the footer's trust anchors)
+// fills in when it is read; until then it says it is being checked, never that all is well.
 
 const NAV = [
   { to: $path("/app/proposals"), label: "Upgrades" },
@@ -23,11 +38,52 @@ const NAV = [
   { to: "/settings", label: "Settings" },
 ];
 
-export default function AppShell({ status, children }: { status: OkStatus; children: ReactNode }) {
+/**
+ * The root status once it is in this browser: right away for a status in hand, else when its
+ * promise settles (after hydration, so the server's and the browser's first renders agree).
+ */
+function useLandedStatus(source: StatusSource): RootStatus | null {
+  const [landed, setLanded] = useState<{ source: StatusSource; status: RootStatus } | null>(() =>
+    source instanceof Promise ? null : { source, status: source }
+  );
+  useEffect(() => {
+    if (!(source instanceof Promise)) {
+      setLanded((current) => (current?.source === source ? current : { source, status: source }));
+      return;
+    }
+    let live = true;
+    source.then(
+      (status) => {
+        if (live) setLanded({ source, status });
+      },
+      () => {}
+    );
+    return () => {
+      live = false;
+    };
+  }, [source]);
+  return landed?.source === source ? landed.status : null;
+}
+
+export default function AppShell({
+  status,
+  children,
+  wallet = true,
+}: {
+  /** The root status, read while the shell streams (or in hand). */
+  status: StatusSource;
+  children: ReactNode;
+  /** Whether a wallet provider is set up around the shell (it offers to connect one). */
+  wallet?: boolean;
+}) {
   // How many Sign / Send buttons are on screen; the header offers to connect only while some are.
   const [walletOffers, setWalletOffers] = useState(0);
+  const landed = useLandedStatus(status);
+  const ok = landed?.ok ? landed : null;
   // A new root status landed: it answers any request to read it again, and its age starts now.
-  useEffect(() => noteStatusLanded(status), [status]);
+  useEffect(() => {
+    if (ok) noteStatusLanded(ok);
+  }, [ok]);
   // The log index finished: read the status again, for its log-history check against the index.
   const { revalidate } = useRevalidator();
   const readStatusAgain = useCallback(() => {
@@ -35,84 +91,184 @@ export default function AppShell({ status, children }: { status: OkStatus; child
     revalidate();
   }, [revalidate]);
   return (
-    <GovernanceContext.Provider value={status}>
-      <IndexProgressProvider initial={status.sync.index} onSettled={readStatusAgain}>
+    <StatusSourceContext.Provider value={status}>
+      <IndexProgressProvider initial={ok?.sync.index ?? null} onSettled={readStatusAgain}>
         <WalletOfferContext.Provider value={setWalletOffers}>
           <div className="flex min-h-screen flex-col">
-            <a
-              href="#main-content"
-              className="sr-only z-50 rounded-lg bg-white px-4 py-3 font-semibold text-brand-700 focus:not-sr-only focus:fixed focus:top-2 focus:left-4"
-            >
-              Skip to content
-            </a>
-            <Header status={status} offerWallet={walletOffers > 0} />
-            <Banners status={status} />
-            <main
-              id="main-content"
-              tabIndex={-1}
-              className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:px-6 sm:py-8"
-            >
-              {children}
-            </main>
-            <Footer status={status} />
+            <SkipLink />
+            <Header offerWallet={walletOffers > 0} wallet={wallet} />
+            <Banners />
+            <Main>
+              <StatusBoundary source={status} problem={(p) => <StatusProblemCard problem={p} />}>
+                {/* A page that needs the status before anything else waits for it here. */}
+                <Suspense fallback={<PagePending />}>{children}</Suspense>
+              </StatusBoundary>
+            </Main>
+            <Footer />
           </div>
         </WalletOfferContext.Provider>
       </IndexProgressProvider>
-    </GovernanceContext.Provider>
+    </StatusSourceContext.Provider>
   );
 }
 
-function Header({ status, offerWallet }: { status: OkStatus; offerWallet: boolean }) {
-  const { network, latestBlock } = status.governance;
+/**
+ * The shell before the app knows which chain the RPC is on (the first moments of a fresh
+ * process): the header, the navigation and a page skeleton, nothing read yet.
+ */
+export function AppFrame() {
+  return (
+    <div className="flex min-h-screen flex-col" aria-busy="true">
+      <SkipLink />
+      <header className="sticky top-0 z-40 border-slate-300 border-b bg-white">
+        <HeaderRow>
+          <HomeLink />
+          <Nav />
+          <div className="ml-auto flex min-w-0 items-center gap-2">
+            <NetworkPill chain={null} />
+          </div>
+        </HeaderRow>
+      </header>
+      <CheckingBanner />
+      <Main>
+        <PagePending />
+      </Main>
+    </div>
+  );
+}
+
+function SkipLink() {
+  return (
+    <a
+      href="#main-content"
+      className="sr-only z-50 rounded-lg bg-white px-4 py-3 font-semibold text-brand-700 focus:not-sr-only focus:fixed focus:top-2 focus:left-4"
+    >
+      Skip to content
+    </a>
+  );
+}
+
+function Main({ children }: { children: ReactNode }) {
+  return (
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:px-6 sm:py-8"
+    >
+      {children}
+    </main>
+  );
+}
+
+function HeaderRow({ children }: { children: ReactNode }) {
+  return (
+    <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6 md:h-16 md:flex-nowrap md:py-0">
+      {children}
+    </div>
+  );
+}
+
+function HomeLink() {
+  return (
+    <Link to="/" className="flex shrink-0 items-center gap-3" aria-label="Home">
+      <Logo className="h-6 w-auto" />
+      <span className="hidden h-5 w-px bg-slate-200 sm:block" />
+      <span className="hidden font-medium text-[15px] text-slate-950 sm:block">Governance</span>
+    </Link>
+  );
+}
+
+function Nav() {
+  return (
+    <nav
+      aria-label="Governance navigation"
+      className="-mx-2 order-last flex w-full min-w-0 flex-wrap items-center gap-1 md:order-none md:w-auto md:flex-1 md:flex-nowrap"
+    >
+      {NAV.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          prefetch="intent"
+          className={({ isActive }) =>
+            cn(
+              "flex min-h-11 items-center whitespace-nowrap rounded-[10px] px-3 py-2 font-medium text-slate-700 text-sm transition-colors hover:bg-slate-75 hover:text-slate-950",
+              isActive && "bg-navy-800 font-semibold text-white hover:bg-navy-800 hover:text-white"
+            )
+          }
+        >
+          {item.label}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+function Header({ offerWallet, wallet }: { offerWallet: boolean; wallet: boolean }) {
+  const chain = useChain();
   return (
     <header className="sticky top-0 z-40 border-slate-300 border-b bg-white">
-      <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6 md:h-16 md:flex-nowrap md:py-0">
-        <Link to="/" className="flex shrink-0 items-center gap-3" aria-label="Home">
-          <Logo className="h-6 w-auto" />
-          <span className="hidden h-5 w-px bg-slate-200 sm:block" />
-          <span className="hidden font-medium text-[15px] text-slate-950 sm:block">Governance</span>
-        </Link>
-        <nav
-          aria-label="Governance navigation"
-          className="-mx-2 order-last flex w-full min-w-0 flex-wrap items-center gap-1 md:order-none md:w-auto md:flex-1 md:flex-nowrap"
-        >
-          {NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              prefetch="intent"
-              className={({ isActive }) =>
-                cn(
-                  "flex min-h-11 items-center whitespace-nowrap rounded-[10px] px-3 py-2 font-medium text-slate-700 text-sm transition-colors hover:bg-slate-75 hover:text-slate-950",
-                  isActive &&
-                    "bg-navy-800 font-semibold text-white hover:bg-navy-800 hover:text-white"
-                )
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <IndexingPill />
-          <span
-            className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-2 font-semibold text-navy-800 text-xs"
-            data-testid="network-pill"
+      <HeaderRow>
+        <HomeLink />
+        <Nav />
+        {/* On a phone the group may wrap onto a second line rather than widen the page. */}
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+          <WithStatus
+            fallback={<NetworkPill chain={chain} />}
+            problem={() => <NetworkPill chain={chain} unavailable />}
           >
-            <span
-              className={cn(
-                "h-2 w-2 rounded-full",
-                network.isDevNode ? "bg-amber-500" : "bg-green-500"
-              )}
-            />
-            {network.label}
-            <BlockAge block={latestBlock} />
-          </span>
+            {(status) => (
+              <>
+                <IndexingPill fallback={status.sync.index} />
+                <NetworkPill
+                  chain={status.governance.network}
+                  block={status.governance.latestBlock}
+                />
+              </>
+            )}
+          </WithStatus>
           <RefreshButton />
-          <ConnectButton offer={offerWallet} />
+          {wallet && (
+            <WithStatus fallback={null}>{() => <ConnectButton offer={offerWallet} />}</WithStatus>
+          )}
         </div>
-      </div>
+      </HeaderRow>
     </header>
+  );
+}
+
+/**
+ * The chain the RPC is on and, once the status is read, the block it was read at and how long
+ * ago that was mined. Until then it says so ("checking…"), with a neutral dot.
+ */
+function NetworkPill({
+  chain,
+  block,
+  unavailable = false,
+}: {
+  chain: Pick<ChainView, "label" | "isDevNode"> | null;
+  block?: { number: string; timestamp: string };
+  unavailable?: boolean;
+}) {
+  return (
+    <span
+      className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-slate-50 px-2 py-2 font-semibold text-navy-800 text-xs"
+      data-testid="network-pill"
+    >
+      <span
+        className={cn(
+          "h-2 w-2 shrink-0 rounded-full",
+          !block ? "bg-slate-300" : chain?.isDevNode ? "bg-amber-500" : "bg-green-500"
+        )}
+      />
+      <span className="truncate">{chain?.label ?? "Connecting"}</span>
+      {block ? (
+        <BlockAge block={block} />
+      ) : (
+        <span className="shrink-0 font-normal text-slate-600" data-testid="status-checking">
+          {unavailable ? "unavailable" : "checking…"}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -149,8 +305,16 @@ export function RefreshButton() {
 function Banner({
   tone,
   icon: Icon,
+  spin = false,
+  testId,
   children,
-}: { tone: "error" | "warning" | "info"; icon: typeof Info; children: ReactNode }) {
+}: {
+  tone: "error" | "warning" | "info";
+  icon: typeof Info;
+  spin?: boolean;
+  testId?: string;
+  children: ReactNode;
+}) {
   return (
     <div
       className={cn(
@@ -160,14 +324,60 @@ function Banner({
         tone === "info" && "border-brand-100 bg-brand-50 text-navy-800"
       )}
       role={tone === "info" ? "status" : "alert"}
+      data-testid={testId}
     >
-      <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+      <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", spin && "motion-safe:animate-spin")} />
       <div className="min-w-0 space-y-1">{children}</div>
     </div>
   );
 }
 
-function Banners({ status }: { status: OkStatus }) {
+function BannerArea({ children }: { children: ReactNode }) {
+  return (
+    <div className="mx-auto mt-4 w-full max-w-[1200px] space-y-2 px-4 sm:px-6">{children}</div>
+  );
+}
+
+/**
+ * Until the status is read: no banner can say all is well yet. It floats over the bottom of the
+ * page rather than taking a place in it, so nothing on the page moves when it goes (a warning that
+ * follows takes its place at the top, in the page).
+ */
+function CheckingBanner() {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-30 px-4 sm:px-6">
+      <div className="pointer-events-auto mx-auto max-w-[1200px] rounded-xl shadow-[0_12px_24px_-4px_rgba(10,26,102,0.16)]">
+        <Banner tone="info" icon={Loader2} spin testId="status-checking-banner">
+          <p>
+            Checking the governance contracts, trust anchors and your RPC's log history… Warnings
+            appear at the top of the page once they are read.
+          </p>
+        </Banner>
+      </div>
+    </div>
+  );
+}
+
+function Banners() {
+  return (
+    <WithStatus
+      fallback={<CheckingBanner />}
+      problem={(problem) => (
+        <BannerArea>
+          <Banner tone="error" icon={ShieldAlert} testId="status-problem">
+            <p className="font-semibold">Can't read the governance contracts.</p>
+            <p>{problem.hint}</p>
+            <p className="mono break-all">{problem.error}</p>
+          </Banner>
+        </BannerArea>
+      )}
+    >
+      {(status) => <TrustBanners status={status} />}
+    </WithStatus>
+  );
+}
+
+function TrustBanners({ status }: { status: OkStatus }) {
   const { governance, logHistory } = status;
   const items: ReactNode[] = [];
   if (governance.warnings.length > 0) {
@@ -221,12 +431,11 @@ function Banners({ status }: { status: OkStatus }) {
     );
   }
   if (items.length === 0) return null;
-  return <div className="mx-auto mt-4 w-full max-w-[1200px] space-y-2 px-4 sm:px-6">{items}</div>;
+  return <BannerArea>{items}</BannerArea>;
 }
 
-function Footer({ status }: { status: OkStatus }) {
-  const g = status.governance;
-  const quota = status.safeApi.quota;
+function Footer() {
+  const chain = useChain();
   return (
     <footer id="data-sources" className="mt-12 border-slate-200 border-t bg-white">
       <div className="mx-auto grid max-w-[1200px] gap-x-10 gap-y-3 px-4 py-8 text-[13px] sm:grid-cols-2 sm:px-6">
@@ -237,44 +446,91 @@ function Footer({ status }: { status: OkStatus }) {
           <p className="max-w-3xl text-slate-950">
             Proposals and roles are read from the chain through your RPC. Signatures are fetched
             from the Safe Transaction Service and counted only after the governance contract accepts
-            them in an <code className="mono">eth_call</code>. This app keeps a local cache of
-            public chain and Safe data between runs (never verdicts, settings or keys): its log
-            history is read from the chain again at every start, and saved Safe copies are shown
-            with their age until Safe is read again. It never posts to Safe.
+            them in an <code className="mono">eth_call</code>.{" "}
+            <WithStatus fallback={null}>
+              {(status) => <CacheSentence state={status.sync.cache.state} />}
+            </WithStatus>{" "}
+            It never posts to Safe.
           </p>
         </div>
-        <FooterRow label="Chain">
-          {g.network.label} · chain id {g.network.chainId}
-        </FooterRow>
-        <FooterRow label="ProtocolUpgradeHandler (pinned)">
-          <AddressLink address={g.upgradeHandler} />
-        </FooterRow>
-        <FooterRow label={`Security Council · ${g.securityCouncil.members.length} members`}>
-          <AddressLink address={g.securityCouncil.address} />
-        </FooterRow>
-        <FooterRow label={`Guardians · ${g.guardians.members.length} members`}>
-          <AddressLink address={g.guardians.address} />
-        </FooterRow>
-        <FooterRow label="Emergency Upgrade Board">
-          <AddressLink address={g.emergencyUpgradeBoard.address} />
-        </FooterRow>
-        <FooterRow label="ZKsync Foundation Safe">
-          <AddressLink address={g.emergencyUpgradeBoard.zkFoundation} />
-        </FooterRow>
-        <FooterRow label="Safe Transaction Service">
-          <span className="mono break-all">{status.safeApi.url ?? "not configured"}</span>
-          {quota.remaining !== null && (
-            <span className="ml-2 text-slate-600">
-              {formatNumber(quota.remaining)} of {formatNumber(quota.limit ?? 0)} requests left
-              {status.safeApi.withKey ? "" : " this month (no API key)"}
-            </span>
-          )}
-        </FooterRow>
-        <FooterRow label="L2 (ZKsync Era) RPC">
-          {status.l2RpcConfigured ? "configured" : "not configured — L2 veto data unavailable"}
-        </FooterRow>
+        <WithStatus
+          fallback={<FooterPending chain={chain} />}
+          problem={() => <FooterPending chain={chain} unavailable />}
+        >
+          {(status) => <FooterRows status={status} />}
+        </WithStatus>
       </div>
     </footer>
+  );
+}
+
+/** What this app keeps between runs, by the state of its chain cache (see /api/status sync.cache). */
+export function CacheSentence({ state }: { state: OkStatus["sync"]["cache"]["state"] }) {
+  return (
+    <span data-testid="cache-sentence">
+      {state === "disabled"
+        ? "This app keeps nothing between runs: it reads its log history and Safe's copies again at every start."
+        : "This app keeps a local cache of public chain and Safe data between runs (never verdicts, settings or keys): its log history is read from the chain again at every start, and saved Safe copies are shown with their age until Safe is read again."}
+    </span>
+  );
+}
+
+function FooterPending({
+  chain,
+  unavailable = false,
+}: { chain: ChainView | null; unavailable?: boolean }) {
+  return (
+    <>
+      <FooterRow label="Chain">
+        {chain ? `${chain.label} · chain id ${chain.chainId}` : "Connecting…"}
+      </FooterRow>
+      <FooterRow label="Trust anchors">
+        <span className="text-slate-600" role="status">
+          {unavailable
+            ? "Not available: the governance contracts could not be read."
+            : "Reading the ProtocolUpgradeHandler and the roles it names…"}
+        </span>
+      </FooterRow>
+    </>
+  );
+}
+
+function FooterRows({ status }: { status: OkStatus }) {
+  const g = status.governance;
+  const quota = status.safeApi.quota;
+  return (
+    <>
+      <FooterRow label="Chain">
+        {g.network.label} · chain id {g.network.chainId}
+      </FooterRow>
+      <FooterRow label="ProtocolUpgradeHandler (pinned)">
+        <AddressLink address={g.upgradeHandler} />
+      </FooterRow>
+      <FooterRow label={`Security Council · ${g.securityCouncil.members.length} members`}>
+        <AddressLink address={g.securityCouncil.address} />
+      </FooterRow>
+      <FooterRow label={`Guardians · ${g.guardians.members.length} members`}>
+        <AddressLink address={g.guardians.address} />
+      </FooterRow>
+      <FooterRow label="Emergency Upgrade Board">
+        <AddressLink address={g.emergencyUpgradeBoard.address} />
+      </FooterRow>
+      <FooterRow label="ZKsync Foundation Safe">
+        <AddressLink address={g.emergencyUpgradeBoard.zkFoundation} />
+      </FooterRow>
+      <FooterRow label="Safe Transaction Service">
+        <span className="mono break-all">{status.safeApi.url ?? "not configured"}</span>
+        {quota.remaining !== null && (
+          <span className="ml-2 text-slate-600">
+            {formatNumber(quota.remaining)} of {formatNumber(quota.limit ?? 0)} requests left
+            {status.safeApi.withKey ? "" : " this month (no API key)"}
+          </span>
+        )}
+      </FooterRow>
+      <FooterRow label="L2 (ZKsync Era) RPC">
+        {status.l2RpcConfigured ? "configured" : "not configured — L2 veto data unavailable"}
+      </FooterRow>
+    </>
   );
 }
 
@@ -283,6 +539,35 @@ function FooterRow({ label, children }: { label: string; children: ReactNode }) 
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="text-slate-600">{label}</span>
       <span className="min-w-0 text-slate-950">{children}</span>
+    </div>
+  );
+}
+
+/** A page that needs the status before anything else, while it is read. */
+function PagePending() {
+  return (
+    <div className="space-y-4" aria-busy="true" data-testid="page-pending">
+      <p role="status" className="text-slate-700">
+        Reading governance data: your RPC, contract roles and network status…
+      </p>
+      <div aria-hidden="true" className="space-y-3 motion-safe:animate-pulse">
+        <div className="h-8 w-64 max-w-full rounded bg-slate-200" />
+        <div className="h-4 w-80 max-w-full rounded bg-slate-200" />
+        <div className="h-24 w-full rounded-xl bg-slate-100" />
+      </div>
+    </div>
+  );
+}
+
+/** In place of a page that needed the status, when it could not be read. */
+function StatusProblemCard({ problem }: { problem: StatusProblemValue }) {
+  return (
+    <div className="w-full max-w-xl rounded-2xl bg-white p-8 shadow-[0_12px_24px_-4px_rgba(10,26,102,0.08)]">
+      <h1 className="mb-3 text-2xl">Can't read the governance contracts</h1>
+      <p className="mb-4 text-slate-950">{problem.hint}</p>
+      <pre className="mono overflow-x-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-red-800">
+        {problem.error}
+      </pre>
     </div>
   );
 }

@@ -105,8 +105,21 @@ export type Network = NetworkConfig & {
 
 export class ConfigError extends Error {}
 
+// The network as last read under the current settings, for what needs it without waiting
+// (resolvedNetwork): set once network() has answered, never guessed.
+let settledNetwork: { generation: number; net: Network } | null = null;
+
+/**
+ * The network network() answered under the current settings, or null while it has not (a fresh
+ * process, or right after a settings change). Never reads anything.
+ */
+export function resolvedNetwork(): Network | null {
+  return settledNetwork?.generation === generation ? settledNetwork.net : null;
+}
+
 export function network(): Promise<Network> {
   return cached("network", FOREVER, async () => {
+    const readGeneration = generation;
     const [chainId, clientVersion, multicallCode] = await Promise.all([
       direct.getChainId(),
       direct
@@ -136,7 +149,7 @@ export function network(): Promise<Network> {
     }
 
     const isDevNode = /anvil|hardhat|ganache/i.test(clientVersion);
-    return {
+    const net: Network = {
       ...base,
       upgradeHandler,
       safeTxServiceUrl: override(
@@ -167,6 +180,8 @@ export function network(): Promise<Network> {
       clientVersion,
       overrides,
     };
+    if (readGeneration === generation) settledNetwork = { generation: readGeneration, net };
+    return net;
   });
 }
 

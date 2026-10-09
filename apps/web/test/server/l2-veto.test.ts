@@ -135,12 +135,27 @@ vi.mock("@/.server/signatures", () => ({
       : fresh,
   simulate: async () => ({ status: "ok" }),
 }));
+// Members' Safe messages: the fresh listings (`collectMessages`, which a test may hold) and the
+// copies held now, whatever their age (`collectHeldMessages`).
+const messages = vi.hoisted(() => ({
+  fresh: null as unknown,
+  held: null as unknown,
+  gate: null as Promise<void> | null,
+}));
 vi.mock("@/.server/flows/messages", () => ({
-  collectMessages: async () => ({ groups: [], errors: [], anomalies: 0 }),
+  collectMessages: async () => {
+    await messages.gate;
+    return messages.fresh ?? { groups: [], errors: [], anomalies: 0 };
+  },
+  collectHeldMessages: async () => messages.held,
 }));
 
-const { getL2Veto, listL2Vetoes, loadL2Veto } = await import("@/.server/flows/l2-veto");
-const { loadFreezeRequest } = await import("@/.server/flows/freeze");
+const { getL2Veto, listL2Vetoes, loadL2Veto, loadL2VetoList } = await import(
+  "@/.server/flows/l2-veto"
+);
+const { listFreezeRequests, loadFreezeList, loadFreezeRequest } = await import(
+  "@/.server/flows/freeze"
+);
 
 const params = {
   l2ProposalId: vetoed.id.toString(),
@@ -170,6 +185,9 @@ const internalError = () =>
 
 beforeEach(() => {
   clearCache();
+  messages.fresh = null;
+  messages.held = null;
+  messages.gate = null;
   sets.firstStale = false;
   state.l2Configured = true;
   state.l2State = 1;
@@ -309,6 +327,149 @@ describe("a page's first answer for a veto or a freeze request", () => {
       const fresh = await freeze.fresh;
       expect(fresh.set.stale).toBe(false);
       expect(fresh.execution?.to).toBe(GUARDIANS);
+    } finally {
+      for (const key of Object.keys(extra)) delete served[key];
+    }
+  });
+});
+
+/** Safe answers wait until the returned release is called. */
+function holdSafe() {
+  let release!: () => void;
+  messages.gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  return release;
+}
+
+/** Whether `promise` settled within a few ms. */
+async function settles(promise: Promise<unknown>, ms = 30): Promise<boolean> {
+  let done = false;
+  promise.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    }
+  );
+  await new Promise((resolve) => setTimeout(resolve, ms));
+  return done;
+}
+
+/** A message group as collected from members' Safes, for typed data `message` of `primaryType`. */
+const group = (primaryType: string, message: Record<string, string>, n: number) => ({
+  digest: `0x${n.toString(16).padStart(64, "0")}`,
+  typedData: { primaryType, message },
+  reportedSigners: [SIGNER],
+  firstSeen: "2026-10-01T10:00:00.000Z",
+  lastSeen: "2026-10-01T10:00:00.000Z",
+});
+const OLD = "2026-10-01T10:00:00.000Z";
+const NOW = "2026-10-07T10:00:00.000Z";
+const collected = (groups: unknown[], fetchedAt: string, stale: boolean) => ({
+  groups,
+  errors: [],
+  anomalies: 0,
+  safeFetchedAt: fetchedAt,
+  stale,
+});
+
+describe("a page's first list of vetoes", () => {
+  const veto = (nonce: number) =>
+    group("CancelL2GovernorProposal", { ...params, nonce: String(nonce) }, nonce + 1);
+
+  it("comes from Safe copies of any age, labelled, and the fresh list follows; JSON waits for it", async () => {
+    messages.held = collected([veto(0)], OLD, true);
+    messages.fresh = collected([veto(0), veto(1)], NOW, false);
+    const release = holdSafe();
+    const loading = loadL2VetoList({ freshness: "page" });
+    const first = await loading.signed;
+    expect(first).toMatchObject({ stale: true, safeFetchedAt: OLD });
+    expect(first.vetoes.map((v) => v.nonce)).toEqual(["0"]);
+    // Each veto's state is read at the head (governance), whatever the copies' age.
+    expect(first.vetoes[0]?.state).toEqual({ status: "open" });
+    expect(await settles(loading.freshSigned)).toBe(false);
+    const json = listL2Vetoes();
+    expect(await settles(json)).toBe(false);
+    release();
+    const fresh = await loading.freshSigned;
+    expect(fresh).toMatchObject({ stale: false, safeFetchedAt: NOW });
+    expect(fresh.vetoes.map((v) => v.nonce)).toEqual(["0", "1"]);
+    // JSON: the fresh list only, in its documented shape.
+    const result = await json;
+    expect(result.vetoes.map((v) => v.nonce)).toEqual(["0", "1"]);
+    expect(Object.keys(result).sort()).toEqual(
+      ["anomalies", "errors", "governance", "l2Error", "vetoable", "vetoes"].sort()
+    );
+  });
+
+  it("is the fresh list itself when no copy held is older than 60 s, or none is held", async () => {
+    messages.fresh = collected([veto(0)], NOW, false);
+    for (const held of [null, collected([veto(0)], NOW, false)]) {
+      messages.held = held;
+      const loading = loadL2VetoList({ freshness: "page" });
+      expect(await loading.signed).toBe(await loading.freshSigned);
+    }
+  });
+
+  it("lists the vetoable proposals on their own, never waiting for Safe", async () => {
+    holdSafe();
+    const loading = loadL2VetoList({ freshness: "page" });
+    const vetoable = await loading.vetoable;
+    expect(vetoable).toMatchObject({ l2Error: null, fromLastRun: false });
+    expect(vetoable.vetoable.map((p) => p.proposalId)).toEqual([vetoed.id.toString()]);
+    expect(await loading.freshVetoable).toBe(vetoable);
+    expect(await settles(loading.signed)).toBe(false);
+  });
+
+  it("says why the vetoable proposals could not be read, never an empty list as an answer", async () => {
+    state.l2State = new TypeError(`fetch failed: getaddrinfo ENOTFOUND ${SECRET_URL}`);
+    const vetoable = await loadL2VetoList({ freshness: "page" }).vetoable;
+    expect(vetoable.vetoable).toEqual([]);
+    expect(vetoable.l2Error).toContain("fetch failed");
+    expect(vetoable.l2Error).not.toContain("secret-host");
+  });
+});
+
+describe("a page's first list of freeze requests", () => {
+  it("comes from Safe copies of any age, labelled, and the fresh list follows; JSON waits for it", async () => {
+    const { governance } = await import("@/.server/governance");
+    const served = (await governance()) as unknown as Record<string, unknown>;
+    const extra = {
+      securityCouncil: {
+        address: GUARDIANS,
+        members: [SIGNER],
+        nonces: { softFreeze: "1", hardFreeze: "0", unfreeze: "0", setSoftFreezeThreshold: "0" },
+        thresholds: { softFreeze: 1, hardFreeze: 1, unfreeze: 1, softFreezeConservative: 1 },
+        domain: { name: "SecurityCouncil", version: "1", chainId: 1, verifyingContract: GUARDIANS },
+      },
+      latestBlock: { timestamp: "100" },
+      freeze: { lastFreezeStatus: 0 },
+    };
+    Object.assign(served, extra);
+    try {
+      const request = (nonce: number) =>
+        group("SoftFreeze", { nonce: String(nonce), validUntil: "1000" }, nonce + 1);
+      messages.held = collected([request(0)], OLD, true);
+      messages.fresh = collected([request(0), request(1)], NOW, false);
+      const release = holdSafe();
+      const loading = loadFreezeList({ freshness: "page" });
+      const first = await loading.first;
+      expect(first).toMatchObject({ stale: true, safeFetchedAt: OLD });
+      // States at the head: nonce 0 is used already, whatever the copies' age.
+      expect(first.requests.map((r) => r.state.status)).toEqual(["done"]);
+      const json = listFreezeRequests();
+      expect(await settles(json)).toBe(false);
+      release();
+      const fresh = await loading.fresh;
+      expect(fresh).toMatchObject({ stale: false, safeFetchedAt: NOW });
+      expect(fresh.requests.map((r) => [r.nonce, r.state.status])).toEqual([
+        ["0", "done"],
+        ["1", "open"],
+      ]);
+      expect((await json).stale).toBe(false);
+      expect((await json).requests).toHaveLength(2);
     } finally {
       for (const key of Object.keys(extra)) delete served[key];
     }

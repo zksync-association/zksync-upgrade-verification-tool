@@ -1,4 +1,14 @@
-import { AlertTriangle } from "lucide-react";
+import { useNowSeconds } from "@/components/sync-state";
+import { type Refresh, copiesAge } from "@/components/verification/freshness";
+import { AlertTriangle, Loader2 } from "lucide-react";
+import type { ReactNode } from "react";
+
+/**
+ * Where a count's first answer came from when it is not fresh: the history the last run saved
+ * (`lastRun`), Safe copies older than 60 s (`safeFetchedAt`, when the oldest was read), or both.
+ * null for a fresh count.
+ */
+export type SummarySource = { lastRun: boolean; safeFetchedAt: string | null } | null;
 
 /** Discovery failures must not look like a complete, empty proposal list. */
 export function OverviewSummary({
@@ -6,11 +16,14 @@ export function OverviewSummary({
   label,
   detail,
   incomplete = false,
+  note,
 }: {
   count: number;
   label: string;
   detail?: string;
   incomplete?: boolean;
+  /** Says where a count that is not fresh came from (see SummaryNote). */
+  note?: ReactNode;
 }) {
   return (
     <div className="space-y-1">
@@ -27,6 +40,43 @@ export function OverviewSummary({
         </p>
       )}
       {detail && <p className="text-slate-600 text-xs">{detail}</p>}
+      {note}
     </div>
+  );
+}
+
+/**
+ * The line under a count that is not fresh: where it came from, while the fresh count is read
+ * ("pending"), or that reading it did not complete ("failed"). Nothing for a fresh count.
+ */
+export function SummaryNote({ source, refresh }: { source: SummarySource; refresh: Refresh }) {
+  const now = useNowSeconds();
+  if (!source) return null;
+  const parts = [
+    source.lastRun ? "History from last run" : null,
+    source.safeFetchedAt ? `Safe copies from ${copiesAge(source.safeFetchedAt, now)}` : null,
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
+  const failed = refresh === "failed";
+  return (
+    <p
+      className="inline-flex items-start gap-1 font-medium text-amber-900 text-xs"
+      data-testid="summary-note"
+    >
+      {failed ? (
+        <AlertTriangle aria-hidden className="mt-px h-3.5 w-3.5 shrink-0" />
+      ) : (
+        <Loader2
+          aria-hidden
+          className={`mt-px h-3.5 w-3.5 shrink-0${refresh === "pending" ? " motion-safe:animate-spin" : ""}`}
+        />
+      )}
+      <span>
+        {parts.join(" · ")} ·{" "}
+        <span className="whitespace-nowrap">
+          {failed ? "checking again did not complete" : "re-verifying"}
+        </span>
+      </span>
+    </p>
   );
 }

@@ -56,26 +56,42 @@ export function indexingLabel(progress: IndexProgress, subject?: string): string
   return subject ? `${what} · ${progress.percent}%` : `${what} ${progress.percent}%`;
 }
 
-const IndexProgressContext = createContext<IndexProgress>(NOT_INDEXING);
+/** The progress, and whether it comes from a root status (or a poll) yet. */
+type ProgressState = { progress: IndexProgress; known: boolean };
 
-/** The live backfill progress (not indexing outside the app shell). */
+const IndexProgressContext = createContext<ProgressState>({
+  progress: NOT_INDEXING,
+  known: false,
+});
+
+/**
+ * The live backfill progress: not indexing outside the app shell, and until the root status is
+ * in this browser (a loading state then gives no share, never a count).
+ */
 export function useIndexProgress(): IndexProgress {
-  return useContext(IndexProgressContext);
+  return useContext(IndexProgressContext).progress;
 }
 
 const POLL_MS = 2_000;
 // About 5 minutes of polling; after that the label keeps its last value until Refresh.
 const MAX_POLLS = 150;
+/**
+ * Polls of an index that has not started (idle) after a root status, at most: enough to see the
+ * backfill a settings save starts, never forever (with SYNC_MODE=off and PREWARM=0 it stays idle
+ * until a page reads it, and every poll would read through to the RPC).
+ */
+export const IDLE_POLLS = 5;
 
 /** Not settled yet: the backfill has not started (e.g. right after a settings save) or runs. */
 const unsettled = (index: IndexStatusView) =>
   index.state === "idle" || index.state === "backfilling";
 
 /**
- * Provides the index progress from the root status, and while the index is not settled (idle or
- * backfilling) polls /api/status for fresher progress (only then: an idle tab must not poll
- * forever; the server does not count these reads as a visit either). A failed poll keeps the last
- * value.
+ * Provides the index progress from the root status (`initial`; null until it is in this
+ * browser), and while the index is backfilling polls /api/status for fresher progress; while it
+ * has not started (idle), only IDLE_POLLS times in a row. Never otherwise: an idle tab must not
+ * poll forever, and the server does not count these reads as a visit. A failed poll keeps the
+ * last value.
  *
  * `onSettled` runs once when a poll finds the index ready or unavailable. The root status is not
  * read again on its own, and it holds what the finished index changes: the log-history check
@@ -87,12 +103,14 @@ export function IndexProgressProvider({
   onSettled,
   children,
 }: {
-  initial: IndexStatusView;
+  initial: IndexStatusView | null;
   onSettled?: () => void;
   children: ReactNode;
 }) {
   const [index, setIndex] = useState(initial);
   const [polls, setPolls] = useState(0);
+  // Polls in a row that found the index idle.
+  const [idlePolls, setIdlePolls] = useState(0);
   // A newer root status (Refresh, settings) replaces whatever polling found, and late answers
   // to polls sent before it are dropped.
   const epoch = useRef(0);
@@ -100,14 +118,17 @@ export function IndexProgressProvider({
     epoch.current += 1;
     setIndex(initial);
     setPolls(0);
+    setIdlePolls(0);
   }, [initial]);
   const settled = useRef(onSettled);
   useEffect(() => {
     settled.current = onSettled;
   }, [onSettled]);
 
-  const progress = useMemo(() => indexProgress(index), [index]);
-  const polling = unsettled(index);
+  const value = useMemo(() => ({ progress: indexProgress(index), known: index !== null }), [index]);
+  const polling =
+    index !== null &&
+    (index.state === "backfilling" || (index.state === "idle" && idlePolls < IDLE_POLLS));
   useEffect(() => {
     if (!polling || polls >= MAX_POLLS) return;
     const sent = epoch.current;
@@ -121,6 +142,7 @@ export function IndexProgressProvider({
         if (!cancelled && sent === epoch.current && body?.ok && body.sync?.index) {
           const next = body.sync.index;
           setIndex(next);
+          setIdlePolls((n) => (next.state === "idle" ? n + 1 : 0));
           // Polling stops here (the index is settled), so this runs once per root status.
           if (!unsettled(next)) settled.current?.();
         }
@@ -135,15 +157,18 @@ export function IndexProgressProvider({
     };
   }, [polling, polls]);
 
-  return <IndexProgressContext.Provider value={progress}>{children}</IndexProgressContext.Provider>;
+  return <IndexProgressContext.Provider value={value}>{children}</IndexProgressContext.Provider>;
 }
 
 /**
- * The header's indexing state; nothing once the index is ready. Below `sm` only the spinner and
- * the share show (the word stays for screen readers), so the header fits a phone.
+ * The header's indexing state; nothing once the index is ready. `fallback`: the index state of
+ * the root status the header shows, for as long as the provider has none of its own (on the
+ * server, and until the status is in this browser). Below `sm` only the spinner and the share
+ * show (the word stays for screen readers), so the header fits a phone.
  */
-export function IndexingPill() {
-  const progress = useIndexProgress();
+export function IndexingPill({ fallback }: { fallback?: IndexStatusView | null }) {
+  const live = useContext(IndexProgressContext);
+  const progress = live.known ? live.progress : indexProgress(fallback);
   if (!progress.indexing) return null;
   return (
     <span

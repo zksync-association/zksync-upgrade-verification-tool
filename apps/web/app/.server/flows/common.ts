@@ -123,12 +123,23 @@ const execTransactionAbi = parseAbi([
 type SignedCall = { to: Address; data: Hex };
 
 /**
+ * A transaction's recipient and input, by its hash (a hash names one transaction for good, wherever
+ * it is mined): kept once read, so a caller may read it ahead of knowing what to look for in it.
+ */
+export function transactionByHash(txHash: Hex): Promise<{ to: Address | null; input: Hex }> {
+  return cached(`tx:${txHash.toLowerCase()}`, Number.POSITIVE_INFINITY, async () => {
+    const tx = await l1.getTransaction({ hash: txHash });
+    return { to: tx.to ?? null, input: tx.input };
+  });
+}
+
+/**
  * The call a transaction made to `target`, also when wrapped in a Safe execTransaction (the
  * Security Council approval in 0x1defa4f7… was sent that way). Returns null for anything else.
  */
 export async function callTo(txHash: Hex, target: Address): Promise<SignedCall | null> {
   return cached(`call-to:${txHash}:${target}`, Number.POSITIVE_INFINITY, async () => {
-    const tx = await l1.getTransaction({ hash: txHash });
+    const tx = await transactionByHash(txHash);
     if (tx.to && isAddressEqual(tx.to, target)) return { to: tx.to, data: tx.input };
     try {
       const { args } = decodeFunctionData({ abi: execTransactionAbi, data: tx.input });

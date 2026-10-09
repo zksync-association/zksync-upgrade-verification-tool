@@ -5,7 +5,7 @@ import {
   loadEmergencyList,
 } from "@/.server/flows/emergency";
 import { EMERGENCY_RECENT_DAYS } from "@/common/emergency";
-import { useStatus } from "@/components/app-shell";
+import { WithStatus } from "@/components/governance-context";
 import { HistoryToggle, PendingRegion, useNavigatingTo } from "@/components/history-toggle";
 import { TxLink } from "@/components/hex";
 import { EmptyState, LoadingCard, PageHeader } from "@/components/page";
@@ -32,14 +32,14 @@ export function loader({ request }: LoaderFunctionArgs) {
   // (labelled with their age when older than 60 s) and the fresh list after it.
   const loading = loadEmergencyList({ allHistory, freshness: "page" });
   // Executions likewise: from the history the last run saved while this run re-reads it
-  // (labelled), and the list from this run's history after it.
+  // (labelled), and the list from this run's history after it. They need no governance read.
   return defer({
     allHistory,
-    pending: loading.then((d) => d.pending),
-    freshPending: loading.then((d) => freshAfter(d.pending, d.freshPending, (p) => p.stale)),
-    executed: loading.then((d) => d.executedFirst),
-    freshExecuted: loading.then((d) =>
-      d.executedFirst.then((first) => (first.fromLastRun ? d.executed : null))
+    pending: loading.pending,
+    freshPending: freshAfter(loading.pending, loading.freshPending, (p) => p.stale),
+    executed: loading.executedFirst,
+    freshExecuted: loading.executedFirst.then((first) =>
+      first.fromLastRun ? loading.executed : null
     ),
   });
 }
@@ -47,7 +47,6 @@ export function loader({ request }: LoaderFunctionArgs) {
 export default function EmergencyList() {
   const { pending, freshPending, executed, freshExecuted, allHistory } =
     useLoaderData<typeof loader>();
-  const { governance } = useStatus();
   const toggle = allHistory ? $path("/app/emergency") : `${$path("/app/emergency")}?history=all`;
   const switching = useNavigatingTo(toggle);
   return (
@@ -62,11 +61,14 @@ export default function EmergencyList() {
         }
       >
         <p className="max-w-3xl text-slate-950">
-          An emergency upgrade runs immediately once {governance.securityCouncil.eip1271Threshold}{" "}
-          of {governance.securityCouncil.members.length} Security Council members,{" "}
-          {governance.guardians.eip1271Threshold} of {governance.guardians.members.length} Guardians
-          and the ZKsync Foundation have signed its id. Members sign only the id: the calls and salt
-          come from the proposer, and this app checks them against the id in your browser.
+          {/* The thresholds come from the root status; the rest of the page does not wait for it. */}
+          <WithStatus fallback="An emergency upgrade runs immediately once enough Security Council members, Guardians and the ZKsync Foundation have signed its id.">
+            {({ governance }) =>
+              `An emergency upgrade runs immediately once ${governance.securityCouncil.eip1271Threshold} of ${governance.securityCouncil.members.length} Security Council members, ${governance.guardians.eip1271Threshold} of ${governance.guardians.members.length} Guardians and the ZKsync Foundation have signed its id.`
+            }
+          </WithStatus>{" "}
+          Members sign only the id: the calls and salt come from the proposer, and this app checks
+          them against the id in your browser.
         </p>
       </PageHeader>
       <div className="space-y-8">

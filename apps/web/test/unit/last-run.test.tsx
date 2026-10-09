@@ -1,4 +1,5 @@
 import {
+  DIRECT_LABEL,
   LAST_RUN_LABEL,
   LastRunCheck,
   LastRunNote,
@@ -99,5 +100,27 @@ describe("LastRunText", () => {
       </p>
     );
     expect(screen.getByTestId("text")).toHaveTextContent(texts.confirmed);
+  });
+});
+
+describe("an item located directly while the history index reads the history", () => {
+  it("is labelled until the index confirms it, then shows nothing", async () => {
+    const check = deferred<unknown>();
+    render(<LastRunCheck check={check.promise} source="direct" what="execution" />);
+    expect(screen.getByTestId("last-run-check")).toHaveTextContent(DIRECT_LABEL);
+    expect(screen.getByTestId("last-run-check")).toHaveTextContent(
+      "Located directly · history index verifying"
+    );
+    await act(async () => check.resolve({ txHash: "0x01" }));
+    expect(screen.queryByTestId("last-run-check")).toBeNull();
+  });
+
+  it("raises an alert when the index does not confirm it", async () => {
+    const check = deferred<unknown>();
+    render(<LastRunCheck check={check.promise} source="direct" />);
+    await act(async () => check.reject(new Error("integrity")));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The handler's complete log history could not confirm this start, which was located directly."
+    );
   });
 });

@@ -58,7 +58,10 @@ function status(
     safeApi: { url: null, withKey: false, quota: { remaining: null, limit: null } },
     l2RpcConfigured: true,
     clientVersion: "test",
-    sync: { index },
+    sync: {
+      index,
+      cache: { state: "verified", file: null, savedAt: null, sizeBytes: null, detail: null },
+    },
   } as unknown as OkStatus;
 }
 

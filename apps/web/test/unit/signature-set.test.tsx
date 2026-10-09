@@ -6,18 +6,28 @@ import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const wallet = vi.hoisted(() => ({ address: undefined as string | undefined }));
+// Whether the root status has been read (the card never waits for it).
+const root = vi.hoisted(() => ({ read: true }));
 
-vi.mock("@/components/governance-context", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/components/governance-context")>()),
-  useStatus: () => ({
+vi.mock("@/components/governance-context", async (importOriginal) => {
+  const status = () => ({
+    ok: true,
     governance: {
       network: { explorerUrl: "https://etherscan.io", l2ExplorerUrl: null },
       securityCouncil: { members: [MEMBER_A, MEMBER_B, MEMBER_C] },
       guardians: { members: [] },
       emergencyUpgradeBoard: { zkFoundation: "0x0000000000000000000000000000000000000009" },
     },
-  }),
-}));
+  });
+  return {
+    ...(await importOriginal<typeof import("@/components/governance-context")>()),
+    useStatus: () => {
+      if (!root.read) throw new Error("the card waited for the root status");
+      return status();
+    },
+    useStatusIfRead: () => (root.read ? status() : null),
+  };
+});
 
 vi.mock("@remix-run/react", () => ({
   useRouteLoaderData: () => ({
@@ -107,6 +117,7 @@ const set = {
 
 beforeEach(() => {
   wallet.address = undefined;
+  root.read = true;
 });
 
 describe("SignatureSetCard", () => {
@@ -159,6 +170,17 @@ describe("SignatureSetCard", () => {
     wallet.address = MEMBER_A;
     rerender(<SignatureSetCard title="t" set={set} state={{ status: "open" }} />);
     expect(screen.getByTestId("sign-button")).toBeDisabled();
+  });
+
+  it("renders its members at once before the root status is read, and lets no one sign yet", () => {
+    root.read = false;
+    wallet.address = MEMBER_C;
+    render(<SignatureSetCard title="t" set={set} state={{ status: "open" }} />);
+    expect(screen.getAllByTestId("member-row")).toHaveLength(3);
+    // The connected Safe is still highlighted (its row opens): that needs only the wallet.
+    expect(screen.getByText(hashes.domainHash)).toBeInTheDocument();
+    expect(screen.getByTestId("sign-button")).toBeDisabled();
+    expect(screen.getByText("Reading the governance roles…")).toBeInTheDocument();
   });
 
   it("shows ready calldata with the simulation verdict, and no sign button once done", () => {

@@ -19,7 +19,9 @@ const page = vi.hoisted(() => ({
   revalidator: { state: "idle", revalidate: vi.fn() },
 }));
 vi.mock("@/.server/rpc", () => ({ l1: {} }));
-vi.mock("@remix-run/react", () => ({
+vi.mock("@remix-run/react", async (importOriginal) => ({
+  // Await: the receipt is deferred (here already in hand, so it renders at once).
+  ...(await importOriginal<typeof import("@remix-run/react")>()),
   useLoaderData: () => page.data,
   useRevalidator: () => page.revalidator,
 }));

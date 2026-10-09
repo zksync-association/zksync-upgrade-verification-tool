@@ -17,7 +17,7 @@ import { UPGRADE_STATES } from "@/common/upgrade-states";
 import { type Address, type Hex, decodeAbiParameters, decodeFunctionData, getAddress } from "viem";
 import { FOREVER, cached, cachedUntil } from "../cache";
 import { CallReverted, callFn, isFinalBlock } from "../chain/call";
-import { type PuhEvent, puhIndex } from "../chain/puh-index";
+import { IndexIntegrityError, type PuhEvent, puhIndex } from "../chain/puh-index";
 import { type Governance, governance } from "../governance";
 import { findBlockByTimestamp, getLogs } from "../logs";
 import {
@@ -37,9 +37,12 @@ import {
   hasArchiveState,
   streamSignatureSet,
   topicOf,
+  transactionByHash,
 } from "./common";
+import { directLookupHelps, emergencyEventDirectly, firstAnswer } from "./direct";
+import { firstFromHeld } from "./held";
 import { type Collected, collectHeldMessages, collectMessages } from "./messages";
-import { findEmergencyEvent } from "./emergency-event";
+import { type EmergencyEvent, findEmergencyEvent } from "./emergency-event";
 import { currentUpgradeStatus } from "../upgrade-status";
 
 // Emergency upgrades sign only the id = keccak256(abi.encode(calls, executor, salt)); Safe never
@@ -225,28 +228,6 @@ async function pendingFrom(collected: Collected): Promise<PendingEmergencies> {
   };
 }
 
-/**
- * A page's first pending list: from the Safe listings held, whatever their age, when one is older
- * than 60 s (labelled `stale`); otherwise, or when a Safe has no listing held, or the fresh list is
- * in first, the fresh list itself.
- */
-async function firstPending(
-  held: Promise<Collected | null>,
-  fresh: Promise<PendingEmergencies>
-): Promise<PendingEmergencies> {
-  let freshIn = false;
-  fresh.then(
-    () => {
-      freshIn = true;
-    },
-    () => {}
-  );
-  const collected = await held.catch(() => null);
-  if (!collected?.stale || freshIn) return fresh;
-  const early = await pendingFrom(collected).catch(() => null);
-  return early === null || freshIn ? fresh : early;
-}
-
 /** A page's first list of executed emergency upgrades (see loadEmergencyList). */
 export type ExecutedFirst = {
   items: EmergencySummary[];
@@ -258,24 +239,17 @@ export type ExecutedFirst = {
 };
 
 /**
- * Pending Safe messages and executed events do not wait for one another. With `freshness:
- * "page"`, `pending` is the page's first answer (see firstPending) and `freshPending` the list from
+ * Pending Safe messages and executed events do not wait for one another, and the executions
+ * (from the handler's log index alone) do not wait for governance either. With `freshness:
+ * "page"`, `pending` is the page's first answer (see firstFromHeld) and `freshPending` the list from
  * listings at most 60 s old; otherwise both are the latter. Likewise `executedFirst` is the
  * page's first list of executions (possibly from the last run's history, `fromLastRun`) and
  * `executed` the list from this run's history; without "page" both are the latter.
  */
-export async function loadEmergencyList({
+export function loadEmergencyList({
   allHistory = false,
   freshness = "strict",
 }: { allHistory?: boolean; freshness?: Freshness } = {}) {
-  const gov = await governance();
-  const board = gov.emergencyUpgradeBoard;
-  const safes = [...gov.securityCouncil.members, ...gov.guardians.members, board.zkFoundation];
-  const freshPending = collectMessages(safes, EMERGENCY_ACTIONS, board.domain).then(pendingFrom);
-  const pending =
-    freshness === "page"
-      ? firstPending(collectHeldMessages(safes, EMERGENCY_ACTIONS, board.domain), freshPending)
-      : freshPending;
   const summaries = (events: Executed[]) =>
     events
       .map((event) => ({
@@ -290,7 +264,29 @@ export async function loadEmergencyList({
   const executed = executedFirst.then((first) =>
     first.fromLastRun ? executedEmergencies({ allHistory }).then(summaries) : first.items
   );
-  for (const promise of [pending, freshPending, executedFirst, executed])
+  // The members' Safes come from governance.
+  const signers = governance().then((gov) => ({
+    domain: gov.emergencyUpgradeBoard.domain,
+    safes: [
+      ...gov.securityCouncil.members,
+      ...gov.guardians.members,
+      gov.emergencyUpgradeBoard.zkFoundation,
+    ],
+  }));
+  const freshPending = signers.then(({ safes, domain }) =>
+    collectMessages(safes, EMERGENCY_ACTIONS, domain).then(pendingFrom)
+  );
+  const pending =
+    freshness === "page"
+      ? signers.then(({ safes, domain }) =>
+          firstFromHeld(
+            collectHeldMessages(safes, EMERGENCY_ACTIONS, domain),
+            freshPending,
+            pendingFrom
+          )
+        )
+      : freshPending;
+  for (const promise of [signers, pending, freshPending, executedFirst, executed])
     void promise.catch(() => {});
   return { pending, freshPending, executedFirst, executed };
 }
@@ -377,6 +373,17 @@ export type EmergencyExecution = {
     checks: { role: string; accepted: boolean | null; error: string | null }[];
   } | null;
   historicalUnavailable: string | null;
+  /**
+   * Pages only: the execution event was located directly (archive state and that block's log)
+   * while this run's log index was still reading the history, and is not checked against it yet.
+   * Never set in JSON.
+   */
+  locatedDirectly?: true;
+  /**
+   * Pages only: the execution event came from the history the last run saved, not read again in
+   * this run yet. Never set in JSON.
+   */
+  fromLastRun?: true;
 };
 
 export type EmergencyDetail = {
@@ -389,11 +396,30 @@ export type EmergencyDetail = {
 
 export type EmergencyOverview = Pick<EmergencyDetail, "id" | "state" | "governance">;
 
+/** What a page shows of an execution first: its calls, rebuilt from its calldata. */
+export type EmergencyExecutionFirst = Omit<
+  EmergencyExecution,
+  "historical" | "historicalUnavailable"
+>;
+
+/** The board's three checks of an execution, re-run at the block before it (see EmergencyExecution). */
+export type EmergencyHistorical = Pick<EmergencyExecution, "historical" | "historicalUnavailable">;
+
 /**
  * Start execution discovery and current Safe verification independently. With `freshness:
  * "page"`, `first` is the page's first answer (roles from first answers, see firstSignatureSet:
  * the strict result, or labelled stale sets) and `detail` the strict result; otherwise (JSON) both
  * are the strict result.
+ *
+ * `executed` is the execution from this run's log index. `executedFirst` is what a page shows
+ * first: with "page", the calls of the execution from the history the last run saved
+ * (`fromLastRun`) while this run re-reads it, or, while the index is still reading the history
+ * (and has nothing from the last run), of the one located directly if that comes first
+ * (`locatedDirectly`); `executedCheck` then checks either against the index's (an integrity error
+ * when they differ; null when there is nothing to check). Such an event stands in for the index's
+ * only when it shows an execution of this id: anything else is the index's to answer. The board's
+ * re-checks of the execution shown follow in `executedHistorical`, so its calls never wait on
+ * archive reads. Without "page", `executedFirst` is `executed`.
  */
 export async function loadEmergencyUpgrade(
   id: Hex,
@@ -402,9 +428,27 @@ export async function loadEmergencyUpgrade(
     freshness = "strict",
   }: { supplied?: MemberSignature[]; freshness?: Freshness } = {}
 ) {
-  const gov = await governance();
+  // The upgrade's state, governance and, for an executed upgrade, its execution's event are read
+  // together (none waits on another), and the event's transaction as soon as the event is known:
+  // only telling the board's call apart in it needs governance (the board's address).
+  const status = currentUpgradeStatus(id);
+  const executedState = status.then(({ state }) => state === UPGRADE_STATES.Done);
+  const indexedRead = executedState.then((done) => (done ? findEmergencyEvent(id) : null));
+  const locatedRead =
+    freshness === "page"
+      ? executedState.then(async (done) =>
+          done ? pageEvent(id, await network(), indexedRead) : null
+        )
+      : null;
+  for (const event of [indexedRead, locatedRead?.then((l) => l?.event ?? null)])
+    void event
+      ?.then((e) => e && transactionByHash(e.txHash))
+      .catch(() => {
+        // Read again, and its failure handled, where the execution is decoded.
+      });
+  void locatedRead?.catch(() => {});
+  const [gov, { state }] = await Promise.all([governance(), status]);
   const board = gov.emergencyUpgradeBoard;
-  const { state } = await currentUpgradeStatus(id);
 
   const specs = [
     {
@@ -451,80 +495,170 @@ export async function loadEmergencyUpgrade(
   );
   const sets = Promise.all(streamed.map((s) => s.fresh));
 
+  /** An execution event's transaction, decoded; null when it is not an execution sent to the board. */
+  const decodedOf = (event: EmergencyEvent) => decodeExecution(event.txHash, board.address);
+
+  /** What an execution event shows first: the calls rebuilt from its calldata. */
+  const callsFrom = (event: EmergencyEvent, decoded: Decoded): EmergencyExecutionFirst => ({
+    txHash: event.txHash,
+    blockNumber: event.blockNumber.toString(),
+    proposal: decoded.proposal,
+    calls: decoded.proposal.calls.map(decodeCall),
+    idMatches: upgradeProposalId(decoded.proposal).toLowerCase() === id.toLowerCase(),
+  });
+
+  /** The board's three checks of an execution, re-run at the block before it. */
+  const historicalFrom = async (
+    event: EmergencyEvent,
+    { guardians, securityCouncil, zkFoundation }: Decoded
+  ): Promise<EmergencyHistorical> => {
+    const block = event.blockNumber - 1n;
+    const hashes = specs.map((spec) => ({
+      hashes: governanceHashes(buildTypedData(spec.action, board.domain, { id })),
+    }));
+    // Keyed by the block the checks run at: the same transaction reorged into another block is
+    // checked again there, never answered from the old one.
+    const recheck = () =>
+      cachedUntil(`emergency-recheck:${event.txHash}:${block}`, async () => {
+        // The boundary is read before the checks: a block at or below it was final when they
+        // were read.
+        const final = await isFinalBlock(block);
+        const checks = await Promise.all([
+          check1271(
+            gov.securityCouncil.address,
+            hashes[0] as Pick<SignatureSet, "hashes">,
+            securityCouncil,
+            block,
+            "Security Council"
+          ),
+          check1271(
+            gov.guardians.address,
+            hashes[1] as Pick<SignatureSet, "hashes">,
+            guardians,
+            block,
+            "Guardians"
+          ),
+          checkSafe(
+            board.zkFoundation,
+            hashes[2] as Pick<SignatureSet, "hashes">,
+            zkFoundation,
+            block
+          ),
+        ]);
+        // Kept for good only when every answer is definite and the block is final.
+        const definite = checks.every((check) => check.accepted !== null);
+        return { value: checks, ttlMs: final && definite ? FOREVER : 0 };
+      });
+    // No answer about the archive state: every check reads as not done, with the RPC error
+    // (never as "no archive state"), and nothing is kept.
+    const archive = await hasArchiveState(board.address, block).catch(
+      (error: unknown) => `RPC error: ${error instanceof Error ? error.message : String(error)}`
+    );
+    const historical: EmergencyExecution["historical"] =
+      archive === false
+        ? null
+        : {
+            block: block.toString(),
+            checks:
+              archive === true
+                ? await recheck()
+                : specs.map((spec) => ({ role: spec.title, accepted: null, error: archive })),
+          };
+    const historicalUnavailable =
+      archive === false ? "RPC has no archive state for the execution block" : null;
+    return { historical, historicalUnavailable };
+  };
+
+  /** What an execution event shows: the calls rebuilt from its calldata, and their re-check. */
+  const executionOf = async (event: EmergencyEvent): Promise<EmergencyExecution | null> => {
+    const decoded = await decodedOf(event);
+    if (!decoded) return null;
+    return { ...callsFrom(event, decoded), ...(await historicalFrom(event, decoded)) };
+  };
+
+  // The index's event; its execution is what JSON and everything that acts on it use.
+  const indexedEvent = state === UPGRADE_STATES.Done ? indexedRead : null;
   const executed = (async (): Promise<EmergencyExecution | null> => {
-    if (state !== UPGRADE_STATES.Done) return null;
-    const event = await findEmergencyEvent(id);
-    if (event) {
-      const decoded = await decodeExecution(event.txHash, board.address);
-      if (decoded) {
-        const { proposal, guardians, securityCouncil, zkFoundation } = decoded;
-        const block = event.blockNumber - 1n;
-        const hashes = specs.map((spec) => ({
-          hashes: governanceHashes(buildTypedData(spec.action, board.domain, { id })),
-        }));
-        // Keyed by the block the checks run at: the same transaction reorged into another
-        // block is checked again there, never answered from the old one.
-        const recheck = () =>
-          cachedUntil(`emergency-recheck:${event.txHash}:${block}`, async () => {
-            // The boundary is read before the checks: a block at or below it was final when
-            // they were read.
-            const final = await isFinalBlock(block);
-            const checks = await Promise.all([
-              check1271(
-                gov.securityCouncil.address,
-                hashes[0] as Pick<SignatureSet, "hashes">,
-                securityCouncil,
-                block,
-                "Security Council"
-              ),
-              check1271(
-                gov.guardians.address,
-                hashes[1] as Pick<SignatureSet, "hashes">,
-                guardians,
-                block,
-                "Guardians"
-              ),
-              checkSafe(
-                board.zkFoundation,
-                hashes[2] as Pick<SignatureSet, "hashes">,
-                zkFoundation,
-                block
-              ),
-            ]);
-            // Kept for good only when every answer is definite and the block is final.
-            const definite = checks.every((check) => check.accepted !== null);
-            return { value: checks, ttlMs: final && definite ? FOREVER : 0 };
-          });
-        // No answer about the archive state: every check reads as not done, with the RPC error
-        // (never as "no archive state"), and nothing is kept.
-        const archive = await hasArchiveState(board.address, block).catch(
-          (error: unknown) => `RPC error: ${error instanceof Error ? error.message : String(error)}`
-        );
-        const historical: EmergencyExecution["historical"] =
-          archive === false
-            ? null
-            : {
-                block: block.toString(),
-                checks:
-                  archive === true
-                    ? await recheck()
-                    : specs.map((spec) => ({ role: spec.title, accepted: null, error: archive })),
-              };
-        const historicalUnavailable =
-          archive === false ? "RPC has no archive state for the execution block" : null;
-        return {
-          txHash: event.txHash,
-          blockNumber: event.blockNumber.toString(),
-          proposal,
-          calls: proposal.calls.map(decodeCall),
-          idMatches: upgradeProposalId(proposal).toLowerCase() === id.toLowerCase(),
-          historical,
-          historicalUnavailable,
-        };
-      }
-    }
-    return null;
+    const event = await indexedEvent;
+    return event ? executionOf(event) : null;
   })();
+  const historicalOf = (execution: EmergencyExecution | null): EmergencyHistorical | null =>
+    execution && {
+      historical: execution.historical,
+      historicalUnavailable: execution.historicalUnavailable,
+    };
+
+  // A page's first execution: the event (see pageEvent) and the calls it shows. One from the
+  // history the last run saved, or located directly, is labelled and checked against the index's;
+  // it stands in for the index's only when its transaction is an execution of this id sent to the
+  // board. One whose transaction is not, whose calls do not hash to the id, or whose read fails is
+  // the index's to answer: a page never shows a negative, or an error, from an event the index has
+  // not confirmed.
+  const located =
+    indexedEvent && locatedRead
+      ? locatedRead.then(
+          async (l): Promise<LocatedEvent> => l ?? { event: await indexedEvent, source: "index" }
+        )
+      : null;
+  const shown: Promise<Shown | null> | null = located
+    ? located.then(async ({ event, source }): Promise<Shown | null> => {
+        if (source !== "index" && event) {
+          const decoded = await decodedOf(event).catch(() => null);
+          const execution = decoded && callsFrom(event, decoded);
+          if (decoded && execution?.idMatches)
+            return {
+              event,
+              decoded,
+              source,
+              execution:
+                source === "direct"
+                  ? { ...execution, locatedDirectly: true }
+                  : source === "last-run"
+                    ? { ...execution, fromLastRun: true }
+                    : execution,
+            };
+        }
+        const indexed = source === "index" ? event : await indexedEvent;
+        const decoded = indexed && (await decodedOf(indexed));
+        return indexed && decoded
+          ? { event: indexed, decoded, source: "index", execution: callsFrom(indexed, decoded) }
+          : null;
+      })
+    : null;
+  const executedFirst: Promise<EmergencyExecutionFirst | null> = shown
+    ? shown.then((s) => s?.execution ?? null)
+    : executed;
+  // The board's re-checks of the execution shown first (the index's own: those of `executed`).
+  const executedHistorical: Promise<EmergencyHistorical | null> = shown
+    ? shown.then((s) =>
+        !s
+          ? null
+          : s.source === "index"
+            ? executed.then(historicalOf)
+            : historicalFrom(s.event, s.decoded)
+      )
+    : executed.then(historicalOf);
+  // An execution from the last run's history, or located directly, must be the one in this run's
+  // complete history.
+  const executedCheck: Promise<EmergencyExecution | null> | null = shown
+    ? shown.then(async (s) => {
+        if (!s || (s.source !== "last-run" && s.source !== "direct")) return null;
+        const { event, source } = s;
+        const indexed = await indexedEvent;
+        if (
+          !indexed ||
+          indexed.txHash.toLowerCase() !== event.txHash.toLowerCase() ||
+          indexed.blockNumber !== event.blockNumber
+        ) {
+          const from =
+            source === "direct" ? "located directly" : "in the history from the last run";
+          throw new IndexIntegrityError(
+            `The execution of emergency upgrade ${id} ${from} (block ${event.blockNumber}, transaction ${event.txHash}) is not the one in the handler's complete log history (${indexed ? `block ${indexed.blockNumber}, transaction ${indexed.txHash}` : "no execution event"}). Reload the page.`
+          );
+        }
+        return executed;
+      })
+    : null;
 
   const overview: EmergencyOverview = { id, state, governance: gov };
   const withRoles = async (
@@ -558,8 +692,18 @@ export async function loadEmergencyUpgrade(
     withRoles(immediate, await executed)
   );
   // Deferred loaders attach their own error handlers after this function returns.
-  for (const pending of [sets, executed, detail, first]) void pending.catch(() => {});
-  return { overview, executed, detail, first };
+  for (const pending of [
+    sets,
+    executed,
+    shown,
+    executedFirst,
+    executedHistorical,
+    executedCheck,
+    detail,
+    first,
+  ])
+    void pending?.catch(() => {});
+  return { overview, executed, executedFirst, executedHistorical, executedCheck, detail, first };
 }
 
 /** JSON retains the complete verification result, including comparisons with Safe's copies. */
@@ -570,7 +714,67 @@ export async function getEmergencyUpgrade(
   return (await loadEmergencyUpgrade(id, options)).detail;
 }
 
+/**
+ * Where a page's execution event came from (see pageEvent): this run's index ("index"), this
+ * run's own reads above the history the last run saved ("run"), that history ("last-run"), or a
+ * direct lookup ("direct").
+ */
+type LocatedEvent = {
+  event: EmergencyEvent | null;
+  source: "index" | "run" | "last-run" | "direct";
+};
+
+/** A page's first execution: its event, where that came from, and the calls it shows. */
+type Shown = {
+  event: EmergencyEvent;
+  decoded: Decoded;
+  source: LocatedEvent["source"];
+  execution: EmergencyExecutionFirst;
+};
+
+/**
+ * A page's execution event of an executed emergency upgrade: from the history the last run saved
+ * while this run's backfill has not re-read it ("last-run"; an event this run has read itself,
+ * above that history, is "run", as a start is in standard.ts pageStart), else this run's index
+ * ("index", `indexed`), or, while the index is still reading the history and has nothing from the
+ * last run, the event located directly when that comes first ("direct"). Anything the last run's
+ * history cannot answer, and any failure there, is the index's to answer.
+ */
+function pageEvent(
+  id: Hex,
+  net: { isDevNode: boolean },
+  indexed: Promise<EmergencyEvent | null>
+): Promise<LocatedEvent> {
+  const fromIndex = async (): Promise<LocatedEvent> => ({ event: await indexed, source: "index" });
+  const fromHistory: Promise<LocatedEvent> = net.isDevNode
+    ? fromIndex()
+    : puhIndex()
+        .singleAnswer("EmergencyUpgradeExecuted", id, { provisional: true })
+        .then(({ event, provisional }) =>
+          provisional && event
+            ? {
+                event: {
+                  id,
+                  txHash: event.log.transactionHash,
+                  blockNumber: event.log.blockNumber,
+                },
+                source: event.provisional ? ("last-run" as const) : ("run" as const),
+              }
+            : fromIndex()
+        )
+        .catch(fromIndex);
+  const direct = directLookupHelps(net)
+    ? emergencyEventDirectly(id).then((event): LocatedEvent | null =>
+        event ? { event, source: "direct" } : null
+      )
+    : null;
+  return firstAnswer(fromHistory, direct).then(({ value }) => value);
+}
+
 type Blob = { signers: readonly Address[]; signatures: readonly Hex[] };
+
+/** An executeEmergencyUpgrade transaction, decoded (see decodeExecution). */
+type Decoded = NonNullable<Awaited<ReturnType<typeof decodeExecution>>>;
 
 /** calls, salt and the three signature blobs from an executeEmergencyUpgrade transaction. */
 async function decodeExecution(txHash: Hex, board: Address) {

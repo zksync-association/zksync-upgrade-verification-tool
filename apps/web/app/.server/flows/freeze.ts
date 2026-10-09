@@ -11,7 +11,8 @@ import {
   firstOrFresh,
   streamSignatureSet,
 } from "./common";
-import { collectMessages } from "./messages";
+import { firstFromHeld } from "./held";
+import { type Collected, collectHeldMessages, collectMessages } from "./messages";
 
 // Freeze requests live only as Security Council members' Safe messages. Their typed data holds
 // everything (type, nonce, validUntil, threshold), so a request is fully described by its URL.
@@ -88,13 +89,22 @@ export type FreezeSummary = FreezeParams & {
   state: SetState;
 };
 
-export async function listFreezeRequests() {
-  const gov = await governance();
-  const collected = await collectMessages(
-    gov.securityCouncil.members,
-    FREEZE_ACTIONS,
-    gov.securityCouncil.domain
-  );
+export type FreezeList = {
+  requests: FreezeSummary[];
+  errors: string[];
+  anomalies: number;
+  governance: Governance;
+  /** When the oldest Safe listing the requests came from was read (ISO time), or null. */
+  safeFetchedAt: string | null;
+  /**
+   * A page's first answer from Safe listings older than 60 s (see loadFreezeList); the fresh list
+   * follows. Always false for the fresh list (and so in JSON).
+   */
+  stale: boolean;
+};
+
+/** The requests in Security Council members' Safe messages, each with its state at the head. */
+function freezeListFrom(gov: Governance, collected: Collected): FreezeList {
   const requests: FreezeSummary[] = collected.groups.map((group) => {
     const params: FreezeParams = {
       action: group.typedData.primaryType as FreezeAction,
@@ -110,7 +120,51 @@ export async function listFreezeRequests() {
       state: freezeState(gov, params),
     };
   });
-  return { requests, errors: collected.errors, anomalies: collected.anomalies, governance: gov };
+  return {
+    requests,
+    errors: collected.errors,
+    anomalies: collected.anomalies,
+    governance: gov,
+    safeFetchedAt: collected.safeFetchedAt ?? null,
+    stale: collected.stale === true,
+  };
+}
+
+/**
+ * `fresh` is the list from listings at most 60 s old. With `freshness: "page"`, `first` is the
+ * page's first answer: from the listings held, whatever their age, when one is older than 60 s
+ * (`stale`, labelled with `safeFetchedAt`; see firstFromHeld), else `fresh` itself. Requests'
+ * states are always read at the head (governance); only which messages exist may be old.
+ */
+export function loadFreezeList({ freshness = "strict" }: { freshness?: Freshness } = {}) {
+  const gov = governance();
+  const fresh = gov.then(async (g) =>
+    freezeListFrom(
+      g,
+      await collectMessages(g.securityCouncil.members, FREEZE_ACTIONS, g.securityCouncil.domain)
+    )
+  );
+  const first =
+    freshness === "page"
+      ? gov.then((g) =>
+          firstFromHeld(
+            collectHeldMessages(
+              g.securityCouncil.members,
+              FREEZE_ACTIONS,
+              g.securityCouncil.domain
+            ),
+            fresh,
+            (collected) => freezeListFrom(g, collected)
+          )
+        )
+      : fresh;
+  for (const promise of [first, fresh]) void promise.catch(() => {});
+  return { first, fresh };
+}
+
+/** The strict list (JSON). */
+export function listFreezeRequests(): Promise<FreezeList> {
+  return loadFreezeList().fresh;
 }
 
 export type FreezeDetail = {

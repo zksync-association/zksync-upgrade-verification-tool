@@ -1,7 +1,7 @@
-import { appStatus } from "@/.server/status";
-import AppShell, { StatusProblem } from "@/components/app-shell";
-import { AppLoading } from "@/components/app-loading";
+import { appStatus, shellChain } from "@/.server/status";
+import AppShell, { AppFrame, StatusProblem } from "@/components/app-shell";
 import { GeneralErrorBoundary } from "@/components/error-boundary";
+import { ChainContext } from "@/components/governance-context";
 import { WalletProvider } from "@/components/providers/wallet-provider";
 import { useNonce } from "@/utils/nonce-provider";
 import { shouldRevalidateRoot } from "@/utils/revalidation";
@@ -39,10 +39,13 @@ export const links: LinksFunction = () => [
   },
 ];
 
-export async function loader({ request }: LoaderFunctionArgs) {
+// Nothing here waits on the network before the first bytes of the page: the status is deferred
+// (the shell renders while it is read), and the chain the RPC is on is in hand once the server
+// has read it (before it starts listening), else deferred too.
+export function loader({ request }: LoaderFunctionArgs) {
   const cookies = request.headers.get("Cookie");
   const wagmiCookie = cookies ? parseWagmiCookie(cookies, "wagmi.store") : undefined;
-  return defer({ env: clientEnv, wagmiCookie, status: appStatus() });
+  return defer({ env: clientEnv, wagmiCookie, chain: shellChain(), status: appStatus() });
 }
 
 export type RootLoader = typeof loader;
@@ -53,35 +56,65 @@ export const shouldRevalidate: ShouldRevalidateFunction = shouldRevalidateRoot;
 
 export default function App() {
   const nonce = useNonce();
-  const { env, wagmiCookie, status } = useLoaderData<typeof loader>();
+  const { env, wagmiCookie, chain, status } = useLoaderData<typeof loader>();
   const initialState = wagmiCookie
     ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
     : undefined;
 
+  // The shell, the navigation and the page render at once; only the wallet needs the chain id
+  // first (in hand unless the server has not read it yet). The status fills in as it is read.
   return (
     <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
-      <Suspense fallback={<AppLoading />}>
-        <Await resolve={status}>
-          {(status) =>
-            status.ok ? (
+      <Suspense fallback={<AppFrame />}>
+        <Await resolve={chain} errorElement={<ChainProblem status={status} />}>
+          {(chain) => (
+            <ChainContext.Provider value={chain}>
               <WalletProvider
                 initialState={initialState}
                 projectId={env.WALLET_CONNECT_PROJECT_ID}
                 safeWalletOrigins={env.SAFE_WALLET_ORIGINS}
-                chainId={status.governance.network.chainId}
-                chainLabel={status.governance.network.label}
+                chainId={chain.chainId}
+                chainLabel={chain.label}
               >
                 <AppShell status={status}>
                   <Outlet />
                 </AppShell>
               </WalletProvider>
-            ) : (
-              <StatusProblem error={status.error} hint={status.hint} />
-            )
-          }
+            </ChainContext.Provider>
+          )}
         </Await>
       </Suspense>
     </Document>
+  );
+}
+
+/** The RPC's chain could not be read: why, from the status (which failed on the same read). */
+function ChainProblem({
+  status,
+}: { status: ReturnType<typeof useLoaderData<typeof loader>>["status"] }) {
+  return (
+    <Suspense fallback={<AppFrame />}>
+      <Await
+        resolve={status}
+        errorElement={
+          <StatusProblem
+            error="The app could not read which chain the RPC is on."
+            hint="Check L1_RPC_URL."
+          />
+        }
+      >
+        {(status) =>
+          status.ok ? (
+            <StatusProblem
+              error="The app could not read which chain the RPC is on."
+              hint="Reload the page."
+            />
+          ) : (
+            <StatusProblem error={status.error} hint={status.hint} />
+          )
+        }
+      </Await>
+    </Suspense>
   );
 }
 

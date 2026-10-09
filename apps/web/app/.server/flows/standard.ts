@@ -18,16 +18,8 @@ import { FOREVER, cachedUntil, seed } from "../cache";
 import { CallReverted, callFn, isFinalBlock } from "../chain/call";
 import { IndexIntegrityError, type PuhEvent, puhIndex } from "../chain/puh-index";
 import { type Governance, governance } from "../governance";
-import { findBlockByTimestamp, getLogs } from "../logs";
-import {
-  type Network,
-  blockTimestamps,
-  l1,
-  latestBlock,
-  network,
-  refreshHead,
-  safeBlockNumber,
-} from "../rpc";
+import type { getLogs } from "../logs";
+import { type Network, blockTimestamps, latestBlock, network, refreshHead } from "../rpc";
 import {
   type Freshness,
   type SignatureSet,
@@ -46,8 +38,8 @@ import {
   executionFor,
   hasArchiveState,
   streamSignatureSet,
-  topicOf,
 } from "./common";
+import { blockAt, directLookupHelps, firstAnswer, startedLog } from "./direct";
 import { type Located, indexCannotAnswer, locateEvent } from "./indexed";
 import { findL2ProposalForUpgrade } from "./l2";
 import { defaultLogger } from "@config/log.server";
@@ -84,6 +76,12 @@ export type StartedUpgrade = {
    * run yet. Never set in JSON, and never kept.
    */
   fromLastRun?: true;
+  /**
+   * Pages only: located directly from the upgrade's creation time (a narrow log read) while this
+   * run's log index was still reading the history, and not checked against it yet. Never set in
+   * JSON, and never kept.
+   */
+  locatedDirectly?: true;
 };
 
 function startedFrom({
@@ -237,24 +235,53 @@ function sameStart(a: StartedUpgrade, b: StartedUpgrade): boolean {
   );
 }
 
+/** A start this run's index has not confirmed yet: from the last run's history, or located directly. */
+const unconfirmed = (started: StartedUpgrade) =>
+  started.fromLastRun === true || started.locatedDirectly === true;
+
 /**
- * The page's core with the start as this run reads it: the same core when its start was read in
- * this run; otherwise (a start from the last run's history) once this run's index answers, which
- * must be the same start (else an integrity error: the cached history was wrong).
+ * The page's core with the start as this run's index reads it: the same core when its start came
+ * from it; otherwise (a start from the last run's history, or located directly) once the index
+ * answers, which must be the same start (else an integrity error: the cached history, or the
+ * direct read, was wrong).
  */
 async function confirmedStart(core: StandardUpgradeCore): Promise<StandardUpgradeCore> {
-  if (!core.started.fromLastRun) return core;
+  if (!unconfirmed(core.started)) return core;
   const started = await startedUpgrade(
     core.id,
     core.status,
     core.governance.network,
     indexedStart(core.id)
   );
-  if (!sameStart(started, core.started))
+  if (!sameStart(started, core.started)) {
+    const source = core.started.fromLastRun
+      ? "in the history from the last run"
+      : "located directly";
     throw new IndexIntegrityError(
-      `The start of upgrade ${core.id} in the history from the last run (block ${core.started.blockNumber}, transaction ${core.started.txHash}) is not the one the chain has (block ${started.blockNumber}, transaction ${started.txHash}). Reload the page.`
+      `The start of upgrade ${core.id} ${source} (block ${core.started.blockNumber}, transaction ${core.started.txHash}) is not the one in the handler's complete log history (block ${started.blockNumber}, transaction ${started.txHash}). Reload the page.`
     );
+  }
   return { ...core, started, calls: started.proposal.calls.map(decodeCall) };
+}
+
+/**
+ * A page's start: the index's (see pageStart), or, while the index is still reading the history
+ * and has nothing from the last run to answer from, the start located directly from the creation
+ * time if that comes first (`locatedDirectly`; confirmedStart checks it against the index's).
+ */
+async function pageLocatedStart(
+  id: Hex,
+  status: Status,
+  indexed: Promise<StartedUpgrade | null>
+): Promise<StartedUpgrade | null> {
+  const net = await network();
+  const direct =
+    status.creationTimestamp !== 0 && directLookupHelps(net)
+      ? findStarted(id, status.creationTimestamp).then((started) =>
+          started ? { ...started, locatedDirectly: true as const } : null
+        )
+      : null;
+  return (await firstAnswer(indexed, direct)).value;
 }
 
 async function readStart(id: Hex): Promise<{ value: StartedUpgrade | null; ttlMs: number }> {
@@ -327,22 +354,14 @@ async function missingStart(id: Hex, status: Status): Promise<Error> {
 }
 
 /**
- * Legacy lookup, when the log index cannot answer: the UpgradeStarted event for `id`, found from
- * the on-chain creation timestamp (no full scan).
+ * The UpgradeStarted event for `id`, found from the on-chain creation timestamp (no full scan):
+ * the legacy lookup when the log index cannot answer, and a page's direct lookup beside it.
  */
 async function findStarted(id: Hex, creationTimestamp: number): Promise<StartedUpgrade | null> {
-  const net = await network();
-  const head = await latestBlock();
-  const block = await blockAt(creationTimestamp);
-  const logs = await getLogs(
-    l1,
-    { address: net.upgradeHandler, topics: [topicOf(upgradeHandlerAbi, "UpgradeStarted"), id] },
-    block,
-    // Dev chains can share a timestamp across several blocks.
-    block + 16n < head.number ? block + 16n : head.number
-  );
-  const log = logs[0];
-  return log ? decodeStarted(log) : null;
+  const log = await startedLog(id, creationTimestamp);
+  const started = log ? decodeStarted(log) : null;
+  // Only the start of this id: its calls are checked against this id, never another's.
+  return started && started.id.toLowerCase() === id.toLowerCase() ? started : null;
 }
 
 export type ApprovalSet = {
@@ -414,10 +433,13 @@ export async function loadStandardUpgrade(
       prefetchSafeListings([...gov.securityCouncil.members, ...gov.guardians.members]),
     freshness,
   });
-  // A page may show a start from the last run's history (`fromLastRun`); whatever acts on the
-  // proposal (its execution, the recorded approvals, the L2 proposal) waits for this run's.
+  // A page may show a start from the last run's history (`fromLastRun`) or located directly
+  // (`locatedDirectly`); whatever acts on the proposal (its execution, the recorded approvals,
+  // the L2 proposal) waits for this run's index.
   const confirmed = confirmedStart(overview);
-  const startedCheck = overview.started.fromLastRun ? confirmed.then((core) => core.started) : null;
+  const startedCheck = unconfirmed(overview.started)
+    ? confirmed.then((core) => core.started)
+    : null;
   const evidence = confirmed.then((core) =>
     timedRead(id, "recorded-approvals", () => getRecordedApprovals(core))
   );
@@ -503,8 +525,9 @@ export async function getStandardUpgradeOverview(id: Hex): Promise<StandardUpgra
 
 /**
  * The upgrade's state, status, start and calls. With `freshness: "page"` the start may come from
- * the last run's history (`started.fromLastRun`, see pageStart); JSON's always comes from this
- * run's index.
+ * the last run's history (`started.fromLastRun`, see pageStart) or be located directly while the
+ * index reads the history (`started.locatedDirectly`, see pageLocatedStart); JSON's always comes
+ * from this run's index.
  */
 export async function getStandardUpgradeCore(
   id: Hex,
@@ -513,19 +536,26 @@ export async function getStandardUpgradeCore(
     freshness = "strict",
   }: { onExists?: (gov: Governance) => void; freshness?: Freshness } = {}
 ): Promise<StandardUpgradeCore> {
-  // The start event is looked up while governance and the status are read.
+  // The start event is looked up while governance and the status are read; a page's direct
+  // lookup (see pageLocatedStart) starts as soon as the status gives the creation time.
   const indexed = freshness === "page" ? pageStart(id) : indexedStart(id);
   void indexed.catch(() => {});
+  const statusRead = timedRead(id, "status", () => readStatus(id));
+  const located =
+    freshness === "page"
+      ? statusRead.then(({ status }) => pageLocatedStart(id, status, indexed))
+      : indexed;
+  void located.catch(() => {});
   const [gov, { state, status }] = await Promise.all([
     timedRead(id, "governance", governance),
-    timedRead(id, "status", () => readStatus(id)),
+    statusRead,
   ]);
   if (state === UPGRADE_STATES.None || status.creationTimestamp === 0) {
     throw new UpgradeNotFound(`ProtocolUpgradeHandler has no standard upgrade ${id}`);
   }
   onExists?.(gov);
   const started = await timedRead(id, "started-event", () =>
-    startedUpgrade(id, status, gov.network, indexed)
+    startedUpgrade(id, status, gov.network, located)
   );
 
   const vetoDays = BigInt(
@@ -818,18 +848,6 @@ async function legacyEvent(
   return log?.transactionHash && log.blockNumber !== null
     ? { transactionHash: log.transactionHash, blockNumber: log.blockNumber }
     : null;
-}
-
-async function blockAt(timestamp: number) {
-  const net = await network();
-  const head = await latestBlock();
-  return findBlockByTimestamp(
-    l1,
-    BigInt(timestamp),
-    net.upgradeHandlerDeployBlock,
-    head.number,
-    net.isDevNode ? null : { key: "l1", safeHead: await safeBlockNumber() }
-  );
 }
 
 function simulateAs(execution: ExecutionView | Parameters<typeof simulate>[0], executor: Address) {

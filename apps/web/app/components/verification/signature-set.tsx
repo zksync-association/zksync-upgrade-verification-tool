@@ -1,6 +1,5 @@
 import type { ExecutionView, SetState, UsedSignature } from "@/.server/flows/common";
 import type { MemberResult, SignatureSet } from "@/.server/signatures";
-import { useConnectedGroups } from "@/components/connect-button";
 import { AddressLink, CopyButton, ExternalAnchor, Hash, TxLink } from "@/components/hex";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -10,6 +9,7 @@ import type { SerializeFrom } from "@remix-run/node";
 import { AlertTriangle, CheckCircle2, ChevronDown, ShieldCheck, XCircle } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { isAddressEqual } from "viem";
+import { useAccount } from "wagmi";
 import { MemberStatusBadge, SetStateBadge } from "./badges";
 import { ExecutionPanel } from "./execution-panel";
 import { FreshnessNote, type Refresh } from "./freshness";
@@ -250,7 +250,8 @@ function ThresholdLine({
 }
 
 function MemberList({ set, staleAt }: { set: Serialized<SignatureSet>; staleAt: string | null }) {
-  const { address } = useConnectedGroups();
+  // Only the connected account: the list never waits for the root status.
+  const { address } = useAccount();
   const [open, setOpen] = useState<string | null>(null);
   return (
     <ul className="border-slate-200 border-t" data-testid="member-list">

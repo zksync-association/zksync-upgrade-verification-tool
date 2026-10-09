@@ -7,30 +7,40 @@ import { formatEth } from "@/utils/format";
 import { notFound } from "@/utils/http";
 import { Meta } from "@/utils/meta";
 import { requestStatusRevalidation } from "@/utils/revalidation";
-import { type LoaderFunctionArgs, json } from "@remix-run/node";
-import { useLoaderData, useRevalidator } from "@remix-run/react";
+import { type LoaderFunctionArgs, defer } from "@remix-run/node";
+import { Await, useLoaderData, useRevalidator } from "@remix-run/react";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import type { Hex } from "viem";
 
 export const meta = Meta["/app/transactions/:hash"];
 
-// Receipt read on the server through the app's RPC, polled until mined.
-export async function loader({ params }: LoaderFunctionArgs) {
+// Receipt read on the server through the app's RPC, polled until mined. Deferred: the page is
+// sent before the RPC answers.
+export function loader({ params }: LoaderFunctionArgs) {
   const hash = params.hash ?? "";
   if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) throw notFound();
-  const receipt = await l1.getTransactionReceipt({ hash: hash as Hex }).catch(() => null);
-  return json({
-    hash,
-    receipt: receipt && {
+  const receipt: Promise<Receipt> = l1
+    .getTransactionReceipt({ hash: hash as Hex })
+    .then((receipt) => ({
       status: receipt.status,
       blockNumber: receipt.blockNumber.toString(),
       from: receipt.from,
       to: receipt.to,
       fee: (receipt.gasUsed * receipt.effectiveGasPrice).toString(),
-    },
-  });
+    }))
+    .catch(() => null);
+  return defer({ hash, receipt });
 }
+
+/** The receipt, once mined; null while it is not (or could not be read). */
+type Receipt = {
+  status: "success" | "reverted";
+  blockNumber: string;
+  from: string;
+  to: string | null;
+  fee: string;
+} | null;
 
 const POLL_MS = 4_000;
 // Root status reads at most, once mined, while it is still older than the transaction's block
@@ -39,6 +49,27 @@ const STATUS_READS = 3;
 
 export default function Transaction() {
   const { hash, receipt } = useLoaderData<typeof loader>();
+  return (
+    <div className="space-y-6">
+      <PageHeader eyebrow="Transaction" title="Transaction" id={hash} />
+      <Suspense
+        fallback={
+          <Card className="p-6">
+            <p role="status" className="flex items-center gap-2 text-slate-950">
+              <Clock className="h-5 w-5 text-slate-600" /> Reading the transaction receipt…
+            </p>
+          </Card>
+        }
+      >
+        <Await resolve={receipt}>
+          {(receipt) => <TransactionStatus hash={hash} receipt={receipt as Receipt} />}
+        </Await>
+      </Suspense>
+    </div>
+  );
+}
+
+function TransactionStatus({ hash, receipt }: { hash: string; receipt: Receipt }) {
   const { governance } = useStatus();
   const revalidator = useRevalidator();
   // Until mined, poll for the receipt. These polls leave the app status alone.
@@ -73,43 +104,39 @@ export default function Transaction() {
   }, [statusBehind, revalidator]);
 
   return (
-    <div className="space-y-6">
-      <PageHeader eyebrow="Transaction" title="Transaction" id={hash} />
-      <Card className="p-6">
-        {!receipt ? (
-          <p className="flex items-center gap-2 text-slate-950">
-            <Clock className="h-5 w-5 text-slate-600" /> Waiting for the transaction to be mined… If
-            you sent it from a Safe, this may be a Safe transaction hash; follow it in Safe{"{"}
-            Wallet{"}"}.
+    <Card className="p-6">
+      {!receipt ? (
+        <p className="flex items-center gap-2 text-slate-950">
+          <Clock className="h-5 w-5 text-slate-600" /> Waiting for the transaction to be mined… If
+          you sent it from a Safe, this may be a Safe transaction hash; follow it in Safe{"{"}
+          Wallet{"}"}.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <p
+            className={`flex items-center gap-2 font-medium ${receipt.status === "success" ? "text-green-900" : "text-red-800"}`}
+          >
+            {receipt.status === "success" ? (
+              <CheckCircle2 className="h-5 w-5" />
+            ) : (
+              <XCircle className="h-5 w-5" />
+            )}
+            {receipt.status === "success" ? "Succeeded" : "Reverted"} in block {receipt.blockNumber}
           </p>
-        ) : (
-          <div className="space-y-4">
-            <p
-              className={`flex items-center gap-2 font-medium ${receipt.status === "success" ? "text-green-900" : "text-red-800"}`}
-            >
-              {receipt.status === "success" ? (
-                <CheckCircle2 className="h-5 w-5" />
-              ) : (
-                <XCircle className="h-5 w-5" />
-              )}
-              {receipt.status === "success" ? "Succeeded" : "Reverted"} in block{" "}
-              {receipt.blockNumber}
-            </p>
-            <dl className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-[120px_1fr]">
-              <dt className="text-slate-600">Hash</dt>
-              <dd>
-                <TxLink hash={hash} />
-              </dd>
-              <dt className="text-slate-600">From</dt>
-              <dd className="mono">{receipt.from}</dd>
-              <dt className="text-slate-600">To</dt>
-              <dd className="mono">{receipt.to}</dd>
-              <dt className="text-slate-600">Fee</dt>
-              <dd>{formatEth(receipt.fee)}</dd>
-            </dl>
-          </div>
-        )}
-      </Card>
-    </div>
+          <dl className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-[120px_1fr]">
+            <dt className="text-slate-600">Hash</dt>
+            <dd>
+              <TxLink hash={hash} />
+            </dd>
+            <dt className="text-slate-600">From</dt>
+            <dd className="mono">{receipt.from}</dd>
+            <dt className="text-slate-600">To</dt>
+            <dd className="mono">{receipt.to}</dd>
+            <dt className="text-slate-600">Fee</dt>
+            <dd>{formatEth(receipt.fee)}</dd>
+          </dl>
+        </div>
+      )}
+    </Card>
   );
 }

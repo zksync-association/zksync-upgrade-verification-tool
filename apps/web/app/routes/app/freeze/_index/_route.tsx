@@ -1,8 +1,9 @@
-import { type FreezeSummary, listFreezeRequests } from "@/.server/flows/freeze";
+import { freshAfter } from "@/.server/flows/common";
+import { type FreezeList, type FreezeSummary, loadFreezeList } from "@/.server/flows/freeze";
 import type { FreezeAction } from "@/common/execution";
 import { FREEZE_ACTIONS, FREEZE_LABELS, freezePath } from "@/common/freeze";
 import { FREEZE_STATUS_LABELS } from "@/common/upgrade-states";
-import { useStatus } from "@/components/app-shell";
+import { WithStatus, useStatus } from "@/components/governance-context";
 import { EmptyState, Facts, LoadingCard, PageHeader } from "@/components/page";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,6 +18,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SetStateBadge } from "@/components/verification/badges";
+import { FreshnessNote, type Refresh } from "@/components/verification/freshness";
+import { UntilFresh } from "@/components/verification/until-fresh";
 import { cn } from "@/utils/cn";
 import { formatTime, relativeTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
@@ -28,69 +31,129 @@ import { Suspense, useState } from "react";
 export const meta = Meta["/app/freeze"];
 
 export function loader() {
-  return defer({ list: listFreezeRequests() });
+  // Requests come from Security Council members' Safe messages: the page lists them at once from
+  // the copies held (labelled with their age when older than 60 s) and the fresh list after it.
+  const loading = loadFreezeList({ freshness: "page" });
+  return defer({
+    list: loading.first,
+    freshList: freshAfter(loading.first, loading.fresh, (list) => list.stale),
+  });
 }
 
-export default function FreezeList() {
-  const { list } = useLoaderData<typeof loader>();
-  const { governance } = useStatus();
-  const sc = governance.securityCouncil;
-  const frozenUntil = Number(governance.freeze.protocolFrozenUntil);
+export default function FreezeListPage() {
+  const { list, freshList } = useLoaderData<typeof loader>();
+  // The header and the list's section render at once; the thresholds, nonces and freeze state
+  // come from the root status, and fill in when it is read.
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Security Council" title="Freeze requests" actions={<NewRequestDialog />}>
+      <PageHeader
+        eyebrow="Security Council"
+        title="Freeze requests"
+        actions={
+          <WithStatus
+            fallback={
+              <Button variant="secondary" disabled data-testid="new-freeze">
+                <Plus /> New request
+              </Button>
+            }
+          >
+            {() => <NewRequestDialog />}
+          </WithStatus>
+        }
+      >
         <p className="max-w-3xl text-slate-950">
-          A soft freeze needs {sc.thresholds.softFreeze} Security Council signatures, a hard freeze{" "}
-          {sc.thresholds.hardFreeze}, an unfreeze {sc.thresholds.unfreeze}, and changing the
-          soft-freeze threshold {sc.thresholds.softFreezeConservative}. Each request is signed for
-          the contract's next nonce and expires at its deadline.
+          <WithStatus fallback="A soft freeze, a hard freeze, an unfreeze and changing the soft-freeze threshold each need their own number of Security Council signatures.">
+            {({ governance: { securityCouncil: sc } }) =>
+              `A soft freeze needs ${sc.thresholds.softFreeze} Security Council signatures, a hard freeze ${sc.thresholds.hardFreeze}, an unfreeze ${sc.thresholds.unfreeze}, and changing the soft-freeze threshold ${sc.thresholds.softFreezeConservative}.`
+            }
+          </WithStatus>{" "}
+          Each request is signed for the contract's next nonce and expires at its deadline.
         </p>
       </PageHeader>
-      <Facts
-        items={[
-          {
-            label: "Protocol",
-            value:
-              frozenUntil > Number(governance.latestBlock.timestamp)
-                ? `Frozen until ${formatTime(frozenUntil)}`
-                : FREEZE_STATUS_LABELS[governance.freeze.lastFreezeStatus] ?? "Unknown",
-          },
-          {
-            label: "Next nonces (soft · hard · unfreeze · threshold)",
-            value: (
-              <span className="mono">
-                {sc.nonces.softFreeze} · {sc.nonces.hardFreeze} · {sc.nonces.unfreeze} ·{" "}
-                {sc.nonces.setSoftFreezeThreshold}
-              </span>
-            ),
-          },
-        ]}
-      />
+      <WithStatus fallback={<ProtocolFacts />}>
+        {({ governance }) => <ProtocolFacts governance={governance} />}
+      </WithStatus>
       <Suspense
         fallback={<LoadingCard label="Collecting freeze requests from Security Council Safes…" />}
       >
-        <Await resolve={list}>{(result) => <Requests result={result} />}</Await>
+        <Await
+          resolve={list}
+          errorElement={
+            <EmptyState>Freeze requests could not be checked. Refresh to retry.</EmptyState>
+          }
+        >
+          {(first) => (
+            <UntilFresh stale={first.stale} fresh={freshList}>
+              {(fresh, refresh) => (
+                <Requests result={fresh ?? first} refresh={fresh ? null : refresh} />
+              )}
+            </UntilFresh>
+          )}
+        </Await>
       </Suspense>
     </div>
   );
 }
 
-function Requests({
-  result,
-}: { result: SerializeFrom<Awaited<ReturnType<typeof listFreezeRequests>>> }) {
+/** The protocol's freeze state and the next nonces, once the root status is read. */
+function ProtocolFacts({
+  governance,
+}: { governance?: ReturnType<typeof useStatus>["governance"] }) {
+  const reading = (
+    <span role="status" className="text-slate-600">
+      Reading…
+    </span>
+  );
+  const sc = governance?.securityCouncil;
+  const frozenUntil = Number(governance?.freeze.protocolFrozenUntil ?? 0);
+  return (
+    <Facts
+      items={[
+        {
+          label: "Protocol",
+          value: !governance
+            ? reading
+            : frozenUntil > Number(governance.latestBlock.timestamp)
+              ? `Frozen until ${formatTime(frozenUntil)}`
+              : FREEZE_STATUS_LABELS[governance.freeze.lastFreezeStatus] ?? "Unknown",
+        },
+        {
+          label: "Next nonces (soft · hard · unfreeze · threshold)",
+          value: !sc ? (
+            reading
+          ) : (
+            <span className="mono">
+              {sc.nonces.softFreeze} · {sc.nonces.hardFreeze} · {sc.nonces.unfreeze} ·{" "}
+              {sc.nonces.setSoftFreezeThreshold}
+            </span>
+          ),
+        },
+      ]}
+    />
+  );
+}
+
+function Requests({ result, refresh }: { result: SerializeFrom<FreezeList>; refresh: Refresh }) {
   const open = result.requests.filter((r) => r.state.status === "open");
   const rest = result.requests.filter((r) => r.state.status !== "open");
   return (
     <div className="space-y-8">
-      {result.errors.length > 0 && (
+      <FreshnessNote set={result} refresh={refresh} what="The requests and counts below" />
+      {(result.errors.length > 0 || result.anomalies > 0) && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-sm">
-          Some Safes could not be read: {result.errors.join("; ")}
+          The list may be incomplete. {result.errors.join("; ")}
+          {result.anomalies > 0 &&
+            ` ${result.anomalies} messages had unexpected hashes and were excluded.`}
         </p>
       )}
       <div className="space-y-3">
         <h2 className="text-[22px] leading-7">Open</h2>
         {open.length === 0 ? (
-          <EmptyState>No open freeze request.</EmptyState>
+          <EmptyState>
+            {result.errors.length > 0 || result.anomalies > 0
+              ? "No open freeze request was found in the available messages."
+              : "No open freeze request."}
+          </EmptyState>
         ) : (
           <Rows requests={open} testId="open-freezes" />
         )}
@@ -106,7 +169,6 @@ function Requests({
 }
 
 function Rows({ requests, testId }: { requests: SerializeFrom<FreezeSummary>[]; testId: string }) {
-  const { governance } = useStatus();
   return (
     <Card className="divide-y divide-slate-100 overflow-hidden" data-testid={testId}>
       {requests.map((r) => (
@@ -122,9 +184,14 @@ function Rows({ requests, testId }: { requests: SerializeFrom<FreezeSummary>[]; 
               {r.action === "SetSoftFreezeThreshold" && ` to ${r.threshold}`} · nonce {r.nonce}
             </span>
             <span className="text-slate-600 text-xs">
-              Valid until {formatTime(r.validUntil)} (
-              {relativeTime(r.validUntil, governance.latestBlock.timestamp)}) · signed in{" "}
-              {r.reportedSigners} Safe{r.reportedSigners === 1 ? "" : "s"}
+              Valid until {formatTime(r.validUntil)}
+              {/* How far off, by the head the root status was read at: once it is. */}
+              <WithStatus fallback={null}>
+                {({ governance }) =>
+                  ` (${relativeTime(r.validUntil, governance.latestBlock.timestamp)})`
+                }
+              </WithStatus>{" "}
+              · signed in {r.reportedSigners} Safe{r.reportedSigners === 1 ? "" : "s"}
             </span>
           </span>
           <SetStateBadge state={r.state} />

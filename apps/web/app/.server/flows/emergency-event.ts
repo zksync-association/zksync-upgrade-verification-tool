@@ -42,9 +42,14 @@ export async function findEmergencyEvent(id: Hex): Promise<EmergencyEvent | null
 /**
  * Without the index: bisect upgradeStatus over archive state, then read that one block's log.
  * Each read is a direct eth_call that either decodes or throws, so a failed read never counts as
- * "not executed yet"; any failure of the bisection falls back to the complete log scan.
+ * "not executed yet"; any failure of the bisection falls back to the complete log scan, or (with
+ * `scan: false`, a page's direct lookup beside the index) gives up with null.
  */
-async function archiveEmergencyEvent(id: Hex, net: Network): Promise<EmergencyEvent | null> {
+export async function archiveEmergencyEvent(
+  id: Hex,
+  net: Network,
+  { scan = true }: { scan?: boolean } = {}
+): Promise<EmergencyEvent | null> {
   const head = await l1.getBlockNumber({ cacheTime: 0 });
   const filter = {
     address: net.upgradeHandler,
@@ -67,6 +72,7 @@ async function archiveEmergencyEvent(id: Hex, net: Network): Promise<EmergencyEv
       head
     );
   } catch {
+    if (!scan) return null;
     defaultLogger.info(
       { id },
       "Archive execution lookup unavailable; falling back to indexed emergency logs"

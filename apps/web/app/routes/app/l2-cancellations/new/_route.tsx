@@ -1,33 +1,47 @@
 import { knownGovernors } from "@/.server/flows/l2";
 import { VETO_DEFAULTS, vetoPath } from "@/common/veto";
 import { useStatus } from "@/components/app-shell";
-import { PageHeader } from "@/components/page";
+import { LoadingCard, PageHeader } from "@/components/page";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Meta } from "@/utils/meta";
-import { type LoaderFunctionArgs, json } from "@remix-run/node";
-import { useLoaderData, useNavigate } from "@remix-run/react";
-import { useState } from "react";
+import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
+import { Await, useLoaderData, useNavigate } from "@remix-run/react";
+import { Suspense, useState } from "react";
 import { $path } from "remix-routes";
 import { formatEther, isAddress, parseEther } from "viem";
 import { useAccount } from "wagmi";
 
 export const meta = Meta["/app/l2-cancellations/new"];
 
-export async function loader({ request }: LoaderFunctionArgs) {
+// Deferred: the page is sent before the governors are known (they need the network read).
+export function loader({ request }: LoaderFunctionArgs) {
   const query = new URL(request.url).searchParams;
-  const governors = (await knownGovernors()).filter((g) => g.kind !== "protocol");
-  return json({
-    governors,
-    governor: query.get("governor") ?? governors[0]?.address ?? "",
-    proposalId: query.get("proposalId") ?? "",
+  const form = knownGovernors().then((all) => {
+    const governors = all.filter((g) => g.kind !== "protocol");
+    return {
+      governors,
+      governor: query.get("governor") ?? governors[0]?.address ?? "",
+      proposalId: query.get("proposalId") ?? "",
+    };
   });
+  return defer({ form });
 }
 
+type VetoFormData = SerializeFrom<typeof loader>["form"] extends Promise<infer F> ? F : never;
+
 export default function NewVeto() {
-  const data = useLoaderData<typeof loader>();
+  const { form } = useLoaderData<typeof loader>();
+  return (
+    <Suspense fallback={<LoadingCard label="Reading the L2 governors…" />}>
+      <Await resolve={form}>{(data) => <VetoForm data={data} />}</Await>
+    </Suspense>
+  );
+}
+
+function VetoForm({ data }: { data: VetoFormData }) {
   const { governance } = useStatus();
   const { address } = useAccount();
   const navigate = useNavigate();

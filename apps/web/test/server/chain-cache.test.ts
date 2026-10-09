@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { clearCache } from "@/.server/cache";
 import { l2GovernorIndex } from "@/.server/chain/l2-index";
+import { activeL2ProposalsAnswer } from "@/.server/flows/l2";
 import { IndexIncomplete } from "@/.server/chain/log-index";
 import { puhIndex } from "@/.server/chain/puh-index";
 import {
@@ -799,6 +800,63 @@ describe("the L2 governors' history", () => {
     await vi.waitFor(() => expect(chainCacheStatus().state).toBe("mismatch"));
     const strict = await l2GovernorIndex().read();
     expect(strict.events[0]?.proposalId).toBe(proposalIdOf("first"));
+  });
+
+  it("answers a page's vetoable list, labelled, and never keeps what a seeded log says", async () => {
+    const vetoable = () => [
+      ...proposals(),
+      { governor: GOVERNORS.govOps, description: "third", created: ERA_FINAL - 8_000n, state: 1 },
+    ];
+    restart(ERA_MAINNET());
+    upstream({ era: fakeEra(vetoable()) });
+    await loadChainCache({ dir: cacheDir() });
+    await Promise.all([puhIndex().startBackfill(), l2GovernorIndex().startBackfill()]);
+    expect((await activeL2ProposalsAnswer()).proposals.map((p) => p.description)).toEqual([
+      "second",
+      "third",
+    ]);
+    expect(await saveChainCache()).toBe(true);
+    const saved = readFile();
+    // "second"'s creation, at its place in the chain, says what "third"'s does.
+    const logs = saved.l2.logs as { data: Hex }[];
+    const [second, third] = logs.slice(-2) as [{ data: Hex }, { data: Hex }];
+    writeFile({
+      ...saved,
+      l2: { ...saved.l2, logs: [...logs.slice(0, -2), { ...second, data: third.data }, third] },
+    });
+
+    restart(ERA_MAINNET());
+    // Era's backfill waits for the test; its tail is answered.
+    const era = fakeEra(vetoable());
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const held = {
+      ...era,
+      handle: async (call: FakeCall) => {
+        const filter = call.params[0] as { toBlock?: Hex };
+        if (call.method === "eth_getLogs" && BigInt(filter.toBlock ?? "0x0") <= ERA_FINAL)
+          await gate;
+        return era.handle(call);
+      },
+    };
+    upstream({ era: held as unknown as ReturnType<typeof fakeEra> });
+    await loadChainCache({ dir: cacheDir() });
+    const backfill = l2GovernorIndex().startBackfill();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // A page: what the saved history says, labelled as such; states are read now.
+    const page = await activeL2ProposalsAnswer({ provisional: true });
+    expect(page.provisional).toBe(true);
+    expect(page.proposals.map((p) => p.description)).toEqual(["third", "third"]);
+    expect(page.proposals.every((p) => p.state === "Active")).toBe(true);
+    release();
+    await backfill;
+    // This run's list: the chain's history, with nothing kept from what the saved log said.
+    const strict = await activeL2ProposalsAnswer();
+    expect(strict.provisional).toBe(false);
+    expect(strict.proposals.map((p) => p.description)).toEqual(["second", "third"]);
+    expect(strict.proposals[0]?.proposalId).toBe(proposalIdOf("second").toString());
   });
 
   it("is not seeded when it claims Era blocks beyond Era's head", async () => {
