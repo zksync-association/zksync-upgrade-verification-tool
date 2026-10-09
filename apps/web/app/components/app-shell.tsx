@@ -1,69 +1,79 @@
-import type { AppStatus } from "@/.server/status";
+import { GovernanceContext, type OkStatus } from "@/components/governance-context";
 import ConnectButton, { WalletOfferContext } from "@/components/connect-button";
 import { AddressLink } from "@/components/hex";
 import Logo from "@/components/logo";
 import { Button } from "@/components/ui/button";
-import type { RootLoader } from "@/root";
 import { cn } from "@/utils/cn";
 import { formatNumber } from "@/utils/format";
-import type { SerializeFrom } from "@remix-run/node";
-import { Link, NavLink, useFetcher, useRevalidator, useRouteLoaderData } from "@remix-run/react";
+import { Link, NavLink, useFetcher, useRevalidator } from "@remix-run/react";
 import { AlertTriangle, Info, RefreshCw, ShieldAlert } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
 
-type OkStatus = Extract<SerializeFrom<AppStatus>, { ok: true }>;
-
-/** Governance context from the root loader (always present inside the shell). */
-export function useStatus(): OkStatus {
-  const data = useRouteLoaderData<RootLoader>("root");
-  if (!data?.status.ok) throw new Error("App status unavailable");
-  return data.status as OkStatus;
-}
+export { useStatus } from "@/components/governance-context";
 
 const NAV = [
   { to: $path("/app/proposals"), label: "Upgrades" },
   { to: $path("/app/emergency"), label: "Emergency" },
   { to: $path("/app/freeze"), label: "Freeze" },
   { to: $path("/app/l2-cancellations"), label: "L2 veto" },
+  { to: "/settings", label: "Settings" },
 ];
 
 export default function AppShell({ status, children }: { status: OkStatus; children: ReactNode }) {
   // How many Sign / Send buttons are on screen; the header offers to connect only while some are.
   const [walletOffers, setWalletOffers] = useState(0);
   return (
-    <WalletOfferContext.Provider value={setWalletOffers}>
-      <div className="flex min-h-screen flex-col">
-        <Header status={status} offerWallet={walletOffers > 0} />
-        <Banners status={status} />
-        <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-8 sm:px-6">{children}</main>
-        <Footer status={status} />
-      </div>
-    </WalletOfferContext.Provider>
+    <GovernanceContext.Provider value={status}>
+      <WalletOfferContext.Provider value={setWalletOffers}>
+        <div className="flex min-h-screen flex-col">
+          <a
+            href="#main-content"
+            className="sr-only z-50 rounded-lg bg-white px-4 py-3 font-semibold text-brand-700 focus:not-sr-only focus:fixed focus:top-2 focus:left-4"
+          >
+            Skip to content
+          </a>
+          <Header status={status} offerWallet={walletOffers > 0} />
+          <Banners status={status} />
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:px-6 sm:py-8"
+          >
+            {children}
+          </main>
+          <Footer status={status} />
+        </div>
+      </WalletOfferContext.Provider>
+    </GovernanceContext.Provider>
   );
 }
 
 function Header({ status, offerWallet }: { status: OkStatus; offerWallet: boolean }) {
   const { network, latestBlock } = status.governance;
   return (
-    <header className="sticky top-0 z-40 border-slate-200/60 border-b bg-white/70 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-slate-300 border-b bg-white">
       <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6 md:h-16 md:flex-nowrap md:py-0">
         <Link to="/" className="flex shrink-0 items-center gap-3" aria-label="Home">
           <Logo className="h-6 w-auto" />
           <span className="hidden h-5 w-px bg-slate-200 sm:block" />
           <span className="hidden font-medium text-[15px] text-slate-950 sm:block">Governance</span>
         </Link>
-        <nav className="no-scrollbar -mx-2 order-last flex w-full min-w-0 items-center gap-1 overflow-x-auto md:order-none md:w-auto md:flex-1">
+        <nav
+          aria-label="Governance navigation"
+          className="-mx-2 order-last flex w-full min-w-0 flex-wrap items-center gap-1 md:order-none md:w-auto md:flex-1 md:flex-nowrap"
+        >
           {NAV.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
+              prefetch="intent"
               className={({ isActive }) =>
                 cn(
-                  "whitespace-nowrap rounded-[10px] px-3 py-1.5 font-medium text-slate-700 text-sm transition-colors hover:bg-slate-75 hover:text-slate-950",
+                  "flex min-h-11 items-center whitespace-nowrap rounded-[10px] px-3 py-2 font-medium text-slate-700 text-sm transition-colors hover:bg-slate-75 hover:text-slate-950",
                   isActive &&
-                    "bg-brand-50 font-semibold text-brand-600 hover:bg-brand-50 hover:text-brand-600"
+                    "bg-navy-800 font-semibold text-white hover:bg-navy-800 hover:text-white"
                 )
               }
             >
@@ -73,7 +83,7 @@ function Header({ status, offerWallet }: { status: OkStatus; offerWallet: boolea
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <span
-            className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[13px] text-slate-700 lg:inline-flex"
+            className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-2 font-semibold text-navy-800 text-xs"
             title={`Block ${latestBlock.number} via your RPC`}
             data-testid="network-pill"
           >
@@ -84,7 +94,9 @@ function Header({ status, offerWallet }: { status: OkStatus; offerWallet: boolea
               )}
             />
             {network.label}
-            <span className="text-slate-400">#{formatNumber(latestBlock.number)}</span>
+            <span className="hidden font-mono text-slate-700 lg:inline">
+              #{formatNumber(latestBlock.number)}
+            </span>
           </span>
           <RefreshButton />
           <ConnectButton offer={offerWallet} />
@@ -128,8 +140,8 @@ function Banner({
     <div
       className={cn(
         "flex items-start gap-3 rounded-xl border px-4 py-3 text-sm",
-        tone === "error" && "border-red-200 bg-red-50 text-red-800",
-        tone === "warning" && "border-amber-200 bg-amber-50 text-amber-900",
+        tone === "error" && "border-red-700 bg-red-50 text-red-900",
+        tone === "warning" && "border-amber-600 bg-amber-50 text-amber-950",
         tone === "info" && "border-brand-100 bg-brand-50 text-navy-800"
       )}
       role={tone === "info" ? "status" : "alert"}
@@ -201,7 +213,7 @@ function Footer({ status }: { status: OkStatus }) {
   const g = status.governance;
   const quota = status.safeApi.quota;
   return (
-    <footer className="mt-16 border-slate-200 border-t bg-white">
+    <footer id="data-sources" className="mt-12 border-slate-200 border-t bg-white">
       <div className="mx-auto grid max-w-[1200px] gap-x-10 gap-y-3 px-4 py-8 text-[13px] sm:grid-cols-2 sm:px-6">
         <div className="space-y-3 sm:col-span-2">
           <p className="font-semibold text-[11px] text-slate-600 uppercase tracking-[0.08em]">
@@ -265,7 +277,7 @@ export function StatusProblem({ error, hint }: { error: string; hint: string }) 
         <Logo className="mb-8 h-6 w-auto" />
         <h1 className="mb-3 text-2xl">Can't read the governance contracts</h1>
         <p className="mb-4 text-slate-950">{hint}</p>
-        <pre className="mono overflow-x-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-red-700">
+        <pre className="mono overflow-x-auto whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-red-800">
           {error}
         </pre>
       </div>

@@ -190,7 +190,7 @@ export default function NewEmergency() {
               {fetcher.data?.results[i] && (
                 <p
                   className={
-                    fetcher.data.results[i]?.ok ? "text-green-700 text-xs" : "text-red-700 text-xs"
+                    fetcher.data.results[i]?.ok ? "text-green-900 text-xs" : "text-red-800 text-xs"
                   }
                 >
                   {fetcher.data.results[i]?.ok
@@ -211,7 +211,7 @@ export default function NewEmergency() {
             {built.ok ? (
               <Hash value={built.id} />
             ) : (
-              <p className="text-red-700 text-sm">{built.error}</p>
+              <p className="text-red-800 text-sm">{built.error}</p>
             )}
             <p className="text-slate-600 text-xs">
               keccak256(abi.encode(calls, executor = Emergency Upgrade Board, salt)). This is what

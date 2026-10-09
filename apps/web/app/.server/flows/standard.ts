@@ -11,7 +11,7 @@ import {
   fromAbi,
   upgradeProposalId,
 } from "@/common/proposal";
-import { type ActionName, buildTypedData } from "@/common/typed-data";
+import { type ActionName, buildTypedData, governanceHashes } from "@/common/typed-data";
 import { UPGRADE_STATES, UPGRADE_STATE_LABELS, type UpgradeState } from "@/common/upgrade-states";
 import { type Address, type Hex, decodeEventLog, isAddressEqual, zeroAddress } from "viem";
 import { cached } from "../cache";
@@ -38,6 +38,17 @@ import {
   topicOf,
 } from "./common";
 import { findL2ProposalForUpgrade } from "./l2";
+import { defaultLogger } from "@config/log.server";
+
+async function timedRead<T>(id: Hex, stage: string, read: () => Promise<T>): Promise<T> {
+  const start = performance.now();
+  try {
+    return await read();
+  } finally {
+    const elapsedMs = Math.round(performance.now() - start);
+    if (elapsedMs >= 1000) defaultLogger.warn({ id, stage, elapsedMs }, "Slow proposal read");
+  }
+}
 
 const DAY = 86_400n;
 // Longest a standard upgrade can still need signatures: 7-day extended legal veto + 30 days waiting.
@@ -130,6 +141,11 @@ export async function listStandardUpgrades({ allHistory }: { allHistory: boolean
   const upgrades = await Promise.all(
     logs.map(async (log): Promise<UpgradeSummary> => {
       const started = decodeStarted(log);
+      await cached(
+        `started:${started.id}`,
+        net.isDevNode ? 0 : Number.POSITIVE_INFINITY,
+        async () => started
+      );
       const { state, status } = await readStatus(started.id);
       return {
         ...started,
@@ -202,18 +218,70 @@ export type StandardUpgradeDetail = {
 
 export class UpgradeNotFound extends Error {}
 
-export async function getStandardUpgrade(
+export type StandardUpgradeOverview = Omit<StandardUpgradeDetail, "sets">;
+
+export type StandardUpgradeCore = Omit<
+  StandardUpgradeOverview,
+  "execute" | "executedTx" | "l2Proposal"
+>;
+
+/** Independent sections start as soon as the status and original proposal are available. */
+export async function loadStandardUpgrade(
   id: Hex,
   { supplied = [] }: { supplied?: MemberSignature[] } = {}
+) {
+  const overview = await getStandardUpgradeCore(id);
+  const evidence = timedRead(id, "recorded-approvals", () => getRecordedApprovals(overview));
+  const sets = timedRead(id, "current-signatures", () =>
+    getStandardUpgradeSets(overview, supplied, evidence)
+  );
+  const execution = timedRead(id, "execution", () => getUpgradeExecution(overview));
+  const l2Proposal = timedRead(id, "l2-discovery", () =>
+    findL2ProposalForUpgrade(id, overview.status.creationTimestamp, {
+      startedTxHash: overview.started.txHash,
+    })
+  );
+  for (const pending of [evidence, sets, execution, l2Proposal]) void pending.catch(() => {});
+  return { overview, evidence, sets, execution, l2Proposal };
+}
+
+/** JSON waits for the same engine's complete result; the page streams each section separately. */
+export async function getStandardUpgrade(
+  id: Hex,
+  options: { supplied?: MemberSignature[] } = {}
 ): Promise<StandardUpgradeDetail> {
-  const [gov, { state, status }] = await Promise.all([governance(), readStatus(id)]);
+  const loading = await loadStandardUpgrade(id, options);
+  const [sets, execution, l2Proposal] = await Promise.all([
+    loading.sets,
+    loading.execution,
+    loading.l2Proposal.catch(() => null),
+  ]);
+  return { ...loading.overview, ...execution, l2Proposal, sets };
+}
+
+export async function getStandardUpgradeOverview(id: Hex): Promise<StandardUpgradeOverview> {
+  const core = await getStandardUpgradeCore(id);
+  const [execution, l2Proposal] = await Promise.all([
+    getUpgradeExecution(core),
+    findL2ProposalForUpgrade(id, core.status.creationTimestamp, {
+      startedTxHash: core.started.txHash,
+    }).catch(() => null),
+  ]);
+  return { ...core, ...execution, l2Proposal };
+}
+
+export async function getStandardUpgradeCore(id: Hex): Promise<StandardUpgradeCore> {
+  const [gov, { state, status }] = await Promise.all([
+    timedRead(id, "governance", governance),
+    timedRead(id, "status", () => readStatus(id)),
+  ]);
   if (state === UPGRADE_STATES.None || status.creationTimestamp === 0) {
     throw new UpgradeNotFound(`ProtocolUpgradeHandler has no standard upgrade ${id}`);
   }
-  const started = await cached(
-    `started:${id}`,
-    gov.network.isDevNode ? 0 : Number.POSITIVE_INFINITY,
-    () => findStarted(id, status.creationTimestamp)
+  const started = await timedRead(id, "started-event", () =>
+    cached(`started:${id}`, gov.network.isDevNode ? 0 : Number.POSITIVE_INFINITY, () =>
+      findStarted(id, status.creationTimestamp)
+    )
   );
   if (!started) {
     throw new UpgradeNotFound(
@@ -237,6 +305,41 @@ export async function getStandardUpgrade(
         : null,
   };
 
+  return {
+    id,
+    started,
+    calls: started.proposal.calls.map(decodeCall),
+    state,
+    stateLabel: UPGRADE_STATE_LABELS[state],
+    status,
+    timeline,
+    governance: gov,
+  };
+}
+
+async function getUpgradeExecution(d: StandardUpgradeCore) {
+  const { governance: gov, started, state, id } = d;
+  let execute: ExecutionView | null = null;
+  let executedTx: Hex | null = null;
+  if (state === UPGRADE_STATES.Ready) {
+    const execution = executeUpgradeExecution(gov.upgradeHandler, started.proposal);
+    execute = { ...execution, simulation: await simulateAs(execution, started.proposal.executor) };
+  }
+  if (state === UPGRADE_STATES.Done) {
+    const events = await eventsWithId(
+      gov.upgradeHandler,
+      upgradeHandlerAbi,
+      "UpgradeExecuted",
+      id,
+      BigInt(started.blockNumber)
+    );
+    executedTx = (events[0]?.log.transactionHash ?? null) as Hex | null;
+  }
+  return { execute, executedTx };
+}
+
+function approvalSpecs(d: StandardUpgradeCore) {
+  const { governance: gov, status, state } = d;
   const specs: {
     key: ApprovalSet["key"];
     title: string;
@@ -291,7 +394,72 @@ export async function getStandardUpgrade(
     },
   ];
 
-  const sets = await Promise.all(
+  return specs;
+}
+
+export type RecordedApproval = {
+  key: ApprovalSet["key"];
+  title: string;
+  state: SetState;
+  used: ReturnType<typeof decodeApprovalCall>;
+  historical: ApprovalSet["historical"];
+};
+
+async function getRecordedApprovals(d: StandardUpgradeCore): Promise<RecordedApproval[]> {
+  const { governance: gov, status, started, id } = d;
+  return Promise.all(
+    approvalSpecs(d)
+      .filter((s) => s.state.status === "done")
+      .map(async (spec) => {
+        const contract = spec.group === "securityCouncil" ? gov.securityCouncil : gov.guardians;
+        let used: ReturnType<typeof decodeApprovalCall> = null;
+        let historical: ApprovalSet["historical"] = null;
+        let state = spec.state;
+        if (spec.state.status === "done") {
+          // The Security Council approval time is on-chain, so its event is found without a scan.
+          const near =
+            spec.key === "securityCouncil" && status.securityCouncilApprovalTimestamp
+              ? await blockAt(status.securityCouncilApprovalTimestamp)
+              : null;
+          const events = await eventsWithId(
+            gov.upgradeHandler,
+            upgradeHandlerAbi,
+            spec.event,
+            id,
+            near ?? BigInt(started.blockNumber),
+            near === null ? undefined : near + 16n
+          );
+          const txHash = (events[0]?.log.transactionHash ?? null) as Hex | null;
+          state = { ...spec.state, txHash };
+          const call = txHash ? await callTo(txHash, contract.address) : null;
+          const decoded = call ? decodeApprovalCall(call.data) : null;
+          if (decoded && txHash) {
+            used = decoded;
+            const block = (events[0]?.log.blockNumber ?? 1n) - 1n;
+            historical = await recheckAt(
+              contract.address,
+              {
+                hashes: governanceHashes(buildTypedData(spec.action, contract.domain, { id })),
+                threshold: spec.threshold,
+              },
+              decoded,
+              block
+            );
+          }
+        }
+        return { key: spec.key, title: spec.title, state, used, historical };
+      })
+  );
+}
+
+async function getStandardUpgradeSets(
+  d: StandardUpgradeCore,
+  supplied: MemberSignature[],
+  evidence: Promise<RecordedApproval[]>
+): Promise<ApprovalSet[]> {
+  const { governance: gov, id } = d;
+  const specs = approvalSpecs(d);
+  return Promise.all(
     specs.map(async (spec): Promise<ApprovalSet> => {
       const contract = spec.group === "securityCouncil" ? gov.securityCouncil : gov.guardians;
       const set = await verifySignatureSet({
@@ -306,73 +474,18 @@ export async function getStandardUpgrade(
       const execution = await executionFor(set, spec.state, (valid) =>
         approvalExecution(spec.action, contract.address, id, valid)
       );
-      let used: UsedSignature[] | null = null;
-      let historical: ApprovalSet["historical"] = null;
-      let state = spec.state;
-      if (spec.state.status === "done") {
-        // The Security Council approval time is on-chain, so its event is found without a scan.
-        const near =
-          spec.key === "securityCouncil" && status.securityCouncilApprovalTimestamp
-            ? await blockAt(status.securityCouncilApprovalTimestamp)
-            : null;
-        const events = await eventsWithId(
-          gov.upgradeHandler,
-          upgradeHandlerAbi,
-          spec.event,
-          id,
-          near ?? BigInt(started.blockNumber),
-          near === null ? undefined : near + 16n
-        );
-        const txHash = (events[0]?.log.transactionHash ?? null) as Hex | null;
-        state = { ...spec.state, txHash };
-        const call = txHash ? await callTo(txHash, contract.address) : null;
-        const decoded = call ? decodeApprovalCall(call.data) : null;
-        if (decoded && txHash) {
-          used = compareUsedSignatures(decoded, set);
-          const block = (events[0]?.log.blockNumber ?? 1n) - 1n;
-          historical = await recheckAt(contract.address, set, decoded, block);
-        }
-      }
+      const recorded = (await evidence).find((e) => e.key === spec.key);
+      const used = recorded?.used ? compareUsedSignatures(recorded.used, set) : null;
+      const historical = recorded?.historical ?? null;
+      const state = recorded?.state ?? spec.state;
       return { key: spec.key, title: spec.title, set, state, execution, used, historical };
     })
   );
-
-  let execute: ExecutionView | null = null;
-  let executedTx: Hex | null = null;
-  if (state === UPGRADE_STATES.Ready) {
-    const execution = executeUpgradeExecution(gov.upgradeHandler, started.proposal);
-    execute = { ...execution, simulation: await simulateAs(execution, started.proposal.executor) };
-  }
-  if (state === UPGRADE_STATES.Done) {
-    const events = await eventsWithId(
-      gov.upgradeHandler,
-      upgradeHandlerAbi,
-      "UpgradeExecuted",
-      id,
-      BigInt(started.blockNumber)
-    );
-    executedTx = (events[0]?.log.transactionHash ?? null) as Hex | null;
-  }
-
-  return {
-    id,
-    started,
-    calls: started.proposal.calls.map(decodeCall),
-    state,
-    stateLabel: UPGRADE_STATE_LABELS[state],
-    status,
-    timeline,
-    sets,
-    execute,
-    executedTx,
-    l2Proposal: await findL2ProposalForUpgrade(id, status.creationTimestamp).catch(() => null),
-    governance: gov,
-  };
 }
 
 async function recheckAt(
   contract: Address,
-  set: SignatureSet,
+  set: Pick<SignatureSet, "hashes" | "threshold">,
   used: { signers: readonly Address[]; signatures: readonly Hex[] },
   block: bigint
 ): Promise<ApprovalSet["historical"]> {
@@ -391,7 +504,7 @@ async function recheckAt(
 
 async function recheck(
   contract: Address,
-  set: SignatureSet,
+  set: Pick<SignatureSet, "hashes" | "threshold">,
   used: { signers: readonly Address[]; signatures: readonly Hex[] },
   block: bigint
 ): Promise<ApprovalSet["historical"]> {

@@ -2,12 +2,13 @@ import { addressSchema } from "@repo/common/schemas";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 import "dotenv/config";
+import { localSetting } from "./local-settings.server";
 
 export const NodeEnvEnum = z.enum(["development", "test", "production"]);
 
 // Only L1_RPC_URL is required. Everything else is optional and either derived from the chain
 // (network, governance contracts, members, thresholds) or has a per-network default.
-export const env = createEnv({
+const baseEnv = createEnv({
   server: {
     L1_RPC_URL: z.string().url(),
     L2_RPC_URL: z.string().url().optional(),
@@ -39,6 +40,14 @@ export const env = createEnv({
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
+});
+
+// Secret settings are server-only and override environment defaults for this local instance.
+export const env = new Proxy(baseEnv, {
+  get(target, name) {
+    const local = localSetting(String(name));
+    return local === undefined ? Reflect.get(target, name) : local === null ? undefined : local;
+  },
 });
 
 function splitOrigins(value: string) {

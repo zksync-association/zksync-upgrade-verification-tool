@@ -6,23 +6,26 @@ import * as React from "react";
 import { cn } from "@/utils/cn";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-600/20 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] border-2 border-transparent font-semibold transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-600 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed disabled:border-slate-600 disabled:bg-slate-200 disabled:text-slate-700 [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-brand-600 text-white hover:bg-brand-500 active:bg-brand-700",
+        default:
+          "border-brand-700 bg-brand-600 text-white hover:border-navy-800 hover:bg-brand-700 active:bg-navy-800",
         secondary:
-          "border border-brand-600/25 bg-brand-600/5 font-normal text-brand-600 hover:bg-brand-600/10",
-        outline: "border border-slate-200 bg-white text-slate-950 hover:bg-slate-50",
-        ghost: "font-medium text-slate-700 hover:bg-slate-75 hover:text-slate-950",
-        destructive: "bg-red-600 text-white hover:bg-red-700",
-        link: "rounded-none px-0 font-medium text-brand-600 underline-offset-4 hover:underline",
+          "border-navy-800 bg-navy-800 text-white hover:border-brand-700 hover:bg-brand-700 active:border-brand-600 active:bg-brand-600",
+        outline:
+          "border-slate-600 bg-white text-slate-950 hover:border-navy-800 hover:bg-slate-100",
+        ghost:
+          "border-slate-600 bg-slate-75 text-navy-800 hover:border-navy-800 hover:bg-slate-100",
+        destructive: "border-red-900 bg-red-800 text-white hover:bg-red-900",
+        link: "rounded-none border-0 px-0 text-brand-700 underline underline-offset-4",
       },
       size: {
-        default: "h-10 px-5 text-sm",
-        sm: "h-8 px-3.5 text-[13px]",
+        default: "h-11 px-5 text-sm",
+        sm: "h-11 px-3.5 text-[13px] sm:h-9",
         lg: "h-12 px-6 text-base",
-        icon: "h-9 w-9",
+        icon: "h-11 w-11",
       },
     },
     defaultVariants: {

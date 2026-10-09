@@ -1,9 +1,22 @@
+import type { SignatureSet } from "@/.server/signatures";
 import { SignatureSetCard } from "@/components/verification/signature-set";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const wallet = vi.hoisted(() => ({ address: undefined as string | undefined }));
+
+vi.mock("@/components/governance-context", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/components/governance-context")>()),
+  useStatus: () => ({
+    governance: {
+      network: { explorerUrl: "https://etherscan.io", l2ExplorerUrl: null },
+      securityCouncil: { members: [MEMBER_A, MEMBER_B, MEMBER_C] },
+      guardians: { members: [] },
+      emergencyUpgradeBoard: { zkFoundation: "0x0000000000000000000000000000000000000009" },
+    },
+  }),
+}));
 
 vi.mock("@remix-run/react", () => ({
   useRouteLoaderData: () => ({
@@ -174,5 +187,97 @@ describe("SignatureSetCard", () => {
       "no longer reach the threshold"
     );
     expect(screen.queryByText(/more valid signature/)).not.toBeInTheDocument();
+  });
+  it("shows incomplete verification instead of a definitive shortfall when Safe data is unavailable", () => {
+    const incompleteSet = {
+      ...(set as SignatureSet),
+      members: [member(MEMBER_A, "valid"), member(MEMBER_B, "unavailable")],
+      safeApiError: "Rate limit reached",
+    } as never;
+    render(<SignatureSetCard title="Council" set={incompleteSet} state={{ status: "open" }} />);
+    expect(screen.getByTestId("signature-count")).toHaveTextContent(
+      "1 verified · check incomplete"
+    );
+    expect(screen.getByTestId("threshold-incomplete")).toHaveTextContent("lower bound");
+    expect(screen.queryByTestId("threshold-below")).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.queryByText(/more valid signature/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the contract's accepted threshold authoritative during a partial API failure", () => {
+    const metSet = {
+      ...(set as SignatureSet),
+      valid: [
+        { signer: MEMBER_A, signature: "0xaa" },
+        { signer: MEMBER_B, signature: "0xbb" },
+      ],
+      members: [
+        member(MEMBER_A, "valid"),
+        member(MEMBER_B, "valid"),
+        member(MEMBER_C, "unavailable"),
+      ],
+      thresholdCheck: { status: "met", checkedWith: "checkSignatures" },
+      safeApiError: "Some Safe data unavailable",
+    } as never;
+    render(<SignatureSetCard title="Council" set={metSet} state={{ status: "open" }} />);
+    expect(screen.getByTestId("signature-count")).toHaveTextContent("2 / 2");
+    expect(screen.getByTestId("threshold-met")).toHaveTextContent("Accepted by");
+    expect(screen.queryByTestId("threshold-incomplete")).not.toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+  });
+
+  it("does not hide a rejected contract check behind an API warning", () => {
+    const rejectedSet = {
+      ...(set as SignatureSet),
+      thresholdCheck: {
+        status: "rejected",
+        checkedWith: "checkSignatures",
+        error: "InvalidSignature",
+      },
+      safeApiError: "Some Safe data unavailable",
+    } as never;
+    render(<SignatureSetCard title="Council" set={rejectedSet} state={{ status: "open" }} />);
+    expect(screen.getByText(/The contract rejected/)).toHaveTextContent("InvalidSignature");
+    expect(screen.queryByTestId("threshold-incomplete")).not.toBeInTheDocument();
+  });
+
+  it("does not report unavailable historical Safe comparisons as mismatches", () => {
+    render(
+      <SignatureSetCard
+        title="Council"
+        set={set}
+        state={{ status: "done", detail: "Approved by the Security Council", txHash: null }}
+        used={[{ signer: MEMBER_A, signature: "0xaa", matchesSafe: null }]}
+        historical={{ block: "100", accepted: true, error: null }}
+      />
+    );
+    expect(screen.getByTestId("used-match")).toHaveTextContent("1 Safe copy could not be compared");
+    expect(screen.getByTestId("done-summary")).toHaveTextContent("before execution): accepted");
+    expect(screen.queryByText(/0 of 1/)).not.toBeInTheDocument();
+  });
+
+  it("does not request more signatures for a closed action", () => {
+    render(
+      <SignatureSetCard
+        title="Council"
+        set={set}
+        state={{ status: "closed", detail: "The upgrade was executed" }}
+      />
+    );
+    expect(screen.getByTestId("threshold-below")).toHaveTextContent("This action is closed");
+    expect(screen.queryByText(/more valid signature/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sign-button")).not.toBeInTheDocument();
+  });
+
+  it("keeps a failed historical re-check visible on a completed action", () => {
+    render(
+      <SignatureSetCard
+        title="Council"
+        set={set}
+        state={{ status: "done", detail: "Approved by the Security Council", txHash: null }}
+        historical={{ block: "100", accepted: false, error: "InvalidSignature" }}
+      />
+    );
+    expect(screen.getByTestId("done-summary")).toHaveTextContent("rejected (InvalidSignature)");
   });
 });

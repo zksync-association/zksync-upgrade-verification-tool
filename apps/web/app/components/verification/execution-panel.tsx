@@ -23,7 +23,10 @@ export type ExecutionLike = {
 export function SimulationResult({ simulation }: { simulation: Simulation }) {
   if (simulation.status === "ok") {
     return (
-      <p className="flex items-center gap-2 text-green-700 text-sm" data-testid="simulation-ok">
+      <p
+        className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-100 px-3 py-2 font-semibold text-green-900 text-sm"
+        data-testid="simulation-ok"
+      >
         <CheckCircle2 className="h-4 w-4" /> Simulated against the latest block: the transaction
         would succeed.
       </p>
@@ -31,7 +34,10 @@ export function SimulationResult({ simulation }: { simulation: Simulation }) {
   }
   if (simulation.status === "reverted") {
     return (
-      <p className="flex items-start gap-2 text-red-700 text-sm" data-testid="simulation-reverted">
+      <p
+        className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-100 px-3 py-2 font-semibold text-red-900 text-sm"
+        data-testid="simulation-reverted"
+      >
         <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
           Simulated against the latest block: it would revert with{" "}
@@ -97,11 +103,11 @@ export function ExecutionPanel({
 
   return (
     <div
-      className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
+      className="space-y-3 rounded-xl border border-brand-200 bg-brand-25 p-5"
       data-testid="execution-panel"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-medium text-slate-950">{title}</p>
+        <p className="font-bold text-lg text-navy-800">{title}</p>
         <div className="flex items-center gap-2">
           <CopyButton value={execution.data} label="Copy calldata" />
           <Button
@@ -143,7 +149,7 @@ export function ExecutionPanel({
       {execution.simulation && <SimulationResult simulation={execution.simulation} />}
       {safeTxHash && (
         <p
-          className="rounded-lg bg-green-50 px-3 py-2 text-green-800 text-sm"
+          className="rounded-lg bg-green-50 px-3 py-2 text-green-900 text-sm"
           data-testid="safe-tx-created"
         >
           Your Safe has the transaction (safeTxHash{" "}

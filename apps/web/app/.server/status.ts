@@ -20,11 +20,15 @@ export type AppStatus =
 
 export async function appStatus(): Promise<AppStatus> {
   try {
-    const [net, gov] = await Promise.all([network(), governance()]);
+    const [net, gov, logHistory] = await Promise.all([
+      network(),
+      governance(),
+      checkLogHistory(l1),
+    ]);
     return {
       ok: true,
       governance: gov,
-      logHistory: await checkLogHistory(l1),
+      logHistory,
       safeApi: { url: net.safeTxServiceUrl, withKey: !!env.SAFE_API_KEY, quota: { ...quota } },
       l2RpcConfigured: net.l2RpcUrl !== null,
       clientVersion: net.clientVersion,

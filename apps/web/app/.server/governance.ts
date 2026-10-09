@@ -9,6 +9,7 @@ import { safeMessageHashes } from "@/common/safe";
 import type { Eip712Domain } from "@/common/typed-data";
 import { type Abi, type Address, getAddress, isAddressEqual, zeroHash } from "viem";
 import { cached } from "./cache";
+import { readMemberList } from "./member-list";
 import { type Network, l1, latestBlock, network } from "./rpc";
 
 // Everything the old database cached about roles and thresholds is re-read from the chain. The
@@ -66,15 +67,7 @@ const read = <T>(address: Address, abi: Abi, functionName: string, args: readonl
   l1.readContract({ address, abi, functionName, args }) as Promise<T>;
 
 async function readMembers(address: Address, abi: Abi): Promise<Address[]> {
-  const members: Address[] = [];
-  for (let i = 0n; i < 64n; i++) {
-    try {
-      members.push(getAddress(await read<Address>(address, abi, "members", [i])));
-    } catch {
-      break;
-    }
-  }
-  return members;
+  return readMemberList((index) => read<Address>(address, abi, "members", [index]));
 }
 
 async function readDomain(

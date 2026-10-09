@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/utils/cn";
 import type { SerializeFrom } from "@remix-run/node";
-import { CheckCircle2, ChevronDown, ShieldCheck, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ShieldCheck, XCircle } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { isAddressEqual } from "viem";
 import { MemberStatusBadge, SetStateBadge } from "./badges";
@@ -38,42 +38,57 @@ export function SignatureSetCard({
 }) {
   const valid = set.valid.length;
   const met = set.thresholdCheck.status === "met";
+  const unavailable = set.members.filter((m) => m.status === "unavailable").length;
+  const incomplete =
+    set.thresholdCheck.status === "below" && (unavailable > 0 || !!set.safeApiError);
   return (
     <Card data-testid={testId} className="overflow-hidden">
-      <div className="space-y-3 px-4 pt-5 pb-4 sm:px-6">
+      <div className="space-y-3 border-slate-200 border-b bg-slate-50 px-4 py-5 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-medium text-[17px] text-slate-950">{title}</h3>
+              <h3 className="font-semibold text-[19px] text-navy-800">{title}</h3>
               <SetStateBadge state={state} />
             </div>
             {state.status !== "open" && <p className="text-slate-600 text-sm">{state.detail}</p>}
           </div>
-          <div className="text-right">
-            <p
-              className="font-medium text-[28px] text-navy-800 leading-8 tracking-[-0.02em]"
-              data-testid="signature-count"
-            >
-              {valid}
-              <span className="text-slate-400"> / {set.threshold}</span>
-            </p>
-            <p className="text-slate-600 text-xs">
-              {state.status === "done" ? "valid today / required" : "valid signatures / required"}
-            </p>
+          <div className="shrink-0 text-left sm:text-right">
+            {incomplete ? (
+              <>
+                <p className="font-semibold text-amber-900 text-base" data-testid="signature-count">
+                  {valid} verified · check incomplete
+                </p>
+                <p className="text-slate-700 text-xs">Contract threshold: {set.threshold}</p>
+              </>
+            ) : (
+              <>
+                <p
+                  className="font-semibold text-[28px] text-navy-800 tabular-nums leading-8"
+                  data-testid="signature-count"
+                >
+                  {valid}
+                  <span className="font-normal text-slate-700 text-xl"> / {set.threshold}</span>
+                </p>
+                <p className="text-slate-600 text-xs">
+                  {state.status === "open"
+                    ? "verified signatures / required"
+                    : "verified today / current threshold"}
+                </p>
+              </>
+            )}
           </div>
         </div>
-        <Progress
-          value={(valid / Math.max(set.threshold, 1)) * 100}
-          indicatorClassName={cn(met && "bg-green-600")}
-        />
-        {state.status === "done" && set.thresholdCheck.status !== "met" ? (
-          <p className="text-slate-600 text-sm" data-testid="threshold-below">
-            Safe's copies no longer reach the threshold today (for example, because owners changed).
-            What counted is the transaction below.
-          </p>
-        ) : (
-          <ThresholdLine set={set} />
+        {state.status === "open" && !incomplete && (
+          <Progress
+            value={(valid / Math.max(set.threshold, 1)) * 100}
+            indicatorClassName={cn(met && "bg-green-700")}
+            aria-label="Verified signatures toward the contract threshold"
+          />
         )}
+        {state.status === "done" && (
+          <DoneSummary state={state} used={used} historical={historical} />
+        )}
+        <ThresholdLine set={set} state={state} incomplete={incomplete} />
         {set.safeApiError && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 text-sm">
             Safe Transaction Service: {set.safeApiError}. On-chain approvals are still checked.
@@ -81,12 +96,18 @@ export function SignatureSetCard({
         )}
       </div>
 
-      <MemberList set={set} />
+      <details open={state.status === "open"} className="group/members">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-semibold text-slate-800 text-sm hover:bg-slate-50 sm:px-6 [&::-webkit-details-marker]:hidden">
+          Current member signatures · {set.members.length} members
+          <ChevronDown
+            aria-hidden
+            className="h-4 w-4 shrink-0 transition-transform group-open/members:rotate-180"
+          />
+        </summary>
+        <MemberList set={set} />
+      </details>
 
       <div className="space-y-4 border-slate-200 border-t px-4 py-5 sm:px-6">
-        {state.status === "done" && (
-          <DoneSummary state={state} used={used} historical={historical} />
-        )}
         {execution && <ExecutionPanel execution={execution} toLabel={executionToLabel} />}
         <SignedData set={set} />
         {state.status === "open" && (
@@ -105,11 +126,18 @@ export function SignatureSetCard({
   );
 }
 
-function ThresholdLine({ set }: { set: Serialized<SignatureSet> }) {
+function ThresholdLine({
+  set,
+  state,
+  incomplete,
+}: { set: Serialized<SignatureSet>; state: Serialized<SetState>; incomplete: boolean }) {
   const check = set.thresholdCheck;
   if (check.status === "met") {
     return (
-      <p className="flex items-start gap-2 text-green-700 text-sm" data-testid="threshold-met">
+      <p
+        className="flex items-start gap-2 rounded-lg border border-green-300 bg-green-100 px-3 py-2 font-semibold text-green-900 text-sm"
+        data-testid="threshold-met"
+      >
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
           Threshold met. Accepted by <span className="mono break-all">{check.checkedWith}</span>
@@ -119,7 +147,7 @@ function ThresholdLine({ set }: { set: Serialized<SignatureSet> }) {
   }
   if (check.status === "rejected") {
     return (
-      <p className="flex items-start gap-2 text-red-700 text-sm">
+      <p className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-100 px-3 py-2 font-semibold text-red-900 text-sm">
         <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
           The contract rejected the combined signatures: <span className="mono">{check.error}</span>
@@ -127,8 +155,41 @@ function ThresholdLine({ set }: { set: Serialized<SignatureSet> }) {
       </p>
     );
   }
+  if (incomplete) {
+    return (
+      <p
+        className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950 text-sm"
+        data-testid="threshold-incomplete"
+      >
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>
+          Some signatures could not be checked. The verified count is a lower bound, not proof of
+          missing signatures. Retry when the source is available.
+        </span>
+      </p>
+    );
+  }
+  if (state.status === "done") {
+    return (
+      <p className="text-slate-700 text-sm" data-testid="threshold-below">
+        Safe's copies no longer reach the threshold today (for example, because owners changed). The
+        recorded transaction above is the evidence for this completed action.
+      </p>
+    );
+  }
+  if (state.status === "closed") {
+    return (
+      <p className="text-slate-700 text-sm" data-testid="threshold-below">
+        Current copies are below the threshold. This action is closed; no further signatures are
+        needed for it.
+      </p>
+    );
+  }
   return (
-    <p className="text-slate-600 text-sm" data-testid="threshold-below">
+    <p
+      className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-medium text-slate-800 text-sm"
+      data-testid="threshold-below"
+    >
       {check.threshold - check.valid} more valid signature
       {check.threshold - check.valid === 1 ? "" : "s"} needed.
     </p>
@@ -146,14 +207,18 @@ function MemberList({ set }: { set: Serialized<SignatureSet> }) {
         return (
           <li
             key={m.member}
-            className="border-slate-100 border-b last:border-b-0"
+            className={cn(
+              "border-slate-200 border-b last:border-b-0",
+              m.status === "valid" && "bg-green-50/40",
+              m.status === "invalid" && "bg-red-50/40"
+            )}
             data-testid="member-row"
             data-status={m.status}
           >
             <button
               type="button"
               onClick={() => setOpen(expanded ? "" : m.member)}
-              className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-25 sm:items-center sm:gap-4 sm:px-6"
+              className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-75 sm:items-center sm:gap-4 sm:px-6"
               aria-expanded={expanded}
             >
               <span className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
@@ -166,7 +231,7 @@ function MemberList({ set }: { set: Serialized<SignatureSet> }) {
                       </span>
                     )}
                   </span>
-                  <span className="mono break-all text-slate-600">{m.member}</span>
+                  <span className="mono break-all text-slate-800">{m.member}</span>
                 </span>
                 <span className="hidden w-32 text-slate-600 text-xs md:block">
                   {m.safe.isContract
@@ -184,7 +249,7 @@ function MemberList({ set }: { set: Serialized<SignatureSet> }) {
               </span>
               <ChevronDown
                 className={cn(
-                  "mt-0.5 h-4 w-4 shrink-0 text-slate-400 transition-transform sm:mt-0",
+                  "mt-0.5 h-4 w-4 shrink-0 text-slate-600 transition-transform sm:mt-0",
                   expanded && "rotate-180"
                 )}
               />
@@ -250,7 +315,7 @@ function MemberDetail({ member: m }: { member: Serialized<MemberResult> }) {
         </div>
       )}
       {m.error && (
-        <p className="text-red-700">
+        <p className="text-red-800">
           Contract response: <span className="mono">{m.error}</span>
         </p>
       )}
@@ -275,7 +340,7 @@ function MemberDetail({ member: m }: { member: Serialized<MemberResult> }) {
 function SignedData({ set }: { set: Serialized<SignatureSet> }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-xl border border-slate-200">
+    <div className="rounded-xl border border-slate-300 bg-slate-50">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -285,7 +350,7 @@ function SignedData({ set }: { set: Serialized<SignatureSet> }) {
         <span className="min-w-0 break-words">What members sign: {set.typedData.primaryType}</span>
         <ChevronDown
           className={cn(
-            "h-4 w-4 shrink-0 text-slate-400 transition-transform",
+            "h-4 w-4 shrink-0 text-slate-600 transition-transform",
             open && "rotate-180"
           )}
         />
@@ -336,9 +401,13 @@ function DoneSummary({
   historical?: { block: string; accepted: boolean | null; error: string | null } | null;
 }) {
   const matching = used?.filter((u) => u.matchesSafe === true).length ?? 0;
+  const unavailable = used?.filter((u) => u.matchesSafe === null).length ?? 0;
   return (
-    <div className="space-y-2 rounded-xl bg-green-50 p-4 text-sm" data-testid="done-summary">
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium text-green-800">
+    <div
+      className="space-y-2 rounded-lg border border-green-200 bg-green-50 p-4 text-sm"
+      data-testid="done-summary"
+    >
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium text-green-900">
         <CheckCircle2 className="h-4 w-4 shrink-0" /> {state.detail}
         {state.txHash && (
           <>
@@ -350,10 +419,21 @@ function DoneSummary({
       {used && (
         <p className="text-slate-950">
           The transaction passed {used.length} signature{used.length === 1 ? "" : "s"};{" "}
-          <span data-testid="used-match">
-            {matching} of {used.length}
-          </span>{" "}
-          are byte-for-byte identical to the copies in Safe.
+          {unavailable > 0 ? (
+            <span data-testid="used-match">
+              {unavailable} Safe {unavailable === 1 ? "copy could" : "copies could"} not be
+              compared.
+              {matching > 0 &&
+                ` ${matching} of ${used.length} are byte-for-byte identical to the copies in Safe.`}
+            </span>
+          ) : (
+            <>
+              <span data-testid="used-match">
+                {matching} of {used.length}
+              </span>{" "}
+              are byte-for-byte identical to the copies in Safe.
+            </>
+          )}
           {used.some((u) => u.matchesSafe === false) && (
             <span className="text-amber-800">
               {" "}
@@ -364,7 +444,16 @@ function DoneSummary({
         </p>
       )}
       {historical && (
-        <p className="text-slate-950">
+        <p
+          className={cn(
+            "font-medium text-sm",
+            historical.accepted === true
+              ? "text-green-900"
+              : historical.accepted === false
+                ? "text-red-900"
+                : "text-slate-800"
+          )}
+        >
           {historical.accepted === true &&
             `Re-checked at block ${historical.block} (just before execution): accepted.`}
           {historical.accepted === false &&

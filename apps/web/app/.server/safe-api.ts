@@ -1,3 +1,5 @@
+import { setMaxListeners } from "node:events";
+import { setTimeout as delay } from "node:timers/promises";
 import { env } from "@config/env.server";
 import { defaultLogger } from "@config/log.server";
 import { hexSchema } from "@repo/common/schemas";
@@ -45,60 +47,131 @@ const LIST_TTL_MS = 60_000;
 
 // api.safe.global allows 2 requests/s without a key (5/s with one) and 5,000 a month per IP.
 // A self-hosted Transaction Service has no such limits.
-const minIntervalMs = env.SAFE_API_KEY ? 220 : 550;
+const minIntervalMs = () => (env.SAFE_API_KEY ? 220 : 550);
 let nextSlot = 0;
+let clientGeneration = 0;
+function requestQueue() {
+  const controller = new AbortController();
+  // A governance scan legitimately queues more than ten members on this signal.
+  // The delay helper removes each listener when its timer resolves or is cancelled.
+  setMaxListeners(0, controller.signal);
+  return controller;
+}
+
+let queuedRequests = requestQueue();
+let cooldown: { until: number; error: SafeApiError } | null = null;
+const failures = new Map<string, { until: number; error: SafeApiError }>();
+
+function checkCooldown() {
+  if (!cooldown) return;
+  if (Date.now() < cooldown.until) throw cooldown.error;
+  cooldown = null;
+}
+
+function pauseRequests(ms: number, message: string): SafeApiError {
+  // An older in-flight response must not shorten a quota cooldown established by another request.
+  if (cooldown && cooldown.until >= Date.now() + ms) return cooldown.error;
+  const error = new SafeApiError(message);
+  cooldown = { until: Date.now() + ms, error };
+  // Release requests waiting for a throttle slot: they should fail promptly, not keep queueing.
+  queuedRequests.abort();
+  queuedRequests = requestQueue();
+  nextSlot = 0;
+  return error;
+}
+
+function secondsHeader(value: string | null): number | null {
+  if (value === null || value.trim() === "") return null;
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1_000 : null;
+}
+
+function retryDelay(value: string | null): number {
+  return (secondsHeader(value) ?? Math.max(0, Date.parse(value ?? "") - Date.now())) || 2_000;
+}
+
 async function throttle(baseUrl: string) {
+  checkCooldown();
   if (new URL(baseUrl).hostname !== "api.safe.global") return;
   const now = Date.now();
   const wait = Math.max(0, nextSlot - now);
-  nextSlot = Math.max(now, nextSlot) + minIntervalMs;
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  nextSlot = Math.max(now, nextSlot) + minIntervalMs();
+  if (wait > 0) {
+    try {
+      await delay(wait, undefined, { signal: queuedRequests.signal });
+    } catch {
+      checkCooldown();
+    }
+  }
+  checkCooldown();
 }
 
 export const quota = { limit: null as number | null, remaining: null as number | null };
 
 async function getJson(path: string): Promise<unknown | null> {
+  const generation = clientGeneration;
+  const checkGeneration = () => {
+    if (generation !== clientGeneration)
+      throw new SafeApiError("Data source settings changed. Refresh to check signatures again.");
+  };
+  checkCooldown();
+  const failure = failures.get(path);
+  if (failure && Date.now() < failure.until) throw failure.error;
+  failures.delete(path);
   const { safeTxServiceUrl } = await network();
   if (!safeTxServiceUrl) {
     throw new SafeApiError("No Safe Transaction Service for this chain. Set SAFE_TX_SERVICE_URL.");
   }
 
-  for (let attempt = 0; ; attempt++) {
-    await throttle(safeTxServiceUrl);
-    let response: Response;
-    try {
-      response = await fetch(`${safeTxServiceUrl}${path}`, {
-        headers: {
-          accept: "application/json",
-          ...(env.SAFE_API_KEY ? { authorization: `Bearer ${env.SAFE_API_KEY}` } : {}),
-        },
-        signal: AbortSignal.timeout(15_000),
-      });
-    } catch (error) {
-      throw new SafeApiError(`Safe Transaction Service unreachable: ${(error as Error).message}`);
-    }
-
-    const limit = response.headers.get("x-ratelimit-limit");
-    const remaining = response.headers.get("x-ratelimit-remaining");
-    if (limit) quota.limit = Number(limit);
-    if (remaining) quota.remaining = Number(remaining);
-
-    if (response.status === 404) return null;
-    if (response.status === 429 && attempt < 2) {
-      const retryAfter = Number(response.headers.get("retry-after") ?? "2");
-      log.warn({ path, retryAfter }, "Safe API rate limited");
-      await new Promise((r) => setTimeout(r, Math.min(retryAfter, 10) * 1_000));
-      continue;
-    }
-    if (!response.ok) {
-      throw new SafeApiError(
-        response.status === 429
-          ? "Safe Transaction Service rate limit reached. Keyless access allows 5,000 requests a month per IP; set SAFE_API_KEY or wait."
-          : `Safe Transaction Service returned HTTP ${response.status} for ${path}`
-      );
-    }
-    return response.json();
+  await throttle(safeTxServiceUrl);
+  checkGeneration();
+  let response: Response;
+  try {
+    response = await fetch(`${safeTxServiceUrl}${path}`, {
+      headers: {
+        accept: "application/json",
+        ...(env.SAFE_API_KEY ? { authorization: `Bearer ${env.SAFE_API_KEY}` } : {}),
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (error) {
+    checkGeneration();
+    const unavailable = new SafeApiError(
+      `Safe Transaction Service unreachable: ${(error as Error).message}`
+    );
+    failures.set(path, { until: Date.now() + 15_000, error: unavailable });
+    throw unavailable;
   }
+
+  checkGeneration();
+  const limit = response.headers.get("x-ratelimit-limit");
+  const remaining = response.headers.get("x-ratelimit-remaining");
+  if (limit !== null && Number.isFinite(Number(limit))) quota.limit = Number(limit);
+  if (remaining !== null && Number.isFinite(Number(remaining))) quota.remaining = Number(remaining);
+
+  if (response.status === 404) return null;
+  if (response.status === 429) {
+    const body = await response.text();
+    const exhausted = remaining === "0" || /monthly quota exceeded/i.test(body);
+    const wait = exhausted
+      ? secondsHeader(response.headers.get("x-ratelimit-reset")) ?? 60_000
+      : retryDelay(response.headers.get("retry-after"));
+    log.warn({ path, exhausted, cooldownMs: wait }, "Safe API requests paused");
+    throw pauseRequests(
+      Math.max(wait, 1_000),
+      exhausted
+        ? "Safe Transaction Service monthly quota exhausted. Signature copies are unavailable until the quota resets or service access is updated."
+        : "Safe Transaction Service is temporarily rate limited. Signature copies are unavailable; retry after the cooldown."
+    );
+  }
+  if (!response.ok) {
+    const error = new SafeApiError(
+      `Safe Transaction Service returned HTTP ${response.status} for ${path}`
+    );
+    failures.set(path, { until: Date.now() + 15_000, error });
+    throw error;
+  }
+  return response.json();
 }
 
 /** Newest messages of a Safe (governance actions are recent, so a few pages cover them). */
@@ -163,4 +236,16 @@ export async function safeWalletUrl(safe: Address): Promise<string | null> {
   return safeWalletPrefix
     ? `https://app.safe.global/home?safe=${safeWalletPrefix}:${getAddress(safe)}`
     : null;
+}
+
+export function resetSafeClient() {
+  clientGeneration++;
+  queuedRequests.abort();
+  queuedRequests = requestQueue();
+  cooldown = null;
+  failures.clear();
+  nextSlot = 0;
+  lastRefresh = 0;
+  quota.limit = null;
+  quota.remaining = null;
 }

@@ -2,10 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ZKsync light theme: slate-50 page, white cards, navy-800 headings, brand-600 for interactive only. */
+/* High-contrast light theme: white data surfaces, navy headings, distinct status colors. */
 @layer base {
   :root {
-    --background: 216 45% 98%; /* slate-50 */
+    /* This app has one light theme, including native controls in a dark-mode browser. */
+    color-scheme: light;
+    --background: 216 45.455% 97.843%; /* slate-50 */
     --foreground: 220 21% 8%; /* slate-950 */
 
     --card: 0 0% 100%;
@@ -18,19 +20,19 @@
     --primary-foreground: 0 0% 100%;
 
     --secondary: 231 84% 95%; /* brand-50 */
-    --secondary-foreground: 237 90% 49%;
+    --secondary-foreground: 237 91% 40%; /* brand-700 */
 
     --muted: 218 33% 95%; /* slate-75 */
-    --muted-foreground: 219 8% 46%; /* slate-600 */
+    --muted-foreground: 217.895 23.75% 31.373%; /* slate-600 */
 
     --accent: 216 45% 98%;
     --accent-foreground: 220 21% 8%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 70% 35.294%; /* red-800 */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 224 17% 88%; /* slate-200 */
-    --input: 224 17% 88%;
+    --border: 220 19% 78%;
+    --input: 220 19% 70%;
     --ring: 237 90% 49%;
 
     --heading: 230 82% 22%; /* navy-800 */
@@ -49,19 +51,39 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "cv11", "ss01";
+    caret-color: hsl(var(--primary));
   }
   h1,
   h2 {
-    @apply font-medium text-heading;
+    @apply font-semibold text-heading;
+  }
+  :focus-visible {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 3px;
   }
   ::selection {
-    background: rgba(12, 24, 236, 0.15);
+    background: #D5D9FB;
+    color: #0A1A66;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    opacity: 1;
   }
 }
 
 @layer components {
   .mono {
     @apply font-mono text-[13px] leading-5 tracking-tight;
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
   .no-scrollbar {
     scrollbar-width: none;

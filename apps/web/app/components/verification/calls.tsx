@@ -42,7 +42,7 @@ function CallItem({ call, index, label }: { call: DecodedCall; index: number; la
               {call.decoded.args.map((arg) => (
                 <div key={arg.name} className="contents">
                   <dt className="mono text-slate-600">
-                    {arg.name} <span className="text-slate-400">{arg.type}</span>
+                    {arg.name} <span className="text-slate-600">{arg.type}</span>
                   </dt>
                   <dd className="mono break-all text-slate-950">{arg.value}</dd>
                 </div>

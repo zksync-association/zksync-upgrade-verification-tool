@@ -85,7 +85,7 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
                 )}
               </span>
             ) : (
-              <span className="text-amber-700">Not found on ZKsync Era</span>
+              <span className="text-amber-900">Not found on ZKsync Era</span>
             ),
           },
           {

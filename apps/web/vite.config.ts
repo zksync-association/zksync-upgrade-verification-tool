@@ -10,6 +10,9 @@ export default defineConfig({
   },
   plugins: [
     remix({
+      // Scan route dependencies before serving pages, rather than rebuilding the
+      // browser's dependency graph as someone navigates to a new route.
+      future: { unstable_optimizeDeps: true },
       ignoredRouteFiles: ["**/*"],
       serverModuleFormat: "esm",
       routes: (defineRoutes) => {

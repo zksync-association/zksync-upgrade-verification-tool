@@ -44,7 +44,28 @@ export default function Upgrades() {
           <LoadingCard label="Reading UpgradeStarted events from the ProtocolUpgradeHandler…" />
         }
       >
-        <Await resolve={list}>
+        <Await
+          resolve={list}
+          errorElement={
+            <EmptyState>
+              <div className="space-y-3" role="alert" data-testid="upgrades-unavailable">
+                <p className="font-semibold text-slate-950">
+                  The proposal list could not be loaded.
+                </p>
+                <p>
+                  Check that your L1 RPC is available and supports log history, then retry. An
+                  unavailable list does not mean there are no proposals.
+                </p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Button onClick={() => window.location.reload()}>Retry</Button>
+                  <Button variant="secondary" asChild>
+                    <Link to="/settings">Open settings</Link>
+                  </Button>
+                </div>
+              </div>
+            </EmptyState>
+          }
+        >
           {(result) => <UpgradeTable result={result} allHistory={allHistory} />}
         </Await>
       </Suspense>
@@ -108,22 +129,22 @@ function UpgradeRows({
   testId,
 }: { upgrades: SerializeFrom<UpgradeSummary>[]; testId: string }) {
   return (
-    <Card className="divide-y divide-slate-100 overflow-hidden" data-testid={testId}>
+    <Card className="divide-y divide-slate-300 overflow-hidden" data-testid={testId}>
       {upgrades.map((u) => (
         <Link
           key={u.id}
           to={$path("/app/proposals/:id", { id: u.id })}
-          className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 transition-colors hover:bg-slate-25"
+          className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 transition-colors hover:bg-brand-25"
           data-testid="upgrade-row"
         >
           <span className="min-w-0 flex-1">
-            <span className="mono block truncate text-slate-950">{u.id}</span>
+            <span className="mono block break-all font-medium text-navy-800">{u.id}</span>
             <span className="text-slate-600 text-xs">
               Started {formatDay(u.createdAt)} · block {formatNumber(u.blockNumber)} ·{" "}
               {u.proposal.calls.length} call
               {u.proposal.calls.length === 1 ? "" : "s"}
               {!u.idMatches && (
-                <span className="ml-2 font-semibold text-red-700">
+                <span className="ml-2 font-semibold text-red-800">
                   id does not match its content
                 </span>
               )}
@@ -135,7 +156,7 @@ function UpgradeRows({
             {u.legalVetoExtended && <Badge variant="navy">Veto extended</Badge>}
           </span>
           <UpgradeStateBadge state={u.state} />
-          <ArrowRight className="h-4 w-4 text-slate-400" />
+          <ArrowRight className="h-5 w-5 text-brand-700" />
         </Link>
       ))}
     </Card>

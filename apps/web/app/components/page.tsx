@@ -7,7 +7,6 @@ import type { ReactNode } from "react";
 
 export function PageHeader({
   back,
-  eyebrow,
   title,
   badges,
   id,
@@ -34,18 +33,18 @@ export function PageHeader({
       )}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 space-y-2">
-          {eyebrow && (
-            <p className="font-semibold text-[11px] text-slate-600 uppercase tracking-[0.08em]">
-              {eyebrow}
-            </p>
-          )}
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[32px] leading-10 tracking-[-0.02em]">{title}</h1>
+            <h1 className="font-semibold text-[28px] leading-9 tracking-[-0.02em] sm:text-[32px] sm:leading-10">
+              {title}
+            </h1>
             {badges}
           </div>
           {id && (
-            <p className="flex items-center gap-1">
-              <span className="mono break-all text-slate-700" data-testid="page-id">
+            <p className="flex max-w-full items-start gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3">
+              <span
+                className="mono min-w-0 break-all font-medium text-navy-800"
+                data-testid="page-id"
+              >
                 {id}
               </span>
               <CopyButton value={id} label="Copy id" />
@@ -92,12 +91,16 @@ export function Facts({
   className,
 }: { items: { label: string; value: ReactNode; testId?: string }[]; className?: string }) {
   return (
-    <Card className={cn("p-6", className)}>
+    <Card className={cn("p-5 sm:p-6", className)}>
       <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
         {items.map((item) => (
-          <div key={item.label} className="min-w-0 space-y-1" data-testid={item.testId}>
-            <dt className="text-slate-600 text-xs">{item.label}</dt>
-            <dd className="min-w-0 text-slate-950 text-sm">{item.value}</dd>
+          <div
+            key={item.label}
+            className="min-w-0 space-y-2 border-slate-200 border-b pb-3"
+            data-testid={item.testId}
+          >
+            <dt className="font-medium text-slate-600 text-xs">{item.label}</dt>
+            <dd className="min-w-0 font-medium text-slate-950 text-sm">{item.value}</dd>
           </div>
         ))}
       </dl>
@@ -109,9 +112,9 @@ export function Check({ ok, children }: { ok: boolean | null; children: ReactNod
   return (
     <span
       className={cn(
-        "inline-flex items-start gap-1.5 text-sm",
-        ok === true && "text-green-700",
-        ok === false && "text-red-700",
+        "inline-flex items-start gap-1.5 rounded-md px-2 py-1 font-semibold text-sm",
+        ok === true && "bg-green-100 text-green-900",
+        ok === false && "bg-red-100 text-red-900",
         ok === null && "text-slate-600"
       )}
     >
@@ -133,9 +136,12 @@ export function EmptyState({ children }: { children: ReactNode }) {
 
 export function LoadingCard({ label }: { label: string }) {
   return (
-    <Card className="flex items-center gap-3 px-6 py-8 text-slate-600 text-sm">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-navy-800" />
-      {label}
+    <Card className="space-y-3 px-6 py-6 text-slate-700 text-sm">
+      <p role="status">{label}</p>
+      <div aria-hidden className="space-y-2 motion-safe:animate-pulse">
+        <div className="h-3 w-3/4 rounded bg-slate-100" />
+        <div className="h-3 w-1/2 rounded bg-slate-100" />
+      </div>
     </Card>
   );
 }

@@ -1,11 +1,21 @@
 import { appStatus } from "@/.server/status";
 import AppShell, { StatusProblem } from "@/components/app-shell";
+import { AppLoading } from "@/components/app-loading";
 import { GeneralErrorBoundary } from "@/components/error-boundary";
 import { WalletProvider } from "@/components/providers/wallet-provider";
 import { useNonce } from "@/utils/nonce-provider";
 import { type CLIENT_ENV, clientEnv } from "@config/env.server";
-import { type LinksFunction, type LoaderFunctionArgs, json } from "@remix-run/node";
-import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "@remix-run/react";
+import { type LinksFunction, type LoaderFunctionArgs, defer } from "@remix-run/node";
+import {
+  Await,
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  useLoaderData,
+} from "@remix-run/react";
+import { Suspense } from "react";
 import { Toaster } from "react-hot-toast";
 import {
   type State,
@@ -14,21 +24,23 @@ import {
 } from "wagmi";
 
 import "@/globals.css";
+import "@/fonts.css";
 import "@rainbow-me/rainbowkit/styles.css";
 
 export const links: LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
   {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;500&display=swap",
+    rel: "preload",
+    href: "/fonts/inter-latin.woff2",
+    as: "font",
+    type: "font/woff2",
+    crossOrigin: "anonymous",
   },
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const cookies = request.headers.get("Cookie");
   const wagmiCookie = cookies ? parseWagmiCookie(cookies, "wagmi.store") : undefined;
-  return json({ env: clientEnv, wagmiCookie, status: await appStatus() });
+  return defer({ env: clientEnv, wagmiCookie, status: appStatus() });
 }
 
 export type RootLoader = typeof loader;
@@ -42,21 +54,27 @@ export default function App() {
 
   return (
     <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
-      {status.ok ? (
-        <WalletProvider
-          initialState={initialState}
-          projectId={env.WALLET_CONNECT_PROJECT_ID}
-          safeWalletOrigins={env.SAFE_WALLET_ORIGINS}
-          chainId={status.governance.network.chainId}
-          chainLabel={status.governance.network.label}
-        >
-          <AppShell status={status}>
-            <Outlet />
-          </AppShell>
-        </WalletProvider>
-      ) : (
-        <StatusProblem error={status.error} hint={status.hint} />
-      )}
+      <Suspense fallback={<AppLoading />}>
+        <Await resolve={status}>
+          {(status) =>
+            status.ok ? (
+              <WalletProvider
+                initialState={initialState}
+                projectId={env.WALLET_CONNECT_PROJECT_ID}
+                safeWalletOrigins={env.SAFE_WALLET_ORIGINS}
+                chainId={status.governance.network.chainId}
+                chainLabel={status.governance.network.label}
+              >
+                <AppShell status={status}>
+                  <Outlet />
+                </AppShell>
+              </WalletProvider>
+            ) : (
+              <StatusProblem error={status.error} hint={status.hint} />
+            )
+          }
+        </Await>
+      </Suspense>
     </Document>
   );
 }
@@ -81,9 +99,18 @@ function Document({
         {allowIndexing ? null : <meta name="robots" content="noindex, nofollow" />}
         <Links />
       </head>
-      <body className="min-h-screen bg-slate-50">
+      <body className="min-h-screen bg-background text-foreground">
         {children}
-        <Toaster position="bottom-center" toastOptions={{ className: "!rounded-xl !text-sm" }} />
+        <Toaster
+          position="bottom-center"
+          toastOptions={{
+            className: "!rounded-xl !text-sm",
+            style: {
+              background: "hsl(var(--popover))",
+              color: "hsl(var(--popover-foreground))",
+            },
+          }}
+        />
         <script
           nonce={nonce}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: public client env only

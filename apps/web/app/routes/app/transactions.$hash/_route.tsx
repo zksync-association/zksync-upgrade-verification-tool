@@ -45,14 +45,14 @@ export default function Transaction() {
       <Card className="p-6">
         {!receipt ? (
           <p className="flex items-center gap-2 text-slate-950">
-            <Clock className="h-5 w-5 text-slate-500" /> Waiting for the transaction to be mined… If
+            <Clock className="h-5 w-5 text-slate-600" /> Waiting for the transaction to be mined… If
             you sent it from a Safe, this may be a Safe transaction hash; follow it in Safe{"{"}
             Wallet{"}"}.
           </p>
         ) : (
           <div className="space-y-4">
             <p
-              className={`flex items-center gap-2 font-medium ${receipt.status === "success" ? "text-green-700" : "text-red-700"}`}
+              className={`flex items-center gap-2 font-medium ${receipt.status === "success" ? "text-green-900" : "text-red-800"}`}
             >
               {receipt.status === "success" ? (
                 <CheckCircle2 className="h-5 w-5" />

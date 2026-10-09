@@ -1,42 +1,33 @@
 import { type NetworkConfig, knownNetwork, localNetwork } from "@/common/networks";
 import { env } from "@config/env.server";
-import { type Address, type PublicClient, type Transport, createPublicClient, http } from "viem";
+import { type Address, type PublicClient, createPublicClient } from "viem";
 import { zksync } from "viem/chains";
-import { FOREVER, cached, concurrencyLimit } from "./cache";
+import { FOREVER, cached } from "./cache";
+import { limitedHttp } from "./rpc-transport";
 
 // Public RPCs throttle bursts, so every client funnels requests through a small pool and backs
 // off on 429 (viem retries rate-limit errors with exponential delay: 0.5, 1, 2, 4, 8 s).
-function limitedHttp(url: string, maxInFlight: number): Transport {
-  const base = http(url, { timeout: 30_000, retryCount: 5, retryDelay: 500 });
-  const limit = concurrencyLimit(maxInFlight);
-  return (args) => {
-    const transport = base(args);
-    return {
-      ...transport,
-      request: ((request) => limit(() => transport.request(request))) as typeof transport.request,
-    };
-  };
-}
-
 // Multicall3 is deployed at the same address on mainnet, Sepolia and their forks. Reads made in the
 // same tick go out as one aggregate3 eth_call, which keeps a page within public-RPC rate limits.
 // None of the batched calls depend on msg.sender.
 export const MULTICALL3: Address = "0xcA11bde05977b3631167028862bE2a173976CA11";
 
-const transport = limitedHttp(env.L1_RPC_URL, 8);
-const direct = createPublicClient({ transport });
-const batched = createPublicClient({
-  chain: {
-    id: 0,
-    name: "l1",
-    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-    rpcUrls: { default: { http: [env.L1_RPC_URL] } },
-    contracts: { multicall3: { address: MULTICALL3 } },
-  },
-  batch: { multicall: { wait: 10 } },
-  transport,
-});
+let transport = limitedHttp(env.L1_RPC_URL, 8);
+let direct = createPublicClient({ transport });
+const makeBatched = () =>
+  createPublicClient({
+    chain: {
+      id: 0,
+      name: "l1",
+      nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+      rpcUrls: { default: { http: [env.L1_RPC_URL] } },
+      contracts: { multicall3: { address: MULTICALL3 } },
+    },
+    batch: { multicall: { wait: 10 } },
+    transport,
+  });
 
+let batched = makeBatched();
 let useMulticall = false;
 
 /** L1 client: batched through Multicall3 once the chain is known to have it. */
@@ -65,12 +56,14 @@ export class ConfigError extends Error {}
 
 export function network(): Promise<Network> {
   return cached("network", FOREVER, async () => {
-    const chainId = await direct.getChainId();
-    const clientVersion = await direct
-      .request({ method: "web3_clientVersion" })
-      .then(String)
-      .catch(() => "unknown");
-    const multicallCode = await direct.getCode({ address: MULTICALL3 }).catch(() => undefined);
+    const [chainId, clientVersion, multicallCode] = await Promise.all([
+      direct.getChainId(),
+      direct
+        .request({ method: "web3_clientVersion" })
+        .then(String)
+        .catch(() => "unknown"),
+      direct.getCode({ address: MULTICALL3 }).catch(() => undefined),
+    ]);
     useMulticall = !!multicallCode && multicallCode !== "0x";
     const base = knownNetwork(chainId) ?? localNetwork(chainId);
     const overrides: string[] = [];
@@ -168,4 +161,13 @@ export async function safeBlockNumber(): Promise<bigint> {
   const [net, latest] = await Promise.all([network(), latestBlock()]);
   if (net.isDevNode) return net.forkBlock ?? -1n;
   return latest.number - 64n;
+}
+
+/** Recreate clients after a local settings change. Call with cleared chain/log caches. */
+export function resetRpcClients() {
+  transport = limitedHttp(env.L1_RPC_URL, 8);
+  direct = createPublicClient({ transport });
+  batched = makeBatched();
+  useMulticall = false;
+  l2Client = undefined;
 }

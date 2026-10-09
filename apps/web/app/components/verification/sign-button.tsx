@@ -133,7 +133,7 @@ export function SignButton({
               </dl>
             </div>
           ) : (
-            <p className="text-amber-700 text-sm">
+            <p className="text-amber-900 text-sm">
               The connected account is not a Safe. This page only picks up signatures that a member
               Safe files with Safe's service.
             </p>

@@ -1,5 +1,5 @@
 import { type Address, type Hex, type Log, type PublicClient, formatLog, numberToHex } from "viem";
-import { FOREVER, cached } from "./cache";
+import { FOREVER, cached, concurrencyLimit } from "./cache";
 import { latestBlock, network, safeBlockNumber } from "./rpc";
 
 // eth_getLogs without a database. Public RPCs cap block ranges (or refuse history), so ranges are
@@ -20,12 +20,19 @@ export class LogsUnavailableError extends Error {
 
 type Filter = { address: Address; topics: (Hex | null)[] };
 type Segment = { from: bigint; to: bigint };
-type FilterCache = { segments: Segment[]; logs: Map<string, Log>; lock: Promise<unknown> };
+type FilterCache = {
+  segments: Segment[];
+  logs: Map<string, Log>;
+  lock: Promise<unknown>;
+  pendingTail: Map<string, Promise<Log[]>>;
+};
 
 const MIN_SPAN = 1_000n;
-const caches = new WeakMap<PublicClient, Map<string, FilterCache>>();
+// Leave transport capacity for foreground status, receipts, signatures and small event lookups.
+const historyChunk = concurrencyLimit(2);
+let caches = new WeakMap<PublicClient, Map<string, FilterCache>>();
 // Largest span each client has accepted so far; starts unbounded and only shrinks.
-const learnedSpan = new WeakMap<PublicClient, bigint>();
+let learnedSpan = new WeakMap<PublicClient, bigint>();
 
 export async function getLogs(
   client: PublicClient,
@@ -46,7 +53,7 @@ export async function getLogs(
   }
   let entry = byFilter.get(key);
   if (!entry) {
-    entry = { segments: [], logs: new Map(), lock: Promise.resolve() };
+    entry = { segments: [], logs: new Map(), lock: Promise.resolve(), pendingTail: new Map() };
     byFilter.set(key, entry);
   }
 
@@ -66,10 +73,20 @@ export async function getLogs(
     await fill;
   }
 
-  const fresh =
-    head > finalized
-      ? await fetchRange(client, filter, fromBlock > finalized ? fromBlock : finalized + 1n, head)
-      : [];
+  let fresh: Log[] = [];
+  if (head > finalized) {
+    const tailFrom = fromBlock > finalized ? fromBlock : finalized + 1n;
+    const tailKey = `${tailFrom}:${head}`;
+    let pending = entry.pendingTail.get(tailKey);
+    if (!pending) {
+      pending = fetchRange(client, filter, tailFrom, head);
+      entry.pendingTail.set(tailKey, pending);
+      const pendingTail = entry.pendingTail;
+      const remove = () => pendingTail.delete(tailKey);
+      pending.then(remove, remove);
+    }
+    fresh = await pending;
+  }
 
   const all = [...entry.logs.values()].filter(
     (log) => log.blockNumber !== null && log.blockNumber >= fromBlock && log.blockNumber <= cacheTo
@@ -93,21 +110,46 @@ async function fetchRange(
       first = await request(client, filter, from, end);
       break;
     } catch (error) {
-      if (end - from + 1n <= MIN_SPAN) throw new LogsUnavailableError(rpcMessage(error), from, end);
-      span = (end - from + 1n) / 2n;
+      if (!isRangeError(error) || end - from + 1n <= MIN_SPAN)
+        throw new LogsUnavailableError(rpcMessage(error), from, end);
+      const explicitLimit = rpcMessage(error).match(
+        /range\s+\d+\s+exceeds limit of\s+([\d,]+)/i
+      )?.[1];
+      const cap = explicitLimit ? BigInt(explicitLimit.replaceAll(",", "")) : 0n;
+      span = cap > 0n && cap < end - from + 1n ? cap : (end - from + 1n) / 2n;
       const learned = learnedSpan.get(client);
       if (learned === undefined || span < learned) learnedSpan.set(client, span);
     }
   }
   // The rest at the span that worked; a chunk that still fails (e.g. too many results) re-probes.
   const rest: Promise<Log[]>[] = [];
+  let failure: unknown;
   for (let start = from + span; start <= to; start += span) {
     const end = start + span - 1n < to ? start + span - 1n : to;
     rest.push(
-      request(client, filter, start, end).catch(() => fetchRange(client, filter, start, end))
+      historyChunk(() => {
+        if (failure) return Promise.reject(failure);
+        return request(client, filter, start, end);
+      }).catch((error) => {
+        if (failure) throw failure;
+        if (!isRangeError(error)) {
+          failure = new LogsUnavailableError(rpcMessage(error), start, end);
+          throw failure;
+        }
+        return fetchRange(client, filter, start, end).catch((error) => {
+          failure = error;
+          throw error;
+        });
+      })
     );
   }
   return [first, ...(await Promise.all(rest))].flat();
+}
+
+function isRangeError(error: unknown) {
+  return /block.*range|range.*(?:block|exceed|limit|too large)|query.*(?:too large|exceed)|too many (?:logs|results)|more than.*results|response.*(?:size|too large)|log.*limit/i.test(
+    rpcMessage(error)
+  );
 }
 
 async function request(client: PublicClient, filter: Filter, from: bigint, to: bigint) {
@@ -255,4 +297,9 @@ export async function findBlockByTimestamp(
     bisect = (hi - lo) * 2n > before;
   }
   return hi;
+}
+
+export function resetLogCaches() {
+  caches = new WeakMap();
+  learnedSpan = new WeakMap();
 }

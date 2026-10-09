@@ -12,6 +12,7 @@ export const FOREVER = Number.POSITIVE_INFINITY;
  * promise. Rejections are never cached.
  */
 export function cached<T>(key: string, ttlMs: number, compute: () => Promise<T>): Promise<T> {
+  if (ttlMs <= 0) return compute();
   const now = Date.now();
   const hit = store.get(key) as Entry<T> | undefined;
   if (hit && hit.expiresAt > now) {
@@ -19,7 +20,16 @@ export function cached<T>(key: string, ttlMs: number, compute: () => Promise<T>)
   }
 
   const value = compute();
-  store.set(key, { value, expiresAt: now + ttlMs });
+  const entry = { value, expiresAt: FOREVER };
+  store.set(key, entry);
+  // Slow reads still share one promise. Freshness starts when the result arrives,
+  // not before the provider has answered; invalidated results are never reinserted.
+  value.then(
+    () => {
+      if (store.get(key) === entry) entry.expiresAt = Date.now() + ttlMs;
+    },
+    () => {}
+  );
   value.catch(() => {
     if (store.get(key)?.value === value) {
       store.delete(key);

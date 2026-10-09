@@ -100,7 +100,7 @@ function Vetoes({ vetoes }: { vetoes: SerializeFrom<VetoSummary>[] }) {
           </span>
           {!v.governorName && <Badge variant="error">Unknown governor</Badge>}
           <SetStateBadge state={v.state} />
-          <ArrowRight className="h-4 w-4 text-slate-400" />
+          <ArrowRight className="h-4 w-4 text-slate-600" />
         </Link>
       ))}
     </Card>

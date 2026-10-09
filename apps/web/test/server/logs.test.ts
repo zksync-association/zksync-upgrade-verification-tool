@@ -1,6 +1,6 @@
 import { LogsUnavailableError, findBlockByTimestamp, getLogs, merge } from "@/.server/logs";
 import { type PublicClient, numberToHex } from "viem";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const ADDRESS = "0x0000000000000000000000000000000000000001";
 const TOPIC = `0x${"aa".repeat(32)}` as const;
@@ -38,6 +38,93 @@ function fakeLogsClient({ logBlocks, maxRange }: { logBlocks: bigint[]; maxRange
 }
 
 describe("getLogs", () => {
+  it("uses the provider's explicit block cap instead of repeatedly halving the range", async () => {
+    const spans: bigint[] = [];
+    const client = {
+      request: async ({ params }: { params: [{ fromBlock: string; toBlock: string }] }) => {
+        const span = BigInt(params[0].toBlock) - BigInt(params[0].fromBlock) + 1n;
+        spans.push(span);
+        if (span > 10_000n) throw new Error(`range ${span} exceeds limit of 10000`);
+        return [];
+      },
+    } as unknown as PublicClient;
+    await getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 0n, 99_999n, { safeHead: -1n });
+    expect(spans).toEqual([100_000n, ...Array(10).fill(10_000n)]);
+  });
+  it("does not shrink ranges or fan out when the RPC times out", async () => {
+    const request = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("request timed out"))
+      .mockResolvedValue([]);
+    const client = { request } as unknown as PublicClient;
+    await expect(
+      getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 0n, 100_000n, { safeHead: -1n })
+    ).rejects.toBeInstanceOf(LogsUnavailableError);
+    expect(request).toHaveBeenCalledTimes(1);
+    await getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 0n, 100_000n, { safeHead: -1n });
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1]?.[0].params[0].toBlock).toBe(numberToHex(100_000n));
+  });
+
+  it("keeps history chunks bounded and allows a small event lookup while history is pending", async () => {
+    const pending: (() => void)[] = [];
+    const client = {
+      request: async ({ params }: { params: [{ fromBlock: string; toBlock: string }] }) => {
+        const from = BigInt(params[0].fromBlock);
+        const to = BigInt(params[0].toBlock);
+        if (to - from + 1n > 1_000n) throw new Error("range 4001 exceeds limit of 1000");
+        if (from > 0n && to - from > 10n)
+          return new Promise<[]>((resolve) => {
+            pending.push(() => resolve([]));
+          });
+        return [];
+      },
+    } as unknown as PublicClient;
+    const history = getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 0n, 4_000n, {
+      safeHead: -1n,
+    });
+    await vi.waitFor(() => expect(pending).toHaveLength(2));
+    expect(
+      await getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 5n, 6n, { safeHead: -1n })
+    ).toEqual([]);
+    for (let i = 0; i < 3; i++) {
+      if (!pending[i]) await vi.waitFor(() => expect(pending[i]).toBeDefined());
+      pending[i]?.();
+    }
+    await history;
+  });
+  it("evicts a failed shared recent scan so the next request can retry", async () => {
+    const request = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue([]);
+    const client = { request } as unknown as PublicClient;
+    const scan = () =>
+      getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 0n, 10n, { safeHead: -1n });
+    const results = await Promise.allSettled([scan(), scan()]);
+    expect(results.every((result) => result.status === "rejected")).toBe(true);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(await scan()).toEqual([]);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+  it("shares concurrent recent-range scans but re-reads after completion, including on forks", async () => {
+    let complete!: (logs: []) => void;
+    const request = vi.fn(
+      () =>
+        new Promise<[]>((resolve) => {
+          complete = resolve;
+        })
+    );
+    const client = { request } as unknown as PublicClient;
+    const scan = () =>
+      getLogs(client, { address: ADDRESS, topics: [TOPIC] }, 0n, 10n, { safeHead: -1n });
+    const first = scan();
+    const second = scan();
+    expect(request).toHaveBeenCalledTimes(1);
+    complete([]);
+    await Promise.all([first, second]);
+    const third = scan();
+    expect(request).toHaveBeenCalledTimes(2);
+    complete([]);
+    await third;
+  });
   it("splits ranges the RPC refuses, learns its limit and returns every log once", async () => {
     const { client, calls } = fakeLogsClient({
       logBlocks: [100n, 50_000n, 99_999n],

@@ -1,4 +1,4 @@
-import { useStatus } from "@/components/app-shell";
+import { useStatus } from "@/components/governance-context";
 import Avatar from "@/components/connect-button/avatar";
 import { Button } from "@/components/ui/button";
 import type { SignerGroup } from "@/common/typed-data";
@@ -84,13 +84,13 @@ export default function ConnectButton({ offer }: { offer: boolean }) {
               address={account.address}
               ensImage={account.ensAvatar}
               size={22}
-              className="text-slate-500"
+              className="text-slate-600"
             />
             <span className="mono">{shortHex(account.address)}</span>
             <span className="hidden font-normal text-slate-600 text-xs lg:inline">
               {groups.length > 0 ? groups.map((g) => GROUP_LABEL[g]).join(" · ") : "not a member"}
             </span>
-            <ChevronDown className="text-slate-500" />
+            <ChevronDown className="text-slate-600" />
           </Button>
         );
       }}

@@ -5,19 +5,20 @@ import {
   upgradeHandlerAbi,
 } from "@/common/abis";
 import { type MemberSignature, encodeMultisigSignature } from "@/common/execution";
+import { EMERGENCY_RECENT_DAYS } from "@/common/emergency";
 import {
   type DecodedCall,
   type UpgradeProposal,
   decodeCall,
   upgradeProposalId,
 } from "@/common/proposal";
-import { type ActionName, buildTypedData } from "@/common/typed-data";
+import { type ActionName, buildTypedData, governanceHashes } from "@/common/typed-data";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
 import { type Address, type Hex, decodeAbiParameters, decodeFunctionData, getAddress } from "viem";
 import { cached } from "../cache";
 import { type Governance, governance } from "../governance";
-import { getLogs } from "../logs";
-import { l1, network } from "../rpc";
+import { findBlockByTimestamp, getLogs } from "../logs";
+import { l1, latestBlock, network, safeBlockNumber } from "../rpc";
 import { type SignatureSet, isRevert, revertReason, verifySignatureSet } from "../signatures";
 import {
   type UsedSignature,
@@ -27,6 +28,7 @@ import {
   topicOf,
 } from "./common";
 import { collectMessages } from "./messages";
+import { findEmergencyEvent } from "./emergency-event";
 
 // Emergency upgrades sign only the id = keccak256(abi.encode(calls, executor, salt)); Safe never
 // sees the calls or salt. Before execution they must come from the proposer (a payload file the
@@ -40,16 +42,27 @@ const EMERGENCY_ACTIONS = [
 
 type Executed = { id: Hex; txHash: Hex; blockNumber: bigint };
 
-/** Every EmergencyUpgradeExecuted event since the handler was deployed (cached per range). */
-async function executedEmergencies(): Promise<Executed[]> {
+/** Full history is opt-in for pages; the JSON list retains it by default. */
+async function executedEmergencies({ allHistory = true } = {}): Promise<Executed[]> {
   const net = await network();
+  const head = await latestBlock();
+  const recentFrom = allHistory
+    ? net.upgradeHandlerDeployBlock
+    : await findBlockByTimestamp(
+        l1,
+        head.timestamp - BigInt(EMERGENCY_RECENT_DAYS * 24 * 60 * 60),
+        net.upgradeHandlerDeployBlock,
+        head.number,
+        net.isDevNode ? null : { key: String(net.chainId), safeHead: await safeBlockNumber() }
+      );
   const logs = await getLogs(
     l1,
     {
       address: net.upgradeHandler,
       topics: [topicOf(upgradeHandlerAbi, "EmergencyUpgradeExecuted")],
     },
-    net.upgradeHandlerDeployBlock
+    recentFrom,
+    head.number
   );
   return logs.map((log) => ({
     id: log.topics[1] as Hex,
@@ -64,6 +77,75 @@ export type EmergencySummary = {
   reported: { securityCouncil: number; guardians: number; zkFoundation: boolean };
   firstSeen: string | null;
 };
+
+const summary = (id: Hex): EmergencySummary => ({
+  id,
+  executed: null,
+  reported: { securityCouncil: 0, guardians: 0, zkFoundation: false },
+  firstSeen: null,
+});
+
+/** Pending Safe messages and executed events do not wait for one another. */
+export async function loadEmergencyList({ allHistory = false } = {}) {
+  const gov = await governance();
+  const board = gov.emergencyUpgradeBoard;
+  const pending = collectMessages(
+    [...gov.securityCouncil.members, ...gov.guardians.members, board.zkFoundation],
+    EMERGENCY_ACTIONS,
+    board.domain
+  ).then(async (collected) => {
+    const byId = new Map<string, EmergencySummary>();
+    for (const group of collected.groups) {
+      const id = group.typedData.message.id as Hex;
+      const key = id.toLowerCase();
+      const entry = byId.get(key) ?? summary(id);
+      byId.set(key, entry);
+      const n = group.reportedSigners.length;
+      if (group.typedData.primaryType === "ExecuteEmergencyUpgradeSecurityCouncil")
+        entry.reported.securityCouncil = n;
+      if (group.typedData.primaryType === "ExecuteEmergencyUpgradeGuardians")
+        entry.reported.guardians = n;
+      if (group.typedData.primaryType === "ExecuteEmergencyUpgradeZKFoundation")
+        entry.reported.zkFoundation = n > 0;
+      if (!entry.firstSeen || group.firstSeen < entry.firstSeen) entry.firstSeen = group.firstSeen;
+    }
+    // Concurrent current-state calls are batched by the RPC client. No archive or log scan needed.
+    const entries = await Promise.all(
+      [...byId.values()].map(async (entry) => {
+        const status = await l1.readContract({
+          address: gov.upgradeHandler,
+          abi: upgradeHandlerAbi,
+          functionName: "upgradeStatus",
+          args: [entry.id],
+        });
+        return status[4] ? null : entry;
+      })
+    );
+    return {
+      pending: entries
+        .filter((entry): entry is EmergencySummary => entry !== null)
+        .sort((a, b) => ((a.firstSeen ?? "") < (b.firstSeen ?? "") ? 1 : -1)),
+      errors: collected.errors,
+      anomalies: collected.anomalies,
+    };
+  });
+  const executed = executedEmergencies({ allHistory }).then((events) =>
+    events
+      .map((event) => ({
+        ...summary(event.id),
+        executed: { txHash: event.txHash, blockNumber: event.blockNumber.toString() },
+      }))
+      .reverse()
+  );
+  for (const promise of [pending, executed]) void promise.catch(() => {});
+  return { pending, executed };
+}
+
+export async function listRecentEmergencyUpgrades() {
+  const loading = await loadEmergencyList();
+  const [pending, executed] = await Promise.all([loading.pending, loading.executed]);
+  return { ...pending, executed };
+}
 
 export async function listEmergencyUpgrades() {
   const gov = await governance();
@@ -151,10 +233,13 @@ export type EmergencyDetail = {
   governance: Governance;
 };
 
-export async function getEmergencyUpgrade(
+export type EmergencyOverview = Pick<EmergencyDetail, "id" | "state" | "governance">;
+
+/** Start execution discovery and current Safe verification independently. */
+export async function loadEmergencyUpgrade(
   id: Hex,
   { supplied = [] }: { supplied?: MemberSignature[] } = {}
-): Promise<EmergencyDetail> {
+) {
   const gov = await governance();
   const board = gov.emergencyUpgradeBoard;
   const state = await l1.readContract({
@@ -191,7 +276,7 @@ export async function getEmergencyUpgrade(
     },
   ] as const;
 
-  const sets = await Promise.all(
+  const sets = Promise.all(
     specs.map((spec) =>
       verifySignatureSet({
         action: spec.action,
@@ -205,40 +290,19 @@ export async function getEmergencyUpgrade(
     )
   );
 
-  let executed: EmergencyExecution | null = null;
-  const roles: EmergencyRole[] = specs.map((spec, i) => ({
-    key: spec.key,
-    title: spec.title,
-    set: sets[i] as SignatureSet,
-    used: null,
-  }));
-
-  if (state === UPGRADE_STATES.Done) {
-    const event = (await executedEmergencies()).find(
-      (e) => e.id.toLowerCase() === id.toLowerCase()
-    );
+  const executed = (async (): Promise<EmergencyExecution | null> => {
+    if (state !== UPGRADE_STATES.Done) return null;
+    const event = await findEmergencyEvent(id);
     if (event) {
       const decoded = await decodeExecution(event.txHash, board.address);
       if (decoded) {
         const { proposal, guardians, securityCouncil, zkFoundation } = decoded;
-        roles[0] = {
-          ...(roles[0] as EmergencyRole),
-          used: compareUsedSignatures(securityCouncil, (roles[0] as EmergencyRole).set),
-        };
-        roles[1] = {
-          ...(roles[1] as EmergencyRole),
-          used: compareUsedSignatures(guardians, (roles[1] as EmergencyRole).set),
-        };
-        roles[2] = {
-          ...(roles[2] as EmergencyRole),
-          used: compareUsedSignatures(
-            { signers: [board.zkFoundation], signatures: [zkFoundation] },
-            (roles[2] as EmergencyRole).set
-          ),
-        };
         const block = event.blockNumber - 1n;
         const archive = await hasArchiveState(board.address, block);
-        executed = {
+        const hashes = specs.map((spec) => ({
+          hashes: governanceHashes(buildTypedData(spec.action, board.domain, { id })),
+        }));
+        return {
           txHash: event.txHash,
           blockNumber: event.blockNumber.toString(),
           proposal,
@@ -254,19 +318,24 @@ export async function getEmergencyUpgrade(
                     Promise.all([
                       check1271(
                         gov.securityCouncil.address,
-                        sets[0] as SignatureSet,
+                        hashes[0] as Pick<SignatureSet, "hashes">,
                         securityCouncil,
                         block,
                         "Security Council"
                       ),
                       check1271(
                         gov.guardians.address,
-                        sets[1] as SignatureSet,
+                        hashes[1] as Pick<SignatureSet, "hashes">,
                         guardians,
                         block,
                         "Guardians"
                       ),
-                      checkSafe(board.zkFoundation, sets[2] as SignatureSet, zkFoundation, block),
+                      checkSafe(
+                        board.zkFoundation,
+                        hashes[2] as Pick<SignatureSet, "hashes">,
+                        zkFoundation,
+                        block
+                      ),
                     ])
                 ),
               }
@@ -277,9 +346,41 @@ export async function getEmergencyUpgrade(
         };
       }
     }
-  }
+    return null;
+  })();
 
-  return { id, state, roles, executed, governance: gov };
+  const overview: EmergencyOverview = { id, state, governance: gov };
+  const detail = Promise.all([sets, executed]).then(async ([sets, execution]) => {
+    const decoded = execution ? await decodeExecution(execution.txHash, board.address) : null;
+    const used = decoded
+      ? [
+          decoded.securityCouncil,
+          decoded.guardians,
+          {
+            signers: [board.zkFoundation],
+            signatures: [decoded.zkFoundation],
+          },
+        ]
+      : [];
+    const roles: EmergencyRole[] = specs.map((spec, i) => ({
+      key: spec.key,
+      title: spec.title,
+      set: sets[i] as SignatureSet,
+      used: used[i] ? compareUsedSignatures(used[i] as Blob, sets[i] as SignatureSet) : null,
+    }));
+    return { ...overview, roles, executed: execution } satisfies EmergencyDetail;
+  });
+  // Deferred loaders attach their own error handlers after this function returns.
+  for (const pending of [sets, executed, detail]) void pending.catch(() => {});
+  return { overview, executed, detail };
+}
+
+/** JSON retains the complete verification result, including comparisons with Safe's copies. */
+export async function getEmergencyUpgrade(
+  id: Hex,
+  options: { supplied?: MemberSignature[] } = {}
+): Promise<EmergencyDetail> {
+  return (await loadEmergencyUpgrade(id, options)).detail;
 }
 
 type Blob = { signers: readonly Address[]; signatures: readonly Hex[] };
@@ -322,7 +423,7 @@ async function decodeExecution(txHash: Hex, board: Address) {
 
 async function check1271(
   contract: Address,
-  set: SignatureSet,
+  set: Pick<SignatureSet, "hashes">,
   used: Blob,
   block: bigint,
   role: string
@@ -346,7 +447,12 @@ async function check1271(
   }
 }
 
-async function checkSafe(safe: Address, set: SignatureSet, signature: Hex, block: bigint) {
+async function checkSafe(
+  safe: Address,
+  set: Pick<SignatureSet, "hashes">,
+  signature: Hex,
+  block: bigint
+) {
   try {
     const result = await l1.readContract({
       address: safe,

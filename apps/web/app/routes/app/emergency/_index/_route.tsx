@@ -1,4 +1,5 @@
-import { type EmergencySummary, listEmergencyUpgrades } from "@/.server/flows/emergency";
+import { type EmergencySummary, loadEmergencyList } from "@/.server/flows/emergency";
+import { EMERGENCY_RECENT_DAYS } from "@/common/emergency";
 import { useStatus } from "@/components/app-shell";
 import { TxLink } from "@/components/hex";
 import { EmptyState, LoadingCard, PageHeader } from "@/components/page";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatDay, formatNumber } from "@/utils/format";
 import { Meta } from "@/utils/meta";
-import { type SerializeFrom, defer } from "@remix-run/node";
+import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
 import { Await, Link, useLoaderData } from "@remix-run/react";
 import { ArrowRight } from "lucide-react";
 import { Suspense } from "react";
@@ -15,12 +16,18 @@ import { $path } from "remix-routes";
 
 export const meta = Meta["/app/emergency"];
 
-export function loader() {
-  return defer({ list: listEmergencyUpgrades() });
+export function loader({ request }: LoaderFunctionArgs) {
+  const allHistory = new URL(request.url).searchParams.get("history") === "all";
+  const loading = loadEmergencyList({ allHistory });
+  return defer({
+    allHistory,
+    pending: loading.then((d) => d.pending),
+    executed: loading.then((d) => d.executed),
+  });
 }
 
 export default function EmergencyList() {
-  const { list } = useLoaderData<typeof loader>();
+  const { pending, executed, allHistory } = useLoaderData<typeof loader>();
   const { governance } = useStatus();
   return (
     <div>
@@ -41,41 +48,101 @@ export default function EmergencyList() {
           come from the proposer, and this app checks them against the id in your browser.
         </p>
       </PageHeader>
-      <Suspense
-        fallback={<LoadingCard label="Collecting emergency signatures from members' Safes…" />}
-      >
-        <Await resolve={list}>{(result) => <Lists result={result} />}</Await>
-      </Suspense>
+      <div className="space-y-8">
+        <section className="space-y-3" aria-labelledby="pending-emergencies-heading">
+          <h2 id="pending-emergencies-heading" className="text-[22px] leading-7">
+            Pending
+          </h2>
+          <Suspense
+            fallback={<LoadingCard label="Collecting emergency signatures from members' Safes…" />}
+          >
+            <Await
+              resolve={pending}
+              errorElement={
+                <EmptyState>Pending upgrades could not be checked. Refresh to retry.</EmptyState>
+              }
+            >
+              {(result) => <PendingList result={result} />}
+            </Await>
+          </Suspense>
+        </section>
+        <section className="space-y-3" aria-labelledby="executed-emergencies-heading">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="executed-emergencies-heading" className="text-[22px] leading-7">
+              {allHistory
+                ? "Executed · full history"
+                : `Executed · last ${EMERGENCY_RECENT_DAYS} days`}
+            </h2>
+            <Button variant="secondary" size="sm" asChild>
+              <Link
+                to={allHistory ? $path("/app/emergency") : `${$path("/app/emergency")}?history=all`}
+              >
+                {allHistory ? "Show recent executions" : "Show full history"}
+              </Link>
+            </Button>
+          </div>
+          <p className="text-slate-600 text-sm">
+            {allHistory
+              ? "Loading every execution since deployment may take longer on RPCs with small log ranges."
+              : "Older executions remain available through full history or by opening their id."}
+          </p>
+          <Suspense
+            fallback={
+              <LoadingCard
+                label={
+                  allHistory
+                    ? "Reading emergency executions since deployment…"
+                    : "Reading recent emergency executions…"
+                }
+              />
+            }
+          >
+            <Await
+              resolve={executed}
+              errorElement={
+                <EmptyState>Execution history could not be read. Refresh to retry.</EmptyState>
+              }
+            >
+              {(items) =>
+                items.length ? (
+                  <Rows items={items} testId="executed-emergencies" />
+                ) : (
+                  <EmptyState>
+                    {allHistory
+                      ? "No emergency executions found since deployment."
+                      : `No emergency executions in the last ${EMERGENCY_RECENT_DAYS} days.`}
+                  </EmptyState>
+                )
+              }
+            </Await>
+          </Suspense>
+        </section>
+      </div>
     </div>
   );
 }
 
-function Lists({
+function PendingList({
   result,
-}: { result: SerializeFrom<Awaited<ReturnType<typeof listEmergencyUpgrades>>> }) {
+}: { result: SerializeFrom<Awaited<Awaited<ReturnType<typeof loadEmergencyList>>["pending"]>> }) {
   return (
     <div className="space-y-8">
-      {result.errors.length > 0 && (
+      {(result.errors.length > 0 || result.anomalies > 0) && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-sm">
-          Some Safes could not be read: {result.errors.join("; ")}
+          The pending list may be incomplete. {result.errors.join("; ")}
+          {result.anomalies > 0 &&
+            ` ${result.anomalies} messages had unexpected hashes and were excluded.`}
         </p>
       )}
       <div className="space-y-3">
-        <h2 className="text-[22px] leading-7">Pending</h2>
         {result.pending.length === 0 ? (
           <EmptyState>
-            No member has signed an emergency upgrade that is not executed yet.
+            {result.errors.length > 0 || result.anomalies > 0
+              ? "No pending upgrades were found in the available messages."
+              : "No pending emergency upgrades were found in members' Safe messages."}
           </EmptyState>
         ) : (
           <Rows items={result.pending} testId="pending-emergencies" />
-        )}
-      </div>
-      <div className="space-y-3">
-        <h2 className="text-[22px] leading-7">Executed</h2>
-        {result.executed.length === 0 ? (
-          <EmptyState>None yet.</EmptyState>
-        ) : (
-          <Rows items={result.executed} testId="executed-emergencies" />
         )}
       </div>
     </div>
@@ -112,7 +179,7 @@ function Rows({ items, testId }: { items: SerializeFrom<EmergencySummary>[]; tes
             </span>
           )}
           <Link to={$path("/app/emergency/:id", { id: e.id })} aria-label="Open">
-            <ArrowRight className="h-4 w-4 text-slate-400" />
+            <ArrowRight className="h-4 w-4 text-slate-600" />
           </Link>
         </div>
       ))}

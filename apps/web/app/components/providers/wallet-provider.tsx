@@ -23,6 +23,22 @@ import { mainnet, sepolia } from "wagmi/chains";
 import { safe } from "wagmi/connectors";
 
 const queryClient = new QueryClient();
+const walletTheme = lightTheme({
+  accentColor: "hsl(var(--primary))",
+  accentColorForeground: "hsl(var(--primary-foreground))",
+  borderRadius: "large",
+  fontStack: "system",
+});
+// RainbowKit defaults dim text with alpha; keep wallet dialogs as readable as the app.
+Object.assign(walletTheme.colors, {
+  modalBackground: "hsl(var(--popover))",
+  modalText: "hsl(var(--popover-foreground))",
+  modalTextDim: "hsl(var(--muted-foreground))",
+  modalTextSecondary: "hsl(var(--muted-foreground))",
+  closeButton: "hsl(var(--muted-foreground))",
+  connectButtonText: "hsl(var(--foreground))",
+  error: "hsl(var(--destructive))",
+});
 
 // The browser never talks to an RPC of its own: chain reads happen on the server through the
 // user's RPC, and signing/sending go through the connected wallet. Without this, wagmi would send
@@ -125,11 +141,7 @@ export function WalletProvider({
   return (
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider
-          theme={lightTheme({ accentColor: "#0C18EC", borderRadius: "large", fontStack: "system" })}
-          avatar={Avatar}
-          modalSize="compact"
-        >
+        <RainbowKitProvider theme={walletTheme} avatar={Avatar} modalSize="compact">
           <ConnectSafeApp />
           {children}
         </RainbowKitProvider>

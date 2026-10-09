@@ -1,4 +1,4 @@
-import { type StandardUpgradeDetail, getStandardUpgrade } from "@/.server/flows/standard";
+import { type StandardUpgradeCore, loadStandardUpgrade } from "@/.server/flows/standard";
 import { parseId } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
@@ -23,7 +23,15 @@ export const meta = Meta["/app/proposals/:id"];
 
 export function loader({ params, request }: LoaderFunctionArgs) {
   const id = parseId(params.id);
-  return defer({ id, detail: getStandardUpgrade(id, { supplied: suppliedSignatures(request) }) });
+  const loading = loadStandardUpgrade(id, { supplied: suppliedSignatures(request) });
+  return defer({
+    id,
+    detail: loading.then((d) => d.overview),
+    evidence: loading.then((d) => d.evidence),
+    sets: loading.then((d) => d.sets),
+    execution: loading.then((d) => d.execution),
+    l2Proposal: loading.then((d) => d.l2Proposal),
+  });
 }
 
 export default function UpgradePage() {
@@ -39,7 +47,7 @@ export default function UpgradePage() {
               title="Upgrade"
               id={id}
             />
-            <LoadingCard label="Reading the upgrade and checking every member's signature on-chain…" />
+            <LoadingCard label="Reading the proposal status and original calls from L1…" />
           </>
         }
       >
@@ -75,14 +83,15 @@ function DetailError({ id }: { id: string }) {
             .
           </>
         ) : (
-          <span className="text-red-700">{error?.message ?? "Failed to load"}</span>
+          <span className="text-red-800">{error?.message ?? "Failed to load"}</span>
         )}
       </EmptyState>
     </>
   );
 }
 
-function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeDetail> }) {
+function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeCore> }) {
+  const { sets, evidence, execution, l2Proposal } = useLoaderData<typeof loader>();
   const { governance } = useStatus();
   const labels = {
     [governance.upgradeHandler.toLowerCase()]: "ProtocolUpgradeHandler",
@@ -122,21 +131,42 @@ function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeDetail> })
             { label: "Salt", value: <Hash value={d.started.proposal.salt} /> },
             {
               label: "L2 vote",
-              value: d.l2Proposal ? (
-                <span className="space-x-2">
-                  <span className="mono">
-                    ZkProtocolGovernor #{shortId(d.l2Proposal.proposalId)}
-                  </span>
-                  {governance.network.tallyUrl && (
-                    <ExternalAnchor
-                      href={`${governance.network.tallyUrl}/proposal/${d.l2Proposal.proposalId}`}
-                    >
-                      Tally
-                    </ExternalAnchor>
-                  )}
-                </span>
-              ) : (
-                <span className="text-slate-600">Not found on ZKsync Era</span>
+              value: (
+                <Suspense
+                  fallback={
+                    <span role="status" className="text-slate-600">
+                      Finding the L2 vote…
+                    </span>
+                  }
+                >
+                  <Await
+                    resolve={l2Proposal}
+                    errorElement={
+                      <span className="text-slate-600">
+                        L2 lookup unavailable. Refresh to retry.
+                      </span>
+                    }
+                  >
+                    {(proposal) =>
+                      proposal ? (
+                        <span className="space-x-2">
+                          <span className="mono break-all">
+                            ZkProtocolGovernor #{proposal.proposalId}
+                          </span>
+                          {governance.network.tallyUrl && (
+                            <ExternalAnchor
+                              href={`${governance.network.tallyUrl}/proposal/${proposal.proposalId}`}
+                            >
+                              Tally
+                            </ExternalAnchor>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600">Not found on ZKsync Era</span>
+                      )
+                    }
+                  </Await>
+                </Suspense>
               ),
             },
             {
@@ -150,11 +180,35 @@ function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeDetail> })
             },
             {
               label: "Executed",
-              value: d.executedTx ? (
-                <TxLink hash={d.executedTx} />
-              ) : (
-                <span className="text-slate-600">Not yet</span>
-              ),
+              value:
+                d.state === UPGRADE_STATES.Done ? (
+                  <Suspense
+                    fallback={
+                      <span role="status" className="text-slate-600">
+                        Finding the execution transaction…
+                      </span>
+                    }
+                  >
+                    <Await
+                      resolve={execution}
+                      errorElement={
+                        <span className="text-slate-600">
+                          Execution transaction unavailable. Refresh to retry.
+                        </span>
+                      }
+                    >
+                      {(result) =>
+                        result.executedTx ? (
+                          <TxLink hash={result.executedTx} />
+                        ) : (
+                          <span className="text-slate-600">Execution transaction not found</span>
+                        )
+                      }
+                    </Await>
+                  </Suspense>
+                ) : (
+                  <span className="text-slate-600">Not yet</span>
+                ),
             },
           ]}
         />
@@ -199,47 +253,149 @@ function Detail({ detail: d }: { detail: SerializeFrom<StandardUpgradeDetail> })
         <UpgradeFile proposal={d.started.proposal} name={`upgrade-${d.id.slice(0, 10)}`} />
       </Section>
 
+      {(d.status.securityCouncilApprovalTimestamp !== 0 ||
+        d.status.guardiansApproval ||
+        d.status.guardiansExtendedLegalVeto) && (
+        <Section
+          title="Recorded approvals"
+          description="Transaction evidence and historical checks load independently of current Safe signatures."
+        >
+          <Suspense
+            fallback={
+              <LoadingCard label="Reading recorded approvals and re-checking their historical signatures…" />
+            }
+          >
+            <Await
+              resolve={evidence}
+              errorElement={
+                <EmptyState>
+                  Recorded approval evidence could not be read. Refresh to retry; the proposal's
+                  current state is shown above.
+                </EmptyState>
+              }
+            >
+              {(records) => (
+                <div className="space-y-4" data-testid="recorded-approvals">
+                  {records.map((record) => (
+                    <div
+                      key={record.key}
+                      className="space-y-2 rounded-xl border border-slate-300 bg-white p-4 sm:p-6"
+                    >
+                      <h3 className="font-semibold text-navy-800">{record.title}</h3>
+                      <p className="text-sm">
+                        {record.state.status !== "open" && record.state.detail}
+                      </p>
+                      {record.state.status === "done" && record.state.txHash ? (
+                        <TxLink hash={record.state.txHash} />
+                      ) : (
+                        <p className="text-amber-900 text-sm">
+                          The approval transaction could not be located.
+                        </p>
+                      )}
+                      {record.used && (
+                        <p className="text-slate-700 text-sm">
+                          The transaction carried {record.used.signers.length} signatures.
+                          Comparison with current Safe copies appears below.
+                        </p>
+                      )}
+                      {record.historical ? (
+                        <p
+                          className={
+                            record.historical.accepted === true
+                              ? "text-green-900 text-sm"
+                              : record.historical.accepted === false
+                                ? "text-red-900 text-sm"
+                                : "text-slate-700 text-sm"
+                          }
+                        >
+                          {record.historical.accepted === true
+                            ? `Re-checked at block ${record.historical.block} (just before execution): accepted.`
+                            : record.historical.accepted === false
+                              ? `Re-checked at block ${record.historical.block}: rejected (${record.historical.error}).`
+                              : `Not re-checked at block ${record.historical.block}: ${record.historical.error}.`}
+                        </p>
+                      ) : (
+                        <p className="text-amber-900 text-sm">
+                          Historical signatures could not be reconstructed for a re-check.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Await>
+          </Suspense>
+        </Section>
+      )}
+
       <Section
         title="Approvals"
         description="Each member is a Safe. Its signature is looked up in the Safe Transaction Service by the hash this page computes, and counted only if the contract accepts it."
       >
-        <div className="space-y-6">
-          {d.sets.map((s) => (
-            <SignatureSetCard
-              key={s.key}
-              testId={`set-${s.key}`}
-              title={s.title}
-              set={s.set}
-              state={s.state}
-              execution={s.execution}
-              executionToLabel={s.key === "securityCouncil" ? "SecurityCouncil" : "Guardians"}
-              used={s.used}
-              historical={s.historical}
-            />
-          ))}
-        </div>
+        <Suspense
+          fallback={
+            <LoadingCard label="Checking current member signatures on-chain… Proposal data above is ready to review." />
+          }
+        >
+          <Await
+            resolve={sets}
+            errorElement={
+              <EmptyState>
+                Current signatures could not be checked. Proposal data and recorded evidence remain
+                available. Refresh to retry.
+              </EmptyState>
+            }
+          >
+            {(verified) => (
+              <div className="space-y-6">
+                {verified.map((s) => (
+                  <SignatureSetCard
+                    key={s.key}
+                    testId={`set-${s.key}`}
+                    title={s.title}
+                    set={s.set}
+                    state={s.state}
+                    execution={s.execution}
+                    executionToLabel={s.key === "securityCouncil" ? "SecurityCouncil" : "Guardians"}
+                    used={s.used}
+                    historical={s.historical}
+                  />
+                ))}
+              </div>
+            )}
+          </Await>
+        </Suspense>
       </Section>
 
-      {d.execute && (
+      {d.state === UPGRADE_STATES.Ready && (
         <Section
           title="Execute the upgrade"
           description="Ready: the handler accepts execute(proposal) from the executor."
         >
-          <ExecutionPanel
-            execution={d.execute}
-            toLabel="ProtocolUpgradeHandler"
-            note={
-              anyone
-                ? "Anyone can execute this upgrade."
-                : "Only the executor can execute this upgrade."
-            }
-          />
+          <Suspense fallback={<LoadingCard label="Simulating execution on-chain…" />}>
+            <Await
+              resolve={execution}
+              errorElement={
+                <EmptyState>Execution simulation unavailable. Refresh to retry.</EmptyState>
+              }
+            >
+              {(result) =>
+                result.execute && (
+                  <ExecutionPanel
+                    execution={result.execute}
+                    toLabel="ProtocolUpgradeHandler"
+                    note={
+                      anyone
+                        ? "Anyone can execute this upgrade."
+                        : "Only the executor can execute this upgrade."
+                    }
+                  />
+                )
+              }
+            </Await>
+          </Suspense>
         </Section>
       )}
     </div>
   );
-}
-
-function shortId(id: string) {
-  return id.length > 14 ? `${id.slice(0, 6)}…${id.slice(-6)}` : id;
 }

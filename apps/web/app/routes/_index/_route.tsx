@@ -1,4 +1,5 @@
-import { listEmergencyUpgrades } from "@/.server/flows/emergency";
+import { listRecentEmergencyUpgrades } from "@/.server/flows/emergency";
+import { EMERGENCY_RECENT_DAYS } from "@/common/emergency";
 import { listFreezeRequests } from "@/.server/flows/freeze";
 import { listL2Vetoes } from "@/.server/flows/l2-veto";
 import { listStandardUpgrades } from "@/.server/flows/standard";
@@ -8,7 +9,7 @@ import { upgradeHandlerAbi } from "@/common/abis";
 import { isUpgradeActive } from "@/common/upgrade-states";
 import { useStatus } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { OverviewSummary } from "@/components/overview-summary";
 import { Input } from "@/components/ui/input";
 import { Meta } from "@/utils/meta";
 import { type ActionFunctionArgs, defer, json, redirect } from "@remix-run/node";
@@ -26,16 +27,19 @@ export function loader() {
       open: r.upgrades.filter((u) => isUpgradeActive(u.state)).length,
       total: r.upgrades.length,
     })),
-    emergency: listEmergencyUpgrades().then((r) => ({
+    emergency: listRecentEmergencyUpgrades().then((r) => ({
       pending: r.pending.length,
       executed: r.executed.length,
+      incomplete: r.errors.length > 0 || r.anomalies > 0,
     })),
     freeze: listFreezeRequests().then((r) => ({
       open: r.requests.filter((q) => q.state.status === "open").length,
+      incomplete: r.errors.length > 0 || r.anomalies > 0,
     })),
     vetoes: listL2Vetoes().then((r) => ({
       open: r.vetoes.filter((v) => v.state.status === "open").length,
       vetoable: r.vetoable.length,
+      incomplete: r.errors.length > 0 || r.anomalies > 0 || r.l2Error !== null,
     })),
   });
 }
@@ -44,7 +48,7 @@ export function loader() {
 export async function action({ request }: ActionFunctionArgs) {
   const id = String((await request.formData()).get("id") ?? "").trim();
   if (!bytes32Pattern.test(id))
-    return json({ error: "Enter a 32-byte id (0x followed by 64 hex characters)." });
+    return json({ id, error: "Enter a 32-byte id: 0x followed by 64 hexadecimal characters." });
   const { upgradeHandler } = await network();
   const status = await l1.readContract({
     address: upgradeHandler,
@@ -65,96 +69,154 @@ export default function Index() {
   const { governance } = useStatus();
 
   return (
-    <div className="space-y-10">
-      <section className="relative overflow-hidden rounded-[20px] bg-navy-100 px-6 py-12 sm:px-12">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background: "radial-gradient(60% 80% at 0% 0%, #FFF6E5 0%, rgba(255,246,229,0) 70%)",
-          }}
-        />
-        <div className="relative max-w-2xl space-y-4">
-          <h1 className="text-[40px] leading-[48px] tracking-[-0.03em] sm:text-[48px] sm:leading-[56px]">
-            ZKsync governance, <span className="font-extrabold">verified on‑chain.</span>
-          </h1>
-          <p className="text-[17px] text-slate-950 leading-7">
-            Proposals come from the ProtocolUpgradeHandler on {governance.network.label}. Signatures
-            come from members' Safes and count only when the governance contract itself accepts
-            them, in an <span className="mono">eth_call</span> through your RPC.
-          </p>
-          <Card className="mt-6 p-2">
-            <Form method="post" className="flex flex-col gap-2 sm:flex-row">
+    <div className="space-y-8">
+      <header className="space-y-2">
+        <h1 className="text-[32px] leading-10 tracking-tight">Governance review</h1>
+        <p className="max-w-3xl text-slate-700 text-sm leading-6">
+          Review proposals on {governance.network.label}, inspect their calls, and compare the
+          hashes your Safe signs. Signatures count only after the contract accepts them.
+        </p>
+      </header>
+
+      <section className="rounded-xl bg-navy-800 p-5 sm:p-6" aria-labelledby="proposal-lookup">
+        <div className="grid gap-4 lg:grid-cols-[200px_1fr] lg:items-start">
+          <div className="space-y-1">
+            <h2 id="proposal-lookup" className="font-semibold text-lg text-white">
+              Open a proposal
+            </h2>
+            <p className="text-indigo-100 text-sm">Paste an upgrade or emergency id.</p>
+          </div>
+          <Form method="post" className="space-y-2">
+            <label htmlFor="proposal-id" className="sr-only">
+              Upgrade or emergency id
+            </label>
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Input
+                id="proposal-id"
                 name="id"
-                placeholder="Upgrade or emergency id (0x…)"
-                className="mono border-transparent text-[13px] focus-visible:border-brand-600"
-                aria-label="Upgrade or emergency id"
+                defaultValue={actionData?.id ?? ""}
+                placeholder="0x followed by 64 hexadecimal characters"
+                className="mono h-11 min-w-0 flex-1 text-[13px]"
                 autoComplete="off"
                 spellCheck={false}
+                aria-invalid={actionData?.error ? true : undefined}
+                aria-describedby={actionData?.error ? "proposal-error" : "proposal-hint"}
               />
-              <Button type="submit" loading={navigation.state === "submitting"}>
+              <Button
+                type="submit"
+                loading={navigation.state === "submitting"}
+                className="h-11 border-white hover:border-white"
+              >
                 Open <ArrowRight />
               </Button>
-            </Form>
-          </Card>
-          {actionData?.error && <p className="text-red-700 text-sm">{actionData.error}</p>}
+            </div>
+            {actionData?.error ? (
+              <p
+                id="proposal-error"
+                role="alert"
+                className="rounded-lg bg-red-50 px-3 py-2 text-red-900 text-sm"
+              >
+                {actionData.error}
+              </p>
+            ) : (
+              <p id="proposal-hint" className="text-indigo-100 text-xs">
+                Opens the proposal for review. No wallet connection needed.
+              </p>
+            )}
+          </Form>
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        <FlowCard
-          to={$path("/app/proposals")}
-          icon={<Rocket />}
-          title="Protocol upgrades"
-          description="Upgrades voted on ZKsync Era and started on L1. The Security Council approves, Guardians may approve or extend the legal veto."
-          summary={
-            <Deferred value={data.upgrades}>
-              {(v) => `${v.open} in progress · ${v.total} in the last 45 days`}
-            </Deferred>
-          }
-          testId="flow-upgrades"
-        />
-        <FlowCard
-          to={$path("/app/emergency")}
-          icon={<ShieldAlert />}
-          title="Emergency upgrades"
-          description="Executed immediately with Security Council, Guardians and ZKsync Foundation signatures over the upgrade id."
-          summary={
-            <Deferred value={data.emergency}>
-              {(v) => `${v.pending} pending · ${v.executed} executed`}
-            </Deferred>
-          }
-          testId="flow-emergency"
-        />
-        <FlowCard
-          to={$path("/app/freeze")}
-          icon={<Snowflake />}
-          title="Freeze requests"
-          description="Soft and hard freezes, unfreeze, and the soft-freeze threshold, signed by the Security Council."
-          summary={
-            <Deferred value={data.freeze}>{(v) => `${v.open} open for signatures`}</Deferred>
-          }
-          testId="flow-freeze"
-        />
-        <FlowCard
-          to={$path("/app/l2-cancellations")}
-          icon={<Ban />}
-          title="Guardian veto"
-          description="Guardians cancel a proposal on the ZKsync Era Token or GovOps governor before it executes."
-          summary={
-            <Deferred value={data.vetoes}>
-              {(v) => `${v.open} open vetoes · ${v.vetoable} L2 proposals can be vetoed`}
-            </Deferred>
-          }
-          testId="flow-veto"
-        />
+      <section className="space-y-3" aria-labelledby="governance-actions">
+        <h2 id="governance-actions" className="text-xl">
+          Governance actions
+        </h2>
+        <div className="divide-y divide-slate-200 rounded-xl border border-slate-300 bg-white">
+          <FlowRow
+            to={$path("/app/proposals")}
+            icon={<Rocket />}
+            title="Protocol upgrades"
+            description="L2 decisions started on L1, with Security Council or Guardian approval."
+            summary={
+              <Deferred value={data.upgrades}>
+                {(v) => (
+                  <OverviewSummary
+                    count={v.open}
+                    label="in progress"
+                    detail={`${v.total} upgrade${v.total === 1 ? "" : "s"} in the last 45 days`}
+                  />
+                )}
+              </Deferred>
+            }
+            testId="flow-upgrades"
+          />
+          <FlowRow
+            to={$path("/app/emergency")}
+            icon={<ShieldAlert />}
+            title="Emergency upgrades"
+            description="Upgrade ids signed by the Council, Guardians, and ZKsync Foundation."
+            summary={
+              <Deferred value={data.emergency}>
+                {(v) => (
+                  <OverviewSummary
+                    count={v.pending}
+                    label="pending"
+                    detail={`${v.executed} executions in the last ${EMERGENCY_RECENT_DAYS} days`}
+                    incomplete={v.incomplete}
+                  />
+                )}
+              </Deferred>
+            }
+            testId="flow-emergency"
+          />
+          <FlowRow
+            to={$path("/app/freeze")}
+            icon={<Snowflake />}
+            title="Freeze requests"
+            description="Council requests to freeze, unfreeze, or change the soft-freeze threshold."
+            summary={
+              <Deferred value={data.freeze}>
+                {(v) => (
+                  <OverviewSummary
+                    count={v.open}
+                    label="open for signatures"
+                    incomplete={v.incomplete}
+                  />
+                )}
+              </Deferred>
+            }
+            testId="flow-freeze"
+          />
+          <FlowRow
+            to={$path("/app/l2-cancellations")}
+            icon={<Ban />}
+            title="Guardian veto"
+            description="Guardian cancellations of Token or GovOps proposals before execution."
+            summary={
+              <Deferred value={data.vetoes}>
+                {(v) => (
+                  <OverviewSummary
+                    count={v.open}
+                    label="open vetoes"
+                    incomplete={v.incomplete}
+                    detail={v.incomplete ? undefined : `${v.vetoable} L2 proposals can be vetoed`}
+                  />
+                )}
+              </Deferred>
+            }
+            testId="flow-veto"
+          />
+        </div>
+        <p className="text-slate-600 text-xs">
+          Safe discovery can be incomplete when its API is unavailable. Open a known id to review
+          the on-chain evidence directly.
+        </p>
       </section>
     </div>
   );
 }
 
-function FlowCard({
+function FlowRow({
   to,
   icon,
   title,
@@ -170,20 +232,26 @@ function FlowCard({
   testId: string;
 }) {
   return (
-    <Link to={to} className="group" data-testid={testId}>
-      <Card className="flex h-full flex-col gap-4 p-6 transition-colors group-hover:border-slate-300">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-navy-800/[0.08] text-navy-800 [&_svg]:h-6 [&_svg]:w-6">
+    <Link
+      to={to}
+      prefetch="intent"
+      className="group grid gap-3 px-5 py-5 transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-slate-50 sm:grid-cols-[minmax(0,1fr)_220px_20px] sm:items-center sm:gap-6 sm:px-6"
+      data-testid={testId}
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <span aria-hidden className="mt-0.5 shrink-0 text-navy-800 [&_svg]:size-5">
           {icon}
         </span>
-        <div className="space-y-1.5">
-          <h3 className="flex items-center gap-2 font-medium text-[19px] text-slate-950">
-            {title}
-            <ArrowRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600" />
-          </h3>
-          <p className="text-slate-950 text-sm leading-6">{description}</p>
+        <div className="space-y-1">
+          <h3 className="font-semibold text-base text-navy-800">{title}</h3>
+          <p className="max-w-2xl text-slate-700 text-sm leading-6">{description}</p>
         </div>
-        <p className="mt-auto text-slate-600 text-sm">{summary}</p>
-      </Card>
+      </div>
+      <div className="pl-8 sm:pl-0">{summary}</div>
+      <ArrowRight
+        aria-hidden
+        className="hidden h-4 w-4 text-slate-600 group-hover:text-brand-700 sm:block"
+      />
     </Link>
   );
 }
@@ -194,11 +262,20 @@ function Deferred<T>({
 }: { value: Promise<T> | T; children: (v: T) => ReactNode }) {
   return (
     <Suspense
-      fallback={<span className="inline-block h-4 w-40 animate-pulse rounded bg-slate-100" />}
+      fallback={
+        <span role="status" className="inline-flex flex-col gap-1.5 text-slate-600 text-xs">
+          <span className="h-4 w-28 animate-pulse rounded bg-slate-100" />
+          Reading sources…
+        </span>
+      }
     >
       <Await
         resolve={value}
-        errorElement={<span className="text-amber-700">Could not load (see the page)</span>}
+        errorElement={
+          <span className="font-medium text-amber-900 text-sm">
+            Data unavailable · open to retry
+          </span>
+        }
       >
         {(v) => children(v as T)}
       </Await>

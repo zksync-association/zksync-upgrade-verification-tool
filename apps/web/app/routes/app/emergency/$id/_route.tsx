@@ -1,4 +1,9 @@
-import { type EmergencyDetail, getEmergencyUpgrade } from "@/.server/flows/emergency";
+import {
+  type EmergencyDetail,
+  type EmergencyExecution,
+  type EmergencyOverview,
+  loadEmergencyUpgrade,
+} from "@/.server/flows/emergency";
 import { governance } from "@/.server/governance";
 import { parseId } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
@@ -8,7 +13,7 @@ import { type PayloadCheck, checkEmergencyPayload, decodeCall } from "@/common/p
 import { UPGRADE_STATES } from "@/common/upgrade-states";
 import { useStatus } from "@/components/app-shell";
 import { Hash, TxLink } from "@/components/hex";
-import { Check, Facts, LoadingCard, PageHeader, Section } from "@/components/page";
+import { Check, EmptyState, Facts, LoadingCard, PageHeader, Section } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -39,7 +44,13 @@ export const meta = Meta["/app/emergency/:id"];
 
 export function loader({ params, request }: LoaderFunctionArgs) {
   const id = parseId(params.id);
-  return defer({ id, detail: getEmergencyUpgrade(id, { supplied: suppliedSignatures(request) }) });
+  const loading = loadEmergencyUpgrade(id, { supplied: suppliedSignatures(request) });
+  return defer({
+    id,
+    detail: loading.then((d) => d.overview),
+    executed: loading.then((d) => d.executed),
+    verified: loading.then((d) => d.detail),
+  });
 }
 
 // Opt-in simulation of the execution transaction. Only calls to the Emergency Upgrade Board are
@@ -77,7 +88,7 @@ export default function EmergencyPage() {
             title="Emergency upgrade"
             id={id}
           />
-          <LoadingCard label="Checking Security Council, Guardian and Foundation signatures on-chain…" />
+          <LoadingCard label="Reading the emergency upgrade status from L1…" />
         </>
       }
     >
@@ -86,7 +97,8 @@ export default function EmergencyPage() {
   );
 }
 
-function Detail({ detail: d }: { detail: SerializeFrom<EmergencyDetail> }) {
+function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
+  const { executed: execution, verified } = useLoaderData<typeof loader>();
   const { governance } = useStatus();
   const board = governance.emergencyUpgradeBoard.address;
   const executed = d.state === UPGRADE_STATES.Done;
@@ -97,21 +109,6 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyDetail> }) {
     const stored = loadPayload(d.id);
     if (stored) setCheck(checkEmergencyPayload(stored, d.id as Hex, board as Hex));
   }, [d.id, board, executed]);
-
-  const allMet = d.roles.every((r) => r.set.thresholdCheck.status === "met");
-  const zkf = d.roles.find((r) => r.key === "zkFoundation");
-  const execution = useMemo(() => {
-    if (executed || !check?.ok || !allMet || !zkf?.set.valid[0]) return null;
-    const role = (key: string) =>
-      (d.roles.find((r) => r.key === key)?.set.valid ?? []) as { signer: Hex; signature: Hex }[];
-    return emergencyExecution(
-      board as Hex,
-      check.proposal,
-      role("guardians"),
-      role("securityCouncil"),
-      zkf.set.valid[0].signature as Hex
-    );
-  }, [executed, check, allMet, zkf, d.roles, board]);
 
   return (
     <div className="space-y-10">
@@ -129,48 +126,30 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyDetail> }) {
         id={d.id}
       />
 
-      {d.executed ? (
-        <Section
-          title="What it did"
-          description="Rebuilt from the executeEmergencyUpgrade calldata of the execution transaction, and hashed again with the board as executor."
+      {executed ? (
+        <Suspense
+          fallback={
+            <LoadingCard label="Locating the emergency execution and checking its original calls…" />
+          }
         >
-          <Facts
-            items={[
-              { label: "Executed in", value: <TxLink hash={d.executed.txHash} /> },
-              { label: "Salt", value: <Hash value={d.executed.proposal.salt} /> },
-              {
-                label: "Calls and salt match the id",
-                value: (
-                  <Check ok={d.executed.idMatches}>
-                    keccak256(abi.encode(calls, board, salt)) {d.executed.idMatches ? "=" : "≠"} id
-                  </Check>
-                ),
-                testId: "id-check",
-              },
-              {
-                label: "Board's checks before execution",
-                value: d.executed.historical ? (
-                  <span className="flex flex-col gap-0.5">
-                    {d.executed.historical.checks.map((c) => (
-                      <Check key={c.role} ok={c.accepted}>
-                        {c.role}{" "}
-                        {c.accepted === true
-                          ? "accepted"
-                          : c.accepted === false
-                            ? `rejected (${c.error})`
-                            : `not checked (${c.error})`}
-                      </Check>
-                    ))}
-                  </span>
-                ) : (
-                  <span className="text-slate-600">{d.executed.historicalUnavailable}</span>
-                ),
-              },
-            ]}
-          />
-          <CallList calls={d.executed.calls} />
-          <UpgradeFile proposal={d.executed.proposal} name={`emergency-${d.id.slice(0, 10)}`} />
-        </Section>
+          <Await
+            resolve={execution}
+            errorElement={
+              <EmptyState>Emergency execution lookup unavailable. Refresh to retry.</EmptyState>
+            }
+          >
+            {(execution) =>
+              execution ? (
+                <ExecutedContent execution={execution} id={d.id} />
+              ) : (
+                <EmptyState>
+                  No emergency execution event was found for this id. The completed state alone does
+                  not establish an emergency upgrade.
+                </EmptyState>
+              )
+            }
+          </Await>
+        </Suspense>
       ) : (
         <Section
           title="What it will do"
@@ -180,6 +159,96 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyDetail> }) {
         </Section>
       )}
 
+      <Suspense
+        fallback={
+          <LoadingCard label="Checking Security Council, Guardian and Foundation signatures on-chain…" />
+        }
+      >
+        <Await
+          resolve={verified}
+          errorElement={
+            <EmptyState>Signature verification unavailable. Refresh to retry.</EmptyState>
+          }
+        >
+          {(detail) => <SignatureSections detail={detail} board={board} check={check} />}
+        </Await>
+      </Suspense>
+    </div>
+  );
+}
+
+function ExecutedContent({
+  execution,
+  id,
+}: { execution: SerializeFrom<EmergencyExecution>; id: string }) {
+  return (
+    <Section
+      title="What it did"
+      description="Rebuilt from the executeEmergencyUpgrade calldata of the execution transaction, and hashed again with the board as executor."
+    >
+      <Facts
+        items={[
+          { label: "Executed in", value: <TxLink hash={execution.txHash} /> },
+          { label: "Salt", value: <Hash value={execution.proposal.salt} /> },
+          {
+            label: "Calls and salt match the id",
+            value: (
+              <Check ok={execution.idMatches}>
+                keccak256(abi.encode(calls, board, salt)) {execution.idMatches ? "=" : "≠"} id
+              </Check>
+            ),
+            testId: "id-check",
+          },
+          {
+            label: "Board's checks before execution",
+            value: execution.historical ? (
+              <span className="flex flex-col gap-0.5">
+                {execution.historical.checks.map((c) => (
+                  <Check key={c.role} ok={c.accepted}>
+                    {c.role}{" "}
+                    {c.accepted === true
+                      ? "accepted"
+                      : c.accepted === false
+                        ? `rejected (${c.error})`
+                        : `not checked (${c.error})`}
+                  </Check>
+                ))}
+              </span>
+            ) : (
+              <span className="text-slate-600">{execution.historicalUnavailable}</span>
+            ),
+          },
+        ]}
+      />
+      <CallList calls={execution.calls} />
+      <UpgradeFile proposal={execution.proposal} name={`emergency-${id.slice(0, 10)}`} />
+    </Section>
+  );
+}
+
+function SignatureSections({
+  detail: d,
+  board,
+  check,
+}: { detail: SerializeFrom<EmergencyDetail>; board: string; check: PayloadCheck | null }) {
+  const executed = d.state === UPGRADE_STATES.Done;
+  const allMet = d.roles.every((r) => r.set.thresholdCheck.status === "met");
+  const zkf = d.roles.find((r) => r.key === "zkFoundation");
+  const execution = useMemo(() => {
+    if (executed || !check?.ok || !allMet || !zkf?.set.valid[0]) return null;
+    const role = (key: string) =>
+      (d.roles.find((r) => r.key === key)?.set.valid ?? []) as { signer: Hex; signature: Hex }[];
+    return emergencyExecution(
+      board as Hex,
+      check.proposal,
+      role("guardians"),
+      role("securityCouncil"),
+      zkf.set.valid[0].signature as Hex
+    );
+  }, [executed, check, allMet, zkf, d.roles, board]);
+
+  return (
+    <div className="space-y-10">
       <Section
         title="Signatures"
         description="All three are needed. The board checks each group through its EIP-1271 isValidSignature."
@@ -281,7 +350,7 @@ function PayloadLoader({
     return (
       <div className="space-y-4" data-testid="payload-ok">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
-          <p className="flex items-center gap-2 text-green-800 text-sm">
+          <p className="flex items-center gap-2 text-green-900 text-sm">
             <CheckCircle2 className="h-4 w-4" /> The payload hashes to this id
             {check.title && (
               <span className="text-slate-950">· “{check.title}” (title is not signed)</span>
@@ -363,7 +432,7 @@ function PayloadLoader({
         </div>
       </div>
       {check && !check.ok && (
-        <p className="flex items-start gap-2 text-red-700 text-sm" data-testid="payload-error">
+        <p className="flex items-start gap-2 text-red-800 text-sm" data-testid="payload-error">
           <XCircle className="mt-0.5 h-4 w-4 shrink-0" /> {check.error}
         </p>
       )}

@@ -128,7 +128,7 @@ function Rows({ requests, testId }: { requests: SerializeFrom<FreezeSummary>[]; 
             </span>
           </span>
           <SetStateBadge state={r.state} />
-          <ArrowRight className="h-4 w-4 text-slate-400" />
+          <ArrowRight className="h-4 w-4 text-slate-600" />
         </Link>
       ))}
     </Card>

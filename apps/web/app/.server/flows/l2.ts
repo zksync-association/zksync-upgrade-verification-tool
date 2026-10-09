@@ -17,14 +17,14 @@ import { cached } from "../cache";
 import { governance } from "../governance";
 import { findBlockByTimestamp, getLogs } from "../logs";
 import { l1, l2, network } from "../rpc";
-import { topicOf } from "./common";
+import { callTo, topicOf } from "./common";
+import { L1_MESSENGER, findL2ProposalInBatch, upgradeBatch } from "./l2-batch";
 
 // ZKsync Era side of governance: the governors Guardians can veto, and the protocol governor whose
 // executed proposals start L1 upgrades. Era's public RPC serves wide log ranges, so windows are
 // scanned directly; results near the head are never cached.
 
 const DAY = 86_400n;
-const L1_MESSENGER: Address = "0x0000000000000000000000000000000000008008";
 
 // IGovernor.ProposalState
 export const L2_PROPOSAL_STATES = [
@@ -215,39 +215,59 @@ export async function getL2Proposal(
 }
 
 /** ZkProtocolGovernor proposal whose L2 → L1 message is the upgrade `l1Id` (for the Tally link). */
-export async function findL2ProposalForUpgrade(l1Id: Hex, creationTimestamp: number) {
+export async function findL2ProposalForUpgrade(
+  l1Id: Hex,
+  creationTimestamp: number,
+  { startedTxHash, strategy = "batch" }: { startedTxHash?: Hex; strategy?: "batch" | "legacy" } = {}
+) {
   const client = await l2();
-  const { l2Governors, isDevNode } = await network();
+  const { l2Governors, isDevNode, upgradeHandler } = await network();
   if (!client || !l2Governors.protocol) return null;
   const governor = l2Governors.protocol;
-  return cached(`l2-for-upgrade:${l1Id}`, isDevNode ? 0 : Number.POSITIVE_INFINITY, async () => {
-    const from = await l2BlockAt(client, BigInt(creationTimestamp) - 21n * DAY);
-    const to = await l2BlockAt(client, BigInt(creationTimestamp));
-    const logs = await getLogs(
-      client,
-      { address: governor, topics: [topicOf(l2GovernorAbi, "ProposalExecuted")] },
-      from,
-      to,
-      { safeHead: -1n }
-    );
-    for (const log of logs) {
-      const message = await l1MessageOf(client, log.transactionHash as Hex);
-      if (message && keccak256(message.body) === l1Id) {
-        const { args } = decodeEventLog({
-          abi: l2GovernorAbi,
-          eventName: "ProposalExecuted",
-          data: log.data,
-          topics: log.topics,
-        });
-        return {
-          governor,
-          proposalId: args.proposalId.toString(),
-          executedTx: log.transactionHash as Hex,
-        };
+  return cached(
+    `l2-for-upgrade:${strategy}:${l1Id}`,
+    isDevNode ? 0 : Number.POSITIVE_INFINITY,
+    async () => {
+      if (strategy === "batch" && startedTxHash) {
+        try {
+          const call = await callTo(startedTxHash, upgradeHandler);
+          const batch = call ? upgradeBatch(call.data, l1Id) : null;
+          if (batch !== null) {
+            const match = await findL2ProposalInBatch(client, l1Id, governor, batch);
+            if (match) return match;
+          }
+        } catch {
+          // Unsupported RPC methods or unavailable batch history retain the existing discovery path.
+        }
       }
+      const from = await l2BlockAt(client, BigInt(creationTimestamp) - 21n * DAY);
+      const to = await l2BlockAt(client, BigInt(creationTimestamp));
+      const logs = await getLogs(
+        client,
+        { address: governor, topics: [topicOf(l2GovernorAbi, "ProposalExecuted")] },
+        from,
+        to,
+        { safeHead: -1n }
+      );
+      for (const log of logs) {
+        const message = await l1MessageOf(client, log.transactionHash as Hex);
+        if (message && keccak256(message.body) === l1Id) {
+          const { args } = decodeEventLog({
+            abi: l2GovernorAbi,
+            eventName: "ProposalExecuted",
+            data: log.data,
+            topics: log.topics,
+          });
+          return {
+            governor,
+            proposalId: args.proposalId.toString(),
+            executedTx: log.transactionHash as Hex,
+          };
+        }
+      }
+      return null;
     }
-    return null;
-  });
+  );
 }
 
 async function l1MessageOf(client: PublicClient, txHash: Hex) {
