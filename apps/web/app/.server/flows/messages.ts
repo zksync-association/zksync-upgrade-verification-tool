@@ -55,13 +55,17 @@ type Listing = { messages: SafeMessage[]; fetchedAt?: number };
 type Reading = { typedData: GovernanceTypedData; digest: Hex; filed: boolean } | null;
 
 // What each message read as, per Safe and chain, keyed by the message object the Safe store
-// holds: a listing that has not changed keeps its objects, so the typed data is parsed and hashed
-// once instead of on every page (that work ran before a page's first bytes were sent). The store
-// replaces the objects when it reads a listing again, and dropped ones are collected with them.
+// holds: the store keeps the objects of messages that did not change when it reads a listing
+// again, so each message's typed data is parsed and hashed once, not on every page (on a page that
+// work comes before its first bytes are sent: about 0.1 s for the 17 member Safes' listings).
+// Dropped objects are collected with their readings. warmMessageReadings does it for the listings
+// held at the start, off the request path.
 const readings = new WeakMap<SafeMessage, Map<string, Reading>>();
 
+const readingKey = (safe: Address, chainId: number) => `${chainId}:${safe.toLowerCase()}`;
+
 function readMessage(message: SafeMessage, safe: Address, chainId: number): Reading {
-  const key = `${chainId}:${safe.toLowerCase()}`;
+  const key = readingKey(safe, chainId);
   let bySafe = readings.get(message);
   const known = bySafe?.get(key);
   if (known !== undefined) return known;
@@ -82,6 +86,29 @@ function readMessage(message: SafeMessage, safe: Address, chainId: number): Read
   }
   bySafe.set(key, reading);
   return reading;
+}
+
+/**
+ * Reads (parses and hashes) the messages of the listings held for these Safes, of any age, as
+ * collecting them would, one Safe at a time with a turn of the event loop between: the boot
+ * warm-up's, so that the first page to list them does not do it before its first bytes. Never asks
+ * Safe. Returns how many messages it read (those not read before).
+ */
+export async function warmMessageReadings(safes: readonly Address[]): Promise<number> {
+  const { chainId } = await network();
+  let read = 0;
+  for (const safe of safes) {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const listing = heldSafeListing(safe);
+    if (!listing) continue;
+    const key = readingKey(safe, chainId);
+    for (const message of listing.messages) {
+      if (readings.get(message)?.has(key)) continue;
+      readMessage(message, safe, chainId);
+      read++;
+    }
+  }
+  return read;
 }
 
 const sameDomain = (a: Eip712Domain, b: Eip712Domain) =>

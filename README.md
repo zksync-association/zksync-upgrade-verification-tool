@@ -46,6 +46,11 @@ You can also connect your Safe over WalletConnect: start the app with `WALLET_CO
 | `SAFE_API_KEY` | Safe API key. Without one, Safe allows 2 requests/s and 5,000 a month per IP: enough for one signer, not for a hosted instance |
 | `UPGRADE_HANDLER_ADDRESS`, `SAFE_TX_SERVICE_URL`, `ZK_*_GOVERNOR_ADDRESS` | Overrides for local chains. The app warns when a pinned address is overridden |
 | `CHAIN_CACHE` | `0` turns off the local cache of public chain and Safe data kept between runs in `apps/web/.cache/chain/` (logs, block timestamps, Safe listings; never verdicts, settings or keys). Delete that folder to clear it |
+| `PREWARM` | `0` turns off the reads made right after the start (network, governance, both log histories and, with a Safe API key, the member Safes' listings, whose messages it then parses); the first pages then make them |
+| `SYNC_MODE` | `always` (default): follow the chain head and refresh what pages read before they ask, for as long as the app runs, doing less while nobody uses it (measured on mainnet: about 2,600 RPC requests an hour idle, 14,000 in use). `window`: only while it is in use. `off`: every request reads on demand |
+| `SYNC_KEEPWARM_MS` | How long after a request the app counts as in use (default `600000`, 10 minutes) |
+| `SYNC_SAFE_ACTIVE_MS` | While in use, the Safe listings of the signer groups a page showed in this window are re-read before they turn 60 s old (default `300000`). Needs `SAFE_API_KEY` or a self-hosted Safe service |
+| `SYNC_SAFE_HOURLY_BUDGET` | Most background Safe requests an hour (default `1200`; `0` turns them off). Requests a page or `/api/*` call needs are not limited by it |
 
 [AGENTS.md](AGENTS.md) is for running and checking it with an agent, and running the tests.
 The upgrade verification CLI for deep upgrade analysis lives in [apps/cli](apps/cli/README.md).

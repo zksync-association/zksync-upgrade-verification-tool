@@ -396,15 +396,21 @@ async function runRead(safe: Address, key: string, ticket: SafeTicket): Promise<
   }
   const listing = await fetchListing(safe, options);
   const fingerprint = JSON.stringify([listing.complete, listing.messages]);
-  const version =
-    previous && previous.fingerprint === fingerprint ? previous.snapshot.version : ++versions;
+  const unchanged = previous !== undefined && previous.fingerprint === fingerprint;
+  const version = previous && unchanged ? previous.snapshot.version : ++versions;
   return commit(
     key,
     ticket,
     previous,
     {
       snapshot: {
-        messages: listing.messages,
+        // The objects held for messages that did not change (all of them, when none did): what
+        // was derived from them (flows/messages.ts parses and hashes each once) still applies.
+        messages: !previous
+          ? listing.messages
+          : unchanged
+            ? previous.snapshot.messages
+            : sameObjects(listing.messages, previous.snapshot.messages),
         complete: listing.complete,
         fetchedAt: listing.arrivedAt,
         version,
@@ -437,6 +443,16 @@ function commit(
     if (previous?.snapshot.version !== next.snapshot.version) notifyChange(key as Address);
   }
   return next.snapshot;
+}
+
+/**
+ * The messages just read, each one that has not changed since `held` replaced by the object held
+ * for it. Equal means the same JSON: exactly the same content.
+ */
+function sameObjects(read: SafeMessage[], held: SafeMessage[]): SafeMessage[] {
+  if (held.length === 0) return read;
+  const byContent = new Map(held.map((message) => [JSON.stringify(message), message]));
+  return read.map((message) => byContent.get(JSON.stringify(message)) ?? message);
 }
 
 function sameNewest(a: NewestMessage, b: NewestMessage): boolean {

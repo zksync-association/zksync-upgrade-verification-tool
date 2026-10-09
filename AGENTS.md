@@ -24,14 +24,51 @@ L1_RPC_URL=<rpc> npm start          # repo root: install, build, serve on http:/
 curl -s localhost:3000/api/status | jq '{ok, chain: .governance.network.label, warnings: .governance.warnings, overrides: .governance.network.overrides, logHistory, cache: .sync.cache.state}'
 ```
 
-The first load of a page takes up to about 15 s. Without a Safe API key, Safe allows 2 requests/s, and every result
-is cached for a minute.
+Pages start streaming at once and fill in as their reads finish; JSON waits for complete, current results. Measured
+on mainnet (Infura RPC with a Safe API key, 2026-10-07, `apps/web/test/support/benchmark-sync.ts`; details in
+`docs/performance-improvements.md`):
+
+| When | JSON, complete | Page: first bytes / data / complete |
+| --- | --- | --- |
+| First request after the start | 0.7–6.5 s (`/api/emergency/<id>` slowest) | 25–31 ms / 0.2–2.8 s / 0.8–6.3 s |
+| Running, also right after a new block | 1–32 ms | 4–21 ms / 5–21 ms / 6–246 ms |
+| Safe copies older than 60 s (after a pause) | 3–40 ms, or 2.0–4.9 s where Safe is read again | 18–29 ms / 19–31 ms, older copies labelled / up to 5.9 s |
+
+Rarely (once in 26 blocks measured) the sync engine (below) serves a new block at once, when it cannot rule out that
+its clock ran behind the chain's; the first request at that block then verifies signature sets itself (0.5 s for an
+upgrade's).
+
+Without a Safe API key, Safe allows 2 requests/s and 5,000 a month per IP: the app then reads Safe only when a
+request needs it, so the 16–17 member Safes an upgrade or emergency upgrade needs take about 9 s to read again once
+their copies are older than 60 s.
 
 At start the app reads the ProtocolUpgradeHandler's log history in the background (`PREWARM=0` turns this off).
 `/api/status` shows its progress in `sync.index`: `state` goes from `idle` to `backfilling` to `ready`, or is
 `unavailable` with an `error`. Lists wait a bounded time for it and fail rather than answer from part of the
 history. `logHistory` is still the check that counts. The ZKsync Era governors' proposal events (created,
 executed, canceled) are indexed the same way, in `sync.l2Index`, for the veto pages and startable upgrades.
+
+While the app runs, a sync engine follows the chain head and at each new block refreshes what requests read (the
+head, governance, upgrade states, the signature sets pages showed), so they find it in memory. It never answers by
+itself: stopped or failing, requests read on demand with the same bounds (head 4 s, governance 30 s, Safe 60 s).
+A new block is served to requests once what they read at it is in memory (signature sets included), at most 2 s
+after the engine saw it; until then they read the block before. `sync.engine` shows it: `mode` (`always` by default,
+`window`, `off`; `off` on anvil/hardhat), `active`, the `head` it follows (`servedAt`: when requests started to read
+it), `lastTick` (`failedSteps`: steps that failed at that block), and `cost`: the JSON-RPC and Safe requests the app
+sent in the last hour, with `mode` `viewing` (a request within `SYNC_KEEPWARM_MS`; reading `/api/status` does not
+count) or `idle`. `sync.safe` is the background Safe sweep (`groups` kept under 60 s old, the quota-paced `baseline`
+check of every member Safe, `budgetUsedThisHour`, `paused` and why), `sync.signatures` the sets it re-verifies at
+each block. These are information; the checks are still `warnings`, `overrides`, `logHistory` and a
+`sync.cache.state` of `"mismatch"` (see Rules).
+
+Pages and JSON differ in one way. A page streams at once and may first show, always labelled, what the app already
+holds: Safe copies older than 60 s ("Safe copies from 2m ago · refreshing"), a set's last verdict at an older block
+("Verified at block #N · re-verifying at #M": nothing in a passing colour, nothing to sign or send from it), the
+history the last run saved ("History from last run · re-verifying"), or an upgrade located directly while the
+history is still read ("Located directly · history index verifying"). The current result replaces it in the same
+response. `/api/*` never answers that way: only with Safe copies at most 60 s old, verdicts read at the current head
+and this run's own history, as before. Every set carries `verifiedAtBlock` and `safeFetchedAt`; `stale` is always
+`false` in JSON.
 
 The app keeps a local cache of public chain and Safe data between runs, in
 `apps/web/.cache/chain/<chainId>-<first 8 hex digits of the genesis hash>.json` (folder 0700, file 0600): both log
@@ -113,6 +150,7 @@ corepack pnpm test                                        # hermetic: web unit/s
 cd apps/web && corepack pnpm test:i                       # mainnet, read-only: the brief's evidence (Tenderly + Safe API)
 cd apps/web && corepack pnpm test:fork                    # write paths on an anvil fork (needs `anvil`; FORK_URL to override)
 corepack pnpm --filter web build && cd packages/e2e && corepack pnpm test:web   # Playwright on the fork (PW_CHANNEL=chrome to use local Chrome)
+cd apps/web && corepack pnpm exec tsx test/support/benchmark-sync.ts   # after the build: read-only timings and upstream cost (about 30 min)
 ```
 
 Test data recorded from mainnet lives in `apps/web/test/fixtures` (re-record with
@@ -124,7 +162,8 @@ Playwright suite opens the app as a Safe App in a local stand-in for Safe{Wallet
 ## Map
 
 - `apps/web/app/.server/`: chain and Safe access, log scanning, the verification engine (`signatures.ts`), and one
-  module per flow (`flows/`).
+  module per flow (`flows/`). `chain/` holds the read-only JSON-RPC lanes, the log indexes and the revert
+  classification, `sync/` the engine, `safe/store.ts` the Safe listings, `persist/` the chain cache.
 - `apps/web/app/common/`: shared with the browser: ABIs, EIP-712 types, Safe hashes, calldata builders, pinned
   network addresses (`networks.ts`).
 - `apps/web/app/routes/`: pages (`app/…`) and the JSON API (`api+/…`).

@@ -2,6 +2,7 @@ import { defaultLogger } from "@config/log.server";
 import type { Address } from "viem";
 import { l2GovernorIndex } from "./chain/l2-index";
 import { puhIndex } from "./chain/puh-index";
+import { warmMessageReadings } from "./flows/messages";
 import { type Governance, governance } from "./governance";
 import { checkLogHistory } from "./logs";
 import { l1, network, rpcGeneration } from "./rpc";
@@ -82,9 +83,12 @@ async function warm(reason: PrewarmReason, generation: number): Promise<void> {
 }
 
 async function warmSteps(reason: PrewarmReason, generation: number): Promise<void> {
-  // A settings change since the start: the new settings get their own warm-up.
+  // A settings change since the start: the new settings get their own warm-up. Logged once.
+  let stopped = false;
   const superseded = () => {
+    if (stopped) return true;
     if (rpcGeneration() === generation) return false;
+    stopped = true;
     log.info({ reason, step: "superseded" }, "prewarm stopped");
     return true;
   };
@@ -149,9 +153,20 @@ async function warmL1(
     ),
   ]);
   // The Safe listings need only governance (the member Safes): they are read while the log index
-  // backfills (another upstream), so a page opened a few seconds after the start finds both.
+  // backfills (another upstream), so a page opened a few seconds after the start finds both. Then
+  // the messages of every listing held (read now, or by the last run) are parsed and hashed, so
+  // the first page that lists them does not do it before its first bytes.
   const gov = await governed;
-  const listings = gov && !superseded() ? warmListings(reason, net, gov, superseded) : null;
+  const listings =
+    gov && !superseded()
+      ? warmListings(reason, net, gov, superseded).then(() =>
+          superseded()
+            ? null
+            : step(reason, "safe-messages", () => warmMessageReadings(governanceSafes(gov)), {
+                details: (read) => ({ read }),
+              })
+        )
+      : null;
   await Promise.all([history, listings]);
 }
 

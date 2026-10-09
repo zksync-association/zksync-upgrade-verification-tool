@@ -55,11 +55,12 @@ import { type UpstreamCost, upstreamCost } from "./cost";
 // profile, nor the cost and mode the status reports.
 //
 // A new head is served (published as the cached head) once what requests at it need has been
-// read (the index tail, upgrade states), at most 2 s after it was seen, and only while it is still
-// the head the engine follows. Until then requests keep the previous head, within its own 4 s
-// since it was last confirmed (at once instead when the previous head was confirmed by the clock
-// and those confirmations may have been wrong). Each step runs on its own: a slow step for one
-// head delays only that step's next run, never the other steps of newer heads.
+// read (the index tail, upgrade states, and the signature sets pages are watching, verified at
+// it), at most 2 s after it was seen, and only while it is still the head the engine follows.
+// Until then requests keep the previous head, within its own 4 s since it was last confirmed (at
+// once instead when the previous head was confirmed by the clock and those confirmations may have
+// been wrong). Each step runs on its own: a slow step for one head delays only that step's next
+// run, never the other steps of newer heads.
 //
 // Timers are unref'd; in "window" mode they stop when nobody has made a request for
 // SYNC_KEEPWARM_MS. Nothing here logs an error's text: it can carry the RPC URL and its key.
@@ -76,12 +77,16 @@ export type SyncEngineStatus = {
    * or idle (`cost.mode` tells which); with "window": only while the app is in use.
    */
   active: boolean;
-  /** The newest head the engine has seen; ageMs is the time since it was last confirmed. */
+  /**
+   * The newest head the engine has seen; ageMs is the time since it was last confirmed. servedAt:
+   * when requests started to read it (null until then, and for good when it was replaced first).
+   */
   head: {
     number: string;
     hash: Hex;
     observedAt: string;
     confirmedAt: string;
+    servedAt: string | null;
     ageMs: number;
   } | null;
   /** The last finished tick: the block, how long its steps took, and the steps that failed. */
@@ -179,6 +184,8 @@ type Observation = {
   slotConfirm: boolean;
   /** Its publication point passed (its tick read what requests need, or the deadline). */
   published: boolean;
+  /** When it was served; null until then, or when it never was. */
+  servedAt: number | null;
   deadline: ReturnType<typeof setTimeout> | null;
   /** Settles once the head was served (true), or will never be: replaced, or retired (false). */
   served: Promise<boolean>;
@@ -312,6 +319,7 @@ export class SyncEngine {
         hash: seen.polled.head.hash,
         observedAt: new Date(seen.observedAt).toISOString(),
         confirmedAt: new Date(seen.confirmedAt).toISOString(),
+        servedAt: seen.servedAt === null ? null : new Date(seen.servedAt).toISOString(),
         ageMs: Math.max(0, now - seen.confirmedAt),
       },
       lastTick: this.#lastTick && {
@@ -528,6 +536,7 @@ export class SyncEngine {
       nextSlotAt: onSchedule && slotMs ? timestampMs + slotMs : null,
       slotConfirm: onSchedule && proven && now >= this.#distrustClockUntil,
       published: false,
+      servedAt: null,
       deadline: null,
       served,
       resolveServed,
@@ -553,7 +562,10 @@ export class SyncEngine {
     // replacement was served. publish() also says no when a newer head is known elsewhere.
     const served =
       this.#current() && observation === this.#observed && observation.polled.publish();
-    if (served) observation.confirmedAt = observation.polled.answeredAt;
+    if (served) {
+      observation.confirmedAt = observation.polled.answeredAt;
+      observation.servedAt = this.#now();
+    }
     observation.resolveServed(served);
   }
 
@@ -847,10 +859,10 @@ export function liveSteps(): TickStep[] {
         );
       },
     },
-    // (e) The signature sets pages viewed, verified at this head once it is served (after its
-    // governance read and upgrade states), so the next request finds them: while the app is in
-    // use, those viewed in the last 10 minutes and the open ones; while idle, the open ones.
-    signaturesStep((tick) => governanceFor(tick)),
+    // (e) The signature sets pages viewed, verified at this head before it is served, so the
+    // first request at it finds them: while the app is in use, those viewed in the last 10
+    // minutes and the open ones; while idle, the open ones.
+    signaturesStep(),
     // (f) ZKsync Era, when the vetoable L2 proposals were viewed in the last 10 minutes (and the
     // app is in use): Era's head, the L2 governor index's tail at it and those proposals' states,
     // read now and then every 3 s until the next L1 block, so requests find them in memory (Era's
@@ -873,17 +885,25 @@ class PrecomputeFailed extends Error {
 }
 
 /**
- * The tick step that verifies watched signature sets at the new head, after `after(tick)` settled
- * and the head was served (requests then read at it): while the app is in use, those viewed in the
- * last 10 minutes and the open ones; while idle, only the open ones. Sets that would need Safe (no
- * listing at most 60 s old) are left to requests.
+ * The tick step that verifies watched signature sets at the new head: while the app is in use,
+ * those viewed in the last 10 minutes and the open ones; while idle, only the open ones. Sets that
+ * would need Safe (no listing at most 60 s old) are left to requests.
+ *
+ * The head is served only once this step settled (beforePublish), within the same 2 s as the
+ * index tail and upgrade states: served earlier, a request in the gap would find no result at the
+ * new head and verify the set itself (0.3-0.5 s on mainnet), while until then requests read the
+ * previous head, whose results are kept. The verdicts are read at the head's block number and kept
+ * under its hash, whether or not the head is ever served: requests at another head never use them
+ * (a page's first answer may show one as a set's last result, labelled with its block, as it does
+ * any older result), so a head replaced before it was served only cost the reads. Nothing here
+ * waits for the head to be served (it would wait for itself) or for governance: a watched set
+ * carries its members, threshold and contract.
  */
-export function signaturesStep(after: (tick: Tick) => Promise<unknown> = async () => {}): TickStep {
+export function signaturesStep(): TickStep {
   return {
     name: "signatures",
+    beforePublish: true,
     run: async (tick) => {
-      await after(tick).catch(() => {});
-      if (!(await tick.served())) throw new StepSkipped("head replaced before it was served");
       if (!tick.current()) return;
       const run = await precomputeSignatureSets(tick.head, {
         current: tick.current,

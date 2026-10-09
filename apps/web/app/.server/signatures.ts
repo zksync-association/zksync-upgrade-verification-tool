@@ -66,9 +66,10 @@ import { SafeApiError, safeWalletUrl } from "./safe-api";
 // are still the ones served (listings at most 60 s old); a request that finds the set being
 // computed takes that result only on the same terms, and otherwise computes it itself. The sets
 // pages viewed are remembered for 24 hours; the sync engine computes them again at each new head
-// before the next request asks (see precomputeSignatureSets): while the app is in use, those
-// viewed in the last 10 minutes and those that were open (still signable) when last viewed; while
-// it is idle, only the open ones. Nothing involving a signature the viewer supplied (?sig=) is kept.
+// before it serves that head to requests (see precomputeSignatureSets): while the app is in use,
+// those viewed in the last 10 minutes and those that were open (still signable) when last viewed;
+// while it is idle, only the open ones. Nothing involving a signature the viewer supplied (?sig=)
+// is kept.
 //
 // Pages may show a first answer before that result (see firstSignatureSet): the set's last result,
 // labelled with the block it was verified at, or a verification at the head from Safe listings

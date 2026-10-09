@@ -71,6 +71,13 @@ vi.mock("@/.server/safe-api", () => ({
   backgroundSafeReadsAllowed: vi.fn(() => state.safeBackground),
 }));
 
+vi.mock("@/.server/flows/messages", () => ({
+  warmMessageReadings: vi.fn(async (safes: string[]) => {
+    state.events.push(`messages:${safes.length}`);
+    return 42;
+  }),
+}));
+
 const { governanceSafes, prewarm, shouldPrewarm } = await import("@/.server/prewarm");
 const { network } = await import("@/.server/rpc");
 const { governance } = await import("@/.server/governance");
@@ -78,6 +85,7 @@ const { checkLogHistory } = await import("@/.server/logs");
 const { backgroundSafeReadsAllowed } = await import("@/.server/safe-api");
 // The warm-up's reads go through the Safe store at low priority (safe-store.test.ts).
 const { warmSafeListing: listSafeMessages } = await import("@/.server/safe/store");
+const { warmMessageReadings } = await import("@/.server/flows/messages");
 
 const address = (n: number) => `0x${n.toString(16).padStart(40, "0")}` as Address;
 const SC = [address(1), address(2), address(3)];
@@ -194,11 +202,18 @@ describe("prewarm", () => {
     expect(safeEvents).toEqual(order.flatMap((safe) => [`safe:start:${safe}`, `safe:end:${safe}`]));
     expect(listSafeMessages).toHaveBeenCalledTimes(order.length);
     expect(checkLogHistory).toHaveBeenCalledWith({ client: "l1" });
+    // Then the messages of the listings held are read (parsed and hashed), once all are in.
+    expect(warmMessageReadings).toHaveBeenCalledTimes(1);
+    expect(warmMessageReadings).toHaveBeenCalledWith(order);
+    expect(state.events.indexOf("messages:6")).toBeGreaterThan(
+      state.events.indexOf(`safe:end:${ZKF}`)
+    );
 
     expect(steps()).toEqual([
       "network",
       "governance",
       "safe-listings",
+      "safe-messages",
       "log-history",
       "log-index",
       "l2-index",
@@ -215,6 +230,8 @@ describe("prewarm", () => {
     });
     const listings = state.records.find((r) => r.fields.step === "safe-listings");
     expect(listings?.fields).toMatchObject({ listed: 6, of: 6 });
+    const messages = state.records.find((r) => r.fields.step === "safe-messages");
+    expect(messages?.fields).toMatchObject({ reason: "boot", read: 42 });
     for (const record of state.records) expect(typeof record.fields.ms).toBe("number");
   });
 
@@ -251,6 +268,7 @@ describe("prewarm", () => {
     await expect(prewarm("boot")).resolves.toBeUndefined();
     // Without governance there is nothing to list.
     expect(listSafeMessages).not.toHaveBeenCalled();
+    expect(warmMessageReadings).not.toHaveBeenCalled();
     const failed = state.records.filter((r) => r.level === "warn").map((r) => r.fields.step);
     expect(failed.sort()).toEqual(["governance", "l2-index", "log-history", "log-index"]);
 
@@ -306,7 +324,10 @@ describe("prewarm", () => {
       "log-index",
       "network",
       "safe-listings",
+      "safe-messages",
     ]);
+    // The listings the last run kept are held: their messages are read all the same.
+    expect(warmMessageReadings).toHaveBeenCalledTimes(1);
   });
 
   it("never logs an RPC URL, host, key or error text", async () => {
@@ -417,7 +438,8 @@ describe("prewarm", () => {
     };
     await prewarm("boot");
     expect(listSafeMessages).toHaveBeenCalledTimes(2);
-    expect(steps()).toContain("superseded");
+    expect(steps().filter((step) => step === "superseded")).toHaveLength(1);
+    expect(warmMessageReadings).not.toHaveBeenCalled();
     expect(state.records.find((r) => r.fields.step === "safe-listings")?.fields).toMatchObject({
       listed: 2,
       of: 6,

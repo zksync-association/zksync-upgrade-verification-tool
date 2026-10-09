@@ -1530,6 +1530,63 @@ describe("live engine", () => {
     expect(safe.requests).toHaveLength(SC_MEMBERS.length);
   });
 
+  it("serves a new head only once the watched sets are verified at it: the first request at it is answered from memory", async () => {
+    // The council's check at the next block answers 300 ms late (a slow upstream); everything
+    // else at once.
+    const next = numberToHex(HEAD + 1n);
+    const signatures = new Set<string>();
+    const { fake } = liveChain({
+      signatures,
+      gate: (call) =>
+        call.block === next && call.functionName === "checkSignatures"
+          ? new Promise((resolve) => setTimeout(resolve, 300))
+          : undefined,
+    });
+    await backfilled();
+    const engine = liveEngine();
+    await firstTick(engine);
+    const safe = await safeService(fake, signatures);
+    for (const member of SC_MEMBERS.slice(0, 2)) safe.sign(member);
+    expect((await settle(safe.view())).thresholdCheck.status).toBe("met");
+    /** The set as a request gets it now, if it is answered from memory: in this turn, no timer. */
+    const fromMemory = async () => {
+      const posts = fake.posts.length;
+      let answered: Awaited<ReturnType<typeof safe.view>> | null = null;
+      void safe.view().then((set) => {
+        answered = set;
+      });
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+      expect(fake.posts.length).toBe(posts);
+      return answered as Awaited<ReturnType<typeof safe.view>> | null;
+    };
+
+    // The next block reaches the node; the engine sees it at its next poll.
+    fake.chain.options.head = {
+      number: HEAD + 1n,
+      hash: blockHash(HEAD + 1n),
+      timestamp: HEAD_TIME + 12n,
+    };
+    await until(() => engine.status().head?.number === (HEAD + 1n).toString(), 15_000);
+    const observedAt = Date.parse(engine.status().head?.observedAt ?? "");
+    // Until the set is verified at the new head, requests read the previous one, from memory.
+    await vi.advanceTimersByTimeAsync(100);
+    expect(engine.status().head?.servedAt).toBeNull();
+    expect((await latestBlock()).number).toBe(HEAD);
+    expect(await fromMemory()).toMatchObject({ verifiedAtBlock: HEAD.toString() });
+
+    // The moment the new head is served, its set is already verified at it.
+    await until(() => engine.status().head?.servedAt != null, 2_500);
+    const servedAt = Date.parse(engine.status().head?.servedAt ?? "");
+    expect(servedAt - observedAt).toBeGreaterThanOrEqual(300);
+    expect(servedAt - observedAt).toBeLessThan(2_000);
+    expect((await latestBlock()).number).toBe(HEAD + 1n);
+    expect(await fromMemory()).toMatchObject({
+      verifiedAtBlock: (HEAD + 1n).toString(),
+      thresholdCheck: { status: "met" },
+    });
+    expect(safe.requests).toHaveLength(SC_MEMBERS.length);
+  });
+
   it("the server's engine verifies a watched set again at the served head when a member Safe's listing changes", async () => {
     const signatures = new Set<string>();
     const { fake } = liveChain({ signatures });
