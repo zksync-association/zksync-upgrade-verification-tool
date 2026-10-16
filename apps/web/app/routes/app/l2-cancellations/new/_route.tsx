@@ -67,13 +67,13 @@ function VetoForm({ data }: { data: VetoFormData }) {
     /^\d+$/.test(nonce);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <PageHeader
         back={{ to: $path("/app/l2-cancellations"), label: "Guardian veto" }}
         eyebrow="Guardians"
         title="Prepare a veto"
       >
-        <p className="max-w-3xl text-slate-950">
+        <p className="max-w-[600px] text-[14px] text-slate-550">
           Every field below is signed. All Guardians must sign the same values, so share the
           resulting page link with them.
         </p>
@@ -94,14 +94,14 @@ function VetoForm({ data }: { data: VetoFormData }) {
             ))}
           </div>
           <Input
-            className="mono text-[12px]"
+            className="mono text-[13px]"
             value={governor}
             onChange={(e) => setGovernor(e.target.value)}
           />
         </Field>
         <Field label="L2 proposal id (decimal)" className="sm:col-span-2">
           <Input
-            className="mono text-[12px]"
+            className="mono text-[13px]"
             value={proposalId}
             onChange={(e) => setProposalId(e.target.value.trim())}
           />
@@ -120,7 +120,7 @@ function VetoForm({ data }: { data: VetoFormData }) {
         </Field>
         <Field label="Refund recipient on L2" className="sm:col-span-2">
           <Input
-            className="mono text-[12px]"
+            className="mono text-[13px]"
             value={refund}
             onChange={(e) => setRefund(e.target.value.trim())}
             placeholder="0x…"

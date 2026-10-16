@@ -45,12 +45,10 @@
   * {
     @apply border-border;
   }
-  html {
-    -webkit-font-smoothing: antialiased;
-  }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "cv11", "ss01";
+    /* A little heavier than regular, for legibility (Inter here is a variable font). */
+    font-weight: 450;
     caret-color: hsl(var(--primary));
   }
   h1,
@@ -73,7 +71,7 @@
 
 @layer components {
   .mono {
-    @apply font-mono text-[13px] leading-5 tracking-tight;
+    @apply font-mono text-[13px] leading-5;
     font-variant-numeric: tabular-nums;
   }
   @media (prefers-reduced-motion: reduce) {

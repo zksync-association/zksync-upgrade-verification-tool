@@ -6,6 +6,7 @@ import { shortHex } from "@/utils/format";
 import { ConnectButton as RainbowConnectButton } from "@rainbow-me/rainbowkit";
 import { ChevronDown } from "lucide-react";
 import { type Dispatch, type SetStateAction, createContext, useContext, useEffect } from "react";
+import { toast } from "react-hot-toast";
 import { type Address, isAddressEqual } from "viem";
 import { useAccount } from "wagmi";
 
@@ -49,6 +50,9 @@ export function useOfferWallet() {
   }, [setOffers]);
 }
 
+const NO_WALLETCONNECT =
+  "Wallets connect over WalletConnect: add a WalletConnect project id in Settings first. Members then connect their Safe from Safe{Wallet} to sign; to send a transaction, connect any WalletConnect wallet app, or copy its to, data and value from this page into your wallet.";
+
 /**
  * The connected account, or (while `offer` is set: something on the page can be signed or
  * executed) a button to connect one. Checking never needs a wallet.
@@ -61,6 +65,18 @@ export default function ConnectButton({ offer }: { offer: boolean }) {
         if (!mounted) return offer ? <div className="h-10 w-[104px]" aria-hidden /> : null;
         if (!account || !chain) {
           if (!offer) return null;
+          if (!window.ENV?.WALLET_CONNECT_PROJECT_ID)
+            return (
+              <Button
+                variant="secondary"
+                onClick={() => toast(NO_WALLETCONNECT, { duration: 12_000 })}
+                data-testid="connect-wallet"
+                title={NO_WALLETCONNECT}
+              >
+                <span className="xl:hidden">Connect</span>
+                <span className="hidden xl:inline">Connect to sign or execute</span>
+              </Button>
+            );
           return (
             <Button
               variant="secondary"

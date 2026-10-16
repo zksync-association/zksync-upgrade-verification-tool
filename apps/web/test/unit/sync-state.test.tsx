@@ -250,7 +250,7 @@ describe("BlockAge", () => {
 
   it("renders no age on the server, so hydration matches", () => {
     const html = renderToString(<BlockAge block={block} />);
-    expect(html).toContain("block #<!-- -->23,500,000");
+    expect(html).toContain("#<!-- -->23,500,000");
     expect(html).not.toContain("ago");
   });
 

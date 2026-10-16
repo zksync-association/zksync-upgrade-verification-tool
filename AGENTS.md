@@ -197,6 +197,8 @@ Playwright suite opens the app as a Safe App in a local stand-in for Safe{Wallet
   classification, `sync/` the engine, `safe/store.ts` the Safe listings, `persist/` the chain cache.
 - `apps/web/app/common/`: shared with the browser: ABIs, EIP-712 types, Safe hashes, calldata builders, pinned
   network addresses (`networks.ts`).
+- `apps/web/app/common/abi-catalog/`: the functions and address labels the call decoder (`calldata.ts`) uses,
+  imported from a folder of ABI files with `apps/web/scripts/import-abis.ts`.
 - `apps/web/app/routes/`: pages (`app/…`) and the JSON API (`api+/…`).
-- `apps/cli/`: upgrade verification CLI. Each upgrade page offers its upgrade file.
+- `apps/cli/`: upgrade verification CLI.
 - `packages/e2e/`: Playwright suite for the web app (`suites/web`) and CLI e2e (`suites/cli`).

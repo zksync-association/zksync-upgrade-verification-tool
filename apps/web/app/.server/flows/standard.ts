@@ -128,6 +128,22 @@ export type UpgradeList = {
   fromLastRun?: true;
 };
 
+/**
+ * Pages only: each listed upgrade's title, from its L2 proposal (null where it cannot be read
+ * now). Found once per upgrade and kept, as the upgrade page finds it.
+ */
+export async function upgradeTitles(list: UpgradeList): Promise<Record<string, string | null>> {
+  const titles = await Promise.all(
+    list.upgrades.map((u) =>
+      findL2ProposalForUpgrade(u.id, u.createdAt, { startedTxHash: u.txHash }).then(
+        (found) => found?.title ?? null,
+        () => null
+      )
+    )
+  );
+  return Object.fromEntries(list.upgrades.map((u, i) => [u.id, titles[i] ?? null]));
+}
+
 /** JSON waits for this run's complete history; a page may use the last run's (`fromLastRun`). */
 export async function listStandardUpgrades({
   allHistory,
@@ -224,7 +240,7 @@ async function confirmedStart(core: StandardUpgradeCore): Promise<StandardUpgrad
       `The start of upgrade ${core.id} ${source} (block ${core.started.blockNumber}, transaction ${core.started.txHash}) is not the one in the handler's complete log history (block ${started.blockNumber}, transaction ${started.txHash}). Reload the page.`
     );
   }
-  return { ...core, started, calls: started.proposal.calls.map(decodeCall) };
+  return { ...core, started, calls: started.proposal.calls.map((call) => decodeCall(call)) };
 }
 
 // The index's start, or the one located directly from the creation time if that comes first
@@ -513,7 +529,7 @@ export async function getStandardUpgradeCore(
   return {
     id,
     started,
-    calls: started.proposal.calls.map(decodeCall),
+    calls: started.proposal.calls.map((call) => decodeCall(call)),
     state,
     stateLabel: UPGRADE_STATE_LABELS[state],
     status,

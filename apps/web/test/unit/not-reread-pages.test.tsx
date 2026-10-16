@@ -138,7 +138,7 @@ describe("an executed emergency upgrade's state not read again at the served hea
     return render(wrap(live(notedAt), <EmergencyPage />));
   };
 
-  it("is labelled as of its block, in no colour, with no upgrade file to copy or download", async () => {
+  it("is labelled as of its block, in no colour", async () => {
     const view = show({ [key]: { rev: "9", block: "21000066" } });
     const idCheck = await screen.findByTestId("id-check");
     expect(screen.getByTestId("not-reread")).toHaveTextContent(
@@ -146,16 +146,13 @@ describe("an executed emergency upgrade's state not read again at the served hea
     );
     expect(idCheck.closest("[data-stale='true']")).toHaveClass("grayscale");
     expect(screen.getByText("Executed").closest("[data-stale='true']")).not.toBeNull();
-    expect(screen.queryByText("Upgrade file")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Copy upgrade file")).not.toBeInTheDocument();
     view.unmount();
   });
 
-  it("read again at the served head: no label, and the upgrade file is offered", async () => {
+  it("read again at the served head: no label", async () => {
     show({ [key]: { rev: "9", block: SERVED.number } });
     const idCheck = await screen.findByTestId("id-check");
     expect(screen.queryByTestId("not-reread")).not.toBeInTheDocument();
     expect(idCheck.closest("[data-stale='true']")).toBeNull();
-    expect(screen.getByText("Upgrade file")).toBeInTheDocument();
   });
 });

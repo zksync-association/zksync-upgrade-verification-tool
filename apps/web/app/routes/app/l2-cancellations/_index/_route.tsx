@@ -11,7 +11,7 @@ import {
 } from "@/.server/flows/l2-veto";
 import { vetoPath } from "@/common/veto";
 import { WithStatus } from "@/components/governance-context";
-import { EmptyState, LoadingCard, PageHeader } from "@/components/page";
+import { EmptyState, LoadingCard, PageHeader, QuietEmpty } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -71,10 +71,10 @@ export default function VetoList() {
   const { signed, freshSigned, signedAfter, vetoable, freshVetoable } =
     useLoaderData<typeof loader>();
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <PageHeader eyebrow="Guardians" title="Guardian veto">
         {/* The threshold and nonce come from the root status; the lists do not wait for it. */}
-        <p className="max-w-3xl text-slate-950">
+        <p className="max-w-[600px] text-[14px] text-slate-550">
           <WithStatus fallback="Guardians can cancel a proposal on the ZKsync Era Token or GovOps governor before it executes.">
             {({ governance }) =>
               `${governance.guardians.thresholds.cancelL2Proposal} of ${governance.guardians.members.length} Guardians can cancel a proposal on the ZKsync Era Token or GovOps governor before it executes.`
@@ -91,9 +91,9 @@ export default function VetoList() {
           </WithStatus>
         </p>
       </PageHeader>
-      <div className="space-y-8">
+      <div className="space-y-5">
         <section className="space-y-3" aria-labelledby="signed-vetoes-heading">
-          <h2 id="signed-vetoes-heading" className="text-[22px] leading-7">
+          <h2 id="signed-vetoes-heading" className="font-semibold text-lg">
             Vetoes signed in Safe
           </h2>
           <Suspense fallback={<LoadingCard label="Collecting vetoes from Guardian Safes…" />}>
@@ -117,7 +117,7 @@ export default function VetoList() {
           </Suspense>
         </section>
         <section className="space-y-3" aria-labelledby="vetoable-heading">
-          <h2 id="vetoable-heading" className="text-[22px] leading-7">
+          <h2 id="vetoable-heading" className="font-semibold text-lg">
             L2 proposals that can still be vetoed
           </h2>
           <Suspense
@@ -173,11 +173,11 @@ function SignedList({
         </p>
       )}
       {result.vetoes.length === 0 ? (
-        <EmptyState>
+        <QuietEmpty incomplete={result.errors.length > 0 || result.anomalies > 0}>
           {result.errors.length > 0 || result.anomalies > 0
             ? "No veto was found in the available messages."
             : "No Guardian has signed a veto."}
-        </EmptyState>
+        </QuietEmpty>
       ) : (
         <Vetoes vetoes={result.vetoes} asOf={result.asOf} />
       )}
@@ -203,7 +203,7 @@ function VetoableList({
           <span className="block text-amber-800 text-sm">ZKsync Era RPC: {result.l2Error}</span>
         </EmptyState>
       ) : result.vetoable.length === 0 ? (
-        <EmptyState>No Token or GovOps governor proposal is pending or active.</EmptyState>
+        <QuietEmpty>No Token or GovOps governor proposal is pending or active.</QuietEmpty>
       ) : (
         <Vetoable proposals={result.vetoable} />
       )}
@@ -214,20 +214,20 @@ function VetoableList({
 function Vetoes({ vetoes, asOf }: { vetoes: SerializeFrom<VetoSummary>[]; asOf?: AsOfBlock }) {
   return (
     <AsOfContent asOf={asOf}>
-      <Card className="divide-y divide-slate-100 overflow-hidden" data-testid="vetoes">
+      <Card className="divide-y divide-slate-200 overflow-hidden" data-testid="vetoes">
         {vetoes.map((v) => (
           <Link
             key={v.digest}
             to={vetoPath(v)}
-            className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 hover:bg-slate-25"
+            className="group relative flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-2.5 transition-colors hover:bg-slate-75 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-600 focus-visible:ring-inset"
             data-testid="veto-row"
           >
             <span className="min-w-0 flex-1">
-              <span className="block font-medium text-slate-950">
+              <span className="block font-semibold text-navy-800 group-hover:text-brand-700">
                 {v.governorName ?? "Unknown governor"} proposal{" "}
                 <span className="mono">{short(v.l2ProposalId)}</span>
               </span>
-              <span className="text-slate-600 text-xs">
+              <span className="text-slate-550 text-xs">
                 Nonce {v.nonce} · mint value {formatEth(v.txMintValue)} · signed in{" "}
                 {v.reportedSigners} Safe
                 {v.reportedSigners === 1 ? "" : "s"}
@@ -235,7 +235,10 @@ function Vetoes({ vetoes, asOf }: { vetoes: SerializeFrom<VetoSummary>[]; asOf?:
             </span>
             {!v.governorName && <Badge variant="error">Unknown governor</Badge>}
             <SetStateBadge state={v.state} />
-            <ArrowRight className="h-4 w-4 text-slate-600" />
+            <ArrowRight
+              aria-hidden
+              className="h-4 w-4 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-700"
+            />
           </Link>
         ))}
       </Card>
@@ -245,17 +248,17 @@ function Vetoes({ vetoes, asOf }: { vetoes: SerializeFrom<VetoSummary>[]; asOf?:
 
 function Vetoable({ proposals }: { proposals: SerializeFrom<L2ProposalView>[] }) {
   return (
-    <Card className="divide-y divide-slate-100 overflow-hidden" data-testid="vetoable">
+    <Card className="divide-y divide-slate-200 overflow-hidden" data-testid="vetoable">
       {proposals.map((p) => (
         <div
           key={`${p.governor}-${p.proposalId}`}
-          className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4"
+          className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-2.5"
         >
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium text-slate-950">
+            <span className="block truncate font-semibold text-navy-800">
               {p.description.split("\n")[0] || "(no description)"}
             </span>
-            <span className="text-slate-600 text-xs">
+            <span className="text-slate-550 text-xs">
               {p.governorName} · {p.state ?? "state unknown"} · voting ends {formatTime(p.voteEnd)}
               <WithStatus fallback={null}>
                 {({ governance }) =>

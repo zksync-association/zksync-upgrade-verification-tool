@@ -144,15 +144,14 @@ export function BlockAge({
   const age = now === null ? null : formatAge(now - Number(block.timestamp));
   return (
     <span
-      className={cn("font-mono text-slate-700", className)}
+      className={cn("font-medium text-slate-700 tabular-nums", className)}
       title={`Block ${block.number}, mined ${formatTime(block.timestamp)}, read through your RPC. Refresh to read a newer one.`}
       data-testid="block-age"
     >
-      <span className="hidden 2xl:inline">block #{formatNumber(block.number)}</span>
+      block<span className="hidden 2xl:inline"> #{formatNumber(block.number)}</span>
       {age && (
         <>
-          <span className="hidden 2xl:inline"> · </span>
-          {age}
+          <span className="hidden 2xl:inline"> ·</span> {age}
         </>
       )}
     </span>

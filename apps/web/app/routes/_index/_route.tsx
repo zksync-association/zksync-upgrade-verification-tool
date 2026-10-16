@@ -20,13 +20,13 @@ import { network, l1 } from "@/.server/rpc";
 import { bytes32Pattern } from "@/.server/request";
 import { upgradeHandlerAbi } from "@/common/abis";
 import { isUpgradeActive } from "@/common/upgrade-states";
-import { useChain } from "@/components/governance-context";
 import { Button } from "@/components/ui/button";
 import { OverviewSummary, type SummarySource, SummaryNote } from "@/components/overview-summary";
 import { notReReadHeadline, useContentCurrency } from "@/components/verification/content-currency";
 import { indexingLabel, useIndexProgress } from "@/components/sync-state";
 import { UntilFresh } from "@/components/verification/until-fresh";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/utils/cn";
 import { Meta } from "@/utils/meta";
 import {
   type ActionFunctionArgs,
@@ -36,8 +36,8 @@ import {
   redirect,
 } from "@remix-run/node";
 import { Await, Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
-import { ArrowRight, Ban, Rocket, ShieldAlert, Snowflake } from "lucide-react";
-import { type ReactNode, Suspense } from "react";
+import { AlertTriangle, ArrowRight, Ban, Rocket, ShieldAlert, Snowflake } from "lucide-react";
+import { type ReactNode, Suspense, useState } from "react";
 import { $path } from "remix-routes";
 import type { Hex } from "viem";
 
@@ -54,6 +54,14 @@ const sourceOf = (
     ? { lastRun, safeFetchedAt: safe?.stale ? safe.safeFetchedAt ?? null : null }
     : null;
 
+// Besides the open ones: the requests Safe holds that were executed or can no longer be signed.
+function freezeDetail({ open, total }: { open: number; total: number }) {
+  const earlier = total - open;
+  if (total === 0) return "No requests in Safe";
+  if (earlier === 0) return undefined;
+  return `${earlier} earlier request${earlier === 1 ? "" : "s"}, no longer open`;
+}
+
 const upgradeCount = (r: UpgradeList) => ({
   open: r.upgrades.filter((u) => isUpgradeActive(u.state)).length,
   total: r.upgrades.length,
@@ -69,6 +77,7 @@ const emergencyCount = ([pending, executed]: [PendingEmergencies, ExecutedFirst]
 
 const freezeCount = (r: FreezeList) => ({
   open: r.requests.filter((q) => q.state.status === "open").length,
+  total: r.requests.length,
   incomplete: r.errors.length > 0 || r.anomalies > 0,
   source: sourceOf(false, r),
 });
@@ -188,7 +197,7 @@ export function loader({ request }: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
   const id = String((await request.formData()).get("id") ?? "").trim();
   if (!bytes32Pattern.test(id))
-    return json({ id, error: "Enter a 32-byte id: 0x followed by 64 hexadecimal characters." });
+    return json({ id, error: "Enter a 32-byte ID: 0x followed by 64 hexadecimal characters." });
   const { upgradeHandler } = await network();
   const status = await l1.readContract({
     address: upgradeHandler,
@@ -206,71 +215,22 @@ export default function Index() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
-  // The chain the RPC is on, known before anything else is read: the page never waits for the
-  // root status.
-  const chain = useChain();
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-2">
-        <h1 className="text-[32px] leading-10 tracking-tight">Governance review</h1>
-        <p className="max-w-3xl text-slate-700 text-sm leading-6">
-          Review proposals on {chain?.label ?? "this network"}, inspect their calls, and compare the
-          hashes your Safe signs. Signatures count only after the contract accepts them.
-        </p>
+    <div className="space-y-5">
+      <header className="space-y-3">
+        <h1 className="text-2xl leading-8 tracking-tight">Governance review</h1>
+        <section aria-label="Open a proposal" className="min-w-0">
+          <ProposalLookup
+            error={actionData?.error ?? null}
+            defaultId={actionData?.id ?? ""}
+            submitting={navigation.state === "submitting"}
+          />
+        </section>
       </header>
 
-      <section className="rounded-xl bg-navy-800 p-5 sm:p-6" aria-labelledby="proposal-lookup">
-        <div className="grid gap-4 lg:grid-cols-[200px_1fr] lg:items-start">
-          <div className="space-y-1">
-            <h2 id="proposal-lookup" className="font-semibold text-lg text-white">
-              Open a proposal
-            </h2>
-            <p className="text-indigo-100 text-sm">Paste an upgrade or emergency id.</p>
-          </div>
-          <Form method="post" className="space-y-2">
-            <label htmlFor="proposal-id" className="sr-only">
-              Upgrade or emergency id
-            </label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                id="proposal-id"
-                name="id"
-                defaultValue={actionData?.id ?? ""}
-                placeholder="0x followed by 64 hexadecimal characters"
-                className="mono h-11 min-w-0 flex-1 text-[13px]"
-                autoComplete="off"
-                spellCheck={false}
-                aria-invalid={actionData?.error ? true : undefined}
-                aria-describedby={actionData?.error ? "proposal-error" : "proposal-hint"}
-              />
-              <Button
-                type="submit"
-                loading={navigation.state === "submitting"}
-                className="h-11 border-white hover:border-white"
-              >
-                Open <ArrowRight />
-              </Button>
-            </div>
-            {actionData?.error ? (
-              <p
-                id="proposal-error"
-                role="alert"
-                className="rounded-lg bg-red-50 px-3 py-2 text-red-900 text-sm"
-              >
-                {actionData.error}
-              </p>
-            ) : (
-              <p id="proposal-hint" className="text-indigo-100 text-xs">
-                Opens the proposal for review. No wallet connection needed.
-              </p>
-            )}
-          </Form>
-        </div>
-      </section>
-
       <section className="space-y-3" aria-labelledby="governance-actions">
-        <h2 id="governance-actions" className="text-xl">
+        <h2 id="governance-actions" className="font-semibold text-lg">
           Governance actions
         </h2>
         <div className="divide-y divide-slate-200 rounded-xl border border-slate-300 bg-white">
@@ -286,12 +246,15 @@ export default function Index() {
                 indexed
                 watchKey={"list:upgrades"}
               >
-                {(v, note) => (
+                {(v, note, current) => (
                   <OverviewSummary
                     count={v.open}
                     label="in progress"
-                    detail={`${v.total} upgrade${v.total === 1 ? "" : "s"} in the last 45 days`}
+                    detail={`${v.total - v.open} finished in the last 45 days`}
                     note={note}
+                    emphasize={current}
+                    tone="active"
+                    from="chain"
                   />
                 )}
               </Deferred>
@@ -302,7 +265,7 @@ export default function Index() {
             to={$path("/app/emergency")}
             icon={<ShieldAlert />}
             title="Emergency upgrades"
-            description="Upgrade ids signed by the Council, Guardians, and ZKsync Foundation."
+            description="Upgrade IDs signed by the Council, Guardians, and ZKsync Foundation."
             summary={
               <Deferred
                 value={data.emergency}
@@ -311,13 +274,15 @@ export default function Index() {
                 indexed
                 watchKey={"list:emergency"}
               >
-                {(v, note) => (
+                {(v, note, current) => (
                   <OverviewSummary
                     count={v.pending}
                     label="pending"
-                    detail={`${v.executed} executions in the last ${EMERGENCY_RECENT_DAYS} days`}
+                    detail={`${v.executed} executed in the last ${EMERGENCY_RECENT_DAYS} days`}
                     incomplete={v.incomplete}
                     note={note}
+                    emphasize={current}
+                    from="safe"
                   />
                 )}
               </Deferred>
@@ -336,12 +301,15 @@ export default function Index() {
                 after={data.freezeAfter}
                 watchKey={"list:freeze"}
               >
-                {(v, note) => (
+                {(v, note, current) => (
                   <OverviewSummary
                     count={v.open}
                     label="open for signatures"
+                    detail={freezeDetail(v)}
                     incomplete={v.incomplete}
                     note={note}
+                    emphasize={current}
+                    from="safe"
                   />
                 )}
               </Deferred>
@@ -355,13 +323,15 @@ export default function Index() {
             description="Guardian cancellations of Token or GovOps proposals before execution."
             summary={
               <Deferred value={data.vetoes} fresh={data.vetoesFresh} after={data.vetoesAfter}>
-                {(v, note) => (
+                {(v, note, current) => (
                   <OverviewSummary
                     count={v.open}
                     label="open vetoes"
                     incomplete={v.incomplete}
                     detail={v.incomplete ? undefined : `${v.vetoable} L2 proposals can be vetoed`}
                     note={note}
+                    emphasize={current}
+                    from="safe"
                   />
                 )}
               </Deferred>
@@ -369,15 +339,99 @@ export default function Index() {
             testId="flow-veto"
           />
         </div>
-        <p className="text-slate-600 text-xs">
-          Safe discovery can be incomplete when its API is unavailable. Open a known id to review
-          the on-chain evidence directly.
-        </p>
       </section>
     </div>
   );
 }
 
+const fullId = /^0x[0-9a-fA-F]{64}$/;
+
+// What the field holds so far, measured against a 32-byte ID: the format stays in view while typing.
+// `tried`: Open was pressed, so an incomplete ID says what is missing.
+function idHint(value: string, tried: boolean): { text: string; problem: boolean } {
+  const v = value.trim();
+  if (v === "")
+    return tried
+      ? { text: "Enter a proposal ID: 0x and 64 hexadecimal characters", problem: true }
+      : { text: "An upgrade or emergency upgrade ID", problem: false };
+  if (!v.startsWith("0x") && !"0x".startsWith(v)) return { text: "Starts with 0x", problem: true };
+  const hex = v.slice(2);
+  if (/[^0-9a-fA-F]/.test(hex)) return { text: "Only 0–9 and a–f after 0x", problem: true };
+  if (hex.length > 64)
+    return { text: `${hex.length} of 64 hexadecimal characters · too long`, problem: true };
+  if (hex.length === 64)
+    return { text: "64 of 64 hexadecimal characters · ready to open", problem: false };
+  return {
+    text: `${hex.length} of 64 hexadecimal characters${tried ? " · enter all 64 to open" : ""}`,
+    problem: tried,
+  };
+}
+
+function ProposalLookup({
+  error,
+  defaultId,
+  submitting,
+}: { error: string | null; defaultId: string; submitting: boolean }) {
+  const [value, setValue] = useState(defaultId);
+  const [tried, setTried] = useState(false);
+  const hint = idHint(value, tried);
+  // The server's answer is about the ID it was sent: editing the field brings the live hint back.
+  const shownError = value === defaultId ? error : null;
+  return (
+    <Form
+      method="post"
+      // Only a complete ID is sent (the action checks it again).
+      onSubmit={(e) => {
+        const id = new FormData(e.currentTarget).get("id");
+        if (typeof id === "string" && fullId.test(id.trim())) return;
+        e.preventDefault();
+        setTried(true);
+      }}
+      className="grid max-w-[600px] gap-y-1.5"
+    >
+      <label htmlFor="proposal-id" className="font-semibold text-[14px] text-navy-800 leading-5">
+        Open a proposal by ID
+      </label>
+      {/* One control: the field and its button share an edge and a height. */}
+      <div className="flex min-w-0">
+        <Input
+          id="proposal-id"
+          name="id"
+          defaultValue={defaultId}
+          placeholder="0x + 64 hexadecimal characters"
+          className="mono h-11 min-w-0 flex-1 rounded-r-none px-3 text-[12px] placeholder:font-sans placeholder:text-[13px] placeholder:text-slate-500 focus-visible:z-10 sm:h-10"
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(e) => {
+            setValue(e.currentTarget.value);
+            setTried(false);
+          }}
+          aria-invalid={shownError || hint.problem ? true : undefined}
+          aria-describedby={shownError ? "proposal-error" : "proposal-hint"}
+        />
+        <Button type="submit" loading={submitting} className="h-11 rounded-l-none px-4 sm:h-10">
+          Open <ArrowRight />
+        </Button>
+      </div>
+      {shownError ? (
+        <p id="proposal-error" role="alert" className="text-red-800 text-xs">
+          {shownError}
+        </p>
+      ) : (
+        <p
+          id="proposal-hint"
+          aria-live="polite"
+          className={cn("text-xs", hint.problem ? "font-medium text-amber-900" : "text-slate-550")}
+        >
+          {hint.text}
+        </p>
+      )}
+    </Form>
+  );
+}
+
+// Every row reads the same way: icon, title and status on the first line, the description and the
+// supporting numbers on the second. The whole row is the link.
 function FlowRow({
   to,
   icon,
@@ -397,22 +451,22 @@ function FlowRow({
     <Link
       to={to}
       prefetch="intent"
-      className="group grid gap-3 px-5 py-5 transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-slate-50 sm:grid-cols-[minmax(0,1fr)_220px_20px] sm:items-center sm:gap-6 sm:px-6"
+      className="group grid grid-cols-[20px_minmax(0,1fr)] gap-x-3 gap-y-2 px-4 py-2.5 transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-slate-75 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-600 focus-visible:ring-inset active:bg-slate-100 has-[[data-tone=attention]]:bg-orange-50/60 has-[[data-tone=attention]]:hover:bg-orange-50 sm:grid-cols-[20px_minmax(0,1fr)_300px_16px] sm:gap-x-4 sm:px-5"
       data-testid={testId}
     >
-      <div className="flex min-w-0 items-start gap-3">
-        <span aria-hidden className="mt-0.5 shrink-0 text-navy-800 [&_svg]:size-5">
-          {icon}
-        </span>
-        <div className="space-y-1">
-          <h3 className="font-semibold text-base text-navy-800">{title}</h3>
-          <p className="max-w-2xl text-slate-700 text-sm leading-6">{description}</p>
-        </div>
+      <span aria-hidden className="mt-0.5 text-navy-800 [&_svg]:size-5">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <h3 className="font-semibold text-base text-navy-800 leading-6 group-hover:text-brand-700 group-hover:underline group-hover:underline-offset-4">
+          {title}
+        </h3>
+        <p className="text-slate-550 text-xs">{description}</p>
       </div>
-      <div className="pl-8 sm:pl-0">{summary}</div>
+      <div className="col-start-2 sm:col-start-3">{summary}</div>
       <ArrowRight
         aria-hidden
-        className="hidden h-4 w-4 text-slate-600 group-hover:text-brand-700 sm:block"
+        className="mt-1 hidden h-4 w-4 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-700 sm:block"
       />
     </Link>
   );
@@ -437,7 +491,8 @@ function Deferred<T extends { source: SummarySource }>({
   indexed?: boolean;
   /** The list the count is built from: a current count not re-read at the head served says so. */
   watchKey?: string;
-  children: (v: T, note: ReactNode) => ReactNode;
+  /** `current`: fresh and read at the head served, the only count that may be highlighted. */
+  children: (v: T, note: ReactNode, current: boolean) => ReactNode;
 }) {
   const { block, behind } = useContentCurrency(watchKey);
   const notReRead =
@@ -451,7 +506,8 @@ function Deferred<T extends { source: SummarySource }>({
       <Await
         resolve={value}
         errorElement={
-          <span className="font-medium text-amber-900 text-sm">
+          <span className="inline-flex h-6 items-center gap-1.5 font-semibold text-[14px] text-red-800">
+            <AlertTriangle aria-hidden className="h-3.5 w-3.5 shrink-0" />
             Data unavailable · open to retry
           </span>
         }
@@ -468,8 +524,8 @@ function Deferred<T extends { source: SummarySource }>({
               {(freshValue, refresh) => {
                 const shown = freshValue ?? v;
                 return shown.source === null
-                  ? children(shown, notReRead)
-                  : children(shown, <SummaryNote source={shown.source} refresh={refresh} />);
+                  ? children(shown, notReRead, notReRead === null)
+                  : children(shown, <SummaryNote source={shown.source} refresh={refresh} />, false);
               }}
             </UntilFresh>
           );
@@ -482,8 +538,8 @@ function Deferred<T extends { source: SummarySource }>({
 function DeferredPending({ indexed }: { indexed: boolean }) {
   const progress = useIndexProgress();
   return (
-    <span role="status" className="inline-flex flex-col gap-1.5 text-slate-600 text-xs">
-      <span className="h-4 w-28 animate-pulse rounded bg-slate-100" />
+    <span role="status" className="inline-flex flex-col text-slate-600 text-xs">
+      <span className="my-0.5 h-5 w-28 animate-pulse rounded-full bg-slate-100" />
       {indexed && progress.indexing ? indexingLabel(progress, "log history") : "Reading sources…"}
     </span>
   );

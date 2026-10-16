@@ -25,7 +25,15 @@ import { cn } from "@/utils/cn";
 import { formatAge, formatNumber } from "@/utils/format";
 import { noteStatusLanded, requestStatusRevalidation } from "@/utils/revalidation";
 import { Link, NavLink, useFetcher, useRevalidator } from "@remix-run/react";
-import { AlertTriangle, Clock, Info, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronRight,
+  Clock,
+  Info,
+  Loader2,
+  RefreshCw,
+  ShieldAlert,
+} from "lucide-react";
 import { type ReactNode, Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
@@ -37,10 +45,11 @@ export { useStatus } from "@/components/governance-context";
 // then it says it is being checked, never that all is well.
 
 const NAV = [
-  { to: $path("/app/proposals"), label: "Upgrades" },
-  { to: $path("/app/emergency"), label: "Emergency" },
-  { to: $path("/app/freeze"), label: "Freeze" },
-  { to: $path("/app/l2-cancellations"), label: "L2 veto" },
+  { to: "/", label: "Overview" },
+  { to: $path("/app/proposals"), label: "Protocol upgrades" },
+  { to: $path("/app/emergency"), label: "Emergency upgrades" },
+  { to: $path("/app/freeze"), label: "Freeze requests" },
+  { to: $path("/app/l2-cancellations"), label: "Guardian veto" },
   { to: "/settings", label: "Settings" },
 ];
 
@@ -121,11 +130,11 @@ export function AppFrame() {
       <header className="sticky top-0 z-40 border-slate-300 border-b bg-white">
         <HeaderRow>
           <HomeLink />
-          <Nav />
           <div className="ml-auto flex min-w-0 items-center gap-2">
             <NetworkPill chain={null} />
           </div>
         </HeaderRow>
+        <Nav />
       </header>
       <CheckingBanner />
       <Main>
@@ -151,7 +160,7 @@ function Main({ children }: { children: ReactNode }) {
     <main
       id="main-content"
       tabIndex={-1}
-      className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:px-6 sm:py-8"
+      className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-5 sm:px-6 sm:py-6"
     >
       {children}
     </main>
@@ -160,7 +169,7 @@ function Main({ children }: { children: ReactNode }) {
 
 function HeaderRow({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6 md:h-16 md:flex-nowrap md:py-0">
+    <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6 md:h-12 md:flex-nowrap md:py-0">
       {children}
     </div>
   );
@@ -170,39 +179,38 @@ function HomeLink() {
   return (
     <Link to="/" className="flex shrink-0 items-center gap-3" aria-label="Home">
       <Logo className="h-6 w-auto" />
-      {/* Not beside the links on narrower desktops (md to xl): they would not all fit. */}
-      <span className="hidden h-5 w-px bg-slate-200 sm:block md:hidden xl:block" />
-      <span className="hidden font-medium text-[15px] text-slate-950 sm:block md:hidden xl:block">
-        Governance
-      </span>
+      <span className="hidden h-5 w-px bg-slate-200 sm:block" />
+      <span className="hidden font-medium text-[15px] text-slate-950 sm:block">Governance</span>
     </Link>
   );
 }
 
 function Nav() {
   return (
-    <nav
-      aria-label="Governance navigation"
-      // From md up the links share one row with the network pill and the wallet button: when they
-      // do not all fit, the links scroll within the navigation rather than run under the pill.
-      className="-mx-2 order-last flex w-full min-w-0 flex-wrap items-center gap-1 md:order-none md:w-auto md:flex-1 md:flex-nowrap md:overflow-x-auto"
-    >
-      {NAV.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          prefetch="intent"
-          className={({ isActive }) =>
-            cn(
-              "flex min-h-11 items-center whitespace-nowrap rounded-[10px] px-3 py-2 font-medium text-slate-700 text-sm transition-colors hover:bg-slate-75 hover:text-slate-950",
-              isActive && "bg-navy-800 font-semibold text-white hover:bg-navy-800 hover:text-white"
-            )
-          }
-        >
-          {item.label}
-        </NavLink>
-      ))}
-    </nav>
+    <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
+      <nav
+        aria-label="Governance navigation"
+        className="-mx-3 flex items-center gap-x-1 overflow-x-auto pb-1.5"
+      >
+        {NAV.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === "/"}
+            prefetch="intent"
+            className={({ isActive }) =>
+              cn(
+                "flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 py-1 font-medium text-slate-700 text-sm transition-colors hover:bg-slate-75 hover:text-slate-950 md:min-h-8",
+                isActive &&
+                  "bg-navy-800 font-semibold text-white hover:bg-navy-800 hover:text-white"
+              )
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+    </div>
   );
 }
 
@@ -261,7 +269,6 @@ function Header({ offerWallet, wallet }: { offerWallet: boolean; wallet: boolean
       <header className="sticky top-0 z-40 border-slate-300 border-b bg-white">
         <HeaderRow>
           <HomeLink />
-          <Nav />
           {/* On a phone the group may wrap onto a second line rather than widen the page. */}
           <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
             <WithStatus
@@ -285,6 +292,7 @@ function Header({ offerWallet, wallet }: { offerWallet: boolean; wallet: boolean
             )}
           </div>
         </HeaderRow>
+        <Nav />
       </header>
       <WithStatus fallback={null} problem={() => null}>
         {() => <LiveNote />}
@@ -307,7 +315,7 @@ function NetworkPill({
 }) {
   return (
     <span
-      className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-slate-50 px-2 py-2 font-semibold text-navy-800 text-xs"
+      className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1.5 font-semibold text-navy-800 text-xs"
       data-testid="network-pill"
       data-stale={notReRead ? "true" : undefined}
     >
@@ -344,6 +352,7 @@ export function RefreshButton() {
     <Button
       variant="ghost"
       size="icon"
+      className="border-transparent bg-transparent text-slate-600 hover:border-transparent hover:bg-slate-75 hover:text-navy-800"
       aria-label="Refresh data"
       title="Fetch Safe signatures and chain state again"
       onClick={() => {
@@ -506,29 +515,35 @@ function TrustBanners({ status }: { status: OkStatus }) {
 function Footer() {
   const chain = useChain();
   return (
-    <footer id="data-sources" className="mt-12 border-slate-200 border-t bg-white">
-      <div className="mx-auto grid max-w-[1200px] gap-x-10 gap-y-3 px-4 py-8 text-[13px] sm:grid-cols-2 sm:px-6">
-        <div className="space-y-3 sm:col-span-2">
-          <p className="font-semibold text-[11px] text-slate-600 uppercase tracking-[0.08em]">
-            Where this page's data comes from
-          </p>
-          <p className="max-w-3xl text-slate-950">
-            Proposals and roles are read from the chain through your RPC. Signatures are fetched
-            from the Safe Transaction Service and counted only after the governance contract accepts
-            them in an <code className="mono">eth_call</code>.{" "}
-            <WithStatus fallback={null}>
-              {(status) => <CacheSentence state={status.sync.cache.state} />}
-            </WithStatus>{" "}
-            It never posts to Safe.
-          </p>
+    <footer id="data-sources" className="mt-10 border-slate-200 border-t bg-white">
+      <details className="group mx-auto max-w-[1200px] px-4 sm:px-6">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 font-semibold text-[13px] text-navy-800 hover:text-brand-700 [&::-webkit-details-marker]:hidden">
+          <ChevronRight
+            aria-hidden
+            className="h-4 w-4 shrink-0 transition-transform group-open:rotate-90"
+          />
+          Data sources & verification
+        </summary>
+        <div className="grid gap-x-10 gap-y-3 pt-1 pb-8 text-[13px] sm:grid-cols-2">
+          <div className="space-y-3 sm:col-span-2">
+            <p className="max-w-3xl text-slate-950">
+              Proposals and roles are read from the chain through your RPC. Signatures are fetched
+              from the Safe Transaction Service and counted only after the governance contract
+              accepts them in an <code className="mono">eth_call</code>.{" "}
+              <WithStatus fallback={null}>
+                {(status) => <CacheSentence state={status.sync.cache.state} />}
+              </WithStatus>{" "}
+              It never posts to Safe.
+            </p>
+          </div>
+          <WithStatus
+            fallback={<FooterPending chain={chain} />}
+            problem={() => <FooterPending chain={chain} unavailable />}
+          >
+            {(status) => <FooterRows status={status} />}
+          </WithStatus>
         </div>
-        <WithStatus
-          fallback={<FooterPending chain={chain} />}
-          problem={() => <FooterPending chain={chain} unavailable />}
-        >
-          {(status) => <FooterRows status={status} />}
-        </WithStatus>
-      </div>
+      </details>
     </footer>
   );
 }
@@ -572,19 +587,19 @@ function FooterRows({ status }: { status: OkStatus }) {
         {g.network.label} · chain id {g.network.chainId}
       </FooterRow>
       <FooterRow label="ProtocolUpgradeHandler (pinned)">
-        <AddressLink address={g.upgradeHandler} />
+        <AddressLink address={g.upgradeHandler} full={false} />
       </FooterRow>
       <FooterRow label={`Security Council · ${g.securityCouncil.members.length} members`}>
-        <AddressLink address={g.securityCouncil.address} />
+        <AddressLink address={g.securityCouncil.address} full={false} />
       </FooterRow>
       <FooterRow label={`Guardians · ${g.guardians.members.length} members`}>
-        <AddressLink address={g.guardians.address} />
+        <AddressLink address={g.guardians.address} full={false} />
       </FooterRow>
       <FooterRow label="Emergency Upgrade Board">
-        <AddressLink address={g.emergencyUpgradeBoard.address} />
+        <AddressLink address={g.emergencyUpgradeBoard.address} full={false} />
       </FooterRow>
       <FooterRow label="ZKsync Foundation Safe">
-        <AddressLink address={g.emergencyUpgradeBoard.zkFoundation} />
+        <AddressLink address={g.emergencyUpgradeBoard.zkFoundation} full={false} />
       </FooterRow>
       <FooterRow label="Safe Transaction Service">
         <span className="mono break-all">{status.safeApi.url ?? "not configured"}</span>

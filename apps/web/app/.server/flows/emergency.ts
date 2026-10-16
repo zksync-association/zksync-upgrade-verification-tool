@@ -490,7 +490,7 @@ export async function loadEmergencyUpgrade(
     txHash: event.txHash,
     blockNumber: event.blockNumber.toString(),
     proposal: decoded.proposal,
-    calls: decoded.proposal.calls.map(decodeCall),
+    calls: decoded.proposal.calls.map((call) => decodeCall(call)),
     idMatches: upgradeProposalId(decoded.proposal).toLowerCase() === id.toLowerCase(),
   });
 

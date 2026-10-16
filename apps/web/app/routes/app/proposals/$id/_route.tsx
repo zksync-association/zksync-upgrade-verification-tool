@@ -11,7 +11,7 @@ import {
 import { parseId } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
-import { AddressLink, ExternalAnchor, Hash, TxLink } from "@/components/hex";
+import { AddressLink, Hash, TxLink } from "@/components/hex";
 import { Check, EmptyState, Facts, LoadingCard, PageHeader, Section } from "@/components/page";
 import { CallList } from "@/components/verification/calls";
 import { ExecutionPanel } from "@/components/verification/execution-panel";
@@ -32,12 +32,12 @@ import { UpgradeStateBadge } from "@/components/verification/badges";
 import type { Refresh } from "@/components/verification/freshness";
 import { Timeline } from "@/components/verification/timeline";
 import { UntilFresh } from "@/components/verification/until-fresh";
-import { UpgradeFile } from "@/components/verification/upgrade-file";
 import { formatNumber, formatTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
 import { Await, Link, useAsyncError, useLoaderData } from "@remix-run/react";
 import { Suspense } from "react";
+import { ExternalLink } from "lucide-react";
 import { $path } from "remix-routes";
 import { zeroAddress } from "viem";
 
@@ -258,11 +258,11 @@ function Detail({
   const stale = behind !== null;
 
   const page = (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <PageHeader
         back={{ to: $path("/app/proposals"), label: "Upgrades" }}
         eyebrow="Protocol upgrade"
-        title="Upgrade"
+        title={<UpgradeTitle l2Proposal={l2Proposal} />}
         badges={
           <AsOfContent asOf={asOf} stale={stale} className="inline-flex">
             <UpgradeStateBadge state={d.state} />
@@ -276,7 +276,7 @@ function Detail({
         <NotReReadNote watchKey={watchKey} what="The state and timeline below" />
       )}
 
-      <AsOfContent asOf={asOf} stale={stale} className="space-y-10">
+      <AsOfContent asOf={asOf} stale={stale} className="space-y-8">
         <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
           <Facts
             items={[
@@ -317,17 +317,12 @@ function Detail({
                     >
                       {(proposal) =>
                         proposal ? (
-                          <span className="space-x-2">
-                            <span className="mono break-all">
-                              ZkProtocolGovernor #{proposal.proposalId}
-                            </span>
-                            {governance.network.tallyUrl && (
-                              <ExternalAnchor
-                                href={`${governance.network.tallyUrl}/proposal/${proposal.proposalId}`}
-                              >
-                                Tally
-                              </ExternalAnchor>
-                            )}
+                          <span className="mono break-all">
+                            ZkProtocolGovernor #
+                            <ProposalNumberLink
+                              id={proposal.proposalId}
+                              tallyUrl={governance.network.tallyUrl}
+                            />
                           </span>
                         ) : (
                           <span className="text-slate-600">Not found on ZKsync Era</span>
@@ -428,10 +423,6 @@ function Detail({
           }
         >
           <CallList calls={d.calls} labels={labels} />
-          {/* Nothing to download from a state as of an older block (held, or not re-read). */}
-          {!asOf && !stale && (
-            <UpgradeFile proposal={d.started.proposal} name={`upgrade-${d.id.slice(0, 10)}`} />
-          )}
         </Section>
       </AsOfContent>
 
@@ -660,7 +651,7 @@ function HeldApprovalsView({
   refresh: Refresh;
 }) {
   return (
-    <AsOfContent asOf={asOf} className="space-y-10">
+    <AsOfContent asOf={asOf} className="space-y-8">
       {recorded && (
         <Section
           title="Recorded approvals"
@@ -695,5 +686,38 @@ function HeldApprovalsView({
         </div>
       </Section>
     </AsOfContent>
+  );
+}
+
+/** The title of the L2 proposal the upgrade came from, once it is found; "Upgrade" until then. */
+function UpgradeTitle({ l2Proposal }: { l2Proposal: Promise<{ title: string | null } | null> }) {
+  return (
+    <Suspense fallback="Upgrade">
+      <Await resolve={l2Proposal} errorElement="Upgrade">
+        {(proposal) => <span data-testid="upgrade-title">{proposal?.title ?? "Upgrade"}</span>}
+      </Await>
+    </Suspense>
+  );
+}
+
+/**
+ * The L2 proposal number as the link to its vote on Tally (plain where the network has none). Its
+ * last digits and the external-link icon stay together when the long number wraps.
+ */
+function ProposalNumberLink({ id, tallyUrl }: { id: string; tallyUrl: string | null }) {
+  if (!tallyUrl) return <>{id}</>;
+  return (
+    <a
+      href={`${tallyUrl}/proposal/${id}`}
+      target="_blank"
+      rel="noreferrer"
+      className="text-brand-700 hover:underline"
+    >
+      {id.slice(0, -4)}
+      <span className="whitespace-nowrap">
+        {id.slice(-4)}
+        <ExternalLink aria-hidden className="ml-1 inline h-3 w-3 align-[-1px]" />
+      </span>
+    </a>
   );
 }

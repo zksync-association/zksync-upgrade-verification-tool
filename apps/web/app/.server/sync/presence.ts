@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { MAX_STARTABLE_DAYS, STARTABLE_DAYS } from "@/common/startable";
 import { type Address, isAddress } from "viem";
 
 // Who uses the app now, and what is on their screens: the engine follows the chain only then. Two
@@ -297,7 +298,14 @@ export function onPageLoad(key: string) {
 
 /** While a key on ZKsync Era is on screen, the engine also follows Era. */
 export function isL2Key(key: string): boolean {
-  return key.startsWith("l2:") || key === "list:vetoes" || key === "list:startable";
+  return key.startsWith("l2:") || key === "list:vetoes" || startableDaysOf(key) !== null;
+}
+
+/** The look-back of a start-page key (`list:startable`, `list:startable:<days>`), else null. */
+export function startableDaysOf(key: string): number | null {
+  if (key === "list:startable") return STARTABLE_DAYS;
+  const days = /^list:startable:([1-9]\d{0,3})$/.exec(key);
+  return days ? Math.min(Number(days[1]), MAX_STARTABLE_DAYS) : null;
 }
 
 export const watchKeys = {
@@ -306,7 +314,9 @@ export const watchKeys = {
   emergencies: (all: boolean) => (all ? "list:emergency:all" : "list:emergency"),
   freezes: "list:freeze",
   vetoes: "list:vetoes",
-  startable: "list:startable",
+  /** The start page's list; another look-back than the default is a list of its own. */
+  startable: (days: number = STARTABLE_DAYS) =>
+    days === STARTABLE_DAYS ? "list:startable" : `list:startable:${days}`,
   upgrade: (id: string) => `upgrade:${id.toLowerCase()}`,
   emergency: (id: string) => `emergency:${id.toLowerCase()}`,
   l2: (governor: string, proposalId: bigint | string) =>

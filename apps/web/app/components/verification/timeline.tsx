@@ -29,7 +29,7 @@ export function Timeline({ steps, now }: { steps: TimelineStep[]; now: number })
             )}
             <span
               className={cn(
-                "relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px]",
+                "relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[12px]",
                 step.failed && "border-red-200 bg-red-50 text-red-800",
                 !step.failed && step.done && "border-navy-800 bg-navy-800 text-white",
                 !step.failed &&

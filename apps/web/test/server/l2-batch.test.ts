@@ -133,6 +133,7 @@ it("uses the previous discovery path when the batch RPC is unsupported", async (
     governor,
     proposalId: "42",
     executedTx: txHash,
+    title: null,
   });
   expect(state.scans.mock.calls.some(([filter]) => filter.address === governor)).toBe(true);
 });
@@ -143,6 +144,7 @@ it("falls back when the exact batch contains no matching message", async () => {
     governor,
     proposalId: "42",
     executedTx: txHash,
+    title: null,
   });
   expect(state.scans.mock.calls.some(([filter]) => filter.address === governor)).toBe(true);
 });
@@ -157,6 +159,7 @@ it("does not trust batch metadata from a start call for another proposal", async
     governor,
     proposalId: "42",
     executedTx: txHash,
+    title: null,
   });
   expect(state.request).not.toHaveBeenCalled();
 });

@@ -87,7 +87,7 @@ export async function warmMessageReadings(safes: readonly Address[]): Promise<nu
   const { chainId } = await network();
   let read = 0;
   for (const safe of safes) {
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
     const listing = heldSafeListing(safe);
     if (!listing) continue;
     const key = readingKey(safe, chainId);

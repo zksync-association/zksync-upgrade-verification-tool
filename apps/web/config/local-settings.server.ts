@@ -6,6 +6,7 @@ const schema = z.object({
   L1_RPC_URL: z.string().url().optional(),
   L2_RPC_URL: z.string().url().nullable().optional(),
   SAFE_API_KEY: z.string().nullable().optional(),
+  WALLET_CONNECT_PROJECT_ID: z.string().nullable().optional(),
 });
 export type LocalSettings = z.infer<typeof schema>;
 type Name = keyof LocalSettings;

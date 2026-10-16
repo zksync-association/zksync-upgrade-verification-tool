@@ -70,13 +70,30 @@ it("allows settings only on a loopback-bound server and same-origin submissions"
   expect(() => requireLocalSettings(new Request("http://localhost:3000/settings"))).toThrow();
 });
 
-it("returns provider names and configured flags, never credentials", () => {
+it("returns the saved values for the settings page, the file build's placeholder as none", () => {
   expect(settingsSummary()).toEqual({
-    l1Host: "l1.example",
-    l2Host: null,
-    safeKeyConfigured: true,
+    l1Rpc: "https://l1.example/secret",
+    l2Rpc: null,
+    safeKey: "secret-key",
+    wcProjectId: null,
   });
-  expect(JSON.stringify(settingsSummary())).not.toContain("secret");
+  state.env.L1_RPC_URL = "https://rpc.not-configured.invalid";
+  expect(settingsSummary().l1Rpc).toBeNull();
+  state.env.L1_RPC_URL = "https://l1.example/secret";
+});
+
+it("saves, rejects and removes a WalletConnect project id", async () => {
+  await updateSettings(form({ wcProjectId: "0123456789abcdef0123456789abcdef" }));
+  expect(state.save).toHaveBeenLastCalledWith(
+    expect.objectContaining({ WALLET_CONNECT_PROJECT_ID: "0123456789abcdef0123456789abcdef" })
+  );
+  await expect(updateSettings(form({ wcProjectId: "not an id!" }))).rejects.toThrow(
+    "Enter a WalletConnect project id"
+  );
+  await updateSettings(form({ clearWcProjectId: "on" }));
+  expect(state.save).toHaveBeenLastCalledWith(
+    expect.objectContaining({ WALLET_CONNECT_PROJECT_ID: null })
+  );
 });
 
 it("persists replacements and resets every data client/cache", async () => {

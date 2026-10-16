@@ -170,29 +170,6 @@ describe("proposal encoding", () => {
   });
 });
 
-describe("CLI upgrade file", () => {
-  it("is what apps/cli parses, and hashes to the same id", async () => {
-    const { upgradeFileJson } = await import("@/components/verification/upgrade-file");
-    const { calculateUpgradeProposalHash } = await import("@repo/common/util");
-    const proposal = {
-      calls: [
-        {
-          target: getAddress("0xC2a36181fB524a6bEfE639aFEd37A67e77d62cf1"),
-          value: "16",
-          data: "0x1234" as Hex,
-        },
-      ],
-      executor: getAddress("0x0000000000000000000000000000000000000000"),
-      salt: `0x${"00".repeat(32)}` as Hex,
-    };
-    const file = JSON.parse(upgradeFileJson(proposal));
-    expect(file.calls[0].value).toBe("0x10");
-    expect(calculateUpgradeProposalHash(file.calls, file.salt, file.executor)).toBe(
-      upgradeProposalId(proposal)
-    );
-  });
-});
-
 describe("freeze and veto calldata", () => {
   const sigs = [
     { signer: getAddress("0x34Ea62D4b9bBB8AD927eFB6ab31E3Ab3474aC93a"), signature: "0xaa" as Hex },

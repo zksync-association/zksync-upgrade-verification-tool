@@ -4,6 +4,7 @@ import { freshAfter } from "@/.server/flows/common";
 import { type VetoDetail, loadL2Veto } from "@/.server/flows/l2-veto";
 import { parseVetoParams } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
+import { ERA_CHAIN } from "@/common/calldata";
 import { decodeCall } from "@/common/proposal";
 import { useStatus } from "@/components/app-shell";
 import { AddressLink, ExternalAnchor, TxLink } from "@/components/hex";
@@ -72,8 +73,9 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
   const { fresh, eraKey } = useLoaderData<typeof loader>();
   const p = d.params;
   const l2 = d.l2Proposal;
+  const eraChain = ERA_CHAIN[governance.network.chainId];
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <PageHeader
         back={{ to: $path("/app/l2-cancellations"), label: "Guardian veto" }}
         eyebrow="Guardian veto"
@@ -157,8 +159,12 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
               ]}
             />
             <CallList
+              chainId={eraChain}
               calls={l2.targets.map((target, i) =>
-                decodeCall({ target, value: l2.values[i] ?? "0", data: l2.calldatas[i] ?? "0x" })
+                decodeCall(
+                  { target, value: l2.values[i] ?? "0", data: l2.calldatas[i] ?? "0x" },
+                  { chainId: eraChain }
+                )
               )}
             />
             <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">

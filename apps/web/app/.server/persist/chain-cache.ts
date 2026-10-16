@@ -597,7 +597,7 @@ async function save(force: boolean): Promise<boolean> {
   state.loadedPath = null;
   state.file = name;
   state.savedAt = file.savedAt;
-  state.sizeBytes = Buffer.byteLength(json);
+  state.sizeBytes = new TextEncoder().encode(json).length;
   if (state.detail?.startsWith("The cache could not be saved")) state.detail = null;
   return true;
 }

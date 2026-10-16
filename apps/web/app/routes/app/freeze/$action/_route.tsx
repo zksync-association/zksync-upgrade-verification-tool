@@ -65,7 +65,7 @@ function Detail({ detail: d }: { detail: SerializeFrom<FreezeDetail> }) {
     SetSoftFreezeThreshold: sc.nonces.setSoftFreezeThreshold,
   }[p.action];
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <PageHeader
         back={{ to: $path("/app/freeze"), label: "Freeze requests" }}
         eyebrow="Freeze request"

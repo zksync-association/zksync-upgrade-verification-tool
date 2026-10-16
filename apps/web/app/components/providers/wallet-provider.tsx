@@ -1,26 +1,16 @@
 import Avatar from "@/components/connect-button/avatar";
 import {
+  type DisclaimerComponent,
   RainbowKitProvider,
-  type Wallet,
   connectorsForWallets,
   lightTheme,
 } from "@rainbow-me/rainbowkit";
-import { injectedWallet, safeWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
+import { walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useMemo, useRef } from "react";
+import { type ReactNode, useMemo } from "react";
 import { type Chain, custom, defineChain } from "viem";
-import {
-  type State,
-  WagmiProvider,
-  cookieStorage,
-  createConfig,
-  createConnector,
-  createStorage,
-  useAccount,
-  useConnect,
-} from "wagmi";
+import { type State, WagmiProvider, cookieStorage, createConfig, createStorage } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
-import { safe } from "wagmi/connectors";
 
 const queryClient = new QueryClient();
 const walletTheme = lightTheme({
@@ -63,89 +53,61 @@ function chainFor(chainId: number, label: string): Chain {
 /** True inside an iframe, e.g. when Safe{Wallet} opens the app as a Safe App. */
 export const isFramed = () => typeof window !== "undefined" && window.parent !== window;
 
-const exactOrigin = (origin: string) =>
-  new RegExp(`^${origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`);
-
-// RainbowKit's Safe entry (shown only inside Safe{Wallet}), except that the Safe Apps SDK accepts
-// messages only from the configured Safe{Wallet} origins.
-function safeAppWallet(origins: string[]) {
-  return (): Wallet => ({
-    ...safeWallet(),
-    createConnector: (details) =>
-      createConnector((config) => ({
-        ...safe({ allowedDomains: origins.map(exactOrigin), unstable_getInfoTimeout: 1000 })(
-          config
-        ),
-        ...details,
-      })),
-  });
-}
-
-// Inside Safe{Wallet}, connect to the open Safe straight away, even if another wallet was used
-// on this origin before.
-function ConnectSafeApp() {
-  const { connector, status } = useAccount();
-  const { connectors, connect } = useConnect();
-  const tried = useRef(false);
-  useEffect(() => {
-    if (tried.current || !isFramed() || status === "connecting" || status === "reconnecting")
-      return;
-    const safeConnector = connectors.find((c) => c.id === "safe");
-    if (!safeConnector || connector?.id === "safe") return;
-    tried.current = true;
-    connect({ connector: safeConnector });
-  }, [connector, connectors, connect, status]);
-  return null;
-}
-
-// A wallet is only needed to sign as a member Safe or to send a transaction. Members sign by
-// opening the app inside Safe{Wallet} (a Safe App), or over WalletConnect when a project id is
-// set. Any browser wallet can send a transaction.
+// A wallet is only needed to sign as a member Safe or to send a transaction, and is reached only
+// over WalletConnect (a project id in Settings): members connect their Safe from Safe{Wallet}, and
+// anyone can connect a wallet app to send. Browser extensions cannot connect to the single-file
+// build (they talk to the page through window.postMessage, which browsers drop on file:// pages), so
+// installed ones are not discovered either: listed, they would hang at "Confirm in the extension".
 export function WalletProvider({
   children,
   initialState,
   projectId,
-  safeWalletOrigins,
   chainId,
   chainLabel,
 }: {
   children: ReactNode;
   initialState?: State;
   projectId: string | null;
-  safeWalletOrigins: string[];
   chainId: number;
   chainLabel: string;
 }) {
-  const origins = safeWalletOrigins.join(",");
   const config = useMemo(() => {
     const chain = chainFor(chainId, chainLabel);
-    const memberSafe = [
-      safeAppWallet(origins.split(",").filter(Boolean)),
-      ...(projectId ? [walletConnectWallet] : []),
-    ];
     return createConfig({
       chains: [chain] as [Chain],
       transports: { [chain.id]: noBrowserRpc },
       ssr: true,
       storage: createStorage({ storage: cookieStorage }),
-      connectors: connectorsForWallets(
-        [
-          { groupName: "Member Safe", wallets: memberSafe },
-          { groupName: "Browser wallet", wallets: [injectedWallet] },
-        ],
-        { appName: "ZKsync Governance", projectId: projectId ?? "" }
-      ),
+      multiInjectedProviderDiscovery: false,
+      // RainbowKit refuses an empty wallet list: without a project id there is no wallet.
+      connectors: projectId
+        ? connectorsForWallets([{ groupName: "WalletConnect", wallets: [walletConnectWallet] }], {
+            appName: "ZKsync Governance",
+            projectId,
+          })
+        : [],
     });
-  }, [projectId, origins, chainId, chainLabel]);
+  }, [projectId, chainId, chainLabel]);
 
   return (
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={walletTheme} avatar={Avatar} modalSize="compact">
-          <ConnectSafeApp />
+        <RainbowKitProvider
+          theme={walletTheme}
+          avatar={Avatar}
+          modalSize="compact"
+          appInfo={{ appName: "ZKsync Governance", disclaimer: WalletNote }}
+        >
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );
 }
+
+const WalletNote: DisclaimerComponent = ({ Text }) => (
+  <Text>
+    Wallets connect over WalletConnect: your Safe from Safe{"{"}Wallet{"}"}, or a wallet app such as
+    Rabby Mobile. Browser extensions (Rabby, MetaMask) cannot connect to a page opened from a file.
+  </Text>
+);

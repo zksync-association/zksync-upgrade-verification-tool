@@ -64,6 +64,16 @@ export const shouldRevalidate: ShouldRevalidateFunction = shouldRevalidateRoot;
 
 export default function App() {
   const nonce = useNonce();
+  const { env } = useLoaderData<typeof loader>();
+  return (
+    <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
+      <AppBody />
+    </Document>
+  );
+}
+
+/** Everything inside <body> but the toaster and scripts: shared with the single-file build. */
+export function AppBody() {
   const { env, wagmiCookie, chain, status, presence } = useLoaderData<typeof loader>();
   const initialState = wagmiCookie
     ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
@@ -72,29 +82,41 @@ export default function App() {
   // The shell, the navigation and the page render at once: the chain id the wallet needs is in
   // hand unless the server has not read it yet. The status fills in as it is read.
   return (
-    <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
-      <PresenceProvider awayMs={presence.awayMs}>
-        <Suspense fallback={<AppFrame />}>
-          <Await resolve={chain} errorElement={<ChainProblem status={status} />}>
-            {(chain) => (
-              <ChainContext.Provider value={chain}>
-                <WalletProvider
-                  initialState={initialState}
-                  projectId={env.WALLET_CONNECT_PROJECT_ID}
-                  safeWalletOrigins={env.SAFE_WALLET_ORIGINS}
-                  chainId={chain.chainId}
-                  chainLabel={chain.label}
-                >
-                  <AppShell status={status}>
-                    <Outlet />
-                  </AppShell>
-                </WalletProvider>
-              </ChainContext.Provider>
-            )}
-          </Await>
-        </Suspense>
-      </PresenceProvider>
-    </Document>
+    <PresenceProvider awayMs={presence.awayMs}>
+      <Suspense fallback={<AppFrame />}>
+        <Await resolve={chain} errorElement={<ChainProblem status={status} />}>
+          {(chain) => (
+            <ChainContext.Provider value={chain}>
+              <WalletProvider
+                initialState={initialState}
+                projectId={env.WALLET_CONNECT_PROJECT_ID}
+                chainId={chain.chainId}
+                chainLabel={chain.label}
+              >
+                <AppShell status={status}>
+                  <Outlet />
+                </AppShell>
+              </WalletProvider>
+            </ChainContext.Provider>
+          )}
+        </Await>
+      </Suspense>
+    </PresenceProvider>
+  );
+}
+
+export function AppToaster() {
+  return (
+    <Toaster
+      position="bottom-center"
+      toastOptions={{
+        className: "!rounded-xl !text-sm",
+        style: {
+          background: "hsl(var(--popover))",
+          color: "hsl(var(--popover-foreground))",
+        },
+      }}
+    />
   );
 }
 
@@ -150,16 +172,7 @@ function Document({
       </head>
       <body className="min-h-screen bg-background text-foreground">
         {children}
-        <Toaster
-          position="bottom-center"
-          toastOptions={{
-            className: "!rounded-xl !text-sm",
-            style: {
-              background: "hsl(var(--popover))",
-              color: "hsl(var(--popover-foreground))",
-            },
-          }}
-        />
+        <AppToaster />
         <script
           nonce={nonce}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: public client env only

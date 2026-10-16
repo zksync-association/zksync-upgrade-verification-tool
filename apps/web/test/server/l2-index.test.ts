@@ -645,6 +645,20 @@ describe("the flows on the index", () => {
     ]);
   });
 
+  it("look further back when the page asks, by the index and by the timestamp search alike", async () => {
+    upstream();
+    const ids = (items: { l2ProposalId: string }[]) => items.map((i) => i.l2ProposalId);
+    const before = toHex(proposalIdOf("executed a block before the 30 days"));
+    expect(ids(await notStartedUpgrades())).not.toContain(before);
+    const indexed = await notStartedUpgrades({ days: 31 });
+    expect(indexed).toContainEqual(
+      expect.objectContaining({ l2ProposalId: before, ok: true, l1ProposalId: keccak256(body(2)) })
+    );
+    settings(UNPINNED);
+    upstream();
+    expect(await notStartedUpgrades({ days: 31 })).toEqual(indexed);
+  });
+
   it("ask Era for an upgrade's log proof once: the Era timer's minute reads of the startable list keep it", async () => {
     const { era } = upstream();
     const first = await notStartedUpgrades({ page: true });
@@ -673,11 +687,15 @@ describe("the flows on the index", () => {
     const scanned = await findL2ProposalForUpgrade(keccak256(body(1)), created, {
       strategy: "legacy",
     });
-    expect(indexed).toEqual(scanned);
+    // The same match either way. The unindexed path reads the title through the governor's
+    // proposalSnapshot, which this fake Era does not serve: only the index's title is checked.
+    expect({ ...indexed, title: null }).toEqual({ ...scanned, title: null });
     expect(indexed).toEqual({
       governor: P,
       proposalId: proposalIdOf("upgrade one").toString(),
       executedTx: executionTx(one),
+      // The first line of its description.
+      title: "upgrade one",
     });
 
     // An execution timed after the creation is outside the window on both paths.

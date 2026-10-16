@@ -183,7 +183,14 @@ describe("the app shell before the status is read", () => {
   it("renders the header, the navigation and the page, and says the status is being checked", () => {
     const out = serverHtml(<Shell status={pending()} />);
     expect(out).toContain('aria-label="Governance navigation"');
-    for (const item of ["Upgrades", "Emergency", "Freeze", "L2 veto", "Settings"])
+    for (const item of [
+      "Overview",
+      "Protocol upgrades",
+      "Emergency upgrades",
+      "Freeze requests",
+      "Guardian veto",
+      "Settings",
+    ])
       expect(out).toContain(`>${item}</a>`);
     expect(out).toContain("page body");
     expect(out).toContain("Ethereum Mainnet");
@@ -195,7 +202,7 @@ describe("the app shell before the status is read", () => {
   it("never looks checked early: no block, no green dot, no trust anchor", () => {
     const out = serverHtml(<Shell status={pending()} />);
     expect(out).not.toContain("bg-green-500");
-    expect(out).not.toContain("block #");
+    expect(out).not.toContain('data-testid="block-age"');
     expect(out).not.toContain("ProtocolUpgradeHandler (pinned)");
     expect(out).not.toContain("Non-default trust anchor");
   });
@@ -218,7 +225,7 @@ describe("the app shell before the status is read", () => {
       </Shell>
     );
     expect(out).toContain("Council threshold 9");
-    expect(out).toContain("block #");
+    expect(out).toContain('data-testid="block-age"');
     expect(out).toContain("ProtocolUpgradeHandler (pinned)");
     expect(out).not.toContain("checking…");
   });
@@ -325,8 +332,8 @@ describe("each page's first flush, before its data and the status are read", () 
       vetoes: pending(),
     });
     expect(out).not.toContain("PAGE WAITED");
-    expect(out).toContain("Review proposals on Ethereum Mainnet");
-    expect(out).toContain("Open a proposal");
+    expect(out).toContain("Governance review");
+    expect(out).toContain("Open a proposal by ID");
     for (const flow of ["flow-upgrades", "flow-emergency", "flow-freeze", "flow-veto"])
       expect(out).toContain(`data-testid="${flow}"`);
     expect(out).toContain("Reading sources…");

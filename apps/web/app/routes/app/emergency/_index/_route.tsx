@@ -11,8 +11,8 @@ import {
 import { EMERGENCY_RECENT_DAYS } from "@/common/emergency";
 import { WithStatus } from "@/components/governance-context";
 import { HistoryToggle, PendingRegion, useNavigatingTo } from "@/components/history-toggle";
-import { TxLink } from "@/components/hex";
-import { EmptyState, LoadingCard, PageHeader } from "@/components/page";
+import { CopyButton, TxLink } from "@/components/hex";
+import { EmptyState, LoadingCard, PageHeader, QuietEmpty } from "@/components/page";
 import { IndexedLoadingCard } from "@/components/sync-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import { CheckSafeNow } from "@/components/verification/check-safe-now";
 import { ListFreshnessNote, type Refresh } from "@/components/verification/freshness";
 import { LastRunNote } from "@/components/verification/last-run";
 import { UntilFresh } from "@/components/verification/until-fresh";
-import { formatDay, formatNumber } from "@/utils/format";
+import { formatDay, formatNumber, shortHex } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
 import { Await, Link, useLoaderData } from "@remix-run/react";
@@ -97,12 +97,12 @@ export default function EmergencyList() {
         eyebrow="Emergency governance"
         title="Emergency upgrades"
         actions={
-          <Button variant="secondary" asChild>
+          <Button asChild>
             <Link to={$path("/app/emergency/new")}>Prepare an emergency upgrade</Link>
           </Button>
         }
       >
-        <p className="max-w-3xl text-slate-950">
+        <p className="max-w-[600px] text-[14px] text-slate-550">
           {/* The thresholds come from the root status; the rest of the page does not wait for it. */}
           <WithStatus fallback="An emergency upgrade runs immediately once enough Security Council members, Guardians and the ZKsync Foundation have signed its id.">
             {({ governance }) =>
@@ -113,10 +113,10 @@ export default function EmergencyList() {
           them against the id in your browser.
         </p>
       </PageHeader>
-      <div className="space-y-8">
+      <div className="space-y-5">
         <NotReReadNote watchKey={watchKey} what="The pending ids, counts and executions below" />
         <section className="space-y-3" aria-labelledby="pending-emergencies-heading">
-          <h2 id="pending-emergencies-heading" className="text-[22px] leading-7">
+          <h2 id="pending-emergencies-heading" className="font-semibold text-lg">
             Pending
           </h2>
           <Suspense
@@ -150,7 +150,7 @@ export default function EmergencyList() {
         </section>
         <section className="space-y-3" aria-labelledby="executed-emergencies-heading">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 id="executed-emergencies-heading" className="text-[22px] leading-7">
+            <h2 id="executed-emergencies-heading" className="font-semibold text-lg">
               {allHistory
                 ? "Executed · full history"
                 : `Executed · last ${EMERGENCY_RECENT_DAYS} days`}
@@ -214,11 +214,11 @@ export default function EmergencyList() {
                               stale={stale}
                             />
                           ) : (
-                            <EmptyState>
+                            <QuietEmpty>
                               {allHistory
                                 ? "No emergency executions found since deployment."
                                 : `No emergency executions in the last ${EMERGENCY_RECENT_DAYS} days.`}
-                            </EmptyState>
+                            </QuietEmpty>
                           )}
                         </div>
                       </PendingRegion>
@@ -249,7 +249,7 @@ function PendingList({
   stale?: boolean;
 }) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <ListFreshnessNote
           watchKey={allHistory ? "list:emergency:all" : "list:emergency"}
@@ -271,11 +271,11 @@ function PendingList({
       )}
       <div className="space-y-3">
         {result.pending.length === 0 ? (
-          <EmptyState>
+          <QuietEmpty incomplete={result.errors.length > 0 || result.anomalies > 0}>
             {result.errors.length > 0 || result.anomalies > 0
               ? "No pending upgrades were found in the available messages."
               : "No pending emergency upgrades were found in members' Safe messages."}
-          </EmptyState>
+          </QuietEmpty>
         ) : (
           <Rows items={result.pending} testId="pending-emergencies" stale={stale} />
         )}
@@ -297,26 +297,38 @@ function Rows({
 }) {
   return (
     <AsOfContent asOf={asOf} stale={stale}>
-      <Card className="divide-y divide-slate-100 overflow-hidden" data-testid={testId}>
+      <Card className="divide-y divide-slate-200 overflow-hidden" data-testid={testId}>
         {items.map((e) => (
+          // The whole row opens the upgrade (its link covers it); the copy button and the
+          // transaction link sit above.
           <div
             key={e.id}
-            className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 hover:bg-slate-25"
+            className="group relative flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-2.5 transition-colors hover:bg-slate-75 has-[a:focus-visible]:ring-[3px] has-[a:focus-visible]:ring-brand-600 has-[a:focus-visible]:ring-inset"
             data-testid="emergency-row"
           >
-            <Link to={$path("/app/emergency/:id", { id: e.id })} className="min-w-0 flex-1">
-              <span className="mono block truncate text-slate-950">{e.id}</span>
-              <span className="text-slate-600 text-xs">
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1">
+                <Link
+                  to={$path("/app/emergency/:id", { id: e.id })}
+                  className="mono font-medium text-[13px] text-navy-800 after:absolute after:inset-0 focus-visible:outline-none group-hover:text-brand-700"
+                  title={e.id}
+                >
+                  {shortHex(e.id, 10, 8)}
+                  <span className="sr-only"> (open the emergency upgrade)</span>
+                </Link>
+                <CopyButton value={e.id} label="Copy upgrade ID" className="relative z-10" />
+              </span>
+              <span className="text-slate-550 text-xs">
                 {e.executed
                   ? `Executed in block ${formatNumber(e.executed.blockNumber)}`
                   : `First signed in Safe ${formatDay(e.firstSeen)}`}
               </span>
-            </Link>
+            </span>
             {e.executed ? (
-              <TxLink hash={e.executed.txHash} />
+              <TxLink hash={e.executed.txHash} className="relative z-10" />
             ) : (
               <span
-                className="flex flex-wrap items-center gap-1.5"
+                className="relative z-10 flex flex-wrap items-center gap-1.5"
                 title="As reported by Safe; open the upgrade to verify each signature on-chain"
               >
                 <Badge>Security Council {e.reported.securityCouncil}</Badge>
@@ -326,9 +338,10 @@ function Rows({
                 </Badge>
               </span>
             )}
-            <Link to={$path("/app/emergency/:id", { id: e.id })} aria-label="Open">
-              <ArrowRight className="h-4 w-4 text-slate-600" />
-            </Link>
+            <ArrowRight
+              aria-hidden
+              className="h-4 w-4 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-700"
+            />
           </div>
         ))}
       </Card>

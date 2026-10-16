@@ -385,7 +385,7 @@ function MemberList({ set, staleAt }: { set: Serialized<SignatureSet>; staleAt: 
                   <span className="flex items-center gap-2 font-medium text-slate-950 text-sm">
                     {m.label ?? "Member"}
                     {isYou && (
-                      <span className="rounded-full bg-brand-50 px-2 text-[11px] text-brand-600">
+                      <span className="rounded-full bg-brand-50 px-2 text-[12px] text-brand-600">
                         you
                       </span>
                     )}

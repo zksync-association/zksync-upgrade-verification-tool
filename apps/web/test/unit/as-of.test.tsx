@@ -239,11 +239,9 @@ describe("the emergency upgrade page after a pause", () => {
     expect(out).toContain('data-testid="id-check"');
     expect(out).toMatch(/class="[^"]*grayscale[^"]*" data-stale="true"/);
     expect(out).toContain("signatures at the newest block");
-    // No payload to load, nothing to execute or download from it (as on the upgrade page).
+    // No payload to load, nothing to execute from it.
     expect(out).not.toContain("What it will do");
     expect(out).not.toMatch(/>Execute<\/h2>/);
-    expect(out).not.toMatch(/emergency-0xabababab/);
-    expect(out).not.toContain("Copy upgrade file");
 
     const detail = deferred<unknown>();
     show(Emergency, { ...data, lastShown: Promise.resolve(held), detail: detail.promise });
@@ -367,10 +365,12 @@ describe("lists after a pause", () => {
     expect(await within(row).findByTestId("summary-note")).toHaveTextContent(
       "As of block #21,000,000 · re-verifying"
     );
-    expect(row).toHaveTextContent("3 upgrades in the last 45 days");
+    expect(row).toHaveTextContent("0 in progress");
+    expect(row).toHaveTextContent("3 finished in the last 45 days");
     await act(async () => fresh.resolve({ open: 1, total: 4, source: null }));
     expect(within(row).queryByTestId("summary-note")).toBeNull();
-    expect(row).toHaveTextContent("4 upgrades in the last 45 days");
+    expect(row).toHaveTextContent("1 in progress");
+    expect(row).toHaveTextContent("3 finished in the last 45 days");
   });
 
   it("a count fed by Safe: the one last shown gives way to the current count (from older Safe copies, labelled) as soon as it is in, then to the fresh one; or stays labelled when that fails", async () => {

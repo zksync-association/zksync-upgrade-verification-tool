@@ -15,12 +15,16 @@ export function requireLocalSettings(request: Request) {
     throw new Response("Settings must be changed from this site's origin.", { status: 403 });
 }
 
+// The saved values, for the settings page only (loopback, never cached): it shows each one hidden
+// until its owner presses Show. The file build's `.invalid` placeholder counts as nothing saved.
 export function settingsSummary() {
-  const host = (value: string | undefined) => (value ? new URL(value).hostname : null);
+  const url = (value: string | undefined) =>
+    value && !new URL(value).hostname.endsWith(".invalid") ? value : null;
   return {
-    l1Host: host(env.L1_RPC_URL),
-    l2Host: host(env.L2_RPC_URL),
-    safeKeyConfigured: !!env.SAFE_API_KEY,
+    l1Rpc: url(env.L1_RPC_URL),
+    l2Rpc: url(env.L2_RPC_URL),
+    safeKey: env.SAFE_API_KEY || null,
+    wcProjectId: env.WALLET_CONNECT_PROJECT_ID || null,
   };
 }
 
@@ -36,6 +40,11 @@ export async function updateSettings(form: FormData) {
   if (l1) next.L1_RPC_URL = rpcUrl(l1);
   if (l2) next.L2_RPC_URL = rpcUrl(l2);
   if (form.get("clearL2Rpc") === "on") next.L2_RPC_URL = null;
+  const projectId = read("wcProjectId");
+  if (projectId && !/^[A-Za-z0-9]{16,64}$/.test(projectId))
+    throw new Error("Enter a WalletConnect project id (letters and digits, as Reown shows it).");
+  if (projectId) next.WALLET_CONNECT_PROJECT_ID = projectId;
+  if (form.get("clearWcProjectId") === "on") next.WALLET_CONNECT_PROJECT_ID = null;
 
   try {
     const chain = await probeChain(next.L1_RPC_URL ?? env.L1_RPC_URL);

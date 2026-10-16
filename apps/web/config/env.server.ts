@@ -1,4 +1,5 @@
 import { addressSchema } from "@repo/common/schemas";
+import { DEFAULT_WALLET_CONNECT_PROJECT_ID } from "@/common/walletconnect";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 import "dotenv/config";
@@ -75,7 +76,10 @@ export const safeWalletOrigins = splitOrigins(env.SAFE_WALLET_ORIGINS);
 export const clientEnv = {
   ALLOW_INDEXING: env.ALLOW_INDEXING,
   NODE_ENV: env.NODE_ENV,
-  WALLET_CONNECT_PROJECT_ID: env.WALLET_CONNECT_PROJECT_ID ?? null,
+  // Read when sent: a project id saved in Settings applies at once; else the app's own.
+  get WALLET_CONNECT_PROJECT_ID(): string {
+    return env.WALLET_CONNECT_PROJECT_ID ?? DEFAULT_WALLET_CONNECT_PROJECT_ID;
+  },
   SAFE_WALLET_ORIGINS: safeWalletOrigins,
 };
 

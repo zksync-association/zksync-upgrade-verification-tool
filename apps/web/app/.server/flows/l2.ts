@@ -1,5 +1,7 @@
 import { guardiansAbi, l1MessengerEventAbi, l2GovernorAbi, upgradeHandlerAbi } from "@/common/abis";
 import type { L2Proposal } from "@/common/execution";
+import { proposalTitle } from "@/common/proposal-title";
+import { STARTABLE_DAYS } from "@/common/startable";
 import {
   type Address,
   type Hex,
@@ -39,8 +41,6 @@ import { L1_MESSENGER, findL2ProposalInBatch, upgradeBatch } from "./l2-batch";
 const DAY = 86_400n;
 // 3-day voting delay + 7-day voting period + 7-day possible extension, with margin.
 const VETO_WINDOW = 24n * DAY;
-// Executed protocol proposals whose L1 upgrade may still be started.
-const STARTABLE_WINDOW = 30n * DAY;
 // An upgrade's L2 execution, before its L1 creation (legacy discovery).
 const DISCOVERY_WINDOW = 21n * DAY;
 // A proposal's state() read at an Era head is served while that head is (4 s).
@@ -459,8 +459,53 @@ async function executedFromIndex(
   return eventsInWindow(executed, since, until);
 }
 
-/** ZkProtocolGovernor proposal whose L2 → L1 message is the upgrade `l1Id` (for the Tally link). */
+/**
+ * ZkProtocolGovernor proposal whose L2 → L1 message is the upgrade `l1Id` (for the Tally link),
+ * with its title: the first line of its description (null when it cannot be read now).
+ */
 export async function findL2ProposalForUpgrade(
+  l1Id: Hex,
+  creationTimestamp: number,
+  options: { startedTxHash?: Hex; strategy?: "batch" | "legacy" } = {}
+) {
+  const match = await matchL2ProposalForUpgrade(l1Id, creationTimestamp, options);
+  if (!match) return null;
+  const title = await l2ProposalTitle(match.governor, BigInt(match.proposalId)).catch(() => null);
+  return { ...match, title };
+}
+
+/** From its ProposalCreated log: the index's when the governor is indexed, else read for it. */
+export async function l2ProposalTitle(
+  governor: Address,
+  proposalId: bigint
+): Promise<string | null> {
+  const net = await network();
+  const at = isIndexedL2Governor(net, governor) ? await l2IndexHead(net) : null;
+  if (!at) {
+    const proposal = await getL2Proposal(governor, proposalId);
+    return proposal ? proposalTitle(proposal.description) : null;
+  }
+  const { events } = await l2GovernorIndex().read({ head: at });
+  const event = events.find(
+    (e) =>
+      e.eventName === "ProposalCreated" &&
+      isAddressEqual(e.governor, governor) &&
+      e.proposalId === proposalId
+  );
+  return event ? proposalTitle((await createdOf(event.log)).proposal.description) : null;
+}
+
+/** When an Era transaction was included: its block's time (seconds). */
+export async function l2TxTime(txHash: Hex): Promise<number | null> {
+  const client = await l2();
+  if (!client) return null;
+  return cached(`l2-tx-time:${txHash.toLowerCase()}`, 10 * 60_000, async () => {
+    const receipt = await client.getTransactionReceipt({ hash: txHash });
+    return Number((await client.getBlock({ blockNumber: receipt.blockNumber })).timestamp);
+  });
+}
+
+async function matchL2ProposalForUpgrade(
   l1Id: Hex,
   creationTimestamp: number,
   { startedTxHash, strategy = "batch" }: { startedTxHash?: Hex; strategy?: "batch" | "legacy" } = {}
@@ -574,33 +619,37 @@ export type NotStartedUpgrade = {
 );
 
 /**
- * Executed ZkProtocolGovernor proposals whose L1 upgrade has not been started yet. With `page`
- * (never JSON): at the Era head pages answer at, kept for as long as they do.
+ * Executed ZkProtocolGovernor proposals whose L1 upgrade has not been started yet, among those
+ * executed in the last `days` days. With `page` (never JSON): at the Era head pages answer at,
+ * kept for as long as they do.
  */
 export async function notStartedUpgrades({
   page = false,
-}: { page?: boolean } = {}): Promise<NotStartedUpgrade[]> {
+  days = STARTABLE_DAYS,
+}: { page?: boolean; days?: number } = {}): Promise<NotStartedUpgrade[]> {
   const client = await l2();
   const net = await network();
   if (!client || !net.l2Governors.protocol) return [];
   const governor = net.l2Governors.protocol;
   const at = isIndexedL2Governor(net, governor) ? await l2IndexHead(net, { page }) : null;
   if (page && at)
-    return cached(`startable-page:${at.head.hash.toLowerCase()}`, ERA_PAGE_MAX_AGE_MS, () =>
-      readNotStarted(client, net, governor, at)
+    return cached(`startable-page:${days}:${at.head.hash.toLowerCase()}`, ERA_PAGE_MAX_AGE_MS, () =>
+      readNotStarted(client, net, governor, at, days)
     );
-  return readNotStarted(client, net, governor, at);
+  return readNotStarted(client, net, governor, at, days);
 }
 
 async function readNotStarted(
   client: PublicClient,
   net: Awaited<ReturnType<typeof network>>,
   governor: Address,
-  at: L2Head | null
+  at: L2Head | null,
+  days: number
 ): Promise<NotStartedUpgrade[]> {
+  const window = BigInt(days) * DAY;
   const logs: { log: Log; final: boolean }[] = at
-    ? await executedFromIndex(governor, at, at.head.timestamp - STARTABLE_WINDOW)
-    : (await scanWindow(client, governor, "ProposalExecuted", STARTABLE_WINDOW)).map((log) => ({
+    ? await executedFromIndex(governor, at, at.head.timestamp - window)
+    : (await scanWindow(client, governor, "ProposalExecuted", window)).map((log) => ({
         log,
         final: false,
       }));

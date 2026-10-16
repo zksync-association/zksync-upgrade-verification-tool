@@ -75,13 +75,13 @@ export default function NewEmergency() {
     setCalls(calls.map((c, j) => (j === i ? { ...c, ...patch } : c)));
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <PageHeader
         back={{ to: $path("/app/emergency"), label: "Emergency upgrades" }}
         eyebrow="Emergency upgrade"
         title="Prepare an emergency upgrade"
       >
-        <p className="max-w-3xl text-slate-950">
+        <p className="max-w-[600px] text-[14px] text-slate-550">
           Build the payload, share the JSON with every signer through your usual private channel,
           then sign its id from your Safe. Safe only ever stores the id; signers check the payload
           against it themselves.
@@ -105,7 +105,7 @@ export default function NewEmergency() {
               <div className="flex gap-2">
                 <Input
                   id="salt"
-                  className="mono text-[12px]"
+                  className="mono text-[13px]"
                   value={salt}
                   onChange={(e) => setSalt(e.target.value)}
                   spellCheck={false}
@@ -141,7 +141,7 @@ export default function NewEmergency() {
               </div>
               <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
                 <Input
-                  className="mono text-[12px]"
+                  className="mono text-[13px]"
                   placeholder="Target address"
                   value={call.target}
                   onChange={(e) => update(i, { target: e.target.value })}
@@ -153,7 +153,7 @@ export default function NewEmergency() {
                 />
               </div>
               <Textarea
-                className="mono min-h-20 text-[12px]"
+                className="mono min-h-20 text-[13px]"
                 placeholder="Calldata (0x…)"
                 value={call.data}
                 onChange={(e) => update(i, { data: e.target.value })}

@@ -16,6 +16,7 @@ test("landing shows the chain, the trust anchors and every flow", async ({ page 
   await expect(page.getByText("Connected to a local development node")).toBeVisible();
   await expect(page.getByTestId("flow-upgrades")).toContainText("1 in progress");
   await expect(page.getByTestId("flow-emergency")).toContainText("executed");
+  await page.getByText("Data sources & verification").click();
   await expect(page.getByText("ProtocolUpgradeHandler (pinned)")).toBeVisible();
 });
 
@@ -23,13 +24,16 @@ test("an upgrade id opens its page with the decoded proposal and on-chain verdic
   page,
 }) => {
   await page.goto("/");
-  await page.getByLabel("Upgrade or emergency id").fill(UPGRADE_ID);
+  await page.getByLabel("Open a proposal by ID").fill(UPGRADE_ID);
   await page.getByRole("button", { name: "Open" }).click();
   await expect(page).toHaveURL(new RegExp(`/app/proposals/${UPGRADE_ID}`));
 
   await expect(page.getByTestId("upgrade-state")).toHaveText("Waiting for approval");
   await expect(page.getByTestId("id-check")).toContainText("= id");
-  await expect(page.getByTestId("call-list")).toContainText("upgrade(address,address)");
+  const calls = page.getByTestId("call-list");
+  await expect(calls.getByTestId("call")).toContainText("upgrade(..)");
+  await calls.getByRole("button", { name: "Raw", exact: true }).click();
+  await expect(calls).toContainText("upgrade(address,address)");
 
   const council = page.getByTestId("set-securityCouncil");
   await expect(council.getByTestId("signature-count")).toHaveText("7 / 4");

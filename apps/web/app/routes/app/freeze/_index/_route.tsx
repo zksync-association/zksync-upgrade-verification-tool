@@ -6,7 +6,7 @@ import type { FreezeAction } from "@/common/execution";
 import { FREEZE_ACTIONS, FREEZE_LABELS, freezePath } from "@/common/freeze";
 import { FREEZE_STATUS_LABELS } from "@/common/upgrade-states";
 import { WithStatus, useStatus } from "@/components/governance-context";
-import { EmptyState, Facts, LoadingCard, PageHeader } from "@/components/page";
+import { EmptyState, Facts, LoadingCard, PageHeader, QuietEmpty } from "@/components/page";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -53,14 +53,14 @@ export default function FreezeListPage() {
   // The header and the list's section render at once; the thresholds, nonces and freeze state
   // come from the root status, and fill in when it is read.
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <PageHeader
         eyebrow="Security Council"
         title="Freeze requests"
         actions={
           <WithStatus
             fallback={
-              <Button variant="secondary" disabled data-testid="new-freeze">
+              <Button disabled data-testid="new-freeze">
                 <Plus /> New request
               </Button>
             }
@@ -69,7 +69,7 @@ export default function FreezeListPage() {
           </WithStatus>
         }
       >
-        <p className="max-w-3xl text-slate-950">
+        <p className="max-w-[600px] text-[14px] text-slate-550">
           <WithStatus fallback="A soft freeze, a hard freeze, an unfreeze and changing the soft-freeze threshold each need their own number of Security Council signatures.">
             {({ governance: { securityCouncil: sc } }) =>
               `A soft freeze needs ${sc.thresholds.softFreeze} Security Council signatures, a hard freeze ${sc.thresholds.hardFreeze}, an unfreeze ${sc.thresholds.unfreeze}, and changing the soft-freeze threshold ${sc.thresholds.softFreezeConservative}.`
@@ -147,7 +147,7 @@ function Requests({ result, refresh }: { result: SerializeFrom<FreezeList>; refr
   // block, in no colour.
   const stale = useContentCurrency(result.stale ? null : "list:freeze").behind !== null;
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {!result.stale && (
         <NotReReadNote watchKey="list:freeze" what="The requests and their states below" />
       )}
@@ -168,20 +168,20 @@ function Requests({ result, refresh }: { result: SerializeFrom<FreezeList>; refr
         </p>
       )}
       <div className="space-y-3">
-        <h2 className="text-[22px] leading-7">Open</h2>
+        <h2 className="font-semibold text-lg">Open</h2>
         {open.length === 0 ? (
-          <EmptyState>
+          <QuietEmpty incomplete={result.errors.length > 0 || result.anomalies > 0}>
             {result.errors.length > 0 || result.anomalies > 0
               ? "No open freeze request was found in the available messages."
               : "No open freeze request."}
-          </EmptyState>
+          </QuietEmpty>
         ) : (
           <Rows requests={open} testId="open-freezes" stale={stale} />
         )}
       </div>
       {rest.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-[22px] leading-7">Past</h2>
+          <h2 className="font-semibold text-lg">Past</h2>
           <Rows requests={rest} testId="past-freezes" stale={stale} />
         </div>
       )}
@@ -201,7 +201,7 @@ function Rows({
 }) {
   return (
     <Card
-      className={cn("divide-y divide-slate-100 overflow-hidden", stale && "grayscale")}
+      className={cn("divide-y divide-slate-200 overflow-hidden", stale && "grayscale")}
       data-testid={testId}
       data-stale={stale ? "true" : undefined}
     >
@@ -209,15 +209,15 @@ function Rows({
         <Link
           key={r.digest}
           to={freezePath(r)}
-          className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 hover:bg-slate-25"
+          className="group relative flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-2.5 transition-colors hover:bg-slate-75 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-600 focus-visible:ring-inset"
           data-testid="freeze-row"
         >
           <span className="min-w-0 flex-1">
-            <span className="block font-medium text-slate-950">
+            <span className="block font-semibold text-navy-800 group-hover:text-brand-700">
               {FREEZE_LABELS[r.action]}
               {r.action === "SetSoftFreezeThreshold" && ` to ${r.threshold}`} · nonce {r.nonce}
             </span>
-            <span className="text-slate-600 text-xs">
+            <span className="text-slate-550 text-xs">
               Valid until {formatTime(r.validUntil)}
               <WithStatus fallback={null}>
                 {({ governance }) =>
@@ -228,7 +228,10 @@ function Rows({
             </span>
           </span>
           <SetStateBadge state={r.state} />
-          <ArrowRight className="h-4 w-4 text-slate-600" />
+          <ArrowRight
+            aria-hidden
+            className="h-4 w-4 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-700"
+          />
         </Link>
       ))}
     </Card>
@@ -254,7 +257,7 @@ function NewRequestDialog() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="secondary" data-testid="new-freeze">
+        <Button data-testid="new-freeze">
           <Plus /> New request
         </Button>
       </DialogTrigger>

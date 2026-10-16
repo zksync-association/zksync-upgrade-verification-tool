@@ -42,7 +42,6 @@ import {
 } from "@/components/verification/last-run";
 import { SignatureSetCard } from "@/components/verification/signature-set";
 import { UntilFresh } from "@/components/verification/until-fresh";
-import { UpgradeFile } from "@/components/verification/upgrade-file";
 import { formatNumber } from "@/utils/format";
 import { badRequest } from "@/utils/http";
 import { Meta } from "@/utils/meta";
@@ -220,7 +219,7 @@ function HeldDetail({
   const d = held.overview;
   const executed = d.state === UPGRADE_STATES.Done;
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <PageHeader
         back={{ to: $path("/app/emergency"), label: "Emergency upgrades" }}
         eyebrow="Emergency upgrade"
@@ -241,10 +240,8 @@ function HeldDetail({
         <AsOfContent asOf={held.asOf}>
           <ExecutedContent
             execution={held.execution}
-            id={d.id}
             check={Promise.resolve(null)}
             historical={executedHistorical}
-            download={false}
           />
         </AsOfContent>
       )}
@@ -322,7 +319,7 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
   const { behind } = useContentCurrency(watchKey);
 
   const page = (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <PageHeader
         back={{ to: $path("/app/emergency"), label: "Emergency upgrades" }}
         eyebrow="Emergency upgrade"
@@ -354,15 +351,12 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
           >
             {(execution) =>
               execution ? (
-                // Not re-read at the head served now: as of its block, in no colour, and
-                // nothing to download from it.
+                // Not re-read at the head served now: as of its block, in no colour.
                 <AsOfContent asOf={null} stale={behind !== null}>
                   <ExecutedContent
                     execution={execution}
-                    id={d.id}
                     check={executedCheck}
                     historical={executedHistorical}
-                    download={behind === null}
                   />
                 </AsOfContent>
               ) : (
@@ -434,21 +428,13 @@ const EXECUTION_SOURCE: Record<Provenance, { pending: string; failed: string }> 
 
 function ExecutedContent({
   execution,
-  id,
   check,
   historical,
-  download = true,
 }: {
   execution: SerializeFrom<EmergencyExecutionFirst>;
-  id: string;
   /** For an execution from the last run's history or located directly: its confirmation. */
   check: Promise<unknown>;
   historical: Promise<SerializeFrom<EmergencyHistorical> | null>;
-  /**
-   * Offer the upgrade file (to copy or download); never from the view held after a pause (as of
-   * an older block: nothing to sign, send or download from it), as on the upgrade page.
-   */
-  download?: boolean;
 }) {
   const provenance = provenanceOf(execution);
   return (
@@ -500,9 +486,6 @@ function ExecutedContent({
         ]}
       />
       <CallList calls={execution.calls} />
-      {download && (
-        <UpgradeFile proposal={execution.proposal} name={`emergency-${id.slice(0, 10)}`} />
-      )}
     </Section>
   );
 }
@@ -604,7 +587,7 @@ function SignatureSections({
   }, [executed, check, allMet, zkf, d.roles, board]);
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <Section
         title="Signatures"
         description="All three are needed. The board checks each group through its EIP-1271 isValidSignature."
@@ -733,8 +716,7 @@ function PayloadLoader({
           </Button>
         </div>
         <Facts items={[{ label: "Salt", value: <Hash value={check.proposal.salt} /> }]} />
-        <CallList calls={check.proposal.calls.map(decodeCall)} />
-        <UpgradeFile proposal={check.proposal} name={`emergency-${id.slice(0, 10)}`} />
+        <CallList calls={check.proposal.calls.map((call) => decodeCall(call))} />
       </div>
     );
   }

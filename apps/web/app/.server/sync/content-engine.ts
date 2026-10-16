@@ -26,7 +26,7 @@ import {
   vetoListContent,
 } from "./content";
 import { ReceiptLost, receiptContent, receiptView, resetReceipts } from "./receipt";
-import { type WatchItem, isL2Key } from "./presence";
+import { type WatchItem, isL2Key, startableDaysOf } from "./presence";
 import { currentRev, noteContent } from "./revs";
 
 // The sync engine's passes over what is on screen: at each served head, from memory, and for
@@ -193,8 +193,9 @@ export async function noteEraContent(
           if (await noteVetoList({ head }, current)) noted++;
           return;
         }
-        if (key === "list:startable") {
-          const items = await notStartedUpgrades({ page: true });
+        const days = startableDaysOf(key);
+        if (days !== null) {
+          const items = await notStartedUpgrades({ page: true, days });
           if (!current()) return;
           const head = BigInt((await pageGovernance()).latestBlock.number);
           noteContent(key, { head }, startableContent(items));
