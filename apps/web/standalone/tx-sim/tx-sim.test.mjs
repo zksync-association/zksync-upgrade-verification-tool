@@ -35,6 +35,7 @@ import {
   canRepropose,
   proposalFromCall,
   preparedProposals,
+  upgradeSources,
   votingRetry,
 } from "./tx-sim-source.mjs";
 
@@ -499,6 +500,28 @@ test("prepared workflow reads one L2 block and checks proposer voting power at t
     ADDRESSES.control,
     "99",
   ]);
+});
+test("retries share an upgrade family and history without hiding arbitrary source calls", () => {
+  const original = { ...vote, source: "l2-transactions/upgrade.json", from: ADDRESSES.control };
+  const second = votingRetry(original, `${vote.description}\nRetry 2`, c);
+  const third = votingRetry(
+    { ...second, rows: voteRows(second, c).map((_row) => ({ ..._row, id: _row.tag })) },
+    `${vote.description}\nRetry 3`,
+    c
+  );
+  assert.equal(third.retryOf, second.proposalId);
+  assert.equal(third.originalDescription, vote.description);
+  assert.deepEqual(
+    third.history.map((_attempt) => _attempt.proposalId),
+    [vote.proposalId, second.proposalId]
+  );
+  assert.equal(third.history[1].rows[2].id, "castVote");
+  assert.equal(third.history[1].rows[2].data, undefined);
+  assert.equal(third.message, vote.message);
+  const rows = voteRows(vote, c).filter((_row) => _row.tag !== "delegate");
+  assert.equal(upgradeSources([{ rows }], third, c).length, 1);
+  assert.equal(upgradeSources([{ rows: [...rows, row] }], third, c).length, 0);
+  assert.equal(upgradeSources([{ rows }], { ...third, message: "0x00" }, c).length, 0);
 });
 test("native proof uses the batch transaction index, verifies sender/message and L1 inclusion", async () => {
   const executeRow = voteRows(vote, c)[4];

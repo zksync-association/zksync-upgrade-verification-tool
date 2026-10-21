@@ -1,8 +1,40 @@
 import { ADDRESSES, CHAINS, GOVERNOR_RETRY_STATES, UPGRADE_TUPLE } from "./tx-sim-config.mjs";
 import { parseTransactions, requireThat, same, sha256 } from "./tx-sim-core.mjs";
-import { makeVote } from "./tx-sim-contracts.mjs";
+import { makeVote, governorAction } from "./tx-sim-contracts.mjs";
 
 export const canRepropose = (_state) => GOVERNOR_RETRY_STATES.includes(_state);
+
+// Only replace a complete proposal sequence. A file containing other arbitrary
+// transactions must remain available with all of its own dependency checks.
+export function upgradeSources(_bundles, _vote, _c) {
+  if (!_vote) return [];
+  return _bundles.flatMap((_bundle, _index) => {
+    try {
+      const proposal = _bundle.rows.map((_row) => proposalFromCall(_row, _c)).find(Boolean);
+      if (
+        !proposal ||
+        !same(proposal.message, _vote.message) ||
+        !same(proposal.upgradeId, _vote.upgradeId)
+      )
+        return [];
+      if (
+        !_bundle.rows.every((_row) => {
+          const action = governorAction(_row, _c);
+          return (
+            action &&
+            same(_row.from, _vote.from ?? ADDRESSES.control) &&
+            BigInt(action.proposalId) === BigInt(proposal.proposalId)
+          );
+        })
+      )
+        return [];
+      return [{ index: _index, bundle: _bundle, proposal }];
+    } catch {
+      // Unsupported/mixed proposals stay in the ordinary source transaction view.
+      return [];
+    }
+  });
+}
 
 // The PR supplies the complete call payload. A retry changes only the governor
 // description: its L1 message and upgrade ID must stay byte-identical.
@@ -86,8 +118,21 @@ export function votingRetry(_original, _description, _c) {
   return {
     ...retry,
     retryOf: _original.proposalId,
-    originalDescription: _original.description,
+    originalDescription: _original.originalDescription ?? _original.description,
     source: _original.source,
     from: _original.from,
+    history: [
+      ...(_original.history ?? []),
+      {
+        proposalId: _original.proposalId,
+        description: _original.description,
+        source: _original.source,
+        rows: (_original.rows ?? []).map((_row) => ({
+          id: _row.id,
+          tag: _row.tag,
+          network: _row.network,
+        })),
+      },
+    ],
   };
 }

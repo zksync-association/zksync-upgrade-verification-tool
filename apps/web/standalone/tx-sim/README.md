@@ -6,6 +6,12 @@ transaction review panel. Voting, queueing, L2 execution and the L1 relay have n
 tab. Payload editing and manual imports are available in collapsible advanced sections. Saved
 proposal IDs, wallet submissions and receipts survive switching groups and reloading.
 
+An upgrade has one entry keyed by its exact L1 payload. Its latest voting attempt is the active
+workflow, while **Voting attempts** keeps previous proposal IDs and receipt links read only. Source
+files containing only that same proposal sequence are merged into this entry; mixed files retain
+their arbitrary calls and dependency checks. A successful attempt continues through queue and
+execution, with no new retry action. A later failed attempt can be retried while retaining its history.
+
 The tx-sim workflow can also be packaged as **one HTML file**, opened directly in Chrome. Its build
 automatically fetches the latest private PR through your existing `gh` login, pins one revision, and
 embeds all transaction files, ABIs, scripts and styles. No GitHub token enters the file. Opening a
@@ -27,6 +33,8 @@ The same generated HTML supports direct desktop MetaMask when served over HTTP(S
 serve its directory on loopback with `python3 -m http.server 8766 --bind 127.0.0.1`, then open
 `http://127.0.0.1:8766/tx-sim-testnet-3.html`. This requires only static file serving; all chain
 reads and transaction preparation remain in the browser. The WalletConnect button is also available.
+**Connect Safe / WalletConnect** switches this app away from its direct extension connection; the
+Safe web app can still use desktop MetaMask as its owner signer.
 
 An imported proposal in Canceled, Defeated or Expired state has **Prepare voting retry**. It reads the
 matching source `propose` call, fills the workflow automatically with a new description and L2 ID,

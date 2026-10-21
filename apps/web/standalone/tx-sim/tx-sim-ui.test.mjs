@@ -49,6 +49,31 @@ for (const protocol of ["file:", "http:"])
           raw,
           sha256: await sha256(raw),
         },
+        {
+          path: "l2-transactions/admin.json",
+          title: "Administration",
+          gate: "Reviewed",
+          raw: JSON.stringify([
+            {
+              network: "zksync-testnet3",
+              from: ADDRESSES.control,
+              to: ADDRESSES.token,
+              value: "0",
+              data: "0x12345678",
+            },
+          ]),
+          sha256: await sha256(
+            JSON.stringify([
+              {
+                network: "zksync-testnet3",
+                from: ADDRESSES.control,
+                to: ADDRESSES.token,
+                value: "0",
+                data: "0x12345678",
+              },
+            ])
+          ),
+        },
       ],
     };
     const dom = new JSDOM(readFileSync(new URL("./tx-sim.html", import.meta.url), "utf8"), {
@@ -240,12 +265,18 @@ for (const protocol of ["file:", "http:"])
       assert.equal(document.getElementById("normal-tab"), null);
       assert.equal(document.getElementById("bundle-tab"), null);
       const currentId = stored.retryInfo.proposalId;
-      document.querySelector("#bundles .bundle-button").click();
+      [...document.querySelectorAll("#bundles .bundle-button")]
+        .find((_button) => _button.textContent.startsWith("Administration"))
+        .click();
       assert.equal(document.getElementById("bundle-view").hidden, false);
       assert.equal(document.getElementById("normal-view").hidden, true);
-      const workflow = [...document.querySelectorAll("#bundles .bundle-button")].find((_button) =>
-        _button.textContent.startsWith("Current voting retry")
+      const workflow = document.getElementById("upgrade-workflow");
+      assert.equal(document.querySelectorAll("#bundles .bundle-button").length, 2);
+      assert.match(
+        document.getElementById("attempt-history").textContent,
+        new RegExp(BigInt(vote.proposalId).toString())
       );
+      assert.equal(document.querySelectorAll("#attempt-history button").length, 0);
       workflow.click();
       assert.equal(document.getElementById("normal-view").hidden, false);
       assert.equal(JSON.parse(localStorage.getItem(STORAGE.vote)).retryInfo.proposalId, currentId);
@@ -273,6 +304,19 @@ for (const protocol of ["file:", "http:"])
             _button.textContent === (protocol === "file:" ? "Send to wallet" : "Send to MetaMask")
         ).disabled
       );
+      values.state = 4;
+      [...document.querySelectorAll("#vote-status button")]
+        .find((_button) => _button.textContent === "Refresh governance state")
+        .click();
+      await waitFor(() => document.getElementById("vote-status").textContent.includes("Succeeded"));
+      assert.equal(
+        [...document.querySelectorAll("#workflow-actions button")].some(
+          (_button) => _button.textContent === "Prepare voting retry"
+        ),
+        false
+      );
+      assert.match(document.getElementById("upgrade-workflow").textContent, /Succeeded/);
+      assert.equal(document.querySelectorAll("#bundles .bundle-button").length, 2);
       assert.deepEqual(walletRequests, []);
     } finally {
       dom.window.close();

@@ -36,7 +36,7 @@ import {
   actionRow,
   buildStart,
 } from "./tx-sim-contracts.mjs";
-import { canRepropose, proposalFromCall, votingRetry } from "./tx-sim-source.mjs";
+import { canRepropose, proposalFromCall, upgradeSources, votingRetry } from "./tx-sim-source.mjs";
 
 const $ = (_id) => document.getElementById(_id);
 const bootstrap = window.__TX_SIM_BOOTSTRAP__;
@@ -337,17 +337,45 @@ function importedGovernorContext(_row) {
   return { panel, blocked: governorActionReason(state) };
 }
 async function prepareImportedRetry(_row) {
-  const state = await governorCallStatus(_row, rpc, c);
+  const family = upgradeSources(bundles, vote, c);
+  const currentRow =
+    vote &&
+    (family.some((_source) => _source.bundle.rows.some((_item) => _item.id === _row.id)) ||
+      BigInt(governorAction(_row, c).proposalId) === BigInt(vote.proposalId))
+      ? normalRows.find((_item) => _item.tag === "propose")
+      : _row;
+  const state = await governorCallStatus(currentRow, rpc, c);
   requireThat(
     canRepropose(state.state),
     "This proposal has not ended unsuccessfully. Refresh its current state."
   );
   let original;
+  if (vote && family.length && BigInt(state.proposalId) === BigInt(vote.proposalId)) {
+    original = {
+      ...vote,
+      source: retryInfo?.source ?? family[0].bundle.path,
+      from: currentRow.from,
+      rows: normalRows,
+      originalDescription: retryInfo?.originalDescription,
+      history:
+        retryInfo?.history ??
+        (retryInfo?.retryOf
+          ? [
+              {
+                proposalId: retryInfo.retryOf,
+                description: retryInfo.originalDescription,
+                source: retryInfo.source,
+                rows: family[0].bundle.rows,
+              },
+            ]
+          : []),
+    };
+  }
   for (const bundle of bundles) {
     for (const row of bundle.rows) {
       const candidate = proposalFromCall(row, c);
       if (candidate && BigInt(candidate.proposalId) === BigInt(state.proposalId))
-        original = { ...candidate, from: row.from, source: bundle.path };
+        original ??= { ...candidate, from: row.from, source: bundle.path, rows: bundle.rows };
     }
   }
   requireThat(
@@ -584,6 +612,19 @@ function renderCandidates() {
         {
           class: "bundle-button",
           onclick: () => {
+            if (
+              vote &&
+              same(
+                vote.upgradeId,
+                makeVote(_candidate.payload, _candidate.description, c).upgradeId
+              )
+            ) {
+              setView("normal");
+              notice(
+                "Showing the latest voting attempt for this upgrade. Earlier attempts are available in history."
+              );
+              return;
+            }
             $("payload").value = JSON.stringify(_candidate.payload, null, 2);
             $("description").value = _candidate.description;
             render();
@@ -597,11 +638,23 @@ function renderCandidates() {
 async function prepareVote() {
   const input = JSON.parse($("payload").value);
   const previousId = vote?.proposalId;
-  vote = makeVote(
+  const next = makeVote(
     input.payload ?? input.proposal ?? input.upgradeProposal ?? input,
     $("description").value,
     c
   );
+  if (vote && same(next.upgradeId, vote.upgradeId) && !same(next.proposalId, vote.proposalId)) {
+    requireThat(
+      !votingAttempts().some((_attempt) => BigInt(_attempt.proposalId) === BigInt(next.proposalId)),
+      "Earlier voting attempts are read only. Use the latest attempt for this upgrade."
+    );
+    const latest = await voteStatus(vote, rpc, c);
+    requireThat(
+      canRepropose(latest.state),
+      "The latest voting attempt has not ended unsuccessfully. Continue with that attempt instead of creating another proposal."
+    );
+  }
+  vote = next;
   normalRows = await identifyRows(voteRows(vote, c), `normal:${vote.proposalId}`);
   if (previousId && previousId !== vote.proposalId) $("execution-hash").value = "";
   start = null;
@@ -931,6 +984,76 @@ function renderTransaction(_panel, _row, _guard, _blocked = "") {
       )
     );
 }
+function votingAttempts() {
+  if (!vote) return [];
+  const attempts = new Map();
+  const add = (_attempt) => {
+    const id = BigInt(_attempt.proposalId).toString();
+    const previous = attempts.get(id);
+    attempts.set(id, {
+      ...previous,
+      ..._attempt,
+      proposalId: id,
+      rows: [
+        ...new Map(
+          [...(previous?.rows ?? []), ...(_attempt.rows ?? [])].map((_row) => [_row.id, _row])
+        ).values(),
+      ],
+    });
+  };
+  for (const source of upgradeSources(bundles, vote, c))
+    add({ ...source.proposal, source: source.bundle.path, rows: source.bundle.rows });
+  for (const attempt of retryInfo?.history ?? []) add(attempt);
+  if (retryInfo?.retryOf && !attempts.has(BigInt(retryInfo.retryOf).toString()))
+    add({ proposalId: retryInfo.retryOf, description: retryInfo.originalDescription, rows: [] });
+  add({ ...vote, rows: normalRows, current: true });
+  return [...attempts.values()];
+}
+function nextWorkflowRow() {
+  const state = status?.state === null ? "Not proposed" : GOVERNOR_STATES[status?.state];
+  const method =
+    state === "Not proposed" || canRepropose(status?.state)
+      ? "propose"
+      : state === "Pending" || (state === "Active" && !status.hasVoted)
+        ? "castVote"
+        : state === "Active" || state === "Succeeded"
+          ? "queue"
+          : "execute";
+  return normalRows.find((_row) => _row.tag === method);
+}
+function renderAttemptHistory() {
+  const attempts = votingAttempts();
+  $("voting-history").hidden = !vote;
+  const panel = $("attempt-history");
+  panel.replaceChildren(
+    el(
+      "p",
+      { class: "muted" },
+      "The latest attempt is used for voting and execution. Earlier attempts and receipts are read only."
+    )
+  );
+  attempts.forEach((_attempt, _index) => {
+    const item = el(
+      "section",
+      { class: "step" },
+      el("strong", {}, `Attempt ${_index + 1} · ${_attempt.current ? "current" : "earlier"}`),
+      el("p", { class: "mono" }, `L2 proposal: ${_attempt.proposalId}`),
+      el("p", {}, _attempt.description)
+    );
+    for (const row of _attempt.rows) {
+      const entry = journal[row.id];
+      if (entry?.hash)
+        item.append(
+          el(
+            "p",
+            {},
+            link(`${row.tag} · ${entry.hash}`, `${CHAINS[row.network].explorer}/tx/${entry.hash}`)
+          )
+        );
+    }
+    panel.append(item);
+  });
+}
 function renderNormal() {
   const panel = $("vote-status");
   const actions = $("vote-actions");
@@ -952,6 +1075,7 @@ function renderNormal() {
     el("p", { class: "mono" }, `L1 upgrade: ${vote.upgradeId}`)
   );
   panel.replaceChildren(identifiers);
+  renderAttemptHistory();
   if (retryInfo && same(vote.proposalId, retryInfo.proposalId))
     identifiers.append(
       el(
@@ -1065,7 +1189,9 @@ function renderNormal() {
       },
       `${index + 1}. ${row.description}`,
       el("small", {}, CHAINS[row.network].name),
-      badge(row),
+      completed && entry?.status !== "confirmed"
+        ? el("span", { class: "badge confirmed" }, "Recorded on chain")
+        : badge(row),
       el("small", { class: "step-state" }, label)
     );
     actions.append(step);
@@ -1151,7 +1277,42 @@ function renderNormal() {
 function renderBundles() {
   const list = $("bundles");
   list.replaceChildren(el("h2", {}, "Transaction files"));
+  const family = upgradeSources(bundles, vote, c);
+  const familyIndices = new Set(family.map((_source) => _source.index));
+  let workflowAdded = false;
+  const appendWorkflow = () => {
+    workflowAdded = true;
+    const version = family[0]?.bundle.path?.match(/-(v[0-9.]+)-/i)?.[1];
+    const count = votingAttempts().length;
+    list.append(
+      el(
+        "button",
+        {
+          id: "upgrade-workflow",
+          class: `bundle-button ${activeView === "normal" ? "active" : ""}`,
+          disabled: busy,
+          onclick: () => {
+            setView("normal");
+            if (!vote) $("proposal-settings").open = true;
+          },
+        },
+        version ? `${version} upgrade` : "Protocol upgrade",
+        el(
+          "small",
+          {},
+          vote
+            ? `Attempt ${count}${status?.state !== null && status?.state !== undefined ? ` · ${GOVERNOR_STATES[status.state]}` : ""} · ${normalRows.filter((_row) => journal[_row.id]?.status === "confirmed").length}/${normalRows.length} confirmed`
+            : "Prepare a reviewed proposal"
+        )
+      )
+    );
+  };
   bundles.forEach((_bundle, _index) => {
+    if (familyIndices.has(_index)) {
+      if (!workflowAdded) appendWorkflow();
+      return;
+    }
+
     const done = _bundle.rows.filter((_row) => journal[_row.id]?.status === "confirmed").length;
     list.append(
       el(
@@ -1177,29 +1338,7 @@ function renderBundles() {
       )
     );
   });
-  list.append(
-    el(
-      "button",
-      {
-        class: `bundle-button ${activeView === "normal" ? "active" : ""}`,
-        disabled: busy,
-        onclick: () => {
-          setView("normal");
-          if (!vote) $("proposal-settings").open = true;
-        },
-      },
-      vote && retryInfo && same(vote.proposalId, retryInfo.proposalId)
-        ? "Current voting retry"
-        : "L2 → L1 upgrade",
-      el(
-        "small",
-        {},
-        vote
-          ? `${normalRows.filter((_row) => journal[_row.id]?.status === "confirmed").length}/${normalRows.length} confirmed · voting, relay and L1 execution`
-          : "Prepare a reviewed proposal"
-      )
-    )
-  );
+  if (!workflowAdded && (vote || !bundles.length)) appendWorkflow();
   if (activeView === "normal") return;
   const bundle = bundles[selectedBundle];
   if (!bundle) return;
@@ -1385,7 +1524,11 @@ async function importBundle(_text, _name) {
   if (known >= 0) {
     selectedBundle = known;
     selectedRow = 0;
-    setView("bundle");
+    setView(
+      upgradeSources(bundles, vote, c).some((_source) => _source.index === known)
+        ? "normal"
+        : "bundle"
+    );
     return;
   }
   const rows = await identifyRows(parsed.rows, `import:${digest}`);
@@ -1402,7 +1545,11 @@ async function importBundle(_text, _name) {
   });
   selectedBundle = bundles.length - 1;
   selectedRow = 0;
-  setView("bundle");
+  setView(
+    upgradeSources(bundles, vote, c).some((_source) => _source.index === selectedBundle)
+      ? "normal"
+      : "bundle"
+  );
   notice(
     `Loaded ${rows.length} executable calls; ${parsed.skipped.length} excluded by source flags.`
   );
@@ -1574,7 +1721,18 @@ async function initialize() {
       "Refresh from GitHub using your local gh login, or open a JSON file.";
     render();
   }
-  if (bootstrap?.prepared) {
+  let keepSavedAttempt = false;
+  if (bootstrap?.prepared && normalSaved?.retryInfo) {
+    const saved = makeVote(normalSaved.input, normalSaved.description, c);
+    keepSavedAttempt =
+      same(saved.upgradeId, bootstrap.prepared.upgradeId) &&
+      [
+        normalSaved.retryInfo.retryOf,
+        ...(normalSaved.retryInfo.history ?? []).map((_attempt) => _attempt.proposalId),
+      ].some((_id) => _id && BigInt(_id) === BigInt(bootstrap.prepared.proposalId));
+    if (keepSavedAttempt) retryInfo = normalSaved.retryInfo;
+  }
+  if (bootstrap?.prepared && !keepSavedAttempt) {
     $("payload").value = JSON.stringify(bootstrap.prepared.payload, null, 2);
     $("description").value = bootstrap.prepared.description;
     if (normalSaved?.description === bootstrap.prepared.description)
@@ -1582,9 +1740,7 @@ async function initialize() {
     setView("normal");
     try {
       await prepareVote();
-      normalSelected = normalRows.find(
-        (_row) => _row.tag === (status?.state === null ? "propose" : "castVote")
-      );
+      normalSelected = nextWorkflowRow();
       render();
     } catch (_error) {
       notice(
@@ -1602,9 +1758,7 @@ async function initialize() {
     setView("normal");
     try {
       await refreshVote();
-      normalSelected = normalRows.find(
-        (_row) => _row.tag === (status.state === null ? "propose" : "castVote")
-      );
+      normalSelected = nextWorkflowRow();
       render();
     } catch (_error) {
       status = null;
