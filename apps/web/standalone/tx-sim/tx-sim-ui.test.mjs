@@ -154,6 +154,8 @@ for (const protocol of ["file:", "http:"])
           );
         if (body.method === "eth_getBlockByNumber")
           return response({ number: "0x42", timestamp: "0x44c" });
+        if (["eth_getTransactionReceipt", "eth_getTransactionByHash"].includes(body.method))
+          return response(null);
         assert.equal(body.method, "eth_call");
         const call = body.params[0];
         const iface =
@@ -317,6 +319,38 @@ for (const protocol of ["file:", "http:"])
       );
       assert.match(document.getElementById("upgrade-workflow").textContent, /Succeeded/);
       assert.equal(document.querySelectorAll("#bundles .bundle-button").length, 2);
+      const executedReceipts = JSON.parse(localStorage.getItem(STORAGE.journal));
+      executedReceipts[rows.find((_row) => _row.tag === "execute").id] = oldReceipt;
+      localStorage.setItem(STORAGE.journal, JSON.stringify(executedReceipts));
+      window.dispatchEvent(new window.StorageEvent("storage", { key: STORAGE.journal }));
+      // Finish step 5 while viewing it: advance to a real step-6 detail panel.
+      document.querySelectorAll("#vote-actions .call-button")[4].click();
+      values.state = 7;
+      [...document.querySelectorAll("#vote-status button")]
+        .find((_button) => _button.textContent === "Refresh governance state")
+        .click();
+      await waitFor(() => document.getElementById("vote-status").textContent.includes("Executed"));
+      await waitFor(() => !document.querySelectorAll("#vote-actions .call-button")[5].disabled);
+      const proofPanel = document.getElementById("proof-panel");
+      assert.equal(proofPanel.hidden, false);
+      assert.equal(proofPanel.open, true);
+      assert.equal(document.getElementById("normal-transaction").hidden, true);
+      assert.equal(document.getElementById("execution-hash").value, oldReceipt.hash);
+      assert.ok(proofPanel.closest(".transaction-detail"));
+      assert.ok(
+        document.querySelectorAll("#vote-actions .call-button")[5].classList.contains("active")
+      );
+      // Reviewing an earlier completed call and returning must restore relay controls.
+      document.querySelectorAll("#vote-actions .call-button")[4].click();
+      assert.equal(proofPanel.hidden, true);
+      document.querySelectorAll("#vote-actions .call-button")[5].click();
+      assert.equal(proofPanel.hidden, false);
+      assert.equal(document.getElementById("normal-transaction").hidden, true);
+      document.getElementById("load-proof").click();
+      await waitFor(() =>
+        document.getElementById("notice").textContent.includes("must be confirmed first")
+      );
+      assert.equal(proofPanel.hidden, false);
       assert.deepEqual(walletRequests, []);
     } finally {
       dom.window.close();

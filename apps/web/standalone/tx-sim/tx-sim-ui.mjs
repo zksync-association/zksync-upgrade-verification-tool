@@ -80,6 +80,7 @@ let normalRows = [];
 let status = null;
 let start = null;
 let normalSelected = null;
+let relaySelected = false;
 const normalSaved = readStored(STORAGE.vote, null);
 const gates = new Set();
 const independentCalls = new Set();
@@ -659,6 +660,7 @@ async function prepareVote() {
   if (previousId && previousId !== vote.proposalId) $("execution-hash").value = "";
   start = null;
   normalSelected = null;
+  relaySelected = false;
   status = null;
   localStorage.setItem(
     STORAGE.vote,
@@ -692,6 +694,7 @@ function draftMatches() {
 async function refreshVote() {
   requireThat(vote, "Prepare a proposal first.");
   await checkChains();
+  const previousState = status?.state;
   status = await voteStatus(vote, rpc, c);
   status.l1State = Number(
     (
@@ -702,6 +705,15 @@ async function refreshVote() {
   );
   const executed = current(normalRows.find((_row) => _row.tag === "execute").id);
   if (executed?.hash && !$("execution-hash").value) $("execution-hash").value = executed.hash;
+  if (
+    status.state === 7 &&
+    previousState !== 7 &&
+    (!normalSelected || normalSelected.tag === "execute")
+  ) {
+    relaySelected = true;
+    normalSelected = start?.row ?? null;
+    $("proof-panel").open = true;
+  }
   render();
 }
 async function prepareProof() {
@@ -718,6 +730,7 @@ async function prepareProof() {
   );
   [start.row] = await identifyRows([start.row], `start:${vote.upgradeId}`);
   normalSelected = start.row;
+  relaySelected = true;
   const stored = readStored(STORAGE.vote, {});
   stored.executionHash = hash;
   localStorage.setItem(STORAGE.vote, JSON.stringify(stored));
@@ -1010,6 +1023,7 @@ function votingAttempts() {
   return [...attempts.values()];
 }
 function nextWorkflowRow() {
+  if (status?.state === 7) return null;
   const state = status?.state === null ? "Not proposed" : GOVERNOR_STATES[status?.state];
   const method =
     state === "Not proposed" || canRepropose(status?.state)
@@ -1061,7 +1075,7 @@ function renderNormal() {
   actions.replaceChildren();
   workflowActions.replaceChildren();
   $("normal-transaction").hidden = !normalSelected;
-  $("proof-panel").hidden = !vote;
+  $("proof-panel").hidden = !vote || !relaySelected;
   if (!vote) {
     panel.replaceChildren(el("p", {}, "Choose the reviewed payload to begin."));
     $("normal-transaction").hidden = true;
@@ -1183,6 +1197,7 @@ function renderNormal() {
         class: `call-button ${normalSelected?.id === row.id ? "active" : ""}`,
         disabled: busy,
         onclick: () => {
+          relaySelected = false;
           normalSelected = row;
           render();
         },
@@ -1200,10 +1215,14 @@ function renderNormal() {
     el(
       "button",
       {
-        class: `call-button ${start && normalSelected?.id === start.row.id ? "active" : ""}`,
+        class: `call-button ${relaySelected ? "active" : ""}`,
         disabled: busy,
         onclick: () => {
-          if (start) normalSelected = start.row;
+          relaySelected = true;
+          normalSelected = start?.row ?? null;
+          const executed = current(normalRows.find((_row) => _row.tag === "execute").id);
+          if (executed?.hash && !$("execution-hash").value)
+            $("execution-hash").value = executed.hash;
           $("proof-panel").open = true;
           render();
         },
@@ -1246,6 +1265,7 @@ function renderNormal() {
                 "ProtocolUpgradeHandlerV31"
               );
               row.tag = "executeL1";
+              relaySelected = false;
               [normalSelected] = await identifyRows([row], `executeL1:${vote.upgradeId}`);
               render();
             }),
@@ -1602,6 +1622,7 @@ $("clear-vote").onclick = () => {
   status = null;
   start = null;
   normalSelected = null;
+  relaySelected = false;
   $("payload").value = "";
   $("description").value = "";
   $("execution-hash").value = "";
@@ -1741,6 +1762,8 @@ async function initialize() {
     try {
       await prepareVote();
       normalSelected = nextWorkflowRow();
+      relaySelected = status?.state === 7;
+      if (relaySelected) $("proof-panel").open = true;
       render();
     } catch (_error) {
       notice(
@@ -1759,6 +1782,8 @@ async function initialize() {
     try {
       await refreshVote();
       normalSelected = nextWorkflowRow();
+      relaySelected = status?.state === 7;
+      if (relaySelected) $("proof-panel").open = true;
       render();
     } catch (_error) {
       status = null;
