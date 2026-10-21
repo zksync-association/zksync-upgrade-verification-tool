@@ -50,7 +50,7 @@ unsupported enforcers, changed runtime code and mismatched calls remain blocked.
 
 The normal proposal helper accepts the exact upgrade `calls`, `executor`, `salt` and proposal
 description, or detects prepared governor `propose` calls from source arrays. Live governor state gates
-delegation, propose, vote FOR, queue and execute. The proof helper validates the exact timelock event
+delegation, propose, vote FOR, queue and execute. Imported governor transaction arrays receive the same live-state checks, decoded from their calldata rather than their source tags. Their panels show the proposal state, opening time and current deadline, and refresh automatically. State reads are pinned to one block; wall-clock time alone never enables a vote. A fresh state check also runs before simulation or submission, including for calls marked independent. The proof helper validates the exact timelock event
 and native log, uses the L1 batch transaction index, waits for batch execution, and verifies inclusion
 against the chain 312 diamond on L1 before constructing `startUpgrade`. Approval/veto periods still
 apply; the verifier handles Council/Guardian approvals. Older Board-based v33 upgrade bundles are

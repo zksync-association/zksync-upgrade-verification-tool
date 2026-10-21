@@ -1,4 +1,11 @@
-import { ADDRESSES, CHAINS, UPGRADE_TUPLE, METAMASK, WALLET_ABIS } from "./tx-sim-config.mjs";
+import {
+  ADDRESSES,
+  CHAINS,
+  UPGRADE_TUPLE,
+  METAMASK,
+  WALLET_ABIS,
+  GOVERNOR_STATES,
+} from "./tx-sim-config.mjs";
 import {
   requireThat,
   uint,
@@ -17,10 +24,10 @@ export function contracts(_abis, _ethers) {
     utils: _ethers.utils,
     match: (_row, _tx, _rpc, _block) =>
       matchWalletTransaction(_row, _tx, _rpc, _block, _ethers.utils),
-    async read(_rpc, _network, _name, _address, _method, _args = []) {
+    async read(_rpc, _network, _name, _address, _method, _args = [], _block = "latest") {
       const iface = interfaces[_name];
       const data = iface.encodeFunctionData(_method, _args);
-      const output = await _rpc(_network, "eth_call", [{ to: _address, data }, "latest"]);
+      const output = await _rpc(_network, "eth_call", [{ to: _address, data }, _block]);
       return iface.decodeFunctionResult(_method, output);
     },
     encode(_name, _method, _args) {
@@ -179,6 +186,125 @@ export function voteRows(_vote, _c) {
     actionRow(_c, "queue", args, "Queue the successful L2 proposal"),
     actionRow(_c, "execute", args, "Execute on L2: timelock sends the exact upgrade message to L1"),
   ];
+}
+// Decode the actual imported calldata, rather than trusting its source tag. These
+// checks also apply when the operator marks the call independent of earlier rows.
+export function governorAction(_row, _c) {
+  if (_row.network !== "zksync-testnet3" || !same(_row.to, ADDRESSES.governor)) return null;
+  const iface = _c.interfaces.Testnet3Governor;
+  const method = ["propose", "castVote", "queue", "execute"].find((_method) =>
+    same(_row.data.slice(0, 10), iface.getSighash(_method))
+  );
+  if (!method) return null;
+  const args = iface.decodeFunctionData(method, _row.data);
+  requireThat(
+    same(iface.encodeFunctionData(method, args), _row.data),
+    "Governor calldata is not canonical."
+  );
+  const proposalId =
+    method === "castVote"
+      ? args[0].toString()
+      : BigInt(
+          _c.utils.keccak256(
+            _c.utils.defaultAbiCoder.encode(
+              ["address[]", "uint256[]", "bytes[]", "bytes32"],
+              [args[0], args[1], args[2], method === "propose" ? _c.utils.id(args[3]) : args[3]]
+            )
+          )
+        ).toString();
+  return { method, proposalId };
+}
+export async function governorCallStatus(_row, _rpc, _c) {
+  const action = governorAction(_row, _c);
+  if (!action) return null;
+  // Pin all governance reads to one block. Browser wall time must never open voting.
+  const block = await _rpc(_row.network, "eth_getBlockByNumber", ["latest", false]);
+  requireThat(block?.number && block.timestamp, "RPC returned no current L2 block.");
+  const read = async (_method, _args = []) =>
+    (
+      await _c.read(_rpc, _row.network, "Testnet3Governor", _row.to, _method, _args, block.number)
+    )[0];
+  const [snapshot, clock, mode] = await Promise.all([
+    read("proposalSnapshot", [action.proposalId]),
+    read("clock"),
+    read("CLOCK_MODE"),
+  ]);
+  const result = {
+    ...action,
+    snapshot: snapshot.toString(),
+    clock: clock.toString(),
+    mode,
+    blockNumber: block.number,
+    blockTimestamp: BigInt(block.timestamp).toString(),
+    state: null,
+    hasVoted: false,
+    checkedAt: Date.now(),
+  };
+  if (BigInt(result.snapshot) > 0n) {
+    const [state, deadline, hasVoted, eta] = await Promise.all([
+      read("state", [action.proposalId]),
+      read("proposalDeadline", [action.proposalId]),
+      read("hasVoted", [action.proposalId, _row.from]),
+      read("proposalEta", [action.proposalId]),
+    ]);
+    Object.assign(result, {
+      state: Number(state),
+      deadline: deadline.toString(),
+      hasVoted,
+      eta: eta.toString(),
+    });
+  }
+  if (action.method === "propose" && result.state === null) {
+    const [token, threshold] = await Promise.all([read("token"), read("proposalThreshold")]);
+    requireThat(same(token, ADDRESSES.token), "Governor token differs from the pinned deployment.");
+    const votes = (
+      await _c.read(
+        _rpc,
+        _row.network,
+        "Testnet3ZkTokenV3",
+        token,
+        "getPastVotes",
+        [_row.from, (BigInt(result.clock) - 1n).toString()],
+        block.number
+      )
+    )[0];
+    Object.assign(result, { votes: votes.toString(), threshold: threshold.toString() });
+  }
+  return result;
+}
+export function governorTime(_value, _mode) {
+  return new URLSearchParams(_mode).get("mode") === "timestamp"
+    ? `${new Date(Number(_value) * 1000).toLocaleString(undefined, { timeZoneName: "short" })} (chain timestamp ${_value})`
+    : `chain clock ${_value}`;
+}
+export function governorActionReason(_status) {
+  const state = _status.state === null ? "Not proposed" : GOVERNOR_STATES[_status.state];
+  if (_status.method === "propose") {
+    if (_status.state !== null) return `Proposal already exists (${state}).`;
+    return BigInt(_status.votes) < BigInt(_status.threshold)
+      ? "Insufficient past delegated votes to propose."
+      : "";
+  }
+  if (_status.state === null)
+    return "This proposal is not on chain yet. Confirm the propose transaction first.";
+  if (_status.method === "castVote") {
+    if (_status.state === 0)
+      return `Voting has not opened. Vote after ${governorTime(_status.snapshot, _status.mode)}, once the governor reports Active. Current chain clock: ${_status.clock}.`;
+    if (_status.state !== 1)
+      return `Voting is closed or unavailable: ${state}. Voting deadline: ${governorTime(_status.deadline, _status.mode)}.`;
+    if (_status.hasVoted) return "This account has already voted on this proposal.";
+    return "";
+  }
+  if (_status.method === "queue")
+    return _status.state === 4
+      ? ""
+      : `Queue requires Succeeded; this proposal is ${state}. Voting deadline: ${governorTime(_status.deadline, _status.mode)}. Late quorum may extend it.`;
+  if (_status.method === "execute") {
+    if (_status.state !== 5) return `Execution requires Queued; this proposal is ${state}.`;
+    if (BigInt(_status.blockTimestamp) < BigInt(_status.eta))
+      return `The timelock is not ready. Execute at ${governorTime(_status.eta, "mode=timestamp")}.`;
+  }
+  return "";
 }
 export async function voteStatus(_vote, _rpc, _c) {
   const read = (_method, _args = []) =>

@@ -22,6 +22,9 @@ import {
 } from "./tx-sim-core.mjs";
 import {
   contracts,
+  governorAction,
+  governorCallStatus,
+  governorActionReason,
   makeVote,
   voteRows,
   allowedVoteAction,
@@ -787,4 +790,114 @@ test("receipt verification uses bounded concurrency and reports progress", async
   assert.equal(checked.length, rows.length);
   assert.ok(checked.every(([_id, _status]) => _status === "confirmed"));
   assert.match(progress.at(-1), /Verified 8\/8/);
+});
+
+test("imported governor calldata determines the action and proposal regardless of source tags", () => {
+  for (const candidate of voteRows(vote, c).filter((_row) => _row.tag !== "delegate")) {
+    const decoded = governorAction({ ...candidate, tag: "arbitrary source label" }, c);
+    assert.equal(decoded.method, candidate.tag);
+    assert.equal(BigInt(decoded.proposalId), BigInt(vote.proposalId));
+  }
+  const candidate = voteRows(vote, c)[2];
+  assert.equal(governorAction({ ...candidate, to: ADDRESSES.token }, c), null);
+  assert.equal(governorAction({ ...candidate, network: "sepolia" }, c), null);
+  assert.throws(
+    () => governorAction({ ...candidate, data: `${candidate.data}00` }, c),
+    /canonical/
+  );
+});
+
+function governorReads(_changes = {}) {
+  const calls = [];
+  const values = {
+    proposalSnapshot: "100",
+    clock: "100",
+    CLOCK_MODE: "mode=timestamp",
+    state: 0,
+    proposalDeadline: "1000",
+    hasVoted: false,
+    proposalEta: "0",
+    token: ADDRESSES.token,
+    proposalThreshold: "10",
+    getPastVotes: "11",
+    ..._changes,
+  };
+  const at = {
+    ...c,
+    read: async (_rpc, _network, _abi, _address, _method, _args, _block) => {
+      calls.push({ method: _method, args: _args, block: _block });
+      assert.equal(_block, "0x42");
+      return [values[_method]];
+    },
+  };
+  const rpc = async (_network, _method, _args) => {
+    assert.equal(_method, "eth_getBlockByNumber");
+    assert.deepEqual(_args, ["latest", false]);
+    return { number: "0x42", timestamp: "0x66" };
+  };
+  return { at, rpc, calls };
+}
+
+test("imported vote waits on the actual governor state at the snapshot boundary", async () => {
+  const candidate = voteRows(vote, c)[2];
+  const reads = governorReads();
+  const state = await governorCallStatus(candidate, reads.rpc, reads.at);
+  assert.equal(state.state, 0);
+  assert.equal(state.snapshot, state.clock);
+  assert.match(governorActionReason(state), /Voting has not opened/);
+  assert.match(governorActionReason(state), /once the governor reports Active/);
+  assert.match(governorActionReason({ ...state, clock: "9999999999" }), /not opened/);
+  const w = wallet({ eth_chainId: "0x138" });
+  await assert.rejects(
+    sendOne({
+      ...w,
+      row: { ...candidate, id: "vote" },
+      beforeSend: async () => {
+        const fresh = await governorCallStatus(candidate, reads.rpc, reads.at);
+        const reason = governorActionReason(fresh);
+        if (reason) throw new Error(reason);
+      },
+    }),
+    /Voting has not opened/
+  );
+  assert.equal(w.calls.length, 0);
+});
+
+test("imported governor gating covers active, already-voted, closed, unproposed and failed proposals", async () => {
+  const candidate = voteRows(vote, c)[2];
+  const active = governorReads({ state: 1, clock: "101" });
+  const state = await governorCallStatus(candidate, active.rpc, active.at);
+  assert.equal(governorActionReason(state), "");
+  assert.match(governorActionReason({ ...state, hasVoted: true }), /already voted/);
+  for (const code of [2, 3, 4, 5, 6, 7])
+    assert.match(governorActionReason({ ...state, state: code }), /closed or unavailable/);
+  const absent = governorReads({ proposalSnapshot: "0" });
+  assert.match(
+    governorActionReason(await governorCallStatus(candidate, absent.rpc, absent.at)),
+    /not on chain yet/
+  );
+  assert.ok(!absent.calls.some((_call) => _call.method === "state"));
+  const proposal = voteRows(vote, c)[1];
+  const unproposed = await governorCallStatus(proposal, absent.rpc, absent.at);
+  assert.equal(governorActionReason(unproposed), "");
+  assert.deepEqual(absent.calls.find((_call) => _call.method === "getPastVotes").args, [
+    proposal.from,
+    "99",
+  ]);
+  assert.match(governorActionReason({ ...unproposed, votes: "9" }), /Insufficient past/);
+  assert.match(governorActionReason({ ...unproposed, state: 0 }), /already exists/);
+});
+
+test("imported queue and execute enforce successful voting and the timestamp timelock", async () => {
+  const rows = voteRows(vote, c);
+  const queued = governorReads({ state: 5, clock: "99999", proposalEta: "103" });
+  const state = await governorCallStatus(rows[4], queued.rpc, queued.at);
+  assert.equal(state.blockTimestamp, "102");
+  assert.match(governorActionReason(state), /timelock is not ready/);
+  assert.equal(governorActionReason({ ...state, blockTimestamp: "103" }), "");
+  assert.match(governorActionReason({ ...state, state: 7 }), /requires Queued/);
+  const succeeded = governorReads({ state: 4 });
+  const queue = await governorCallStatus(rows[3], succeeded.rpc, succeeded.at);
+  assert.equal(governorActionReason(queue), "");
+  assert.match(governorActionReason({ ...queue, state: 1 }), /requires Succeeded/);
 });

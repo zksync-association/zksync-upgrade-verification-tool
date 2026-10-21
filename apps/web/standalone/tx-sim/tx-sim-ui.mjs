@@ -25,6 +25,10 @@ import {
 } from "./tx-sim-core.mjs";
 import {
   contracts,
+  governorAction,
+  governorCallStatus,
+  governorActionReason,
+  governorTime,
   makeVote,
   voteRows,
   voteStatus,
@@ -72,6 +76,7 @@ let normalSelected = null;
 const normalSaved = readStored(STORAGE.vote, null);
 const gates = new Set();
 const independentCalls = new Set();
+const importedGovernors = new Map();
 const discovered = new Map();
 let initialized = false;
 let restoring = null;
@@ -227,6 +232,75 @@ async function chooseAccount() {
 function onWalletChange() {
   refreshWallet().catch((_error) => notice(_error.message, true));
 }
+async function refreshImportedGovernor(_row) {
+  if (importedGovernors.get(_row.id)?.loading) return;
+  importedGovernors.set(_row.id, { ...importedGovernors.get(_row.id), loading: true });
+  try {
+    const state = await governorCallStatus(_row, rpc, c);
+    importedGovernors.set(_row.id, { state, checkedAt: Date.now(), loading: false });
+    return state;
+  } catch (_error) {
+    importedGovernors.set(_row.id, {
+      error: _error.message,
+      checkedAt: Date.now(),
+      loading: false,
+    });
+    return null;
+  } finally {
+    render();
+  }
+}
+function importedGovernorContext(_row) {
+  let action;
+  try {
+    action = governorAction(_row, c);
+  } catch (_error) {
+    return { blocked: _error.message };
+  }
+  if (!action) return null;
+  let entry = importedGovernors.get(_row.id);
+  if (!entry) {
+    importedGovernors.set(_row.id, { scheduled: true });
+    Promise.resolve().then(() => refreshImportedGovernor(_row));
+    entry = { loading: true };
+  }
+  const panel = el("section", { class: "step" }, el("h3", {}, "Live governor state"));
+  panel.append(el("p", { class: "mono" }, `Proposal: ${action.proposalId}`));
+  panel.append(
+    el(
+      "button",
+      { disabled: busy || entry.loading, onclick: () => run(() => refreshImportedGovernor(_row)) },
+      "Refresh governance state"
+    )
+  );
+  if (entry.error) return { panel, blocked: `Could not verify governor state: ${entry.error}` };
+  if (entry.loading || !entry.state) return { panel, blocked: "Reading live governor state…" };
+  const state = entry.state;
+  panel.append(
+    el(
+      "p",
+      {},
+      `State: ${state.state === null ? "Not proposed" : GOVERNOR_STATES[state.state]} · Governor clock: ${governorTime(state.clock, state.mode)}`
+    )
+  );
+  if (state.state !== null)
+    panel.append(
+      el("p", {}, `Voting opens after ${governorTime(state.snapshot, state.mode)}.`),
+      el(
+        "p",
+        {},
+        `Voting deadline: ${governorTime(state.deadline, state.mode)}. Late quorum may extend this deadline.`
+      )
+    );
+  return { panel, blocked: governorActionReason(state) };
+}
+async function guardImportedGovernor(_row) {
+  if (!governorAction(_row, c)) return;
+  notice("Checking current governor state and voting/timelock requirements…");
+  const state = await refreshImportedGovernor(_row);
+  requireThat(state, importedGovernors.get(_row.id)?.error || "Could not verify governor state.");
+  requireThat(!governorActionReason(state), governorActionReason(state));
+}
 async function switchChain(_row) {
   requireThat(provider, "Connect MetaMask first.");
   const chain = CHAINS[_row.network];
@@ -296,6 +370,7 @@ async function useSnapshot(_snapshot) {
   selectedRow = 0;
   gates.clear();
   independentCalls.clear();
+  importedGovernors.clear();
   renderCandidates();
   render();
   if (next.some((_bundle) => _bundle.superseded))
@@ -1025,11 +1100,13 @@ function renderBundles() {
     $("transaction").replaceChildren(el("p", {}, "No executable calls in this file."));
     return;
   }
+  const governance = importedGovernorContext(row);
   let blocked = bundle.superseded
     ? "This is the superseded Board-based v33 route."
     : bundle.gate && !gates.has(bundle.sha256)
       ? "Confirm the bundle prerequisites above first."
       : "";
+  if (!blocked && governance?.blocked) blocked = governance.blocked;
   const plan = dependencyPlan(bundle.rows, selectedRow, independentCalls.has(row.id));
   if (!blocked && plan.indices.some((_i) => journal[bundle.rows[_i].id]?.status !== "confirmed"))
     blocked = `Waiting for required calls ${plan.indices
@@ -1088,6 +1165,7 @@ function renderBundles() {
         !bundle.gate || gates.has(bundle.sha256),
         "Confirm the bundle prerequisites first."
       );
+      await guardImportedGovernor(row);
       await verifyDependencies(
         bundle.rows,
         dependencyPlan(bundle.rows, selectedRow, independentCalls.has(row.id)).indices,
@@ -1100,6 +1178,7 @@ function renderBundles() {
     },
     blocked
   );
+  if (governance?.panel) $("transaction").prepend(governance.panel);
 }
 function render() {
   $("normal-view").hidden = activeView !== "normal";
@@ -1312,6 +1391,11 @@ async function initialize() {
 initialize().catch((_error) => notice(_error.message, true));
 setInterval(async () => {
   if (busy) return;
+  const selected = bundles[selectedBundle]?.rows[selectedRow];
+  if (activeView === "bundle" && selected && importedGovernors.has(selected.id)) {
+    await refreshImportedGovernor(selected);
+    if (busy) return;
+  }
   const rows = [
     ...bundles.flatMap((_bundle) => _bundle.rows),
     ...normalRows,
