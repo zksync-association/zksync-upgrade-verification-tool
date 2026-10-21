@@ -1,6 +1,10 @@
 # Testnet 3 desktop sender
 
-This localhost companion executes reviewed transaction-simulator JSON on Sepolia and ZKsync Testnet 3
+The primary governance signer flow is the standalone HTML opened directly from disk: connect the
+member Safe through WalletConnect for signatures, then a separate mobile executor wallet for calls
+that allow any sender. That flow needs no server. See [the standalone build instructions](../ecosystems/README.md).
+
+This optional localhost companion executes reviewed transaction-simulator JSON on Sepolia and ZKsync Testnet 3
 (chain 312). It includes arbitrary calls, governance handovers, and normal L2 voting → native L2-to-L1
 message proof → `startUpgrade` → final L1 execution. MetaMask receives one request at a time; the signer
 reviews and confirms each in the extension. Mainnet transaction files are rejected.

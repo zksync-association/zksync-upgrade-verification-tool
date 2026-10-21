@@ -88,7 +88,7 @@ export function SignButton({
     members,
     disabledReason,
   });
-  const { connect: openConnectModal } = useConnectWallet();
+  const { connectWalletConnect: openConnectModal } = useConnectWallet();
   const [own, setOwn] = useState(false);
   const open = controlled ?? own;
   const setOpen = (next: boolean) => {

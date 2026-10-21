@@ -14,6 +14,7 @@ import {
   useSwitchChain,
 } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
+import { supportsDesktopWallet } from "@/common/walletconnect";
 import { injected, walletConnect } from "wagmi/connectors";
 
 const queryClient = new QueryClient();
@@ -115,14 +116,17 @@ export function WalletProvider({
 }) {
   const config = useMemo(() => {
     const chain = chainFor(chainId, chainLabel);
+    const desktop = supportsDesktopWallet(
+      typeof window === "undefined" ? undefined : window.location.protocol
+    );
     return createConfig({
       chains: [chain] as [Chain],
       transports: { [chain.id]: noBrowserRpc },
       ssr: true,
       storage: createStorage({ storage: walletStorage(), key: `${STORAGE_PREFIX}wagmi` }),
-      multiInjectedProviderDiscovery: true,
+      multiInjectedProviderDiscovery: desktop,
       connectors: [
-        injected({ target: "metaMask" }),
+        ...(desktop ? [injected({ target: "metaMask" })] : []),
         ...(projectId
           ? [
               walletConnect({

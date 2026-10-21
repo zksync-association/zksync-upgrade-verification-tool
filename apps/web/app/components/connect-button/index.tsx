@@ -1,6 +1,7 @@
 import { useStatusIfRead } from "@/components/governance-context";
 import Avatar from "@/components/connect-button/avatar";
 import { Button } from "@/components/ui/button";
+import { supportsDesktopWallet } from "@/common/walletconnect";
 import type { SignerGroup } from "@/common/typed-data";
 import { shortHex } from "@/utils/format";
 import { ConnectButton as RainbowConnectButton } from "@rainbow-me/rainbowkit";
@@ -37,7 +38,7 @@ export function useConnectedGroups(): {
   return { address, groups, known: true };
 }
 
-/** Prefer the discovered MetaMask provider; retain WalletConnect for member Safes. */
+/** Connect member Safes and mobile executors over WalletConnect by default. */
 export function useConnectWallet() {
   const { connectors, connect, isPending } = useConnect({
     mutation: {
@@ -47,10 +48,13 @@ export function useConnectWallet() {
       },
     },
   });
-  const metamask =
-    connectors.find((c) => c.id === "io.metamask") ?? connectors.find((c) => c.id === "metaMask");
+  const metamask = supportsDesktopWallet(
+    typeof window === "undefined" ? undefined : window.location.protocol
+  )
+    ? connectors.find((c) => c.id === "io.metamask") ?? connectors.find((c) => c.id === "metaMask")
+    : undefined;
   const walletConnect = connectors.find((c) => c.id === "walletConnect");
-  const connector = metamask ?? walletConnect;
+  const connector = walletConnect;
   return {
     connect: connector ? () => connect({ connector }) : undefined,
     connectMetaMask: metamask ? () => connect({ connector: metamask }) : undefined,
@@ -94,21 +98,21 @@ export default function ConnectButton() {
               <Button
                 variant="default"
                 className="px-3.5"
-                onClick={wallet.connectMetaMask}
-                disabled={!wallet.connectMetaMask}
+                onClick={wallet.connectWalletConnect}
+                disabled={!wallet.connectWalletConnect}
                 loading={wallet.isPending}
                 data-testid="connect-wallet"
-                title="Connect MetaMask in your desktop browser. Serve single-file builds on localhost."
+                title="Connect your member Safe through WalletConnect to sign. A mobile wallet can connect separately to execute permissionless calls."
               >
-                Connect MetaMask
+                Connect Safe / wallet
               </Button>
-              {wallet.connectWalletConnect && (
+              {wallet.connectMetaMask && (
                 <Button
                   variant="outline"
-                  onClick={wallet.connectWalletConnect}
+                  onClick={wallet.connectMetaMask}
                   loading={wallet.isPending}
                 >
-                  WalletConnect
+                  Desktop MetaMask
                 </Button>
               )}
             </div>

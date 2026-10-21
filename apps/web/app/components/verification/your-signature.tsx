@@ -188,7 +188,7 @@ function Who({
   /** The viewer's Safe in a group here whose signing is not open now. */
   member?: Member;
 }) {
-  const { connect: openConnectModal } = useConnectWallet();
+  const { connectWalletConnect: openConnectModal } = useConnectWallet();
   const groups = [...new Set(open.map((a) => GROUP_NAME[a.set.signerGroup] ?? a.title))];
   if (!you)
     return (

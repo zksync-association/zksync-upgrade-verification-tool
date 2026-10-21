@@ -18,4 +18,13 @@ Emergency Upgrade Board, and of a member Safe's proxy, with the Safes' singleton
 handler (all members alike); `null` reads every check on-chain instead. Its handler's legal veto
 and delay are 0 for TestnetProtocolUpgradeHandler, else 3 and 1.
 
-For desktop MetaMask and reviewed Testnet 3 L1/L2 transactions, see [the tx-sim companion](../tx-sim/README.md).
+Open the generated HTML directly from disk for the signer flow: use **Connect Safe / wallet**,
+copy the WalletConnect pairing URI, then connect the member Safe in Safe{Wallet}. Review the
+SafeMessage hashes and collect the Safe owners' signatures there. This flow uses the browser, RPC
+and Safe service directly; no localhost server is required. For execution calls that permit any
+sender, disconnect the signer Safe and connect a separate mobile wallet through WalletConnect.
+Calls bound to a particular sender (for example, L2 votes) still require that sender.
+
+The optional [tx-sim companion](../tx-sim/README.md) remains available over localhost for reviewed
+Testnet 3 L1/L2 transaction arrays. It is not required for the serverless signer flow. Desktop
+MetaMask and the companion navigation link are offered only when the verifier is served over HTTP(S).
