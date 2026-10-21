@@ -1,4 +1,3 @@
-import { expect, test } from "@playwright/test";
 import type { Hex } from "viem";
 import {
   COUNCIL,
@@ -9,6 +8,8 @@ import {
   refreshApp,
   resetAll,
   signInSafe,
+  expect,
+  test,
 } from "./support";
 
 // Members sign in their own Safe (over WalletConnect, which a test can't drive; what the app asks

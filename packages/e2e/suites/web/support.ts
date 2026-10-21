@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { type Page, test as base, expect } from "@playwright/test";
 import type { Address, Hex } from "viem";
 import { TEST_OWNER, forkActions, signAsSafeOwner } from "../../../../apps/web/test/support/fork";
 import {
@@ -52,3 +53,34 @@ export async function signInSafe(safe: Address, typedData: GovernanceTypedData) 
 }
 
 export { buildTypedData };
+
+/**
+ * The app's pages, interactive once open: `goto` and `reload` also wait until React has hydrated
+ * every element a test can reach (each then carries its fiber). A section's data is streamed with
+ * the page, but React hydrates it only after its promise resolves on the client; a click on it
+ * before that is dropped, not replayed, and on a slow runner that comes well after the load event.
+ */
+export const test = base.extend<{ page: Page }>({
+  page: async ({ page }, use) => {
+    const interactive = () =>
+      page.waitForFunction(() =>
+        Array.from(document.querySelectorAll("[data-testid]")).every((el) =>
+          Object.keys(el).some((key) => key.startsWith("__reactFiber$"))
+        )
+      );
+    const goto = page.goto.bind(page);
+    const reload = page.reload.bind(page);
+    page.goto = async (url: string, options?: Parameters<Page["goto"]>[1]) => {
+      const response = await goto(url, options);
+      await interactive();
+      return response;
+    };
+    page.reload = async (options?: Parameters<Page["reload"]>[0]) => {
+      const response = await reload(options);
+      await interactive();
+      return response;
+    };
+    await use(page);
+  },
+});
+export { expect };

@@ -1,8 +1,7 @@
-import { expect, test } from "@playwright/test";
 import { getAddress } from "viem";
 import { safeMessageHashes } from "../../../../apps/web/app/common/safe";
 import { buildTypedData, governanceHashes } from "../../../../apps/web/app/common/typed-data";
-import { COUNCIL, UPGRADE_ID, resetAll } from "./support";
+import { COUNCIL, UPGRADE_ID, resetAll, expect, test } from "./support";
 
 // Reading and verifying, no wallet: every flow's page against the fork.
 

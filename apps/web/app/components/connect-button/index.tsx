@@ -85,7 +85,13 @@ export default function ConnectButton() {
   return (
     <RainbowConnectButton.Custom>
       {({ account, chain, openAccountModal, mounted }) => {
-        if (!mounted) return <div className="h-10 w-[104px]" aria-hidden />;
+        // Until mounted, the disconnected button's own size, unseen: the header never grows for it.
+        if (!mounted)
+          return (
+            <Button variant="default" className="invisible px-3.5" tabIndex={-1} aria-hidden>
+              Connect wallet
+            </Button>
+          );
         if (!account || !chain) {
           if (!window.ENV?.WALLET_CONNECT_PROJECT_ID)
             return (

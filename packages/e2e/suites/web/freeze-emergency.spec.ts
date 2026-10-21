@@ -1,6 +1,5 @@
-import { expect, test } from "@playwright/test";
 import { type Address, getAddress } from "viem";
-import { COUNCIL, buildTypedData, refreshApp, resetAll, signInSafe } from "./support";
+import { COUNCIL, buildTypedData, refreshApp, resetAll, signInSafe, expect, test } from "./support";
 
 test.beforeEach(async () => {
   await resetAll();

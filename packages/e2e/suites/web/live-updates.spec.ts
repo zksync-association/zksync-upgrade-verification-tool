@@ -1,4 +1,3 @@
-import { expect, test } from "@playwright/test";
 import {
   COUNCIL,
   UNSIGNED_MEMBER,
@@ -6,6 +5,8 @@ import {
   buildTypedData,
   resetAll,
   signInSafe,
+  expect,
+  test,
 } from "./support";
 
 // An open page updates itself: while it is on screen the app asks the member Safes of a set that
