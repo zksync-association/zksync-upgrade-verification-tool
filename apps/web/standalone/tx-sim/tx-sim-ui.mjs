@@ -36,8 +36,15 @@ import {
   actionRow,
   buildStart,
 } from "./tx-sim-contracts.mjs";
+import { canRepropose, proposalFromCall, votingRetry } from "./tx-sim-source.mjs";
 
 const $ = (_id) => document.getElementById(_id);
+const bootstrap = window.__TX_SIM_BOOTSTRAP__;
+const walletConnectBridge = window.__TX_SIM_WALLET__;
+const desktopAvailable = ["http:", "https:"].includes(window.location.protocol);
+let walletBridge = desktopAvailable ? null : walletConnectBridge;
+let walletLabel = walletBridge ? "wallet" : "MetaMask";
+let retryInfo = bootstrap?.prepared ?? readStored(STORAGE.vote, null)?.retryInfo ?? null;
 function el(_tag, _props = {}, ..._children) {
   const node = document.createElement(_tag);
   for (const [key, value] of Object.entries(_props)) {
@@ -108,7 +115,7 @@ async function run(_fn) {
   } catch (_error) {
     notice(
       _error.code === 4001
-        ? "Request rejected in MetaMask. You can retry when ready."
+        ? "Request rejected in your wallet. You can retry when ready."
         : _error.message,
       true
     );
@@ -180,10 +187,18 @@ function bindProvider(_found) {
       provider.removeListener(event, onWalletChange);
   provider = _found;
   for (const event of ["accountsChanged", "chainChanged", "disconnect"])
-    provider.on?.(event, onWalletChange);
+    provider?.on?.(event, onWalletChange);
 }
 async function restoreWallet() {
   if (provider || restoring) return restoring;
+  if (walletBridge) {
+    const found = await walletBridge.restore();
+    if (found) {
+      bindProvider(found);
+      await refreshWallet();
+    }
+    return;
+  }
   const found = findMetaMask();
   if (!found) return;
   restoring = (async () => {
@@ -200,6 +215,13 @@ async function restoreWallet() {
   }
 }
 async function connect() {
+  if (walletBridge) {
+    const row = normalSelected ?? bundles[selectedBundle]?.rows[selectedRow];
+    bindProvider(await walletBridge.connect(row?.chainId ?? CHAINS["zksync-testnet3"].id));
+    await refreshWallet();
+    notice("Wallet connected. The transaction panel checks its exact required sender and network.");
+    return;
+  }
   const found = findMetaMask();
   requireThat(
     found,
@@ -216,7 +238,15 @@ async function connect() {
   );
 }
 async function chooseAccount() {
-  requireThat(provider, "Connect MetaMask first.");
+  if (walletBridge) {
+    await walletBridge.disconnect();
+    bindProvider(null);
+    account = "";
+    walletChain = null;
+    await connect();
+    return;
+  }
+  requireThat(provider, "Connect your wallet first.");
   await provider.request({
     method: "wallet_requestPermissions",
     params: [{ eth_accounts: {} }],
@@ -292,7 +322,57 @@ function importedGovernorContext(_row) {
         `Voting deadline: ${governorTime(state.deadline, state.mode)}. Late quorum may extend this deadline.`
       )
     );
+  if (canRepropose(state.state))
+    panel.append(
+      el(
+        "button",
+        {
+          class: "primary",
+          disabled: busy,
+          onclick: () => run(() => prepareImportedRetry(_row)),
+        },
+        "Prepare voting retry"
+      )
+    );
   return { panel, blocked: governorActionReason(state) };
+}
+async function prepareImportedRetry(_row) {
+  const state = await governorCallStatus(_row, rpc, c);
+  requireThat(
+    canRepropose(state.state),
+    "This proposal has not ended unsuccessfully. Refresh its current state."
+  );
+  let original;
+  for (const bundle of bundles) {
+    for (const row of bundle.rows) {
+      const candidate = proposalFromCall(row, c);
+      if (candidate && BigInt(candidate.proposalId) === BigInt(state.proposalId))
+        original = { ...candidate, from: row.from, source: bundle.path };
+    }
+  }
+  requireThat(
+    original,
+    "The source propose call is missing. Refresh the PR's transaction files before preparing a retry."
+  );
+  requireThat(
+    same(original.from, ADDRESSES.control),
+    "This workflow must use the source's required voting account."
+  );
+  retryInfo = votingRetry(
+    original,
+    `${original.description}\n\nVoting retry: ${new Date().toISOString()}`,
+    c
+  );
+  $("payload").value = JSON.stringify(retryInfo.payload, null, 2);
+  $("description").value = retryInfo.description;
+  $("execution-hash").value = "";
+  setView("normal");
+  await prepareVote();
+  normalSelected = normalRows.find((_candidate) => _candidate.tag === "propose");
+  render();
+  notice(
+    "Retry prepared from the tx-sim proposal. Only the L2 description changed; the L1 upgrade is identical. Review the new proposal and send it when ready."
+  );
 }
 async function guardImportedGovernor(_row) {
   if (!governorAction(_row, c)) return;
@@ -302,7 +382,7 @@ async function guardImportedGovernor(_row) {
   requireThat(!governorActionReason(state), governorActionReason(state));
 }
 async function switchChain(_row) {
-  requireThat(provider, "Connect MetaMask first.");
+  requireThat(provider, "Connect your wallet first.");
   const chain = CHAINS[_row.network];
   try {
     await provider.request({
@@ -379,6 +459,10 @@ async function useSnapshot(_snapshot) {
     );
 }
 async function refreshSource() {
+  requireThat(
+    !bootstrap,
+    "This file contains the PR revision shown above. Regenerate the HTML to fetch the latest private tx-sim revision through your gh login."
+  );
   notice("Reading the current PR #386 files from GitHub…");
   const response = await fetch("./api/pr386", {
     headers: { "X-TxSim-Request": "1" },
@@ -529,6 +613,7 @@ async function prepareVote() {
       input: vote.payload,
       description: vote.description,
       executionHash: $("execution-hash").value,
+      retryInfo: retryInfo && same(retryInfo.proposalId, vote.proposalId) ? retryInfo : null,
     })
   );
   notice("Prepared the exact L2 governor calls. Reading the live proposal state…");
@@ -701,11 +786,11 @@ function renderTransaction(_panel, _row, _guard, _blocked = "") {
   const walletOk = requirement === null;
   const walletReason =
     requirement === "connect"
-      ? "This page is not connected to a wallet. Connect MetaMask to continue."
+      ? `This page is not connected to a wallet. Connect your ${walletLabel} to continue.`
       : requirement === "account"
-        ? `This page sees ${account}. Connect the required sender ${_row.from} to this site in MetaMask; selecting it in the wallet alone may not connect it.`
+        ? `This page sees ${account}. Connect the required sender ${_row.from}. A Safe sends from its own address; it cannot substitute for the voting EOA.`
         : requirement === "network"
-          ? `MetaMask is on chain ${walletChain}. Switch to ${CHAINS[_row.network].name} (${_row.chainId}) to continue.`
+          ? `Your wallet is on chain ${walletChain}. Switch to ${CHAINS[_row.network].name} (${_row.chainId}) to continue.`
           : "";
   if (_blocked) _panel.append(el("p", { class: "warning" }, _blocked));
   if (walletReason) _panel.append(el("p", { class: "warning" }, walletReason));
@@ -715,7 +800,7 @@ function renderTransaction(_panel, _row, _guard, _blocked = "") {
       el(
         "button",
         { class: "primary", disabled: busy, onclick: () => run(connect) },
-        "Connect MetaMask to continue"
+        walletBridge ? "Connect via WalletConnect" : "Connect MetaMask to continue"
       )
     );
   if (requirement === "account")
@@ -723,7 +808,7 @@ function renderTransaction(_panel, _row, _guard, _blocked = "") {
       el(
         "button",
         { class: "primary", disabled: busy, onclick: () => run(chooseAccount) },
-        "Choose account in MetaMask"
+        walletBridge ? "Reconnect the required account" : "Choose account in MetaMask"
       )
     );
   if (provider && walletChain !== _row.chainId)
@@ -745,7 +830,7 @@ function renderTransaction(_panel, _row, _guard, _blocked = "") {
             await _guard();
             const checked = await preflight(provider, _row, simulationProvider(_row));
             notice(
-              `Simulation succeeded. Direct-call estimate with margin: ${checked.gas}. MetaMask estimates the full transaction, including any smart-account wrapper. Rechecked when you send.`
+              `Simulation succeeded. Direct-call estimate with margin: ${checked.gas}. Your wallet estimates the full transaction, including any smart-account wrapper. Rechecked when you send.`
             );
           }),
       },
@@ -766,7 +851,7 @@ function renderTransaction(_panel, _row, _guard, _blocked = "") {
             (!canSend ? "Check the existing transaction receipt before continuing." : ""),
         onclick: () => run(() => send(_row, _guard)),
       },
-      entry?.status === "reverted" ? "Retry in MetaMask" : "Send to MetaMask"
+      entry?.status === "reverted" ? `Retry in ${walletLabel}` : `Send to ${walletLabel}`
     )
   );
   _panel.append(
@@ -774,7 +859,7 @@ function renderTransaction(_panel, _row, _guard, _blocked = "") {
     el(
       "p",
       { class: "muted" },
-      "MetaMask receives the exact recipient, value and calldata, and estimates gas for its full transaction. Review the gas and fees before confirming."
+      "Your wallet receives the exact recipient, value and calldata, and estimates gas for its full transaction. Review the gas and fees before confirming."
     )
   );
   if (entry) {
@@ -865,6 +950,14 @@ function renderNormal() {
     el("p", { class: "mono" }, `L2 proposal: ${BigInt(vote.proposalId)}`),
     el("p", { class: "mono" }, `L1 upgrade: ${vote.upgradeId}`)
   );
+  if (retryInfo && same(vote.proposalId, retryInfo.proposalId))
+    panel.prepend(
+      el(
+        "p",
+        { class: "warning" },
+        `Voting retry of L2 proposal ${BigInt(retryInfo.retryOf)}. Only the L2 description changed; the L1 message, calls, executor, salt and upgrade ID are identical to ${retryInfo.source}.`
+      )
+    );
   panel.append(
     el("button", { disabled: busy, onclick: () => run(refreshVote) }, "Refresh governance state")
   );
@@ -908,6 +1001,19 @@ function renderNormal() {
         "p",
         {},
         "L2 execution is complete. Check batch finality and build the inclusion proof below."
+      )
+    );
+  if (canRepropose(status.state))
+    actions.append(
+      el(
+        "button",
+        {
+          class: "primary",
+          disabled: busy,
+          onclick: () =>
+            run(() => prepareImportedRetry(normalRows.find((_row) => _row.tag === "propose"))),
+        },
+        "Prepare voting retry"
       )
     );
   for (const row of normalRows) {
@@ -1119,7 +1225,7 @@ function renderBundles() {
       "p",
       {},
       plan.group.length
-        ? `${plan.label}: calls ${plan.group.map((_i) => _i + 1).join(", ")} can be submitted without waiting for each other's receipts. Confirm each request in MetaMask; the wallet manages nonces.`
+        ? `${plan.label}: calls ${plan.group.map((_i) => _i + 1).join(", ")} can be submitted without waiting for each other's receipts. Confirm each request in your wallet; the wallet manages nonces.`
         : plan.indices.length
           ? `Requires confirmed calls: ${plan.indices.map((_i) => _i + 1).join(", ")}.`
           : "No earlier receipt is required."
@@ -1188,10 +1294,13 @@ function render() {
   $("wallet-state").textContent = account
     ? `${account.slice(0, 8)}…${account.slice(-4)} · chain ${walletChain}`
     : "Wallet disconnected";
-  $("connect").textContent = account ? "Reconnect MetaMask" : "Connect MetaMask";
+  $("connect").textContent = desktopAvailable
+    ? account && !walletBridge
+      ? "Reconnect MetaMask"
+      : "Connect desktop MetaMask"
+    : "Connect via WalletConnect";
   if (snapshot) {
-    $("source-title").textContent =
-      `matter-labs/transaction-simulator #386 · ${snapshot.commit.slice(0, 12)}`;
+    $("source-title").textContent = `${snapshot.repo} #${snapshot.number} · ${snapshot.commit}`;
     $("source-info").replaceChildren(
       "Pinned ",
       new Date(snapshot.pinnedAt).toLocaleString(),
@@ -1244,7 +1353,28 @@ function download(_name, _value) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-$("connect").onclick = () => run(connect);
+$("connect").onclick = () =>
+  run(async () => {
+    if (desktopAvailable && walletBridge) {
+      await walletBridge.disconnect();
+      walletBridge = null;
+      walletLabel = "MetaMask";
+      bindProvider(null);
+      account = "";
+      walletChain = null;
+    }
+    await connect();
+  });
+$("connect-walletconnect").onclick = () =>
+  run(async () => {
+    requireThat(walletConnectBridge, "Use the single-file build for WalletConnect.");
+    walletBridge = walletConnectBridge;
+    walletLabel = "wallet";
+    bindProvider(null);
+    account = "";
+    walletChain = null;
+    await connect();
+  });
 $("normal-tab").onclick = () => setView("normal");
 $("bundle-tab").onclick = () => setView("bundle");
 $("refresh-source").onclick = () => run(refreshSource);
@@ -1364,10 +1494,14 @@ $("l1-rpc").value = rpcs.sepolia || CHAINS.sepolia.rpc;
 $("l2-rpc").value = rpcs["zksync-testnet3"] || CHAINS["zksync-testnet3"].rpc;
 
 async function initialize() {
-  const [abis, data] = await Promise.all([
-    fetch("./tx-sim-abis.json").then((_r) => _r.json()),
-    fetch("./tx-sim-package.json", { cache: "no-store" }).then((_r) => (_r.ok ? _r.json() : null)),
-  ]);
+  const [abis, data] = bootstrap
+    ? [bootstrap.abis, bootstrap.snapshot]
+    : await Promise.all([
+        fetch("./tx-sim-abis.json").then((_r) => _r.json()),
+        fetch("./tx-sim-package.json", { cache: "no-store" }).then((_r) =>
+          _r.ok ? _r.json() : null
+        ),
+      ]);
   c = contracts(abis, window.ethers);
   if (data) await useSnapshot(data);
   else {
@@ -1376,7 +1510,23 @@ async function initialize() {
       "Refresh from GitHub using your local gh login, or open a JSON file.";
     render();
   }
-  if (normalSaved) {
+  if (bootstrap?.prepared) {
+    $("payload").value = JSON.stringify(bootstrap.prepared.payload, null, 2);
+    $("description").value = bootstrap.prepared.description;
+    if (normalSaved?.description === bootstrap.prepared.description)
+      $("execution-hash").value = normalSaved.executionHash || "";
+    setView("normal");
+    try {
+      await prepareVote();
+      normalSelected = normalRows.find((_row) => _row.tag === "propose");
+      render();
+    } catch (_error) {
+      notice(
+        `Proposal imported automatically; live RPC checks need attention: ${_error.message}`,
+        true
+      );
+    }
+  } else if (normalSaved) {
     $("payload").value = JSON.stringify(normalSaved.input, null, 2);
     $("description").value = normalSaved.description;
     $("execution-hash").value = normalSaved.executionHash || "";
@@ -1388,23 +1538,50 @@ async function initialize() {
   initialized = true;
   await restoreWallet();
 }
+if (bootstrap) {
+  $("refresh-source").hidden = true;
+  document.querySelector(".brand").href = "#";
+  $("connect-walletconnect").hidden = !desktopAvailable;
+  document.querySelector(".heading p").textContent =
+    "Transactions imported from the pinned tx-sim PR. Connect the required sender and review each request in your wallet.";
+  const note = el(
+    "p",
+    { class: "muted" },
+    "This single HTML contains the imported PR revision. Regenerate it to fetch updates. When served over HTTP(S), desktop MetaMask connects directly. Opened from disk, use WalletConnect. Safe approvals use the Safe address; this L2 vote uses the voting EOA."
+  );
+  document.querySelector(".source").after(note);
+}
 initialize().catch((_error) => notice(_error.message, true));
+let polling = false;
 setInterval(async () => {
-  if (busy) return;
-  const selected = bundles[selectedBundle]?.rows[selectedRow];
-  if (activeView === "bundle" && selected && importedGovernors.has(selected.id)) {
-    await refreshImportedGovernor(selected);
-    if (busy) return;
+  if (busy || polling || document.hidden) return;
+  polling = true;
+  try {
+    if (activeView === "normal" && vote) {
+      await refreshVote();
+      if (busy) return;
+    }
+    const selected = bundles[selectedBundle]?.rows[selectedRow];
+    if (activeView === "bundle" && selected && importedGovernors.has(selected.id)) {
+      await refreshImportedGovernor(selected);
+      if (busy) return;
+    }
+    const rows = [
+      ...bundles.flatMap((_bundle) => _bundle.rows),
+      ...normalRows,
+      ...(start ? [start.row] : []),
+      ...(normalSelected ? [normalSelected] : []),
+    ];
+    const pending = rows.filter((_row) => journal[_row.id]?.status === "pending");
+    if (!pending.length) return;
+    await run(async () => {
+      for (const row of pending) await checkRow(row);
+    });
+  } catch (_error) {
+    status = null;
+    notice(`Live refresh failed: ${_error.message}`, true);
+    render();
+  } finally {
+    polling = false;
   }
-  const rows = [
-    ...bundles.flatMap((_bundle) => _bundle.rows),
-    ...normalRows,
-    ...(start ? [start.row] : []),
-    ...(normalSelected ? [normalSelected] : []),
-  ];
-  const pending = rows.filter((_row) => journal[_row.id]?.status === "pending");
-  if (!pending.length) return;
-  await run(async () => {
-    for (const row of pending) await checkRow(row);
-  });
 }, LIMITS.pollMs);

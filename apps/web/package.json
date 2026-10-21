@@ -17,7 +17,7 @@
     "test:s": "vitest run --config ./vitest.server.config.ts",
     "test:i": "vitest run --config ./vitest.integration.config.ts",
     "test:fork": "vitest run --config ./vitest.fork.config.ts",
-    "test:tx-sim": "node --test standalone/tx-sim/tx-sim.test.mjs"
+    "test:tx-sim": "node --test standalone/tx-sim/*.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "=1.1.4",

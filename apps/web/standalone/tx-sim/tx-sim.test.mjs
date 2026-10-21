@@ -24,12 +24,19 @@ import {
   contracts,
   governorAction,
   governorCallStatus,
+  voteStatus,
   governorActionReason,
   makeVote,
   voteRows,
   allowedVoteAction,
   buildStart,
 } from "./tx-sim-contracts.mjs";
+import {
+  canRepropose,
+  proposalFromCall,
+  preparedProposals,
+  votingRetry,
+} from "./tx-sim-source.mjs";
 
 const require = createRequire(import.meta.url);
 const ethers = require("ethers");
@@ -423,9 +430,75 @@ test("governor gates pending, active, success, timelock, and completed states", 
   assert.equal(allowedVoteAction({ state: 1, hasVoted: false }, "castVote"), true);
   assert.equal(allowedVoteAction({ state: 1, hasVoted: true }, "castVote"), false);
   assert.equal(allowedVoteAction({ state: 4 }, "queue"), true);
-  assert.equal(allowedVoteAction({ state: 5, clock: "10", eta: "11" }, "execute"), false);
-  assert.equal(allowedVoteAction({ state: 5, clock: "11", eta: "11" }, "execute"), true);
+  assert.equal(
+    allowedVoteAction({ state: 5, clock: "10000", blockTimestamp: "10", eta: "11" }, "execute"),
+    false
+  );
+  assert.equal(
+    allowedVoteAction({ state: 5, clock: "1", blockTimestamp: "11", eta: "11" }, "execute"),
+    true
+  );
   assert.equal(allowedVoteAction({ state: 7 }, "execute"), false);
+});
+
+test("proposal import and voting retry preserve the exact L1 payload and source sender", async () => {
+  const row = voteRows(vote, c)[1];
+  const imported = proposalFromCall(row, c);
+  assert.equal(imported.proposalId, vote.proposalId);
+  const source = JSON.stringify([
+    { network: row.network, from: row.from, to: row.to, value: "0", data: row.data },
+  ]);
+  const snapshot = {
+    commit: "a".repeat(40),
+    stages: [{ path: "l2-transactions/proposal.json", raw: source, sha256: await sha256(source) }],
+  };
+  const candidates = await preparedProposals(snapshot, c);
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].from, row.from);
+  const retry = votingRetry(candidates[0], `${vote.description}\nVoting retry 2`, c);
+  assert.notEqual(retry.proposalId, vote.proposalId);
+  assert.equal(retry.retryOf, vote.proposalId);
+  assert.deepEqual(retry.payload, vote.payload);
+  assert.equal(retry.message, vote.message);
+  assert.equal(retry.upgradeId, vote.upgradeId);
+  assert.equal(retry.source, "l2-transactions/proposal.json");
+  assert.throws(() => votingRetry(candidates[0], vote.description, c), /new description/);
+  assert.throws(
+    () => votingRetry({ ...candidates[0], message: "0x00" }, "different", c),
+    /changed/
+  );
+  await assert.rejects(
+    preparedProposals({ ...snapshot, stages: [{ ...snapshot.stages[0], raw: `${source} ` }] }, c),
+    /Source hash/
+  );
+  assert.throws(() => proposalFromCall({ ...row, data: `${row.data}00` }, c), /Noncanonical/);
+  assert.throws(() => proposalFromCall({ ...row, valueWei: "1" }, c), /zero ETH/);
+  assert.equal(proposalFromCall({ ...row, to: ADDRESSES.token }, c), null);
+});
+
+test("only unsuccessful terminal governor states offer a voting retry", () => {
+  for (const state of [2, 3, 6]) assert.equal(canRepropose(state), true);
+  for (const state of [null, 0, 1, 4, 5, 7]) assert.equal(canRepropose(state), false);
+});
+
+test("prepared workflow reads one L2 block and checks proposer voting power at the prior clock tick", async () => {
+  const reads = governorReads({
+    proposalSnapshot: "0",
+    timelock: ADDRESSES.timelock,
+    hashProposal: vote.proposalId,
+    getVotes: "20",
+    getPastVotes: "9",
+  });
+  const state = await voteStatus(vote, reads.rpc, reads.at);
+  assert.equal(state.blockNumber, "0x42");
+  assert.equal(state.blockTimestamp, "102");
+  assert.equal(state.state, null);
+  assert.equal(state.votes, "9");
+  assert.equal(allowedVoteAction(state, "propose"), false);
+  assert.deepEqual(reads.calls.find((_call) => _call.method === "getPastVotes").args, [
+    ADDRESSES.control,
+    "99",
+  ]);
 });
 test("native proof uses the batch transaction index, verifies sender/message and L1 inclusion", async () => {
   const executeRow = voteRows(vote, c)[4];

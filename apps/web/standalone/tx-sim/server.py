@@ -10,7 +10,7 @@ ROOT = Path(__file__).parent
 HOST = '127.0.0.1'
 PORT = 8765
 ALLOWED_HOSTS = {f'127.0.0.1:{PORT}', f'localhost:{PORT}'}
-FILES = {'index.html', 'tx-sim.html', 'tx-sim.css', 'tx-sim-ui.mjs', 'tx-sim-core.mjs', 'tx-sim-config.mjs', 'tx-sim-contracts.mjs', 'tx-sim-abis.json', 'tx-sim-package.json', 'ethers.umd.min.js'}
+FILES = {'index.html', 'tx-sim.html', 'tx-sim-testnet-3.html', 'tx-sim.css', 'tx-sim-ui.mjs', 'tx-sim-core.mjs', 'tx-sim-config.mjs', 'tx-sim-contracts.mjs', 'tx-sim-source.mjs', 'tx-sim-abis.json', 'tx-sim-package.json', 'ethers.umd.min.js'}
 spec = importlib.util.spec_from_file_location('prepare', ROOT / 'prepare-tx-sim.py')
 prepare = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(prepare)

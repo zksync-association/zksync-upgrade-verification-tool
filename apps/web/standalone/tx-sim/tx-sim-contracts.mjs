@@ -307,9 +307,19 @@ export function governorActionReason(_status) {
   return "";
 }
 export async function voteStatus(_vote, _rpc, _c) {
+  const block = await _rpc("zksync-testnet3", "eth_getBlockByNumber", ["latest", false]);
+  requireThat(block?.number && block?.timestamp, "Could not read the current L2 block.");
   const read = (_method, _args = []) =>
     _c
-      .read(_rpc, "zksync-testnet3", "Testnet3Governor", ADDRESSES.governor, _method, _args)
+      .read(
+        _rpc,
+        "zksync-testnet3",
+        "Testnet3Governor",
+        ADDRESSES.governor,
+        _method,
+        _args,
+        block.number
+      )
       .then((_r) => _r[0]);
   const [timelock, token, proposalId, snapshot, clock, mode, votes, threshold] = await Promise.all([
     read("timelock"),
@@ -319,9 +329,15 @@ export async function voteStatus(_vote, _rpc, _c) {
     read("clock"),
     read("CLOCK_MODE"),
     _c
-      .read(_rpc, "zksync-testnet3", "Testnet3ZkTokenV3", ADDRESSES.token, "getVotes", [
-        ADDRESSES.control,
-      ])
+      .read(
+        _rpc,
+        "zksync-testnet3",
+        "Testnet3ZkTokenV3",
+        ADDRESSES.token,
+        "getVotes",
+        [ADDRESSES.control],
+        block.number
+      )
       .then((_r) => _r[0]),
     read("proposalThreshold"),
   ]);
@@ -341,6 +357,8 @@ export async function voteStatus(_vote, _rpc, _c) {
     threshold: threshold.toString(),
     state: null,
     hasVoted: false,
+    blockNumber: block.number,
+    blockTimestamp: BigInt(block.timestamp).toString(),
   };
   if (BigInt(result.snapshot) > 0n) {
     const [state, deadline, voted, eta, totals] = await Promise.all([
@@ -348,9 +366,15 @@ export async function voteStatus(_vote, _rpc, _c) {
       read("proposalDeadline", [_vote.proposalId]),
       read("hasVoted", [_vote.proposalId, ADDRESSES.control]),
       read("proposalEta", [_vote.proposalId]),
-      _c.read(_rpc, "zksync-testnet3", "Testnet3Governor", ADDRESSES.governor, "proposalVotes", [
-        _vote.proposalId,
-      ]),
+      _c.read(
+        _rpc,
+        "zksync-testnet3",
+        "Testnet3Governor",
+        ADDRESSES.governor,
+        "proposalVotes",
+        [_vote.proposalId],
+        block.number
+      ),
     ]);
     Object.assign(result, {
       state: Number(state),
@@ -359,6 +383,18 @@ export async function voteStatus(_vote, _rpc, _c) {
       eta: eta.toString(),
       forVotes: totals[1].toString(),
     });
+  } else {
+    result.votes = (
+      await _c.read(
+        _rpc,
+        "zksync-testnet3",
+        "Testnet3ZkTokenV3",
+        ADDRESSES.token,
+        "getPastVotes",
+        [ADDRESSES.control, (BigInt(result.clock) - 1n).toString()],
+        block.number
+      )
+    )[0].toString();
   }
   return result;
 }
@@ -369,7 +405,7 @@ export function allowedVoteAction(_status, _method) {
   if (_method === "castVote") return _status.state === 1 && !_status.hasVoted;
   if (_method === "queue") return _status.state === 4;
   if (_method === "execute")
-    return _status.state === 5 && BigInt(_status.clock) >= BigInt(_status.eta);
+    return _status.state === 5 && BigInt(_status.blockTimestamp) >= BigInt(_status.eta);
   return false;
 }
 export async function buildStart(_vote, _executeRow, _hash, _rpc, _c) {

@@ -5,6 +5,7 @@ import base64
 import hashlib
 import json
 import subprocess
+import argparse
 
 ROOT = Path(__file__).parent
 REPO = 'matter-labs/transaction-simulator'
@@ -56,10 +57,14 @@ def snapshot():
     return result
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', type=Path, default=ROOT, help='Directory for the pinned package and ABIs')
+    args = parser.parse_args()
     result = snapshot()
-    (ROOT / 'tx-sim-package.json').write_text(json.dumps(result, indent=2) + '\n')
     abis = {name: json.loads(read_file(f'abi/{name}.json', result['commit'])) for name in ABI_NAMES}
-    (ROOT / 'tx-sim-abis.json').write_text(json.dumps(abis) + '\n')
+    args.output.mkdir(parents=True, exist_ok=True)
+    (args.output / 'tx-sim-package.json').write_text(json.dumps(result, indent=2) + '\n')
+    (args.output / 'tx-sim-abis.json').write_text(json.dumps(abis) + '\n')
 
     print(f'Pinned {REPO}#386 at {result["commit"]}; {sum(len(json.loads(item["raw"])) for item in result["stages"])} source calls.')
 

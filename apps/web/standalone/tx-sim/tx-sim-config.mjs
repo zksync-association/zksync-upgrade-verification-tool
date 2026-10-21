@@ -48,6 +48,7 @@ export const GOVERNOR_STATES = [
   "Expired",
   "Executed",
 ];
+export const GOVERNOR_RETRY_STATES = Object.freeze([2, 3, 6]);
 export const UPGRADE_STATES = [
   "Not started",
   "Legal veto period",

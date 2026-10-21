@@ -1,5 +1,42 @@
 # Testnet 3 desktop sender
 
+The tx-sim workflow can also be packaged as **one HTML file**, opened directly in Chrome. Its build
+automatically fetches the latest private PR through your existing `gh` login, pins one revision, and
+embeds all transaction files, ABIs, scripts and styles. No GitHub token enters the file. Opening a
+GitHub tab cannot share that tab's private content or login with a local HTML file.
+
+From `apps/web`:
+
+```sh
+node standalone/tx-sim/build-singlefile.mjs --output /tmp/tx-sim-testnet-3.html
+```
+
+Open that file and connect through WalletConnect. For Safe-originated requests, connect the Safe and
+approve in the Safe web app using desktop MetaMask. Transactions requiring an EOA, including the
+prepared Testnet 3 L2 vote, require that exact EOA through a compatible WalletConnect wallet such as
+MetaMask Mobile. A Safe does not preserve its owner's address as `msg.sender`. The localhost companion
+below remains available for direct desktop MetaMask execution.
+
+The same generated HTML supports direct desktop MetaMask when served over HTTP(S). For example,
+serve its directory on loopback with `python3 -m http.server 8766 --bind 127.0.0.1`, then open
+`http://127.0.0.1:8766/tx-sim-testnet-3.html`. This requires only static file serving; all chain
+reads and transaction preparation remain in the browser. The WalletConnect button is also available.
+
+An imported proposal in Canceled, Defeated or Expired state has **Prepare voting retry**. It reads the
+matching source `propose` call, fills the workflow automatically with a new description and L2 ID,
+and checks live state. The original receipts remain intact; no wallet request opens until the user
+chooses to send. Pending, Active, Succeeded, Queued and Executed proposals do not offer a retry.
+
+To prepare a voting retry of an expired proposal, supply `--retry-description "<new full description>"`
+and, if the PR contains several proposals, `--proposal-id <original ID>`. The builder extracts the
+original payload from the PR's governor `propose` calldata; the retry must change the L2 proposal ID
+while retaining byte-identical L1 message data and upgrade ID. The HTML opens with that workflow
+already populated, shows the change, and checks live governance state before any wallet request.
+It never sends automatically. The adjacent `.build.json` and `.proposal.json` provide reviewable
+source/retry metadata. `--snapshot <downloaded package JSON>` supports an offline rebuild. These
+generated files can contain private PR content and must not be committed. Regenerate the HTML to
+import subsequent PR updates; an opened file never silently substitutes a different revision.
+
 The primary governance signer flow is the standalone HTML opened directly from disk: connect the
 member Safe through WalletConnect for signatures, then a separate mobile executor wallet for calls
 that allow any sender. That flow needs no server. See [the standalone build instructions](../ecosystems/README.md).
