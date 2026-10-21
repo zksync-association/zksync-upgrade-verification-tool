@@ -698,10 +698,12 @@ describe("labels that follow the tab's beats", () => {
       cadenceMs: 60_000,
       reason: null,
     });
-    expect(newerCheck(check(30), check(2))?.checkedAt).toBe(check(2).checkedAt);
-    expect(newerCheck(check(2), check(30))?.checkedAt).toBe(check(2).checkedAt);
-    expect(newerCheck(check(null), check(5))?.checkedAt).toBe(check(5).checkedAt);
-    expect(newerCheck(null, check(5))).not.toBeNull();
+    // Each built once: two reads of the clock can be a millisecond apart.
+    const [older, recent, fifth, never] = [check(30), check(2), check(5), check(null)];
+    expect(newerCheck(older, recent)?.checkedAt).toBe(recent.checkedAt);
+    expect(newerCheck(recent, older)?.checkedAt).toBe(recent.checkedAt);
+    expect(newerCheck(never, fifth)?.checkedAt).toBe(fifth.checkedAt);
+    expect(newerCheck(null, fifth)).not.toBeNull();
     expect(newerCheck(undefined, null)).toBeNull();
     // On the card: the reloaded set's own check (2 s ago) over the last beat's (30 s ago).
     const open = {
