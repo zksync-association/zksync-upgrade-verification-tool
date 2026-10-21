@@ -9,6 +9,7 @@ import {
 } from "@/.server/flows/standard";
 import { parseId } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
+import { CHAIN_UPGRADE } from "@/common/chain-upgrade";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
 import { AddressLink, CopyButton, Hash, TxLink } from "@/components/hex";
 import { EmptyState, LoadingCard, PageHeader, Section } from "@/components/page";
@@ -250,6 +251,17 @@ function Detail({
           </AsOfContent>
         }
         id={d.id}
+        actions={
+          d.state === UPGRADE_STATES.Done &&
+          governance.upgradeHandler.toLowerCase() === CHAIN_UPGRADE.handler.toLowerCase() ? (
+            <Link
+              to="/app/chain-upgrade"
+              className="rounded-lg bg-brand-600 px-4 py-2 font-medium text-sm text-white"
+            >
+              Continue to chain upgrade
+            </Link>
+          ) : undefined
+        }
       >
         <UpgradeSummary l2Proposal={l2Proposal} />
       </PageHeader>

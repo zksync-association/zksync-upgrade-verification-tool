@@ -48,3 +48,22 @@ transaction, or twice the direct-call estimate when larger (bounded at 2,000,000
 shows the limit; unused gas is not charged. This covers MetaMask's first 7702 authorization,
 which was underfunded by the wallet's estimate even though the direct Safe simulation passed. Opening the same HTML from disk retains the Safe /
 WalletConnect flow; desktop MetaMask requires serving it over HTTP(S).
+
+After the ecosystem upgrade executes, **Chain upgrade** handles an individual chain registered
+with the configured Testnet 3 CTM (312 by default). It reads the chain's current version, CTM,
+ChainAdmin owner and ServerNotifier. It obtains the diamond cut from the CTM's published event
+and requires its ABI hash to equal `upgradeCutHash(currentVersion)`. No calldata needs copying
+from GitHub. The supported ChainAdminOwnable runtime is checked before preparing its atomic
+`multicall(..., true)`.
+
+First choose an upgrade time in UTC and review **Set upgrade timestamp**. After that timestamp
+is recorded on-chain and the L1 chain clock reaches it, review **Execute chain upgrade**. Both
+calls are simulated from the current owner, checked again before wallet handoff, and shown with
+exact calldata and a buffered whole-wallet gas limit. Pending or uncertain submissions remain
+blocked; a matching canonical reverted receipt permits another reviewed attempt. The current
+chain protocol version selects the legacy two-argument or current three-argument upgrade ABI.
+Once the chain's version matches the CTM, the page reports completion and offers no duplicate
+upgrade. Mainnet and chains using another CTM/admin implementation are outside this execution
+flow. The section uses the same read-only preparation code in the normal server and standalone
+HTML builds; a file opened from disk uses WalletConnect, while HTTP(S) also offers desktop
+MetaMask. Signing and transaction confirmation always happen in the user's wallet.

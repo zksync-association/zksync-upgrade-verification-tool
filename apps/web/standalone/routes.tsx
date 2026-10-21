@@ -1,5 +1,7 @@
 // The site's routes for React Router's hash router (verifier.html#/app/proposals/0x…), from the
 // same route modules the server build uses.
+import * as chainUpgrade from "@/routes/app/chain-upgrade/_route";
+import * as chainUpgradeResource from "@/routes/resources+/chain-upgrade";
 import * as index from "@/routes/_index/_route";
 import * as notFound from "@/routes/$";
 import * as emergencyId from "@/routes/app/emergency/$id/_route";
@@ -97,6 +99,7 @@ export const routes = [
   {
     ...(route("root", "/", root as Module) as object),
     children: [
+      route("routes/app/chain-upgrade", "app/chain-upgrade", chainUpgrade as Module),
       route("routes/_index", undefined, index as Module),
       route("routes/app/proposals/_index", "app/proposals", proposalIndex as Module),
       route("routes/app/proposals/new", "app/proposals/new", proposalNew as Module),
@@ -119,6 +122,7 @@ export const routes = [
 
 /** The two endpoints the pages fetch() themselves (beats, Fetch signatures), answered in the page. */
 export const pageEndpoints: Record<string, (args: ActionFunctionArgs) => unknown> = {
+  "/resources/chain-upgrade": chainUpgradeResource.loader as (args: ActionFunctionArgs) => unknown,
   "/resources/safe-owner-approval": safeOwnerApproval.loader as (
     args: ActionFunctionArgs
   ) => unknown,

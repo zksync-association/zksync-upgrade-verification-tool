@@ -111,3 +111,43 @@ export const l1MessengerEventAbi = parseAbi([
 ]);
 
 export const ERC1271_MAGIC_VALUE = "0x1626ba7e" as const;
+
+// Per-chain upgrades: read the registered cut and forward the chain owner's two actions.
+const chainDiamondStructs = [
+  "struct FacetCut { address facet; uint8 action; bool isFreezable; bytes4[] selectors; }",
+  "struct DiamondCutData { FacetCut[] facetCuts; address initAddress; bytes initCalldata; }",
+] as const;
+export const chainUpgradeBridgehubAbi = parseAbi([
+  "function getZKChain(uint256 _chainId) view returns (address)",
+  "function chainTypeManager(uint256 _chainId) view returns (address)",
+]);
+export const chainUpgradeDiamondAbi = parseAbi([
+  ...chainDiamondStructs,
+  "function getAdmin() view returns (address)",
+  "function getChainTypeManager() view returns (address)",
+  "function getChainId() view returns (uint256)",
+  "function getProtocolVersion() view returns (uint256)",
+  "function upgradeChainFromVersion(address _chainAddress,uint256 _oldProtocolVersion,DiamondCutData _diamondCut)",
+]);
+export const chainUpgradeLegacyDiamondAbi = parseAbi([
+  ...chainDiamondStructs,
+  "function upgradeChainFromVersion(uint256 _oldProtocolVersion,DiamondCutData _diamondCut)",
+]);
+export const chainUpgradeCtmAbi = parseAbi([
+  ...chainDiamondStructs,
+  "function protocolVersion() view returns (uint256)",
+  "function upgradeCutHash(uint256 _oldProtocolVersion) view returns (bytes32)",
+  "function upgradeCutDataBlock(uint256 _oldProtocolVersion) view returns (uint256)",
+  "function serverNotifierAddress() view returns (address)",
+  "event NewUpgradeCutData(uint256 indexed protocolVersion,DiamondCutData diamondCutData)",
+]);
+export const chainUpgradeNotifierAbi = parseAbi([
+  "function chainTypeManager() view returns (address)",
+  "function protocolVersionToUpgradeTimestamp(uint256 _chainId,uint256 _oldProtocolVersion) view returns (uint256)",
+  "function setUpgradeTimestamp(uint256 _chainId,uint256 _upgradeTimestamp)",
+]);
+export const chainUpgradeAdminAbi = parseAbi([
+  "struct Call { address target; uint256 value; bytes data; }",
+  "function owner() view returns (address)",
+  "function multicall(Call[] _calls,bool _requireSuccess) payable",
+]);

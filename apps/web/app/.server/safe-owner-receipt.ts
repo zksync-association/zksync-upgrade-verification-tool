@@ -6,7 +6,10 @@ import { matchWalletTransaction } from "../../standalone/tx-sim/tx-sim-contracts
 import { l1 } from "./rpc";
 
 /** Shares tx-sim's exact-call, wrapper-runtime and canonical-receipt checks. Never broadcasts. */
-export async function readSafeOwnerReceipt(_plan: SafeOwnerApprovalPlan, _hash: Hex) {
+export async function readSafeOwnerReceipt(
+  _plan: Pick<SafeOwnerApprovalPlan, "chainId" | "owner" | "to" | "data" | "value">,
+  _hash: Hex
+) {
   const row = {
     network: "sepolia",
     chainId: _plan.chainId,
