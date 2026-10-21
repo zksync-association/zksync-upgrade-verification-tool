@@ -446,7 +446,7 @@ export async function sendOne({
   });
   try {
     await assertWallet(_provider, _row);
-    _progress("Opening MetaMask. Review the transaction in your wallet…");
+    _progress("Wallet request sent. Review and confirm the transaction in your connected wallet…");
     const hash = await _provider.request({
       method: "eth_sendTransaction",
       params: [checked.tx],

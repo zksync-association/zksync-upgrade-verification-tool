@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { CHAINS, ADDRESSES, STORAGE } from "./tx-sim-config.mjs";
 import { contracts, makeVote, voteRows } from "./tx-sim-contracts.mjs";
-import { sha256 } from "./tx-sim-core.mjs";
+import { sha256, identifyRows } from "./tx-sim-core.mjs";
 
 const require = createRequire(import.meta.url);
 const { JSDOM } = require("jsdom");
@@ -100,7 +100,9 @@ for (const protocol of ["file:", "http:"])
       proposalDeadline: "1000",
       proposalEta: "0",
       upgradeState: 0,
+      proposalVotes: ["0", "0", "0"],
     };
+    let proposedRetry = false;
     const response = (_result) => ({ ok: true, json: async () => ({ result: _result }) });
     try {
       for (const [_key, _value] of Object.entries({
@@ -138,7 +140,12 @@ for (const protocol of ["file:", "http:"])
         const decoded = iface.parseTransaction({ data: call.data });
         let value = values[decoded.name];
         if (decoded.name === "proposalSnapshot")
-          value = BigInt(decoded.args[0].toString()) === BigInt(vote.proposalId) ? "100" : "0";
+          value =
+            BigInt(decoded.args[0].toString()) === BigInt(vote.proposalId)
+              ? "100"
+              : proposedRetry
+                ? "1200"
+                : "0";
         if (decoded.name === "hashProposal")
           value = c.utils.keccak256(
             c.utils.defaultAbiCoder.encode(
@@ -147,7 +154,9 @@ for (const protocol of ["file:", "http:"])
             )
           );
         assert.notEqual(value, undefined, decoded.name);
-        return response(iface.encodeFunctionResult(decoded.name, [value]));
+        return response(
+          iface.encodeFunctionResult(decoded.name, Array.isArray(value) ? value : [value])
+        );
       };
       await import(`./tx-sim-ui.mjs?ui-test=${Date.now()}`);
       const waitFor = async (_predicate) => {
@@ -192,6 +201,28 @@ for (const protocol of ["file:", "http:"])
         JSON.parse(dom.window.localStorage.getItem(STORAGE.journal)).oldProposal,
         oldReceipt
       );
+      assert.deepEqual(walletRequests, []);
+      const retry = makeVote(stored.input, stored.description, c);
+      const rows = await identifyRows(voteRows(retry, c), `normal:${retry.proposalId}`);
+      const receipts = JSON.parse(localStorage.getItem(STORAGE.journal));
+      receipts[rows[0].id] = oldReceipt;
+      receipts[rows[1].id] = oldReceipt;
+      localStorage.setItem(STORAGE.journal, JSON.stringify(receipts));
+      window.dispatchEvent(new window.StorageEvent("storage", { key: STORAGE.journal }));
+      proposedRetry = true;
+      values.state = 0;
+      values.proposalDeadline = "1500";
+      [...document.querySelectorAll("button")]
+        .find((_button) => _button.textContent === "Refresh governance state")
+        .click();
+      await waitFor(() =>
+        document.getElementById("vote-status").textContent.includes("Initial deadline")
+      );
+      const steps = [...document.querySelectorAll("#vote-actions .step")];
+      assert.equal(steps[0].querySelector("button").textContent, "Completed");
+      assert.equal(steps[1].querySelector("button").textContent, "Completed");
+      assert.equal(steps[2].querySelector("button").textContent, "Waiting for voting to open");
+      assert.equal(steps[2].querySelector("button").disabled, true);
       assert.deepEqual(walletRequests, []);
     } finally {
       dom.window.close();

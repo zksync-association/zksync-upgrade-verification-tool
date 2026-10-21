@@ -11,6 +11,8 @@ import { build } from "esbuild";
 import { ethers } from "ethers";
 import { contracts } from "./tx-sim-contracts.mjs";
 import { preparedProposals, votingRetry } from "./tx-sim-source.mjs";
+import { ADDRESSES } from "./tx-sim-config.mjs";
+import { requireThat, same } from "./tx-sim-core.mjs";
 
 const root = fileURLToPath(new URL("./", import.meta.url));
 const { values } = parseArgs({
@@ -50,6 +52,10 @@ try {
       throw new Error(
         "Choose one prepared proposal with --proposal-id before building its voting retry."
       );
+    requireThat(
+      same(choices[0].from, ADDRESSES.control),
+      "The prepared retry workflow must use the source's required Testnet 3 voting account."
+    );
     prepared = votingRetry(choices[0], values["retry-description"], c);
   }
   const result = await build({

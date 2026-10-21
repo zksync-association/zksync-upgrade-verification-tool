@@ -983,7 +983,11 @@ function renderNormal() {
       : `chain clock ${_value}`;
   if (status.state === 0)
     panel.append(
-      el("p", {}, `Voting opens after ${time(status.snapshot)}. Refresh when that time has passed.`)
+      el(
+        "p",
+        {},
+        `Voting opens after ${time(status.snapshot)}. Initial deadline: ${time(status.deadline)}. This page refreshes automatically and enables voting only when the governor reports Active.`
+      )
     );
   if (status.state === 1)
     panel.append(
@@ -1017,7 +1021,28 @@ function renderNormal() {
       )
     );
   for (const row of normalRows) {
-    const allowed = draftMatches() && allowedVoteAction(status, row.tag);
+    const entry = journal[row.id];
+    const completed =
+      entry?.status === "confirmed" ||
+      (row.tag === "propose" && status.state !== null) ||
+      (row.tag === "castVote" && status.hasVoted) ||
+      (row.tag === "queue" && [5, 7].includes(status.state)) ||
+      (row.tag === "execute" && status.state === 7);
+    const pending = ["pending", "awaiting", "uncertain"].includes(entry?.status);
+    const allowed = draftMatches() && allowedVoteAction(status, row.tag) && !completed && !pending;
+    const label = completed
+      ? "Completed"
+      : entry?.status === "pending"
+        ? "Pending confirmation"
+        : entry?.status === "awaiting"
+          ? "Wallet request open"
+          : entry?.status === "uncertain"
+            ? "Check transaction hash"
+            : row.tag === "castVote" && status.state === 0
+              ? "Waiting for voting to open"
+              : allowed
+                ? "Review transaction"
+                : "Waiting for required state";
     const step = el("div", { class: "step" }, el("strong", {}, row.description), " ", badge(row));
     step.append(
       el(
@@ -1026,7 +1051,7 @@ function renderNormal() {
         el(
           "button",
           {
-            disabled: busy || !allowed,
+            disabled: busy || (!allowed && !completed && !pending),
             onclick: () => {
               normalSelected = row;
               render();
@@ -1036,7 +1061,7 @@ function renderNormal() {
               });
             },
           },
-          allowed ? "Review transaction" : "Waiting for required state"
+          label
         )
       )
     );
@@ -1518,7 +1543,9 @@ async function initialize() {
     setView("normal");
     try {
       await prepareVote();
-      normalSelected = normalRows.find((_row) => _row.tag === "propose");
+      normalSelected = normalRows.find(
+        (_row) => _row.tag === (status?.state === null ? "propose" : "castVote")
+      );
       render();
     } catch (_error) {
       notice(
@@ -1533,7 +1560,18 @@ async function initialize() {
     // Rebuilding is local; no automatic wallet connection or transaction request.
     vote = makeVote(normalSaved.input, normalSaved.description, c);
     normalRows = await identifyRows(voteRows(vote, c), `normal:${vote.proposalId}`);
-    render();
+    setView("normal");
+    try {
+      await refreshVote();
+      normalSelected = normalRows.find(
+        (_row) => _row.tag === (status.state === null ? "propose" : "castVote")
+      );
+      render();
+    } catch (_error) {
+      status = null;
+      notice(`Workflow restored; live RPC checks need attention: ${_error.message}`, true);
+      render();
+    }
   }
   initialized = true;
   await restoreWallet();
