@@ -39,7 +39,9 @@ async function startable(found: Promise<NotStartedUpgrade[]>) {
       // Its name and when it executed on Era, for the card: neither decides anything.
       const [title, executedAt] = await Promise.all([
         l2Governors.protocol
-          ? l2ProposalTitle(l2Governors.protocol, BigInt(item.l2ProposalId)).catch(() => null)
+          ? l2ProposalTitle(l2Governors.protocol, BigInt(item.l2ProposalId), { page: true }).catch(
+              () => null
+            )
           : null,
         l2TxTime(item.executedTx).catch(() => null),
       ]);

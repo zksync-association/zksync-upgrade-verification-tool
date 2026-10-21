@@ -12,7 +12,7 @@ export default defineConfig({
     testTimeout: 300_000,
     hookTimeout: 300_000,
     env: {
-      L1_RPC_URL: process.env.L1_RPC_URL ?? "https://mainnet.gateway.tenderly.co",
+      L1_RPC_URL: process.env.L1_RPC_URL || "https://mainnet.gateway.tenderly.co",
       LOG_LEVEL: "warn",
       // The RPC above, not one saved in apps/web/.cache/local-settings.json. Only the RPC
       // settings are ignored: a saved SAFE_API_KEY still applies (keyless, Safe allows 2 req/s).

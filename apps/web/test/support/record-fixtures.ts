@@ -6,7 +6,7 @@ import path from "node:path";
 import { parseGovernanceTypedData } from "@/common/typed-data";
 import { createPublicClient, http, getAddress, type Hex } from "viem";
 
-const RPC = process.env.L1_RPC_URL ?? "https://mainnet.gateway.tenderly.co";
+const RPC = process.env.L1_RPC_URL || "https://mainnet.gateway.tenderly.co";
 const SAFE = "https://api.safe.global/tx-service/eth";
 const VERIFIERS = [
   "0x59195219d1176E42f8e607e9AC114926D47f9035", // SecurityCouncil

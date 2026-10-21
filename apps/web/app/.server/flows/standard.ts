@@ -136,7 +136,7 @@ export type UpgradeList = {
 export async function upgradeTitles(list: UpgradeList): Promise<Record<string, string | null>> {
   const titles = await Promise.all(
     list.upgrades.map((u) =>
-      findL2ProposalForUpgrade(u.id, u.createdAt, { startedTxHash: u.txHash }).then(
+      findL2ProposalForUpgrade(u.id, u.createdAt, { startedTxHash: u.txHash, page: true }).then(
         (found) => found?.title ?? null,
         () => null
       )
@@ -425,6 +425,7 @@ export async function loadStandardUpgrade(
     timedRead(id, "l2-discovery", () =>
       findL2ProposalForUpgrade(id, core.status.creationTimestamp, {
         startedTxHash: core.started.txHash,
+        page: freshness === "page",
       })
     )
   );

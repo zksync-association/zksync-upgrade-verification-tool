@@ -2,6 +2,7 @@
 // the <html> document (this page is already one). Until an RPC URL is saved only the settings show.
 import { AppBody, AppToaster, loader as appLoader, shouldRevalidate } from "@/root";
 import { GeneralErrorBoundary } from "@/components/error-boundary";
+import { KeepScrollOnReload } from "@/components/keep-scroll";
 import { Navigate, Outlet, ScrollRestoration, useLocation } from "react-router-dom";
 import { hasRpcSetting } from "./shims/local-settings";
 
@@ -31,6 +32,7 @@ export default function Root() {
       <AppToaster />
       {/* Back and forward land where each page was scrolled to (Settings' close button is a back). */}
       <ScrollRestoration />
+      <KeepScrollOnReload />
     </>
   );
 }

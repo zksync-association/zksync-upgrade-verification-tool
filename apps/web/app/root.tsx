@@ -5,6 +5,7 @@ import AppShell, { AppFrame, StatusProblem } from "@/components/app-shell";
 import { GeneralErrorBoundary } from "@/components/error-boundary";
 import { ChainContext } from "@/components/governance-context";
 import { PresenceProvider } from "@/components/presence";
+import { KeepScrollOnReload } from "@/components/keep-scroll";
 import { WalletProvider } from "@/components/providers/wallet-provider";
 import { useNonce } from "@/utils/nonce-provider";
 import { shouldRevalidateRoot } from "@/utils/revalidation";
@@ -182,6 +183,7 @@ function Document({
           suppressHydrationWarning
         />
         <ScrollRestoration nonce={nonce} />
+        <KeepScrollOnReload />
         <Scripts nonce={nonce} />
       </body>
     </html>

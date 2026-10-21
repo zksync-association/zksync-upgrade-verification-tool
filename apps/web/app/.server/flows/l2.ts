@@ -466,13 +466,13 @@ async function executedFromIndex(
 export async function findL2ProposalForUpgrade(
   l1Id: Hex,
   creationTimestamp: number,
-  options: { startedTxHash?: Hex; strategy?: "batch" | "legacy" } = {}
+  options: { startedTxHash?: Hex; strategy?: "batch" | "legacy"; page?: boolean } = {}
 ) {
   const match = await matchL2ProposalForUpgrade(l1Id, creationTimestamp, options);
   if (!match) return null;
-  const description = await l2ProposalDescription(match.governor, BigInt(match.proposalId)).catch(
-    () => null
-  );
+  const description = await l2ProposalDescription(match.governor, BigInt(match.proposalId), {
+    page: options.page,
+  }).catch(() => null);
   return {
     ...match,
     title: description === null ? null : proposalTitle(description),
@@ -480,21 +480,26 @@ export async function findL2ProposalForUpgrade(
   };
 }
 
-/** From its ProposalCreated log: the index's when the governor is indexed, else read for it. */
+/**
+ * From its ProposalCreated log: the index's when the governor is indexed, else read for it. A page
+ * reads the index at Era's head as pages keep it (ERA_PAGE_MAX_AGE_MS), JSON at the newest.
+ */
 export async function l2ProposalTitle(
   governor: Address,
-  proposalId: bigint
+  proposalId: bigint,
+  { page = false }: { page?: boolean } = {}
 ): Promise<string | null> {
-  const description = await l2ProposalDescription(governor, proposalId);
+  const description = await l2ProposalDescription(governor, proposalId, { page });
   return description === null ? null : proposalTitle(description);
 }
 
 async function l2ProposalDescription(
   governor: Address,
-  proposalId: bigint
+  proposalId: bigint,
+  { page = false }: { page?: boolean } = {}
 ): Promise<string | null> {
   const net = await network();
-  const at = isIndexedL2Governor(net, governor) ? await l2IndexHead(net) : null;
+  const at = isIndexedL2Governor(net, governor) ? await l2IndexHead(net, { page }) : null;
   if (!at) return (await getL2Proposal(governor, proposalId))?.description ?? null;
   const { events } = await l2GovernorIndex().read({ head: at });
   const event = events.find(
@@ -526,9 +531,11 @@ async function matchL2ProposalForUpgrade(
   const { l2Governors, isDevNode, upgradeHandler } = net;
   if (!client || !l2Governors.protocol) return null;
   const governor = l2Governors.protocol;
+  // Found once and kept; on a dev node (rewound at will, which /resources/refresh follows) for a
+  // minute, as pages read Era.
   return cached(
     `l2-for-upgrade:${strategy}:${l1Id}`,
-    isDevNode ? 0 : Number.POSITIVE_INFINITY,
+    isDevNode ? 60_000 : Number.POSITIVE_INFINITY,
     async () => {
       if (strategy === "batch" && startedTxHash) {
         try {
