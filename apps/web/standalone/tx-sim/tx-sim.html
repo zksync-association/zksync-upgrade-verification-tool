@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Tx-sim · Testnet 3 governance</title>
+    <link rel="stylesheet" href="tx-sim.css" />
+    <script src="ethers.umd.min.js"></script>
+    <script type="module" src="tx-sim-ui.mjs"></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="./">ZKsync <span>Governance</span></a>
+      <nav>
+        <button id="bundle-tab" class="active">All PR transactions</button>
+        <button id="normal-tab">L2 → L1 proposal</button>
+      </nav>
+      <div id="wallet-state">Wallet disconnected</div>
+      <button id="connect" class="primary">Connect MetaMask</button>
+    </header>
+    <main>
+      <div class="heading">
+        <div>
+          <span class="eyebrow">TESTNET 3 · TRANSACTION SIMULATOR</span>
+          <h1 id="page-title">Execute tx-sim transactions</h1>
+          <p>
+            Send reviewed L1 and L2 calls to MetaMask, including ownership
+            handovers, token administration, voting and upgrades.
+          </p>
+        </div>
+        <a
+          id="pr-link"
+          target="_blank"
+          rel="noopener"
+          href="https://github.com/matter-labs/transaction-simulator/pull/386"
+          >PR #386 ↗</a
+        >
+      </div>
+      <div id="notice" role="status" aria-live="polite" hidden></div>
+      <section class="card source">
+        <div>
+          <strong id="source-title">Loading PR #386…</strong>
+          <p id="source-info">Reading the pinned transaction files.</p>
+        </div>
+        <button id="refresh-source">Refresh from GitHub</button
+        ><button id="export-progress">Export receipts</button>
+      </section>
+      <section id="normal-view" hidden>
+        <div class="flow">
+          <span>1 · Propose on L2</span><span>2 · Vote & wait</span
+          ><span>3 · Queue & execute</span><span>4 · Prove message on L1</span
+          ><span>5 · Start upgrade</span>
+        </div>
+        <div class="grid normal-grid">
+          <section class="card">
+            <h2>Proposal payload</h2>
+            <p>
+              Load the corrected normal-governance payload from PR #386, or
+              paste its upgrade JSON. Call values in this payload are
+              <strong>wei</strong>.
+            </p>
+            <div id="vote-candidates"></div>
+            <label for="description">L2 proposal description</label
+            ><textarea
+              id="description"
+              rows="2"
+              placeholder="Exact description from the reviewed proposal"
+            ></textarea
+            ><label for="payload">Upgrade payload</label
+            ><textarea
+              id="payload"
+              rows="9"
+              spellcheck="false"
+              placeholder='{"calls":[{"target":"0x…","value":"0","data":"0x…"}],"executor":"0x…","salt":"0x…"}'
+            ></textarea>
+            <div class="actions">
+              <button id="prepare-vote" class="primary">
+                Prepare L2 → L1 workflow</button
+              ><label class="file-button"
+                >Open JSON file<input
+                  id="vote-file"
+                  type="file"
+                  accept=".json,application/json" /></label
+              ><button id="clear-vote">Clear workflow</button>
+            </div>
+            <p class="muted">
+              Preparing calculates the proposal IDs and calldata. Sending opens
+              MetaMask for one transaction at a time.
+            </p>
+          </section>
+          <section class="card">
+            <h2>Live governance state</h2>
+            <div id="vote-status">
+              <p>Choose the reviewed payload to begin.</p>
+            </div>
+            <div id="vote-actions"></div>
+          </section>
+        </div>
+        <section class="card" id="proof-panel" hidden>
+          <h2>L2 → L1 inclusion proof</h2>
+          <p>
+            The L2 execute transaction emits the message from the governor
+            timelock. Once its batch has executed on L1, this view verifies the
+            proof on L1 and prepares <code>startUpgrade</code>.
+          </p>
+          <label for="execution-hash"
+            >L2 governor execute transaction hash</label
+          >
+          <div class="actions">
+            <input
+              id="execution-hash"
+              class="mono grow"
+              placeholder="0x…"
+            /><button id="load-proof">Check finality & build L1 call</button>
+          </div>
+          <div id="proof-status"></div>
+        </section>
+        <section class="card" id="normal-transaction" hidden></section>
+      </section>
+      <section id="bundle-view">
+        <section class="card">
+          <h2>Reviewed transaction files</h2>
+          <p>
+            Values in tx-sim files are <strong>ETH</strong>. Independent approvals and grouped admin calls can be submitted while earlier calls are pending. Dependent calls wait for their required receipts.
+          </p>
+          <div class="actions">
+            <label class="file-button"
+              >Open tx-sim JSON<input
+                id="bundle-file"
+                type="file"
+                accept=".json,application/json" /></label
+            ><button id="paste-toggle">Paste JSON / fetch URL</button>
+          </div>
+          <div id="import-panel" hidden>
+            <label for="import-json">Transaction array</label
+            ><textarea
+              id="import-json"
+              rows="5"
+              placeholder='[{"network":"sepolia","from":"0x…","to":"0x…","value":"0","data":"0x…"}]'
+            ></textarea
+            ><button id="import-paste">Load pasted transactions</button
+            ><label for="import-url"
+              >Raw JSON URL, GitHub file URL, or PR #386 URL</label
+            >
+            <div class="actions">
+              <input
+                id="import-url"
+                class="grow"
+                placeholder="https://github.com/matter-labs/transaction-simulator/pull/386"
+              /><button id="import-fetch">Fetch</button>
+            </div>
+          </div>
+        </section>
+        <div class="grid bundle-grid">
+          <aside class="card"><div id="bundles"></div></aside>
+          <section>
+            <div id="bundle-summary" class="card"></div>
+            <div class="grid tx-grid">
+              <aside class="card call-list" id="calls"></aside>
+              <section class="card" id="transaction">
+                <p>Select a transaction file.</p>
+              </section>
+            </div>
+          </section>
+        </div>
+      </section>
+      <details class="card settings">
+        <summary>RPCs & local progress</summary>
+        <p>
+          Reads and simulations use these RPCs or your connected wallet.
+          Receipts are saved in this browser. An uncertain wallet submission
+          stays blocked until you attach its transaction hash.
+        </p>
+        <label for="l1-rpc">Sepolia RPC</label
+        ><input id="l1-rpc" type="url" /><label for="l2-rpc"
+          >Chain 312 RPC</label
+        ><input id="l2-rpc" type="url" /><button id="save-rpcs">
+          Save RPCs
+        </button>
+        <p>Required owner: <code id="required-owner"></code></p>
+      </details>
+    </main>
+  </body>
+</html>

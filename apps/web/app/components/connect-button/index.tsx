@@ -37,10 +37,7 @@ export function useConnectedGroups(): {
   return { address, groups, known: true };
 }
 
-/**
- * Connects over WalletConnect: its own modal opens, with the QR to scan and Copy link to paste into
- * Safe{Wallet}. Closing the modal is not an error; anything else is said.
- */
+/** Prefer the discovered MetaMask provider; retain WalletConnect for member Safes. */
 export function useConnectWallet() {
   const { connectors, connect, isPending } = useConnect({
     mutation: {
@@ -50,12 +47,17 @@ export function useConnectWallet() {
       },
     },
   });
-  const connector = connectors.find((c) => c.id === "walletConnect");
-  return { connect: connector ? () => connect({ connector }) : undefined, isPending };
+  const metamask =
+    connectors.find((c) => c.id === "io.metamask") ?? connectors.find((c) => c.id === "metaMask");
+  const walletConnect = connectors.find((c) => c.id === "walletConnect");
+  const connector = metamask ?? walletConnect;
+  return {
+    connect: connector ? () => connect({ connector }) : undefined,
+    connectMetaMask: metamask ? () => connect({ connector: metamask }) : undefined,
+    connectWalletConnect: walletConnect ? () => connect({ connector: walletConnect }) : undefined,
+    isPending,
+  };
 }
-
-const NO_WALLETCONNECT =
-  "Wallets connect over WalletConnect: add a WalletConnect project id in Settings first. Members then connect their Safe from Safe{Wallet} to sign; to send a transaction, connect any WalletConnect wallet app, or copy its to, data and value from this page into your wallet.";
 
 /**
  * Asks the connected wallet to move to this page's chain. Refused or impossible (a wallet whose
@@ -87,29 +89,29 @@ export default function ConnectButton() {
       {({ account, chain, openAccountModal, mounted }) => {
         if (!mounted) return <div className="h-10 w-[104px]" aria-hidden />;
         if (!account || !chain) {
-          if (!window.ENV?.WALLET_CONNECT_PROJECT_ID)
-            return (
+          return (
+            <div className="flex gap-2">
               <Button
                 variant="default"
                 className="px-3.5"
-                onClick={() => toast(NO_WALLETCONNECT, { duration: 12_000 })}
+                onClick={wallet.connectMetaMask}
+                disabled={!wallet.connectMetaMask}
+                loading={wallet.isPending}
                 data-testid="connect-wallet"
-                title={NO_WALLETCONNECT}
+                title="Connect MetaMask in your desktop browser. Serve single-file builds on localhost."
               >
-                Connect wallet
+                Connect MetaMask
               </Button>
-            );
-          return (
-            <Button
-              variant="default"
-              className="px-3.5"
-              onClick={wallet.connect}
-              loading={wallet.isPending}
-              data-testid="connect-wallet"
-              title="Only needed to sign as a member Safe or to send a transaction. Checking needs no wallet."
-            >
-              Connect wallet
-            </Button>
+              {wallet.connectWalletConnect && (
+                <Button
+                  variant="outline"
+                  onClick={wallet.connectWalletConnect}
+                  loading={wallet.isPending}
+                >
+                  WalletConnect
+                </Button>
+              )}
+            </div>
           );
         }
         if (chain.unsupported) {

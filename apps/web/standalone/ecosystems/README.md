@@ -17,3 +17,5 @@ A config's `codePins` are keccak256 of the runtime code at the Security Council,
 Emergency Upgrade Board, and of a member Safe's proxy, with the Safes' singleton and fallback
 handler (all members alike); `null` reads every check on-chain instead. Its handler's legal veto
 and delay are 0 for TestnetProtocolUpgradeHandler, else 3 and 1.
+
+For desktop MetaMask and reviewed Testnet 3 L1/L2 transactions, see [the tx-sim companion](../tx-sim/README.md).

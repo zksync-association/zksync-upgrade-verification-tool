@@ -216,12 +216,23 @@ function HomeLink() {
   );
 }
 
+declare const __TX_SIM_COMPANION__: boolean;
+
 function Nav() {
   return (
     <nav
       aria-label="Governance navigation"
       className="-mx-2 order-4 flex w-[calc(100%+1rem)] items-center gap-x-1 overflow-x-auto xl:order-2 xl:mx-0 xl:w-auto xl:flex-1 xl:justify-center xl:overflow-visible"
     >
+      {typeof __TX_SIM_COMPANION__ !== "undefined" && __TX_SIM_COMPANION__ && (
+        <a
+          href="./tx-sim.html"
+          className="px-2.5 py-2 font-medium text-sm"
+          title="Execute reviewed Testnet 3 transaction files"
+        >
+          Tx-sim
+        </a>
+      )}
       {NAV.map((item) => (
         <NavLink
           key={item.to}
