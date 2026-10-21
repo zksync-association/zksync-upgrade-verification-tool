@@ -55,6 +55,7 @@ const plan = {
   digest,
   value: "0",
   alreadyApproved: false,
+  gasLimit: "1000000",
   checkedAtBlock: "100",
 };
 const action = () =>
@@ -138,11 +139,12 @@ it("reviews first, rechecks before sending, and persists one pending request", a
     to: safe,
     data: plan.data,
     value: 0n,
+    gas: 1_000_000n,
   });
-  await screen.findByRole("button", { name: "Check approval" });
+  await screen.findByRole("button", { name: "Check approval / retry if failed" });
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(localStorage.getItem(localStorage.key(0) ?? "")).toContain(hash);
-  fireEvent.click(screen.getByRole("button", { name: "Check approval" }));
+  fireEvent.click(screen.getByRole("button", { name: "Check approval / retry if failed" }));
   await screen.findByRole("alert");
   expect(state.wallet.sendTransaction).toHaveBeenCalledOnce();
 });
@@ -172,7 +174,7 @@ it("keeps an ambiguous wallet submission blocked across remounts", async () => {
   await screen.findByRole("alert");
   view.unmount();
   render(<SafeOwnerApprovals actions={[action()]} />);
-  fireEvent.click(screen.getByRole("button", { name: "Check approval" }));
+  fireEvent.click(screen.getByRole("button", { name: "Check approval / retry if failed" }));
   await screen.findByRole("alert");
   expect(state.wallet.sendTransaction).toHaveBeenCalledOnce();
 });
@@ -205,4 +207,21 @@ it("blocks stale governance and hides the helper on mainnet", () => {
   state.status.governance.network.chainId = 1;
   view.rerender(<SafeOwnerApprovals actions={[action()]} />);
   expect(screen.queryByTestId("safe-owner-approvals")).toBeNull();
+});
+
+it("offers a reviewed retry only after the matching receipt proves the earlier send reverted", async () => {
+  render(<SafeOwnerApprovals actions={[action()]} />);
+  await review();
+  fireEvent.click(screen.getByRole("button", { name: "Send to MetaMask" }));
+  await screen.findByRole("button", { name: "Check approval / retry if failed" });
+  fetchMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({ plan: { ...plan, previousSubmission: { hash, status: "reverted" } } }),
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Check approval / retry if failed" }));
+  await screen.findByText(/previous transaction reverted on-chain/i);
+  expect(state.wallet.sendTransaction).toHaveBeenCalledTimes(1);
+  expect(fetchMock.mock.calls.at(-1)?.[0]).toContain(`hash=${hash}`);
+  fireEvent.click(screen.getByRole("button", { name: "Send to MetaMask" }));
+  await waitFor(() => expect(state.wallet.sendTransaction).toHaveBeenCalledTimes(2));
 });

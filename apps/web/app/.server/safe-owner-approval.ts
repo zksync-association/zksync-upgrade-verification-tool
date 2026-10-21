@@ -20,6 +20,7 @@ import { callFn, ethCall } from "./chain/call";
 import { getStandardUpgradeCore } from "./flows/standard";
 import { l1, latestBlock, network, refreshHead } from "./rpc";
 import { appStatus } from "./status";
+import { readSafeOwnerReceipt } from "./safe-owner-receipt";
 
 const requireThat = (_ok: unknown, _message: string) => {
   if (!_ok) throw new Error(_message);
@@ -29,7 +30,8 @@ const requireThat = (_ok: unknown, _message: string) => {
 export async function prepareSafeOwnerApproval(
   _id: Hex,
   _safe: Address,
-  _owner: Address
+  _owner: Address,
+  _previousHash?: Hex
 ): Promise<SafeOwnerApprovalPlan> {
   const net = await network();
   requireThat(
@@ -119,6 +121,7 @@ export async function prepareSafeOwnerApproval(
     domain.toLowerCase() === safeMessageHashes(net.chainId, _safe, digest).domainHash.toLowerCase(),
     "Safe domain separator differs from the expected Sepolia domain."
   );
+  let gasLimit: bigint = SAFE_OWNER_APPROVAL.minimumWalletGas;
   if (approved === 0n) {
     const result = await ethCall(
       { from: _owner, to: _safe, data: call.data, value: 0n, blockNumber: head.number },
@@ -128,8 +131,20 @@ export async function prepareSafeOwnerApproval(
       decodeFunctionResult({ abi: safeAbi, functionName: "execTransaction", data: result }),
       "Safe execution simulation returned false."
     );
+    const estimate = await l1.estimateGas({
+      account: _owner,
+      to: _safe,
+      data: call.data,
+      value: 0n,
+    });
+    const buffered = estimate * SAFE_OWNER_APPROVAL.estimateMultiplier;
+    gasLimit = buffered > gasLimit ? buffered : gasLimit;
+    requireThat(
+      gasLimit <= SAFE_OWNER_APPROVAL.maximumWalletGas,
+      "The Safe gas estimate exceeds the supported approval budget. Inspect it before sending."
+    );
   }
-  return {
+  const plan: SafeOwnerApprovalPlan = {
     chainId: net.chainId,
     safe: _safe,
     owner: _owner,
@@ -139,6 +154,10 @@ export async function prepareSafeOwnerApproval(
     data: call.data,
     value: "0",
     alreadyApproved: approved !== 0n,
+    gasLimit: gasLimit.toString(),
     checkedAtBlock: head.number.toString(),
   };
+  if (_previousHash && !plan.alreadyApproved)
+    plan.previousSubmission = await readSafeOwnerReceipt(plan, _previousHash);
+  return plan;
 }

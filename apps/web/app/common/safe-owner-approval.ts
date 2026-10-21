@@ -21,6 +21,12 @@ export const SAFE_OWNER_APPROVAL = {
   handler: "0xD7B653c373aa9585141223d244DA857b10c92d85" as Address,
   library: "0xA65387F16B013cf2Af4605Ad8aA5ec25a2cbA3a2" as Address,
   libraryCodeHash: "0x3ac65dea3cc9dd0d7b7b800f834e3d73415b4e944bb94555c3e4a08fb137e918" as Hex,
+  // The first MetaMask 7702 authorization consumed gas outside the Safe. Its historical
+  // wrapped call reverted at 553,725 gas and succeeded at 1,000,000. Keep this allowance
+  // for the whole wallet transaction, separately from Safe's zero-refund inner fields.
+  minimumWalletGas: 1_000_000n,
+  maximumWalletGas: 2_000_000n,
+  estimateMultiplier: 2n,
   delegateCall: 1,
   ownerSignatureType: "0x01" as Hex,
   fallbackSlot: keccak256(toBytes("fallback_manager.handler.address")),
@@ -36,6 +42,8 @@ export type SafeOwnerApprovalPlan = {
   data: Hex;
   value: "0";
   alreadyApproved: boolean;
+  gasLimit: string;
+  previousSubmission?: { hash: Hex; status: "pending" | "reverted" | "confirmed" };
   checkedAtBlock: string;
 };
 

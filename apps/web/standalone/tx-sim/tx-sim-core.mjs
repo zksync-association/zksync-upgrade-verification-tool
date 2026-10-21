@@ -268,6 +268,7 @@ export function assertMatches(_row, _tx) {
       );
   }
 }
+/** @param {(_row: any, _tx: any, _rpc: any, _block: any) => unknown} [_match] */
 export async function inspectReceipt(_row, _hash, _rpc, _match = assertMatches) {
   requireThat(HASH.test(_hash), "Enter a 32-byte transaction hash.");
   const chain = await _rpc(_row.network, "eth_chainId", []);

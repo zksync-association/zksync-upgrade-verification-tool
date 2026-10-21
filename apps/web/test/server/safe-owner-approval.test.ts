@@ -25,12 +25,14 @@ const reads = vi.hoisted(() => ({
   library: "",
   result: true,
   calls: [] as any[],
+  estimate: 200_000n,
 }));
 vi.mock("@/.server/rpc", () => ({
   network: async () => reads.net,
   refreshHead: async () => {},
   latestBlock: async () => ({ number: 100n }),
   l1: {
+    estimateGas: async () => reads.estimate,
     getCode: async ({ address }: any) =>
       address === SAFE_OWNER_APPROVAL.library ? reads.library : reads.code,
     getStorageAt: async ({ slot }: any) =>
@@ -102,6 +104,7 @@ beforeEach(() => {
   reads.library = runtime.library;
   reads.result = true;
   reads.calls = [];
+  reads.estimate = 200_000n;
 });
 
 it("builds and simulates an exact zero-value Safe message approval from its sole owner", async () => {
@@ -248,4 +251,12 @@ it("binds approval calldata to the precise member Safe and governance digest", (
   const first = safeOwnerMessageCall(safe, owner, id);
   expect(safeOwnerMessageCall(owner, owner, id).safeMessageHash).not.toBe(first.safeMessageHash);
   expect(safeOwnerMessageCall(safe, owner, zeroHash).data).not.toBe(first.data);
+});
+
+it("uses a whole-wallet gas allowance and buffers a larger direct estimate", async () => {
+  expect((await prepareSafeOwnerApproval(id, safe, owner)).gasLimit).toBe("1000000");
+  reads.estimate = 600_000n;
+  expect((await prepareSafeOwnerApproval(id, safe, owner)).gasLimit).toBe("1200000");
+  reads.estimate = 1_100_000n;
+  await expect(prepareSafeOwnerApproval(id, safe, owner)).rejects.toThrow(/exceeds.*budget/);
 });

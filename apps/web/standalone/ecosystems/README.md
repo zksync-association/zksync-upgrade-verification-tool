@@ -40,6 +40,11 @@ This shortcut supports the pinned Testnet 3 deployment's Safe 1.3.0 members with
 threshold of one. It rechecks the owner, governance digest, Safe configuration and library code,
 then simulates the Safe call before opening MetaMask. Other Safe policies retain the normal Safe
 signing flow. Pending or uncertain wallet submissions stay blocked against duplicate sends; use
-**Check approval** to detect an approval that has reached the chain, and inspect any unresolved
-transaction in the wallet before retrying. Opening the same HTML from disk retains the Safe /
+**Check approval / retry if failed** to read its receipt. A matching, canonical reverted receipt
+opens a new review and **Retry failed approval**; pending or uncertain submissions stay blocked.
+An approval already recorded by the Safe refreshes the verified count instead of sending again.
+For this specific approval the request reserves at least 1,000,000 gas for the complete wallet
+transaction, or twice the direct-call estimate when larger (bounded at 2,000,000). The review
+shows the limit; unused gas is not charged. This covers MetaMask's first 7702 authorization,
+which was underfunded by the wallet's estimate even though the direct Safe simulation passed. Opening the same HTML from disk retains the Safe /
 WalletConnect flow; desktop MetaMask requires serving it over HTTP(S).

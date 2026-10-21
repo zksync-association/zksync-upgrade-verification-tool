@@ -18,7 +18,7 @@ import { type Address, type Hex, isAddressEqual } from "viem";
 import { useAccount, useWalletClient } from "wagmi";
 import { useState } from "react";
 
-type Sent = { status: "awaiting" | "pending" | "uncertain"; hash?: Hex };
+type Sent = { status: "awaiting" | "pending" | "uncertain" | "reverted"; hash?: Hex };
 
 export function SafeOwnerApprovals({ actions }: { actions: SignAction[] }) {
   const status = useStatusIfRead();
@@ -89,6 +89,8 @@ function SafeOwnerApprovalsBody({
   };
   const load = async (_safe: Address, _owner: Address) => {
     const query = new URLSearchParams({ id, safe: _safe, owner: _owner });
+    const sent = entry(_safe);
+    if (sent?.hash) query.set("hash", sent.hash);
     const response = await fetch(`/resources/safe-owner-approval?${query}`, {
       cache: "no-store",
       signal: AbortSignal.timeout(30_000),
@@ -109,6 +111,9 @@ function SafeOwnerApprovalsBody({
       if (plan.alreadyApproved) {
         save(_safe, null);
         reload();
+      } else if (plan.previousSubmission?.status === "reverted") {
+        save(_safe, { status: "reverted", hash: plan.previousSubmission.hash });
+        setReview(plan);
       } else if (!entry(_safe)) setReview(plan);
       else
         setError(
@@ -133,14 +138,28 @@ function SafeOwnerApprovalsBody({
         reload();
         return;
       }
-      if (plan.data !== review.data || plan.owner !== review.owner || entry(plan.safe))
+      if (
+        plan.data !== review.data ||
+        plan.owner !== review.owner ||
+        plan.gasLimit !== review.gasLimit ||
+        (entry(plan.safe) && plan.previousSubmission?.status !== "reverted")
+      )
         throw new Error("The reviewed call or its submission state changed. Review it again.");
       if ((await wallet.getChainId()) !== plan.chainId)
         throw new Error("Switch MetaMask to Sepolia.");
       const [currentOwner] = await wallet.getAddresses();
       if (!currentOwner || !isAddressEqual(currentOwner, plan.owner))
         throw new Error("Select the reviewed Safe owner in MetaMask.");
-      if (entry(plan.safe)) throw new Error("This Safe already has a submission in another tab.");
+      const latest = entry(plan.safe);
+      if (
+        latest &&
+        !(
+          latest.status === "reverted" &&
+          latest.hash === plan.previousSubmission?.hash &&
+          plan.previousSubmission?.status === "reverted"
+        )
+      )
+        throw new Error("This Safe already has a submission in another tab.");
       // Store before asking: a lost wallet response must not make it safe to resend.
       save(plan.safe, { status: "awaiting" });
       requested = true;
@@ -150,6 +169,7 @@ function SafeOwnerApprovalsBody({
         to: plan.to,
         data: plan.data,
         value: 0n,
+        gas: BigInt(plan.gasLimit),
       });
       save(plan.safe, { status: "pending", hash });
       setReview(null);
@@ -229,7 +249,9 @@ function SafeOwnerApprovalsBody({
                   {_member.status === "valid"
                     ? "Verified by governance"
                     : sent
-                      ? "Submission recorded — check before sending again"
+                      ? sent.status === "reverted"
+                        ? "Previous transaction reverted — retry available"
+                        : "Submission recorded — check before sending again"
                       : "Ready for owner review"}
                 </p>
                 {sent?.hash && <TxLink hash={sent.hash} />}
@@ -239,7 +261,11 @@ function SafeOwnerApprovalsBody({
                 disabled={busy || !direct || !owns || !!blocked || _member.status === "valid"}
                 onClick={() => void prepare(safe)}
               >
-                {sent ? "Check approval" : "Review approval"}
+                {sent?.status === "reverted"
+                  ? "Retry failed approval"
+                  : sent
+                    ? "Check approval / retry if failed"
+                    : "Review approval"}
               </Button>
             </div>
           );
@@ -275,6 +301,16 @@ function SafeOwnerApprovalsBody({
                 Safe message hash: <Hash value={review.safeMessageHash} />
               </p>
               <p>Value: 0 ETH. Review the gas fee in MetaMask.</p>
+              <p>
+                Gas limit: {review.gasLimit}. This includes an allowance for MetaMask's wallet
+                wrapper; unused gas is not charged.
+              </p>
+              {review.previousSubmission?.status === "reverted" && (
+                <p role="status">
+                  The previous transaction reverted on-chain. This is a new attempt, requiring your
+                  confirmation.
+                </p>
+              )}
               <details>
                 <summary>Exact transaction calldata</summary>
                 <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all">
