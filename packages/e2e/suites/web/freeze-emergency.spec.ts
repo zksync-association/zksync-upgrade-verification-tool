@@ -119,10 +119,25 @@ test("an emergency payload is built, hashed and checked in the browser", async (
     "0 signatures · 6 required"
   );
 
-  // The pending, fully signed id on mainnet: a payload for anything else is refused.
+  // Its payload is the one just built, kept in this browser and matching: nothing to warn about.
+  await expect(page.getByTestId("unchecked-payload")).toHaveCount(0);
+
+  // An id nobody signed yet and no payload here (the first signer's view): warned all the same.
+  await page.goto(`/app/emergency/0x${"ab".repeat(32)}`);
+  await expect(page.getByTestId("unchecked-payload")).toContainText(
+    "A signature covers only its id, not the calls it runs"
+  );
+
+  // The pending, fully signed id on mainnet: signed, with no payload here to check it against.
   await page.goto(
     "/app/emergency/0x4fa238865a64c1ccc992bfc0a4e984d13443e0e87c67feddb3cedc6f20f59f59"
   );
+  const warning = page.getByTestId("unchecked-payload");
+  await expect(warning).toContainText("Check the payload before you sign or execute");
+  // Its button goes to the payload box.
+  await warning.getByRole("button", { name: "Load the payload" }).click();
+  await expect(page.getByLabel("Paste the payload JSON")).toBeFocused();
+  // A payload for anything else is refused, and the warning says not to rely on it.
   await page.getByLabel("Paste the payload JSON").fill(
     JSON.stringify({
       salt: `0x${"00".repeat(32)}`,
@@ -131,6 +146,8 @@ test("an emergency payload is built, hashed and checked in the browser", async (
   );
   await page.getByTestId("check-payload").click();
   await expect(page.getByTestId("payload-error")).toContainText("not to the signed id");
+  await expect(warning).toHaveAttribute("data-kind", "mismatch");
+  await expect(warning).toContainText("The payload you loaded does not match this id");
   // The groups start folded on an emergency upgrade: the row says the threshold is met, the
   // unfolded group what accepted it.
   const council = page.getByTestId("set-securityCouncil");

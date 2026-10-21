@@ -232,6 +232,22 @@ describe("SignatureSetCard", () => {
     });
   });
 
+  it("Your signature: what the page cautions is said first in the review before signing", () => {
+    wallet.address = MEMBER_C;
+    render(
+      <YourSignature
+        hint="h"
+        caution={<p data-testid="caution">Payload not checked</p>}
+        actions={[{ key: "council", title: "Council approval", set, state: { status: "open" } }]}
+      />
+    );
+    expect(screen.queryByTestId("caution")).toBeNull();
+    fireEvent.click(screen.getByTestId("sign-button"));
+    expect(within(screen.getByRole("dialog")).getByTestId("caution")).toHaveTextContent(
+      "Payload not checked"
+    );
+  });
+
   it("renders its members at once before the root status is read, and lets no one sign yet", () => {
     root.read = false;
     wallet.address = MEMBER_C;

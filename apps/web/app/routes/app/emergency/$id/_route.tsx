@@ -26,6 +26,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { JsonDrop, OpenJsonFile } from "@/components/ui/json-drop";
+import {
+  UncheckedPayloadNote,
+  UncheckedPayloadWarning,
+} from "@/components/verification/unchecked-payload";
 import { Textarea } from "@/components/ui/textarea";
 import { CallList } from "@/components/verification/calls";
 import { type AsOfBlock, AsOfContent, AsOfNote } from "@/components/verification/as-of";
@@ -310,12 +314,19 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
   const board = d.governance.emergencyUpgradeBoard.address;
   const executed = d.state === UPGRADE_STATES.Done;
   const [check, setCheck] = useState<PayloadCheck | null>(null);
+  // Whether the payload kept in this browser was read: no warning before it is (it may match).
+  const [restored, setRestored] = useState(false);
 
   useEffect(() => {
     if (executed) return;
     const stored = loadPayload(d.id);
     if (stored) setCheck(checkEmergencyPayload(stored, d.id as Hex, board as Hex));
+    setRestored(true);
   }, [d.id, board, executed]);
+  const toPayload = () => {
+    document.getElementById("payload")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("payload-json")?.focus({ preventScroll: true });
+  };
   // Its state as the beats name it: one not read again at the head served now is shown as of its
   // block, in no colour, and nothing is signed or sent from the page until it is.
   const watchKey = `emergency:${d.id.toLowerCase()}`;
@@ -348,22 +359,28 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
                 const v = fresh ?? first;
                 const done = v.state === UPGRADE_STATES.Done;
                 return (
-                  <YourSignature
-                    hint="Check the payload below against this id, then compare the hashes in the review with your hardware wallet."
-                    actions={v.roles.map((r) => ({
-                      key: r.key,
-                      title: r.title,
-                      set: r.set,
-                      state: done
-                        ? {
-                            status: "done",
-                            detail: "The emergency upgrade was executed",
-                            txHash: v.executed?.txHash ?? null,
-                            at: v.executed?.timestamp ?? null,
-                          }
-                        : { status: "open" },
-                    }))}
-                  />
+                  <>
+                    {!done && restored && (
+                      <UncheckedPayloadWarning roles={v.roles} check={check} onLoad={toPayload} />
+                    )}
+                    <YourSignature
+                      hint="Check the payload below against this id, then compare the hashes in the review with your hardware wallet."
+                      caution={restored ? <UncheckedPayloadNote check={check} /> : null}
+                      actions={v.roles.map((r) => ({
+                        key: r.key,
+                        title: r.title,
+                        set: r.set,
+                        state: done
+                          ? {
+                              status: "done",
+                              detail: "The emergency upgrade was executed",
+                              txHash: v.executed?.txHash ?? null,
+                              at: v.executed?.timestamp ?? null,
+                            }
+                          : { status: "open" },
+                      }))}
+                    />
+                  </>
                 );
               }}
             </UntilFresh>
@@ -403,12 +420,14 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
           </Await>
         </Suspense>
       ) : (
-        <Section
-          title="What it will do"
-          description="Safe stores only the id. Load the payload the proposer shared; it is checked against the id here in your browser and never sent to the server."
-        >
-          <PayloadLoader id={d.id} board={board} check={check} onCheck={setCheck} />
-        </Section>
+        <div id="payload" className="scroll-mt-24">
+          <Section
+            title="What it will do"
+            description="Safe stores only the id. Load the payload the proposer shared; it is checked against the id here in your browser and never sent to the server."
+          >
+            <PayloadLoader id={d.id} board={board} check={check} onCheck={setCheck} />
+          </Section>
+        </div>
       )}
 
       <Suspense

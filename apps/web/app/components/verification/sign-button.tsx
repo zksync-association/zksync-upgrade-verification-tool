@@ -71,6 +71,7 @@ export function SignButton({
   onOpenChange,
   onSigned,
   label,
+  caution,
 }: {
   typedData: GovernanceTypedData;
   signerGroup: SignerGroup;
@@ -82,6 +83,8 @@ export function SignButton({
   /** The Safe has the request. */
   onSigned?: () => void;
   label?: ReactNode;
+  /** Said first in the review, before what is signed (e.g. a payload not checked against the id). */
+  caution?: ReactNode;
 }) {
   const { address, member, blocked, reason } = useSignReason({
     signerGroup,
@@ -169,6 +172,7 @@ export function SignButton({
               confirm.
             </DialogDescription>
           </DialogHeader>
+          {caution}
           <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[150px_1fr]">
             <dt className="text-slate-600">Action</dt>
             <dd className="mono">{typedData.primaryType}</dd>

@@ -64,10 +64,13 @@ const GROUP_NAME: Record<string, string> = {
 export function YourSignature({
   actions,
   hint,
+  caution,
 }: {
   actions: SignAction[];
   /** What to check on the page before signing. */
   hint: string;
+  /** Said first in each review before signing (e.g. a payload not checked against the id). */
+  caution?: React.ReactNode;
 }) {
   const live = useLive();
   const { address: you } = useAccount();
@@ -137,6 +140,7 @@ export function YourSignature({
               member={member}
               live={live}
               dialog={dialogOf("sign", action.key)}
+              caution={caution}
             />
           ))}
           {sending.map((action) => (
@@ -245,11 +249,13 @@ function SignRow({
   member,
   live,
   dialog,
+  caution,
 }: {
   action: SignAction;
   member: Member;
   live: Live;
   dialog: { open: boolean; onOpenChange: (open: boolean) => void };
+  caution?: React.ReactNode;
 }) {
   const { set } = action;
   const { staleAt, notCurrent } = setStanding(set, live);
@@ -330,6 +336,7 @@ function SignRow({
               onOpenChange={dialog.onOpenChange}
               onSigned={() => setSent(now)}
               label={member.status === "invalid" ? "Review and sign again" : "Review and sign"}
+              caution={caution}
             />
           </div>
         )}
