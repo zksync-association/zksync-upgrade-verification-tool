@@ -85,6 +85,10 @@ test("on a phone an update in place leaves the page where it was (the header kee
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  // A phone's CPU: hydration is slow enough that the root status lands while the page's sections
+  // are still hydrating, which must not render them again (detaching what is on screen).
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
   await page.goto(`/app/proposals/${UPGRADE_ID}`);
   const council = page.getByTestId("set-securityCouncil");
   const row = council.getByTestId("member-row").filter({ hasText: "OpenZeppelin" });

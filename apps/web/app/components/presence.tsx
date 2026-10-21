@@ -5,6 +5,7 @@ import { useMatches, useNavigation, useRevalidator } from "@remix-run/react";
 import {
   type ReactNode,
   createContext,
+  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -713,7 +714,8 @@ export function PresenceProvider({ awayMs, children }: { awayMs: number; childre
         (beater.current?.visible ??
           (typeof document === "undefined" || document.visibilityState === "visible")),
       statusChanged: requestStatusRevalidation,
-      onHeld: (held) => setLive((s) => (s.held === held ? s : { ...s, held })),
+      onHeld: (held) =>
+        startTransition(() => setLive((s) => (s.held === held ? s : { ...s, held }))),
     });
 
   // A navigation or a reload ended: a reload that waited for it goes now.
@@ -743,25 +745,31 @@ export function PresenceProvider({ awayMs, children }: { awayMs: number; childre
   useEffect(() => {
     const next = new Beater({
       awayMs,
+      // Beats update the labels as transitions: an urgent update reaching a section that is still
+      // hydrating (a slow device) makes React render that section again from its fallback.
       onAnswer: (answer) => {
-        setLive((s) => ({
-          ...s,
-          head: answer.head ?? s.head,
-          index: answer.index ?? s.index,
-          checked: answer.checked ?? {},
-          verifiedAt: answer.verifiedAt ?? {},
-          notedAt: answer.notedAt ?? {},
-          eraAt: answer.eraAt ?? {},
-          simulatedAt: answer.simulatedAt ?? {},
-          catchingUp: answer.catchingUp === true,
-        }));
+        startTransition(() =>
+          setLive((s) => ({
+            ...s,
+            head: answer.head ?? s.head,
+            index: answer.index ?? s.index,
+            checked: answer.checked ?? {},
+            verifiedAt: answer.verifiedAt ?? {},
+            notedAt: answer.notedAt ?? {},
+            eraAt: answer.eraAt ?? {},
+            simulatedAt: answer.simulatedAt ?? {},
+            catchingUp: answer.catchingUp === true,
+          }))
+        );
         reloader.current?.noteAnswer(answer);
       },
       onState: ({ away, failing, lastBeatAt }) => {
-        setLive((s) =>
-          s.away === away && s.failing === failing && s.lastBeatAt === lastBeatAt
-            ? s
-            : { ...s, away, failing, lastBeatAt }
+        startTransition(() =>
+          setLive((s) =>
+            s.away === away && s.failing === failing && s.lastBeatAt === lastBeatAt
+              ? s
+              : { ...s, away, failing, lastBeatAt }
+          )
         );
         // Visible again: a reload that waited while the tab was hidden goes now.
         if (next.visible) reloader.current?.tryReload();

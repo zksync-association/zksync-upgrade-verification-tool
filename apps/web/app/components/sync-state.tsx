@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import {
   type ReactNode,
   createContext,
+  startTransition,
   useContext,
   useEffect,
   useMemo,
@@ -74,9 +75,12 @@ export function IndexProgressProvider({
 }) {
   const beat = useLive().index as IndexStatusView | null;
   const [index, setIndex] = useState(initial);
+  // As transitions: an urgent update of a context above the page reaching a section still
+  // hydrating (a slow device; the root status lands while it does) makes React render that section
+  // again from its fallback, detaching what is on screen.
   // A newer root status (Refresh, settings) replaces whatever the beats said.
   useEffect(() => {
-    setIndex(initial);
+    startTransition(() => setIndex(initial));
   }, [initial]);
   const settled = useRef(onSettled);
   useEffect(() => {
@@ -87,7 +91,7 @@ export function IndexProgressProvider({
   useEffect(() => {
     if (!beat) return;
     const before = shown.current;
-    setIndex(beat);
+    startTransition(() => setIndex(beat));
     if (before && unsettled(before) && !unsettled(beat)) settled.current?.();
   }, [beat]);
 
