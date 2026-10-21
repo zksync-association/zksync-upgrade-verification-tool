@@ -5,16 +5,19 @@ import { cn } from "@/utils/cn";
 
 // Status colors from the ZKsync web-app guide: success / warning / error / info / neutral.
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 font-medium text-xs leading-5 [&_svg]:size-3.5",
+  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1 font-semibold text-xs leading-5 [&_svg]:size-3.5",
   {
     variants: {
       variant: {
-        neutral: "border-slate-200 bg-slate-50 text-slate-700",
-        success: "border-green-200 bg-green-50 text-green-700",
-        warning: "border-amber-200 bg-amber-50 text-amber-700",
-        error: "border-red-200 bg-red-50 text-red-700",
-        info: "border-brand-100 bg-brand-50 text-brand-600",
-        navy: "border-navy-100 bg-navy-50 text-navy-800",
+        neutral: "border-slate-300 bg-slate-100 text-slate-800",
+        success: "border-green-800 bg-green-800 text-white",
+        // Light, for a status repeated down a table (a member's signature).
+        successSoft: "border-green-300 bg-green-50 text-green-900",
+        warning: "border-amber-400 bg-amber-100 text-amber-950",
+        error: "border-red-800 bg-red-800 text-white",
+        errorSoft: "border-red-300 bg-red-50 text-red-900",
+        info: "border-brand-700 bg-brand-700 text-white",
+        navy: "border-navy-800 bg-navy-800 text-white",
       },
     },
     defaultVariants: {

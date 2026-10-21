@@ -26,7 +26,7 @@ export const TEST_OWNER = privateKeyToAccount(
 
 export async function startFork({
   port,
-  forkUrl = process.env.FORK_URL ?? "https://mainnet.gateway.tenderly.co",
+  forkUrl = process.env.FORK_URL || "https://mainnet.gateway.tenderly.co",
 }: { port: number; forkUrl?: string }) {
   const child: ChildProcess = spawn(
     "anvil",

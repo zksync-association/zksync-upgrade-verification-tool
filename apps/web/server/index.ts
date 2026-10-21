@@ -10,6 +10,7 @@ import getPort, { portNumbers } from "get-port";
 import { env, safeWalletOrigins } from "@config/env.server";
 import { cspNonce } from "@server/middlewares/csp-nonce";
 import { patchBigintToJSON } from "@server/utils/bigint";
+import { beforeListening, bounded } from "./boot";
 import { logger } from "./middlewares/logger";
 import { rateLimit } from "./middlewares/rate-limit";
 import { removeTrailingSlash } from "./middlewares/remove-trailing-slash";
@@ -80,6 +81,49 @@ async function getBuild() {
   return build as unknown as ServerBuild;
 }
 
+// What the app build's entry module exports for the server (app/entry.server.tsx).
+type AppEntry = {
+  readNetwork?: () => Promise<void>;
+  prewarm?: (reason: "boot") => Promise<void>;
+  startSync?: () => void;
+  noteRequest?: (info: {
+    method: string;
+    path: string;
+    header: (name: string) => string | undefined;
+  }) => void;
+  loadChainCache?: () => Promise<void>;
+  saveChainCache?: () => Promise<boolean>;
+};
+
+let productionEntry: Promise<AppEntry> | undefined;
+
+function appEntry(): Promise<AppEntry> {
+  if (productionEntry) return productionEntry;
+  const loading = (async () => {
+    const build = (await getBuild()) as ServerBuild | (() => Promise<ServerBuild>);
+    const { entry } = typeof build === "function" ? await build() : build;
+    return entry.module as AppEntry;
+  })();
+  if (!viteDevServer) {
+    productionEntry = loading;
+    loading.catch(() => {
+      if (productionEntry === loading) productionEntry = undefined;
+    });
+  }
+  return loading;
+}
+
+// Every request that reaches the app is shown to the sync engine, which counts a page load as use
+// (sync/presence.ts decides). The request never waits on it.
+app.use((req, _res, next) => {
+  const info = { method: req.method, path: req.path, header: (name: string) => req.get(name) };
+  appEntry().then(
+    (entry) => entry.noteRequest?.(info),
+    () => {}
+  );
+  next();
+});
+
 app.all(
   "*",
   createRequestHandler({
@@ -123,10 +167,48 @@ async function checkRpc() {
   return known ?? `chain ${chainId}`;
 }
 
+// How long the start waits for the chain cache before it listens; also the bound on saving it.
+const CHAIN_CACHE_LOAD_WAIT_MS = 3_000;
+
+const NETWORK_READ_WAIT_MS = 3_000;
+
+async function prepareBeforeListening() {
+  try {
+    await beforeListening(await appEntry(), {
+      networkMs: NETWORK_READ_WAIT_MS,
+      chainCacheMs: CHAIN_CACHE_LOAD_WAIT_MS,
+    });
+  } catch {
+    // The first page reads them instead.
+  }
+}
+
+// Warms the caches a first page needs and starts the sync engine; never stops the server.
+async function prewarmApp() {
+  try {
+    const { prewarm, startSync } = await appEntry();
+    startSync?.();
+    await prewarm?.("boot");
+  } catch {
+    console.warn("Start-up warm-up skipped; pages read everything on first use.");
+  }
+}
+
+// On shutdown, what this run read is saved for the next one (bounded: never holds the exit up).
+async function saveAppCache() {
+  try {
+    const { saveChainCache } = await appEntry();
+    await bounded(saveChainCache, CHAIN_CACHE_LOAD_WAIT_MS);
+  } catch {
+    // Nothing is lost: the next start reads everything from the chain.
+  }
+}
+
 async function startServer() {
   try {
     const chain = await checkRpc();
     console.log(`Reading governance from ${chain} through L1_RPC_URL.`);
+    await prepareBeforeListening();
 
     const server = app.listen(portToUse, env.SERVER_HOST, () => {
       if (!portAvailable) {
@@ -154,9 +236,11 @@ async function startServer() {
           .filter(Boolean)
           .join("\n")
       );
+      void prewarmApp();
     });
 
     closeWithGrace(async () => {
+      await saveAppCache();
       await new Promise((resolve, reject) => {
         server.close((e) => (e ? reject(e) : resolve("ok")));
       });

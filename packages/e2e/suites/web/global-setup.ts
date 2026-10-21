@@ -28,6 +28,13 @@ export default async function globalSetup() {
       LOG_LEVEL: "warn",
       WALLET_CONNECT_PROJECT_ID: "",
       SAFE_WALLET_ORIGINS: `https://app.safe.global,http://127.0.0.1:${SAFE_SHELL_PORT}`,
+      // The fork above, not an RPC saved in apps/web/.cache/local-settings.json (and nothing the
+      // suite saves through the settings page lands in that file).
+      IGNORE_LOCAL_SETTINGS: "true",
+      // Open sets' member Safes asked about every 3 s (live-updates.spec.ts), without the hourly
+      // budget stretching that (the mock Safe API is local).
+      SYNC_SAFE_WATCH_MS: "3000",
+      SYNC_SAFE_HOURLY_BUDGET: "1000000",
     },
   });
   for (let i = 0; ; i++) {

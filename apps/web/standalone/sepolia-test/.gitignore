@@ -1,0 +1,3 @@
+# Fork dry runs (deploy.ts on anvil)
+*.fork.json
+*.fork.csv

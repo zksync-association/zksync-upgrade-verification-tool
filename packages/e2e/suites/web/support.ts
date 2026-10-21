@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { Page } from "@playwright/test";
+import { type Page, test as base, expect } from "@playwright/test";
 import type { Address, Hex } from "viem";
 import { TEST_OWNER, forkActions, signAsSafeOwner } from "../../../../apps/web/test/support/fork";
 import {
@@ -54,79 +54,33 @@ export async function signInSafe(safe: Address, typedData: GovernanceTypedData) 
 
 export { buildTypedData };
 
-declare global {
-  interface Window {
-    __walletRequests: { method: string; params: unknown }[];
-  }
-}
-
 /**
- * An injected EIP-1193 wallet for `account`: records signature requests (and answers them with a
- * dummy signature, like a Safe that has not collected owner signatures yet) and forwards
- * everything else, including eth_sendTransaction, to the fork.
+ * The app's pages, interactive once open: `goto` and `reload` also wait until React has hydrated
+ * every element a test can reach (each then carries its fiber). A section's data is streamed with
+ * the page, but React hydrates it only after its promise resolves on the client; a click on it
+ * before that is dropped, not replayed, and on a slow runner that comes well after the load event.
  */
-export async function installWallet(page: Page, account: Address) {
-  await chain.test.impersonateAccount({ address: account });
-  await chain.test.setBalance({ address: account, value: 10n ** 20n });
-  await page.addInitScript(
-    ({ account, rpc }) => {
-      window.__walletRequests = [];
-      const forward = async (method: string, params: unknown) => {
-        const res = await fetch(rpc, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params }),
-        });
-        const body = (await res.json()) as {
-          result?: unknown;
-          error?: { message: string; code: number };
-        };
-        if (body.error)
-          throw Object.assign(new Error(body.error.message), { code: body.error.code });
-        return body.result;
-      };
-      const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-      (window as unknown as { ethereum: unknown }).ethereum = {
-        request: async ({ method, params }: { method: string; params?: unknown }) => {
-          window.__walletRequests.push({ method, params });
-          switch (method) {
-            case "eth_requestAccounts":
-            case "eth_accounts":
-              return [account];
-            case "eth_chainId":
-              return "0x1";
-            case "wallet_switchEthereumChain":
-            case "wallet_addEthereumChain":
-              return null;
-            case "wallet_requestPermissions":
-            case "wallet_getPermissions":
-              return [{ parentCapability: "eth_accounts" }];
-            case "eth_signTypedData_v4":
-              return `0x${"11".repeat(65)}`;
-            default:
-              return forward(method, params ?? []);
-          }
-        },
-        on: (event: string, fn: (...args: unknown[]) => void) => {
-          handlers[event] = [...(handlers[event] ?? []), fn];
-        },
-        removeListener: (event: string, fn: (...args: unknown[]) => void) => {
-          handlers[event] = (handlers[event] ?? []).filter((f) => f !== fn);
-        },
-      };
-    },
-    { account, rpc: ANVIL_URL }
-  );
-}
-
-/** Connects the injected test wallet (wagmi may already have reconnected it on load). */
-export async function connectWallet(page: Page) {
-  const connected = page.getByTestId("connected-account");
-  const connect = page.getByTestId("connect-wallet");
-  await connected.or(connect).first().waitFor();
-  if (await connect.isVisible()) {
-    await connect.click();
-    await page.getByRole("button", { name: /Browser Wallet/i }).click();
-  }
-  await connected.waitFor();
-}
+export const test = base.extend<{ page: Page }>({
+  page: async ({ page }, use) => {
+    const interactive = () =>
+      page.waitForFunction(() =>
+        Array.from(document.querySelectorAll("[data-testid]")).every((el) =>
+          Object.keys(el).some((key) => key.startsWith("__reactFiber$"))
+        )
+      );
+    const goto = page.goto.bind(page);
+    const reload = page.reload.bind(page);
+    page.goto = async (url: string, options?: Parameters<Page["goto"]>[1]) => {
+      const response = await goto(url, options);
+      await interactive();
+      return response;
+    };
+    page.reload = async (options?: Parameters<Page["reload"]>[0]) => {
+      const response = await reload(options);
+      await interactive();
+      return response;
+    };
+    await use(page);
+  },
+});
+export { expect };

@@ -13,6 +13,12 @@ import { RemixServer } from "@remix-run/react";
 import { isbot } from "isbot";
 import { renderToPipeableStream } from "react-dom/server";
 
+// For server/index.ts, which must reach this build's own modules (build.entry.module), not a
+// second copy bundled into the server.
+export { prewarm, readNetwork } from "@/.server/prewarm";
+export { noteRequest, startSync } from "@/.server/sync/engine";
+export { loadChainCache, saveChainCache } from "@/.server/persist/chain-cache";
+
 const ABORT_DELAY = 60_000;
 
 const logger = defaultLogger.child({ module: "remix" });

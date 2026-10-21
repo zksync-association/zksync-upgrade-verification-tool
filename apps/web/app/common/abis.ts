@@ -22,6 +22,10 @@ export const upgradeHandlerAbi = parseAbi([
   "event UpgradeApprovedByGuardians(bytes32 indexed _id)",
   "event UpgradeExecuted(bytes32 indexed _id)",
   "event EmergencyUpgradeExecuted(bytes32 indexed _id)",
+  "event ChangeSecurityCouncil(address indexed _securityCouncilBefore, address indexed _securityCouncilAfter)",
+  "event SoftFreeze(uint256 _protocolFrozenUntil)",
+  "event HardFreeze(uint256 _protocolFrozenUntil)",
+  "event Unfreeze()",
 ]);
 
 // Shared by SecurityCouncil and Guardians (both extend Multisig).

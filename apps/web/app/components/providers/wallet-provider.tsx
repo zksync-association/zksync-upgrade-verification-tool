@@ -1,11 +1,6 @@
+import { STORAGE_PREFIX } from "@/common/storage-prefix";
 import Avatar from "@/components/connect-button/avatar";
-import {
-  RainbowKitProvider,
-  type Wallet,
-  connectorsForWallets,
-  lightTheme,
-} from "@rainbow-me/rainbowkit";
-import { injectedWallet, safeWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
+import { RainbowKitProvider, lightTheme } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { type Chain, custom, defineChain } from "viem";
@@ -14,15 +9,30 @@ import {
   WagmiProvider,
   cookieStorage,
   createConfig,
-  createConnector,
   createStorage,
   useAccount,
-  useConnect,
+  useSwitchChain,
 } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
-import { safe } from "wagmi/connectors";
+import { walletConnect } from "wagmi/connectors";
 
 const queryClient = new QueryClient();
+const walletTheme = lightTheme({
+  accentColor: "hsl(var(--primary))",
+  accentColorForeground: "hsl(var(--primary-foreground))",
+  borderRadius: "large",
+  fontStack: "system",
+});
+// RainbowKit defaults dim text with alpha; keep wallet dialogs as readable as the app.
+Object.assign(walletTheme.colors, {
+  modalBackground: "hsl(var(--popover))",
+  modalText: "hsl(var(--popover-foreground))",
+  modalTextDim: "hsl(var(--muted-foreground))",
+  modalTextSecondary: "hsl(var(--muted-foreground))",
+  closeButton: "hsl(var(--muted-foreground))",
+  connectButtonText: "hsl(var(--foreground))",
+  error: "hsl(var(--destructive))",
+});
 
 // The browser never talks to an RPC of its own: chain reads happen on the server through the
 // user's RPC, and signing/sending go through the connected wallet. Without this, wagmi would send
@@ -47,90 +57,101 @@ function chainFor(chainId: number, label: string): Chain {
 /** True inside an iframe, e.g. when Safe{Wallet} opens the app as a Safe App. */
 export const isFramed = () => typeof window !== "undefined" && window.parent !== window;
 
-const exactOrigin = (origin: string) =>
-  new RegExp(`^${origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`);
+// A wallet is only needed to sign as a member Safe or to send a transaction, and is reached only
+// over WalletConnect (a project id in Settings): members connect their Safe from Safe{Wallet}, and
+// anyone can connect a wallet app to send. Browser extensions cannot connect to the single-file
+// build (they talk to the page through window.postMessage, which browsers drop on file:// pages), so
+// installed ones are not discovered either: listed, they would hang at "Confirm in the extension".
+//
+// One WalletConnect connector, which opens WalletConnect's own modal: its QR to scan, and Copy link
+// to paste into Safe{Wallet}. (RainbowKit's WalletConnect wallet adds a second connector for that
+// modal, and with it a second WalletConnect client on the same storage and relay identity.)
+const WALLETCONNECT_MODAL = {
+  themeMode: "light",
+  // Only the QR and its link: no directory of wallets fetched from WalletConnect.
+  enableExplorer: false,
+  themeVariables: {
+    "--wcm-accent-color": "#0C18EC",
+    "--wcm-background-color": "#0C18EC",
+    "--wcm-font-family": "Inter, system-ui, sans-serif",
+    "--wcm-z-index": "60",
+  },
+} as const;
 
-// RainbowKit's Safe entry (shown only inside Safe{Wallet}), except that the Safe Apps SDK accepts
-// messages only from the configured Safe{Wallet} origins.
-function safeAppWallet(origins: string[]) {
-  return (): Wallet => ({
-    ...safeWallet(),
-    createConnector: (details) =>
-      createConnector((config) => ({
-        ...safe({ allowedDomains: origins.map(exactOrigin), unstable_getInfoTimeout: 1000 })(
-          config
-        ),
-        ...details,
-      })),
-  });
+// wagmi's record of the connection (which connector, which chains it asked for). A page opened from
+// a file keeps no cookies in Chrome: there, localStorage, so a reload resumes the WalletConnect
+// session instead of finding it unknown and ending it.
+function walletStorage() {
+  if (typeof window !== "undefined" && window.location.protocol === "file:") {
+    try {
+      return window.localStorage;
+    } catch {}
+  }
+  return cookieStorage;
 }
-
-// Inside Safe{Wallet}, connect to the open Safe straight away, even if another wallet was used
-// on this origin before.
-function ConnectSafeApp() {
-  const { connector, status } = useAccount();
-  const { connectors, connect } = useConnect();
-  const tried = useRef(false);
+// A wallet app approves a WalletConnect session for every network it has, and the session starts
+// on the first (MetaMask Mobile: Ethereum, whatever this page is for). Once connected elsewhere, the
+// wallet is moved to this page's chain: at once when the session includes it, else the wallet asks
+// (a phone wallet has no network menu for a WalletConnect site). Asked once per chain it is on.
+function StayOnChain({ chainId }: { chainId: number }) {
+  const { status, chainId: connected } = useAccount();
+  const { switchChain } = useSwitchChain();
+  const asked = useRef<number | null>(null);
   useEffect(() => {
-    if (tried.current || !isFramed() || status === "connecting" || status === "reconnecting")
-      return;
-    const safeConnector = connectors.find((c) => c.id === "safe");
-    if (!safeConnector || connector?.id === "safe") return;
-    tried.current = true;
-    connect({ connector: safeConnector });
-  }, [connector, connectors, connect, status]);
+    if (status !== "connected" || connected === undefined || connected === chainId) return;
+    if (asked.current === connected) return;
+    asked.current = connected;
+    // Refused or failed: the header's Switch button stays, and says what to do.
+    switchChain({ chainId }, { onError: () => {} });
+  }, [status, connected, chainId, switchChain]);
   return null;
 }
 
-// A wallet is only needed to sign as a member Safe or to send a transaction. Members sign by
-// opening the app inside Safe{Wallet} (a Safe App), or over WalletConnect when a project id is
-// set. Any browser wallet can send a transaction.
 export function WalletProvider({
   children,
   initialState,
   projectId,
-  safeWalletOrigins,
   chainId,
   chainLabel,
 }: {
   children: ReactNode;
   initialState?: State;
   projectId: string | null;
-  safeWalletOrigins: string[];
   chainId: number;
   chainLabel: string;
 }) {
-  const origins = safeWalletOrigins.join(",");
   const config = useMemo(() => {
     const chain = chainFor(chainId, chainLabel);
-    const memberSafe = [
-      safeAppWallet(origins.split(",").filter(Boolean)),
-      ...(projectId ? [walletConnectWallet] : []),
-    ];
     return createConfig({
       chains: [chain] as [Chain],
       transports: { [chain.id]: noBrowserRpc },
       ssr: true,
-      storage: createStorage({ storage: cookieStorage }),
-      connectors: connectorsForWallets(
-        [
-          { groupName: "Member Safe", wallets: memberSafe },
-          { groupName: "Browser wallet", wallets: [injectedWallet] },
-        ],
-        { appName: "ZKsync Governance", projectId: projectId ?? "" }
-      ),
+      storage: createStorage({ storage: walletStorage(), key: `${STORAGE_PREFIX}wagmi` }),
+      multiInjectedProviderDiscovery: false,
+      // Without a project id there is no wallet.
+      connectors: projectId
+        ? [
+            walletConnect({
+              projectId,
+              showQrModal: true,
+              qrModalOptions: WALLETCONNECT_MODAL,
+              customStoragePrefix: STORAGE_PREFIX || undefined,
+            }),
+          ]
+        : [],
     });
-  }, [projectId, origins, chainId, chainLabel]);
+  }, [projectId, chainId, chainLabel]);
 
   return (
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
+        <StayOnChain chainId={chainId} />
         <RainbowKitProvider
-          theme={lightTheme({ accentColor: "#0C18EC", borderRadius: "large", fontStack: "system" })}
+          theme={walletTheme}
           avatar={Avatar}
           modalSize="compact"
+          appInfo={{ appName: "ZKsync Governance" }}
         >
-          <ConnectSafeApp />
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>

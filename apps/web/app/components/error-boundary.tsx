@@ -3,17 +3,61 @@ import {
   type ErrorResponse,
   Link,
   isRouteErrorResponse,
+  useInRouterContext,
   useParams,
   useRouteError,
 } from "@remix-run/react";
 import { $path } from "remix-routes";
+import { useEffect } from "react";
+import { recoverRouter } from "@/utils/router-recovery";
 
 type StatusHandler = (info: {
   error: ErrorResponse;
   params: Record<string, string | undefined>;
 }) => JSX.Element | null;
 
-export function GeneralErrorBoundary({
+type BoundaryProps = {
+  defaultStatusHandler?: StatusHandler;
+  statusHandlers?: Record<number, StatusHandler>;
+  unexpectedErrorHandler?: (error: unknown) => JSX.Element | null;
+};
+
+export function GeneralErrorBoundary(props: BoundaryProps) {
+  const inRouter = useInRouterContext();
+  // A failed hydration or stale development module can render this outside the router.
+  // Route hooks and Link would throw again and hide the original failure.
+  if (!inRouter) return <RouterRecovery />;
+  return <RouteErrorBoundary {...props} />;
+}
+
+function RouterRecovery() {
+  useEffect(() => {
+    recoverRouter(window);
+  }, []);
+  return (
+    <div className="mx-auto max-w-xl space-y-4 px-6 py-12" role="alert">
+      <h1 className="text-2xl">The page could not load</h1>
+      <p>
+        Reload the page to reconnect. If the problem continues, return to the home page and try
+        again.
+      </p>
+      <div className="flex gap-4">
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="font-semibold text-brand-600 underline"
+        >
+          Reload page
+        </button>
+        <a href="/" className="text-brand-600 underline">
+          Go to home page
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function RouteErrorBoundary({
   defaultStatusHandler = ({ error }) => (
     <div>
       <div className="flex items-center space-x-4">
@@ -30,11 +74,7 @@ export function GeneralErrorBoundary({
   ),
   statusHandlers,
   unexpectedErrorHandler = defaultErrorHandler,
-}: {
-  defaultStatusHandler?: StatusHandler;
-  statusHandlers?: Record<number, StatusHandler>;
-  unexpectedErrorHandler?: (error: unknown) => JSX.Element | null;
-}) {
+}: BoundaryProps) {
   const error = useRouteError();
   const params = useParams();
 

@@ -10,11 +10,13 @@ import { EMERGENCY_ID, MAINNET, SAFE_MESSAGES } from "../support/fixtures";
 const listings = vi.hoisted(() => ({ tamper: false }));
 
 vi.mock("@/.server/rpc", () => ({ network: async () => ({ chainId: 1 }) }));
-vi.mock("@/.server/safe-api", async () => {
-  const { SAFE_MESSAGES } = await import("../support/fixtures");
+vi.mock("@/.server/safe-api", () => {
   class SafeApiError extends Error {}
+  return { SafeApiError };
+});
+vi.mock("@/.server/safe/store", async () => {
+  const { SAFE_MESSAGES } = await import("../support/fixtures");
   return {
-    SafeApiError,
     listSafeMessages: async (safe: string) => {
       const messages = (SAFE_MESSAGES[safe] ?? []) as unknown as SafeMessage[];
       return {
@@ -140,5 +142,12 @@ describe("vetoState", () => {
     expect(vetoState(gov({ guardiansNonce: "0" }), veto, null).status).toBe("closed");
     const executed = { state: "Executed" } as Parameters<typeof vetoState>[2];
     expect(vetoState(gov(), veto, executed).status).toBe("closed");
+  });
+
+  it("stays open when the L2 proposal's state is unknown: only a known final state closes it", () => {
+    const unknown = { state: null } as Parameters<typeof vetoState>[2];
+    expect(vetoState(gov(), veto, unknown).status).toBe("open");
+    const active = { state: "Active" } as Parameters<typeof vetoState>[2];
+    expect(vetoState(gov(), veto, active).status).toBe("open");
   });
 });

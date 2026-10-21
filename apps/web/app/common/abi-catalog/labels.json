@@ -1,0 +1,52 @@
+{
+  "1": {
+    "0x1adf137f59949c9081157d5de1e002d1c992071f": "Atlas CTM proxy",
+    "0x1e4c534e7ce1ff5621ea506d99b367d7d8efbe3e": "PUH ProxyAdmin",
+    "0x303a465b659cbb0ab36ee643ea362c509eeb5213": "Bridgehub",
+    "0x600da620ab29f41abc6596a15981e14ce58c86b8": "Guardians",
+    "0x8ef17384a157287921e1ebdb0a08a2f102ba4a92": "L1AssetTracker proxy",
+    "0xc2a36181fb524a6befe639afed37a67e77d62cf1": "Ecosystem Transparent ProxyAdmin",
+    "0xc2ee6b6af7d616f6e27ce7f4a451aedc2b0f5f5c": "Era CTM",
+    "0xe30dca3047b37dc7d88849de4a4dc07937ad5ab3": "PUH proxy",
+    "0xf73a7dcfa68e52030ec39e41a23dca51f3aaa111": "EmergencyUpgradeBoard",
+    "0xff3582a0310916cd62442a4ca88bf1c757d68938": "Atlas CTM ProxyAdmin"
+  },
+  "324": {
+    "0x10560f8b7ee37571ad7e3702eeb12bc422036e89": "ZkTokenGovernorOld",
+    "0x496869a7575a1f907d1c5b1eca28e4e9e382afab": "ZkGovOpsGovernorOld",
+    "0x76705327e682f2d96943280d99464ab61219e34f": "ZkProtocolGovernor",
+    "0xb83ff6501214ddf40c91c9565d095400f3f45746": "ZkTokenGovernor",
+    "0xeeea739a8b6fb1b8f703e23c9be03ceea643b160": "ZkGovOpsGovernor"
+  },
+  "11155111": {
+    "0x150d2f16c621dd7f0cf7c9bb0ec64ccf251655c9": "L1AssetTracker",
+    "0x191de414bb2ed2a2ee895c5ce6fa629eb93a79f1": "PUH ProxyAdmin",
+    "0x21f2372beabe080fe4dd69f3b1989ae68738f23a": "Guardians",
+    "0x236d1c3ff32bd0ca26b72af287e895627c0478ce": "Bridgehub proxy",
+    "0x24de9c60f6e7226f996d4837feb9337c207b07e6": "EmergencyUpgradeBoard",
+    "0x35a54c8c757806eb6820629bc82d90e056394c92": "Bridgehub",
+    "0x360c49a3e63469846b68f86db256d8f25b9a54e4": "Atlas GovernanceUpgradeTimer",
+    "0x36bdd4226c312d782c218c813129935028139fa1": "Atlas ZKsync OS verifier",
+    "0x3b92e09a53573be654a75ec0c0e36ad8c803c25e": "Era RollupDAManager",
+    "0x3cc81628a14c824057a97c1b4ab17758e5d18864": "Era CTM proxy",
+    "0x4e39e90746a9ee410a8ce173c7b96d3afed444a5": "ChainTypeManager",
+    "0x54d55e74de9c6003e7a68a1fe70e633f05761eb5": "Atlas CTM",
+    "0x639b577e6b614971da0b7d50aaa4bc064c13b872": "EmergencyUpgradeBoard",
+    "0x6c9499d438cb708457235450aa7dff858ca1585c": "Guardians",
+    "0x73b668d8374ddb42c9e2f46fd5b754ac215495bc": "Atlas ValidatorTimelock",
+    "0x73bee414c6e006525f3cceedf6d8004c0370502e": "Atlas CTM",
+    "0x7bdf7970f17278a6ff75fdbc671e870b0728ae41": "Bridgehub",
+    "0x7f648511e0b2dfa639896929d36481b4e340132d": "L1AssetTracker",
+    "0x803e5e7af1fdd504f8844e28a249203cfa7c471d": "PUH proxy",
+    "0x8b448ac7cd0f18f3d8464e2645575772a26a3b6b": "Era CTM proxy",
+    "0x8f08627524aed610192132a425d6b9c32a1727ef": "PUH proxy",
+    "0x925dd0bc14552b0b261ca8a23ad26df9c6f2c8ba": "ChainTypeManager",
+    "0xc4fd2580c3487bba18d63f50301020132342fdbd": "Bridgehub proxy",
+    "0xc90e4e4897421e9380d734b72221f5485c3fd116": "Atlas RollupDAManager",
+    "0xcb7f8e556ef02771ea32f54e767d6f9742ed31c2": "Ecosystem Transparent ProxyAdmin",
+    "0xd9dc52a30713c48e6e15696d258489f16c8d9ee0": "PUH ProxyAdmin",
+    "0xdff4c5797b2522d8ed9b27b8993ce455e66d5d40": "ChainRegistrationSender",
+    "0xe00456791da489418355b0a6b27965a54c7c01d2": "Ecosystem Transparent ProxyAdmin",
+    "0xff3582a0310916cd62442a4ca88bf1c757d68938": "Atlas CTM ProxyAdmin"
+  }
+}

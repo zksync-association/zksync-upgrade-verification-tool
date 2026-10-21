@@ -13,3 +13,6 @@ dist
 .env.*
 **/.env
 **/.env.*
+
+# Local state of a developer's run (saved settings, the chain cache): never part of an image
+**/.cache

@@ -1,11 +1,27 @@
-import { appStatus } from "@/.server/status";
-import AppShell, { StatusProblem } from "@/components/app-shell";
+import { appStatus, shellChain } from "@/.server/status";
+import { statusRevs } from "@/.server/sync/content";
+import { watchItems, watchKeys } from "@/.server/sync/presence";
+import AppShell, { AppFrame, StatusProblem } from "@/components/app-shell";
 import { GeneralErrorBoundary } from "@/components/error-boundary";
+import { ChainContext } from "@/components/governance-context";
+import { PresenceProvider } from "@/components/presence";
+import { KeepScrollOnReload } from "@/components/keep-scroll";
 import { WalletProvider } from "@/components/providers/wallet-provider";
 import { useNonce } from "@/utils/nonce-provider";
-import { type CLIENT_ENV, clientEnv } from "@config/env.server";
-import { type LinksFunction, type LoaderFunctionArgs, json } from "@remix-run/node";
-import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData } from "@remix-run/react";
+import { shouldRevalidateRoot } from "@/utils/revalidation";
+import { type CLIENT_ENV, clientEnv, env as serverEnv } from "@config/env.server";
+import { type LinksFunction, type LoaderFunctionArgs, defer } from "@remix-run/node";
+import {
+  Await,
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  type ShouldRevalidateFunction,
+  useLoaderData,
+} from "@remix-run/react";
+import { Suspense } from "react";
 import { Toaster } from "react-hot-toast";
 import {
   type State,
@@ -14,50 +30,126 @@ import {
 } from "wagmi";
 
 import "@/globals.css";
+import "@/fonts.css";
 import "@rainbow-me/rainbowkit/styles.css";
 
 export const links: LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
   {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;500&display=swap",
+    rel: "preload",
+    href: "/fonts/inter-latin.woff2",
+    as: "font",
+    type: "font/woff2",
+    crossOrigin: "anonymous",
   },
 ];
 
-export async function loader({ request }: LoaderFunctionArgs) {
+// Nothing here waits on the network before the page's first bytes: the status is deferred, and
+// the chain is in hand once the server has read it (before it starts listening), else deferred too.
+export function loader({ request }: LoaderFunctionArgs) {
   const cookies = request.headers.get("Cookie");
   const wagmiCookie = cookies ? parseWagmiCookie(cookies, "wagmi.store") : undefined;
-  return json({ env: clientEnv, wagmiCookie, status: await appStatus() });
+  const status = appStatus({ freshness: "page" });
+  return defer({
+    env: clientEnv,
+    wagmiCookie,
+    watch: watchItems(request, [watchKeys.status]),
+    presence: { awayMs: serverEnv.SYNC_AWAY_MS },
+    chain: shellChain(),
+    status,
+    revs: statusRevs(status),
+  });
 }
 
-export type RootLoader = typeof loader;
+// Not on every navigation: only when revalidation.ts says the status must be read again.
+export const shouldRevalidate: ShouldRevalidateFunction = shouldRevalidateRoot;
 
 export default function App() {
   const nonce = useNonce();
-  const { env, wagmiCookie, status } = useLoaderData<typeof loader>();
+  const { env } = useLoaderData<typeof loader>();
+  return (
+    <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
+      <AppBody />
+    </Document>
+  );
+}
+
+/** Everything inside <body> but the toaster and scripts: shared with the single-file build. */
+export function AppBody() {
+  const { env, wagmiCookie, chain, status, presence } = useLoaderData<typeof loader>();
   const initialState = wagmiCookie
     ? deserializeWagmiCookie<{ state: State }>(wagmiCookie).state
     : undefined;
 
+  // The shell, the navigation and the page render at once: the chain id the wallet needs is in
+  // hand unless the server has not read it yet. The status fills in as it is read.
   return (
-    <Document nonce={nonce} env={env} allowIndexing={env.ALLOW_INDEXING}>
-      {status.ok ? (
-        <WalletProvider
-          initialState={initialState}
-          projectId={env.WALLET_CONNECT_PROJECT_ID}
-          safeWalletOrigins={env.SAFE_WALLET_ORIGINS}
-          chainId={status.governance.network.chainId}
-          chainLabel={status.governance.network.label}
-        >
-          <AppShell status={status}>
-            <Outlet />
-          </AppShell>
-        </WalletProvider>
-      ) : (
-        <StatusProblem error={status.error} hint={status.hint} />
-      )}
-    </Document>
+    <PresenceProvider awayMs={presence.awayMs}>
+      <Suspense fallback={<AppFrame />}>
+        <Await resolve={chain} errorElement={<ChainProblem status={status} />}>
+          {(chain) => (
+            <ChainContext.Provider value={chain}>
+              <WalletProvider
+                initialState={initialState}
+                projectId={env.WALLET_CONNECT_PROJECT_ID}
+                chainId={chain.chainId}
+                chainLabel={chain.label}
+              >
+                <AppShell status={status}>
+                  <Outlet />
+                </AppShell>
+              </WalletProvider>
+            </ChainContext.Provider>
+          )}
+        </Await>
+      </Suspense>
+    </PresenceProvider>
+  );
+}
+
+export function AppToaster() {
+  return (
+    <Toaster
+      position="bottom-center"
+      // Above Your signature's bar while it is shown.
+      containerStyle={{ bottom: "calc(var(--action-bar, 0px) + 16px)" }}
+      toastOptions={{
+        className: "!rounded-xl !text-sm",
+        style: {
+          background: "hsl(var(--popover))",
+          color: "hsl(var(--popover-foreground))",
+        },
+      }}
+    />
+  );
+}
+
+/** The RPC's chain could not be read: why, from the status (which failed on the same read). */
+function ChainProblem({
+  status,
+}: { status: ReturnType<typeof useLoaderData<typeof loader>>["status"] }) {
+  return (
+    <Suspense fallback={<AppFrame />}>
+      <Await
+        resolve={status}
+        errorElement={
+          <StatusProblem
+            error="The app could not read which chain the RPC is on."
+            hint="Check L1_RPC_URL."
+          />
+        }
+      >
+        {(status) =>
+          status.ok ? (
+            <StatusProblem
+              error="The app could not read which chain the RPC is on."
+              hint="Reload the page."
+            />
+          ) : (
+            <StatusProblem error={status.error} hint={status.hint} />
+          )
+        }
+      </Await>
+    </Suspense>
   );
 }
 
@@ -81,9 +173,9 @@ function Document({
         {allowIndexing ? null : <meta name="robots" content="noindex, nofollow" />}
         <Links />
       </head>
-      <body className="min-h-screen bg-slate-50">
+      <body className="min-h-screen bg-background text-foreground">
         {children}
-        <Toaster position="bottom-center" toastOptions={{ className: "!rounded-xl !text-sm" }} />
+        <AppToaster />
         <script
           nonce={nonce}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: public client env only
@@ -91,6 +183,7 @@ function Document({
           suppressHydrationWarning
         />
         <ScrollRestoration nonce={nonce} />
+        <KeepScrollOnReload />
         <Scripts nonce={nonce} />
       </body>
     </html>

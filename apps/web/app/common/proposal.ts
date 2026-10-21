@@ -1,13 +1,11 @@
+import { type DecodedFunction, decodeFunction } from "./calldata";
 import {
   type Address,
   type Hex,
   decodeAbiParameters,
-  decodeFunctionData,
   encodeAbiParameters,
-  encodeFunctionData,
   getAddress,
   keccak256,
-  parseAbi,
   size,
   slice,
 } from "viem";
@@ -76,68 +74,16 @@ export function fromAbi(decoded: {
   };
 }
 
-// Functions commonly found in governance upgrades. A match is shown only if re-encoding the
-// decoded arguments reproduces the calldata byte for byte. Anything else is shown raw:
-// deep analysis of protocol upgrades is the CLI's job (apps/cli).
-const knownFunctions = parseAbi([
-  "function upgrade(address proxy, address implementation)",
-  "function upgradeAndCall(address proxy, address implementation, bytes data)",
-  "function upgradeTo(address newImplementation)",
-  "function upgradeToAndCall(address newImplementation, bytes data)",
-  "function changeProxyAdmin(address proxy, address newAdmin)",
-  "function transferOwnership(address newOwner)",
-  "function acceptOwnership()",
-  "function acceptAdmin()",
-  "function setPendingAdmin(address newPendingAdmin)",
-  "function updateSecurityCouncil(address _newSecurityCouncil)",
-  "function updateGuardians(address _newGuardians)",
-  "function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard)",
-  "function freezeChain(uint256 _chainId)",
-  "function unfreezeChain(uint256 _chainId)",
-  "function pause()",
-  "function unpause()",
-  "function setValidatorTimelock(address addr)",
-  "function setPorterAvailability(bool _zkPorterIsAvailable)",
-  "function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit)",
-  "function setTokenMultiplier(uint128 _nominator, uint128 _denominator)",
-]);
-
 export type DecodedCall = Call & {
   selector: Hex | null;
-  decoded: { signature: string; args: { name: string; type: string; value: string }[] } | null;
+  /** Against the known functions (calldata.ts): only when re-encoding reproduces the calldata. */
+  decoded: DecodedFunction | null;
 };
 
-export function decodeCall(call: Call): DecodedCall {
+/** `chainId`: the chain the call runs on, when not the page's own L1 (an Era proposal's calls). */
+export function decodeCall(call: Call, { chainId }: { chainId?: number } = {}): DecodedCall {
   const selector = size(call.data) >= 4 ? slice(call.data, 0, 4) : null;
-  try {
-    const { functionName, args } = decodeFunctionData({ abi: knownFunctions, data: call.data });
-    const item = knownFunctions.find(
-      (f) => f.name === functionName && f.inputs.length === (args?.length ?? 0)
-    );
-    if (!item) return { ...call, selector, decoded: null };
-    const reencoded = encodeFunctionData({
-      abi: [item],
-      functionName,
-      args: args as never,
-    } as Parameters<typeof encodeFunctionData>[0]);
-    if (reencoded.toLowerCase() !== call.data.toLowerCase()) {
-      return { ...call, selector, decoded: null };
-    }
-    return {
-      ...call,
-      selector,
-      decoded: {
-        signature: `${functionName}(${item.inputs.map((i) => i.type).join(",")})`,
-        args: item.inputs.map((input, i) => ({
-          name: input.name ?? `arg${i}`,
-          type: input.type,
-          value: String((args as readonly unknown[])[i]),
-        })),
-      },
-    };
-  } catch {
-    return { ...call, selector, decoded: null };
-  }
+  return { ...call, selector, decoded: decodeFunction(call.data, { to: call.target, chainId }) };
 }
 
 const bytes32 = z.string().regex(/^0x[0-9a-fA-F]{64}$/, "must be a 32-byte hex string");
@@ -161,8 +107,6 @@ export const emergencyPayloadSchema = z.object({
   salt: bytes32,
   calls: z.array(z.object({ target: address, value: uint.default("0"), data: hexBytes })).min(1),
 });
-
-export type EmergencyPayload = z.infer<typeof emergencyPayloadSchema>;
 
 export type PayloadCheck =
   | { ok: true; proposal: UpgradeProposal; id: Hex; title: string | null }

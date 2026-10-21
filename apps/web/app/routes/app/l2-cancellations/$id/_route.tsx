@@ -1,6 +1,10 @@
-import { type VetoDetail, getL2Veto } from "@/.server/flows/l2-veto";
+import { l2Content, loaderRevs } from "@/.server/sync/content";
+import { pageLoad, watchKeys } from "@/.server/sync/presence";
+import { freshAfter } from "@/.server/flows/common";
+import { type VetoDetail, loadL2Veto } from "@/.server/flows/l2-veto";
 import { parseVetoParams } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
+import { ERA_CHAIN } from "@/common/calldata";
 import { decodeCall } from "@/common/proposal";
 import { useStatus } from "@/components/app-shell";
 import { AddressLink, ExternalAnchor, TxLink } from "@/components/hex";
@@ -8,7 +12,10 @@ import { Check, EmptyState, Facts, LoadingCard, PageHeader, Section } from "@/co
 import { Badge } from "@/components/ui/badge";
 import { CallList } from "@/components/verification/calls";
 import { SetStateBadge } from "@/components/verification/badges";
-import { SignatureSetCard } from "@/components/verification/signature-set";
+import { EraBlockNote } from "@/components/verification/freshness";
+import { ApprovalGroups, SignatureSetCard } from "@/components/verification/signature-set";
+import { UntilFresh } from "@/components/verification/until-fresh";
+import { YourSignature } from "@/components/verification/your-signature";
 import { formatEth, formatTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
@@ -20,7 +27,25 @@ export const meta = Meta["/app/l2-cancellations/:id"];
 
 export function loader({ params, request }: LoaderFunctionArgs) {
   const veto = parseVetoParams(params.id, new URL(request.url));
-  return defer({ veto, detail: getL2Veto(veto, { supplied: suppliedSignatures(request) }) });
+  // The signatures' first answer at once (possibly an older block or older Safe copies, labelled),
+  // then the strict result in the same response; the set's key joins the page load's grace.
+  const page = pageLoad(request, [watchKeys.l2(veto.l2GovernorAddress, veto.l2ProposalId)]);
+  const loading = page.run(() =>
+    loadL2Veto(veto, { supplied: suppliedSignatures(request), freshness: "page" })
+  );
+  return defer({
+    watch: page.watch,
+    eraKey: watchKeys.l2(veto.l2GovernorAddress, veto.l2ProposalId),
+    revs: loaderRevs([
+      [
+        watchKeys.l2(veto.l2GovernorAddress, veto.l2ProposalId),
+        loading.fresh.then((d) => (d.l2Error === null ? l2Content(d.l2Proposal, null) : undefined)),
+      ],
+    ]),
+    veto,
+    detail: loading.first,
+    fresh: freshAfter(loading.first, loading.fresh, (d) => d.set.stale === true),
+  });
 }
 
 export default function VetoPage() {
@@ -46,10 +71,12 @@ export default function VetoPage() {
 
 function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
   const { governance } = useStatus();
+  const { fresh, eraKey } = useLoaderData<typeof loader>();
   const p = d.params;
   const l2 = d.l2Proposal;
+  const eraChain = ERA_CHAIN[governance.network.chainId];
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <PageHeader
         back={{ to: $path("/app/l2-cancellations"), label: "Guardian veto" }}
         eyebrow="Guardian veto"
@@ -62,6 +89,26 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
         }
         id={p.l2ProposalId}
       />
+      <UntilFresh stale={d.set.stale === true} fresh={fresh}>
+        {(current) => {
+          const v = current ?? d;
+          return (
+            <YourSignature
+              hint="Check the proposal being cancelled below, then compare the hashes in the review with your hardware wallet."
+              actions={[
+                {
+                  key: "veto",
+                  title: "Guardian veto",
+                  set: v.set,
+                  state: v.state,
+                  execution: v.execution,
+                  executionToLabel: "Guardians",
+                },
+              ]}
+            />
+          );
+        }}
+      </UntilFresh>
       <Facts
         items={[
           {
@@ -71,21 +118,28 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
           {
             label: "L2 proposal",
             value: l2 ? (
-              <span className="space-x-2">
-                <span>{l2.state}</span>
-                <span className="text-slate-600">
-                  voting {formatTime(l2.voteStart)} → {formatTime(l2.voteEnd)}
+              <span className="block space-y-1">
+                <span className="space-x-2">
+                  <span>{l2.state ?? "state unknown"}</span>
+                  <span className="text-slate-600">
+                    voting {formatTime(l2.voteStart)} → {formatTime(l2.voteEnd)}
+                  </span>
+                  {governance.network.tallyUrl && (
+                    <ExternalAnchor
+                      href={`${governance.network.tallyUrl}/proposal/${p.l2ProposalId}`}
+                    >
+                      Tally
+                    </ExternalAnchor>
+                  )}
                 </span>
-                {governance.network.tallyUrl && (
-                  <ExternalAnchor
-                    href={`${governance.network.tallyUrl}/proposal/${p.l2ProposalId}`}
-                  >
-                    Tally
-                  </ExternalAnchor>
-                )}
+                <EraBlockNote watchKey={eraKey} fallback={d.eraHead ?? null} />
+              </span>
+            ) : d.l2Error ? (
+              <span className="text-amber-900" data-testid="l2-error">
+                Not read from ZKsync Era: {d.l2Error}
               </span>
             ) : (
-              <span className="text-amber-700">Not found on ZKsync Era</span>
+              <span className="text-amber-900">Not found on ZKsync Era</span>
             ),
           },
           {
@@ -126,8 +180,12 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
               ]}
             />
             <CallList
+              chainId={eraChain}
               calls={l2.targets.map((target, i) =>
-                decodeCall({ target, value: l2.values[i] ?? "0", data: l2.calldatas[i] ?? "0x" })
+                decodeCall(
+                  { target, value: l2.values[i] ?? "0", data: l2.calldatas[i] ?? "0x" },
+                  { chainId: eraChain }
+                )
               )}
             />
             <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
@@ -139,18 +197,28 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
           </div>
         ) : (
           <EmptyState>
-            The L2 proposal could not be read, so the veto cannot be executed from here yet.
+            {d.l2Error
+              ? "The L2 proposal could not be read, so the veto cannot be executed from here yet. Refresh to retry."
+              : "The proposal was not found on this governor, so the veto cannot be executed from here."}
           </EmptyState>
         )}
       </Section>
-      <SignatureSetCard
-        testId="set-veto"
-        title="Guardian signatures"
-        set={d.set}
-        state={d.state}
-        execution={d.execution}
-        executionToLabel="Guardians"
-      />
+      <ApprovalGroups count={1}>
+        <UntilFresh stale={d.set.stale === true} fresh={fresh}>
+          {(current, refresh) => {
+            const v = current ?? d;
+            return (
+              <SignatureSetCard
+                testId="set-veto"
+                title="Guardian signatures"
+                set={v.set}
+                state={v.state}
+                refresh={current ? null : refresh}
+              />
+            );
+          }}
+        </UntilFresh>
+      </ApprovalGroups>
     </div>
   );
 }

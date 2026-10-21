@@ -2,12 +2,11 @@ import { CopyButton } from "@/components/hex";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/utils/cn";
 import { Link } from "@remix-run/react";
-import { ArrowLeft } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CircleCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
 export function PageHeader({
   back,
-  eyebrow,
   title,
   badges,
   id,
@@ -23,32 +22,29 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <div className="mb-8 space-y-3">
+    <div className="mb-6 space-y-2">
       {back && (
         <Link
           to={back.to}
-          className="inline-flex items-center gap-1.5 text-slate-600 text-sm hover:text-slate-950"
+          className="mb-2 inline-flex items-center gap-1.5 text-slate-600 text-sm hover:text-slate-950"
         >
           <ArrowLeft className="h-4 w-4" /> {back.label}
         </Link>
       )}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 space-y-2">
-          {eyebrow && (
-            <p className="font-semibold text-[11px] text-slate-600 uppercase tracking-[0.08em]">
-              {eyebrow}
-            </p>
-          )}
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[32px] leading-10 tracking-[-0.02em]">{title}</h1>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h1 className="font-semibold text-2xl leading-8 tracking-tight">{title}</h1>
             {badges}
           </div>
+          {/* In full (it is compared character by character), as a quiet line of metadata. */}
           {id && (
-            <p className="flex items-center gap-1">
-              <span className="mono break-all text-slate-700" data-testid="page-id">
+            <p className="flex min-w-0 max-w-full items-center gap-2 text-[13px]">
+              <span className="shrink-0 font-medium text-slate-500">ID</span>
+              <span className="mono min-w-0 break-all text-slate-800" data-testid="page-id">
                 {id}
               </span>
-              <CopyButton value={id} label="Copy id" />
+              <CopyButton value={id} label="Copy id" className="sm:h-7 sm:w-7" />
             </p>
           )}
         </div>
@@ -76,8 +72,8 @@ export function Section({
     <section className={cn("space-y-4", className)}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
-          <h2 className="text-[22px] leading-7 tracking-[-0.01em]">{title}</h2>
-          {description && <p className="max-w-3xl text-slate-950 text-sm">{description}</p>}
+          <h2 className="font-semibold text-lg">{title}</h2>
+          {description && <p className="max-w-3xl text-slate-600 text-sm">{description}</p>}
         </div>
         {actions}
       </div>
@@ -92,12 +88,16 @@ export function Facts({
   className,
 }: { items: { label: string; value: ReactNode; testId?: string }[]; className?: string }) {
   return (
-    <Card className={cn("p-6", className)}>
+    <Card className={cn("p-5 sm:p-6", className)}>
       <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
         {items.map((item) => (
-          <div key={item.label} className="min-w-0 space-y-1" data-testid={item.testId}>
-            <dt className="text-slate-600 text-xs">{item.label}</dt>
-            <dd className="min-w-0 text-slate-950 text-sm">{item.value}</dd>
+          <div
+            key={item.label}
+            className="min-w-0 space-y-2 border-slate-200 border-b pb-3"
+            data-testid={item.testId}
+          >
+            <dt className="font-medium text-slate-600 text-xs">{item.label}</dt>
+            <dd className="min-w-0 font-medium text-slate-950 text-sm">{item.value}</dd>
           </div>
         ))}
       </dl>
@@ -109,9 +109,9 @@ export function Check({ ok, children }: { ok: boolean | null; children: ReactNod
   return (
     <span
       className={cn(
-        "inline-flex items-start gap-1.5 text-sm",
-        ok === true && "text-green-700",
-        ok === false && "text-red-700",
+        "inline-flex items-start gap-1.5 rounded-md px-2 py-1 font-semibold text-sm",
+        ok === true && "bg-green-100 text-green-900",
+        ok === false && "bg-red-100 text-red-900",
         ok === null && "text-slate-600"
       )}
     >
@@ -131,11 +131,36 @@ export function EmptyState({ children }: { children: ReactNode }) {
   );
 }
 
+/** An empty list, said in one quiet line: complete (a check) or from incomplete sources (a warning). */
+export function QuietEmpty({
+  children,
+  incomplete = false,
+}: { children: ReactNode; incomplete?: boolean }) {
+  return (
+    <p
+      className={cn(
+        "flex items-center gap-2 rounded-xl px-4 py-3 text-[14px]",
+        incomplete ? "bg-amber-50 text-amber-950" : "bg-slate-75 text-slate-700"
+      )}
+    >
+      {incomplete ? (
+        <AlertTriangle aria-hidden className="h-4 w-4 shrink-0 text-amber-700" />
+      ) : (
+        <CircleCheck aria-hidden className="h-4 w-4 shrink-0 text-slate-550" />
+      )}
+      {children}
+    </p>
+  );
+}
+
 export function LoadingCard({ label }: { label: string }) {
   return (
-    <Card className="flex items-center gap-3 px-6 py-8 text-slate-600 text-sm">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-navy-800" />
-      {label}
+    <Card className="space-y-3 px-6 py-6 text-slate-700 text-sm">
+      <p role="status">{label}</p>
+      <div aria-hidden className="space-y-2 motion-safe:animate-pulse">
+        <div className="h-3 w-3/4 rounded bg-slate-100" />
+        <div className="h-3 w-1/2 rounded bg-slate-100" />
+      </div>
     </Card>
   );
 }

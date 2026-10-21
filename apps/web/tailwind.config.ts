@@ -21,7 +21,25 @@ const config = {
     extend: {
       fontFamily: {
         sans: ["Inter", ...defaultTheme.fontFamily.sans],
-        mono: ["JetBrains Mono", ...defaultTheme.fontFamily.mono],
+        // Inter, and the system monospace for hashes and code. Chrome on macOS cannot use
+        // SFMono-Regular (it fell back to Courier): ui-monospace is SF Mono in Safari, Menlo the
+        // Mac's own for every browser, then Windows' and Linux's.
+        mono: [
+          "ui-monospace",
+          '"SF Mono"',
+          '"SFMono-Regular"',
+          "Menlo",
+          "Monaco",
+          "Consolas",
+          '"DejaVu Sans Mono"',
+          '"Liberation Mono"',
+          "monospace",
+        ],
+      },
+      // One step larger than Tailwind's defaults, for legibility (12→13 px, 14→15 px).
+      fontSize: {
+        xs: ["0.8125rem", { lineHeight: "1.25rem" }],
+        sm: ["0.9375rem", { lineHeight: "1.375rem" }],
       },
       colors: {
         // ZKsync palette (see the zksync-visual-style guide). slate has a blue tint on purpose.
@@ -34,8 +52,9 @@ const config = {
           300: "#BEC2CC",
           400: "#A1A7B3",
           500: "#858C99",
-          600: "#6C7380",
-          700: "#555A66",
+          550: "#5B6577",
+          600: "#3D4B63",
+          700: "#344054",
           800: "#3D424D",
           900: "#262B33",
           950: "#11141A",
@@ -48,6 +67,16 @@ const config = {
           500: "#3A4AE9",
           600: "#0C18EC",
           700: "#0914C4",
+        },
+        // Decoded calldata, as in the transaction-simulator's tx-viewer: one colour per kind of value.
+        code: {
+          fn: "#4C2FC4",
+          addr: "#08625E",
+          num: "#9A3D06",
+          bytes: "#5F2BD1",
+          bool: "#1550B8",
+          str: "#05613A",
+          type: "#6A45B8",
         },
         navy: {
           50: "#EEF1F6",

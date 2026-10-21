@@ -1,9 +1,8 @@
-import type { RootLoader } from "@/root";
+import { ChainContext, GovernanceContext } from "@/components/governance-context";
 import { cn } from "@/utils/cn";
 import { shortHex } from "@/utils/format";
-import { useRouteLoaderData } from "@remix-run/react";
 import { Check, Copy, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { useContext, useState } from "react";
 
 export function CopyButton({
   value,
@@ -11,22 +10,40 @@ export function CopyButton({
   label,
 }: { value: string; className?: string; label?: string }) {
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
   return (
     <button
       type="button"
-      onClick={() => {
-        navigator.clipboard.writeText(value).then(() => {
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopyError(false);
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
-        });
+        } catch {
+          setCopyError(true);
+        }
       }}
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-75 hover:text-slate-950",
+        "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950 sm:h-8 sm:w-8",
         className
       )}
-      aria-label={label ?? "Copy"}
-      title={label ?? "Copy"}
+      aria-label={copied ? "Copied" : label ?? "Copy"}
+      title={
+        copyError
+          ? "Copy failed. Select the value and copy it manually."
+          : copied
+            ? "Copied"
+            : label ?? "Copy"
+      }
     >
+      <span className="sr-only" role="status">
+        {copyError
+          ? "Copy failed. Select the value and copy it manually."
+          : copied
+            ? "Copied to clipboard"
+            : ""}
+      </span>
       {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
   );
@@ -40,24 +57,20 @@ export function Hash({
 }: { value: string; className?: string; copy?: boolean }) {
   return (
     <span className={cn("inline-flex min-w-0 items-start gap-1", className)}>
-      <span className="mono min-w-0 break-all text-slate-950">{value}</span>
-      {copy && <CopyButton value={value} className="-mt-0.5" />}
-    </span>
-  );
-}
-
-export function ShortHash({ value, className }: { value: string; className?: string }) {
-  return (
-    <span className={cn("inline-flex items-center gap-0.5", className)} title={value}>
-      <span className="mono text-slate-950">{shortHex(value, 10, 8)}</span>
-      <CopyButton value={value} />
+      <span className="mono min-w-0 break-all rounded-md border border-slate-200 bg-slate-75 px-2 py-1 font-medium text-slate-950">
+        {value}
+      </span>
+      {copy && <CopyButton value={value} label="Copy hash" />}
     </span>
   );
 }
 
 export function useExplorer() {
-  const data = useRouteLoaderData<RootLoader>("root");
-  const network = data?.status.ok ? data.status.governance.network : null;
+  // The chain the app shell was set up for (known before the status is read), or the network of
+  // a status in hand.
+  const chain = useContext(ChainContext);
+  const status = useContext(GovernanceContext);
+  const network = chain ?? status?.governance.network ?? null;
   return {
     address: (a: string) => (network?.explorerUrl ? `${network.explorerUrl}/address/${a}` : null),
     tx: (h: string) => (network?.explorerUrl ? `${network.explorerUrl}/tx/${h}` : null),
@@ -79,9 +92,12 @@ export function ExternalAnchor({
       href={href}
       target="_blank"
       rel="noreferrer"
-      className={cn("inline-flex items-center gap-1 text-brand-600 hover:underline", className)}
+      className={cn(
+        "inline-flex min-w-0 items-center gap-1 text-brand-700 hover:underline",
+        className
+      )}
     >
-      {children}
+      <span className="min-w-0 break-all">{children}</span>
       <ExternalLink className="h-3 w-3 shrink-0" />
     </a>
   );
@@ -90,7 +106,7 @@ export function ExternalAnchor({
 export function AddressLink({
   address,
   label,
-  full,
+  full = true,
   className,
   l2,
 }: {
@@ -103,7 +119,10 @@ export function AddressLink({
   const explorer = useExplorer();
   const href = l2 ? explorer.l2Address(address) : explorer.address(address);
   return (
-    <span className={cn("inline-flex min-w-0 items-center gap-1", className)} title={address}>
+    <span
+      className={cn("inline-flex min-w-0 max-w-full flex-wrap items-center gap-1", className)}
+      title={address}
+    >
       {label && <span className="font-medium text-slate-950">{label}</span>}
       <ExternalAnchor
         href={href}
@@ -119,13 +138,27 @@ export function AddressLink({
 export function TxLink({
   hash,
   l2,
+  short = false,
   className,
-}: { hash: string; l2?: boolean; className?: string }) {
+}: {
+  hash: string;
+  l2?: boolean;
+  /** Shortened in view (a transaction to open, not a value to compare); copied in full. */
+  short?: boolean;
+  className?: string;
+}) {
   const explorer = useExplorer();
   return (
-    <span className={cn("inline-flex items-center gap-1", className)} title={hash}>
+    <span
+      className={cn(
+        "inline-flex min-w-0 max-w-full gap-1",
+        short ? "items-center" : "items-start",
+        className
+      )}
+      title={hash}
+    >
       <ExternalAnchor href={l2 ? explorer.l2Tx(hash) : explorer.tx(hash)} className="mono">
-        {shortHex(hash, 10, 8)}
+        {short ? shortHex(hash, 10, 8) : hash}
       </ExternalAnchor>
       <CopyButton value={hash} />
     </span>

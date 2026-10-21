@@ -17,6 +17,9 @@ export default defineConfig({
       L1_RPC_URL: "http://127.0.0.1:18545",
       SAFE_TX_SERVICE_URL: "http://127.0.0.1:18546",
       LOG_LEVEL: "warn",
+      // The fork, not an RPC saved in apps/web/.cache/local-settings.json. Only the RPC settings
+      // are ignored: a saved SAFE_API_KEY still applies.
+      LOCAL_SETTINGS_IGNORE: "L1_RPC_URL,L2_RPC_URL",
     },
   },
 });

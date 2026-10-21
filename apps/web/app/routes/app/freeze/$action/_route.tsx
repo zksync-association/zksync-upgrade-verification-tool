@@ -1,12 +1,18 @@
-import { type FreezeDetail, getFreezeRequest } from "@/.server/flows/freeze";
+import { freshAfter } from "@/.server/flows/common";
+import { type FreezeDetail, loadFreezeRequest } from "@/.server/flows/freeze";
 import { parseFreezeParams } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
+import { pageLoad } from "@/.server/sync/presence";
 import { FREEZE_LABELS } from "@/common/freeze";
 import { FREEZE_STATUS_LABELS } from "@/common/upgrade-states";
 import { useStatus } from "@/components/app-shell";
+import { TxLink } from "@/components/hex";
 import { Facts, LoadingCard, PageHeader } from "@/components/page";
 import { SetStateBadge } from "@/components/verification/badges";
-import { SignatureSetCard } from "@/components/verification/signature-set";
+import { ExecutedOn } from "@/components/verification/executed-on";
+import { ApprovalGroups, SignatureSetCard } from "@/components/verification/signature-set";
+import { UntilFresh } from "@/components/verification/until-fresh";
+import { YourSignature } from "@/components/verification/your-signature";
 import { formatTime, relativeTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
@@ -18,9 +24,15 @@ export const meta = Meta["/app/freeze/:action"];
 
 export function loader({ params, request }: LoaderFunctionArgs) {
   const freeze = parseFreezeParams(params.action, new URL(request.url));
+  // The signatures' first answer at once (possibly an older block or older Safe copies, labelled),
+  // then the strict result in the same response; the set's key joins the page load's grace.
+  const loading = pageLoad(request).run(() =>
+    loadFreezeRequest(freeze, { supplied: suppliedSignatures(request), freshness: "page" })
+  );
   return defer({
     freeze,
-    detail: getFreezeRequest(freeze, { supplied: suppliedSignatures(request) }),
+    detail: loading.first,
+    fresh: freshAfter(loading.first, loading.fresh, (d) => d.set.stale === true),
   });
 }
 
@@ -46,6 +58,7 @@ export default function FreezePage() {
 
 function Detail({ detail: d }: { detail: SerializeFrom<FreezeDetail> }) {
   const { governance } = useStatus();
+  const { fresh } = useLoaderData<typeof loader>();
   const sc = governance.securityCouncil;
   const p = d.params;
   const currentNonce = {
@@ -55,13 +68,33 @@ function Detail({ detail: d }: { detail: SerializeFrom<FreezeDetail> }) {
     SetSoftFreezeThreshold: sc.nonces.setSoftFreezeThreshold,
   }[p.action];
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <PageHeader
         back={{ to: $path("/app/freeze"), label: "Freeze requests" }}
         eyebrow="Freeze request"
         title={`${FREEZE_LABELS[p.action]}${p.action === "SetSoftFreezeThreshold" ? ` to ${p.threshold}` : ""}`}
         badges={<SetStateBadge state={d.state} />}
       />
+      <UntilFresh stale={d.set.stale === true} fresh={fresh}>
+        {(current) => {
+          const v = current ?? d;
+          return (
+            <YourSignature
+              hint="Check the nonce and the deadline below, then compare the hashes in the review with your hardware wallet."
+              actions={[
+                {
+                  key: "freeze",
+                  title: FREEZE_LABELS[p.action],
+                  set: v.set,
+                  state: v.state,
+                  execution: v.execution,
+                  executionToLabel: "SecurityCouncil",
+                },
+              ]}
+            />
+          );
+        }}
+      </UntilFresh>
       <Facts
         items={[
           {
@@ -84,16 +117,39 @@ function Detail({ detail: d }: { detail: SerializeFrom<FreezeDetail> }) {
             label: "Protocol",
             value: FREEZE_STATUS_LABELS[governance.freeze.lastFreezeStatus] ?? "Unknown",
           },
+          ...(d.state.status === "done" && d.state.txHash
+            ? [
+                {
+                  label: "Executed in",
+                  value: (
+                    <span className="block space-y-1">
+                      <TxLink hash={d.state.txHash} />
+                      <ExecutedOn at={d.state.at} />
+                    </span>
+                  ),
+                  testId: "executed-in",
+                },
+              ]
+            : []),
         ]}
       />
-      <SignatureSetCard
-        testId="set-freeze"
-        title="Security Council signatures"
-        set={d.set}
-        state={d.state}
-        execution={d.execution}
-        executionToLabel="SecurityCouncil"
-      />
+      <ApprovalGroups count={1}>
+        <UntilFresh stale={d.set.stale === true} fresh={fresh}>
+          {(current, refresh) => {
+            const v = current ?? d;
+            return (
+              <SignatureSetCard
+                testId="set-freeze"
+                title="Security Council signatures"
+                set={v.set}
+                state={v.state}
+                used={v.used}
+                refresh={current ? null : refresh}
+              />
+            );
+          }}
+        </UntilFresh>
+      </ApprovalGroups>
     </div>
   );
 }

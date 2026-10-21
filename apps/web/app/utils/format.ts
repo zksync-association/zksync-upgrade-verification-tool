@@ -4,32 +4,23 @@ export function shortHex(value: string, start = 6, end = 4) {
   return value.length <= start + end + 3 ? value : `${value.slice(0, start)}…${value.slice(-end)}`;
 }
 
-const dateTime = new Intl.DateTimeFormat("en-US", {
-  year: "numeric",
-  month: "short",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "UTC",
-  hour12: false,
-});
-
-const dateOnly = new Intl.DateTimeFormat("en-US", {
-  year: "numeric",
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-});
+// Intl punctuation differs between Node and Safari (", " versus " at ").
+// Assemble UTC fields explicitly so SSR and hydration render identical text.
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const dayLabel = (date: Date) =>
+  `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 
 /** Unix seconds (number or decimal string) or ISO string → "Sep 30, 2026, 09:31 UTC". */
 export function formatTime(value: number | string | null | undefined) {
   const date = toDate(value);
-  return date ? `${dateTime.format(date)} UTC` : "—";
+  return date
+    ? `${dayLabel(date)}, ${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")} UTC`
+    : "—";
 }
 
 export function formatDay(value: number | string | null | undefined) {
   const date = toDate(value);
-  return date ? dateOnly.format(date) : "—";
+  return date ? dayLabel(date) : "—";
 }
 
 function toDate(value: number | string | null | undefined): Date | null {
@@ -56,6 +47,15 @@ export function relativeTime(value: number | string, now: number | string) {
     }
   }
   return delta >= 0 ? "in less than a minute" : "just now";
+}
+
+/** An age in seconds → "12s ago" / "3m ago" / "2h ago" / "4d ago". A negative age (clock skew) is 0. */
+export function formatAge(seconds: number) {
+  const s = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+  if (s < 60) return `${s}s ago`;
+  if (s < 3_600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86_400) return `${Math.floor(s / 3_600)}h ago`;
+  return `${Math.floor(s / 86_400)}d ago`;
 }
 
 export function formatEth(wei: string) {

@@ -1,10 +1,21 @@
-import { type Address, type Hex, type Log, type PublicClient, formatLog, numberToHex } from "viem";
-import { FOREVER, cached } from "./cache";
-import { latestBlock, network, safeBlockNumber } from "./rpc";
+import {
+  type Address,
+  BaseError,
+  type Hex,
+  HttpRequestError,
+  type Log,
+  type PublicClient,
+  RpcRequestError,
+  formatLog,
+  numberToHex,
+} from "viem";
+import { FOREVER, cached, cachedUntil, concurrencyLimit } from "./cache";
+import type { Lane } from "./chain/jsonrpc";
+import { historyLaneOf, latestBlock, network, safeBlockNumber } from "./rpc";
 
 // eth_getLogs without a database. Public RPCs cap block ranges (or refuse history), so ranges are
 // split adaptively, and every range below the "safe" head is cached forever per filter. Only the
-// newest ~64 blocks are fetched again on later requests.
+// newest ~64 blocks are fetched again; the app's own clients scan through their history lane.
 
 export class LogsUnavailableError extends Error {
   constructor(
@@ -20,12 +31,53 @@ export class LogsUnavailableError extends Error {
 
 type Filter = { address: Address; topics: (Hex | null)[] };
 type Segment = { from: bigint; to: bigint };
-type FilterCache = { segments: Segment[]; logs: Map<string, Log>; lock: Promise<unknown> };
+type FilterCache = {
+  segments: Segment[];
+  logs: Map<string, Log>;
+  lock: Promise<unknown>;
+  pendingTail: Map<string, Promise<Log[]>>;
+};
+
+/** Where eth_getLogs goes: a history lane, or the client itself behind a small shared pool. */
+type Source = {
+  key: object;
+  request: (filter: Filter, from: bigint, to: bigint) => Promise<Log[]>;
+  limit: () => <T>(task: () => Promise<T>) => Promise<T>;
+};
 
 const MIN_SPAN = 1_000n;
-const caches = new WeakMap<PublicClient, Map<string, FilterCache>>();
-// Largest span each client has accepted so far; starts unbounded and only shrinks.
-const learnedSpan = new WeakMap<PublicClient, bigint>();
+// A client without a lane: leave its transport capacity for foreground reads.
+const clientPool = concurrencyLimit(2);
+let caches = new WeakMap<object, Map<string, FilterCache>>();
+// Largest span each source has accepted so far; starts unbounded and only shrinks.
+let learnedSpan = new WeakMap<object, bigint>();
+
+/** Starts `lane`'s scans at a cap the provider named elsewhere (the log index). */
+export function seedLogSpan(lane: Lane, span: bigint) {
+  const learned = learnedSpan.get(lane);
+  if (span > 0n && (learned === undefined || span < learned)) learnedSpan.set(lane, span);
+}
+
+async function sourceOf(client: PublicClient): Promise<Source> {
+  const lane = await historyLaneOf(client);
+  if (lane) {
+    return {
+      key: lane,
+      request: (filter, from, to) => laneRequest(lane, filter, from, to),
+      // The lane queues and batches; keep about as many chunks out as it can send at once, so a
+      // failed scan stops early.
+      limit: () => {
+        const { batch, inFlightLimit } = lane.stats();
+        return concurrencyLimit(Math.max(1, batch * inFlightLimit));
+      },
+    };
+  }
+  return {
+    key: client,
+    request: (filter, from, to) => request(client, filter, from, to),
+    limit: () => clientPool,
+  };
+}
 
 export async function getLogs(
   client: PublicClient,
@@ -37,28 +89,39 @@ export async function getLogs(
   const head = toBlock ?? (await latestBlock()).number;
   const finalized = safeHead ?? (await safeBlockNumber());
   if (head < fromBlock) return [];
+  const source = await sourceOf(client);
 
   const key = `${filter.address.toLowerCase()}:${filter.topics.join(",")}`;
-  let byFilter = caches.get(client);
+  let byFilter = caches.get(source.key);
   if (!byFilter) {
     byFilter = new Map();
-    caches.set(client, byFilter);
+    caches.set(source.key, byFilter);
   }
   let entry = byFilter.get(key);
   if (!entry) {
-    entry = { segments: [], logs: new Map(), lock: Promise.resolve() };
+    entry = { segments: [], logs: new Map(), lock: Promise.resolve(), pendingTail: new Map() };
     byFilter.set(key, entry);
   }
 
   const cacheTo = head < finalized ? head : finalized;
+  // Unfinalized logs this call already read together with the newest finalized gap.
+  const read: { tail: Log[] | null } = { tail: null };
   if (cacheTo >= fromBlock) {
     const cacheEntry = entry;
     // One fill at a time per filter, so concurrent pages don't fetch the same range twice.
     const fill = cacheEntry.lock.then(async () => {
-      for (const gap of missing(cacheEntry.segments, { from: fromBlock, to: cacheTo })) {
-        for (const log of await fetchRange(client, filter, gap.from, gap.to)) {
-          cacheEntry.logs.set(logKey(log), log);
+      const gaps = missing(cacheEntry.segments, { from: fromBlock, to: cacheTo });
+      for (const gap of gaps) {
+        // The newest gap ends at the boundary and the tail starts right after it: one range
+        // [gap.from, head] instead of two round trips.
+        const joined = head > finalized && gap.to === cacheTo;
+        const logs = await fetchRange(source, filter, gap.from, joined ? head : gap.to);
+        for (const log of logs) {
+          if (log.blockNumber !== null && log.blockNumber <= gap.to)
+            cacheEntry.logs.set(logKey(log), log);
         }
+        if (joined)
+          read.tail = logs.filter((log) => log.blockNumber !== null && log.blockNumber > gap.to);
         cacheEntry.segments = merge([...cacheEntry.segments, gap]);
       }
     });
@@ -66,10 +129,20 @@ export async function getLogs(
     await fill;
   }
 
-  const fresh =
-    head > finalized
-      ? await fetchRange(client, filter, fromBlock > finalized ? fromBlock : finalized + 1n, head)
-      : [];
+  let fresh: Log[] = read.tail ?? [];
+  if (head > finalized && read.tail === null) {
+    const tailFrom = fromBlock > finalized ? fromBlock : finalized + 1n;
+    const tailKey = `${tailFrom}:${head}`;
+    let pending = entry.pendingTail.get(tailKey);
+    if (!pending) {
+      pending = fetchRange(source, filter, tailFrom, head);
+      entry.pendingTail.set(tailKey, pending);
+      const pendingTail = entry.pendingTail;
+      const remove = () => pendingTail.delete(tailKey);
+      pending.then(remove, remove);
+    }
+    fresh = await pending;
+  }
 
   const all = [...entry.logs.values()].filter(
     (log) => log.blockNumber !== null && log.blockNumber >= fromBlock && log.blockNumber <= cacheTo
@@ -78,36 +151,76 @@ export async function getLogs(
 }
 
 async function fetchRange(
-  client: PublicClient,
+  source: Source,
   filter: Filter,
   from: bigint,
   to: bigint
 ): Promise<Log[]> {
   // Probe with the first chunk, halving until the RPC accepts it, so failures stay sequential
   // (log2 of the overshoot) instead of fanning out across parallel chunks.
-  let span = learnedSpan.get(client) ?? to - from + 1n;
+  let span = learnedSpan.get(source.key) ?? to - from + 1n;
   let first: Log[];
   for (;;) {
     const end = from + span - 1n < to ? from + span - 1n : to;
     try {
-      first = await request(client, filter, from, end);
+      first = await source.request(filter, from, end);
       break;
     } catch (error) {
-      if (end - from + 1n <= MIN_SPAN) throw new LogsUnavailableError(rpcMessage(error), from, end);
-      span = (end - from + 1n) / 2n;
-      const learned = learnedSpan.get(client);
-      if (learned === undefined || span < learned) learnedSpan.set(client, span);
+      if (!isRangeError(error) || end - from + 1n <= MIN_SPAN)
+        throw new LogsUnavailableError(rpcMessage(error), from, end);
+      const explicitLimit = rpcMessage(error).match(
+        /range\s+\d+\s+exceeds limit of\s+([\d,]+)/i
+      )?.[1];
+      const cap = explicitLimit ? BigInt(explicitLimit.replaceAll(",", "")) : 0n;
+      span = cap > 0n && cap < end - from + 1n ? cap : (end - from + 1n) / 2n;
+      const learned = learnedSpan.get(source.key);
+      if (learned === undefined || span < learned) learnedSpan.set(source.key, span);
     }
   }
   // The rest at the span that worked; a chunk that still fails (e.g. too many results) re-probes.
+  const limit = source.limit();
   const rest: Promise<Log[]>[] = [];
+  let failure: unknown;
   for (let start = from + span; start <= to; start += span) {
     const end = start + span - 1n < to ? start + span - 1n : to;
     rest.push(
-      request(client, filter, start, end).catch(() => fetchRange(client, filter, start, end))
+      limit(() => {
+        if (failure) return Promise.reject(failure);
+        return source.request(filter, start, end);
+      }).catch((error) => {
+        if (failure) throw failure;
+        if (!isRangeError(error)) {
+          failure = new LogsUnavailableError(rpcMessage(error), start, end);
+          throw failure;
+        }
+        return fetchRange(source, filter, start, end).catch((error) => {
+          failure = error;
+          throw error;
+        });
+      })
     );
   }
   return [first, ...(await Promise.all(rest))].flat();
+}
+
+function isRangeError(error: unknown) {
+  return /block.*range|range.*(?:block|exceed|limit|too large)|query.*(?:too large|exceed)|too many (?:logs|results)|more than.*results|response.*(?:size|too large)|log.*limit/i.test(
+    rpcMessage(error)
+  );
+}
+
+/** One eth_getLogs on a lane. The lane already backs off on rate limits and retries timeouts. */
+async function laneRequest(lane: Lane, filter: Filter, from: bigint, to: bigint) {
+  const raw = await lane.request<unknown>("eth_getLogs", [
+    {
+      address: filter.address,
+      topics: filter.topics,
+      fromBlock: numberToHex(from),
+      toBlock: numberToHex(to),
+    },
+  ]);
+  if (!Array.isArray(raw)) throw new Error("eth_getLogs did not answer with a list");
+  return (raw as Parameters<typeof formatLog>[0][]).map((log) => formatLog(log) as Log);
 }
 
 async function request(client: PublicClient, filter: Filter, from: bigint, to: bigint) {
@@ -185,27 +298,91 @@ export type LogHistoryStatus =
   | { status: "missing"; blockNumber: string }
   | { status: "error"; message: string };
 
+// An answer ("ok", "missing", "unchecked") holds for ten minutes. A failure is kept only briefly,
+// so a rate-limit blip (e.g. during the boot backfill) cannot pin the status to "error".
+const CANARY_TTL_MS = 10 * 60_000;
+const CANARY_ERROR_TTL_MS = 30_000;
+const CANARY_ATTEMPTS = 3;
+const CANARY_BACKOFF_MS = 500;
+
+// JSON-RPC answers that say "not now" rather than anything about the request: internal error,
+// resource unavailable, limit exceeded; and -32000 texts of the same kind.
+const TRANSIENT_CODES = new Set([-32603, -32002, -32005]);
+const TRANSIENT_TEXT =
+  /timeout|timed out|rate.?limit|too many requests|busy|overload|try again|temporar|unavailable/i;
+
+/**
+ * True for a failure worth retrying: no answer from the node (network, timeout, HTTP 408/425/429/
+ * 5xx) or an answer that says "not now". A JSON-RPC error about the request itself is final.
+ */
+export function isTransientRpcFailure(error: unknown): boolean {
+  if (error instanceof BaseError) {
+    const rpc = error.walk((e) => e instanceof RpcRequestError);
+    if (rpc instanceof RpcRequestError) return transientCode(rpc.code, rpc.details);
+    const http = error.walk((e) => e instanceof HttpRequestError);
+    if (http instanceof HttpRequestError) {
+      const status = http.status;
+      return status === undefined || [408, 425, 429].includes(status) || status >= 500;
+    }
+    const coded = error as BaseError & { code?: unknown };
+    if (typeof coded.code === "number" && coded.code !== -1)
+      return transientCode(coded.code, rpcMessage(error));
+    return true;
+  }
+  if (error && typeof error === "object") {
+    const { code, status, message } = error as {
+      code?: unknown;
+      status?: unknown;
+      message?: unknown;
+    };
+    if (typeof status === "number") return [408, 425, 429].includes(status) || status >= 500;
+    if (typeof code === "number") return transientCode(code, String(message ?? ""));
+  }
+  return true;
+}
+
+function transientCode(code: number, message: string) {
+  return (
+    TRANSIENT_CODES.has(code) || (code === -32000 && TRANSIENT_TEXT.test(message.slice(0, 500)))
+  );
+}
+
 /**
  * Asks the RPC for a log that must exist (the handler's own deployment event). Some RPCs return
  * an empty array for old blocks instead of an error; without this check an incomplete list would
- * look exactly like a quiet governance week.
+ * look exactly like a quiet governance week. A transient failure is retried first.
  */
 export function checkLogHistory(client: PublicClient): Promise<LogHistoryStatus> {
-  return cached("log-canary", 10 * 60_000, async () => {
+  return cachedUntil<LogHistoryStatus>("log-canary", async () => {
     const { logCanary } = await network();
-    if (!logCanary) return { status: "unchecked" } as const;
-    try {
-      const logs = await request(
-        client,
-        { address: logCanary.address, topics: [logCanary.topic0] },
-        logCanary.blockNumber,
-        logCanary.blockNumber
-      );
-      return logs.length > 0
-        ? ({ status: "ok" } as const)
-        : ({ status: "missing", blockNumber: logCanary.blockNumber.toString() } as const);
-    } catch (error) {
-      return { status: "error", message: rpcMessage(error) } as const;
+    if (!logCanary) return { value: { status: "unchecked" }, ttlMs: CANARY_TTL_MS };
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const logs = await request(
+          client,
+          { address: logCanary.address, topics: [logCanary.topic0] },
+          logCanary.blockNumber,
+          logCanary.blockNumber
+        );
+        return {
+          value:
+            logs.length > 0
+              ? { status: "ok" }
+              : { status: "missing", blockNumber: logCanary.blockNumber.toString() },
+          ttlMs: CANARY_TTL_MS,
+        };
+      } catch (error) {
+        // A rate limit was already backed off and retried in request().
+        const limited = (error as { status?: number }).status === 429;
+        if (attempt < CANARY_ATTEMPTS && !limited && isTransientRpcFailure(error)) {
+          await new Promise((resolve) => setTimeout(resolve, CANARY_BACKOFF_MS * attempt));
+          continue;
+        }
+        return {
+          value: { status: "error", message: rpcMessage(error) },
+          ttlMs: CANARY_ERROR_TTL_MS,
+        };
+      }
     }
   });
 }
@@ -255,4 +432,9 @@ export async function findBlockByTimestamp(
     bisect = (hi - lo) * 2n > before;
   }
   return hi;
+}
+
+export function resetLogCaches() {
+  caches = new WeakMap();
+  learnedSpan = new WeakMap();
 }

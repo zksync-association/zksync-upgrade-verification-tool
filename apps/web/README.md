@@ -4,7 +4,8 @@ Run it with the one command in the [root README](../../README.md). This page is 
 
 ## How it works
 
-There is no database. Everything is derived on each request (with short in-memory caches):
+There is no database. Everything is derived from the chain and Safe (with in-memory caches, and a local cache of public
+chain data kept between runs):
 
 - **Roles and rules come from the chain.** The ProtocolUpgradeHandler address is pinned per network in
   `app/common/networks.ts`. The Security Council, Guardians, Emergency Upgrade Board, members, thresholds, nonces and
@@ -21,6 +22,22 @@ There is no database. Everything is derived on each request (with short in-memor
 
 Log scans split ranges the RPC refuses, learn its limit, and cache everything below the safe head (or below the fork
 block on anvil). A canary log flags RPCs that silently return no history.
+
+**Sync** (`app/.server/sync/`): the app follows the chain only while one of its pages is open and visible in a
+browser (`components/presence.tsx` beats to `/resources/presence` every 10 s with the keys of what it shows;
+`sync/presence.ts`). Then the engine follows the head and, at each new block, re-reads what is on screen at that
+block, normally in one Multicall3 call (`sync/snapshot.ts`, `chain/aggregate.ts`, `chain/verdicts.ts`); the Safe
+watcher (`safe/store.ts`) checks the member Safes of open sets on screen; ZKsync Era has a minute timer while an Era
+page is on screen (`sync/era.ts`); and an open page reloads its data from memory when what it shows changed
+(`sync/revs.ts`). With no page open nothing is sent upstream; `/api/*` reads on demand and never counts as use.
+
+**Chain cache** (`app/.server/persist/chain-cache.ts`): the log histories (ProtocolUpgradeHandler, Era governors) up
+to their finality boundary, final block timestamps and members' last Safe listings are saved to
+`.cache/chain/<chainId>-<genesis hash prefix>.json` (atomic write, 0600; at most once a minute when something changed,
+and on shutdown). At start the file is checked against the chain and seeded as provisional; the backfill re-reads the
+history and the two must match (else the file is discarded). A saved block timestamp is checked when that block is
+read again; saved Safe listings are shown with their age until the Safe is read again. Only pages read provisional
+data, labelled; `/api/*` never does. `CHAIN_CACHE=0` turns it off; dev nodes never use it. Delete `.cache/chain/` to clear it.
 
 ## Develop
 
@@ -39,4 +56,7 @@ shared with the Playwright suite in `packages/e2e`.
 
 Only `L1_RPC_URL` is required. The optional variables are listed in the root README. `LOG_LEVEL`, `SERVER_PORT`
 (default 3000) and `ALLOW_INDEXING` (default false) behave as before. `SERVER_HOST` defaults to `127.0.0.1`, so a
-local run (which spends your RPC) answers only your machine; the Docker image sets `0.0.0.0`.
+local run (which spends your RPC) answers only your machine; the Docker image sets `0.0.0.0`. After it starts
+listening (and after a settings change) the server warms its caches in the background: network, governance, the
+log-history canary, the ProtocolUpgradeHandler log index, then the governance Safes' message listings, one at a
+time. `PREWARM=0` turns that off.
