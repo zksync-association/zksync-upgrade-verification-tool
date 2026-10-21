@@ -30,7 +30,7 @@ export function statusContent(status: Extract<AppStatus, { ok: true }>) {
   };
 }
 
-/** The upgrades list (`list:upgrades[:all]`). */
+/** The upgrades list (`list:upgrades[:90|:all]`). */
 export const upgradeListContent = (list: Pick<UpgradeList, "upgrades" | "allHistory">) => ({
   allHistory: list.allHistory,
   upgrades: list.upgrades.map((u) => ({

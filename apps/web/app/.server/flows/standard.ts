@@ -32,6 +32,7 @@ import {
   type ExecutionView,
   type SetState,
   type UsedSignature,
+  blockTimeOf,
   callTo,
   compareUsedSignatures,
   decodeApprovalCall,
@@ -147,11 +148,14 @@ export async function upgradeTitles(list: UpgradeList): Promise<Record<string, s
 /** JSON waits for this run's complete history; a page may use the last run's (`fromLastRun`). */
 export async function listStandardUpgrades({
   allHistory,
+  days = ACTIVE_WINDOW_DAYS,
   freshness = "strict",
-}: { allHistory: boolean; freshness?: Freshness }): Promise<UpgradeList> {
+}: { allHistory: boolean; days?: bigint; freshness?: Freshness }): Promise<UpgradeList> {
   const net = await network();
   const head = await latestBlock();
-  const windowStart = head.number - (ACTIVE_WINDOW_DAYS * DAY) / BigInt(net.blockTimeSeconds);
+  // At least the active window: every upgrade still in progress is in the list.
+  const window = days > ACTIVE_WINDOW_DAYS ? days : ACTIVE_WINDOW_DAYS;
+  const windowStart = head.number - (window * DAY) / BigInt(net.blockTimeSeconds);
   const from =
     allHistory || windowStart < net.upgradeHandlerDeployBlock
       ? net.upgradeHandlerDeployBlock
@@ -344,9 +348,12 @@ export type ApprovalSet = {
 export type UpgradeTimeline = {
   createdAt: number;
   legalVetoEndsAt: number;
+  /** The last moment to approve: then it expires, or the Guardians' approval takes effect. */
   waitingEndsAt: number;
   approvedAt: number | null;
   readyAt: number | null;
+  /** From approval to "Ready" (seconds; 0 on a testnet handler). */
+  delaySeconds: number;
 };
 
 export type StandardUpgradeDetail = {
@@ -360,6 +367,8 @@ export type StandardUpgradeDetail = {
   sets: ApprovalSet[];
   execute: ExecutionView | null;
   executedTx: Hex | null;
+  /** The execution's block time (unix seconds), when it could be read. */
+  executedAt: string | null;
   l2Proposal: Awaited<ReturnType<typeof findL2ProposalForUpgrade>>;
   governance: Governance;
 };
@@ -370,7 +379,7 @@ export type StandardUpgradeOverview = Omit<StandardUpgradeDetail, "sets">;
 
 export type StandardUpgradeCore = Omit<
   StandardUpgradeOverview,
-  "execute" | "executedTx" | "l2Proposal"
+  "execute" | "executedTx" | "executedAt" | "l2Proposal"
 >;
 
 /**
@@ -514,16 +523,18 @@ export async function getStandardUpgradeCore(
     status.guardiansExtendedLegalVeto ? 7 : gov.network.standardLegalVetoDays
   );
   const created = BigInt(status.creationTimestamp);
+  const delay = BigInt(gov.network.upgradeDelayDays ?? 1) * DAY;
   const timeline: UpgradeTimeline = {
     createdAt: status.creationTimestamp,
     legalVetoEndsAt: Number(created + vetoDays * DAY),
     waitingEndsAt: Number(created + vetoDays * DAY + 30n * DAY),
     approvedAt: status.securityCouncilApprovalTimestamp || null,
     readyAt: status.securityCouncilApprovalTimestamp
-      ? status.securityCouncilApprovalTimestamp + Number(DAY)
+      ? status.securityCouncilApprovalTimestamp + Number(delay)
       : status.guardiansApproval
-        ? Number(created + vetoDays * DAY + 31n * DAY)
+        ? Number(created + vetoDays * DAY + 30n * DAY + delay)
         : null,
+    delaySeconds: Number(delay),
   };
 
   return {
@@ -542,6 +553,7 @@ async function getUpgradeExecution(d: StandardUpgradeCore, page = false) {
   const { governance: gov, started, state, id } = d;
   let execute: ExecutionView | null = null;
   let executedTx: Hex | null = null;
+  let executedAt: string | null = null;
   if (state === UPGRADE_STATES.Ready) {
     const execution = executeUpgradeExecution(gov.upgradeHandler, started.proposal);
     execute = {
@@ -554,8 +566,9 @@ async function getUpgradeExecution(d: StandardUpgradeCore, page = false) {
       legacyEvent(gov.upgradeHandler, "UpgradeExecuted", id, BigInt(started.blockNumber))
     );
     executedTx = executed?.transactionHash ?? null;
+    executedAt = executed ? await blockTimeOf(executed.blockNumber) : null;
   }
-  return { execute, executedTx };
+  return { execute, executedTx, executedAt };
 }
 
 function approvalSpecs(d: StandardUpgradeCore) {
@@ -654,7 +667,14 @@ async function getRecordedApprovals(d: StandardUpgradeCore): Promise<RecordedApp
             );
           });
           const txHash = event?.transactionHash ?? null;
-          state = { ...spec.state, txHash };
+          // When: the Security Council's approval time is on-chain; the others', their block's.
+          const at =
+            spec.key === "securityCouncil" && status.securityCouncilApprovalTimestamp
+              ? String(status.securityCouncilApprovalTimestamp)
+              : event
+                ? await blockTimeOf(event.blockNumber)
+                : null;
+          state = { ...spec.state, txHash, at };
           const call = txHash ? await callTo(txHash, contract.address) : null;
           const decoded = call ? decodeApprovalCall(call.data) : null;
           if (decoded && event) {

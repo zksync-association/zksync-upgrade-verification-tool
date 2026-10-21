@@ -15,7 +15,7 @@ import { cached } from "../cache";
 import { UpstreamError, isFinalBlock } from "../chain/call";
 import { RpcError } from "../chain/jsonrpc";
 import { getLogs } from "../logs";
-import { l1, lanes } from "../rpc";
+import { blockTimestamps, l1, lanes } from "../rpc";
 import {
   type Freshness,
   type SignatureSet,
@@ -31,7 +31,13 @@ import {
 
 export type SetState =
   | { status: "open" }
-  | { status: "done"; detail: string; txHash: Hex | null }
+  | {
+      status: "done";
+      detail: string;
+      txHash: Hex | null;
+      /** With txHash: its block's time (unix seconds), when it could be read. */
+      at?: string | null;
+    }
   | { status: "closed"; detail: string };
 
 export type ExecutionView = Execution & { simulation: Simulation };
@@ -92,6 +98,15 @@ export async function executionFor(
   if (!execution) return null;
   const keep = set.members.every((m) => m.status !== "valid" || m.source !== "supplied");
   return { ...execution, simulation: await simulate(execution, { keep, page: keep && page }) };
+}
+
+/** A block's time (unix seconds) for showing when something was executed; null if not read. */
+export async function blockTimeOf(blockNumber: bigint): Promise<string | null> {
+  try {
+    return (await blockTimestamps([blockNumber])).get(blockNumber)?.toString() ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function topicOf(abi: readonly unknown[], name: string): Hex {

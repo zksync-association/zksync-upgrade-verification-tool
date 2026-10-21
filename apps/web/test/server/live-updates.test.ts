@@ -879,7 +879,7 @@ describe("C-1 for the home page's lists with a pending emergency upgrade (from S
         emergencyListContent(fresh, executed)
       ),
       { key: watchKeys.status, rev: null },
-      { key: watchKeys.upgrades(false), rev: null },
+      { key: watchKeys.upgrades("45"), rev: null },
       { key: watchKeys.freezes, rev: null },
     ];
     presence().beat({ tab: "tab-under-test", reason: "interval", items });

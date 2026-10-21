@@ -1,14 +1,13 @@
 import type { Simulation } from "@/.server/signatures";
-import { useOfferWallet } from "@/components/connect-button";
-import { useHoldUpdates, useLive, useWatchItem } from "@/components/presence";
-import { AddressLink, CopyButton } from "@/components/hex";
+import { useHoldUpdates, useLive, usePresence, useWatchItem } from "@/components/presence";
+import { AddressLink, CopyButton, TxLink } from "@/components/hex";
 import { Button } from "@/components/ui/button";
 import { usePageNotCurrent } from "@/components/verification/content-currency";
 import { cn } from "@/utils/cn";
 import { formatEth, formatNumber } from "@/utils/format";
-import { useNavigate } from "@remix-run/react";
-import { CheckCircle2, Clock, MinusCircle, Send, XCircle } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { Link } from "@remix-run/react";
+import { CheckCircle2, Clock, Loader2, MinusCircle, Send, XCircle } from "lucide-react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { $path } from "remix-routes";
 import type { Hex } from "viem";
@@ -33,6 +32,44 @@ export function simulationFreshness(
   const block = again && at !== null && BigInt(again) > BigInt(at) ? again : at;
   const served = live.head?.number ?? null;
   return { block, current: block === null || served === null || BigInt(block) >= BigInt(served) };
+}
+
+// Blocks after sending in which the page's data is read again, until the action shows as done (a
+// page also reloads by itself when what it shows changed; this covers the block it lands in).
+const RELOAD_BLOCKS_AFTER_SENDING = 30;
+
+/** A transaction sent from this page: its hash, and its receipt one click away. */
+export function SentTransaction({ hash }: { hash: Hex }) {
+  const { reload } = usePresence();
+  const reloadNow = useRef(reload);
+  reloadNow.current = reload;
+  const head = useLive().head?.number;
+  // Counts heads after the one it was sent at: one reload per new block.
+  const blocks = useRef(-1);
+  useEffect(() => {
+    if (head === undefined) return;
+    blocks.current += 1;
+    if (blocks.current > 0 && blocks.current <= RELOAD_BLOCKS_AFTER_SENDING) reloadNow.current();
+  }, [head]);
+  return (
+    <div
+      className="flex items-start gap-2 rounded-lg bg-brand-50 px-3 py-2 text-navy-800 text-sm"
+      role="status"
+      data-testid="tx-sent"
+    >
+      <Loader2 aria-hidden className="mt-0.5 h-4 w-4 shrink-0 motion-safe:animate-spin" />
+      <span className="min-w-0">
+        Sent in <TxLink hash={hash} className="text-[13px]" /> · this page shows it done once it is
+        in a block.{" "}
+        <Link
+          to={$path("/app/transactions/:hash", { hash })}
+          className="font-medium text-brand-700 hover:underline"
+        >
+          Its receipt
+        </Link>
+      </span>
+    </div>
+  );
 }
 
 export function SimulationResult({ simulation }: { simulation: Simulation }) {
@@ -97,6 +134,7 @@ export function ExecutionPanel({
   note,
   extra,
   blockedReason = null,
+  onSent,
 }: {
   execution: ExecutionLike;
   toLabel?: string;
@@ -105,11 +143,12 @@ export function ExecutionPanel({
   extra?: ReactNode;
   /** Why sending waits (its signatures not verified at the head served); the panel stays. */
   blockedReason?: string | null;
+  /** Sent: the hash goes here (the caller shows it); without it, the panel shows it itself. */
+  onSent?: (hash: Hex) => void;
 }) {
-  useOfferWallet();
   const { isConnected, connector } = useAccount();
   const { sendTransaction, isPending } = useSendTransaction();
-  const navigate = useNavigate();
+  const [sent, setSent] = useState<Hex | null>(null);
   // Inside Safe{Wallet} the transaction becomes one of the Safe's own, which its owners confirm
   // and execute there; what comes back is its safeTxHash, not a transaction hash.
   const viaSafe = connector?.id === "safe";
@@ -144,7 +183,9 @@ export function ExecutionPanel({
             return;
           }
           toast.success("Transaction sent", { id: "send-tx" });
-          navigate($path("/app/transactions/:hash", { hash }));
+          // The page stays: it shows the action done once the transaction is in a block.
+          if (onSent) onSent(hash);
+          else setSent(hash);
         },
         onError: (error) => {
           toast.error(error.message.split("\n")[0] ?? "Transaction rejected", { id: "send-tx" });
@@ -205,6 +246,7 @@ export function ExecutionPanel({
         </dd>
       </dl>
       {execution.simulation && <SimulationResult simulation={execution.simulation} />}
+      {sent && <SentTransaction hash={sent} />}
       {safeTxHash && (
         <div
           className="space-y-2 rounded-lg bg-green-50 px-3 py-2 text-green-900 text-sm"

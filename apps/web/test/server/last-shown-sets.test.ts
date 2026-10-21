@@ -23,7 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FAKE_PINS, L1 } from "../support/fake-l1";
 import { HEAD, NOW, SLOT_MS, backfilled, liveWorld, settle } from "../support/live-world";
 
-// After a pause both upgrade pages' first flush carries the sets and recorded approvals last shown,
+// After a pause both upgrade pages' first flush carries the sets last shown (with how each was approved),
 // each labelled as of its block, nothing to sign or send from it; and no set whose Safe copies the
 // current answer keeps (an executed upgrade's) is said to have them refreshed.
 
@@ -110,7 +110,7 @@ afterEach(() => {
 });
 
 describe("the upgrade page after a pause", () => {
-  it("sends its sets and recorded approvals as last shown at once, labelled, with the upgrade", async () => {
+  it("sends its sets as last shown at once, labelled, with the upgrade", async () => {
     // (Any transaction, for the recorded approvals' lookups: none decodes as an approval.)
     const w = liveWorld({ transaction });
     await backfilled();
@@ -120,7 +120,6 @@ describe("the upgrade page after a pause", () => {
     const shownSets = (await settle(before.freshSets as Promise<unknown>)) as HeldSet[] | null;
     const firstSets = (await settle(before.sets as Promise<unknown>)) as HeldSet[];
     const current = shownSets ?? firstSets;
-    const records = (await settle(before.evidence as Promise<unknown>)) as unknown[];
     await load(before);
     expect(current.map((s) => s.set.stale)).toEqual([false, false, false]);
 
@@ -131,14 +130,13 @@ describe("the upgrade page after a pause", () => {
     const detail = (await atOnce(after.detail)) as { asOf: { block: string } };
     const held = (await atOnce(after.heldApprovals)) as {
       sets: HeldSet[];
-      evidence: unknown[];
       asOf: { block: string };
     };
     // The same page load as the upgrade shown with them (the page checks it), at its block.
     expect(held.asOf.block).toBe(HEAD.toString());
     expect(detail.asOf.block).toBe(held.asOf.block);
-    expect(records.length).toBeGreaterThan(0);
-    expect(held.evidence).toEqual(records);
+    // How each set was approved is in its card: no separate list of recorded approvals.
+    expect(held).not.toHaveProperty("evidence");
     expect(held.sets.map((s) => s.state.status)).toEqual(current.map((s) => s.state.status));
     expect(held.sets.map((s) => s.key)).toEqual(current.map((s) => s.key));
     for (const [i, s] of held.sets.entries()) {

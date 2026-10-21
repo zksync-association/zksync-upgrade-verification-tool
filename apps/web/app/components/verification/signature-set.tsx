@@ -1,71 +1,215 @@
-import type { ExecutionView, SetState, UsedSignature } from "@/.server/flows/common";
+import type { SetState, UsedSignature } from "@/.server/flows/common";
 import type { MemberResult, SignatureSet } from "@/.server/signatures";
-import { AddressLink, CopyButton, ExternalAnchor, Hash, TxLink } from "@/components/hex";
-import { Card } from "@/components/ui/card";
+import { AddressLink, CopyButton, ExternalAnchor, Hash, useExplorer } from "@/components/hex";
 import { Progress } from "@/components/ui/progress";
+import { ToolButton, Toolbar } from "@/components/ui/tool-button";
 import { cn } from "@/utils/cn";
 import { useLive, usePresence, useSafeCheck, useWatchItem } from "@/components/presence";
 import { Button } from "@/components/ui/button";
-import { formatNumber } from "@/utils/format";
+import { formatNumber, shortHex } from "@/utils/format";
 import type { SerializeFrom } from "@remix-run/node";
 import {
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Circle,
+  CircleDashed,
   RefreshCw,
   ShieldCheck,
   XCircle,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { isAddressEqual } from "viem";
-import { useAccount } from "wagmi";
 import { MemberStatusBadge, SetStateBadge } from "./badges";
-import { ExecutionPanel } from "./execution-panel";
+import { ExecutedOn } from "./executed-on";
+import { SafeHashes } from "./safe-hashes";
 import {
   FreshnessNote,
   type Refresh,
   newerCheck,
   safeUnavailableReason,
-  setCurrency,
+  setStanding,
 } from "./freshness";
-import { SignButton } from "./sign-button";
+import { useAccount } from "wagmi";
 
 type Serialized<T> = SerializeFrom<T>;
 
-export function SignatureSetCard({
+// The approvals of an action as one table, like its calls: a row per signer group (the Security
+// Council, the Guardians, the Foundation) with its state, count and result, unfolding into how it
+// was verified, its members and what they sign. Open groups start unfolded unless the page folds
+// them all (an emergency upgrade's three); Expand all and Typed data (every group's EIP-712 data)
+// are in the header. A group's folded content stays rendered.
+
+type Groups = {
+  fold: { open: boolean; v: number };
+  typed: boolean;
+  unfoldOpen: boolean;
+  /** Closed groups are folded away under "Show closed groups" (beside a group still in play). */
+  hideClosed: boolean;
+};
+const GroupsContext = createContext<Groups | null>(null);
+
+/** Column widths shared by the header and every group row (from md up). */
+const GROUP_COLUMNS = "md:grid-cols-[minmax(0,1.4fr)_196px_minmax(0,1.1fr)_20px] md:gap-x-4";
+
+export function ApprovalGroups({
+  count,
+  unfoldOpen = true,
+  closed = 0,
   title,
-  set,
-  state,
-  execution,
-  executionToLabel,
-  used,
-  historical,
-  footer,
-  testId,
-  refresh = null,
+  heading: Heading = "h3",
+  note,
+  children,
 }: {
+  count: number;
+  /** Whether a group that can still be signed starts unfolded; false starts every group folded. */
+  unfoldOpen?: boolean;
+  /** How many of the groups are closed: folded away while another one is in play. */
+  closed?: number;
+  /** The heading above the table (else "Signer groups"), with the toolbar beside it. */
+  title?: string;
+  heading?: "h2" | "h3";
+  note?: ReactNode;
+  children: ReactNode;
+}) {
+  const [fold, setFold] = useState({ open: false, v: 0 });
+  const [typed, setTyped] = useState(false);
+  const [showClosed, setShowClosed] = useState(false);
+  const allOpen = fold.v > 0 && fold.open;
+  // Only beside a group still in play (open or done): never a table of nothing.
+  const foldsClosed = closed > 0 && closed < count;
+  const hideClosed = foldsClosed && !showClosed && !typed;
+  return (
+    <GroupsContext.Provider value={{ fold, typed, unfoldOpen, hideClosed }}>
+      <section className="space-y-3" data-testid="approval-groups">
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+          <div className="space-y-1">
+            <Heading className="font-semibold text-lg text-navy-800">
+              {title ?? `Signer group${count === 1 ? "" : "s"}`}{" "}
+              <span className="font-normal text-[15px] text-slate-500">· {count}</span>
+            </Heading>
+            {note && <p className="max-w-3xl text-slate-600 text-sm">{note}</p>}
+          </div>
+          <Toolbar label="View">
+            {!typed && (
+              <ToolButton
+                onClick={() => setFold((f) => ({ open: !(f.v > 0 && f.open), v: f.v + 1 }))}
+              >
+                {allOpen ? (
+                  <>
+                    <ChevronsDownUp aria-hidden className="h-3.5 w-3.5" /> Collapse all
+                  </>
+                ) : (
+                  <>
+                    <ChevronsUpDown aria-hidden className="h-3.5 w-3.5" /> Expand all
+                  </>
+                )}
+              </ToolButton>
+            )}
+            <ToolButton onClick={() => setTyped(!typed)} pressed={typed}>
+              Typed data
+            </ToolButton>
+          </Toolbar>
+        </div>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          {!typed && (
+            <div
+              aria-hidden
+              className={cn(
+                "hidden bg-slate-50 px-4 py-2 font-medium text-[12.5px] text-slate-500 md:grid",
+                GROUP_COLUMNS
+              )}
+            >
+              <span>Signer group</span>
+              <span>Signatures</span>
+              <span>Result</span>
+              <span />
+            </div>
+          )}
+          <div className={typed ? "space-y-3 p-4" : "divide-y divide-slate-100"}>{children}</div>
+          {foldsClosed && !typed && (
+            <button
+              type="button"
+              onClick={() => setShowClosed(!showClosed)}
+              aria-expanded={showClosed}
+              className="flex w-full items-center gap-1.5 border-slate-100 border-t px-4 py-2.5 font-medium text-[13px] text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+              data-testid="toggle-closed"
+            >
+              <ChevronDown
+                aria-hidden
+                className={cn("h-4 w-4 transition-transform", showClosed && "rotate-180")}
+              />
+              {showClosed
+                ? "Hide closed groups"
+                : `Show ${closed} closed group${closed === 1 ? "" : "s"}`}
+            </button>
+          )}
+        </div>
+      </section>
+    </GroupsContext.Provider>
+  );
+}
+
+export function SignatureSetCard(props: SetCardProps) {
+  // A card shown on its own is a table of one group.
+  if (!useContext(GroupsContext))
+    return (
+      <ApprovalGroups count={1}>
+        <SignatureSetCard {...props} />
+      </ApprovalGroups>
+    );
+  return <GroupRow {...props} />;
+}
+
+type SetCardProps = {
   title: string;
   set: Serialized<SignatureSet>;
   state: Serialized<SetState>;
-  execution?: Serialized<ExecutionView> | null;
-  executionToLabel?: string;
   used?: Serialized<UsedSignature>[] | null;
   historical?: { block: string; accepted: boolean | null; error: string | null } | null;
   footer?: ReactNode;
   testId?: string;
   refresh?: Refresh;
-}) {
+};
+
+function GroupRow({
+  title,
+  set,
+  state,
+  used,
+  historical,
+  footer,
+  testId,
+  refresh = null,
+}: SetCardProps) {
   // The engine verifies a watched set again at each new block; the page reloads when it changed.
   useWatchItem(set.watch);
   const live = useLive();
+  const groups = useContext(GroupsContext) ?? {
+    fold: { open: false, v: 0 },
+    typed: false,
+    unfoldOpen: true,
+    hideClosed: false,
+  };
+  const closed = state.status === "closed";
+  const { fold } = groups;
+  // Open to sign: unfolded at first (unless the page folds them); done or closed: folded. Expand /
+  // Collapse all decides after.
+  const [open, setOpen] = useState(() =>
+    fold.v > 0 ? fold.open : groups.unfoldOpen && state.status === "open"
+  );
+  useEffect(() => {
+    if (fold.v > 0) setOpen(fold.open);
+  }, [fold]);
   const valid = set.valid.length;
   const met = set.thresholdCheck.status === "met";
-  const { block: verifiedAt, behind } = setCurrency(set, live);
   // A page's first answer from an older block or old Safe copies, or a result behind the head
-  // served: every verdict is shown as of its block, nothing in a passing colour, and nothing to
-  // sign or send from it (a Sign dialog already open stays, disabled buttons say why).
-  const staleAt = set.stale ? set.verifiedAtBlock ?? "?" : behind !== null ? verifiedAt : null;
-  const notCurrent = behind === null ? null : `Not verified at block #${formatNumber(behind)} yet.`;
+  // served: every verdict is shown as of its block, nothing in a passing colour (signing and
+  // sending, in Your signature, wait for it too).
+  const { verifiedAt, behind, staleAt } = setStanding(set, live);
   const followed = set.watch?.rev !== null && set.watch?.rev !== undefined;
   const unavailable = set.members.filter((m) => m.status === "unavailable").length;
   const incomplete =
@@ -80,127 +224,300 @@ export function SignatureSetCard({
     (staleAt === null || behind !== null) &&
     !!set.watch &&
     set.members.some((m) => m.safe.isContract);
+  // Under the count: as of which block, and for a group that can no longer be signed, that the
+  // count is today's Safe copies (its result is what was recorded).
+  const countNote =
+    staleAt !== null
+      ? state.status === "open"
+        ? `verified at block #${formatNumber(staleAt)} / required`
+        : state.status === "done"
+          ? `Safe copies at #${formatNumber(staleAt)}`
+          : `verified at #${formatNumber(staleAt)}`
+      : state.status === "done"
+        ? "Safe copies today"
+        : closed
+          ? "verified today"
+          : null;
+
+  const [typedOpen, setTypedOpen] = useState(false);
+  const freshness = (
+    <FreshnessNote
+      set={
+        behind === null
+          ? { ...set, verifiedAtBlock: verifiedAt }
+          : { ...set, verifiedAtBlock: verifiedAt, stale: true, reverifyingAt: behind }
+      }
+      // Only a stale set is being checked again; a fresh one beside it is not.
+      refresh={behind !== null ? "behind" : staleAt === null ? null : refresh}
+      followed={followed}
+      what="The statuses and counts on this card"
+      check={staleAt === null ? safeCheck : null}
+      // Behind because Safe cannot be read now: said only where Fetch signatures can retry.
+      safeReason={
+        behind !== null && fetchable ? safeUnavailableReason(safeCheck, unavailable) : null
+      }
+    />
+  );
+  const checkButton =
+    fetchable && set.watch ? (
+      <FetchSignatures watchKey={set.watch.key} />
+    ) : behind !== null ? (
+      <CheckAgain />
+    ) : null;
+
+  if (groups.typed)
+    return (
+      <div
+        className="rounded-lg border border-slate-200 bg-slate-50"
+        data-testid={testId}
+        data-stale={staleAt === null ? undefined : "true"}
+      >
+        <p className="flex flex-wrap items-baseline gap-x-2 border-slate-200 border-b px-4 py-2 font-semibold text-[14px] text-navy-800">
+          {title}
+          <span className="mono font-normal text-[13px] text-slate-600">
+            {set.typedData.primaryType}
+          </span>
+        </p>
+        <div className="px-4 py-3">
+          <SignedDataBody set={set} />
+        </div>
+      </div>
+    );
+
   return (
-    <Card
+    <div
       data-testid={testId}
       data-stale={staleAt === null ? undefined : "true"}
-      className="overflow-hidden"
+      data-closed={closed || undefined}
+      hidden={closed && groups.hideClosed}
     >
-      <div className="space-y-3 border-slate-200 border-b bg-slate-50 px-4 py-5 sm:px-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-semibold text-[19px] text-navy-800">{title}</h3>
-              <SetStateBadge state={state} />
-            </div>
-            {state.status !== "open" && <p className="text-slate-600 text-sm">{state.detail}</p>}
-          </div>
-          <div className="shrink-0 text-left sm:text-right">
-            {incomplete ? (
-              <>
-                <p className="font-semibold text-amber-900 text-base" data-testid="signature-count">
-                  {valid} verified · check incomplete
-                </p>
-                <p className="text-slate-700 text-xs">Contract threshold: {set.threshold}</p>
-              </>
-            ) : (
-              <>
-                <p
-                  className="font-semibold text-[28px] text-navy-800 tabular-nums leading-8"
-                  data-testid="signature-count"
-                >
-                  {valid}
-                  <span className="font-normal text-slate-700 text-xl"> / {set.threshold}</span>
-                </p>
-                <p className="text-slate-600 text-xs">
-                  {staleAt !== null
-                    ? `verified at block #${formatNumber(staleAt)} / required`
-                    : state.status === "open"
-                      ? "verified signatures / required"
-                      : "verified today / current threshold"}
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-        {state.status === "open" && !incomplete && (
-          <Progress
-            value={(valid / Math.max(set.threshold, 1)) * 100}
-            indicatorClassName={cn(met && staleAt === null && "bg-green-700")}
-            aria-label="Verified signatures toward the contract threshold"
+      <div
+        className={cn(
+          "group/grow grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3.5 transition-colors hover:bg-slate-50",
+          GROUP_COLUMNS,
+          open && "bg-slate-50/70"
+        )}
+        onClick={() => setOpen(!open)}
+        onKeyDown={(e) => {
+          if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            setOpen(!open);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        aria-label={`${title}: ${valid} of ${set.threshold}`}
+      >
+        {/* The group and where it stands first; its name reads as the row's link to its detail. */}
+        <span className="col-start-1 row-start-1 min-w-0 space-y-1">
+          <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <span
+              className={cn(
+                "font-semibold text-[15px] decoration-slate-300 underline-offset-4 group-hover/grow:underline",
+                closed ? "text-slate-600" : "text-navy-800"
+              )}
+            >
+              {title}
+            </span>
+            <SetStateBadge state={state} />
+          </span>
+          {state.status !== "open" && (
+            <span className="block text-[13px] text-slate-500">{state.detail}</span>
+          )}
+        </span>
+        <span className="col-start-1 row-start-2 min-w-0 md:col-start-2 md:row-start-1">
+          {incomplete ? (
+            <>
+              <span
+                className="block font-semibold text-[14px] text-amber-900"
+                data-testid="signature-count"
+              >
+                {valid} verified · check incomplete
+              </span>
+              <span className="block text-slate-600 text-xs">
+                Contract threshold: {set.threshold}
+              </span>
+            </>
+          ) : (
+            <>
+              <span
+                className={cn(
+                  "block tabular-nums leading-6",
+                  state.status === "open"
+                    ? "font-semibold text-[15px] text-navy-800"
+                    : closed
+                      ? "text-[14px] text-slate-500"
+                      : "text-[14px] text-slate-700"
+                )}
+                data-testid="signature-count"
+              >
+                {valid} signature{valid === 1 ? "" : "s"}
+                <span className="font-normal text-slate-500"> · {set.threshold} required</span>
+              </span>
+              {state.status === "open" && (
+                <Progress
+                  className="mt-0.5 h-1.5 max-w-[140px]"
+                  value={(valid / Math.max(set.threshold, 1)) * 100}
+                  indicatorClassName={cn(met && staleAt === null && "bg-green-700")}
+                  aria-label="Verified signatures toward the contract threshold"
+                />
+              )}
+              {countNote && <span className="block text-[12px] text-slate-500">{countNote}</span>}
+            </>
+          )}
+        </span>
+        {/* A link in it opens the transaction, not the row. */}
+        <span
+          className="col-start-1 row-start-3 min-w-0 md:col-start-3 md:row-start-1"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <GroupResult
+            set={set}
+            state={state}
+            staleAt={staleAt}
+            incomplete={incomplete}
+            used={used}
+            historical={historical}
           />
-        )}
-        {state.status === "done" && (
-          <DoneSummary state={state} used={used} historical={historical} />
-        )}
-        <div className="flex flex-col-reverse gap-x-3 gap-y-2 sm:flex-row sm:items-start sm:justify-between">
-          {/* The buttons keep their place however tall the label grows: first on a phone, the
-              label below them; at the top right from sm up. */}
-          <div className="min-w-0 sm:flex-1">
-            <FreshnessNote
-              set={
-                behind === null
-                  ? { ...set, verifiedAtBlock: verifiedAt }
-                  : { ...set, verifiedAtBlock: verifiedAt, stale: true, reverifyingAt: behind }
-              }
-              // Only a stale set is being checked again; a fresh one beside it is not.
-              refresh={behind !== null ? "behind" : staleAt === null ? null : refresh}
-              followed={followed}
-              what="The statuses and counts on this card"
-              check={staleAt === null ? safeCheck : null}
-              // Behind because Safe cannot be read now: said only where Fetch signatures can retry.
-              safeReason={
-                behind !== null && fetchable ? safeUnavailableReason(safeCheck, unavailable) : null
-              }
+        </span>
+        <ChevronDown
+          aria-hidden
+          className={cn(
+            "col-start-2 row-start-1 h-4 w-4 text-slate-500 transition-transform md:col-start-4",
+            open && "rotate-180"
+          )}
+        />
+      </div>
+
+      <div hidden={!open} className="border-slate-100 border-t">
+        <div className="space-y-4 px-4 py-4 sm:px-5">
+          {/* How current it is, with Fetch signatures beside it: one place, however the answer
+              changes (the button is never remounted). On a phone the button comes first. */}
+          <div className="flex flex-col-reverse gap-x-3 gap-y-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 sm:flex-1">{freshness}</div>
+            {checkButton}
+          </div>
+          {set.safeApiError && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 text-sm">
+              Safe Transaction Service: {set.safeApiError}. On-chain approvals are still checked.
+            </p>
+          )}
+          <MemberChips set={set} state={state} staleAt={staleAt} incomplete={incomplete} />
+          {footer}
+          <div className="border-slate-200 border-t pt-3">
+            <SignedDataToggle
+              set={set}
+              open={typedOpen}
+              onToggle={() => setTypedOpen(!typedOpen)}
             />
           </div>
-          {fetchable && set.watch ? (
-            <FetchSignatures watchKey={set.watch.key} />
-          ) : (
-            behind !== null && <CheckAgain />
+          {typedOpen && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <SignedDataBody set={set} />
+            </div>
           )}
         </div>
-        <ThresholdLine set={set} state={state} incomplete={incomplete} staleAt={staleAt} />
-        {set.safeApiError && (
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 text-sm">
-            Safe Transaction Service: {set.safeApiError}. On-chain approvals are still checked.
-          </p>
-        )}
       </div>
+    </div>
+  );
+}
 
-      <details open={state.status === "open"} className="group/members">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-semibold text-slate-800 text-sm hover:bg-slate-50 sm:px-6 [&::-webkit-details-marker]:hidden">
-          Current member signatures · {set.members.length} members
-          <ChevronDown
-            aria-hidden
-            className="h-4 w-4 shrink-0 transition-transform group-open/members:rotate-180"
-          />
-        </summary>
-        <MemberList set={set} staleAt={staleAt} />
-      </details>
-
-      <div className="space-y-4 border-slate-200 border-t px-4 py-5 sm:px-6">
-        {execution && (
-          <ExecutionPanel
-            execution={execution}
-            toLabel={executionToLabel}
-            blockedReason={notCurrent}
-          />
+/** The Result cell: how the group stands, in a word or two (its unfolded part says it in full). */
+function GroupResult({
+  set,
+  state,
+  staleAt,
+  incomplete,
+  used,
+  historical,
+}: {
+  set: Serialized<SignatureSet>;
+  state: Serialized<SetState>;
+  staleAt: string | null;
+  incomplete: boolean;
+  used?: Serialized<UsedSignature>[] | null;
+  historical?: { block: string; accepted: boolean | null; error: string | null } | null;
+}) {
+  const explorer = useExplorer();
+  const check = set.thresholdCheck;
+  const tone = "inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[14px]";
+  if (state.status === "done") {
+    // Done on-chain: the transaction is the evidence, whatever Safe's copies count today. Under it
+    // only what would be a problem: a re-check the contract rejected, or signatures that differ
+    // from Safe's copies (the JSON carries every comparison and re-check).
+    const differ = used?.some((u) => u.matchesSafe === false) ?? false;
+    return (
+      <span className="block space-y-0.5" data-testid="done-summary">
+        <span
+          className={cn(tone, staleAt === null ? "text-green-900" : "text-slate-700")}
+          title={state.txHash ?? undefined}
+        >
+          <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0" />
+          {state.txHash ? (
+            <>
+              In{" "}
+              <ExternalAnchor href={explorer.tx(state.txHash)} className="mono text-[13px]">
+                {shortHex(state.txHash, 10, 8)}
+              </ExternalAnchor>
+              <CopyButton value={state.txHash} label="Copy transaction hash" />
+            </>
+          ) : (
+            "Recorded on-chain"
+          )}
+        </span>
+        {state.txHash && <ExecutedOn at={state.at} />}
+        {historical?.accepted === false && (
+          <span className="block text-[12.5px] text-red-900">
+            Re-check at #{formatNumber(historical.block)} rejected ({historical.error})
+          </span>
         )}
-        <SignedData set={set} />
-        {state.status === "open" && (staleAt === null || behind !== null) && (
-          <div className="flex flex-wrap items-center gap-3">
-            <SignButton
-              typedData={set.typedData}
-              signerGroup={set.signerGroup}
-              members={set.members}
-              disabledReason={notCurrent}
-            />
-          </div>
+        {differ && (
+          <span className="block text-[12.5px] text-amber-800" data-testid="used-differ">
+            Some signatures it carried differ from Safe's current copies
+          </span>
         )}
-        {footer}
-      </div>
-    </Card>
+      </span>
+    );
+  }
+  if (incomplete)
+    return (
+      <span className={cn(tone, "text-amber-900")}>
+        <AlertTriangle aria-hidden className="h-4 w-4 shrink-0" /> Check incomplete
+      </span>
+    );
+  if (staleAt !== null && check.status !== "below")
+    return (
+      <span className={cn(tone, "text-slate-700")}>
+        <ShieldCheck aria-hidden className="h-4 w-4 shrink-0 text-slate-500" />
+        {check.status === "met" ? "Met" : "Rejected"} at #{formatNumber(staleAt)}
+      </span>
+    );
+  if (state.status === "closed")
+    return <span className={cn(tone, "text-slate-600")}>No signatures needed</span>;
+  if (check.status === "met")
+    return (
+      <span
+        className={cn(tone, "font-semibold text-green-900")}
+        data-testid="threshold-met"
+        title={`The contract accepted the combined signatures: ${check.checkedWith}`}
+      >
+        <ShieldCheck aria-hidden className="h-4 w-4 shrink-0" /> Threshold met
+        <span className="sr-only">. Accepted by {check.checkedWith}</span>
+      </span>
+    );
+  if (check.status === "rejected")
+    return (
+      <span className={cn(tone, "font-semibold text-red-900")}>
+        <XCircle aria-hidden className="h-4 w-4 shrink-0" /> Rejected by the contract
+      </span>
+    );
+  const more = check.threshold - check.valid;
+  return (
+    <span className={cn(tone, "text-slate-800")}>
+      {more} more needed{staleAt !== null && ` as of #${formatNumber(staleAt)}`}
+    </span>
   );
 }
 
@@ -253,100 +570,62 @@ function CheckAgain() {
 
 function ThresholdLine({
   set,
-  state,
   incomplete,
   staleAt,
 }: {
   set: Serialized<SignatureSet>;
-  state: Serialized<SetState>;
   incomplete: boolean;
   staleAt: string | null;
 }) {
   const check = set.thresholdCheck;
+  const line = "flex items-start gap-2 text-[13.5px]";
   if (staleAt !== null && check.status !== "below") {
     // An older block's verdict: stated as of that block, in no passing (or failing) colour.
     return (
       <p
-        className="flex items-start gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 text-sm"
+        className={cn(line, "text-slate-800")}
         data-testid="threshold-stale"
+        title={check.status === "met" ? `Accepted by ${check.checkedWith}` : undefined}
       >
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+        <ShieldCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
         <span>
           At block #{formatNumber(staleAt)}{" "}
           {check.status === "met" ? (
-            <>
-              the threshold was met: accepted by{" "}
-              <span className="mono break-all">{check.checkedWith}</span>
-            </>
+            "the threshold was met"
           ) : (
             <>
-              the contract rejected the combined signatures:{" "}
-              <span className="mono">{check.error}</span>
+              the contract rejected the combined signatures (
+              <span className="mono">{check.error}</span>)
             </>
-          )}
-          . Not yet confirmed at the current head.
+          )}{" "}
+          · not yet confirmed at the newest block.
         </span>
       </p>
     );
   }
-  if (check.status === "met") {
+  // Met: the row says so, and names the call in its tooltip.
+  if (check.status === "met") return null;
+  if (check.status === "rejected")
     return (
-      <p
-        className="flex items-start gap-2 rounded-lg border border-green-300 bg-green-100 px-3 py-2 font-semibold text-green-900 text-sm"
-        data-testid="threshold-met"
-      >
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-        <span>
-          Threshold met. Accepted by <span className="mono break-all">{check.checkedWith}</span>
-        </span>
-      </p>
-    );
-  }
-  if (check.status === "rejected") {
-    return (
-      <p className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-100 px-3 py-2 font-semibold text-red-900 text-sm">
-        <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+      <p className={cn(line, "font-semibold text-red-900")}>
+        <XCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
           The contract rejected the combined signatures: <span className="mono">{check.error}</span>
         </span>
       </p>
     );
-  }
-  if (incomplete) {
+  if (incomplete)
     return (
-      <p
-        className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950 text-sm"
-        data-testid="threshold-incomplete"
-      >
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <p className={cn(line, "text-amber-950")} data-testid="threshold-incomplete">
+        <AlertTriangle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
         <span>
           Some signatures could not be checked. The verified count is a lower bound, not proof of
           missing signatures. Retry when the source is available.
         </span>
       </p>
     );
-  }
-  if (state.status === "done") {
-    return (
-      <p className="text-slate-700 text-sm" data-testid="threshold-below">
-        Safe's copies no longer reach the threshold today (for example, because owners changed). The
-        recorded transaction above is the evidence for this completed action.
-      </p>
-    );
-  }
-  if (state.status === "closed") {
-    return (
-      <p className="text-slate-700 text-sm" data-testid="threshold-below">
-        Current copies are below the threshold. This action is closed; no further signatures are
-        needed for it.
-      </p>
-    );
-  }
   return (
-    <p
-      className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-medium text-slate-800 text-sm"
-      data-testid="threshold-below"
-    >
+    <p className={cn(line, "text-slate-700")} data-testid="threshold-below">
       {check.threshold - check.valid} more valid signature
       {check.threshold - check.valid === 1 ? "" : "s"} needed
       {staleAt !== null && ` as of block #${formatNumber(staleAt)}`}.
@@ -354,104 +633,152 @@ function ThresholdLine({
   );
 }
 
-function MemberList({ set, staleAt }: { set: Serialized<SignatureSet>; staleAt: string | null }) {
-  // Only the connected account: the list never waits for the root status.
+const SOURCE_TEXT = { safe: "In Safe", onchain: "On-chain", supplied: "From URL" } as const;
+
+/** A member's signature in words: the chip's tooltip and what a screen reader says. */
+function memberStatusText(m: Serialized<MemberResult>, staleAt: string | null) {
+  if (staleAt !== null && m.status === "valid") return `Valid at #${formatNumber(staleAt)}`;
+  if (staleAt !== null && m.status === "invalid") return `Rejected at #${formatNumber(staleAt)}`;
+  switch (m.status) {
+    case "valid":
+      return m.source ? `Verified · ${SOURCE_TEXT[m.source]}` : "Verified";
+    case "collecting":
+      return `Collecting · ${m.confirmations ?? 0} of ${m.safe.threshold ?? "?"} owners`;
+    case "invalid":
+      return "Rejected";
+    case "unavailable":
+      return "Safe API unavailable";
+    default:
+      return "Not signed";
+  }
+}
+
+function chipLook(status: MemberResult["status"], staleAt: string | null) {
+  // An older block's verdict is never in a passing (or failing) colour.
+  if (staleAt !== null && (status === "valid" || status === "invalid"))
+    return {
+      tone: "border-slate-300 bg-slate-50 text-slate-800",
+      icon: status === "valid" ? CheckCircle2 : XCircle,
+    };
+  switch (status) {
+    case "valid":
+      return { tone: "border-green-300 bg-green-50 text-green-900", icon: CheckCircle2 };
+    case "invalid":
+      return { tone: "border-red-300 bg-red-50 text-red-900", icon: XCircle };
+    case "collecting":
+      return { tone: "border-amber-300 bg-amber-50 text-amber-950", icon: CircleDashed };
+    case "unavailable":
+      return { tone: "border-amber-300 bg-amber-50 text-amber-950", icon: AlertTriangle };
+    default:
+      return { tone: "border-slate-300 bg-white text-slate-700", icon: Circle };
+  }
+}
+
+function MemberChips({
+  set,
+  state,
+  staleAt,
+  incomplete,
+}: {
+  set: Serialized<SignatureSet>;
+  state: Serialized<SetState>;
+  staleAt: string | null;
+  incomplete: boolean;
+}) {
+  // Only the connected account: the chips never wait for the root status.
   const { address } = useAccount();
   const [open, setOpen] = useState<string | null>(null);
+  const selected = set.members.find((m) => m.member === open);
+  const signed = set.members.filter((m) => m.status === "valid").length;
   return (
-    <ul className="border-slate-200 border-t" data-testid="member-list">
-      {set.members.map((m) => {
-        const isYou = !!address && isAddressEqual(m.member as `0x${string}`, address);
-        const expanded = open === m.member || (open === null && isYou);
-        return (
-          <li
-            key={m.member}
-            className={cn(
-              "border-slate-200 border-b last:border-b-0",
-              staleAt === null && m.status === "valid" && "bg-green-50/40",
-              staleAt === null && m.status === "invalid" && "bg-red-50/40"
-            )}
-            data-testid="member-row"
-            data-status={m.status}
-          >
-            <button
-              type="button"
-              onClick={() => setOpen(expanded ? "" : m.member)}
-              className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-75 sm:items-center sm:gap-4 sm:px-6"
-              aria-expanded={expanded}
+    <div className="space-y-3" data-testid="member-list">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-[13.5px] text-slate-600">
+          {signed} of {set.members.length} member{set.members.length === 1 ? "" : "s"} signed
+        </span>
+        {set.members.map((m) => {
+          const isYou = !!address && isAddressEqual(m.member as `0x${string}`, address);
+          const { tone, icon: Icon } = chipLook(m.status, staleAt);
+          const status = memberStatusText(m, staleAt);
+          return (
+            <span
+              key={m.member}
+              className="inline-flex"
+              data-testid="member-row"
+              data-status={m.status}
             >
-              <span className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="flex items-center gap-2 font-medium text-slate-950 text-sm">
-                    {m.label ?? "Member"}
-                    {isYou && (
-                      <span className="rounded-full bg-brand-50 px-2 text-[12px] text-brand-600">
-                        you
-                      </span>
-                    )}
-                  </span>
-                  <span className="mono break-all text-slate-800">{m.member}</span>
-                </span>
-                <span className="hidden w-32 text-slate-600 text-xs md:block">
-                  {m.safe.isContract
-                    ? `Safe ${m.safe.version ?? "?"} · ${m.safe.threshold ?? "?"} of ${m.safe.owners.length}`
-                    : "Not a Safe"}
-                </span>
-                <span className="flex sm:w-56 sm:justify-end">
-                  <MemberStatusBadge
-                    status={m.status}
-                    source={m.source}
-                    confirmations={m.confirmations}
-                    safeThreshold={m.safe.threshold}
-                    staleAt={staleAt}
-                  />
-                </span>
-              </span>
-              <ChevronDown
+              <button
+                type="button"
+                onClick={() => setOpen(open === m.member ? null : m.member)}
+                aria-expanded={open === m.member}
+                title={m.member}
                 className={cn(
-                  "mt-0.5 h-4 w-4 shrink-0 text-slate-600 transition-transform sm:mt-0",
-                  expanded && "rotate-180"
+                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium text-[13px] transition-[box-shadow,filter] hover:brightness-[0.97]",
+                  tone,
+                  open === m.member && "ring-2 ring-brand-200 ring-offset-1"
                 )}
-              />
-            </button>
-            {expanded && <MemberDetail member={m} />}
-          </li>
-        );
-      })}
-    </ul>
+              >
+                <Icon aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                {m.label ?? shortHex(m.member)}
+                {m.status === "collecting" && (
+                  <span aria-hidden className="tabular-nums">
+                    {m.confirmations ?? 0}/{m.safe.threshold ?? "?"}
+                  </span>
+                )}
+                {isYou && (
+                  <span className="rounded-full bg-brand-50 px-1.5 text-[11px] text-brand-600">
+                    you
+                  </span>
+                )}
+                <span className="sr-only">{status}</span>
+              </button>
+            </span>
+          );
+        })}
+      </div>
+      {state.status === "open" && (
+        <ThresholdLine set={set} incomplete={incomplete} staleAt={staleAt} />
+      )}
+      {selected && <MemberDetail member={selected} digest={set.hashes.digest} staleAt={staleAt} />}
+    </div>
   );
 }
 
-function MemberDetail({ member: m }: { member: Serialized<MemberResult> }) {
+function MemberDetail({
+  member: m,
+  digest,
+  staleAt,
+}: { member: Serialized<MemberResult>; digest: string; staleAt: string | null }) {
   return (
-    <div className="space-y-4 bg-slate-25 px-4 pt-1 pb-5 text-sm sm:px-6">
+    <div
+      className="space-y-4 rounded-lg border border-slate-200 bg-slate-25 px-4 py-3 text-sm"
+      data-testid="member-detail"
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="font-semibold text-navy-800">{m.label ?? "Member"}</span>
+        <AddressLink address={m.member} />
+        <MemberStatusBadge
+          status={m.status}
+          source={m.source}
+          confirmations={m.confirmations}
+          safeThreshold={m.safe.threshold}
+          staleAt={staleAt}
+        />
+        <span className="text-slate-600 text-xs">
+          {m.safe.isContract
+            ? `Safe ${m.safe.version ?? "?"} · ${m.safe.threshold ?? "?"} of ${m.safe.owners.length} owners`
+            : "Not a Safe"}
+        </span>
+      </div>
       {m.hashes && (
         <div className="space-y-2">
-          <p className="font-medium text-slate-950">
-            A hardware wallet signing for this Safe shows
-          </p>
-          <dl className="grid gap-x-4 gap-y-1.5 sm:grid-cols-[150px_1fr]">
-            <dt className="text-slate-600">Domain hash</dt>
-            <dd>
-              <Hash value={m.hashes.domainHash} />
-            </dd>
-            <dt className="text-slate-600">Message hash</dt>
-            <dd>
-              <Hash value={m.hashes.messageHash} />
-            </dd>
-            <dt className="text-slate-600">SafeMessage hash</dt>
-            <dd>
-              <Hash value={m.hashes.safeMessageHash} />
-            </dd>
-          </dl>
-          <p className="text-slate-600 text-xs">
-            {m.safe.domainSeparatorMatches === true
-              ? "The Safe's on-chain domainSeparator() equals the domain hash above."
-              : m.safe.domainSeparatorMatches === false
-                ? "Warning: the Safe's on-chain domainSeparator() differs from the domain hash above."
-                : "The Safe's domainSeparator() could not be read."}{" "}
-            The SafeMessage hash is also the id Safe{"{"}Wallet{"}"} shows for the message.
-          </p>
+          <SafeHashes digest={digest} hashes={m.hashes} />
+          {/* Said only when it is a problem: the hashes above would not be this Safe's. */}
+          {m.safe.domainSeparatorMatches === false && (
+            <p className="text-red-900 text-xs" data-testid="domain-separator-differs">
+              Warning: the Safe's on-chain domainSeparator() differs from the domain hash above.
+            </p>
+          )}
         </div>
       )}
       {m.owners.length > 0 && (
@@ -497,131 +824,56 @@ function MemberDetail({ member: m }: { member: Serialized<MemberResult> }) {
   );
 }
 
-function SignedData({ set }: { set: Serialized<SignatureSet> }) {
-  const [open, setOpen] = useState(false);
+function SignedDataToggle({
+  set,
+  open,
+  onToggle,
+}: { set: Serialized<SignatureSet>; open: boolean; onToggle: () => void }) {
   return (
-    <div className="rounded-xl border border-slate-300 bg-slate-50">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left font-medium text-slate-950 text-sm"
-        aria-expanded={open}
-      >
-        <span className="min-w-0 break-words">What members sign: {set.typedData.primaryType}</span>
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 shrink-0 text-slate-600 transition-transform",
-            open && "rotate-180"
-          )}
-        />
-      </button>
-      {open && (
-        <div className="space-y-3 border-slate-200 border-t px-4 py-4 text-sm">
-          <dl className="grid gap-x-4 gap-y-1.5 sm:grid-cols-[150px_1fr]">
-            <dt className="text-slate-600">EIP-712 digest</dt>
-            <dd>
-              <Hash value={set.hashes.digest} />
-            </dd>
-            <dt className="text-slate-600">Domain separator</dt>
-            <dd>
-              <Hash value={set.hashes.domainSeparator} />
-            </dd>
-            <dt className="text-slate-600">Struct hash</dt>
-            <dd>
-              <Hash value={set.hashes.structHash} />
-            </dd>
-          </dl>
-          <div className="relative">
-            <pre className="mono max-h-72 overflow-auto rounded-lg bg-slate-50 p-3">
-              {JSON.stringify(set.typedData, null, 2)}
-            </pre>
-            <CopyButton
-              value={JSON.stringify(set.typedData, null, 2)}
-              className="absolute top-2 right-2"
-              label="Copy typed data"
-            />
-          </div>
-          <p className="text-slate-600 text-xs">
-            The domain is read from the contract's eip712Domain(). Each member Safe wraps the digest
-            in its own SafeMessage (expand a member above for the hashes its owners sign).
-          </p>
-        </div>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={onToggle}
+      className="inline-flex items-center gap-1.5 rounded-md py-1 text-left font-medium text-slate-950 text-sm hover:text-brand-700"
+      aria-expanded={open}
+    >
+      <ChevronRight
+        aria-hidden
+        className={cn("h-4 w-4 shrink-0 text-slate-600 transition-transform", open && "rotate-90")}
+      />
+      <span className="min-w-0 break-words">
+        What members sign: <span className="mono">{set.typedData.primaryType}</span>
+      </span>
+    </button>
   );
 }
 
-function DoneSummary({
-  state,
-  used,
-  historical,
-}: {
-  state: Extract<Serialized<SetState>, { status: "done" }>;
-  used?: Serialized<UsedSignature>[] | null;
-  historical?: { block: string; accepted: boolean | null; error: string | null } | null;
-}) {
-  const matching = used?.filter((u) => u.matchesSafe === true).length ?? 0;
-  const unavailable = used?.filter((u) => u.matchesSafe === null).length ?? 0;
+function SignedDataBody({ set }: { set: Serialized<SignatureSet> }) {
   return (
-    <div
-      className="space-y-2 rounded-lg border border-green-200 bg-green-50 p-4 text-sm"
-      data-testid="done-summary"
-    >
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium text-green-900">
-        <CheckCircle2 className="h-4 w-4 shrink-0" /> {state.detail}
-        {state.txHash && (
-          <>
-            {" "}
-            in <TxLink hash={state.txHash} />
-          </>
-        )}
-      </p>
-      {used && (
-        <p className="text-slate-950">
-          The transaction passed {used.length} signature{used.length === 1 ? "" : "s"};{" "}
-          {unavailable > 0 ? (
-            <span data-testid="used-match">
-              {unavailable} Safe {unavailable === 1 ? "copy could" : "copies could"} not be
-              compared.
-              {matching > 0 &&
-                ` ${matching} of ${used.length} are byte-for-byte identical to the copies in Safe.`}
-            </span>
-          ) : (
-            <>
-              <span data-testid="used-match">
-                {matching} of {used.length}
-              </span>{" "}
-              are byte-for-byte identical to the copies in Safe.
-            </>
-          )}
-          {used.some((u) => u.matchesSafe === false) && (
-            <span className="text-amber-800">
-              {" "}
-              Some differ from Safe's current copy (for example, it no longer lists an owner's
-              confirmation). The re-check below shows whether the contract accepted what was used.
-            </span>
-          )}
-        </p>
-      )}
-      {historical && (
-        <p
-          className={cn(
-            "font-medium text-sm",
-            historical.accepted === true
-              ? "text-green-900"
-              : historical.accepted === false
-                ? "text-red-900"
-                : "text-slate-800"
-          )}
-        >
-          {historical.accepted === true &&
-            `Re-checked at block ${historical.block} (just before execution): accepted.`}
-          {historical.accepted === false &&
-            `Re-checked at block ${historical.block}: rejected (${historical.error}).`}
-          {historical.accepted === null &&
-            `Not re-checked at block ${historical.block}: ${historical.error}.`}
-        </p>
-      )}
+    <div className="space-y-3 text-sm">
+      <dl className="grid gap-x-4 gap-y-1.5 sm:grid-cols-[150px_1fr]">
+        <dt className="text-slate-600">EIP-712 digest</dt>
+        <dd>
+          <Hash value={set.hashes.digest} />
+        </dd>
+        <dt className="text-slate-600">Domain separator</dt>
+        <dd>
+          <Hash value={set.hashes.domainSeparator} />
+        </dd>
+        <dt className="text-slate-600">Struct hash</dt>
+        <dd>
+          <Hash value={set.hashes.structHash} />
+        </dd>
+      </dl>
+      <div className="relative">
+        <pre className="mono max-h-72 overflow-auto rounded-lg border border-slate-200 bg-white p-3">
+          {JSON.stringify(set.typedData, null, 2)}
+        </pre>
+        <CopyButton
+          value={JSON.stringify(set.typedData, null, 2)}
+          className="absolute top-2 right-2"
+          label="Copy typed data"
+        />
+      </div>
     </div>
   );
 }

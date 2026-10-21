@@ -109,6 +109,8 @@ export function AppToaster() {
   return (
     <Toaster
       position="bottom-center"
+      // Above Your signature's bar while it is shown.
+      containerStyle={{ bottom: "calc(var(--action-bar, 0px) + 16px)" }}
       toastOptions={{
         className: "!rounded-xl !text-sm",
         style: {

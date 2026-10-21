@@ -4,15 +4,15 @@ import { pageLoad, watchKeys } from "@/.server/sync/presence";
 import { freshAfter } from "@/.server/flows/common";
 import {
   type ApprovalSet,
-  type RecordedApproval,
   type StandardUpgradeCore,
   loadStandardUpgrade,
 } from "@/.server/flows/standard";
 import { parseId } from "@/.server/params";
 import { suppliedSignatures } from "@/.server/request";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
-import { AddressLink, Hash, TxLink } from "@/components/hex";
-import { Check, EmptyState, Facts, LoadingCard, PageHeader, Section } from "@/components/page";
+import { AddressLink, CopyButton, Hash, TxLink } from "@/components/hex";
+import { EmptyState, LoadingCard, PageHeader, Section } from "@/components/page";
+import { Card } from "@/components/ui/card";
 import { CallList } from "@/components/verification/calls";
 import { ExecutionPanel } from "@/components/verification/execution-panel";
 import {
@@ -21,7 +21,8 @@ import {
   type Provenance,
   provenanceOf,
 } from "@/components/verification/last-run";
-import { SignatureSetCard } from "@/components/verification/signature-set";
+import { ApprovalGroups, SignatureSetCard } from "@/components/verification/signature-set";
+import { YourSignature } from "@/components/verification/your-signature";
 import { type AsOfBlock, AsOfContent, AsOfNote } from "@/components/verification/as-of";
 import {
   NotReReadNote,
@@ -30,14 +31,15 @@ import {
 } from "@/components/verification/content-currency";
 import { UpgradeStateBadge } from "@/components/verification/badges";
 import type { Refresh } from "@/components/verification/freshness";
-import { Timeline } from "@/components/verification/timeline";
+import { StepTime, Timeline } from "@/components/verification/timeline";
+import { upgradeSteps } from "@/components/verification/upgrade-steps";
 import { UntilFresh } from "@/components/verification/until-fresh";
-import { formatNumber, formatTime } from "@/utils/format";
+import { formatTime, relativeTime, shortHex } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
 import { Await, Link, useAsyncError, useLoaderData } from "@remix-run/react";
-import { Suspense } from "react";
-import { ExternalLink } from "lucide-react";
+import { type ReactNode, Suspense } from "react";
+import { CheckCircle2, ChevronRight, ExternalLink, XCircle } from "lucide-react";
 import { $path } from "remix-routes";
 import { zeroAddress } from "viem";
 
@@ -71,7 +73,6 @@ export function loader({ params, request }: LoaderFunctionArgs) {
     detail: detail.first,
     freshDetail: detail.fresh,
     startedCheck: loading.then((d) => d.startedCheck),
-    evidence: loading.then((d) => d.evidence),
     // The approvals as last shown, after a pause (null otherwise): each set as of the block it was
     // verified at, nothing to sign or send from it.
     heldApprovals:
@@ -95,27 +96,19 @@ export function loader({ params, request }: LoaderFunctionArgs) {
   });
 }
 
-type HeldApprovals = {
-  sets: ApprovalSet[];
-  evidence: RecordedApproval[] | null;
-};
+type HeldApprovals = { sets: ApprovalSet[] };
 
 async function shownApprovals(
   loading: ReturnType<typeof loadStandardUpgrade>
 ): Promise<HeldApprovals> {
   const d = await loading;
-  const [sets, merged, evidence] = await Promise.all([
-    d.freshSets,
-    d.setEvidence.catch(() => null),
-    d.evidence.catch(() => null),
-  ]);
+  const [sets, merged] = await Promise.all([d.freshSets, d.setEvidence.catch(() => null)]);
   return {
     sets: sets.map((s) => {
       const found = s.state.status === "done" ? merged?.find((e) => e.key === s.key) : undefined;
       // Nothing to send is kept (a held set never offers it).
       return { ...s, ...found, execution: null };
     }),
-    evidence,
   };
 }
 
@@ -226,16 +219,8 @@ function Detail({
   asOf?: AsOfBlock | null;
   refresh?: Refresh;
 }) {
-  const {
-    sets,
-    freshSets,
-    evidence,
-    setEvidence,
-    execution,
-    l2Proposal,
-    startedCheck,
-    heldApprovals,
-  } = useLoaderData<typeof loader>();
+  const { sets, freshSets, setEvidence, execution, l2Proposal, startedCheck, heldApprovals } =
+    useLoaderData<typeof loader>();
   // The governance the upgrade was read with: the page never waits on the root status for it.
   const governance = d.governance;
   const provenance = provenanceOf(d.started);
@@ -247,10 +232,6 @@ function Detail({
   };
   const now = Number(governance.latestBlock.timestamp);
   const anyone = d.started.proposal.executor.toLowerCase() === zeroAddress;
-  const recorded =
-    d.status.securityCouncilApprovalTimestamp !== 0 ||
-    d.status.guardiansApproval ||
-    d.status.guardiansExtendedLegalVeto;
   // The upgrade's state as the beats name it: one not read again at the head served now is shown
   // as of its block, in no colour, and nothing is signed or sent from the page until it is.
   const watchKey = `upgrade:${d.id.toLowerCase()}`;
@@ -269,161 +250,194 @@ function Detail({
           </AsOfContent>
         }
         id={d.id}
-      />
+      >
+        <UpgradeSummary l2Proposal={l2Proposal} />
+      </PageHeader>
       {asOf ? (
         <AsOfNote asOf={asOf} refresh={refresh} what="The state, timeline and calls below" />
       ) : (
         <NotReReadNote watchKey={watchKey} what="The state and timeline below" />
       )}
+      {/* What the viewer can sign or send here (never from the upgrade as last shown). */}
+      {!asOf && (
+        <Suspense fallback={null}>
+          <Await resolve={sets} errorElement={null}>
+            {(first) => (
+              <UntilFresh stale={first.some((s) => s.set.stale === true)} fresh={freshSets}>
+                {(fresh) => (
+                  <YourSignature
+                    hint="Check what the upgrade does below, then compare the hashes in the review with your hardware wallet."
+                    actions={(fresh ?? first).map((s) => ({
+                      key: s.key,
+                      title: s.title,
+                      set: s.set,
+                      state: s.state,
+                      execution: s.execution,
+                      executionToLabel:
+                        s.key === "securityCouncil" ? "SecurityCouncil" : "Guardians",
+                    }))}
+                  />
+                )}
+              </UntilFresh>
+            )}
+          </Await>
+        </Suspense>
+      )}
 
       <AsOfContent asOf={asOf} stale={stale} className="space-y-8">
-        <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
-          <Facts
-            items={[
-              {
-                label: "Started",
-                value: (
-                  <span className="block space-y-1">
-                    <span className="space-x-2">
-                      <span>{formatTime(d.status.creationTimestamp)}</span>
-                      <TxLink hash={d.started.txHash} />
+        <div className="grid items-start gap-4 lg:grid-cols-[1fr_320px]">
+          <Card className="border-slate-200 p-5 sm:p-6" data-testid="upgrade-overview">
+            <dl className="grid gap-x-6 gap-y-3.5 text-sm sm:grid-cols-[110px_minmax(0,1fr)]">
+              <Row label="Started">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <When at={d.status.creationTimestamp} now={now} />
+                  <TxLink hash={d.started.txHash} short />
+                </span>
+                {provenance && <LastRunCheck check={startedCheck} source={provenance} />}
+              </Row>
+              <Row label="Executor">
+                {anyone ? "Anyone" : <AddressLink address={d.started.proposal.executor} />}
+              </Row>
+              <Row label="L2 vote">
+                <Suspense
+                  fallback={
+                    <span role="status" className="text-slate-500">
+                      Finding the L2 vote…
                     </span>
-                    {provenance && <LastRunCheck check={startedCheck} source={provenance} />}
-                  </span>
-                ),
-              },
-              {
-                label: "Executor",
-                value: anyone ? "Anyone" : <AddressLink address={d.started.proposal.executor} />,
-              },
-              { label: "Salt", value: <Hash value={d.started.proposal.salt} /> },
-              {
-                label: "L2 vote",
-                value: (
+                  }
+                >
+                  <Await
+                    resolve={l2Proposal}
+                    errorElement={
+                      <span className="text-slate-500">
+                        L2 lookup unavailable. Refresh to retry.
+                      </span>
+                    }
+                  >
+                    {(proposal) =>
+                      proposal ? (
+                        <L2Vote id={proposal.proposalId} tallyUrl={governance.network.tallyUrl} />
+                      ) : (
+                        <span className="text-slate-500">Not found on ZKsync Era</span>
+                      )
+                    }
+                  </Await>
+                </Suspense>
+              </Row>
+              <Row label="Executed">
+                {d.state === UPGRADE_STATES.Done ? (
                   <Suspense
                     fallback={
-                      <span role="status" className="text-slate-600">
-                        Finding the L2 vote…
+                      <span role="status" className="text-slate-500">
+                        Finding the execution transaction…
                       </span>
                     }
                   >
                     <Await
-                      resolve={l2Proposal}
+                      resolve={execution}
                       errorElement={
-                        <span className="text-slate-600">
-                          L2 lookup unavailable. Refresh to retry.
+                        <span className="text-slate-500">
+                          Execution transaction unavailable. Refresh to retry.
                         </span>
                       }
                     >
-                      {(proposal) =>
-                        proposal ? (
-                          <span className="mono break-all">
-                            ZkProtocolGovernor #
-                            <ProposalNumberLink
-                              id={proposal.proposalId}
-                              tallyUrl={governance.network.tallyUrl}
-                            />
+                      {(result) =>
+                        result.executedTx ? (
+                          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            {result.executedAt && <When at={Number(result.executedAt)} now={now} />}
+                            <TxLink hash={result.executedTx} short />
                           </span>
                         ) : (
-                          <span className="text-slate-600">Not found on ZKsync Era</span>
+                          <span className="text-slate-500">Execution transaction not found</span>
                         )
                       }
                     </Await>
                   </Suspense>
-                ),
-              },
-              {
-                label: "Content matches the id",
-                value: (
-                  <Check ok={d.started.idMatches}>
+                ) : (
+                  <span className="text-slate-500">Not yet</span>
+                )}
+              </Row>
+              <Row label="Content" testId="id-check">
+                {d.started.idMatches ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 font-medium text-green-800"
+                    title="keccak256(abi.encode(calls, executor, salt)) = id"
+                  >
+                    <CheckCircle2 aria-hidden className="h-4 w-4" /> Upgrade content verified
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1.5 font-semibold text-red-800"
+                    title="keccak256(abi.encode(calls, executor, salt)) ≠ id"
+                  >
+                    <XCircle aria-hidden className="h-4 w-4" /> Content does not match the id
+                  </span>
+                )}
+              </Row>
+            </dl>
+            <details className="group mt-4 border-slate-100 border-t pt-3">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1 font-medium text-[13px] text-slate-600 hover:text-slate-950 [&::-webkit-details-marker]:hidden">
+                <ChevronRight
+                  aria-hidden
+                  className="h-4 w-4 transition-transform group-open:rotate-90"
+                />
+                Technical details
+              </summary>
+              <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[110px_minmax(0,1fr)]">
+                <Row label="Salt">
+                  <Hash value={d.started.proposal.salt} />
+                </Row>
+                <Row label="Content check">
+                  <span className="mono text-[13px] text-slate-800">
                     keccak256(abi.encode(calls, executor, salt)) {d.started.idMatches ? "=" : "≠"}{" "}
                     id
-                  </Check>
-                ),
-                testId: "id-check",
-              },
-              {
-                label: "Executed",
-                value:
-                  d.state === UPGRADE_STATES.Done ? (
-                    <Suspense
-                      fallback={
-                        <span role="status" className="text-slate-600">
-                          Finding the execution transaction…
-                        </span>
-                      }
-                    >
-                      <Await
-                        resolve={execution}
-                        errorElement={
-                          <span className="text-slate-600">
-                            Execution transaction unavailable. Refresh to retry.
-                          </span>
-                        }
-                      >
-                        {(result) =>
-                          result.executedTx ? (
-                            <TxLink hash={result.executedTx} />
-                          ) : (
-                            <span className="text-slate-600">Execution transaction not found</span>
-                          )
-                        }
-                      </Await>
-                    </Suspense>
-                  ) : (
-                    <span className="text-slate-600">Not yet</span>
-                  ),
-              },
-            ]}
-          />
+                  </span>
+                </Row>
+              </dl>
+            </details>
+          </Card>
           <Timeline
             now={now}
-            steps={[
-              { label: "Started on L1", at: d.timeline.createdAt, done: true },
-              {
-                label: d.status.guardiansExtendedLegalVeto
-                  ? "Legal veto (extended to 7 days)"
-                  : "Legal veto period",
-                at: d.timeline.legalVetoEndsAt,
-                done: now >= d.timeline.legalVetoEndsAt,
-                current: d.state === UPGRADE_STATES.LegalVetoPeriod,
-              },
-              {
-                label: d.timeline.approvedAt
-                  ? "Approved by the Security Council"
-                  : "Waiting for approval (30 days)",
-                at: d.timeline.approvedAt ?? d.timeline.waitingEndsAt,
-                done: d.timeline.approvedAt !== null || d.status.guardiansApproval,
-                current: d.state === UPGRADE_STATES.Waiting,
-                failed: d.state === UPGRADE_STATES.Expired,
-              },
-              {
-                label: "Ready to execute",
-                at: d.timeline.readyAt,
-                done: d.state === UPGRADE_STATES.Ready || d.state === UPGRADE_STATES.Done,
-                current:
-                  d.state === UPGRADE_STATES.ExecutionPending || d.state === UPGRADE_STATES.Ready,
-              },
-              { label: "Executed", at: null, done: d.state === UPGRADE_STATES.Done },
-            ]}
+            steps={upgradeSteps({
+              state: d.state,
+              timeline: d.timeline,
+              legalVetoExtended: d.status.guardiansExtendedLegalVeto,
+              guardiansApproved: d.status.guardiansApproval,
+              now,
+              // Its time, once the execution transaction is found.
+              executed:
+                d.state === UPGRADE_STATES.Done ? (
+                  <Suspense fallback={null}>
+                    <Await resolve={execution} errorElement={null}>
+                      {(result) =>
+                        result.executedAt ? (
+                          <StepTime at={Number(result.executedAt)} now={now} />
+                        ) : null
+                      }
+                    </Await>
+                  </Suspense>
+                ) : undefined,
+            })}
           />
         </div>
 
-        <Section
-          title={`What the upgrade does · ${d.calls.length} call${d.calls.length === 1 ? "" : "s"}`}
-          description={
-            // A start from the last run's history, or located directly, says so until this run's
-            // history confirms it (the same transaction, block and proposal), then reads as any other.
-            <LastRunText
-              check={provenance ? startedCheck : null}
-              pending={CALLS_SOURCE[provenance ?? "last-run"].pending}
-              confirmed="Decoded from the UpgradeStarted event. The handler executes these calls in order when the upgrade runs."
-              failed={CALLS_SOURCE[provenance ?? "last-run"].failed}
-            />
+        <CallList
+          title="Upgrade actions"
+          heading="h2"
+          calls={d.calls}
+          labels={labels}
+          // Said only for a start not confirmed by this run's history yet (or that failed to be).
+          note={
+            provenance ? (
+              <LastRunText
+                check={startedCheck}
+                pending={CALLS_SOURCE[provenance].pending}
+                confirmed="Decoded from the UpgradeStarted event."
+                failed={CALLS_SOURCE[provenance].failed}
+              />
+            ) : undefined
           }
-        >
-          <CallList calls={d.calls} labels={labels} />
-        </Section>
+        />
       </AsOfContent>
 
       {asOf ? (
@@ -432,7 +446,7 @@ function Detail({
             {(held) =>
               // Only those shown with this upgrade (the same page load): never another block's.
               held && held.asOf.block === asOf.block ? (
-                <HeldApprovalsView held={held} asOf={asOf} recorded={recorded} refresh={refresh} />
+                <HeldApprovalsView held={held} asOf={asOf} refresh={refresh} />
               ) : (
                 <ApprovalsPending />
               )
@@ -441,103 +455,71 @@ function Detail({
         </Suspense>
       ) : (
         <>
-          {recorded && (
-            <Section
-              title="Recorded approvals"
-              description="Transaction evidence and historical checks load independently of current Safe signatures."
-            >
-              <Suspense
-                fallback={
-                  <LoadingCard label="Reading recorded approvals and re-checking their historical signatures…" />
-                }
-              >
-                <Await
-                  resolve={evidence}
-                  errorElement={
-                    <EmptyState>
-                      Recorded approval evidence could not be read. Refresh to retry; the proposal's
-                      current state is shown above.
-                    </EmptyState>
-                  }
-                >
-                  {(records) => <RecordedApprovalList records={records} />}
-                </Await>
-              </Suspense>
-            </Section>
-          )}
-
-          <Section
-            title="Approvals"
-            description="Each member is a Safe. Its signature is looked up in the Safe Transaction Service by the hash this page computes, and counted only if the contract accepts it."
-          >
-            <Suspense
-              fallback={
+          <Suspense
+            fallback={
+              <Section title="Approvals">
                 <LoadingCard label="Checking current member signatures on-chain… Proposal data above is ready to review." />
+              </Section>
+            }
+          >
+            <Await
+              resolve={sets}
+              errorElement={
+                <Section title="Approvals">
+                  <EmptyState>
+                    Current signatures could not be checked. The proposal above is still shown.
+                    Refresh to retry.
+                  </EmptyState>
+                </Section>
               }
             >
-              <Await
-                resolve={sets}
-                errorElement={
-                  <EmptyState>
-                    Current signatures could not be checked. Proposal data and recorded evidence
-                    remain available. Refresh to retry.
-                  </EmptyState>
-                }
-              >
-                {(verified) => (
-                  <div className="space-y-6">
-                    {verified.map((first) => (
-                      <UntilFresh
-                        key={first.key}
-                        stale={first.set.stale === true}
-                        fresh={freshSets}
-                      >
-                        {(fresh, refresh) => {
-                          const s = fresh?.find((f) => f.key === first.key) ?? first;
-                          const card = (
-                            recorded: Pick<typeof s, "state" | "used" | "historical"> = s
-                          ) => (
-                            <SignatureSetCard
-                              testId={`set-${s.key}`}
-                              title={s.title}
-                              set={s.set}
-                              state={recorded.state}
-                              execution={s.execution}
-                              executionToLabel={
-                                s.key === "securityCouncil" ? "SecurityCouncil" : "Guardians"
+              {(verified) => (
+                <ApprovalGroups
+                  title="Approvals"
+                  heading="h2"
+                  count={verified.length}
+                  closed={verified.filter((v) => v.state.status === "closed").length}
+                >
+                  {verified.map((first) => (
+                    <UntilFresh key={first.key} stale={first.set.stale === true} fresh={freshSets}>
+                      {(fresh, refresh) => {
+                        const s = fresh?.find((f) => f.key === first.key) ?? first;
+                        const card = (
+                          recorded: Pick<typeof s, "state" | "used" | "historical"> = s
+                        ) => (
+                          <SignatureSetCard
+                            testId={`set-${s.key}`}
+                            title={s.title}
+                            set={s.set}
+                            state={recorded.state}
+                            used={recorded.used}
+                            historical={recorded.historical}
+                            refresh={s === first ? refresh : null}
+                          />
+                        );
+                        // The recorded evidence is compared with the current result's Safe copies.
+                        // The same tree whether or not there is evidence to wait for (an Await of
+                        // null renders at once), so a reload that changes that keeps the card (and
+                        // what is open in it) mounted.
+                        const evidenceFor = s.state.status === "done" && !s.set.stale;
+                        return (
+                          <Suspense fallback={card()}>
+                            <Await resolve={evidenceFor ? setEvidence : null} errorElement={card()}>
+                              {(merged) =>
+                                card(
+                                  (evidenceFor ? merged?.find((e) => e.key === s.key) : null) ?? s
+                                )
                               }
-                              used={recorded.used}
-                              historical={recorded.historical}
-                              refresh={s === first ? refresh : null}
-                            />
-                          );
-                          // The recorded evidence is compared with the current result's Safe copies.
-                          // The same tree whether or not there is evidence to wait for (an Await of
-                          // null renders at once), so a reload that changes that keeps the card (and
-                          // what is open in it) mounted.
-                          const evidenceFor = s.state.status === "done" && !s.set.stale;
-                          return (
-                            <Suspense fallback={card()}>
-                              <Await
-                                resolve={evidenceFor ? setEvidence : null}
-                                errorElement={card()}
-                              >
-                                {(merged) =>
-                                  card(
-                                    (evidenceFor ? merged?.find((e) => e.key === s.key) : null) ?? s
-                                  )
-                                }
-                              </Await>
-                            </Suspense>
-                          );
-                        }}
-                      </UntilFresh>
-                    ))}
-                  </div>
-                )}
-              </Await>
-            </Suspense>
-          </Section>
+                            </Await>
+                          </Suspense>
+                        );
+                      }}
+                    </UntilFresh>
+                  ))}
+                </ApprovalGroups>
+              )}
+            </Await>
+          </Suspense>
 
           {d.state === UPGRADE_STATES.Ready && (
             <Section
@@ -583,58 +565,6 @@ function ApprovalsPending() {
   return <LoadingCard label="Checking the approvals and member signatures at the newest block…" />;
 }
 
-function RecordedApprovalList({
-  records,
-}: {
-  records: SerializeFrom<RecordedApproval>[];
-}) {
-  return (
-    <div className="space-y-4" data-testid="recorded-approvals">
-      {records.map((record) => (
-        <div
-          key={record.key}
-          className="space-y-2 rounded-xl border border-slate-300 bg-white p-4 sm:p-6"
-        >
-          <h3 className="font-semibold text-navy-800">{record.title}</h3>
-          <p className="text-sm">{record.state.status !== "open" && record.state.detail}</p>
-          {record.state.status === "done" && record.state.txHash ? (
-            <TxLink hash={record.state.txHash} />
-          ) : (
-            <p className="text-amber-900 text-sm">The approval transaction could not be located.</p>
-          )}
-          {record.used && (
-            <p className="text-slate-700 text-sm">
-              The transaction carried {record.used.signers.length} signatures. Comparison with
-              current Safe copies appears below.
-            </p>
-          )}
-          {record.historical ? (
-            <p
-              className={
-                record.historical.accepted === true
-                  ? "text-green-900 text-sm"
-                  : record.historical.accepted === false
-                    ? "text-red-900 text-sm"
-                    : "text-slate-700 text-sm"
-              }
-            >
-              {record.historical.accepted === true
-                ? `Re-checked at block ${record.historical.block} (just before execution): accepted.`
-                : record.historical.accepted === false
-                  ? `Re-checked at block ${record.historical.block}: rejected (${record.historical.error}).`
-                  : `Not re-checked at block ${record.historical.block}: ${record.historical.error}.`}
-            </p>
-          ) : (
-            <p className="text-amber-900 text-sm">
-              Historical signatures could not be reconstructed for a re-check.
-            </p>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /**
  * The approvals as last shown with the upgrade above (after a pause): in no colour, each set under
  * its own notice naming its block, nothing to sign, fetch or send (a stale set's card offers none).
@@ -642,49 +572,33 @@ function RecordedApprovalList({
 function HeldApprovalsView({
   held,
   asOf,
-  recorded,
   refresh,
 }: {
   held: NonNullable<SerializeFrom<Awaited<ReturnType<typeof heldApprovalsOf>>>>;
   asOf: AsOfBlock;
-  recorded: boolean;
   refresh: Refresh;
 }) {
   return (
     <AsOfContent asOf={asOf} className="space-y-8">
-      {recorded && (
-        <Section
-          title="Recorded approvals"
-          description={`As this app last showed them, read at block #${formatNumber(asOf.block)}. The current ones replace them when they arrive.`}
-        >
-          {held.evidence ? (
-            <RecordedApprovalList records={held.evidence} />
-          ) : (
-            <LoadingCard label="Reading recorded approvals and re-checking their historical signatures…" />
-          )}
-        </Section>
-      )}
-      <Section
+      <ApprovalGroups
         title="Approvals"
-        description="Each member is a Safe. Its signature is looked up in the Safe Transaction Service by the hash this page computes, and counted only if the contract accepts it."
+        heading="h2"
+        count={held.sets.length}
+        closed={held.sets.filter((s) => s.state.status === "closed").length}
       >
-        <div className="space-y-6">
-          {held.sets.map((s) => (
-            <SignatureSetCard
-              key={s.key}
-              testId={`set-${s.key}`}
-              title={s.title}
-              set={s.set}
-              state={s.state}
-              execution={null}
-              executionToLabel={s.key === "securityCouncil" ? "SecurityCouncil" : "Guardians"}
-              used={s.used}
-              historical={s.historical}
-              refresh={refresh}
-            />
-          ))}
-        </div>
-      </Section>
+        {held.sets.map((s) => (
+          <SignatureSetCard
+            key={s.key}
+            testId={`set-${s.key}`}
+            title={s.title}
+            set={s.set}
+            state={s.state}
+            used={s.used}
+            historical={s.historical}
+            refresh={refresh}
+          />
+        ))}
+      </ApprovalGroups>
     </AsOfContent>
   );
 }
@@ -700,24 +614,67 @@ function UpgradeTitle({ l2Proposal }: { l2Proposal: Promise<{ title: string | nu
   );
 }
 
-/**
- * The L2 proposal number as the link to its vote on Tally (plain where the network has none). Its
- * last digits and the external-link icon stay together when the long number wraps.
- */
-function ProposalNumberLink({ id, tallyUrl }: { id: string; tallyUrl: string | null }) {
-  if (!tallyUrl) return <>{id}</>;
+/** What the upgrade changes, from its L2 proposal's summary; nothing until (or unless) found. */
+function UpgradeSummary({
+  l2Proposal,
+}: { l2Proposal: Promise<{ summary?: string | null } | null> }) {
   return (
-    <a
-      href={`${tallyUrl}/proposal/${id}`}
-      target="_blank"
-      rel="noreferrer"
-      className="text-brand-700 hover:underline"
-    >
-      {id.slice(0, -4)}
-      <span className="whitespace-nowrap">
-        {id.slice(-4)}
-        <ExternalLink aria-hidden className="ml-1 inline h-3 w-3 align-[-1px]" />
-      </span>
-    </a>
+    <Suspense fallback={null}>
+      <Await resolve={l2Proposal} errorElement={null}>
+        {(proposal) =>
+          proposal?.summary ? (
+            <p
+              className="max-w-3xl pt-1 text-[15px] text-slate-700 leading-6"
+              data-testid="upgrade-summary"
+            >
+              {proposal.summary}
+            </p>
+          ) : null
+        }
+      </Await>
+    </Suspense>
+  );
+}
+
+/** A label and its value in the overview's two columns. */
+function Row({ label, testId, children }: { label: string; testId?: string; children: ReactNode }) {
+  return (
+    // On a phone the label sits over its value; from sm up both take the grid's two columns.
+    <div className="space-y-0.5 sm:contents" data-testid={testId}>
+      <dt className="text-slate-500">{label}</dt>
+      <dd className="min-w-0 text-slate-950">{children}</dd>
+    </div>
+  );
+}
+
+/** A date in view, how long ago on hover. */
+function When({ at, now }: { at: number; now: number }) {
+  return <span title={relativeTime(at, now)}>{formatTime(at)}</span>;
+}
+
+/**
+ * The L2 vote: the governor and the proposal number, shortened (the full number on hover and
+ * copied), linked to its vote on Tally where the network has one.
+ */
+function L2Vote({ id, tallyUrl }: { id: string; tallyUrl: string | null }) {
+  const short = shortHex(id, 6, 4);
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-1.5" title={id}>
+      <span className="mono text-[13px] text-slate-800">ZkProtocolGovernor</span>
+      {tallyUrl ? (
+        <a
+          href={`${tallyUrl}/proposal/${id}`}
+          target="_blank"
+          rel="noreferrer"
+          className="mono inline-flex items-center gap-1 text-[13px] text-brand-700 hover:underline"
+        >
+          #{short}
+          <ExternalLink aria-hidden className="h-3 w-3" />
+        </a>
+      ) : (
+        <span className="mono text-[13px] text-slate-800">#{short}</span>
+      )}
+      <CopyButton value={id} label="Copy proposal number" className="sm:h-7 sm:w-7" />
+    </span>
   );
 }

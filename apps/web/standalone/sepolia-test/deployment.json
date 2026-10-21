@@ -1,0 +1,114 @@
+{
+  "chainId": 11155111,
+  "deployer": "0x0CA09A65E3cEC8DfC0f548381747FA4b34d72579",
+  "owner": "0xF378708B88841Abb63e2316E4Fc8f29469beE885",
+  "zkGovernance": {
+    "repo": "https://github.com/zksync-association/zk-governance.git",
+    "commit": "58df93fc38a0d439c9d2dff4563779251f1c0b64"
+  },
+  "l2ProtocolGovernor": "0xa0eD7885B408961430F89d797cD1cc87530D8fBe",
+  "handlerDeployBlock": 11949797,
+  "contracts": {
+    "protocolUpgradeHandler": "0xd5e02dF8496160A9055adb4cEDf5fA7d826C526E",
+    "protocolUpgradeHandlerImplementation": "0x056761c154DE6634BA27226a0c32Dfb32e59a753",
+    "proxyAdmin": "0xd0dcbaa462cd8e53c2928d0a7e575264da5abab7",
+    "securityCouncil": "0x3911412575371B726A57117a184aC4963C402C0e",
+    "guardians": "0x3B3686bAAcef52b4C340C64adA94294eEA54F130",
+    "emergencyUpgradeBoard": "0x97e0fBC1195D24d7186555222BF0d4507bd62F18",
+    "zksyncStub": "0xC1A682852EdcEF58cE8B85861DaB092FC052996D"
+  },
+  "safes": {
+    "securityCouncil": [
+      {
+        "label": "Security Council member 1",
+        "address": "0xF523dFC76391951d4dE6f5Aa97f1e16c3DD7D1a4"
+      },
+      {
+        "label": "Security Council member 2",
+        "address": "0xf86A6114E469C465f59026D89B61950e0613B13c"
+      },
+      {
+        "label": "Security Council member 3",
+        "address": "0x623B44e81671840C497d922C51Dc3B55570719B6"
+      },
+      {
+        "label": "Security Council member 4",
+        "address": "0xb983A70bF6eBf4bbE039B5F303dA80dE3dFFD2C5"
+      },
+      {
+        "label": "Security Council member 5",
+        "address": "0x93964373E384584664664474fB069D8ABfa14687"
+      },
+      {
+        "label": "Security Council member 6",
+        "address": "0xB9B47954D7EE26e278a7be0Cf3d7725d2eE16DbA"
+      },
+      {
+        "label": "Security Council member 7",
+        "address": "0x2255C11595b5dC590D3517865b7a50D5Cd5d20A8"
+      },
+      {
+        "label": "Security Council member 8",
+        "address": "0x605b7bfFc1387f7B4a28030b3C5a14Cfc42604c1"
+      }
+    ],
+    "guardians": [
+      {
+        "label": "Guardian 1",
+        "address": "0xF74D507fb565db46ea6097f8559e4FA0209FF281"
+      },
+      {
+        "label": "Guardian 2",
+        "address": "0x679E742D8EB21C9df5Cf6833cCD11db65340B830"
+      },
+      {
+        "label": "Guardian 3",
+        "address": "0xA15F1e684AaA1eeFDb7334382EEC99e92B0B0698"
+      },
+      {
+        "label": "Guardian 4",
+        "address": "0x0BE034e513828319328995323c82bDD6eEbC4006"
+      },
+      {
+        "label": "Guardian 5",
+        "address": "0x8313dC42Ca4fd548165C82e3B990c48D4c2ADe35"
+      },
+      {
+        "label": "Guardian 6",
+        "address": "0x3cc6A188764633fbd9C100561C2AC5eCe9d6A2F8"
+      },
+      {
+        "label": "Guardian 7",
+        "address": "0x43cc5CFcce263E4EDf2ec7Ca2c389E2821BCC7ed"
+      },
+      {
+        "label": "Guardian 8",
+        "address": "0x429A4C757980b1Ac9c404Ec656BF0870094D6Bcd"
+      }
+    ],
+    "zkFoundation": {
+      "label": "ZK Foundation",
+      "address": "0xb31c0e6BE8eF10d194c9584E74317bDb9155d902"
+    }
+  },
+  "codeHashes": {
+    "securityCouncil": "0x7e6f0fed4c704c992f1f56bd4ae78b47c8feccdd3e463a6e7a126596fe7efc2c",
+    "guardians": "0xddd6a317a884992d5f8bc50a1d911354c8856273c76cff4dff21e755354ecf12",
+    "emergencyUpgradeBoard": "0x6d26602913a2e5d4471be29afc8f6a5730d9e57a106abc0654e12368e046c573",
+    "safeProxy": "0xb89c1b3bdf2cf8827818646bce9a8f6e372885f8c55e5c07acbd307cb133b000"
+  },
+  "upgrades": [
+    {
+      "title": "Copy of mainnet upgrade 0x5451e3aa… (31 calls; signs, does not execute)",
+      "id": "0x533e3b6a0b357caf7efa067f5686c209cd48cbe5adf28597cbcb29701e63d4f2"
+    },
+    {
+      "title": "Mainnet upgrade 0x77d5461c…'s call, sent to the stub (executes)",
+      "id": "0x7966801a356e3e16ba458183aa71cea62c008b25e657378fa3413070d7a5d3dd"
+    },
+    {
+      "title": "Mainnet upgrade 0x2d891fb5…'s call, sent to the stub (executes)",
+      "id": "0xe9dc0728967e596ffb76855bd3f162169215144583168a0b5208480de4132b17"
+    }
+  ]
+}

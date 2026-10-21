@@ -116,12 +116,13 @@ export type DecodedFunction = {
 const MAX_DEPTH = 8;
 
 // ZKsync Era's diamond on each L1, and the Era chain behind it.
-const ERA_DIAMONDS: Record<string, { l1: number; l2: number }> = {
+// Exported (with ERA_CHAIN and L1_OF) for a single-file build of another ecosystem (standalone/ecosystems).
+export const ERA_DIAMONDS: Record<string, { l1: number; l2: number }> = {
   "0x32400084c286cf3e17e7b677ea9583e60a000324": { l1: 1, l2: 324 },
   "0x9a6de0f62aa270a8bcb1e2610078650d539b1ef9": { l1: 11155111, l2: 300 },
 };
 export const ERA_CHAIN: Record<number, number> = { 1: 324, 11155111: 300 };
-const L1_OF: Record<number, number> = { 324: 1, 300: 11155111 };
+export const L1_OF: Record<number, number> = { 324: 1, 300: 11155111 };
 const L1_CHAINS = new Set([1, 11155111, 17000, 31337]);
 
 // Fields of an L1 → L2 request whose addresses and calldata are on the L2 the request names.

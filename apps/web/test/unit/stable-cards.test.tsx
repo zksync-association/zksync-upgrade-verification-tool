@@ -1,6 +1,7 @@
 import { SignatureSetCard } from "@/components/verification/signature-set";
 import { UntilFresh } from "@/components/verification/until-fresh";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { YourSignature } from "@/components/verification/your-signature";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -39,6 +40,8 @@ vi.mock("wagmi", () => ({
   useAccount: () => ({ address: wallet.address, isConnected: !!wallet.address }),
   useSendTransaction: () => ({ sendTransaction: vi.fn(), isPending: false }),
   useSignTypedData: () => ({ signTypedData: vi.fn(), isPending: false }),
+  // WalletConnect, the one connector (its modal opens on connect).
+  useConnect: () => ({ connectors: [{ id: "walletConnect" }], connect: vi.fn(), isPending: false }),
 }));
 vi.mock("@rainbow-me/rainbowkit", () => ({
   useConnectModal: () => ({ openConnectModal: vi.fn() }),
@@ -109,12 +112,26 @@ function page(first: ReturnType<typeof set>, fresh: Promise<unknown> | null) {
   return (
     <UntilFresh stale={(first as { stale: boolean }).stale} fresh={fresh}>
       {(current, refresh) => (
-        <SignatureSetCard
-          title="Security Council approval"
-          set={(current ?? first) as never}
-          state={{ status: "open" }}
-          refresh={refresh}
-        />
+        <>
+          {/* Your signature above the groups, as a page has it: Sign is there. */}
+          <YourSignature
+            hint="Check."
+            actions={[
+              {
+                key: "council",
+                title: "Security Council approval",
+                set: (current ?? first) as never,
+                state: { status: "open" },
+              },
+            ]}
+          />
+          <SignatureSetCard
+            title="Security Council approval"
+            set={(current ?? first) as never}
+            state={{ status: "open" }}
+            refresh={refresh}
+          />
+        </>
       )}
     </UntilFresh>
   );
@@ -125,31 +142,36 @@ beforeEach(() => {
 });
 
 describe("a set card through a reload of the page", () => {
-  it("keeps an expanded member row, 'What members sign' and the members list as the viewer left them, whichever way the first answer flips", () => {
+  it("keeps an expanded member row, 'What members sign' and the group's fold as the viewer left them, whichever way the first answer flips", () => {
     // First load: the first answer was an older block's; the current one came in.
     const view = render(page(set(true, "100"), settled(set(false, "101"))));
     expect(screen.getByText(/Verified at block #101/)).toBeInTheDocument();
-    // The viewer expands B's row and "What members sign", and closes the members list.
-    fireEvent.click(screen.getByText(MEMBER_B));
+    // The viewer expands B's row and "What members sign", and folds the group.
+    const memberB = screen.getAllByTestId("member-row")[1] as HTMLElement;
+    expect(within(memberB).getByRole("button")).toHaveAttribute("title", MEMBER_B);
+    fireEvent.click(within(memberB).getByRole("button"));
+    // Its Safe's hashes where each screen shows them, the SafeMessage (the set's digest) among them.
+    const detail = screen.getByTestId("member-detail");
+    expect(within(detail).getByText("SafeMessage")).toBeInTheDocument();
+    expect(within(detail).getByText(`0x${"c".repeat(64)}`)).toBeInTheDocument();
     fireEvent.click(screen.getByText(/What members sign/));
-    expect(screen.getByText("A hardware wallet signing for this Safe shows")).toBeInTheDocument();
+    expect(screen.getByTestId("member-detail")).toHaveTextContent("SafeMessage hash");
     expect(screen.getByText("EIP-712 digest")).toBeInTheDocument();
-    const details = screen.getByText(/Current member signatures/).closest("details");
-    (details as HTMLDetailsElement).open = false;
+    const group = () => screen.getByRole("button", { name: /^Security Council approval/ });
+    expect(group()).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(group());
 
     // A reload at the next block: this time the first answer is already the current result.
     view.rerender(page(set(false, "102"), null));
     expect(screen.getByText(/Verified at block #102/)).toBeInTheDocument();
-    expect(screen.getByText("A hardware wallet signing for this Safe shows")).toBeInTheDocument();
+    expect(screen.getByTestId("member-detail")).toHaveTextContent("SafeMessage hash");
     expect(screen.getByText("EIP-712 digest")).toBeInTheDocument();
-    expect(
-      (screen.getByText(/Current member signatures/).closest("details") as HTMLDetailsElement).open
-    ).toBe(false);
+    expect(group()).toHaveAttribute("aria-expanded", "false");
 
     // And back: an older first answer again, the current one in.
     view.rerender(page(set(true, "102"), settled(set(false, "103"))));
     expect(screen.getByText(/Verified at block #103/)).toBeInTheDocument();
-    expect(screen.getByText("A hardware wallet signing for this Safe shows")).toBeInTheDocument();
+    expect(screen.getByTestId("member-detail")).toHaveTextContent("SafeMessage hash");
     expect(screen.getByText("EIP-712 digest")).toBeInTheDocument();
   });
 

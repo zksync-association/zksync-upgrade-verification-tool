@@ -46,7 +46,7 @@ test("a signature filed in Safe appears on the open page without navigating", as
   await signInSafe(UNSIGNED_MEMBER, approval());
   // Within the watcher's cadence and a beat (10 s), without a navigation or a click.
   await expect(row).toHaveAttribute("data-status", "valid", { timeout: 30_000 });
-  await expect(council.getByTestId("signature-count")).toHaveText("8 / 4");
+  await expect(council.getByTestId("signature-count")).toHaveText("8 signatures · 4 required");
   expect(navigations).toEqual([]);
   await expect(council.getByText("EIP-712 digest")).toBeVisible();
   expect(await page.evaluate(() => window.scrollY)).toBe(scroll);

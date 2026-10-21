@@ -156,7 +156,7 @@ export function loader({ request }: LoaderFunctionArgs) {
   const currentFreeze = freeze.first.then((f) => (f.stale ? freeze.fresh : f));
   const currentSigned = vetoes.signed.then((v) => (v.stale ? vetoes.freshSigned : v));
   const revs = loaderRevs([
-    [watchKeys.upgrades(false), currentList.then(upgradeListContent)],
+    [watchKeys.upgrades("45"), currentList.then(upgradeListContent)],
     [
       watchKeys.emergencies(false),
       Promise.all([currentPending, emergency.executed]).then(([pending, executed]) =>
@@ -173,7 +173,7 @@ export function loader({ request }: LoaderFunctionArgs) {
   ]);
   return defer({
     watch: watchItems(request, [
-      watchKeys.upgrades(false),
+      watchKeys.upgrades("45"),
       watchKeys.emergencies(false),
       watchKeys.freezes,
       watchKeys.vetoes,

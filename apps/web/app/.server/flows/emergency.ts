@@ -32,6 +32,7 @@ import {
 import type { Freshness, SignatureSet } from "../signatures";
 import {
   type UsedSignature,
+  blockTimeOf,
   callTo,
   compareUsedSignatures,
   firstOrFresh,
@@ -57,7 +58,8 @@ const EMERGENCY_ACTIONS = [
   "ExecuteEmergencyUpgradeZKFoundation",
 ] as const satisfies readonly ActionName[];
 
-type Executed = { id: Hex; txHash: Hex; blockNumber: bigint };
+// With its block's time when that was read (the recent window's cut reads it).
+type Executed = { id: Hex; txHash: Hex; blockNumber: bigint; timestamp?: bigint };
 
 // Headers read per round when cutting the recent window by timestamp (one JSON-RPC batch).
 const TIMESTAMP_BATCH = 20;
@@ -122,8 +124,10 @@ async function readExecuted({
     const start = Math.max(0, end - TIMESTAMP_BATCH);
     const times = await timesOf(executed.slice(start, end).map((e) => e.blockNumber));
     for (let i = end - 1; i >= start; i--) {
-      const time = times.get((executed[i] as Executed).blockNumber) as bigint;
+      const event = executed[i] as Executed;
+      const time = times.get(event.blockNumber) as bigint;
       if (time < cutoff) return { executed: executed.slice(i + 1), provisional };
+      event.timestamp = time;
     }
     end = start;
   }
@@ -160,10 +164,33 @@ async function legacyExecutedEmergencies(net: Network, allHistory: boolean): Pro
 
 export type EmergencySummary = {
   id: Hex;
-  executed: { txHash: Hex; blockNumber: string } | null;
+  /** timestamp: its block's time (unix seconds), when read; never read for the JSON list. */
+  executed: { txHash: Hex; blockNumber: string; timestamp?: string } | null;
   reported: { securityCouncil: number; guardians: number; zkFoundation: boolean };
   firstSeen: string | null;
 };
+
+const executedOf = (event: Executed): NonNullable<EmergencySummary["executed"]> => ({
+  txHash: event.txHash,
+  blockNumber: event.blockNumber.toString(),
+  ...(event.timestamp !== undefined ? { timestamp: event.timestamp.toString() } : {}),
+});
+
+/** Executed emergency upgrades as the lists show them, newest first. */
+const executedSummaries = (events: Executed[]): EmergencySummary[] =>
+  events.map((event) => ({ ...summary(event.id), executed: executedOf(event) })).reverse();
+
+/** A page's whole history: the block times the recent window did not read (kept once final). */
+async function withTimes(events: Executed[]): Promise<Executed[]> {
+  const missing = events.filter((e) => e.timestamp === undefined).map((e) => e.blockNumber);
+  if (missing.length === 0) return events;
+  const times = await blockTimestamps(missing).catch(() => new Map<bigint, bigint>());
+  return events.map((e) =>
+    e.timestamp === undefined && times.has(e.blockNumber)
+      ? { ...e, timestamp: times.get(e.blockNumber) }
+      : e
+  );
+}
 
 const summary = (id: Hex): EmergencySummary => ({
   id,
@@ -229,19 +256,17 @@ export function loadEmergencyList({
   allHistory = false,
   freshness = "strict",
 }: { allHistory?: boolean; freshness?: Freshness } = {}) {
-  const summaries = (events: Executed[]) =>
-    events
-      .map((event) => ({
-        ...summary(event.id),
-        executed: { txHash: event.txHash, blockNumber: event.blockNumber.toString() },
-      }))
-      .reverse();
   const executedFirst: Promise<ExecutedFirst> = readExecuted({
     allHistory,
     provisional: freshness === "page",
-  }).then((read) => ({ items: summaries(read.executed), fromLastRun: read.provisional }));
+  }).then(async (read) => ({
+    items: executedSummaries(await withTimes(read.executed)),
+    fromLastRun: read.provisional,
+  }));
   const executed = executedFirst.then((first) =>
-    first.fromLastRun ? executedEmergencies({ allHistory }).then(summaries) : first.items
+    first.fromLastRun
+      ? executedEmergencies({ allHistory }).then(withTimes).then(executedSummaries)
+      : first.items
   );
   const signers = governanceFor(freshness).then((gov) => ({
     domain: gov.emergencyUpgradeBoard.domain,
@@ -297,16 +322,7 @@ export async function heldEmergencyList({
     pendingFrom(collected),
     executedEmergencies({ allHistory }),
   ]);
-  return {
-    pending,
-    executed: executed
-      .map((event) => ({
-        ...summary(event.id),
-        executed: { txHash: event.txHash, blockNumber: event.blockNumber.toString() },
-      }))
-      .reverse(),
-    governance: gov,
-  };
+  return { pending, executed: executedSummaries(await withTimes(executed)), governance: gov };
 }
 
 export async function listEmergencyUpgrades() {
@@ -347,9 +363,7 @@ export async function listEmergencyUpgrades() {
       e.reported.zkFoundation = n > 0;
     if (!e.firstSeen || group.firstSeen < e.firstSeen) e.firstSeen = group.firstSeen;
   }
-  for (const ex of executed) {
-    entry(ex.id).executed = { txHash: ex.txHash, blockNumber: ex.blockNumber.toString() };
-  }
+  for (const ex of executed) entry(ex.id).executed = executedOf(ex);
 
   const all = [...byId.values()];
   const recent = (e: EmergencySummary) => e.firstSeen ?? "";
@@ -375,6 +389,8 @@ export type EmergencyRole = {
 export type EmergencyExecution = {
   txHash: Hex;
   blockNumber: string;
+  /** Its block's time (unix seconds), when it could be read. */
+  timestamp: string | null;
   // Rebuilt from the execution calldata.
   proposal: UpgradeProposal;
   calls: DecodedCall[];
@@ -484,11 +500,22 @@ export async function loadEmergencyUpgrade(
   );
   const sets = Promise.all(streamed.map((s) => s.fresh));
 
-  const decodedOf = (event: EmergencyEvent) => decodeExecution(event.txHash, board.address);
+  // With its block's time, read beside it (kept for good once final).
+  const decodedOf = async (event: EmergencyEvent) => {
+    const [decoded, at] = await Promise.all([
+      decodeExecution(event.txHash, board.address),
+      blockTimeOf(event.blockNumber),
+    ]);
+    return decoded && { ...decoded, at };
+  };
 
-  const callsFrom = (event: EmergencyEvent, decoded: Decoded): EmergencyExecutionFirst => ({
+  const callsFrom = (
+    event: EmergencyEvent,
+    decoded: Decoded & { at: string | null }
+  ): EmergencyExecutionFirst => ({
     txHash: event.txHash,
     blockNumber: event.blockNumber.toString(),
+    timestamp: decoded.at,
     proposal: decoded.proposal,
     calls: decoded.proposal.calls.map((call) => decodeCall(call)),
     idMatches: upgradeProposalId(decoded.proposal).toLowerCase() === id.toLowerCase(),

@@ -19,11 +19,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { type AsOfBlock, AsOfContent, AsOfNote } from "@/components/verification/as-of";
 import { NotReReadNote, useContentCurrency } from "@/components/verification/content-currency";
+import {
+  PreparedEmergencies,
+  useSavedPayloads,
+} from "@/components/verification/prepared-emergencies";
 import { CheckSafeNow } from "@/components/verification/check-safe-now";
 import { ListFreshnessNote, type Refresh } from "@/components/verification/freshness";
 import { LastRunNote } from "@/components/verification/last-run";
 import { UntilFresh } from "@/components/verification/until-fresh";
-import { formatDay, formatNumber, shortHex } from "@/utils/format";
+import { formatDay, formatNumber, formatTime, shortHex } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
 import { Await, Link, useLoaderData } from "@remix-run/react";
@@ -91,6 +95,8 @@ export default function EmergencyList() {
   // block, in no colour.
   const watchKey = allHistory ? "list:emergency:all" : "list:emergency";
   const stale = useContentCurrency(watchKey).behind !== null;
+  // Prepared or loaded in this browser (read after hydration): listed before anyone signs.
+  const { saved, reread } = useSavedPayloads();
   return (
     <div>
       <PageHeader
@@ -115,6 +121,50 @@ export default function EmergencyList() {
       </PageHeader>
       <div className="space-y-5">
         <NotReReadNote watchKey={watchKey} what="The pending ids, counts and executions below" />
+        {saved && saved.length > 0 && (
+          <section className="space-y-3" aria-labelledby="prepared-emergencies-heading">
+            <div className="space-y-1">
+              <h2 id="prepared-emergencies-heading" className="font-semibold text-lg">
+                Prepared in this browser
+              </h2>
+              <p className="text-slate-600 text-sm">
+                Kept only here and never sent to the server: the calls stay confidential until the
+                upgrade is executed. Members sign only the id.
+              </p>
+            </div>
+            {/* Where each stands, from the lists below once they are read. */}
+            <Suspense fallback={<PreparedEmergencies saved={saved} onRemoved={reread} />}>
+              <Await
+                resolve={pending}
+                errorElement={<PreparedEmergencies saved={saved} onRemoved={reread} />}
+              >
+                {(p) => (
+                  <Suspense
+                    fallback={
+                      <PreparedEmergencies saved={saved} onRemoved={reread} pending={p.pending} />
+                    }
+                  >
+                    <Await
+                      resolve={executed}
+                      errorElement={
+                        <PreparedEmergencies saved={saved} onRemoved={reread} pending={p.pending} />
+                      }
+                    >
+                      {(e) => (
+                        <PreparedEmergencies
+                          saved={saved}
+                          onRemoved={reread}
+                          pending={p.pending}
+                          executed={e.items}
+                        />
+                      )}
+                    </Await>
+                  </Suspense>
+                )}
+              </Await>
+            </Suspense>
+          </section>
+        )}
         <section className="space-y-3" aria-labelledby="pending-emergencies-heading">
           <h2 id="pending-emergencies-heading" className="font-semibold text-lg">
             Pending
@@ -320,7 +370,9 @@ function Rows({
               </span>
               <span className="text-slate-550 text-xs">
                 {e.executed
-                  ? `Executed in block ${formatNumber(e.executed.blockNumber)}`
+                  ? e.executed.timestamp
+                    ? `Executed ${formatTime(e.executed.timestamp)} · block ${formatNumber(e.executed.blockNumber)}`
+                    : `Executed in block ${formatNumber(e.executed.blockNumber)}`
                   : `First signed in Safe ${formatDay(e.firstSeen)}`}
               </span>
             </span>

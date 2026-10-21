@@ -27,6 +27,8 @@ vi.mock("@remix-run/react", async (importOriginal) => ({
   useNavigation: () => ({ state: "idle", location: undefined }),
   useFetcher: () => ({ state: "idle", data: undefined, submit: vi.fn() }),
   useRevalidator: () => ({ revalidate: vi.fn(), state: "idle" }),
+  useLocation: () => ({ pathname: "/", search: "", hash: "", state: null, key: "default" }),
+  useNavigate: () => vi.fn(),
   Form: ({ children }: { children: ReactNode }) => <form>{children}</form>,
   Link: ({ to, children, ...props }: { to: string; children: ReactNode }) => (
     <a href={to} {...props}>
@@ -37,14 +39,20 @@ vi.mock("@remix-run/react", async (importOriginal) => ({
     to,
     children,
     className,
+    end: _end,
+    prefetch: _prefetch,
+    ...props
   }: {
     to: string;
     children: ReactNode;
     className?: string | ((state: { isActive: boolean }) => string);
+    end?: boolean;
+    prefetch?: string;
   }) => (
     <a
       href={to}
       className={typeof className === "function" ? className({ isActive: false }) : className}
+      {...props}
     >
       {children}
     </a>
@@ -183,15 +191,17 @@ describe("the app shell before the status is read", () => {
   it("renders the header, the navigation and the page, and says the status is being checked", () => {
     const out = serverHtml(<Shell status={pending()} />);
     expect(out).toContain('aria-label="Governance navigation"');
+    // Each destination is named for its page (the menu shows a word and an icon).
     for (const item of [
       "Overview",
       "Protocol upgrades",
       "Emergency upgrades",
       "Freeze requests",
       "Guardian veto",
-      "Settings",
+      // Settings: the toggle floating at the bottom right.
+      "Open settings",
     ])
-      expect(out).toContain(`>${item}</a>`);
+      expect(out).toContain(`aria-label="${item}"`);
     expect(out).toContain("page body");
     expect(out).toContain("Ethereum Mainnet");
     expect(out).toContain("checking…");

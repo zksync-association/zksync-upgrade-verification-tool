@@ -1,5 +1,6 @@
 // config/local-settings.server.ts for the single-file build: the same settings, kept in this
 // browser's local storage instead of apps/web/.cache/local-settings.json.
+import { STORAGE_PREFIX } from "@/common/storage-prefix";
 import { z } from "zod";
 
 const schema = z.object({
@@ -11,7 +12,7 @@ const schema = z.object({
 export type LocalSettings = z.infer<typeof schema>;
 type Name = keyof LocalSettings;
 const NAMES = Object.keys(schema.shape) as Name[];
-const KEY = "zksync-governance-verifier.settings";
+const KEY = `${STORAGE_PREFIX}zksync-governance-verifier.settings`;
 
 function read(): LocalSettings {
   try {

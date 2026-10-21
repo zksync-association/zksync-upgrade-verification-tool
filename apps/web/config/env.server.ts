@@ -9,58 +9,71 @@ export const NodeEnvEnum = z.enum(["development", "test", "production"]);
 
 // Only L1_RPC_URL is required. Everything else is optional and either derived from the chain
 // (network, governance contracts, members, thresholds) or has a per-network default.
+const server = {
+  L1_RPC_URL: z.string().url(),
+  L2_RPC_URL: z.string().url().optional(),
+  // Signing through WalletConnect is disabled without it. Verifying never needs it.
+  WALLET_CONNECT_PROJECT_ID: z.string().optional(),
+  // Safe{Wallet} instances that may open the app as a Safe App (comma-separated origins).
+  SAFE_WALLET_ORIGINS: z
+    .string()
+    .default("https://app.safe.global")
+    .refine(
+      (value) => splitOrigins(value).every((o) => URL.canParse(o) && new URL(o).origin === o),
+      "SAFE_WALLET_ORIGINS must be comma-separated origins, e.g. https://app.safe.global"
+    ),
+  // Only needed when the Safe Transaction Service rate limits you (e.g. a hosted instance).
+  SAFE_API_KEY: z.string().optional(),
+  // Overrides for local chains and tests. Mainnet and Sepolia have pinned defaults.
+  UPGRADE_HANDLER_ADDRESS: addressSchema.optional(),
+  SAFE_TX_SERVICE_URL: z.string().url().optional(),
+  ZK_PROTOCOL_GOVERNOR_ADDRESS: addressSchema.optional(),
+  ZK_TOKEN_GOVERNOR_ADDRESS: addressSchema.optional(),
+  ZK_GOV_OPS_GOVERNOR_ADDRESS: addressSchema.optional(),
+  // "window": follow the head only while the app is in use (never for /api/*); "off": never.
+  SYNC_MODE: z.enum(["window", "off"]).default("window"),
+  SYNC_KEEPWARM_MS: z.coerce.number().int().min(0).default(30_000),
+  SYNC_AWAY_MS: z.coerce.number().int().min(0).default(1_800_000),
+  // The Safe watcher's cadences; without a key on Safe's public service, ..._KEYLESS_MS at most.
+  SYNC_SAFE_WATCH_MS: z.coerce.number().int().min(1_000).default(60_000),
+  SYNC_SAFE_LIST_WATCH_MS: z.coerce.number().int().min(1_000).default(300_000),
+  SYNC_SAFE_WATCH_KEYLESS_MS: z.coerce.number().int().min(0).default(300_000),
+  SYNC_SAFE_HOURLY_BUDGET: z.coerce.number().int().min(0).default(1_200),
+  // 1: a set's checks at a head go in that head's aggregate3, which only supplies positives.
+  SYNC_VERDICT_AGGREGATE: z.coerce.number().int().min(0).max(1).default(1),
+  // The engine's own pace in Infura credits a second (Infura's free plan allows 500). 0: unpaced.
+  SYNC_CREDITS_PER_SECOND: z.coerce.number().int().min(0).default(450),
+  ALLOW_INDEXING: z.coerce.boolean().default(false),
+  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  NODE_ENV: NodeEnvEnum.default("production"),
+  SERVER_PORT: z.coerce.number().default(3000),
+  // Local runs answer only this machine (the app spends the user's RPC); the image sets 0.0.0.0.
+  SERVER_HOST: z.string().default("127.0.0.1"),
+};
+
+const skipValidation = process.env.SKIP_ENV_VALIDATION === "true";
 const baseEnv = createEnv({
-  server: {
-    L1_RPC_URL: z.string().url(),
-    L2_RPC_URL: z.string().url().optional(),
-    // Signing through WalletConnect is disabled without it. Verifying never needs it.
-    WALLET_CONNECT_PROJECT_ID: z.string().optional(),
-    // Safe{Wallet} instances that may open the app as a Safe App (comma-separated origins).
-    SAFE_WALLET_ORIGINS: z
-      .string()
-      .default("https://app.safe.global")
-      .refine(
-        (value) => splitOrigins(value).every((o) => URL.canParse(o) && new URL(o).origin === o),
-        "SAFE_WALLET_ORIGINS must be comma-separated origins, e.g. https://app.safe.global"
-      ),
-    // Only needed when the Safe Transaction Service rate limits you (e.g. a hosted instance).
-    SAFE_API_KEY: z.string().optional(),
-    // Overrides for local chains and tests. Mainnet and Sepolia have pinned defaults.
-    UPGRADE_HANDLER_ADDRESS: addressSchema.optional(),
-    SAFE_TX_SERVICE_URL: z.string().url().optional(),
-    ZK_PROTOCOL_GOVERNOR_ADDRESS: addressSchema.optional(),
-    ZK_TOKEN_GOVERNOR_ADDRESS: addressSchema.optional(),
-    ZK_GOV_OPS_GOVERNOR_ADDRESS: addressSchema.optional(),
-    // "window": follow the head only while the app is in use (never for /api/*); "off": never.
-    SYNC_MODE: z.enum(["window", "off"]).default("window"),
-    SYNC_KEEPWARM_MS: z.coerce.number().int().min(0).default(30_000),
-    SYNC_AWAY_MS: z.coerce.number().int().min(0).default(1_800_000),
-    // The Safe watcher's cadences; without a key on Safe's public service, ..._KEYLESS_MS at most.
-    SYNC_SAFE_WATCH_MS: z.coerce.number().int().min(1_000).default(60_000),
-    SYNC_SAFE_LIST_WATCH_MS: z.coerce.number().int().min(1_000).default(300_000),
-    SYNC_SAFE_WATCH_KEYLESS_MS: z.coerce.number().int().min(0).default(300_000),
-    SYNC_SAFE_HOURLY_BUDGET: z.coerce.number().int().min(0).default(1_200),
-    // 1: a set's checks at a head go in that head's aggregate3, which only supplies positives.
-    SYNC_VERDICT_AGGREGATE: z.coerce.number().int().min(0).max(1).default(1),
-    // The engine's own pace in Infura credits a second (Infura's free plan allows 500). 0: unpaced.
-    SYNC_CREDITS_PER_SECOND: z.coerce.number().int().min(0).default(450),
-    ALLOW_INDEXING: z.coerce.boolean().default(false),
-    LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
-    NODE_ENV: NodeEnvEnum.default("production"),
-    SERVER_PORT: z.coerce.number().default(3000),
-    // Local runs answer only this machine (the app spends the user's RPC); the image sets 0.0.0.0.
-    SERVER_HOST: z.string().default("127.0.0.1"),
-  },
+  server,
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,
-  skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
+  skipValidation,
 });
+
+// Without validation (SKIP_ENV_VALIDATION, as in CI's tests) each value is still parsed on its own,
+// so defaults and numbers apply; a value its schema rejects is passed on as set.
+function unvalidated(name: string) {
+  if (!Object.hasOwn(server, name)) return Reflect.get(baseEnv, name);
+  const raw = process.env[name] || undefined;
+  const parsed = server[name as keyof typeof server].safeParse(raw);
+  return parsed.success ? parsed.data : raw;
+}
 
 // Secret settings are server-only and override environment defaults for this local instance.
 export const env = new Proxy(baseEnv, {
   get(target, name) {
     const local = localSetting(String(name));
-    return local === undefined ? Reflect.get(target, name) : local === null ? undefined : local;
+    if (local !== undefined) return local === null ? undefined : local;
+    return skipValidation ? unvalidated(String(name)) : Reflect.get(target, name);
   },
 });
 

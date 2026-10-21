@@ -1,0 +1,64 @@
+{
+  "name": "ZKsync Testnet 3",
+  "storagePrefix": "zksync-testnet-3:",
+  "network": {
+    "chainId": 11155111,
+    "label": "ZKsync Testnet 3",
+    "upgradeHandler": "0xD7B653c373aa9585141223d244DA857b10c92d85",
+    "upgradeHandlerDeployBlock": 11957426,
+    "standardLegalVetoDays": 0,
+    "upgradeDelayDays": 0,
+    "safeTxServiceUrl": "https://api.safe.global/tx-service/sep",
+    "safeWalletPrefix": "sep",
+    "explorerUrl": "https://sepolia.etherscan.io",
+    "tallyUrl": null,
+    "l2": {
+      "chainId": 312,
+      "rpcUrl": "https://rpc.zksync-era-testnet.zksync.dev",
+      "explorerUrl": "https://block-explorer.zksync-era-testnet.zksync.dev",
+      "diamond": "0xbB94d8F4080d5CD34d6215399f26771990f38A1d",
+      "governors": {
+        "protocol": "0xbD0C5e503BCFBD81C1Cb2F1CdCB8b11598816A7F",
+        "token": null,
+        "govOps": null
+      },
+      "governorsFirstLogBlock": 10537,
+      "governorsDeployBlock": 10537
+    },
+    "codePins": {
+      "securityCouncil": "0x604081c44c8d9cbaea88b8a0d7725397510a66b4d7608462924d97bda9936693",
+      "guardians": "0xf22f3a49a0f167ec836c05172d9d16cd2776dec422c5be03947c4d42fbd5625f",
+      "emergencyUpgradeBoard": "0x18b0b77f5608050db950e2681b432cc59bcbc6ecb2ce668caca5c0f6fe9a1d09",
+      "safeProxy": "0xb89c1b3bdf2cf8827818646bce9a8f6e372885f8c55e5c07acbd307cb133b000",
+      "safeSingleton": "0xfb1bffC9d739B8D520DaF37dF666da4C687191EA",
+      "safeFallbackHandler": "0x017062a1dE2FE6b99BE3d9d37841FeD19F573804"
+    }
+  },
+  "labels": {
+    "0xD7B653c373aa9585141223d244DA857b10c92d85": "PUH proxy",
+    "0xD7b2fEB25E924E34bf231efBad04ADC4848dC85d": "Legacy Governance",
+    "0xF49C690785b9fE5261d786237348A66896e2F477": "Bridgehub",
+    "0x4d058d138F477c4b97B3D762f923811b20220078": "Era ChainTypeManager",
+    "0x281C5f43C9E31A9443CA7f53Bbb9c5c19835CC32": "CTMDeploymentTracker",
+    "0x2b66aF2af1D058Ca569ED567fFA8fcD7E91cC381": "RollupDAManager",
+    "0xb21174A03612C5047BD6F0EE3f41220c0dd8cCE7": "L1AssetTracker",
+    "0xD1eAE5E399F88751Ec2F903785D62cf5A8Dc4b9b": "L1Nullifier",
+    "0x2B64aa3d5AEcA9AC4BbF04a48d671da7d6909C03": "L1AssetRouter",
+    "0x54eDd93d08f703B788587C78b62b64663AF14AF7": "L1NativeTokenVault",
+    "0xcBB88E836507464a4574DBeE25BCAc91582466FE": "ChainAssetHandler",
+    "0x046B9411436c47038c9E1ef83Fd9dd5a1cD9e465": "ValidatorTimelock",
+    "0xD843114592beed3Fe84754f19Dda709A5356e50e": "ChainRegistrationSender",
+    "0xF0D36e057D88d4c878B6640af2CBf703950B1f88": "MessageRoot",
+    "0x9C896ac34c488a806ECAB821D4579219382cc2c8": "Ecosystem ProxyAdmin",
+    "0x62d15aB56822Bf04B57003E13EAE9d7A81A5Faf3": "BridgedTokenBeacon",
+    "0x4d1f2681162694D785a7978b69C9a24d4ADc671F": "PUH ProxyAdmin",
+    "0x7E1Ba159c077F333A6B269e15D8A5a12916E6Fc2": "EmergencyUpgradeBoard",
+    "0x2498CAc75FA29b5c30e126C23ABcCc5ac5119821": "SecurityCouncil",
+    "0x495C4c47C722b3A1C6cc8C9293Fc701C421eA57A": "Guardians",
+    "0x86FF47C9682f9f83dBC1C45C7929C0C5aFEf3E8b": "ZK Foundation Safe",
+    "0xbB94d8F4080d5CD34d6215399f26771990f38A1d": "Chain 312 Diamond",
+    "0xcd759c9bB599e4463771A45F289B318A93Bb07E4": "Chain 312 ChainAdmin",
+    "0x737bd0D41AD4F0CD3753F18f73064D7952b790Fc": "Operations ChainAdmin",
+    "0x9426D0CDee3B9698AE799c21708C7739c14ee9e7": "ServerNotifier"
+  }
+}

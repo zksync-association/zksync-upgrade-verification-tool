@@ -49,6 +49,8 @@ export type NetworkConfig = {
   l2ExplorerUrl: string | null;
   tallyUrl: string | null;
   standardLegalVetoDays: number;
+  // The handler's delay from approval to "Ready" (UPGRADE_DELAY_PERIOD): 1 day, none on testnets.
+  upgradeDelayDays: number;
   blockTimeSeconds: number;
   // A log that must exist on any RPC with full log history. If an RPC returns nothing for it,
   // the app says so instead of silently showing an incomplete list.
@@ -79,6 +81,7 @@ export const NETWORKS: Record<1 | 11155111, NetworkConfig> = {
     l2ExplorerUrl: "https://explorer.zksync.io",
     tallyUrl: "https://tally.xyz/gov/zksync",
     standardLegalVetoDays: 3,
+    upgradeDelayDays: 1,
     blockTimeSeconds: 12,
     logCanary: {
       address: "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3",
@@ -114,6 +117,7 @@ export const NETWORKS: Record<1 | 11155111, NetworkConfig> = {
     l2ExplorerUrl: "https://sepolia.explorer.zksync.io",
     tallyUrl: null,
     standardLegalVetoDays: 0,
+    upgradeDelayDays: 0,
     blockTimeSeconds: 12,
     logCanary: {
       address: "0x7444b49E49A4AD4376a3e3c036900869575f0FBf",
@@ -141,6 +145,7 @@ export function localNetwork(chainId: number): NetworkConfig {
     l2ExplorerUrl: null,
     tallyUrl: null,
     standardLegalVetoDays: 3,
+    upgradeDelayDays: 1,
     blockTimeSeconds: 12,
     logCanary: null,
     codePins: null,

@@ -3,8 +3,14 @@ import { lastShown } from "@/.server/sync/last-shown";
 import { watchItems, watchKeys } from "@/.server/sync/presence";
 import { type UpgradeSummary, listStandardUpgrades, upgradeTitles } from "@/.server/flows/standard";
 import { isUpgradeActive } from "@/common/upgrade-states";
-import { HistoryToggle, PendingRegion, useNavigatingTo } from "@/components/history-toggle";
-import { EmptyState, PageHeader, QuietEmpty } from "@/components/page";
+import {
+  UPGRADE_WINDOWS,
+  UPGRADE_WINDOW_LABELS,
+  type UpgradeWindow,
+  upgradeWindow,
+} from "@/common/upgrade-window";
+import { PendingRegion } from "@/components/history-toggle";
+import { EmptyState, PageHeader } from "@/components/page";
 import { IndexedLoadingCard } from "@/components/sync-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,39 +25,41 @@ import { UntilFresh } from "@/components/verification/until-fresh";
 import { formatDay, formatNumber, shortHex } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
-import { Await, Link, useLoaderData } from "@remix-run/react";
-import { ArrowRight, Check } from "lucide-react";
+import { Await, Link, useLoaderData, useNavigate, useNavigation } from "@remix-run/react";
+import { ArrowRight, Check, CheckCircle2, Loader2 } from "lucide-react";
 import { Suspense, createContext, useContext } from "react";
 import { $path } from "remix-routes";
 
 export const meta = Meta["/app/proposals"];
 
 export function loader({ request }: LoaderFunctionArgs) {
-  const allHistory = new URL(request.url).searchParams.get("history") === "all";
+  const range = upgradeWindow(new URL(request.url).searchParams.get("history"));
+  const allHistory = range === "all";
+  const days = range === "90" ? 90n : undefined;
   // After a pause, the list as last shown comes first, as of its block.
   const shown = lastShown();
   // While this run re-reads the handler's history, the page may list from the history the last
   // run saved (labelled), and the list from this run's history follows in the same response.
-  const list = listStandardUpgrades({ allHistory, freshness: "page" });
+  const list = listStandardUpgrades({ allHistory, days, freshness: "page" });
   const freshList = list.then((first) =>
-    first.fromLastRun ? listStandardUpgrades({ allHistory }) : null
+    first.fromLastRun ? listStandardUpgrades({ allHistory, days }) : null
   );
   void freshList.catch(() => {});
-  const shownList = shown.section(watchKeys.upgrades(allHistory), list, freshList, {
+  const shownList = shown.section(watchKeys.upgrades(range), list, freshList, {
     current: (l) => !l.fromLastRun,
   });
   // The titles follow the list: it never waits for them.
   const titles = list.then(upgradeTitles);
   void titles.catch(() => {});
   return defer({
-    watch: watchItems(request, [watchKeys.upgrades(allHistory)]),
+    watch: watchItems(request, [watchKeys.upgrades(range)]),
     revs: loaderRevs([
       [
-        watchKeys.upgrades(allHistory),
+        watchKeys.upgrades(range),
         Promise.all([list, freshList]).then(([first, fresh]) => upgradeListContent(fresh ?? first)),
       ],
     ]),
-    allHistory,
+    range,
     list: shownList.first,
     freshList: shownList.fresh,
     titles,
@@ -62,7 +70,7 @@ export function loader({ request }: LoaderFunctionArgs) {
 const Titles = createContext<Promise<Record<string, string | null>> | null>(null);
 
 export default function Upgrades() {
-  const { list, freshList, allHistory, titles } = useLoaderData<typeof loader>();
+  const { list, freshList, range, titles } = useLoaderData<typeof loader>();
   return (
     <Titles.Provider value={titles}>
       <div>
@@ -70,15 +78,14 @@ export default function Upgrades() {
           eyebrow="Standard governance"
           title="Protocol upgrades"
           actions={
-            <Button asChild>
-              <Link to={$path("/app/proposals/new")}>Start an upgrade from L2</Link>
+            // A little below the title, beside the description (not on a phone, where it wraps).
+            <Button asChild className="sm:-mb-3">
+              <Link to={$path("/app/proposals/new")}>Start upgrade</Link>
             </Button>
           }
         >
-          <p className="max-w-[600px] text-[14px] text-slate-550">
-            Each upgrade was voted on ZKsync Era and started on L1 with a proof of the L2 decision.
-            It then needs the Security Council (or, after 30 days, the Guardians) to approve before
-            it can be executed.
+          <p className="text-[14px] text-slate-550">
+            Upgrades voted on ZKsync Era and started on L1, and where each stands.
           </p>
         </PageHeader>
         <Suspense
@@ -116,7 +123,7 @@ export default function Upgrades() {
                 {(fresh, refresh) => (
                   <UpgradeTable
                     result={fresh ?? first}
-                    allHistory={allHistory}
+                    range={range}
                     refresh={fresh ? null : refresh}
                   />
                 )}
@@ -129,24 +136,26 @@ export default function Upgrades() {
   );
 }
 
+const windowPath = (w: UpgradeWindow) =>
+  w === "45" ? $path("/app/proposals") : `${$path("/app/proposals")}?history=${w}`;
+
 function UpgradeTable({
   result,
-  allHistory,
+  range,
   refresh = null,
 }: {
   result: SerializeFrom<Awaited<ReturnType<typeof listStandardUpgrades>>> & {
     asOf?: AsOfBlock;
   };
-  allHistory: boolean;
+  range: UpgradeWindow;
   refresh?: Refresh;
 }) {
   const active = result.upgrades.filter((u) => isUpgradeActive(u.state));
   const past = result.upgrades.filter((u) => !isUpgradeActive(u.state));
-  const toggle = allHistory ? $path("/app/proposals") : `${$path("/app/proposals")}?history=all`;
-  const switching = useNavigatingTo(toggle);
+  const switching = useSwitchingWindow();
   // The list as the beats name it: one not read again at the head served now is shown as of its
   // block, in no colour.
-  const watchKey = allHistory ? "list:upgrades:all" : "list:upgrades";
+  const watchKey = range === "45" ? "list:upgrades" : `list:upgrades:${range}`;
   const labelled = result.fromLastRun || result.asOf !== undefined;
   const stale = useContentCurrency(labelled ? null : watchKey).behind !== null;
   return (
@@ -162,42 +171,38 @@ function UpgradeTable({
       {!labelled && (
         <NotReReadNote watchKey={watchKey} what="The upgrades and states listed below" />
       )}
-      <div className="space-y-3">
-        <h2 className="font-semibold text-lg">In progress</h2>
-        <PendingRegion pending={switching}>
-          {active.length === 0 ? (
-            <QuietEmpty>No upgrade is waiting for approval or execution.</QuietEmpty>
-          ) : (
+      {active.length === 0 ? (
+        // Nothing in progress: one line, not a section.
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="no-active">
+          <h2 className="font-semibold text-lg">In progress</h2>
+          <span className="inline-flex items-center gap-1.5 text-[14px] text-green-900">
+            <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0" />
+            No active upgrades
+          </span>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <h2 className="font-semibold text-lg">In progress</h2>
+          <PendingRegion pending={switching}>
             <UpgradeRows
               upgrades={active}
               testId="active-upgrades"
               asOf={result.asOf}
               stale={stale}
             />
-          )}
-        </PendingRegion>
-      </div>
+          </PendingRegion>
+        </div>
+      )}
       <div className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <h2 className="font-semibold text-lg">Finished</h2>
-          <p className="text-[13px] text-slate-550">
-            {result.allHistory ? (
-              "Since the handler was deployed"
-            ) : (
-              <span title={`Since block #${formatNumber(result.fromBlock)}`}>Last 45 days</span>
-            )}{" "}
-            ·{" "}
-            <HistoryToggle
-              to={toggle}
-              pendingLabel={allHistory ? "Loading recent upgrades…" : "Loading full history…"}
-            >
-              {allHistory ? "Show recent only" : "Show full history"}
-            </HistoryToggle>
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <h2 className="font-semibold text-lg">Completed upgrades</h2>
+          <WindowSelect range={range} since={result.fromBlock} />
         </div>
         <PendingRegion pending={switching}>
           {past.length === 0 ? (
-            <QuietEmpty>No finished upgrades in this range.</QuietEmpty>
+            <p className="text-[14px] text-slate-600" data-testid="no-completed">
+              No completed upgrades in this range.
+            </p>
           ) : (
             <UpgradeRows
               upgrades={past}
@@ -209,6 +214,39 @@ function UpgradeTable({
         </PendingRegion>
       </div>
     </div>
+  );
+}
+
+// Loading another window: the list stays (dimmed) until it is in.
+function useSwitchingWindow(): boolean {
+  const navigation = useNavigation();
+  return navigation.state !== "idle" && navigation.location.pathname === $path("/app/proposals");
+}
+
+/** Last 45 days / Last 90 days / All time: the completed upgrades shown. */
+function WindowSelect({ range, since }: { range: UpgradeWindow; since: string }) {
+  const navigate = useNavigate();
+  const pending = useSwitchingWindow();
+  return (
+    <label className="inline-flex items-center gap-2 text-[13px] text-slate-600">
+      {pending && (
+        <Loader2 aria-label="Loading" className="h-4 w-4 text-slate-500 motion-safe:animate-spin" />
+      )}
+      <span className="sr-only">Time range</span>
+      <select
+        value={range}
+        onChange={(e) => navigate(windowPath(upgradeWindow(e.target.value)))}
+        title={`Upgrades started since block #${formatNumber(since)}`}
+        className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 pr-8 font-medium text-[13px] text-slate-800 hover:border-slate-300 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+        data-testid="upgrade-window"
+      >
+        {UPGRADE_WINDOWS.map((w) => (
+          <option key={w} value={w}>
+            {UPGRADE_WINDOW_LABELS[w]}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

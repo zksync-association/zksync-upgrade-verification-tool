@@ -13,6 +13,8 @@ const router = vi.hoisted(() => ({ revalidate: vi.fn() }));
 vi.mock("@remix-run/react", () => ({
   useFetcher: () => ({ state: "idle", data: undefined, submit: vi.fn() }),
   useRevalidator: () => ({ revalidate: router.revalidate, state: "idle" }),
+  useLocation: () => ({ pathname: "/", search: "", hash: "", state: null, key: "default" }),
+  useNavigate: () => vi.fn(),
   Link: ({ children }: { children: ReactNode }) => <a href="/">{children}</a>,
   NavLink: ({ children }: { children: ReactNode }) => <a href="/">{children}</a>,
 }));

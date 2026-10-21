@@ -23,7 +23,6 @@ const defaults: Record<string, unknown> = {
   SERVER_HOST: "127.0.0.1",
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: the server's env is typed by its schema
 export const env: any = new Proxy(defaults, {
   get(target, name) {
     const local = localSetting(String(name));

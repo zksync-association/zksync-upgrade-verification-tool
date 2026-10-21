@@ -13,8 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { CallList } from "@/components/verification/calls";
 import { SetStateBadge } from "@/components/verification/badges";
 import { EraBlockNote } from "@/components/verification/freshness";
-import { SignatureSetCard } from "@/components/verification/signature-set";
+import { ApprovalGroups, SignatureSetCard } from "@/components/verification/signature-set";
 import { UntilFresh } from "@/components/verification/until-fresh";
+import { YourSignature } from "@/components/verification/your-signature";
 import { formatEth, formatTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
@@ -88,6 +89,26 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
         }
         id={p.l2ProposalId}
       />
+      <UntilFresh stale={d.set.stale === true} fresh={fresh}>
+        {(current) => {
+          const v = current ?? d;
+          return (
+            <YourSignature
+              hint="Check the proposal being cancelled below, then compare the hashes in the review with your hardware wallet."
+              actions={[
+                {
+                  key: "veto",
+                  title: "Guardian veto",
+                  set: v.set,
+                  state: v.state,
+                  execution: v.execution,
+                  executionToLabel: "Guardians",
+                },
+              ]}
+            />
+          );
+        }}
+      </UntilFresh>
       <Facts
         items={[
           {
@@ -182,22 +203,22 @@ function Detail({ detail: d }: { detail: SerializeFrom<VetoDetail> }) {
           </EmptyState>
         )}
       </Section>
-      <UntilFresh stale={d.set.stale === true} fresh={fresh}>
-        {(current, refresh) => {
-          const v = current ?? d;
-          return (
-            <SignatureSetCard
-              testId="set-veto"
-              title="Guardian signatures"
-              set={v.set}
-              state={v.state}
-              execution={v.execution}
-              executionToLabel="Guardians"
-              refresh={current ? null : refresh}
-            />
-          );
-        }}
-      </UntilFresh>
+      <ApprovalGroups count={1}>
+        <UntilFresh stale={d.set.stale === true} fresh={fresh}>
+          {(current, refresh) => {
+            const v = current ?? d;
+            return (
+              <SignatureSetCard
+                testId="set-veto"
+                title="Guardian signatures"
+                set={v.set}
+                state={v.state}
+                refresh={current ? null : refresh}
+              />
+            );
+          }}
+        </UntilFresh>
+      </ApprovalGroups>
     </div>
   );
 }

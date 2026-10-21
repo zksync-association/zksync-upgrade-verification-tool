@@ -26,26 +26,25 @@ export function PageHeader({
       {back && (
         <Link
           to={back.to}
-          className="inline-flex items-center gap-1.5 text-slate-600 text-sm hover:text-slate-950"
+          className="mb-2 inline-flex items-center gap-1.5 text-slate-600 text-sm hover:text-slate-950"
         >
           <ArrowLeft className="h-4 w-4" /> {back.label}
         </Link>
       )}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <h1 className="font-semibold text-2xl leading-8 tracking-tight">{title}</h1>
             {badges}
           </div>
+          {/* In full (it is compared character by character), as a quiet line of metadata. */}
           {id && (
-            <p className="flex max-w-full items-start gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3">
-              <span
-                className="mono min-w-0 break-all font-medium text-navy-800"
-                data-testid="page-id"
-              >
+            <p className="flex min-w-0 max-w-full items-center gap-2 text-[13px]">
+              <span className="shrink-0 font-medium text-slate-500">ID</span>
+              <span className="mono min-w-0 break-all text-slate-800" data-testid="page-id">
                 {id}
               </span>
-              <CopyButton value={id} label="Copy id" />
+              <CopyButton value={id} label="Copy id" className="sm:h-7 sm:w-7" />
             </p>
           )}
         </div>
@@ -74,7 +73,7 @@ export function Section({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <h2 className="font-semibold text-lg">{title}</h2>
-          {description && <p className="max-w-3xl text-slate-950 text-sm">{description}</p>}
+          {description && <p className="max-w-3xl text-slate-600 text-sm">{description}</p>}
         </div>
         {actions}
       </div>

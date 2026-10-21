@@ -18,12 +18,14 @@ import { emergencyExecution } from "@/common/execution";
 import { type PayloadCheck, checkEmergencyPayload, decodeCall } from "@/common/proposal";
 import { UPGRADE_STATES } from "@/common/upgrade-states";
 import { Hash, TxLink } from "@/components/hex";
+import { ExecutedOn } from "@/components/verification/executed-on";
 import { useLive } from "@/components/presence";
 import { Check, EmptyState, Facts, LoadingCard, PageHeader, Section } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { JsonDrop, OpenJsonFile } from "@/components/ui/json-drop";
 import { Textarea } from "@/components/ui/textarea";
 import { CallList } from "@/components/verification/calls";
 import { type AsOfBlock, AsOfContent, AsOfNote } from "@/components/verification/as-of";
@@ -40,12 +42,13 @@ import {
   type Provenance,
   provenanceOf,
 } from "@/components/verification/last-run";
-import { SignatureSetCard } from "@/components/verification/signature-set";
+import { ApprovalGroups, SignatureSetCard } from "@/components/verification/signature-set";
 import { UntilFresh } from "@/components/verification/until-fresh";
+import { YourSignature } from "@/components/verification/your-signature";
 import { formatNumber } from "@/utils/format";
 import { badRequest } from "@/utils/http";
 import { Meta } from "@/utils/meta";
-import { forgetPayload, loadPayload, savePayload } from "@/utils/payload-storage";
+import { loadPayload, savePayload } from "@/utils/payload-storage";
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -54,7 +57,7 @@ import {
   json,
 } from "@remix-run/node";
 import { Await, useAsyncError, useFetcher, useLoaderData } from "@remix-run/react";
-import { CheckCircle2, FileJson, Upload, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, FileJson, XCircle } from "lucide-react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { $path } from "remix-routes";
 import { type Hex, isAddressEqual } from "viem";
@@ -255,7 +258,7 @@ function HeldDetail({
                   title="Signatures"
                   description="All three are needed. The board checks each group through its EIP-1271 isValidSignature."
                 >
-                  <div className="space-y-6">
+                  <ApprovalGroups count={kept.roles.length} unfoldOpen={false}>
                     {kept.roles.map((r) => (
                       // As of the block it was verified at: nothing to sign or send from it.
                       <SignatureSetCard
@@ -276,7 +279,7 @@ function HeldDetail({
                         refresh={refresh}
                       />
                     ))}
-                  </div>
+                  </ApprovalGroups>
                 </Section>
               </AsOfContent>
             ) : (
@@ -336,6 +339,37 @@ function Detail({ detail: d }: { detail: SerializeFrom<EmergencyOverview> }) {
         id={d.id}
       />
       <NotReReadNote watchKey={watchKey} what="Its state, and whether it was executed," />
+      {/* What the viewer can sign here, from the same first answer, then the current one. */}
+      <Suspense fallback={null}>
+        <Await resolve={verified} errorElement={null}>
+          {(first) => (
+            <UntilFresh stale={first.roles.some((r) => r.set.stale === true)} fresh={verifiedFresh}>
+              {(fresh) => {
+                const v = fresh ?? first;
+                const done = v.state === UPGRADE_STATES.Done;
+                return (
+                  <YourSignature
+                    hint="Check the payload below against this id, then compare the hashes in the review with your hardware wallet."
+                    actions={v.roles.map((r) => ({
+                      key: r.key,
+                      title: r.title,
+                      set: r.set,
+                      state: done
+                        ? {
+                            status: "done",
+                            detail: "The emergency upgrade was executed",
+                            txHash: v.executed?.txHash ?? null,
+                            at: v.executed?.timestamp ?? null,
+                          }
+                        : { status: "open" },
+                    }))}
+                  />
+                );
+              }}
+            </UntilFresh>
+          )}
+        </Await>
+      </Suspense>
 
       {executed ? (
         <Suspense
@@ -458,6 +492,7 @@ function ExecutedContent({
             value: (
               <span className="block space-y-1">
                 <TxLink hash={execution.txHash} />
+                <ExecutedOn at={execution.timestamp} />
                 {provenance && <LastRunCheck check={check} source={provenance} what="execution" />}
               </span>
             ),
@@ -569,7 +604,6 @@ function SignatureSections({
     r.set.thresholdCheck.status === "met" && r.set.stale !== true;
   // A set the app did not verify at the head it serves now is not met now (see setCurrency).
   const behindAt = (r: (typeof d.roles)[number]) => setCurrency(r.set, live).behind;
-  const metNow = (r: (typeof d.roles)[number]) => metLoaded(r) && behindAt(r) === null;
   const allMet = d.roles.every(metLoaded);
   const behind = d.roles.map(behindAt).find((at) => at !== null) ?? null;
   const zkf = d.roles.find((r) => r.key === "zkFoundation");
@@ -592,7 +626,7 @@ function SignatureSections({
         title="Signatures"
         description="All three are needed. The board checks each group through its EIP-1271 isValidSignature."
       >
-        <div className="space-y-6">
+        <ApprovalGroups count={d.roles.length} unfoldOpen={false}>
           {d.roles.map((r) => (
             <SignatureSetCard
               key={r.key}
@@ -605,6 +639,7 @@ function SignatureSections({
                       status: "done",
                       detail: "The emergency upgrade was executed",
                       txHash: d.executed?.txHash ?? null,
+                      at: d.executed?.timestamp ?? null,
                     }
                   : { status: "open" }
               }
@@ -612,7 +647,7 @@ function SignatureSections({
               refresh={refresh}
             />
           ))}
-        </div>
+        </ApprovalGroups>
       </Section>
 
       {!executed && (
@@ -627,25 +662,18 @@ function SignatureSections({
               }
             />
           ) : (
-            <Card className="p-6 text-slate-950 text-sm">
-              <ul className="space-y-1">
-                <li>
-                  <Check ok={check?.ok ?? null}>Payload loaded and matching the id</Check>
-                </li>
-                {d.roles.map((r) => (
-                  <li key={r.key}>
-                    <Check ok={metNow(r) ? true : null}>
-                      {r.title}: {r.set.valid.length} of {r.set.threshold}
-                      {r.set.stale &&
-                        ` (at block #${r.set.verifiedAtBlock ?? "?"}, checking again)`}
-                      {!r.set.stale &&
-                        behindAt(r) !== null &&
-                        ` (at block #${setCurrency(r.set, live).block ?? "?"}, not verified at #${behindAt(r)} yet)`}
-                    </Check>
-                  </li>
-                ))}
-              </ul>
-            </Card>
+            // What is still missing, in a line: the groups' own rows above say where each stands.
+            <p
+              className="flex items-center gap-2 rounded-xl bg-slate-75 px-4 py-3 text-[14px] text-slate-700"
+              data-testid="execute-waiting"
+            >
+              <Clock aria-hidden className="h-4 w-4 shrink-0 text-slate-550" />
+              {check?.ok === false
+                ? "The payload above does not match this id, so there is nothing to execute."
+                : !check?.ok
+                  ? "Load the payload above to build the execution transaction."
+                  : "The transaction is built once all three signer groups above reach their thresholds at the newest block."}
+            </p>
           )}
         </Section>
       )}
@@ -707,10 +735,8 @@ function PayloadLoader({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              forgetPayload(id);
-              onCheck(null);
-            }}
+            // The copy kept here stays (it is listed under Prepared in this browser).
+            onClick={() => onCheck(null)}
           >
             Load another
           </Button>
@@ -721,69 +747,72 @@ function PayloadLoader({
     );
   }
 
+  // A file dropped or opened: shown in the box, and checked against the id at once.
+  const loadFile = (raw: string) => {
+    setText(raw);
+    accept(raw);
+  };
   return (
-    <Card className="space-y-4 p-6">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-2">
-          <label className="font-medium text-[13px] text-slate-950" htmlFor="payload-json">
-            Paste the payload JSON
-          </label>
-          <Textarea
-            id="payload-json"
-            className="mono min-h-36"
-            placeholder={
-              '{ "salt": "0x…", "calls": [{ "target": "0x…", "value": "0", "data": "0x…" }] }'
-            }
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            spellCheck={false}
-          />
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              onClick={() => accept(text)}
-              disabled={!text.trim()}
-              data-testid="check-payload"
-            >
-              <FileJson /> Check payload
-            </Button>
-            <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 font-semibold text-[13px] hover:bg-slate-50">
-              <Upload className="h-4 w-4" /> Upload file
-              <input
-                type="file"
-                accept="application/json,.json"
-                className="sr-only"
-                onChange={(e) => e.target.files?.[0]?.text().then(accept)}
-              />
+    <JsonDrop onText={loadFile} onError={(error) => onCheck({ ok: false, error })}>
+      <Card className="space-y-4 p-6">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-2">
+            <label className="font-medium text-[13px] text-slate-950" htmlFor="payload-json">
+              Paste the payload JSON, or drop its file here
             </label>
+            <Textarea
+              id="payload-json"
+              className="mono min-h-36"
+              placeholder={
+                '{ "salt": "0x…", "calls": [{ "target": "0x…", "value": "0", "data": "0x…" }] }'
+              }
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              spellCheck={false}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() => accept(text)}
+                disabled={!text.trim()}
+                data-testid="check-payload"
+              >
+                <FileJson /> Check payload
+              </Button>
+              <OpenJsonFile
+                onText={loadFile}
+                onError={(error) => onCheck({ ok: false, error })}
+                label="Upload file"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="font-medium text-[13px] text-slate-950" htmlFor="payload-url">
+              Or fetch it from a URL
+            </label>
+            <Input
+              id="payload-url"
+              placeholder="https://…/payload.json"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+            <Button size="sm" variant="secondary" onClick={fetchUrl} disabled={!url} loading={busy}>
+              Fetch in this browser
+            </Button>
+            <p className="text-slate-600 text-xs">
+              Format: <span className="mono">salt</span>, <span className="mono">calls[]</span> of{" "}
+              <span className="mono">{"{ target, value, data }"}</span>, optional{" "}
+              <span className="mono">title</span> and <span className="mono">executor</span>.
+            </p>
           </div>
         </div>
-        <div className="space-y-2">
-          <label className="font-medium text-[13px] text-slate-950" htmlFor="payload-url">
-            Or fetch it from a URL
-          </label>
-          <Input
-            id="payload-url"
-            placeholder="https://…/payload.json"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-          />
-          <Button size="sm" variant="secondary" onClick={fetchUrl} disabled={!url} loading={busy}>
-            Fetch in this browser
-          </Button>
-          <p className="text-slate-600 text-xs">
-            Format: <span className="mono">salt</span>, <span className="mono">calls[]</span> of{" "}
-            <span className="mono">{"{ target, value, data }"}</span>, optional{" "}
-            <span className="mono">title</span> and <span className="mono">executor</span>.
+        {check && !check.ok && (
+          <p className="flex items-start gap-2 text-red-800 text-sm" data-testid="payload-error">
+            <XCircle className="mt-0.5 h-4 w-4 shrink-0" /> {check.error}
           </p>
-        </div>
-      </div>
-      {check && !check.ok && (
-        <p className="flex items-start gap-2 text-red-800 text-sm" data-testid="payload-error">
-          <XCircle className="mt-0.5 h-4 w-4 shrink-0" /> {check.error}
-        </p>
-      )}
-    </Card>
+        )}
+      </Card>
+    </JsonDrop>
   );
 }
 

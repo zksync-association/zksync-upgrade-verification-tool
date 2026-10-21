@@ -58,6 +58,7 @@ export type Governance = {
     | "isDevNode"
     | "overrides"
     | "standardLegalVetoDays"
+    | "upgradeDelayDays"
     | "safeWalletPrefix"
   >;
   upgradeHandler: Address;
@@ -476,6 +477,7 @@ function shape(net: Network, at: BlockRef, reads: Reads): Governance {
       isDevNode: net.isDevNode,
       overrides: net.overrides,
       standardLegalVetoDays: net.standardLegalVetoDays,
+      upgradeDelayDays: net.upgradeDelayDays,
       safeWalletPrefix: net.safeWalletPrefix,
     },
     upgradeHandler: puh,

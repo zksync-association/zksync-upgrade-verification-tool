@@ -1,8 +1,8 @@
-// A proposal's calls as an actions table, like Tally's: one row per call (its kind, target and
-// function, with the calls it carries), unfolding into its arguments as an aligned tree (names in one
+// A proposal's calls as an actions table, like Tally's: one row per call (its target, in full, and
+// its function, with the calls it carries), unfolding into its arguments as an aligned tree (names in one
 // column, values in the next, whatever the depth; tuples and arrays fold, bytes that hold a known
 // call open into it), each value coloured by kind, addresses linked to their chain's explorer with
-// the names known for them. Raw shows every call as its signature, target, value and calldata. What
+// the names known for them. Raw shows the calls as JSON (target, value, calldata). What
 // is shown was re-encoded to the exact calldata; a call that is not opens by itself, with why.
 import {
   type DecodedFunction,
@@ -15,23 +15,16 @@ import {
 import type { DecodedCall } from "@/common/proposal";
 import { useChain } from "@/components/governance-context";
 import { CopyButton, useExplorer } from "@/components/hex";
+import { ToolButton, Toolbar } from "@/components/ui/tool-button";
 import { cn } from "@/utils/cn";
-import { formatEth, shortHex } from "@/utils/format";
+import { formatEth } from "@/utils/format";
 import {
   AlertTriangle,
-  ArrowRightLeft,
-  ArrowUpCircle,
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
-  Coins,
   ExternalLink,
-  KeyRound,
-  type LucideIcon,
-  Power,
-  Send,
-  SquareCode,
 } from "lucide-react";
 import { type ReactNode, createContext, useContext, useEffect, useState } from "react";
 
@@ -51,11 +44,20 @@ export function CallList({
   calls,
   labels,
   chainId,
+  title = "Actions",
+  heading: Heading = "h3",
+  note,
 }: {
   calls: DecodedCall[];
   labels?: Record<string, string>;
   /** The chain the calls run on, when not the page's L1 (an Era proposal's calls). */
   chainId?: number;
+  /** The heading above the table, with the toolbar beside it. */
+  title?: string;
+  /** h2 where the table is a page's section of its own, h3 inside one. */
+  heading?: "h2" | "h3";
+  /** A line under the heading (where the calls come from, when that needs saying). */
+  note?: ReactNode;
 }) {
   const l1 = useChain()?.chainId;
   const [fold, setFold] = useState({ open: false, v: 0 });
@@ -64,16 +66,16 @@ export function CallList({
   return (
     <WhereContext.Provider value={{ l1, chainId: chainId ?? l1, labels: labels ?? {} }}>
       <ViewContext.Provider value={{ fold, types }}>
-        <div
-          className="overflow-hidden rounded-xl border border-slate-300 bg-white"
-          data-testid="call-list"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2 border-slate-200 border-b px-4 py-2.5">
-            <h3 className="font-semibold text-[16px] text-navy-800">
-              Actions{" "}
-              <span className="font-normal text-[14px] text-slate-600">· {calls.length}</span>
-            </h3>
-            <span className="flex flex-wrap items-center gap-1.5">
+        <section className="space-y-3" data-testid="call-list">
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+            <div className="space-y-1">
+              <Heading className="font-semibold text-lg text-navy-800">
+                {title}{" "}
+                <span className="font-normal text-[15px] text-slate-500">· {calls.length}</span>
+              </Heading>
+              {note && <p className="max-w-3xl text-slate-600 text-sm">{note}</p>}
+            </div>
+            <Toolbar label="View">
               {!raw && (
                 <>
                   <ToolButton
@@ -97,80 +99,49 @@ export function CallList({
               <ToolButton onClick={() => setRaw(!raw)} pressed={raw}>
                 {raw ? "Summary" : "Raw"}
               </ToolButton>
-            </span>
+            </Toolbar>
           </div>
-          {raw ? (
-            <ol className="space-y-3 p-4">
-              {calls.map((call, i) => (
-                <RawCall key={`${i}-${call.target}`} call={call} index={i} />
-              ))}
-            </ol>
-          ) : (
-            <>
-              <div
-                aria-hidden
-                className="hidden grid-cols-[36px_132px_minmax(0,1fr)_minmax(0,1.3fr)_112px] gap-x-4 border-slate-200 border-b bg-slate-50 px-4 py-2 font-medium text-[12.5px] text-slate-600 md:grid"
-              >
-                <span>#</span>
-                <span>Type</span>
-                <span>Target</span>
-                <span>Function</span>
-                <span className="text-right">Details</span>
-              </div>
-              <ol className="divide-y divide-slate-200">
-                {calls.map((call, i) => (
-                  <CallRow key={`${i}-${call.target}`} index={i} call={call} />
-                ))}
-              </ol>
-            </>
-          )}
-        </div>
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            {raw ? (
+              <RawJson calls={calls} />
+            ) : (
+              <>
+                <div
+                  aria-hidden
+                  className={cn(
+                    "hidden gap-x-4 bg-slate-50 px-4 py-2 font-medium text-[12.5px] text-slate-500 md:grid",
+                    CALL_COLUMNS
+                  )}
+                >
+                  <span>#</span>
+                  <span>Function</span>
+                  <span>Contract</span>
+                  <span className="text-right">Details</span>
+                </div>
+                <ol className="divide-y divide-slate-100">
+                  {calls.map((call, i) => (
+                    <CallRow
+                      key={`${i}-${call.target}`}
+                      index={i}
+                      call={call}
+                      // One call: its arguments are what there is to read.
+                      single={calls.length === 1}
+                    />
+                  ))}
+                </ol>
+              </>
+            )}
+          </div>
+        </section>
       </ViewContext.Provider>
     </WhereContext.Provider>
   );
 }
 
-function ToolButton({
-  children,
-  onClick,
-  pressed,
-}: { children: ReactNode; onClick: () => void; pressed?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={pressed}
-      className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 font-medium text-[13px] transition-colors",
-        pressed
-          ? "border-navy-800 bg-navy-800 text-white"
-          : "border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-75"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 // ---- the summary rows ----
 
-type Kind = { label: string; icon: LucideIcon; warn?: boolean };
-
-/** What kind of action a call is, for the Type column. */
-function kindOf(call: DecodedCall): Kind {
-  const name = call.decoded?.name;
-  if (!call.selector) return { label: "Transfer", icon: Send };
-  if (!name) return { label: "Unknown", icon: AlertTriangle, warn: true };
-  if (/^upgrade(To)?(AndCall)?$|^setNewVersionUpgrade$|DiamondCut$/.test(name))
-    return { label: "Upgrade", icon: ArrowUpCircle };
-  if (/^requestL2Transaction/.test(name)) return { label: "L1 → L2", icon: ArrowRightLeft };
-  if (/^(approve|transfer|transferFrom|increaseAllowance|decreaseAllowance)$/.test(name))
-    return { label: "Token", icon: Coins };
-  if (/Owner(ship)?|Admin$|^setPendingAdmin$|^acceptAdmin$|^changeProxyAdmin$/.test(name))
-    return { label: "Admin", icon: KeyRound };
-  if (/^(un)?pause|^(un)?freeze/i.test(name)) return { label: "Control", icon: Power };
-  return { label: "Call", icon: SquareCode };
-}
+/** Column widths shared by the header and every row (from md up). */
+const CALL_COLUMNS = "md:grid-cols-[36px_minmax(0,1fr)_minmax(0,1.2fr)_112px]";
 
 /** The calls a call carries in its bytes arguments (one level down), by name. */
 function carried(fn: DecodedFunction): string[] {
@@ -185,17 +156,20 @@ function carried(fn: DecodedFunction): string[] {
   return out;
 }
 
-function CallRow({ call, index }: { call: DecodedCall; index: number }) {
+function CallRow({
+  call,
+  index,
+  single = false,
+}: { call: DecodedCall; index: number; single?: boolean }) {
   const { fold } = useContext(ViewContext);
   const { chainId } = useContext(WhereContext);
   const decoded = call.decoded;
   // A call that does not decode opens by itself: what it is not is worth reading.
   const attention = !decoded && call.selector !== null;
-  const [open, setOpen] = useState(() => (fold.v > 0 ? fold.open : attention));
+  const [open, setOpen] = useState(() => (fold.v > 0 ? fold.open : attention || single));
   useEffect(() => {
     if (fold.v > 0) setOpen(fold.open);
   }, [fold]);
-  const kind = kindOf(call);
   const inner = decoded ? carried(decoded) : [];
   const params = decoded?.args.length ?? 0;
   const bytes = (call.data.length - 2) / 2;
@@ -203,8 +177,9 @@ function CallRow({ call, index }: { call: DecodedCall; index: number }) {
     <li data-testid="call">
       <div
         className={cn(
-          "group/call grid cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-3 transition-colors hover:bg-slate-75 md:grid-cols-[36px_132px_minmax(0,1fr)_minmax(0,1.3fr)_112px] md:gap-x-4",
-          open && "bg-slate-50"
+          "group/call grid cursor-pointer grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-3 transition-colors hover:bg-slate-50 md:gap-x-4",
+          CALL_COLUMNS,
+          open && "bg-slate-50/70"
         )}
         onClick={() => setOpen(!open)}
         onKeyDown={(e) => {
@@ -216,18 +191,9 @@ function CallRow({ call, index }: { call: DecodedCall; index: number }) {
         role="button"
         tabIndex={0}
         aria-expanded={open}
-        aria-label={`Call ${index + 1}: ${decoded?.name ?? kind.label}`}
+        aria-label={`Call ${index + 1}: ${decoded?.name ?? (call.selector ? "unknown function" : "value transfer")}`}
       >
-        <span className="mono col-start-1 row-start-1 text-[14px] text-slate-600">{index + 1}</span>
-        <span
-          className={cn(
-            "col-start-2 row-start-1 inline-flex items-center gap-2 whitespace-nowrap font-medium text-[14px]",
-            kind.warn ? "text-amber-900" : "text-slate-800"
-          )}
-        >
-          <kind.icon aria-hidden className="h-4 w-4 shrink-0" />
-          {kind.label}
-        </span>
+        <span className="mono col-start-1 row-start-1 text-[13px] text-slate-500">{index + 1}</span>
         <span
           className="col-span-2 col-start-2 row-start-2 min-w-0 md:col-span-1 md:col-start-3 md:row-start-1"
           onClick={(e) => e.stopPropagation()}
@@ -235,16 +201,17 @@ function CallRow({ call, index }: { call: DecodedCall; index: number }) {
         >
           <TargetCell address={call.target} chainId={chainId} />
         </span>
-        <span className="col-span-2 col-start-2 row-start-3 min-w-0 md:col-span-1 md:col-start-4 md:row-start-1">
+        <span className="col-start-2 row-start-1 min-w-0 md:col-start-2">
           {decoded ? (
-            <span className="mono break-all font-bold text-[14.5px] text-code-fn">
-              {decoded.name}(..)
+            <span className="mono break-all font-semibold text-[15px] text-navy-800">
+              {decoded.name}
+              <span className="font-normal text-slate-500">(..)</span>
             </span>
           ) : (
             <span
               className={cn(
                 "font-semibold text-[14px]",
-                kind.warn ? "text-amber-900" : "text-slate-800"
+                attention ? "text-amber-900" : "text-slate-800"
               )}
             >
               {call.selector
@@ -260,7 +227,7 @@ function CallRow({ call, index }: { call: DecodedCall; index: number }) {
             </span>
           )}
         </span>
-        <span className="col-start-3 row-start-1 inline-flex items-center justify-end gap-1.5 whitespace-nowrap text-[13px] text-slate-600 md:col-start-5">
+        <span className="col-start-3 row-start-1 inline-flex items-center justify-end gap-1.5 whitespace-nowrap text-[13px] text-slate-600 md:col-start-4">
           {call.value !== "0" && (
             <span className="mono text-code-num">{formatEth(call.value)}</span>
           )}
@@ -280,7 +247,7 @@ function CallRow({ call, index }: { call: DecodedCall; index: number }) {
   );
 }
 
-/** The short target in the table: its name, else the short address; link and copy beside. */
+/** The target in the table: its name when known, and its full address with link and copy. */
 function TargetCell({ address, chainId }: { address: string; chainId: number | undefined }) {
   const { l1, labels } = useContext(WhereContext);
   const explorer = useExplorer();
@@ -290,26 +257,30 @@ function TargetCell({ address, chainId }: { address: string; chainId: number | u
   const label =
     (onL1 ? labels[address.toLowerCase()] : undefined) ?? addressLabel(address, chainId ?? l1);
   return (
-    <span
-      className="group/row inline-flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5"
-      title={address}
-    >
-      {label && <span className="truncate font-medium text-[14px] text-slate-950">{label}</span>}
-      <span className={cn("mono text-[13px]", label ? "text-slate-600" : "text-code-addr")}>
-        {shortHex(address)}
-      </span>
-      {href && (
-        <a
-          href={href}
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Open in the explorer"
-          className="grid h-6 w-6 place-items-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-brand-700"
+    <span className="group/row flex min-w-0 max-w-full flex-col">
+      {label && <span className="text-[13.5px] text-slate-700">{label}</span>}
+      <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5">
+        <span
+          className={cn(
+            "mono break-all text-[12.5px]",
+            label ? "text-slate-500" : "text-code-addr"
+          )}
         >
-          <ExternalLink className="h-3.5 w-3.5" />
-        </a>
-      )}
-      <MiniCopy value={address} label="Copy address" />
+          {address}
+        </span>
+        {href && (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open in the explorer"
+            className="grid h-6 w-6 place-items-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-brand-700"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        )}
+        <MiniCopy value={address} label="Copy address" />
+      </span>
     </span>
   );
 }
@@ -320,7 +291,7 @@ function CallDetail({ call }: { call: DecodedCall }) {
   const decoded = call.decoded;
   const bytes = (call.data.length - 2) / 2;
   return (
-    <div className="border-slate-200 border-t bg-white pb-2">
+    <div className="border-slate-100 border-t bg-white pb-2">
       <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-1 px-4 py-2.5 text-[13.5px]">
         <Meta label="To">
           <AddressValue address={call.target} chainId={chainId} />
@@ -377,45 +348,20 @@ function CallDetail({ call }: { call: DecodedCall }) {
 
 // ---- raw ----
 
-/** One call as Tally's raw view shows it: signature, target, value and calldata. */
-function RawCall({ call, index }: { call: DecodedCall; index: number }) {
-  const { chainId } = useContext(WhereContext);
+/** The calls as JSON, exactly as they run: each one's target, value (wei) and calldata. */
+function RawJson({ calls }: { calls: DecodedCall[] }) {
+  const json = JSON.stringify(
+    calls.map((c) => ({ target: c.target, value: c.value, data: c.data })),
+    null,
+    2
+  );
   return (
-    <li className="rounded-lg border border-slate-200 bg-slate-50">
-      <p className="border-slate-200 border-b px-4 py-2 font-semibold text-[14px] text-navy-800">
-        Call {index + 1}
-      </p>
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 text-[13.5px] sm:grid-cols-[120px_minmax(0,1fr)]">
-        <dt className="font-semibold text-slate-700">Signature</dt>
-        <dd className="mono break-all text-slate-950">
-          {call.decoded?.signature ?? (call.selector ? `unknown (${call.selector})` : "none")}
-        </dd>
-        <dt className="font-semibold text-slate-700">Target</dt>
-        <dd className="flex flex-wrap items-baseline gap-x-1.5">
-          <AddressValue address={call.target} chainId={chainId} />
-        </dd>
-        <dt className="font-semibold text-slate-700">Value</dt>
-        <dd className="mono text-slate-950">
-          {call.value} wei{" "}
-          <span className="font-sans text-slate-600">({formatEth(call.value)})</span>
-        </dd>
-        <dt className="font-semibold text-slate-700">Calldata</dt>
-        <dd className="relative min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2">
-          {call.data.length > 2 ? (
-            <>
-              <CopyButton
-                value={call.data}
-                label="Copy calldata"
-                className="absolute top-1 right-1"
-              />
-              <Words data={call.data} />
-            </>
-          ) : (
-            <span className="text-slate-600">empty (0x)</span>
-          )}
-        </dd>
-      </dl>
-    </li>
+    <div className="relative p-4" data-testid="calls-json">
+      <pre className="mono max-h-[640px] overflow-auto whitespace-pre-wrap break-all rounded-lg border border-slate-200 bg-slate-50 py-3 pr-12 pl-4 text-[12.5px] text-slate-950 leading-5">
+        {json}
+      </pre>
+      <CopyButton value={json} label="Copy JSON" className="absolute top-6 right-6" />
+    </div>
   );
 }
 
@@ -604,7 +550,7 @@ function ParamRow({
 
 function preview(n: ParamNode): string {
   if (n.kind === "value") {
-    if (n.type === "address") return shortHex(n.value);
+    if (n.type === "address") return n.value;
     return n.value.length > 20 ? `${n.value.slice(0, 18)}…` : n.value;
   }
   if (n.kind === "tuple") return "{…}";
@@ -614,13 +560,27 @@ function preview(n: ParamNode): string {
   return `${(n.value.length - 2) / 2} bytes`;
 }
 
-const clip = (s: string) => (s.length > 110 ? `${s.slice(0, 108)}…` : s);
+/** As many whole items as fit in a line's worth of characters, then "…" for the rest. */
+function fit(items: string[], open: string, close: string, room = 96) {
+  const shown: string[] = [];
+  let used = open.length + close.length;
+  for (const item of items) {
+    if (shown.length > 0 && used + item.length + 2 > room) break;
+    shown.push(item);
+    used += item.length + 2;
+  }
+  return `${open}${shown.join(", ")}${shown.length < items.length ? ", …" : ""}${close}`;
+}
 
 function Value({ node, open, chain }: { node: ParamNode; open: boolean; chain?: number }) {
   if (node.kind === "tuple") {
     return open ? null : (
-      <span className="min-w-0 truncate text-slate-500">
-        {clip(`{ ${node.children.map((c) => `${c.name}: ${preview(c)}`).join(", ")} }`)}
+      <span className="min-w-0 break-all text-slate-500">
+        {fit(
+          node.children.map((c) => `${c.name}: ${preview(c)}`),
+          "{ ",
+          " }"
+        )}
       </span>
     );
   }
@@ -632,10 +592,8 @@ function Value({ node, open, chain }: { node: ParamNode; open: boolean; chain?: 
           {node.children.length} item{node.children.length === 1 ? "" : "s"}
         </span>
         {!open && first?.kind === "value" && (
-          <span className="min-w-0 truncate text-slate-500">
-            {clip(
-              `[${node.children.slice(0, 6).map(preview).join(", ")}${node.children.length > 6 ? ", …" : ""}]`
-            )}
+          <span className="min-w-0 break-all text-slate-500">
+            {fit(node.children.map(preview), "[", "]")}
           </span>
         )}
       </>

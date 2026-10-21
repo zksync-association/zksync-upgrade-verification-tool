@@ -141,7 +141,6 @@ const upgradeData = (detail: Promise<unknown>, freshDetail: Promise<unknown>) =>
   freshDetail,
   sets: pending(),
   freshSets: pending(),
-  evidence: pending(),
   setEvidence: pending(),
   execution: pending(),
   l2Proposal: pending(),

@@ -148,10 +148,14 @@ export function BlockAge({
       title={`Block ${block.number}, mined ${formatTime(block.timestamp)}, read through your RPC. Refresh to read a newer one.`}
       data-testid="block-age"
     >
-      block<span className="hidden 2xl:inline"> #{formatNumber(block.number)}</span>
+      {/* In the one-line header bar (xl) only the age shows; the block is in the tooltip and read
+          out to a screen reader. */}
+      {/* The space inside: after the hidden spans below, one before the age would collapse. */}
+      <span className="xl:sr-only">block </span>
+      <span className="sr-only"> #{formatNumber(block.number)}</span>
       {age && (
         <>
-          <span className="hidden 2xl:inline"> ·</span> {age}
+          <span className="sr-only"> ·</span> {age}
         </>
       )}
     </span>

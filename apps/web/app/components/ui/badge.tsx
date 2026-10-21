@@ -11,8 +11,11 @@ const badgeVariants = cva(
       variant: {
         neutral: "border-slate-300 bg-slate-100 text-slate-800",
         success: "border-green-800 bg-green-800 text-white",
+        // Light, for a status repeated down a table (a member's signature).
+        successSoft: "border-green-300 bg-green-50 text-green-900",
         warning: "border-amber-400 bg-amber-100 text-amber-950",
         error: "border-red-800 bg-red-800 text-white",
+        errorSoft: "border-red-300 bg-red-50 text-red-900",
         info: "border-brand-700 bg-brand-700 text-white",
         navy: "border-navy-800 bg-navy-800 text-white",
       },

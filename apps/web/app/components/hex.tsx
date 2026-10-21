@@ -138,16 +138,27 @@ export function AddressLink({
 export function TxLink({
   hash,
   l2,
+  short = false,
   className,
-}: { hash: string; l2?: boolean; className?: string }) {
+}: {
+  hash: string;
+  l2?: boolean;
+  /** Shortened in view (a transaction to open, not a value to compare); copied in full. */
+  short?: boolean;
+  className?: string;
+}) {
   const explorer = useExplorer();
   return (
     <span
-      className={cn("inline-flex min-w-0 max-w-full items-start gap-1", className)}
+      className={cn(
+        "inline-flex min-w-0 max-w-full gap-1",
+        short ? "items-center" : "items-start",
+        className
+      )}
       title={hash}
     >
       <ExternalAnchor href={l2 ? explorer.l2Tx(hash) : explorer.tx(hash)} className="mono">
-        {hash}
+        {short ? shortHex(hash, 10, 8) : hash}
       </ExternalAnchor>
       <CopyButton value={hash} />
     </span>

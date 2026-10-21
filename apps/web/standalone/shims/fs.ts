@@ -1,6 +1,8 @@
 // node:fs/promises for the single-file build: the chain cache's files in this browser's IndexedDB
 // (one database, one store, keyed by path). Only what chain-cache.ts uses.
-const DB = "zksync-governance-verifier";
+import { STORAGE_PREFIX } from "@/common/storage-prefix";
+
+const DB = `${STORAGE_PREFIX}zksync-governance-verifier`;
 const STORE = "files";
 let opened: Promise<IDBDatabase> | null = null;
 function db() {

@@ -6,10 +6,13 @@ import { pageLoad } from "@/.server/sync/presence";
 import { FREEZE_LABELS } from "@/common/freeze";
 import { FREEZE_STATUS_LABELS } from "@/common/upgrade-states";
 import { useStatus } from "@/components/app-shell";
+import { TxLink } from "@/components/hex";
 import { Facts, LoadingCard, PageHeader } from "@/components/page";
 import { SetStateBadge } from "@/components/verification/badges";
-import { SignatureSetCard } from "@/components/verification/signature-set";
+import { ExecutedOn } from "@/components/verification/executed-on";
+import { ApprovalGroups, SignatureSetCard } from "@/components/verification/signature-set";
 import { UntilFresh } from "@/components/verification/until-fresh";
+import { YourSignature } from "@/components/verification/your-signature";
 import { formatTime, relativeTime } from "@/utils/format";
 import { Meta } from "@/utils/meta";
 import { type LoaderFunctionArgs, type SerializeFrom, defer } from "@remix-run/node";
@@ -72,6 +75,26 @@ function Detail({ detail: d }: { detail: SerializeFrom<FreezeDetail> }) {
         title={`${FREEZE_LABELS[p.action]}${p.action === "SetSoftFreezeThreshold" ? ` to ${p.threshold}` : ""}`}
         badges={<SetStateBadge state={d.state} />}
       />
+      <UntilFresh stale={d.set.stale === true} fresh={fresh}>
+        {(current) => {
+          const v = current ?? d;
+          return (
+            <YourSignature
+              hint="Check the nonce and the deadline below, then compare the hashes in the review with your hardware wallet."
+              actions={[
+                {
+                  key: "freeze",
+                  title: FREEZE_LABELS[p.action],
+                  set: v.set,
+                  state: v.state,
+                  execution: v.execution,
+                  executionToLabel: "SecurityCouncil",
+                },
+              ]}
+            />
+          );
+        }}
+      </UntilFresh>
       <Facts
         items={[
           {
@@ -94,24 +117,39 @@ function Detail({ detail: d }: { detail: SerializeFrom<FreezeDetail> }) {
             label: "Protocol",
             value: FREEZE_STATUS_LABELS[governance.freeze.lastFreezeStatus] ?? "Unknown",
           },
+          ...(d.state.status === "done" && d.state.txHash
+            ? [
+                {
+                  label: "Executed in",
+                  value: (
+                    <span className="block space-y-1">
+                      <TxLink hash={d.state.txHash} />
+                      <ExecutedOn at={d.state.at} />
+                    </span>
+                  ),
+                  testId: "executed-in",
+                },
+              ]
+            : []),
         ]}
       />
-      <UntilFresh stale={d.set.stale === true} fresh={fresh}>
-        {(current, refresh) => {
-          const v = current ?? d;
-          return (
-            <SignatureSetCard
-              testId="set-freeze"
-              title="Security Council signatures"
-              set={v.set}
-              state={v.state}
-              execution={v.execution}
-              executionToLabel="SecurityCouncil"
-              refresh={current ? null : refresh}
-            />
-          );
-        }}
-      </UntilFresh>
+      <ApprovalGroups count={1}>
+        <UntilFresh stale={d.set.stale === true} fresh={fresh}>
+          {(current, refresh) => {
+            const v = current ?? d;
+            return (
+              <SignatureSetCard
+                testId="set-freeze"
+                title="Security Council signatures"
+                set={v.set}
+                state={v.state}
+                used={v.used}
+                refresh={current ? null : refresh}
+              />
+            );
+          }}
+        </UntilFresh>
+      </ApprovalGroups>
     </div>
   );
 }

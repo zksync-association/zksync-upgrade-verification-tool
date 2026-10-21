@@ -2,6 +2,7 @@ import type { SafeCheck } from "@/.server/safe/store";
 import { INITIAL_LIVE, type LiveState, LiveStateProvider } from "@/components/presence";
 import { safeUnavailableReason } from "@/components/verification/freshness";
 import { SignatureSetCard } from "@/components/verification/signature-set";
+import { YourSignature } from "@/components/verification/your-signature";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // A signature set card while Safe cannot be read (its checks paused, its monthly quota used up,
 // no Safe key, members it did not answer for), across several heads: the card keeps the reason,
 // never says it is "checked again at each new block", does not flip between current and behind
-// at each head, and Fetch signatures and Sign keep their places.
+// at each head, and Fetch signatures (on the card) and Sign (in Your signature above it, for a
+// member Safe) keep their places.
 
 const wallet = vi.hoisted(() => ({ address: undefined as string | undefined }));
 
@@ -39,6 +41,8 @@ vi.mock("wagmi", () => ({
   useAccount: () => ({ address: wallet.address, isConnected: !!wallet.address }),
   useSendTransaction: () => ({ sendTransaction: vi.fn(), isPending: false }),
   useSignTypedData: () => ({ signTypedData: vi.fn(), isPending: false }),
+  // WalletConnect, the one connector (its modal opens on connect).
+  useConnect: () => ({ connectors: [{ id: "walletConnect" }], connect: vi.fn(), isPending: false }),
 }));
 vi.mock("@rainbow-me/rainbowkit", () => ({
   useConnectModal: () => ({ openConnectModal: vi.fn() }),
@@ -149,24 +153,23 @@ const execution = {
 function Card({ shown, state }: { shown: never; state: LiveState }) {
   return (
     <LiveStateProvider value={state}>
-      <SignatureSetCard
-        title="Council"
-        set={shown}
-        state={{ status: "open" }}
-        execution={execution}
-        testId="card"
+      <YourSignature
+        hint="Check."
+        actions={[
+          { key: "council", title: "Council", set: shown, state: { status: "open" }, execution },
+        ]}
       />
+      <SignatureSetCard title="Council" set={shown} state={{ status: "open" }} testId="card" />
     </LiveStateProvider>
   );
 }
 
-/** The Sign control: the member's Sign button, or Connect for a visitor. */
-const signControl = () =>
-  screen.queryByTestId("sign-button") ??
-  screen.getByRole("button", { name: /Connect your Safe to sign/ });
+/** The Sign control: a member Safe's Review and sign, in Your signature. */
+const signControl = () => screen.getByTestId("sign-button");
 
 beforeEach(() => {
-  wallet.address = undefined;
+  // A member Safe whose signature is still needed (C).
+  wallet.address = MEMBER_C;
 });
 afterEach(() => {
   vi.unstubAllGlobals();

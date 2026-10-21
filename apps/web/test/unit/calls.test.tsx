@@ -16,21 +16,34 @@ const data = encodeFunctionData({
 describe("CallList", () => {
   it("shows a decoded call as a row without a note: decoded means it re-encodes exactly", () => {
     render(<CallList calls={[decodeCall({ target, value: "0", data })]} />);
-    expect(screen.getByText("approve(..)")).toBeInTheDocument();
-    expect(screen.getByText("Token")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Call 1: approve" })).toHaveTextContent(
+      "approve(..)"
+    );
     expect(screen.getByText("2 params")).toBeInTheDocument();
     expect(screen.queryByTestId("not-exact")).toBeNull();
     expect(screen.queryByText(/matches the calldata/)).toBeNull();
   });
 
-  it("unfolds a row into its arguments, and shows every call raw on request", () => {
-    render(<CallList calls={[decodeCall({ target, value: "0", data })]} />);
+  it("folds a row's arguments, open at once for a lone call, and shows the calls as JSON on request", () => {
+    const { unmount } = render(
+      <CallList
+        calls={[decodeCall({ target, value: "0", data }), decodeCall({ target, value: "0", data })]}
+      />
+    );
+    // Two calls: each folded until opened.
     expect(screen.queryByText("spender")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Call 1: approve" }));
     expect(screen.getByText("spender")).toBeInTheDocument();
+    unmount();
+    // One call: its arguments are what there is to read.
+    render(<CallList calls={[decodeCall({ target, value: "0", data })]} />);
+    expect(screen.getByText("spender")).toBeInTheDocument();
     expect(screen.getByText("amount")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Raw" }));
-    expect(screen.getByText("approve(address,uint256)")).toBeInTheDocument();
+    // Raw: the calls as JSON, exactly as they run.
+    expect(JSON.parse(screen.getByTestId("calls-json").textContent ?? "")).toEqual([
+      { target, value: "0", data },
+    ]);
     expect(screen.getByRole("button", { name: "Summary" })).toBeInTheDocument();
   });
 

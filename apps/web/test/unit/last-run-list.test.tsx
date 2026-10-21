@@ -10,8 +10,9 @@ const data = vi.hoisted(() => ({
 vi.mock("@/.server/flows/standard", () => ({ listStandardUpgrades: vi.fn() }));
 vi.mock("@remix-run/react", async (original) => ({
   ...(await original<typeof import("@remix-run/react")>()),
-  useLoaderData: () => ({ list: data.list, freshList: data.freshList, allHistory: true }),
+  useLoaderData: () => ({ list: data.list, freshList: data.freshList, range: "all" }),
   useNavigation: () => ({ state: "idle" }),
+  useNavigate: () => () => {},
   Link: ({ to, children, ...props }: { to: string; children: ReactNode }) => (
     <a href={to} {...props}>
       {children}

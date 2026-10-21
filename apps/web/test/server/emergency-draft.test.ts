@@ -11,10 +11,14 @@ import { FakeRpcError } from "../support/fake-jsonrpc";
 const PUH = getAddress("0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3");
 const TARGET: Address = "0x000000000000000000000000000000000000dEaD";
 
-const state = vi.hoisted(() => ({ lane: null as Lane | null }));
+const state = vi.hoisted(() => ({ lane: null as Lane | null, noHead: false }));
 vi.mock("@/.server/rpc", () => ({
   lanes: () => ({ call: state.lane }),
   network: async () => ({ chainId: 1, isDevNode: false }),
+  latestBlock: async () => {
+    if (state.noHead) throw new Error("head unavailable");
+    return { number: 1234n, hash: `0x${"ab".repeat(32)}`, timestamp: 1n };
+  },
 }));
 vi.mock("@/.server/governance", () => ({
   governance: async () => ({ upgradeHandler: PUH }),
@@ -26,6 +30,7 @@ let reply: (index: number) => unknown;
 let calls: ReturnType<typeof fakeCallLane>["calls"];
 
 beforeEach(() => {
+  state.noHead = false;
   reply = () => "0x";
   const fake = fakeCallLane((call) => {
     const tx = call.params[0] as { data: string };
@@ -42,12 +47,21 @@ const draft = (count: number) =>
     data: `0x0${i}` as const,
   }));
 
-it("sends each call from the ProtocolUpgradeHandler with its value", async () => {
-  expect(await checkDraftCalls(draft(2))).toEqual([{ ok: true }, { ok: true }]);
+it("sends each call from the ProtocolUpgradeHandler with its value, all at the head, named", async () => {
+  expect(await checkDraftCalls(draft(2))).toEqual({
+    results: [{ ok: true }, { ok: true }],
+    atBlock: "1234",
+  });
   expect(calls().map((c) => c.params)).toEqual([
-    [{ to: TARGET, data: "0x00", from: PUH, value: "0x0" }, "latest"],
-    [{ to: TARGET, data: "0x01", from: PUH, value: "0x1" }, "latest"],
+    [{ to: TARGET, data: "0x00", from: PUH, value: "0x0" }, "0x4d2"],
+    [{ to: TARGET, data: "0x01", from: PUH, value: "0x1" }, "0x4d2"],
   ]);
+});
+
+it("checks at 'latest' when the head cannot be read, naming no block", async () => {
+  state.noHead = true;
+  expect(await checkDraftCalls(draft(1))).toEqual({ results: [{ ok: true }], atBlock: null });
+  expect(calls().map((c) => c.params[1])).toEqual(["latest"]);
 });
 
 it("reports a revert only for a definite revert, and an RPC failure as unchecked", async () => {
@@ -59,7 +73,7 @@ it("reports a revert only for a definite revert, and an RPC failure as unchecked
     new FakeRpcError(-32005, "request rate exceeded"),
   ];
   reply = (index) => answers[index];
-  const results = await checkDraftCalls(draft(answers.length));
+  const { results } = await checkDraftCalls(draft(answers.length));
   expect(results.slice(0, 2)).toEqual([
     { ok: false, error: "Ownable: caller is not the owner" },
     { ok: false, error: "execution reverted" },
@@ -74,6 +88,8 @@ it("reports an HTTP failure as unchecked, never as a revert", async () => {
     intercept: () => new Response("Too Many Requests", { status: 429 }),
   });
   state.lane = fake.lane;
-  const [result] = await checkDraftCalls(draft(1));
+  const {
+    results: [result],
+  } = await checkDraftCalls(draft(1));
   expect(result).toMatchObject({ ok: null });
 });

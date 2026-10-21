@@ -28,6 +28,8 @@ vi.mock("wagmi", () => ({
   useAccount: () => ({ address: undefined, isConnected: false }),
   useSendTransaction: () => ({ sendTransaction: vi.fn(), isPending: false }),
   useSignTypedData: () => ({ signTypedData: vi.fn(), isPending: false }),
+  // WalletConnect, the one connector (its modal opens on connect).
+  useConnect: () => ({ connectors: [{ id: "walletConnect" }], connect: vi.fn(), isPending: false }),
 }));
 vi.mock("@rainbow-me/rainbowkit", () => ({
   useConnectModal: () => ({ openConnectModal: vi.fn() }),
@@ -182,15 +184,6 @@ const heldApprovals = (asOf = AS_OF) => ({
       historical: null,
     },
   ],
-  evidence: [
-    {
-      key: "securityCouncil",
-      title: "Security Council approval",
-      state: { status: "done", detail: "Approved by the Security Council", txHash: TX },
-      used: null,
-      historical: { block: "20000099", accepted: true, error: null },
-    },
-  ],
   asOf,
 });
 
@@ -201,7 +194,6 @@ const upgradeData = (held: unknown) => ({
   heldApprovals: settled(held),
   sets: pending(),
   freshSets: pending(),
-  evidence: pending(),
   setEvidence: pending(),
   execution: pending(),
   l2Proposal: pending(),
@@ -234,7 +226,7 @@ describe("Safe copies said to be refreshing", () => {
 });
 
 describe("the upgrade page's first flush after a pause", () => {
-  it("holds its sets and recorded approvals as last shown, labelled, with nothing to act on", () => {
+  it("holds its sets as last shown, labelled, with nothing to act on", () => {
     const out = firstFlush(Upgrade, upgradeData(heldApprovals()));
     expect(out).toContain('data-testid="as-of"');
     // The set, under its own notice naming its block; its copies not said to be refreshing.
@@ -243,13 +235,12 @@ describe("the upgrade page's first flush after a pause", () => {
     expect(out).toContain("Verified at block #20,999,990 · re-verifying");
     expect(out).toMatch(/Safe copies from [^<·]+</);
     expect(out).not.toContain("refreshing");
-    // The recorded approval as last shown, at the upgrade's block.
-    expect(out).toContain('data-testid="recorded-approvals"');
-    expect(out).toContain("As this app last showed them, read at block #21,000,000");
+    // No list of recorded approvals beside the sets: each set's card says how it was approved.
+    expect(out).not.toContain("Recorded approvals");
     expect(out).not.toContain("Checking the approvals and member signatures at the newest block");
     // In no colour, nothing to sign, fetch or send.
     expect(out).toMatch(
-      /class="[^"]*grayscale[^"]*" data-stale="true"><section[^>]*>(?:(?!<\/section>).)*Recorded approvals/
+      /class="[^"]*grayscale[^"]*" data-stale="true"><section[^>]*>(?:(?!<\/section>).)*data-testid="set-securityCouncil"/
     );
     expect(out).not.toContain('data-testid="sign-button"');
     expect(out).not.toContain('data-testid="fetch-signatures"');

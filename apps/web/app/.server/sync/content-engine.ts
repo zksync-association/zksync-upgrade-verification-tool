@@ -82,9 +82,11 @@ async function noteKey(
     noteContent(key, at, idContent(value));
     return true;
   }
-  if (key === "list:upgrades" || key === "list:upgrades:all") {
+  const upgrades = /^list:upgrades(?::(90|all))?$/.exec(key);
+  if (upgrades) {
     const list = await listStandardUpgrades({
-      allHistory: key.endsWith(":all"),
+      allHistory: upgrades[1] === "all",
+      days: upgrades[1] === "90" ? 90n : undefined,
       freshness: "page",
     });
     if (list.fromLastRun || !current()) return false;

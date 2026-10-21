@@ -689,13 +689,18 @@ describe("the flows on the index", () => {
     });
     // The same match either way. The unindexed path reads the title through the governor's
     // proposalSnapshot, which this fake Era does not serve: only the index's title is checked.
-    expect({ ...indexed, title: null }).toEqual({ ...scanned, title: null });
+    expect({ ...indexed, title: null, summary: null }).toEqual({
+      ...scanned,
+      title: null,
+      summary: null,
+    });
     expect(indexed).toEqual({
       governor: P,
       proposalId: proposalIdOf("upgrade one").toString(),
       executedTx: executionTx(one),
-      // The first line of its description.
+      // The first line of its description; it has nothing after it to summarize.
       title: "upgrade one",
+      summary: null,
     });
 
     // An execution timed after the creation is outside the window on both paths.

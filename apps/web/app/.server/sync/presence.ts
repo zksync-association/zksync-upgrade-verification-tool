@@ -1,3 +1,4 @@
+import type { UpgradeWindow } from "@/common/upgrade-window";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { MAX_STARTABLE_DAYS, STARTABLE_DAYS } from "@/common/startable";
 import { type Address, isAddress } from "viem";
@@ -310,7 +311,8 @@ export function startableDaysOf(key: string): number | null {
 
 export const watchKeys = {
   status: "status",
-  upgrades: (all: boolean) => (all ? "list:upgrades:all" : "list:upgrades"),
+  upgrades: (window: UpgradeWindow) =>
+    window === "45" ? "list:upgrades" : `list:upgrades:${window}`,
   emergencies: (all: boolean) => (all ? "list:emergency:all" : "list:emergency"),
   freezes: "list:freeze",
   vetoes: "list:vetoes",

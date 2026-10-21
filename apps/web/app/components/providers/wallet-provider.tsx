@@ -1,16 +1,20 @@
+import { STORAGE_PREFIX } from "@/common/storage-prefix";
 import Avatar from "@/components/connect-button/avatar";
-import {
-  type DisclaimerComponent,
-  RainbowKitProvider,
-  connectorsForWallets,
-  lightTheme,
-} from "@rainbow-me/rainbowkit";
-import { walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
+import { RainbowKitProvider, lightTheme } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { type Chain, custom, defineChain } from "viem";
-import { type State, WagmiProvider, cookieStorage, createConfig, createStorage } from "wagmi";
+import {
+  type State,
+  WagmiProvider,
+  cookieStorage,
+  createConfig,
+  createStorage,
+  useAccount,
+  useSwitchChain,
+} from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
+import { walletConnect } from "wagmi/connectors";
 
 const queryClient = new QueryClient();
 const walletTheme = lightTheme({
@@ -58,6 +62,51 @@ export const isFramed = () => typeof window !== "undefined" && window.parent !==
 // anyone can connect a wallet app to send. Browser extensions cannot connect to the single-file
 // build (they talk to the page through window.postMessage, which browsers drop on file:// pages), so
 // installed ones are not discovered either: listed, they would hang at "Confirm in the extension".
+//
+// One WalletConnect connector, which opens WalletConnect's own modal: its QR to scan, and Copy link
+// to paste into Safe{Wallet}. (RainbowKit's WalletConnect wallet adds a second connector for that
+// modal, and with it a second WalletConnect client on the same storage and relay identity.)
+const WALLETCONNECT_MODAL = {
+  themeMode: "light",
+  // Only the QR and its link: no directory of wallets fetched from WalletConnect.
+  enableExplorer: false,
+  themeVariables: {
+    "--wcm-accent-color": "#0C18EC",
+    "--wcm-background-color": "#0C18EC",
+    "--wcm-font-family": "Inter, system-ui, sans-serif",
+    "--wcm-z-index": "60",
+  },
+} as const;
+
+// wagmi's record of the connection (which connector, which chains it asked for). A page opened from
+// a file keeps no cookies in Chrome: there, localStorage, so a reload resumes the WalletConnect
+// session instead of finding it unknown and ending it.
+function walletStorage() {
+  if (typeof window !== "undefined" && window.location.protocol === "file:") {
+    try {
+      return window.localStorage;
+    } catch {}
+  }
+  return cookieStorage;
+}
+// A wallet app approves a WalletConnect session for every network it has, and the session starts
+// on the first (MetaMask Mobile: Ethereum, whatever this page is for). Once connected elsewhere, the
+// wallet is moved to this page's chain: at once when the session includes it, else the wallet asks
+// (a phone wallet has no network menu for a WalletConnect site). Asked once per chain it is on.
+function StayOnChain({ chainId }: { chainId: number }) {
+  const { status, chainId: connected } = useAccount();
+  const { switchChain } = useSwitchChain();
+  const asked = useRef<number | null>(null);
+  useEffect(() => {
+    if (status !== "connected" || connected === undefined || connected === chainId) return;
+    if (asked.current === connected) return;
+    asked.current = connected;
+    // Refused or failed: the header's Switch button stays, and says what to do.
+    switchChain({ chainId }, { onError: () => {} });
+  }, [status, connected, chainId, switchChain]);
+  return null;
+}
+
 export function WalletProvider({
   children,
   initialState,
@@ -77,14 +126,18 @@ export function WalletProvider({
       chains: [chain] as [Chain],
       transports: { [chain.id]: noBrowserRpc },
       ssr: true,
-      storage: createStorage({ storage: cookieStorage }),
+      storage: createStorage({ storage: walletStorage(), key: `${STORAGE_PREFIX}wagmi` }),
       multiInjectedProviderDiscovery: false,
-      // RainbowKit refuses an empty wallet list: without a project id there is no wallet.
+      // Without a project id there is no wallet.
       connectors: projectId
-        ? connectorsForWallets([{ groupName: "WalletConnect", wallets: [walletConnectWallet] }], {
-            appName: "ZKsync Governance",
-            projectId,
-          })
+        ? [
+            walletConnect({
+              projectId,
+              showQrModal: true,
+              qrModalOptions: WALLETCONNECT_MODAL,
+              customStoragePrefix: STORAGE_PREFIX || undefined,
+            }),
+          ]
         : [],
     });
   }, [projectId, chainId, chainLabel]);
@@ -92,11 +145,12 @@ export function WalletProvider({
   return (
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
+        <StayOnChain chainId={chainId} />
         <RainbowKitProvider
           theme={walletTheme}
           avatar={Avatar}
           modalSize="compact"
-          appInfo={{ appName: "ZKsync Governance", disclaimer: WalletNote }}
+          appInfo={{ appName: "ZKsync Governance" }}
         >
           {children}
         </RainbowKitProvider>
@@ -104,10 +158,3 @@ export function WalletProvider({
     </WagmiProvider>
   );
 }
-
-const WalletNote: DisclaimerComponent = ({ Text }) => (
-  <Text>
-    Wallets connect over WalletConnect: your Safe from Safe{"{"}Wallet{"}"}, or a wallet app such as
-    Rabby Mobile. Browser extensions (Rabby, MetaMask) cannot connect to a page opened from a file.
-  </Text>
-);

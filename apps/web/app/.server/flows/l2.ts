@@ -1,6 +1,6 @@
 import { guardiansAbi, l1MessengerEventAbi, l2GovernorAbi, upgradeHandlerAbi } from "@/common/abis";
 import type { L2Proposal } from "@/common/execution";
-import { proposalTitle } from "@/common/proposal-title";
+import { proposalSummary, proposalTitle } from "@/common/proposal-title";
 import { STARTABLE_DAYS } from "@/common/startable";
 import {
   type Address,
@@ -470,8 +470,14 @@ export async function findL2ProposalForUpgrade(
 ) {
   const match = await matchL2ProposalForUpgrade(l1Id, creationTimestamp, options);
   if (!match) return null;
-  const title = await l2ProposalTitle(match.governor, BigInt(match.proposalId)).catch(() => null);
-  return { ...match, title };
+  const description = await l2ProposalDescription(match.governor, BigInt(match.proposalId)).catch(
+    () => null
+  );
+  return {
+    ...match,
+    title: description === null ? null : proposalTitle(description),
+    summary: description === null ? null : proposalSummary(description),
+  };
 }
 
 /** From its ProposalCreated log: the index's when the governor is indexed, else read for it. */
@@ -479,12 +485,17 @@ export async function l2ProposalTitle(
   governor: Address,
   proposalId: bigint
 ): Promise<string | null> {
+  const description = await l2ProposalDescription(governor, proposalId);
+  return description === null ? null : proposalTitle(description);
+}
+
+async function l2ProposalDescription(
+  governor: Address,
+  proposalId: bigint
+): Promise<string | null> {
   const net = await network();
   const at = isIndexedL2Governor(net, governor) ? await l2IndexHead(net) : null;
-  if (!at) {
-    const proposal = await getL2Proposal(governor, proposalId);
-    return proposal ? proposalTitle(proposal.description) : null;
-  }
+  if (!at) return (await getL2Proposal(governor, proposalId))?.description ?? null;
   const { events } = await l2GovernorIndex().read({ head: at });
   const event = events.find(
     (e) =>
@@ -492,7 +503,7 @@ export async function l2ProposalTitle(
       isAddressEqual(e.governor, governor) &&
       e.proposalId === proposalId
   );
-  return event ? proposalTitle((await createdOf(event.log)).proposal.description) : null;
+  return event ? (await createdOf(event.log)).proposal.description : null;
 }
 
 /** When an Era transaction was included: its block's time (seconds). */

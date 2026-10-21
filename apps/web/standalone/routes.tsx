@@ -26,7 +26,6 @@ import { hasRpcSetting } from "./shims/local-settings";
 import { serialized } from "./shims/remix-node";
 
 // Route modules are typed for Remix; React Router calls them with the same arguments.
-// biome-ignore lint/suspicious/noExplicitAny: Remix's and React Router's argument types differ only nominally
 type Handler = (args: any) => unknown;
 type Module = {
   default?: ComponentType;
@@ -71,10 +70,12 @@ function route(
   } as RouteObject;
 }
 
-// Saving settings starts over with them: a reload gives every module the new RPC and key.
+// Saving settings starts over with them: a reload gives every module the new RPC and key. The
+// first save (no RPC before it) reloads on the home page; a later one stays on Settings.
 const settingsModule: Module = {
   ...settings,
   action: async (args) => {
+    const first = !hasRpcSetting();
     const response = (await settings.action(
       args as Parameters<typeof settings.action>[0]
     )) as Response;
@@ -82,7 +83,11 @@ const settingsModule: Module = {
       .clone()
       .json()
       .catch(() => null);
-    if (body?.saved) setTimeout(() => window.location.reload(), 400);
+    if (body?.saved)
+      setTimeout(() => {
+        if (first && hasRpcSetting()) history.replaceState(null, "", "#/");
+        window.location.reload();
+      }, 400);
     return response;
   },
 };

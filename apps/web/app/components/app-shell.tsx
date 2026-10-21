@@ -1,4 +1,4 @@
-import ConnectButton, { WalletOfferContext } from "@/components/connect-button";
+import ConnectButton from "@/components/connect-button";
 import {
   type ChainView,
   type OkStatus,
@@ -24,7 +24,14 @@ import { contentCurrency, useContentCurrency } from "@/components/verification/c
 import { cn } from "@/utils/cn";
 import { formatAge, formatNumber } from "@/utils/format";
 import { noteStatusLanded, requestStatusRevalidation } from "@/utils/revalidation";
-import { Link, NavLink, useFetcher, useRevalidator } from "@remix-run/react";
+import {
+  Link,
+  NavLink,
+  useFetcher,
+  useLocation,
+  useNavigate,
+  useRevalidator,
+} from "@remix-run/react";
 import {
   AlertTriangle,
   ChevronRight,
@@ -32,7 +39,9 @@ import {
   Info,
   Loader2,
   RefreshCw,
+  Settings,
   ShieldAlert,
+  X,
 } from "lucide-react";
 import { type ReactNode, Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
@@ -44,13 +53,14 @@ export { useStatus } from "@/components/governance-context";
 // page's skeletons are in the first bytes). What the status says fills in when it is read; until
 // then it says it is being checked, never that all is well.
 
-const NAV = [
-  { to: "/", label: "Overview" },
-  { to: $path("/app/proposals"), label: "Protocol upgrades" },
-  { to: $path("/app/emergency"), label: "Emergency upgrades" },
-  { to: $path("/app/freeze"), label: "Freeze requests" },
-  { to: $path("/app/l2-cancellations"), label: "Guardian veto" },
-  { to: "/settings", label: "Settings" },
+// The menu: a word each (the page's full name is the link's name and tooltip); Settings is the
+// round button floating at the bottom right.
+const NAV: { to: string; label: string; name: string }[] = [
+  { to: "/", label: "Overview", name: "Overview" },
+  { to: $path("/app/proposals"), label: "Upgrades", name: "Protocol upgrades" },
+  { to: $path("/app/emergency"), label: "Emergency", name: "Emergency upgrades" },
+  { to: $path("/app/freeze"), label: "Freeze", name: "Freeze requests" },
+  { to: $path("/app/l2-cancellations"), label: "Veto", name: "Guardian veto" },
 ];
 
 // A status in hand at once; a promise's once it settles, after hydration (so the server's and the
@@ -87,8 +97,6 @@ export default function AppShell({
   children: ReactNode;
   wallet?: boolean;
 }) {
-  // How many Sign / Send buttons are on screen; the header offers to connect only while some are.
-  const [walletOffers, setWalletOffers] = useState(0);
   const landed = useLandedStatus(status);
   const ok = landed?.ok ? landed : null;
   // A new root status landed: it answers any request to read it again, and its age starts now.
@@ -104,19 +112,18 @@ export default function AppShell({
   return (
     <StatusSourceContext.Provider value={status}>
       <IndexProgressProvider initial={ok?.sync.index ?? null} onSettled={readStatusAgain}>
-        <WalletOfferContext.Provider value={setWalletOffers}>
-          <div className="flex min-h-screen flex-col">
-            <SkipLink />
-            <Header offerWallet={walletOffers > 0} wallet={wallet} />
-            <Banners />
-            <Main>
-              <StatusBoundary source={status} problem={(p) => <StatusProblemCard problem={p} />}>
-                <Suspense fallback={<PagePending />}>{children}</Suspense>
-              </StatusBoundary>
-            </Main>
-            <Footer />
-          </div>
-        </WalletOfferContext.Provider>
+        <div className="flex min-h-screen flex-col">
+          <SkipLink />
+          <Header wallet={wallet} />
+          <Banners />
+          <Main>
+            <StatusBoundary source={status} problem={(p) => <StatusProblemCard problem={p} />}>
+              <Suspense fallback={<PagePending />}>{children}</Suspense>
+            </StatusBoundary>
+          </Main>
+          <Footer />
+          <SettingsButton />
+        </div>
       </IndexProgressProvider>
     </StatusSourceContext.Provider>
   );
@@ -130,11 +137,15 @@ export function AppFrame() {
       <header className="sticky top-0 z-40 border-slate-300 border-b bg-white">
         <HeaderRow>
           <HomeLink />
-          <div className="ml-auto flex min-w-0 items-center gap-2">
+          <Nav />
+          <HeaderStatus>
             <NetworkPill chain={null} />
-          </div>
+          </HeaderStatus>
+          <HeaderActions>
+            {/* Where the wallet button appears once the page is ready. */}
+            <div className="h-10 w-[140px]" aria-hidden />
+          </HeaderActions>
         </HeaderRow>
-        <Nav />
       </header>
       <CheckingBanner />
       <Main>
@@ -167,9 +178,28 @@ function Main({ children }: { children: ReactNode }) {
   );
 }
 
+// One bar, as Tally's: logo, menu, then the network and the actions at the right (from xl up, on
+// one line). Narrower, the menu takes a line of its own below; on a phone the actions stay beside
+// the logo and the network goes on a line between.
 function HeaderRow({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6 md:h-12 md:flex-nowrap md:py-0">
+    <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2 px-4 pt-2.5 pb-1.5 sm:px-6 xl:h-16 xl:flex-nowrap xl:gap-x-3 xl:py-0">
+      {children}
+    </div>
+  );
+}
+
+function HeaderStatus({ children }: { children: ReactNode }) {
+  return (
+    <div className="order-3 flex w-full min-w-0 flex-wrap items-center gap-1 md:order-2 md:ml-auto md:w-auto md:justify-end xl:order-3 xl:ml-0 xl:shrink-0 xl:flex-nowrap">
+      {children}
+    </div>
+  );
+}
+
+function HeaderActions({ children }: { children: ReactNode }) {
+  return (
+    <div className="order-2 ml-auto flex shrink-0 items-center gap-2 md:order-3 md:ml-0 xl:order-4">
       {children}
     </div>
   );
@@ -177,40 +207,115 @@ function HeaderRow({ children }: { children: ReactNode }) {
 
 function HomeLink() {
   return (
-    <Link to="/" className="flex shrink-0 items-center gap-3" aria-label="Home">
+    <Link to="/" className="order-1 flex shrink-0 items-center gap-2.5" aria-label="Home">
       <Logo className="h-6 w-auto" />
-      <span className="hidden h-5 w-px bg-slate-200 sm:block" />
-      <span className="hidden font-medium text-[15px] text-slate-950 sm:block">Governance</span>
+      <span className="hidden rounded-lg border border-slate-200 px-2 py-0.5 font-medium text-[13px] text-slate-950 sm:block">
+        Governance
+      </span>
     </Link>
   );
 }
 
 function Nav() {
   return (
-    <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
-      <nav
-        aria-label="Governance navigation"
-        className="-mx-3 flex items-center gap-x-1 overflow-x-auto pb-1.5"
-      >
-        {NAV.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === "/"}
-            prefetch="intent"
-            className={({ isActive }) =>
-              cn(
-                "flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 py-1 font-medium text-slate-700 text-sm transition-colors hover:bg-slate-75 hover:text-slate-950 md:min-h-8",
-                isActive &&
-                  "bg-navy-800 font-semibold text-white hover:bg-navy-800 hover:text-white"
-              )
-            }
-          >
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-    </div>
+    <nav
+      aria-label="Governance navigation"
+      className="-mx-2 order-4 flex w-[calc(100%+1rem)] items-center gap-x-1 overflow-x-auto xl:order-2 xl:mx-0 xl:w-auto xl:flex-1 xl:justify-center xl:overflow-visible"
+    >
+      {NAV.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.to === "/"}
+          prefetch="intent"
+          aria-label={item.name}
+          title={item.name}
+          className={({ isActive }) =>
+            cn(
+              "flex min-h-10 items-center whitespace-nowrap rounded-lg px-2.5 font-medium text-[14px] text-slate-700 transition-colors hover:bg-slate-75 hover:text-slate-950",
+              isActive && "bg-navy-50 text-slate-950 hover:bg-navy-50"
+            )
+          }
+        >
+          {item.label}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+/** Scrolls to `y` once the page can scroll that far (its content still streaming in), or after 4 s. */
+function scrollWhenTall(y: number) {
+  const until = Date.now() + 4000;
+  const step = () => {
+    const room = document.documentElement.scrollHeight - window.innerHeight;
+    if (room >= y || Date.now() > until) window.scrollTo(0, y);
+    else requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+/**
+ * Settings, as a toggle floating in the window's bottom-right corner on every page: the gear opens
+ * it; there it turns into a close button (and Esc closes it) that goes back to the page it was
+ * opened from, where that page was scrolled to (the browser's own back). Opened any other way,
+ * closing goes to the overview. The live-update note sits to its left; the brief status banner,
+ * wider, covers it while it shows.
+ */
+function SettingsButton() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const open = location.pathname === "/settings";
+  const opened = location.state as { from?: string; scrollY?: number } | null;
+  const close = useCallback(() => {
+    if (!opened?.from) return navigate("/");
+    navigate(-1);
+    // The page comes back with its first answer, shorter than it was: scroll to where it was once
+    // it is tall enough again.
+    if (opened.scrollY) scrollWhenTall(opened.scrollY);
+  }, [opened, navigate]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      // Never while typing (Esc there closes the browser's own suggestions), nor over a dialog.
+      const target = e.target as HTMLElement | null;
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog']"))
+        return;
+      close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, close]);
+  const icon = "absolute h-5 w-5 transition-all duration-200 motion-reduce:transition-none";
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        open
+          ? close()
+          : navigate("/settings", { state: { from: location.pathname, scrollY: window.scrollY } })
+      }
+      aria-label={open ? "Close settings" : "Open settings"}
+      title={open ? "Close settings (Esc)" : "Settings"}
+      data-testid="settings-toggle"
+      className={cn(
+        "fixed right-4 bottom-4 z-20 grid h-12 w-12 place-items-center rounded-full border shadow-[0_8px_20px_-6px_rgba(10,26,102,0.28)] transition-colors sm:right-6 sm:bottom-6",
+        open
+          ? "border-navy-800 bg-navy-800 text-white hover:bg-brand-700"
+          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-75 hover:text-navy-800"
+      )}
+    >
+      {/* The gear turns into the close mark and back. */}
+      <Settings
+        aria-hidden
+        className={cn(icon, open ? "rotate-90 scale-50 opacity-0" : "rotate-0 opacity-100")}
+      />
+      <X
+        aria-hidden
+        className={cn(icon, open ? "rotate-0 opacity-100" : "-rotate-90 scale-50 opacity-0")}
+      />
+    </button>
   );
 }
 
@@ -246,7 +351,8 @@ function LiveNote() {
   else if (live.catchingUp) text = "Checking for changes…";
   if (!text) return null;
   return (
-    <div className="pointer-events-none fixed right-4 bottom-4 z-30 flex max-w-[calc(100vw-2rem)] justify-end sm:right-6">
+    // Above Your signature's bar while it is shown (--action-bar).
+    <div className="pointer-events-none fixed right-[76px] bottom-[calc(var(--action-bar,0px)+1.5rem)] z-30 flex max-w-[calc(100vw-6rem)] justify-end sm:right-[84px] sm:bottom-[calc(var(--action-bar,0px)+2rem)]">
       <span
         role="status"
         className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-700 text-xs shadow-[0_8px_16px_-4px_rgba(10,26,102,0.16)]"
@@ -261,7 +367,7 @@ function LiveNote() {
   );
 }
 
-function Header({ offerWallet, wallet }: { offerWallet: boolean; wallet: boolean }) {
+function Header({ wallet }: { wallet: boolean }) {
   const chain = useChain();
   const live = useLive();
   return (
@@ -269,8 +375,8 @@ function Header({ offerWallet, wallet }: { offerWallet: boolean; wallet: boolean
       <header className="sticky top-0 z-40 border-slate-300 border-b bg-white">
         <HeaderRow>
           <HomeLink />
-          {/* On a phone the group may wrap onto a second line rather than widen the page. */}
-          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+          <Nav />
+          <HeaderStatus>
             <WithStatus
               fallback={<NetworkPill chain={chain} />}
               problem={() => <NetworkPill chain={chain} unavailable />}
@@ -287,12 +393,10 @@ function Header({ offerWallet, wallet }: { offerWallet: boolean; wallet: boolean
               )}
             </WithStatus>
             <RefreshButton />
-            {wallet && (
-              <WithStatus fallback={null}>{() => <ConnectButton offer={offerWallet} />}</WithStatus>
-            )}
-          </div>
+          </HeaderStatus>
+          {/* Always at the top right: connect, or the connected account. */}
+          <HeaderActions>{wallet && <ConnectButton />}</HeaderActions>
         </HeaderRow>
-        <Nav />
       </header>
       <WithStatus fallback={null} problem={() => null}>
         {() => <LiveNote />}
@@ -315,7 +419,7 @@ function NetworkPill({
 }) {
   return (
     <span
-      className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1.5 font-semibold text-navy-800 text-xs"
+      className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-slate-50 px-2 py-1.5 font-semibold text-navy-800 text-xs"
       data-testid="network-pill"
       data-stale={notReRead ? "true" : undefined}
     >
@@ -352,7 +456,7 @@ export function RefreshButton() {
     <Button
       variant="ghost"
       size="icon"
-      className="border-transparent bg-transparent text-slate-600 hover:border-transparent hover:bg-slate-75 hover:text-navy-800"
+      className="h-9 w-9 border-transparent bg-transparent text-slate-600 hover:border-transparent hover:bg-slate-75 hover:text-navy-800 sm:h-9"
       aria-label="Refresh data"
       title="Fetch Safe signatures and chain state again"
       onClick={() => {
@@ -587,19 +691,19 @@ function FooterRows({ status }: { status: OkStatus }) {
         {g.network.label} · chain id {g.network.chainId}
       </FooterRow>
       <FooterRow label="ProtocolUpgradeHandler (pinned)">
-        <AddressLink address={g.upgradeHandler} full={false} />
+        <AddressLink address={g.upgradeHandler} />
       </FooterRow>
       <FooterRow label={`Security Council · ${g.securityCouncil.members.length} members`}>
-        <AddressLink address={g.securityCouncil.address} full={false} />
+        <AddressLink address={g.securityCouncil.address} />
       </FooterRow>
       <FooterRow label={`Guardians · ${g.guardians.members.length} members`}>
-        <AddressLink address={g.guardians.address} full={false} />
+        <AddressLink address={g.guardians.address} />
       </FooterRow>
       <FooterRow label="Emergency Upgrade Board">
-        <AddressLink address={g.emergencyUpgradeBoard.address} full={false} />
+        <AddressLink address={g.emergencyUpgradeBoard.address} />
       </FooterRow>
       <FooterRow label="ZKsync Foundation Safe">
-        <AddressLink address={g.emergencyUpgradeBoard.zkFoundation} full={false} />
+        <AddressLink address={g.emergencyUpgradeBoard.zkFoundation} />
       </FooterRow>
       <FooterRow label="Safe Transaction Service">
         <span className="mono break-all">{status.safeApi.url ?? "not configured"}</span>

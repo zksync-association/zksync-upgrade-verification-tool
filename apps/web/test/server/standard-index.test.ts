@@ -359,6 +359,8 @@ describe("one upgrade", () => {
       status: "done",
       detail: "Approved by the Security Council",
       txHash: txHash(approval),
+      // When: the approval time the handler records (no block header read for it).
+      at: expect.any(String),
     });
     expect(state.transactions).toEqual([txHash(approval)]);
     expect(state.headers).toEqual([]);

@@ -71,6 +71,21 @@ export function setCurrency(
   return { block, behind };
 }
 
+/**
+ * How current a set is on screen: `staleAt`, the block its verdicts are shown as of (a first
+ * answer from an older block, or behind the head served), and `notCurrent`, why nothing is signed
+ * or sent from it now. The signer groups and Your signature read it the same way.
+ */
+export function setStanding(
+  set: Followed & { verifiedAtBlock?: string | null },
+  live: Parameters<typeof setCurrency>[1]
+) {
+  const { block: verifiedAt, behind } = setCurrency(set, live);
+  const staleAt = set.stale ? set.verifiedAtBlock ?? "?" : behind !== null ? verifiedAt : null;
+  const notCurrent = behind === null ? null : `Not verified at block #${formatNumber(behind)} yet.`;
+  return { verifiedAt, behind, staleAt, notCurrent };
+}
+
 // The Era head what is shown was read at, never one whose read failed (then the age just grows).
 export function EraBlockNote({
   watchKey,
