@@ -1,5 +1,11 @@
 # Testnet 3 desktop sender
 
+Tx-sim uses the verifier's governance navigation and one transaction workspace. Imported files and
+the current L2 voting retry appear together in the group list; both use a call list and the same
+transaction review panel. Voting, queueing, L2 execution and the L1 relay have no separate navigation
+tab. Payload editing and manual imports are available in collapsible advanced sections. Saved
+proposal IDs, wallet submissions and receipts survive switching groups and reloading.
+
 The tx-sim workflow can also be packaged as **one HTML file**, opened directly in Chrome. Its build
 automatically fetches the latest private PR through your existing `gh` login, pins one revision, and
 embeds all transaction files, ABIs, scripts and styles. No GitHub token enters the file. Opening a

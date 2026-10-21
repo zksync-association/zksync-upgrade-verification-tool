@@ -17,30 +17,62 @@ body {
 }
 header {
   background: #fff;
-  border-bottom: 1px solid #dfe4ee;
+  border-bottom: 1px solid #cbd5e1;
+  padding: 0 max(24px, calc((100vw - 1320px) / 2));
+}
+.header-row {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 14px 4%;
+  gap: 14px;
+  padding: 20px 0 14px;
   flex-wrap: wrap;
 }
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: auto;
   text-decoration: none;
   color: #111;
-  font-size: 20px;
-  font-weight: 750;
+}
+.brand-logo {
+  height: 28px;
+  width: auto;
 }
 .brand span {
-  font-size: 13px;
+  font-size: 15px;
   border: 1px solid #e1e5ed;
   border-radius: 20px;
-  padding: 5px 9px;
+  padding: 5px 12px;
   font-weight: 500;
+}
+.network-pill {
+  background: #f6f8fc;
+  color: #102254;
+  border-radius: 22px;
+  padding: 9px 13px;
+  font-size: 13px;
+  font-weight: 600;
 }
 nav {
   display: flex;
   gap: 6px;
-  margin-right: auto;
+  padding: 0 0 12px;
+  overflow-x: auto;
+}
+nav a {
+  color: #334155;
+  font-size: 15px;
+  font-weight: 550;
+  padding: 12px 17px;
+  text-decoration: none;
+  white-space: nowrap;
+  border-radius: 24px;
+}
+nav a:hover,
+nav a[aria-current="page"] {
+  background: #eef1f5;
+  color: #111827;
 }
 button,
 .file-button {
@@ -157,6 +189,30 @@ code,
 }
 .bundle-grid {
   grid-template-columns: 245px minmax(0, 1fr);
+}
+.transaction-workspace {
+  min-width: 0;
+}
+.import-settings summary,
+#proof-panel summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.proposal-identifiers summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #536580;
+  margin-bottom: 12px;
+}
+.source strong {
+  overflow-wrap: anywhere;
+}
+#vote-actions .call-button {
+  font-weight: 600;
+}
+#vote-actions .step-state {
+  color: #64748b;
 }
 .tx-grid {
   grid-template-columns: 260px minmax(0, 1fr);

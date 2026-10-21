@@ -617,7 +617,7 @@ async function prepareVote() {
     })
   );
   notice("Prepared the exact L2 governor calls. Reading the live proposal state…");
-  render();
+  setView("normal");
   await refreshVote();
   notice("Proposal prepared. Live governance state is shown alongside the exact transactions.");
 }
@@ -932,13 +932,11 @@ function renderTransaction(_panel, _row, _guard, _blocked = "") {
     );
 }
 function renderNormal() {
-  $("normal-tab").classList.toggle("active", activeView === "normal");
-  $("bundle-tab").classList.toggle("active", activeView === "bundle");
-  $("page-title").textContent =
-    activeView === "normal" ? "L2 vote → L1 upgrade" : "Execute tx-sim transactions";
   const panel = $("vote-status");
   const actions = $("vote-actions");
+  const workflowActions = $("workflow-actions");
   actions.replaceChildren();
+  workflowActions.replaceChildren();
   $("normal-transaction").hidden = !normalSelected;
   $("proof-panel").hidden = !vote;
   if (!vote) {
@@ -946,12 +944,16 @@ function renderNormal() {
     $("normal-transaction").hidden = true;
     return;
   }
-  panel.replaceChildren(
+  const identifiers = el(
+    "details",
+    { class: "proposal-identifiers" },
+    el("summary", {}, "Proposal IDs and reviewed source"),
     el("p", { class: "mono" }, `L2 proposal: ${BigInt(vote.proposalId)}`),
     el("p", { class: "mono" }, `L1 upgrade: ${vote.upgradeId}`)
   );
+  panel.replaceChildren(identifiers);
   if (retryInfo && same(vote.proposalId, retryInfo.proposalId))
-    panel.prepend(
+    identifiers.append(
       el(
         "p",
         { class: "warning" },
@@ -1008,7 +1010,7 @@ function renderNormal() {
       )
     );
   if (canRepropose(status.state))
-    actions.append(
+    workflowActions.append(
       el(
         "button",
         {
@@ -1020,7 +1022,7 @@ function renderNormal() {
         "Prepare voting retry"
       )
     );
-  for (const row of normalRows) {
+  for (const [index, row] of normalRows.entries()) {
     const entry = journal[row.id];
     const completed =
       entry?.status === "confirmed" ||
@@ -1038,42 +1040,55 @@ function renderNormal() {
           ? "Wallet request open"
           : entry?.status === "uncertain"
             ? "Check transaction hash"
-            : row.tag === "castVote" && status.state === 0
-              ? "Waiting for voting to open"
-              : allowed
-                ? "Review transaction"
-                : "Waiting for required state";
-    const step = el("div", { class: "step" }, el("strong", {}, row.description), " ", badge(row));
-    step.append(
-      el(
-        "div",
-        { class: "actions" },
-        el(
-          "button",
-          {
-            disabled: busy || (!allowed && !completed && !pending),
-            onclick: () => {
-              normalSelected = row;
-              render();
-              $("normal-transaction").scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-              });
-            },
-          },
-          label
-        )
-      )
+            : allowed
+              ? "Review transaction"
+              : row.tag === "castVote" && status.state === 0
+                ? "Waiting for voting to open"
+                : row.tag === "queue" && status.state === 1
+                  ? "Waiting for voting to close"
+                  : row.tag === "queue"
+                    ? "Requires a successful vote"
+                    : row.tag === "execute" && status.state === 5
+                      ? "Waiting for timelock"
+                      : row.tag === "execute"
+                        ? "Queue the proposal first"
+                        : "Waiting for required state";
+    const step = el(
+      "button",
+      {
+        class: `call-button ${normalSelected?.id === row.id ? "active" : ""}`,
+        disabled: busy,
+        onclick: () => {
+          normalSelected = row;
+          render();
+        },
+      },
+      `${index + 1}. ${row.description}`,
+      el("small", {}, CHAINS[row.network].name),
+      badge(row),
+      el("small", { class: "step-state" }, label)
     );
-    if (journal[row.id]?.hash)
-      step.append(
-        link(
-          "View submitted transaction ↗",
-          `${CHAINS[row.network].explorer}/tx/${journal[row.id].hash}`
-        )
-      );
     actions.append(step);
   }
+  actions.append(
+    el(
+      "button",
+      {
+        class: `call-button ${start && normalSelected?.id === start.row.id ? "active" : ""}`,
+        disabled: busy,
+        onclick: () => {
+          if (start) normalSelected = start.row;
+          $("proof-panel").open = true;
+          render();
+        },
+      },
+      start ? "6. Start the upgrade on L1" : "6. Relay the upgrade message to L1",
+      el("small", {}, CHAINS.sepolia.name),
+      start
+        ? badge(start.row)
+        : el("small", {}, "Check the L2 execution receipt and inclusion proof")
+    )
+  );
   const l1 = el(
     "div",
     { class: "step" },
@@ -1085,7 +1100,7 @@ function renderNormal() {
       {},
       "After startUpgrade confirms, the normal legal-veto and approval periods apply. Use the governance verifier for Council/Guardian approvals."
     ),
-    link("Open this L1 upgrade in governance ↗", `./#/app/proposals/${vote.upgradeId}`)
+    link("Open this L1 upgrade in governance ↗", `./index.html#/app/proposals/${vote.upgradeId}`)
   );
   if (status.l1State === 4)
     l1.append(
@@ -1112,7 +1127,7 @@ function renderNormal() {
         "Review L1 execution"
       )
     );
-  actions.append(l1);
+  if (status.state === 7 || status.l1State > 0) panel.append(l1);
   $("normal-transaction").hidden = !normalSelected;
   if (normalSelected) {
     let blocked = draftMatches()
@@ -1122,7 +1137,9 @@ function renderNormal() {
       !["startUpgrade", "executeL1"].includes(normalSelected.tag) &&
       !allowedVoteAction(status, normalSelected.tag)
     )
-      blocked = "This action is not available in the current governance state.";
+      blocked =
+        governorActionReason({ ...status, method: normalSelected.tag }) ||
+        "This action is not available in the current governance state.";
     renderTransaction(
       $("normal-transaction"),
       normalSelected,
@@ -1140,7 +1157,7 @@ function renderBundles() {
       el(
         "button",
         {
-          class: `bundle-button ${_index === selectedBundle ? "active" : ""}`,
+          class: `bundle-button ${activeView === "bundle" && _index === selectedBundle ? "active" : ""}`,
           disabled: busy,
           onclick: () => {
             selectedBundle = _index;
@@ -1148,7 +1165,7 @@ function renderBundles() {
               0,
               _bundle.rows.findIndex((_row) => journal[_row.id]?.status !== "confirmed")
             );
-            render();
+            setView("bundle");
           },
         },
         _bundle.title,
@@ -1160,6 +1177,30 @@ function renderBundles() {
       )
     );
   });
+  list.append(
+    el(
+      "button",
+      {
+        class: `bundle-button ${activeView === "normal" ? "active" : ""}`,
+        disabled: busy,
+        onclick: () => {
+          setView("normal");
+          if (!vote) $("proposal-settings").open = true;
+        },
+      },
+      vote && retryInfo && same(vote.proposalId, retryInfo.proposalId)
+        ? "Current voting retry"
+        : "L2 → L1 upgrade",
+      el(
+        "small",
+        {},
+        vote
+          ? `${normalRows.filter((_row) => journal[_row.id]?.status === "confirmed").length}/${normalRows.length} confirmed · voting, relay and L1 execution`
+          : "Prepare a reviewed proposal"
+      )
+    )
+  );
+  if (activeView === "normal") return;
   const bundle = bundles[selectedBundle];
   if (!bundle) return;
   const summary = $("bundle-summary");
@@ -1400,8 +1441,6 @@ $("connect-walletconnect").onclick = () =>
     walletChain = null;
     await connect();
   });
-$("normal-tab").onclick = () => setView("normal");
-$("bundle-tab").onclick = () => setView("bundle");
 $("refresh-source").onclick = () => run(refreshSource);
 $("prepare-vote").onclick = () => run(prepareVote);
 $("payload").oninput = () => {
@@ -1578,7 +1617,6 @@ async function initialize() {
 }
 if (bootstrap) {
   $("refresh-source").hidden = true;
-  document.querySelector(".brand").href = "#";
   $("connect-walletconnect").hidden = !desktopAvailable;
   document.querySelector(".heading p").textContent =
     "Transactions imported from the pinned tx-sim PR. Connect the required sender and review each request in your wallet.";

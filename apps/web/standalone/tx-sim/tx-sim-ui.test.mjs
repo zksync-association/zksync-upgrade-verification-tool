@@ -212,17 +212,67 @@ for (const protocol of ["file:", "http:"])
       proposedRetry = true;
       values.state = 0;
       values.proposalDeadline = "1500";
-      [...document.querySelectorAll("button")]
+      [...document.querySelectorAll("#vote-status button")]
         .find((_button) => _button.textContent === "Refresh governance state")
         .click();
       await waitFor(() =>
         document.getElementById("vote-status").textContent.includes("Initial deadline")
       );
-      const steps = [...document.querySelectorAll("#vote-actions .step")];
-      assert.equal(steps[0].querySelector("button").textContent, "Completed");
-      assert.equal(steps[1].querySelector("button").textContent, "Completed");
-      assert.equal(steps[2].querySelector("button").textContent, "Waiting for voting to open");
-      assert.equal(steps[2].querySelector("button").disabled, true);
+      const steps = [...document.querySelectorAll("#vote-actions .call-button")];
+      assert.equal(steps[0].querySelector(".step-state").textContent, "Completed");
+      assert.equal(steps[1].querySelector(".step-state").textContent, "Completed");
+      assert.equal(steps[2].querySelector(".step-state").textContent, "Waiting for voting to open");
+      await waitFor(() => !document.querySelectorAll("#vote-actions .call-button")[2].disabled);
+      document.querySelectorAll("#vote-actions .call-button")[2].click();
+      assert.match(document.getElementById("normal-transaction").textContent, /0x56781388/);
+      assert.ok(
+        [...document.querySelectorAll("#normal-transaction button")].find(
+          (_button) =>
+            _button.textContent === (protocol === "file:" ? "Send to wallet" : "Send to MetaMask")
+        ).disabled
+      );
+      assert.deepEqual(
+        [...document.querySelectorAll("nav[aria-label='Governance navigation'] a")].map(
+          (_link) => _link.textContent
+        ),
+        ["Overview", "Upgrades", "Emergency", "Freeze", "Veto", "Tx-sim"]
+      );
+      assert.equal(document.getElementById("normal-tab"), null);
+      assert.equal(document.getElementById("bundle-tab"), null);
+      const currentId = stored.retryInfo.proposalId;
+      document.querySelector("#bundles .bundle-button").click();
+      assert.equal(document.getElementById("bundle-view").hidden, false);
+      assert.equal(document.getElementById("normal-view").hidden, true);
+      const workflow = [...document.querySelectorAll("#bundles .bundle-button")].find((_button) =>
+        _button.textContent.startsWith("Current voting retry")
+      );
+      workflow.click();
+      assert.equal(document.getElementById("normal-view").hidden, false);
+      assert.equal(JSON.parse(localStorage.getItem(STORAGE.vote)).retryInfo.proposalId, currentId);
+      values.state = 1;
+      values.hasVoted = true;
+      values.proposalDeadline = "1600";
+      [...document.querySelectorAll("#vote-status button")]
+        .find((_button) => _button.textContent === "Refresh governance state")
+        .click();
+      await waitFor(() =>
+        document.getElementById("vote-status").textContent.includes("Your vote is recorded")
+      );
+      await waitFor(() => !document.querySelectorAll("#vote-actions .call-button")[3].disabled);
+      const queue = document.querySelectorAll("#vote-actions .call-button")[3];
+      assert.equal(queue.querySelector(".step-state").textContent, "Waiting for voting to close");
+      queue.click();
+      assert.match(
+        document.getElementById("normal-transaction").textContent,
+        /Queue requires Succeeded/
+      );
+      assert.match(document.getElementById("normal-transaction").textContent, /Voting deadline:/);
+      assert.ok(
+        [...document.querySelectorAll("#normal-transaction button")].find(
+          (_button) =>
+            _button.textContent === (protocol === "file:" ? "Send to wallet" : "Send to MetaMask")
+        ).disabled
+      );
       assert.deepEqual(walletRequests, []);
     } finally {
       dom.window.close();
