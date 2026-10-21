@@ -39,6 +39,7 @@ import { setStanding } from "./freshness";
 import { SignButton, useSignReason } from "./sign-button";
 import { SafeHashes } from "./safe-hashes";
 import { useAccount } from "wagmi";
+import { SafeOwnerApprovals } from "./safe-owner-approvals";
 
 type Serialized<T> = SerializeFrom<T>;
 type Member = Serialized<MemberResult>;
@@ -62,6 +63,21 @@ const GROUP_NAME: Record<string, string> = {
 };
 
 export function YourSignature({
+  actions,
+  hint,
+}: {
+  actions: SignAction[];
+  hint: string;
+}) {
+  return (
+    <>
+      <SafeOwnerApprovals actions={actions} />
+      <SignatureActions actions={actions} hint={hint} />
+    </>
+  );
+}
+
+function SignatureActions({
   actions,
   hint,
 }: {

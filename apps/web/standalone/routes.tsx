@@ -17,6 +17,7 @@ import * as transaction from "@/routes/app/transactions.$hash/_route";
 import * as presence from "@/routes/resources+/presence";
 import * as refresh from "@/routes/resources+/refresh";
 import * as safeCheck from "@/routes/resources+/safe-check";
+import * as safeOwnerApproval from "@/routes/resources+/safe-owner-approval";
 import * as settings from "@/routes/settings/_route";
 import type { ComponentType } from "react";
 import type { ActionFunctionArgs, RouteObject, ShouldRevalidateFunction } from "react-router-dom";
@@ -118,6 +119,9 @@ export const routes = [
 
 /** The two endpoints the pages fetch() themselves (beats, Fetch signatures), answered in the page. */
 export const pageEndpoints: Record<string, (args: ActionFunctionArgs) => unknown> = {
+  "/resources/safe-owner-approval": safeOwnerApproval.loader as (
+    args: ActionFunctionArgs
+  ) => unknown,
   "/resources/presence": presence.action as (args: ActionFunctionArgs) => unknown,
   "/resources/safe-check": safeCheck.action as (args: ActionFunctionArgs) => unknown,
 };

@@ -28,3 +28,18 @@ Calls bound to a particular sender (for example, L2 votes) still require that se
 The optional [tx-sim companion](../tx-sim/README.md) remains available over localhost for reviewed
 Testnet 3 L1/L2 transaction arrays. It is not required for the serverless signer flow. Desktop
 MetaMask and the companion navigation link are offered only when the verifier is served over HTTP(S).
+
+For Testnet 3 Council approval, the served verifier also offers **Upgrades → open the upgrade →
+Approve member Safes with MetaMask**. Connect the funded sole owner, review an approval, then
+confirm its zero-value Safe transaction on Sepolia. Repeat for enough distinct member Safes to
+meet the Council threshold (four on the current deployment). The existing Council approval
+transaction becomes available only after governance verifies those on-chain Safe approvals.
+Each member approval pays gas; no WalletConnect pairing to individual Safes is needed.
+
+This shortcut supports the pinned Testnet 3 deployment's Safe 1.3.0 members with one owner and a
+threshold of one. It rechecks the owner, governance digest, Safe configuration and library code,
+then simulates the Safe call before opening MetaMask. Other Safe policies retain the normal Safe
+signing flow. Pending or uncertain wallet submissions stay blocked against duplicate sends; use
+**Check approval** to detect an approval that has reached the chain, and inspect any unresolved
+transaction in the wallet before retrying. Opening the same HTML from disk retains the Safe /
+WalletConnect flow; desktop MetaMask requires serving it over HTTP(S).

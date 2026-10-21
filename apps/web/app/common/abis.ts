@@ -89,7 +89,10 @@ export const safeAbi = parseAbi([
   "function signedMessages(bytes32) view returns (uint256)",
   "function getMessageHash(bytes message) view returns (bytes32)",
   "function isValidSignature(bytes32 _dataHash, bytes _signature) view returns (bytes4)",
+  "function execTransaction(address to, uint256 value, bytes data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, bytes signatures) payable returns (bool success)",
 ]);
+
+export const safeSignMessageLibAbi = parseAbi(["function signMessage(bytes _data)"]);
 
 export const l2GovernorAbi = parseAbi([
   "event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)",
