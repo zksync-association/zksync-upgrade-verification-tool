@@ -487,13 +487,14 @@ async function useSnapshot(_snapshot) {
       "This PR revision still includes the old Board-based v33 bundle. That bundle is disabled here. Refresh from GitHub after the normal L2 → L1 update lands. Handover and administration files remain available."
     );
 }
-async function refreshSource() {
+async function refreshSource(_number = snapshot?.number ?? 386) {
   requireThat(
-    !bootstrap,
-    "This file contains the PR revision shown above. Regenerate the HTML to fetch the latest private tx-sim revision through your gh login."
+    desktopAvailable && ["127.0.0.1", "localhost"].includes(window.location.hostname),
+    "Private PR imports use the local GitHub helper. Open this HTML through the loopback server, or load downloaded transaction JSON from disk."
   );
-  notice("Reading the current PR #386 files from GitHub…");
-  const response = await fetch("./api/pr386", {
+  requireThat(Number.isSafeInteger(_number) && _number > 0, "Enter a valid PR number.");
+  notice(`Reading PR #${_number} from GitHub…`);
+  const response = await fetch(`./api/pr/${_number}`, {
     headers: { "X-TxSim-Request": "1" },
     signal: AbortSignal.timeout(120000),
     cache: "no-store",
@@ -504,15 +505,24 @@ async function refreshSource() {
   );
   const data = await response.json();
   requireThat(!data.error, data.error);
-  if (data) await useSnapshot(data);
-  else {
+  requireThat(data.number === _number, "The helper returned another PR.");
+  if (data) {
+    await useSnapshot(data);
+    vote = null;
+    normalRows = [];
+    retryInfo = null;
+    status = null;
+    start = null;
+    relaySelected = false;
+    setView("bundle");
+  } else {
     $("source-title").textContent = "Load reviewed transaction files";
     $("source-info").textContent =
       "Refresh from GitHub using your local gh login, or open a JSON file.";
     render();
   }
   notice(
-    `Loaded all PR #386 transaction files at ${data.commit.slice(0, 12)}. Saved receipts are retained for unchanged calls.${bundles.some((_bundle) => _bundle.superseded) ? " The old Board-based v33 file is superseded for the requested L2 voting route." : ""}`
+    `Loaded PR #${data.number} at ${data.commit.slice(0, 12)}. Saved receipts are retained for unchanged calls.${bundles.some((_bundle) => _bundle.superseded) ? " The old Board-based v33 file is superseded for the requested L2 voting route." : ""}`
   );
 }
 function decodeProposal(_targets, _values, _calldatas, _description) {
@@ -1527,12 +1537,10 @@ function render() {
     : "Connect via WalletConnect";
   if (snapshot) {
     document.querySelector(".eyebrow").textContent = snapshot.label || "TRANSACTION SIMULATOR";
-    if (snapshot.executionPlan)
-      for (const item of document.querySelectorAll("nav a:not([aria-current])")) item.hidden = true;
-    if (snapshot.label) {
-      document.title = `Tx-sim · ${snapshot.label}`;
-      document.querySelector(".network-pill").textContent = snapshot.label;
-    }
+    for (const item of document.querySelectorAll("nav a:not([aria-current])"))
+      item.hidden = !!snapshot.executionPlan;
+    document.title = `Tx-sim · ${snapshot.label || `PR #${snapshot.number}`}`;
+    document.querySelector(".network-pill").textContent = snapshot.label || "Transaction simulator";
     const sourceLink = document.querySelector('.heading a[href*="/pull/"]');
     if (sourceLink) {
       sourceLink.href = `https://github.com/${snapshot.repo}/pull/${snapshot.number}`;
@@ -1621,7 +1629,16 @@ $("connect-walletconnect").onclick = () =>
     walletChain = null;
     await connect();
   });
-$("refresh-source").onclick = () => run(refreshSource);
+$("refresh-source").onclick = () => run(() => refreshSource());
+$("load-pr").onclick = () =>
+  run(async () => {
+    const input = $("pr-input").value.trim();
+    const match = input.match(
+      /^(?:https:\/\/github\.com\/matter-labs\/transaction-simulator\/pull\/)?([1-9]\d*)(?:[/?#].*)?$/
+    );
+    requireThat(match, "Enter a transaction-simulator PR URL or number.");
+    await refreshSource(Number(match[1]));
+  });
 $("prepare-vote").onclick = () => run(prepareVote);
 $("payload").oninput = () => {
   if (vote) render();
@@ -1682,9 +1699,9 @@ $("import-fetch").onclick = () =>
     );
     if (
       url.hostname === "github.com" &&
-      url.pathname === "/matter-labs/transaction-simulator/pull/386"
+      /^\/matter-labs\/transaction-simulator\/pull\/[1-9]\d*\/?$/.test(url.pathname)
     )
-      return refreshSource();
+      return refreshSource(Number(url.pathname.split("/").filter(Boolean).at(-1)));
     if (url.hostname === "github.com" && url.pathname.includes("/blob/"))
       url = new URL(`https://raw.githubusercontent.com${url.pathname.replace("/blob/", "/")}`);
     const response = await fetch(url, {
@@ -1748,28 +1765,43 @@ async function initialize() {
         ),
       ]);
   c = contracts(abis, window.ethers);
-  if (data) await useSnapshot(data);
+  let currentData = data;
+  if (
+    bootstrap &&
+    desktopAvailable &&
+    ["127.0.0.1", "localhost"].includes(window.location.hostname)
+  ) {
+    try {
+      const response = await fetch("./tx-sim-package.json", { cache: "no-store" });
+      if (response.ok) currentData = await response.json();
+    } catch {
+      /* The embedded revision also works with a static server. */
+    }
+  }
+  if (currentData) await useSnapshot(currentData);
   else {
     $("source-title").textContent = "Load reviewed transaction files";
     $("source-info").textContent =
       "Refresh from GitHub using your local gh login, or open a JSON file.";
     render();
   }
+  const embeddedPrepared =
+    currentData?.number === bootstrap?.snapshot?.number ? bootstrap?.prepared : null;
   let keepSavedAttempt = false;
-  if (bootstrap?.prepared && normalSaved?.retryInfo) {
+  if (embeddedPrepared && normalSaved?.retryInfo) {
     const saved = makeVote(normalSaved.input, normalSaved.description, c);
     keepSavedAttempt =
-      same(saved.upgradeId, bootstrap.prepared.upgradeId) &&
+      same(saved.upgradeId, embeddedPrepared.upgradeId) &&
       [
         normalSaved.retryInfo.retryOf,
         ...(normalSaved.retryInfo.history ?? []).map((_attempt) => _attempt.proposalId),
-      ].some((_id) => _id && BigInt(_id) === BigInt(bootstrap.prepared.proposalId));
+      ].some((_id) => _id && BigInt(_id) === BigInt(embeddedPrepared.proposalId));
     if (keepSavedAttempt) retryInfo = normalSaved.retryInfo;
   }
-  if (bootstrap?.prepared && !keepSavedAttempt) {
-    $("payload").value = JSON.stringify(bootstrap.prepared.payload, null, 2);
-    $("description").value = bootstrap.prepared.description;
-    if (normalSaved?.description === bootstrap.prepared.description)
+  if (embeddedPrepared && !keepSavedAttempt) {
+    $("payload").value = JSON.stringify(embeddedPrepared.payload, null, 2);
+    $("description").value = embeddedPrepared.description;
+    if (normalSaved?.description === embeddedPrepared.description)
       $("execution-hash").value = normalSaved.executionHash || "";
     setView("normal");
     try {
@@ -1784,7 +1816,7 @@ async function initialize() {
         true
       );
     }
-  } else if (normalSaved && (!data || data.number === 386)) {
+  } else if (normalSaved && (!currentData || currentData.number === 386)) {
     $("payload").value = JSON.stringify(normalSaved.input, null, 2);
     $("description").value = normalSaved.description;
     $("execution-hash").value = normalSaved.executionHash || "";
@@ -1808,14 +1840,14 @@ async function initialize() {
   await restoreWallet();
 }
 if (bootstrap) {
-  $("refresh-source").hidden = true;
+  $("refresh-source").hidden = !desktopAvailable;
   $("connect-walletconnect").hidden = !desktopAvailable;
   document.querySelector(".heading p").textContent =
     "Transactions imported from the pinned tx-sim PR. Connect the required sender and review each request in your wallet.";
   const note = el(
     "p",
     { class: "muted" },
-    "This single HTML contains the imported PR revision. Regenerate it to fetch updates. When served over HTTP(S), desktop MetaMask connects directly. Opened from disk, use WalletConnect. Each call requires its displayed sender; a Safe and its owner are different senders."
+    "This HTML starts with a pinned PR revision. Use Load PR with the loopback GitHub helper to change upgrades without rebuilding. When served over HTTP(S), desktop MetaMask connects directly. Opened from disk, use WalletConnect. Each call requires its displayed sender; a Safe and its owner are different senders."
   );
   document.querySelector(".source").after(note);
 }

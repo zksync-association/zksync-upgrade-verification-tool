@@ -62,7 +62,10 @@
           <strong id="source-title">Loading PR #386…</strong>
           <p id="source-info">Reading the pinned transaction files.</p>
         </div>
-        <button id="refresh-source">Refresh from GitHub</button
+        <label for="pr-input">Transaction-simulator PR</label>
+        <input id="pr-input" placeholder="PR URL or number, e.g. 387" />
+        <button id="load-pr">Load PR</button>
+        <button id="refresh-source">Refresh current PR</button
         ><button id="export-progress">Export receipts</button>
       </section>
 
@@ -90,7 +93,7 @@
             ></textarea
             ><button id="import-paste">Load pasted transactions</button
             ><label for="import-url"
-              >Raw JSON URL, GitHub file URL, or PR #386 URL</label
+              >Raw JSON URL, GitHub file URL, or tx-sim PR URL</label
             >
             <div class="actions">
               <input

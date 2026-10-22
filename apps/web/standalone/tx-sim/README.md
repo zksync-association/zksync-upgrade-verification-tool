@@ -12,6 +12,19 @@ files containing only that same proposal sequence are merged into this entry; mi
 their arbitrary calls and dependency checks. A successful attempt continues through queue and
 execution, with no new retry action. A later failed attempt can be retried while retaining its history.
 
+When served by the loopback helper, **Transaction-simulator PR → Load PR** imports a PR URL
+or number at runtime through the local `gh` login. **Refresh current PR** is explicit: no
+background action substitutes new calldata. The selected snapshot is saved by the helper
+and survives reloads, even when the single HTML embeds an older initial snapshot. A frontend
+rebuild is needed only for application code changes, not for another upgrade or PR revision.
+The helper remains read only and credentials never enter the browser.
+
+For a rehearsal whose senders are contracts, a reviewed real execution plan can be supplied
+as `execution-plans/<PR number>.json` beside `server.py`. It uses the same snapshot format,
+retains pinned source links/hashes, and must match the freshly fetched PR repository, number
+and commit. A stale plan fails rather than reverting to raw contract-sender calls. These
+private plan files are data and must not be committed. They can change without rebuilding.
+
 The tx-sim workflow can also be packaged as **one HTML file**, opened directly in Chrome. Its build
 automatically fetches the latest private PR through your existing `gh` login, pins one revision, and
 embeds all transaction files, ABIs, scripts and styles. No GitHub token enters the file. Opening a
@@ -54,8 +67,9 @@ while retaining byte-identical L1 message data and upgrade ID. The HTML opens wi
 already populated, shows the change, and checks live governance state before any wallet request.
 It never sends automatically. The adjacent `.build.json` and `.proposal.json` provide reviewable
 source/retry metadata. `--snapshot <downloaded package JSON>` supports an offline rebuild. These
-generated files can contain private PR content and must not be committed. Regenerate the HTML to
-import subsequent PR updates; an opened file never silently substitutes a different revision.
+generated files can contain private PR content and must not be committed. Opened directly from disk, regenerate the embedded snapshot or load downloaded JSON for
+subsequent PR updates. When served by the loopback helper, use **Load PR** without rebuilding;
+an opened page never silently substitutes a different revision.
 
 The primary governance signer flow is the standalone HTML opened directly from disk: connect the
 member Safe through WalletConnect for signatures, then a separate mobile executor wallet for calls
@@ -80,8 +94,8 @@ Open <http://127.0.0.1:8765/> in desktop Chrome with MetaMask. The verifier's **
 not sign, broadcast, or accept private keys. Stop it with Ctrl-C. A single-file verifier opened directly
 from disk should use WalletConnect; desktop extension transport needs HTTP(S).
 
-**Refresh from GitHub** uses the existing local `gh` login to read
-`matter-labs/transaction-simulator#386`. It pins every changed `transactions/` and `l2-transactions/`
+**Load PR** uses the existing local `gh` login to read the selected
+`matter-labs/transaction-simulator` PR (initially #386). It pins every changed `transactions/` and `l2-transactions/`
 array at one commit, excludes removed files, hashes each input, and rejects a PR head that changes
 mid-read. The endpoint accepts only same-origin requests and validated loopback hosts. Credentials
 never enter the browser. No private PR snapshot is committed here. You can also open/paste downloaded

@@ -1,9 +1,10 @@
-"""Loopback-only static server with one fixed, read-only PR refresh endpoint."""
+"""Loopback-only static server with read-only transaction-simulator PR imports."""
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 import importlib.util
 import json
+import re
 import threading
 
 ROOT = Path(__file__).parent
@@ -15,6 +16,16 @@ spec = importlib.util.spec_from_file_location('prepare', ROOT / 'prepare-tx-sim.
 prepare = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(prepare)
 lock = threading.Lock()
+
+def current_snapshot(_number):
+    latest = prepare.snapshot(_number)
+    plan_path = ROOT / 'execution-plans' / f'{_number}.json'
+    if plan_path.exists():
+        plan = json.loads(plan_path.read_text())
+        if plan.get('repo') != prepare.REPO or plan.get('number') != _number or plan.get('commit') != latest['commit']:
+            raise ValueError('The reviewed execution plan targets another PR revision; review the new revision first.')
+        latest = plan
+    return latest
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -31,7 +42,9 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(403, 'Loopback host required')
             return
         path = urlparse(self.path).path
-        if path == '/api/pr386':
+        pr_match = re.fullmatch(r'/api/pr/([1-9][0-9]{0,8})', path)
+        if path == '/api/pr386' or pr_match:
+            number = int(pr_match.group(1)) if pr_match else 386
             if self.headers.get('X-TxSim-Request') != '1' or self.headers.get('Sec-Fetch-Site') not in {None, 'same-origin', 'none'}:
                 self.send_error(403, 'Same-origin request required')
                 return
@@ -43,7 +56,7 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_error(429, 'A GitHub refresh is already running')
                 return
             try:
-                latest = prepare.snapshot()
+                latest = current_snapshot(number)
                 data = json.dumps(latest).encode()
                 # Keep the pinned local copy current across browser reloads.
                 temporary = ROOT / 'tx-sim-package.json.tmp'
@@ -51,7 +64,7 @@ class Handler(SimpleHTTPRequestHandler):
                 temporary.replace(ROOT / 'tx-sim-package.json')
                 self.send_response(200)
             except Exception:
-                data = json.dumps({'error': 'Could not read PR #386 through the local gh login. Check gh auth and retry.'}).encode()
+                data = json.dumps({'error': f'Could not read PR #{number} or its matching execution plan. Check gh auth and the reviewed plan revision.'}).encode()
                 self.send_response(502)
             finally:
                 lock.release()

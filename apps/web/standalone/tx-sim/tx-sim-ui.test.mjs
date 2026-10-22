@@ -400,6 +400,11 @@ test("another PR opens its own execution plan without restoring Testnet 3 voting
     },
   };
   dom.window.__TX_SIM_WALLET__ = { restore: async () => null };
+  const currentSnapshot = structuredClone(dom.window.__TX_SIM_BOOTSTRAP__.snapshot);
+  dom.window.__TX_SIM_BOOTSTRAP__.snapshot.number = 386;
+  dom.window.__TX_SIM_BOOTSTRAP__.prepared = {
+    payload: "unrelated embedded retry must not be restored",
+  };
   const values = {
     window: dom.window,
     document: dom.window.document,
@@ -408,8 +413,9 @@ test("another PR opens its own execution plan without restoring Testnet 3 voting
     localStorage: dom.window.localStorage,
     navigator: dom.window.navigator,
     setInterval: () => 0,
-    fetch: async () => {
-      throw Error("This prepared plan must not read the unrelated governor");
+    fetch: async (url) => {
+      assert.equal(url, "./tx-sim-package.json");
+      return { ok: true, json: async () => currentSnapshot };
     },
   };
   const saved = Object.fromEntries(
@@ -439,6 +445,44 @@ test("another PR opens its own execution plan without restoring Testnet 3 voting
     assert.equal(
       JSON.parse(localStorage.getItem(STORAGE.vote)).description,
       "An unrelated saved Testnet 3 vote"
+    );
+    const fetched = [];
+    const next = structuredClone(currentSnapshot);
+    next.number = 388;
+    next.commit = "c".repeat(40);
+    next.label = "Next reviewed upgrade";
+    next.stages[0].title = "Next transaction file";
+    globalThis.fetch = async (url, options) => {
+      fetched.push(url);
+      assert.equal(options.headers["X-TxSim-Request"], "1");
+      return { ok: true, json: async () => next };
+    };
+    document.getElementById("pr-input").value =
+      "https://github.com/matter-labs/transaction-simulator/pull/388";
+    document.getElementById("load-pr").click();
+    for (
+      let i = 0;
+      i < 100 && !document.getElementById("notice").textContent.includes("Loaded PR #388");
+      i++
+    )
+      await new Promise((r) => setTimeout(r, 5));
+    assert.deepEqual(fetched, ["./api/pr/388"]);
+    assert.match(document.getElementById("source-title").textContent, /#388/);
+    assert.match(document.getElementById("bundle-summary").textContent, /Next transaction file/);
+    assert.equal(document.getElementById("normal-view").hidden, true);
+    assert.match(document.title, /Next reviewed upgrade/);
+    assert.equal(
+      JSON.parse(localStorage.getItem(STORAGE.vote)).description,
+      "An unrelated saved Testnet 3 vote"
+    );
+    document.getElementById("pr-input").value = "https://attacker.example/pull/389";
+    document.getElementById("load-pr").click();
+    await new Promise((r) => setTimeout(r, 5));
+    assert.equal(fetched.length, 1);
+    assert.match(document.getElementById("source-title").textContent, /#388/);
+    assert.match(
+      document.getElementById("notice").textContent,
+      /valid|Enter a transaction-simulator/
     );
   } finally {
     dom.window.close();
