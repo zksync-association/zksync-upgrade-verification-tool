@@ -262,7 +262,7 @@ for (const protocol of ["file:", "http:"])
         [...document.querySelectorAll("nav[aria-label='Governance navigation'] a")].map(
           (_link) => _link.textContent
         ),
-        ["Overview", "Upgrades", "Emergency", "Freeze", "Veto", "Tx-sim"]
+        ["Overview", "Upgrades", "Chain upgrade", "Emergency", "Freeze", "Veto", "Tx-sim"]
       );
       assert.equal(document.getElementById("normal-tab"), null);
       assert.equal(document.getElementById("bundle-tab"), null);
@@ -360,3 +360,91 @@ for (const protocol of ["file:", "http:"])
       }
     }
   });
+
+test("another PR opens its own execution plan without restoring Testnet 3 voting", async () => {
+  const raw = JSON.stringify([
+    {
+      network: "sepolia",
+      from: ADDRESSES.control,
+      to: ADDRESSES.token,
+      value: "0",
+      data: "0x12345678",
+    },
+  ]);
+  const dom = new JSDOM(readFileSync(new URL("./tx-sim.html", import.meta.url), "utf8"), {
+    url: "http://127.0.0.1:8765/tx-sim.html",
+  });
+  dom.window.ethers = ethers;
+  dom.window.localStorage.setItem(
+    STORAGE.vote,
+    JSON.stringify({ description: "An unrelated saved Testnet 3 vote" })
+  );
+  dom.window.__TX_SIM_BOOTSTRAP__ = {
+    abis,
+    snapshot: {
+      repo: "matter-labs/transaction-simulator",
+      number: 387,
+      commit: "b".repeat(40),
+      pinnedAt: "2026-10-22T09:00:00Z",
+      label: "ERA STAGE · EraBender",
+      executionPlan: {},
+      stages: [
+        {
+          title: "ERA upgrade",
+          path: "prepared.json",
+          sourceUrl: "https://github.com/matter-labs/era-contracts/blob/pinned/runbook.json",
+          raw,
+          sha256: await sha256(raw),
+        },
+      ],
+    },
+  };
+  dom.window.__TX_SIM_WALLET__ = { restore: async () => null };
+  const values = {
+    window: dom.window,
+    document: dom.window.document,
+    Node: dom.window.Node,
+    Event: dom.window.Event,
+    localStorage: dom.window.localStorage,
+    navigator: dom.window.navigator,
+    setInterval: () => 0,
+    fetch: async () => {
+      throw Error("This prepared plan must not read the unrelated governor");
+    },
+  };
+  const saved = Object.fromEntries(
+    Object.keys(values).map((k) => [k, Object.getOwnPropertyDescriptor(globalThis, k)])
+  );
+  try {
+    for (const [k, v] of Object.entries(values))
+      Object.defineProperty(globalThis, k, { value: v, configurable: true, writable: true });
+    await import(`./tx-sim-ui.mjs?era=${Date.now()}`);
+    for (
+      let i = 0;
+      i < 100 && !document.getElementById("source-title").textContent.includes("#387");
+      i++
+    )
+      await new Promise((r) => setTimeout(r, 5));
+    assert.match(document.getElementById("source-title").textContent, /#387/);
+    assert.equal(document.getElementById("bundle-view").hidden, false);
+    assert.equal(document.getElementById("normal-view").hidden, true);
+    assert.equal(
+      document.getElementById("pr-link").href,
+      "https://github.com/matter-labs/transaction-simulator/pull/387"
+    );
+    assert.match(document.title, /EraBender/);
+    assert.equal(document.querySelectorAll("nav a:not([aria-current]):not([hidden])").length, 0);
+    assert.match(document.getElementById("bundle-summary").textContent, /ERA upgrade/);
+    assert.equal(document.getElementById("notice").hidden, true);
+    assert.equal(
+      JSON.parse(localStorage.getItem(STORAGE.vote)).description,
+      "An unrelated saved Testnet 3 vote"
+    );
+  } finally {
+    dom.window.close();
+    for (const [k, v] of Object.entries(saved)) {
+      if (v) Object.defineProperty(globalThis, k, v);
+      else delete globalThis[k];
+    }
+  }
+});

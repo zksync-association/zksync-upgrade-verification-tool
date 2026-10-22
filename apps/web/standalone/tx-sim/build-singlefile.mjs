@@ -18,6 +18,7 @@ const root = fileURLToPath(new URL("./", import.meta.url));
 const { values } = parseArgs({
   options: {
     snapshot: { type: "string" },
+    pr: { type: "string", default: "386" },
     output: { type: "string", default: "tx-sim-testnet-3.html" },
     "retry-description": { type: "string" },
     "proposal-id": { type: "string" },
@@ -26,9 +27,13 @@ const { values } = parseArgs({
 const scratch = mkdtempSync(join(tmpdir(), "tx-sim-html-"));
 try {
   if (!values.snapshot)
-    execFileSync("python3", [join(root, "prepare-tx-sim.py"), "--output", scratch], {
-      stdio: "inherit",
-    });
+    execFileSync(
+      "python3",
+      [join(root, "prepare-tx-sim.py"), "--output", scratch, "--pr", values.pr],
+      {
+        stdio: "inherit",
+      }
+    );
   const snapshot = JSON.parse(
     readFileSync(
       values.snapshot ? resolve(values.snapshot) : join(scratch, "tx-sim-package.json"),

@@ -31,6 +31,29 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(result['stages'][0]['path'], new_path)
         self.assertEqual(json.loads(result['stages'][0]['raw']), calls)
 
+    def test_other_pr_does_not_import_testnet3_metadata(self):
+        metadata = {'headRefOid': 'a' * 40, 'headRefName': 'era', 'title': 'Era stage', 'url': 'url', 'updatedAt': 'date'}
+        requested = []
+        def gh(_args):
+            requested.append(_args)
+            return [[{'filename': 'transactions/era-stage.json', 'status': 'added'}]] if _args[0] == 'api' else metadata
+        with patch.object(prepare, 'gh_json', side_effect=gh), patch.object(prepare, 'read_file', return_value=b'[]') as read:
+            result = prepare.snapshot(387)
+        self.assertEqual(result['number'], 387)
+        self.assertEqual(read.call_args_list[0].args, ('transactions/era-stage.json', 'a' * 40))
+        self.assertEqual(read.call_count, 1)
+        self.assertTrue(all(args[2] == '387' for args in requested if args[0] == 'pr'))
+        self.assertTrue(any('pulls/387/files' in args[1] for args in requested if args[0] == 'api'))
+
+    def test_large_github_file_uses_raw_response_and_preserves_bytes(self):
+        raw = b'[' + b' ' * (1024 * 1024 + 1) + b']\n'
+        with patch.object(prepare.subprocess, 'check_output', return_value=raw) as read:
+            self.assertEqual(prepare.read_file('transactions/large.json', 'a' * 40), raw)
+        self.assertIn('Accept: application/vnd.github.raw+json', read.call_args.args[0])
+        with patch.object(prepare.subprocess, 'check_output', return_value=b'x' * (prepare.MAX_SOURCE_BYTES + 1)):
+            with self.assertRaisesRegex(ValueError, 'exceeds 8 MB'):
+                prepare.read_file('transactions/large.json', 'a' * 40)
+
     def test_moving_head_is_rejected_instead_of_mixing_revisions(self):
         metadata = {'headRefOid': 'a' * 40, 'headRefName': 'branch', 'title': 'title', 'url': 'url', 'updatedAt': 'date'}
         responses = [metadata, [[{'filename': 'transactions/new.json', 'status': 'added'}]], {'headRefOid': 'b' * 40}]

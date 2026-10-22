@@ -1376,7 +1376,8 @@ function renderBundles() {
     summary.append(
       link(
         "Pinned source ↗",
-        `https://github.com/${snapshot.repo}/blob/${snapshot.commit}/${bundle.path}`
+        bundle.sourceUrl ||
+          `https://github.com/${snapshot.repo}/blob/${snapshot.commit}/${bundle.path}`
       )
     );
   if (bundle.superseded)
@@ -1525,6 +1526,18 @@ function render() {
       : "Connect desktop MetaMask"
     : "Connect via WalletConnect";
   if (snapshot) {
+    document.querySelector(".eyebrow").textContent = snapshot.label || "TRANSACTION SIMULATOR";
+    if (snapshot.executionPlan)
+      for (const item of document.querySelectorAll("nav a:not([aria-current])")) item.hidden = true;
+    if (snapshot.label) {
+      document.title = `Tx-sim · ${snapshot.label}`;
+      document.querySelector(".network-pill").textContent = snapshot.label;
+    }
+    const sourceLink = document.querySelector('.heading a[href*="/pull/"]');
+    if (sourceLink) {
+      sourceLink.href = `https://github.com/${snapshot.repo}/pull/${snapshot.number}`;
+      sourceLink.textContent = `PR #${snapshot.number} ↗`;
+    }
     $("source-title").textContent = `${snapshot.repo} #${snapshot.number} · ${snapshot.commit}`;
     $("source-info").replaceChildren(
       "Pinned ",
@@ -1771,7 +1784,7 @@ async function initialize() {
         true
       );
     }
-  } else if (normalSaved) {
+  } else if (normalSaved && (!data || data.number === 386)) {
     $("payload").value = JSON.stringify(normalSaved.input, null, 2);
     $("description").value = normalSaved.description;
     $("execution-hash").value = normalSaved.executionHash || "";
@@ -1802,7 +1815,7 @@ if (bootstrap) {
   const note = el(
     "p",
     { class: "muted" },
-    "This single HTML contains the imported PR revision. Regenerate it to fetch updates. When served over HTTP(S), desktop MetaMask connects directly. Opened from disk, use WalletConnect. Safe approvals use the Safe address; this L2 vote uses the voting EOA."
+    "This single HTML contains the imported PR revision. Regenerate it to fetch updates. When served over HTTP(S), desktop MetaMask connects directly. Opened from disk, use WalletConnect. Each call requires its displayed sender; a Safe and its owner are different senders."
   );
   document.querySelector(".source").after(note);
 }

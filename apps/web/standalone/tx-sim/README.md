@@ -23,6 +23,12 @@ From `apps/web`:
 node standalone/tx-sim/build-singlefile.mjs --output /tmp/tx-sim-testnet-3.html
 ```
 
+Pass `--pr 387` (or another transaction-simulator PR number) to import a different PR.
+The importer supports GitHub files larger than 1 MB through the raw content API.
+A different PR does not restore the saved Testnet 3 voting workflow. Source sender
+addresses are preserved: calls from a governance contract in a rehearsal still
+need their real governance execution wrapper before they can be sent by an EOA.
+
 Open that file and connect through WalletConnect. For Safe-originated requests, connect the Safe and
 approve in the Safe web app using desktop MetaMask. Transactions requiring an EOA, including the
 prepared Testnet 3 L2 vote, require that exact EOA through a compatible WalletConnect wallet such as
