@@ -438,8 +438,11 @@ test("another PR opens its own execution plan without restoring Testnet 3 voting
       document.getElementById("pr-link").href,
       "https://github.com/matter-labs/transaction-simulator/pull/387"
     );
-    assert.match(document.title, /EraBender/);
-    assert.equal(document.querySelectorAll("nav a:not([aria-current]):not([hidden])").length, 0);
+    const header = document.querySelector("header").textContent;
+    assert.doesNotMatch(header, /ERA STAGE|EraBender/);
+    assert.equal(document.querySelector(".network-pill").textContent, "Sepolia");
+    assert.equal(document.querySelectorAll("nav a:not([hidden])").length, 7);
+    assert.equal(document.title, "Tx-sim · ZKsync governance");
     assert.match(document.getElementById("bundle-summary").textContent, /ERA upgrade/);
     assert.equal(document.getElementById("notice").hidden, true);
     assert.equal(
@@ -470,7 +473,9 @@ test("another PR opens its own execution plan without restoring Testnet 3 voting
     assert.match(document.getElementById("source-title").textContent, /#388/);
     assert.match(document.getElementById("bundle-summary").textContent, /Next transaction file/);
     assert.equal(document.getElementById("normal-view").hidden, true);
-    assert.match(document.title, /Next reviewed upgrade/);
+    assert.equal(document.title, "Tx-sim · ZKsync governance");
+    assert.equal(document.querySelector("header").textContent, header);
+    assert.equal(document.querySelectorAll("nav a:not([hidden])").length, 7);
     assert.equal(
       JSON.parse(localStorage.getItem(STORAGE.vote)).description,
       "An unrelated saved Testnet 3 vote"

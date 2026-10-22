@@ -1537,10 +1537,6 @@ function render() {
     : "Connect via WalletConnect";
   if (snapshot) {
     document.querySelector(".eyebrow").textContent = snapshot.label || "TRANSACTION SIMULATOR";
-    for (const item of document.querySelectorAll("nav a:not([aria-current])"))
-      item.hidden = !!snapshot.executionPlan;
-    document.title = `Tx-sim · ${snapshot.label || `PR #${snapshot.number}`}`;
-    document.querySelector(".network-pill").textContent = snapshot.label || "Transaction simulator";
     const sourceLink = document.querySelector('.heading a[href*="/pull/"]');
     if (sourceLink) {
       sourceLink.href = `https://github.com/${snapshot.repo}/pull/${snapshot.number}`;
