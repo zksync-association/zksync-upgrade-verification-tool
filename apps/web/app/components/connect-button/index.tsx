@@ -1,6 +1,7 @@
 import { useStatusIfRead } from "@/components/governance-context";
 import Avatar from "@/components/connect-button/avatar";
 import { Button } from "@/components/ui/button";
+import { supportsDesktopWallet } from "@/common/walletconnect";
 import type { SignerGroup } from "@/common/typed-data";
 import { shortHex } from "@/utils/format";
 import { ConnectButton as RainbowConnectButton } from "@rainbow-me/rainbowkit";
@@ -37,10 +38,7 @@ export function useConnectedGroups(): {
   return { address, groups, known: true };
 }
 
-/**
- * Connects over WalletConnect: its own modal opens, with the QR to scan and Copy link to paste into
- * Safe{Wallet}. Closing the modal is not an error; anything else is said.
- */
+/** Connect member Safes and mobile executors over WalletConnect by default. */
 export function useConnectWallet() {
   const { connectors, connect, isPending } = useConnect({
     mutation: {
@@ -50,12 +48,20 @@ export function useConnectWallet() {
       },
     },
   });
-  const connector = connectors.find((c) => c.id === "walletConnect");
-  return { connect: connector ? () => connect({ connector }) : undefined, isPending };
+  const metamask = supportsDesktopWallet(
+    typeof window === "undefined" ? undefined : window.location.protocol
+  )
+    ? connectors.find((c) => c.id === "io.metamask") ?? connectors.find((c) => c.id === "metaMask")
+    : undefined;
+  const walletConnect = connectors.find((c) => c.id === "walletConnect");
+  const connector = walletConnect;
+  return {
+    connect: connector ? () => connect({ connector }) : undefined,
+    connectMetaMask: metamask ? () => connect({ connector: metamask }) : undefined,
+    connectWalletConnect: walletConnect ? () => connect({ connector: walletConnect }) : undefined,
+    isPending,
+  };
 }
-
-const NO_WALLETCONNECT =
-  "Wallets connect over WalletConnect: add a WalletConnect project id in Settings first. Members then connect their Safe from Safe{Wallet} to sign; to send a transaction, connect any WalletConnect wallet app, or copy its to, data and value from this page into your wallet.";
 
 /**
  * Asks the connected wallet to move to this page's chain. Refused or impossible (a wallet whose
@@ -93,29 +99,29 @@ export default function ConnectButton() {
             </Button>
           );
         if (!account || !chain) {
-          if (!window.ENV?.WALLET_CONNECT_PROJECT_ID)
-            return (
+          return (
+            <div className="flex gap-2">
               <Button
                 variant="default"
                 className="px-3.5"
-                onClick={() => toast(NO_WALLETCONNECT, { duration: 12_000 })}
+                onClick={wallet.connectWalletConnect}
+                disabled={!wallet.connectWalletConnect}
+                loading={wallet.isPending}
                 data-testid="connect-wallet"
-                title={NO_WALLETCONNECT}
+                title="Connect your member Safe through WalletConnect to sign. A mobile wallet can connect separately to execute permissionless calls."
               >
-                Connect wallet
+                Connect Safe / wallet
               </Button>
-            );
-          return (
-            <Button
-              variant="default"
-              className="px-3.5"
-              onClick={wallet.connect}
-              loading={wallet.isPending}
-              data-testid="connect-wallet"
-              title="Only needed to sign as a member Safe or to send a transaction. Checking needs no wallet."
-            >
-              Connect wallet
-            </Button>
+              {wallet.connectMetaMask && (
+                <Button
+                  variant="outline"
+                  onClick={wallet.connectMetaMask}
+                  loading={wallet.isPending}
+                >
+                  Desktop MetaMask
+                </Button>
+              )}
+            </div>
           );
         }
         if (chain.unsupported) {

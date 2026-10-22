@@ -12,11 +12,12 @@
     "dev": "NODE_ENV=development FORCE_COLOR=true tsx watch --clear-screen=false --ignore \".cache/**\" --ignore \"app/**\" --ignore \"vite.config.ts.timestamp-*\" --ignore \"build/**\" --ignore \"node_modules/**\" -r dotenv/config --inspect ./server/index.ts | pino-pretty",
     "start": "node ./server-build/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "run-s test:u test:s",
+    "test": "run-s test:u test:s test:tx-sim",
     "test:u": "vitest run --config ./vitest.unit.config.ts",
     "test:s": "vitest run --config ./vitest.server.config.ts",
     "test:i": "vitest run --config ./vitest.integration.config.ts",
-    "test:fork": "vitest run --config ./vitest.fork.config.ts"
+    "test:fork": "vitest run --config ./vitest.fork.config.ts",
+    "test:tx-sim": "node --test standalone/tx-sim/*.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "=1.1.4",
@@ -68,6 +69,7 @@
     "autoprefixer": "^10.4.19",
     "esbuild": "^0.23.1",
     "esbuild-node-externals": "^1.14.0",
+    "ethers": "5.7.2",
     "jsdom": "^24.1.0",
     "npm-run-all": "^4.1.5",
     "pino-pretty": "^11.2.1",

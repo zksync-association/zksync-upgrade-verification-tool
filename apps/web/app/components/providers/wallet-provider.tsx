@@ -14,7 +14,8 @@ import {
   useSwitchChain,
 } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
-import { walletConnect } from "wagmi/connectors";
+import { supportsDesktopWallet } from "@/common/walletconnect";
+import { injected, walletConnect } from "wagmi/connectors";
 
 const queryClient = new QueryClient();
 const walletTheme = lightTheme({
@@ -57,15 +58,8 @@ function chainFor(chainId: number, label: string): Chain {
 /** True inside an iframe, e.g. when Safe{Wallet} opens the app as a Safe App. */
 export const isFramed = () => typeof window !== "undefined" && window.parent !== window;
 
-// A wallet is only needed to sign as a member Safe or to send a transaction, and is reached only
-// over WalletConnect (a project id in Settings): members connect their Safe from Safe{Wallet}, and
-// anyone can connect a wallet app to send. Browser extensions cannot connect to the single-file
-// build (they talk to the page through window.postMessage, which browsers drop on file:// pages), so
-// installed ones are not discovered either: listed, they would hang at "Confirm in the extension".
-//
-// One WalletConnect connector, which opens WalletConnect's own modal: its QR to scan, and Copy link
-// to paste into Safe{Wallet}. (RainbowKit's WalletConnect wallet adds a second connector for that
-// modal, and with it a second WalletConnect client on the same storage and relay identity.)
+// Desktop browsers can connect MetaMask directly when this page is served over HTTP(S).
+// WalletConnect remains available for member Safes and for builds opened from disk.
 const WALLETCONNECT_MODAL = {
   themeMode: "light",
   // Only the QR and its link: no directory of wallets fetched from WalletConnect.
@@ -122,23 +116,28 @@ export function WalletProvider({
 }) {
   const config = useMemo(() => {
     const chain = chainFor(chainId, chainLabel);
+    const desktop = supportsDesktopWallet(
+      typeof window === "undefined" ? undefined : window.location.protocol
+    );
     return createConfig({
       chains: [chain] as [Chain],
       transports: { [chain.id]: noBrowserRpc },
       ssr: true,
       storage: createStorage({ storage: walletStorage(), key: `${STORAGE_PREFIX}wagmi` }),
-      multiInjectedProviderDiscovery: false,
-      // Without a project id there is no wallet.
-      connectors: projectId
-        ? [
-            walletConnect({
-              projectId,
-              showQrModal: true,
-              qrModalOptions: WALLETCONNECT_MODAL,
-              customStoragePrefix: STORAGE_PREFIX || undefined,
-            }),
-          ]
-        : [],
+      multiInjectedProviderDiscovery: desktop,
+      connectors: [
+        ...(desktop ? [injected({ target: "metaMask" })] : []),
+        ...(projectId
+          ? [
+              walletConnect({
+                projectId,
+                showQrModal: true,
+                qrModalOptions: WALLETCONNECT_MODAL,
+                customStoragePrefix: STORAGE_PREFIX || undefined,
+              }),
+            ]
+          : []),
+      ],
     });
   }, [projectId, chainId, chainLabel]);
 

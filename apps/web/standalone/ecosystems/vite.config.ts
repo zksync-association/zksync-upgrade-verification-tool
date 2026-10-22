@@ -19,7 +19,11 @@ const title: Plugin = {
 const config: UserConfig = {
   ...base,
   plugins: [...(base.plugins ?? []), title],
-  define: { ...base.define, __ECOSYSTEM__: JSON.stringify(ecosystem) },
+  define: {
+    ...base.define,
+    __ECOSYSTEM__: JSON.stringify(ecosystem),
+    __TX_SIM_COMPANION__: JSON.stringify(name === "testnet-3"),
+  },
   resolve: {
     ...base.resolve,
     alias: [

@@ -18,7 +18,10 @@
     "ignore": [
       "packages/e2e/playwright-report",
       "packages/e2e/test-results",
-      "apps/web/test/fixtures"
+      "apps/web/test/fixtures",
+      "apps/web/standalone/tx-sim/index.html",
+      "apps/web/standalone/tx-sim/ethers.umd.min.js",
+      "apps/web/standalone/tx-sim/tx-sim-package.json"
     ]
   },
   "organizeImports": {

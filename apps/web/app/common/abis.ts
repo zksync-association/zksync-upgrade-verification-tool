@@ -89,7 +89,10 @@ export const safeAbi = parseAbi([
   "function signedMessages(bytes32) view returns (uint256)",
   "function getMessageHash(bytes message) view returns (bytes32)",
   "function isValidSignature(bytes32 _dataHash, bytes _signature) view returns (bytes4)",
+  "function execTransaction(address to, uint256 value, bytes data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, bytes signatures) payable returns (bool success)",
 ]);
+
+export const safeSignMessageLibAbi = parseAbi(["function signMessage(bytes _data)"]);
 
 export const l2GovernorAbi = parseAbi([
   "event ProposalCreated(uint256 proposalId, address proposer, address[] targets, uint256[] values, string[] signatures, bytes[] calldatas, uint256 voteStart, uint256 voteEnd, string description)",
@@ -108,3 +111,43 @@ export const l1MessengerEventAbi = parseAbi([
 ]);
 
 export const ERC1271_MAGIC_VALUE = "0x1626ba7e" as const;
+
+// Per-chain upgrades: read the registered cut and forward the chain owner's two actions.
+const chainDiamondStructs = [
+  "struct FacetCut { address facet; uint8 action; bool isFreezable; bytes4[] selectors; }",
+  "struct DiamondCutData { FacetCut[] facetCuts; address initAddress; bytes initCalldata; }",
+] as const;
+export const chainUpgradeBridgehubAbi = parseAbi([
+  "function getZKChain(uint256 _chainId) view returns (address)",
+  "function chainTypeManager(uint256 _chainId) view returns (address)",
+]);
+export const chainUpgradeDiamondAbi = parseAbi([
+  ...chainDiamondStructs,
+  "function getAdmin() view returns (address)",
+  "function getChainTypeManager() view returns (address)",
+  "function getChainId() view returns (uint256)",
+  "function getProtocolVersion() view returns (uint256)",
+  "function upgradeChainFromVersion(address _chainAddress,uint256 _oldProtocolVersion,DiamondCutData _diamondCut)",
+]);
+export const chainUpgradeLegacyDiamondAbi = parseAbi([
+  ...chainDiamondStructs,
+  "function upgradeChainFromVersion(uint256 _oldProtocolVersion,DiamondCutData _diamondCut)",
+]);
+export const chainUpgradeCtmAbi = parseAbi([
+  ...chainDiamondStructs,
+  "function protocolVersion() view returns (uint256)",
+  "function upgradeCutHash(uint256 _oldProtocolVersion) view returns (bytes32)",
+  "function upgradeCutDataBlock(uint256 _oldProtocolVersion) view returns (uint256)",
+  "function serverNotifierAddress() view returns (address)",
+  "event NewUpgradeCutData(uint256 indexed protocolVersion,DiamondCutData diamondCutData)",
+]);
+export const chainUpgradeNotifierAbi = parseAbi([
+  "function chainTypeManager() view returns (address)",
+  "function protocolVersionToUpgradeTimestamp(uint256 _chainId,uint256 _oldProtocolVersion) view returns (uint256)",
+  "function setUpgradeTimestamp(uint256 _chainId,uint256 _upgradeTimestamp)",
+]);
+export const chainUpgradeAdminAbi = parseAbi([
+  "struct Call { address target; uint256 value; bytes data; }",
+  "function owner() view returns (address)",
+  "function multicall(Call[] _calls,bool _requireSuccess) payable",
+]);

@@ -1,0 +1,4434 @@
+{
+  "Testnet3Governor": [
+    {
+      "inputs": [
+        { "internalType": "string", "name": "_name", "type": "string" },
+        {
+          "internalType": "contract IVotes",
+          "name": "_token",
+          "type": "address"
+        },
+        {
+          "internalType": "contract TimelockController",
+          "name": "_timelock",
+          "type": "address"
+        },
+        {
+          "internalType": "uint48",
+          "name": "_initialVotingDelay",
+          "type": "uint48"
+        },
+        {
+          "internalType": "uint32",
+          "name": "_initialVotingPeriod",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_initialProposalThreshold",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint224",
+          "name": "_initialQuorum",
+          "type": "uint224"
+        },
+        {
+          "internalType": "uint64",
+          "name": "_initialVoteExtension",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    { "inputs": [], "name": "Empty", "type": "error" },
+    { "inputs": [], "name": "InvalidShortString", "type": "error" },
+    {
+      "inputs": [{ "internalType": "string", "name": "str", "type": "string" }],
+      "name": "StringTooLong",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [],
+      "name": "EIP712DomainChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "oldVoteExtension",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "newVoteExtension",
+          "type": "uint64"
+        }
+      ],
+      "name": "LateQuorumVoteExtensionSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "proposalId",
+          "type": "uint256"
+        }
+      ],
+      "name": "ProposalCanceled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "proposalId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "proposer",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address[]",
+          "name": "targets",
+          "type": "address[]"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256[]",
+          "name": "values",
+          "type": "uint256[]"
+        },
+        {
+          "indexed": false,
+          "internalType": "string[]",
+          "name": "signatures",
+          "type": "string[]"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes[]",
+          "name": "calldatas",
+          "type": "bytes[]"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "voteStart",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "voteEnd",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "description",
+          "type": "string"
+        }
+      ],
+      "name": "ProposalCreated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "proposalId",
+          "type": "uint256"
+        }
+      ],
+      "name": "ProposalExecuted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "proposalId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "extendedDeadline",
+          "type": "uint64"
+        }
+      ],
+      "name": "ProposalExtended",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "proposalId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "eta",
+          "type": "uint256"
+        }
+      ],
+      "name": "ProposalQueued",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "oldProposalThreshold",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newProposalThreshold",
+          "type": "uint256"
+        }
+      ],
+      "name": "ProposalThresholdSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "oldQuorum",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newQuorum",
+          "type": "uint256"
+        }
+      ],
+      "name": "QuorumUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "oldTimelock",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "newTimelock",
+          "type": "address"
+        }
+      ],
+      "name": "TimelockChange",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "voter",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "proposalId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "support",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "weight",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "VoteCast",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "voter",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "proposalId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "support",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "weight",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "params",
+          "type": "bytes"
+        }
+      ],
+      "name": "VoteCastWithParams",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "oldVotingDelay",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newVotingDelay",
+          "type": "uint256"
+        }
+      ],
+      "name": "VotingDelaySet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "oldVotingPeriod",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newVotingPeriod",
+          "type": "uint256"
+        }
+      ],
+      "name": "VotingPeriodSet",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "BALLOT_TYPEHASH",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "CLOCK_MODE",
+      "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "COUNTING_MODE",
+      "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "EXTENDED_BALLOT_TYPEHASH",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address[]", "name": "targets", "type": "address[]" },
+        { "internalType": "uint256[]", "name": "values", "type": "uint256[]" },
+        { "internalType": "bytes[]", "name": "calldatas", "type": "bytes[]" },
+        {
+          "internalType": "bytes32",
+          "name": "descriptionHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "cancel",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "proposalId", "type": "uint256" },
+        { "internalType": "uint8", "name": "support", "type": "uint8" }
+      ],
+      "name": "castVote",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "proposalId", "type": "uint256" },
+        { "internalType": "uint8", "name": "support", "type": "uint8" },
+        { "internalType": "uint8", "name": "v", "type": "uint8" },
+        { "internalType": "bytes32", "name": "r", "type": "bytes32" },
+        { "internalType": "bytes32", "name": "s", "type": "bytes32" }
+      ],
+      "name": "castVoteBySig",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "proposalId", "type": "uint256" },
+        { "internalType": "uint8", "name": "support", "type": "uint8" },
+        { "internalType": "string", "name": "reason", "type": "string" }
+      ],
+      "name": "castVoteWithReason",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "proposalId", "type": "uint256" },
+        { "internalType": "uint8", "name": "support", "type": "uint8" },
+        { "internalType": "string", "name": "reason", "type": "string" },
+        { "internalType": "bytes", "name": "params", "type": "bytes" }
+      ],
+      "name": "castVoteWithReasonAndParams",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_proposalId", "type": "uint256" },
+        { "internalType": "uint8", "name": "_support", "type": "uint8" },
+        { "internalType": "string", "name": "_reason", "type": "string" },
+        { "internalType": "bytes", "name": "_params", "type": "bytes" },
+        { "internalType": "uint8", "name": "_v", "type": "uint8" },
+        { "internalType": "bytes32", "name": "_r", "type": "bytes32" },
+        { "internalType": "bytes32", "name": "_s", "type": "bytes32" }
+      ],
+      "name": "castVoteWithReasonAndParamsBySig",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "clock",
+      "outputs": [{ "internalType": "uint48", "name": "", "type": "uint48" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "eip712Domain",
+      "outputs": [
+        { "internalType": "bytes1", "name": "fields", "type": "bytes1" },
+        { "internalType": "string", "name": "name", "type": "string" },
+        { "internalType": "string", "name": "version", "type": "string" },
+        { "internalType": "uint256", "name": "chainId", "type": "uint256" },
+        {
+          "internalType": "address",
+          "name": "verifyingContract",
+          "type": "address"
+        },
+        { "internalType": "bytes32", "name": "salt", "type": "bytes32" },
+        {
+          "internalType": "uint256[]",
+          "name": "extensions",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address[]", "name": "targets", "type": "address[]" },
+        { "internalType": "uint256[]", "name": "values", "type": "uint256[]" },
+        { "internalType": "bytes[]", "name": "calldatas", "type": "bytes[]" },
+        {
+          "internalType": "bytes32",
+          "name": "descriptionHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "execute",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "name": "fractionalVoteNonce",
+      "outputs": [{ "internalType": "uint128", "name": "", "type": "uint128" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "account", "type": "address" },
+        { "internalType": "uint256", "name": "timepoint", "type": "uint256" }
+      ],
+      "name": "getVotes",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "account", "type": "address" },
+        { "internalType": "uint256", "name": "timepoint", "type": "uint256" },
+        { "internalType": "bytes", "name": "params", "type": "bytes" }
+      ],
+      "name": "getVotesWithParams",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_proposalId", "type": "uint256" },
+        { "internalType": "address", "name": "_account", "type": "address" }
+      ],
+      "name": "hasVoted",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address[]", "name": "targets", "type": "address[]" },
+        { "internalType": "uint256[]", "name": "values", "type": "uint256[]" },
+        { "internalType": "bytes[]", "name": "calldatas", "type": "bytes[]" },
+        {
+          "internalType": "bytes32",
+          "name": "descriptionHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "hashProposal",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "lateQuorumVoteExtension",
+      "outputs": [{ "internalType": "uint64", "name": "", "type": "uint64" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "name",
+      "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "", "type": "address" },
+        { "internalType": "address", "name": "", "type": "address" },
+        { "internalType": "uint256[]", "name": "", "type": "uint256[]" },
+        { "internalType": "uint256[]", "name": "", "type": "uint256[]" },
+        { "internalType": "bytes", "name": "", "type": "bytes" }
+      ],
+      "name": "onERC1155BatchReceived",
+      "outputs": [{ "internalType": "bytes4", "name": "", "type": "bytes4" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "", "type": "address" },
+        { "internalType": "address", "name": "", "type": "address" },
+        { "internalType": "uint256", "name": "", "type": "uint256" },
+        { "internalType": "uint256", "name": "", "type": "uint256" },
+        { "internalType": "bytes", "name": "", "type": "bytes" }
+      ],
+      "name": "onERC1155Received",
+      "outputs": [{ "internalType": "bytes4", "name": "", "type": "bytes4" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "", "type": "address" },
+        { "internalType": "address", "name": "", "type": "address" },
+        { "internalType": "uint256", "name": "", "type": "uint256" },
+        { "internalType": "bytes", "name": "", "type": "bytes" }
+      ],
+      "name": "onERC721Received",
+      "outputs": [{ "internalType": "bytes4", "name": "", "type": "bytes4" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_proposalId", "type": "uint256" }
+      ],
+      "name": "proposalDeadline",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "proposalId", "type": "uint256" }
+      ],
+      "name": "proposalEta",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "proposalId", "type": "uint256" }
+      ],
+      "name": "proposalProposer",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "proposalId", "type": "uint256" }
+      ],
+      "name": "proposalSnapshot",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "proposalThreshold",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_proposalId", "type": "uint256" }
+      ],
+      "name": "proposalVotes",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "againstVotes",
+          "type": "uint256"
+        },
+        { "internalType": "uint256", "name": "forVotes", "type": "uint256" },
+        { "internalType": "uint256", "name": "abstainVotes", "type": "uint256" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address[]", "name": "targets", "type": "address[]" },
+        { "internalType": "uint256[]", "name": "values", "type": "uint256[]" },
+        { "internalType": "bytes[]", "name": "calldatas", "type": "bytes[]" },
+        { "internalType": "string", "name": "description", "type": "string" }
+      ],
+      "name": "propose",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address[]", "name": "targets", "type": "address[]" },
+        { "internalType": "uint256[]", "name": "values", "type": "uint256[]" },
+        { "internalType": "bytes[]", "name": "calldatas", "type": "bytes[]" },
+        {
+          "internalType": "bytes32",
+          "name": "descriptionHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "queue",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_voteStart", "type": "uint256" }
+      ],
+      "name": "quorum",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "target", "type": "address" },
+        { "internalType": "uint256", "name": "value", "type": "uint256" },
+        { "internalType": "bytes", "name": "data", "type": "bytes" }
+      ],
+      "name": "relay",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "newVoteExtension",
+          "type": "uint64"
+        }
+      ],
+      "name": "setLateQuorumVoteExtension",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "newProposalThreshold",
+          "type": "uint256"
+        }
+      ],
+      "name": "setProposalThreshold",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint224", "name": "_amount", "type": "uint224" }
+      ],
+      "name": "setQuorum",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "newVotingDelay",
+          "type": "uint256"
+        }
+      ],
+      "name": "setVotingDelay",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "newVotingPeriod",
+          "type": "uint256"
+        }
+      ],
+      "name": "setVotingPeriod",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_proposalId", "type": "uint256" }
+      ],
+      "name": "state",
+      "outputs": [
+        {
+          "internalType": "enum IGovernor.ProposalState",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes4", "name": "_interfaceId", "type": "bytes4" }
+      ],
+      "name": "supportsInterface",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "timelock",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "token",
+      "outputs": [
+        { "internalType": "contract IERC5805", "name": "", "type": "address" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract TimelockController",
+          "name": "newTimelock",
+          "type": "address"
+        }
+      ],
+      "name": "updateTimelock",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "version",
+      "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_proposalId", "type": "uint256" },
+        { "internalType": "address", "name": "_account", "type": "address" }
+      ],
+      "name": "voteWeightCast",
+      "outputs": [{ "internalType": "uint128", "name": "", "type": "uint128" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "votingDelay",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "votingPeriod",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    { "stateMutability": "payable", "type": "receive" }
+  ],
+  "Testnet3ZkTokenV3": [
+    { "inputs": [], "stateMutability": "nonpayable", "type": "constructor" },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "expiry", "type": "uint256" }
+      ],
+      "name": "DelegateSignatureExpired",
+      "type": "error"
+    },
+    { "inputs": [], "name": "DelegateSignatureIsInvalid", "type": "error" },
+    { "inputs": [], "name": "ERC6372InconsistentClock", "type": "error" },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "spender",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "value",
+          "type": "uint256"
+        }
+      ],
+      "name": "Approval",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "delegator",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "fromDelegate",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "toDelegate",
+          "type": "address"
+        }
+      ],
+      "name": "DelegateChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "delegate",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "previousBalance",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newBalance",
+          "type": "uint256"
+        }
+      ],
+      "name": "DelegateVotesChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [],
+      "name": "EIP712DomainChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "version",
+          "type": "uint8"
+        }
+      ],
+      "name": "Initialized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "previousAdminRole",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "newAdminRole",
+          "type": "bytes32"
+        }
+      ],
+      "name": "RoleAdminChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        }
+      ],
+      "name": "RoleGranted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        }
+      ],
+      "name": "RoleRevoked",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "value",
+          "type": "uint256"
+        }
+      ],
+      "name": "Transfer",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "BURNER_ADMIN_ROLE",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "BURNER_ROLE",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "CLOCK_MODE",
+      "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "DEFAULT_ADMIN_ROLE",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "DELEGATION_TYPEHASH",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "DOMAIN_SEPARATOR",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MINTER_ADMIN_ROLE",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MINTER_ROLE",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "owner", "type": "address" },
+        { "internalType": "address", "name": "spender", "type": "address" }
+      ],
+      "name": "allowance",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "spender", "type": "address" },
+        { "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "approve",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "account", "type": "address" }
+      ],
+      "name": "balanceOf",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_amount", "type": "uint256" }
+      ],
+      "name": "burn",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "_from", "type": "address" },
+        { "internalType": "uint256", "name": "_amount", "type": "uint256" }
+      ],
+      "name": "burn",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "_from", "type": "address" },
+        { "internalType": "uint256", "name": "_amount", "type": "uint256" }
+      ],
+      "name": "burnFrom",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "account", "type": "address" },
+        { "internalType": "uint32", "name": "pos", "type": "uint32" }
+      ],
+      "name": "checkpoints",
+      "outputs": [
+        {
+          "components": [
+            { "internalType": "uint32", "name": "fromBlock", "type": "uint32" },
+            { "internalType": "uint224", "name": "votes", "type": "uint224" }
+          ],
+          "internalType": "struct ERC20VotesUpgradeable.Checkpoint",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "clock",
+      "outputs": [{ "internalType": "uint48", "name": "", "type": "uint48" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "decimals",
+      "outputs": [{ "internalType": "uint8", "name": "", "type": "uint8" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "spender", "type": "address" },
+        {
+          "internalType": "uint256",
+          "name": "subtractedValue",
+          "type": "uint256"
+        }
+      ],
+      "name": "decreaseAllowance",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "delegatee", "type": "address" }
+      ],
+      "name": "delegate",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "delegatee", "type": "address" },
+        { "internalType": "uint256", "name": "nonce", "type": "uint256" },
+        { "internalType": "uint256", "name": "expiry", "type": "uint256" },
+        { "internalType": "uint8", "name": "v", "type": "uint8" },
+        { "internalType": "bytes32", "name": "r", "type": "bytes32" },
+        { "internalType": "bytes32", "name": "s", "type": "bytes32" }
+      ],
+      "name": "delegateBySig",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "_signer", "type": "address" },
+        { "internalType": "address", "name": "_delegatee", "type": "address" },
+        { "internalType": "uint256", "name": "_expiry", "type": "uint256" },
+        { "internalType": "bytes", "name": "_signature", "type": "bytes" }
+      ],
+      "name": "delegateOnBehalf",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "account", "type": "address" }
+      ],
+      "name": "delegates",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "eip712Domain",
+      "outputs": [
+        { "internalType": "bytes1", "name": "fields", "type": "bytes1" },
+        { "internalType": "string", "name": "name", "type": "string" },
+        { "internalType": "string", "name": "version", "type": "string" },
+        { "internalType": "uint256", "name": "chainId", "type": "uint256" },
+        {
+          "internalType": "address",
+          "name": "verifyingContract",
+          "type": "address"
+        },
+        { "internalType": "bytes32", "name": "salt", "type": "bytes32" },
+        {
+          "internalType": "uint256[]",
+          "name": "extensions",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "timepoint", "type": "uint256" }
+      ],
+      "name": "getPastTotalSupply",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "account", "type": "address" },
+        { "internalType": "uint256", "name": "timepoint", "type": "uint256" }
+      ],
+      "name": "getPastVotes",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes32", "name": "role", "type": "bytes32" }
+      ],
+      "name": "getRoleAdmin",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "account", "type": "address" }
+      ],
+      "name": "getVotes",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+        { "internalType": "address", "name": "account", "type": "address" }
+      ],
+      "name": "grantRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+        { "internalType": "address", "name": "account", "type": "address" }
+      ],
+      "name": "hasRole",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "spender", "type": "address" },
+        { "internalType": "uint256", "name": "addedValue", "type": "uint256" }
+      ],
+      "name": "increaseAllowance",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "_admin", "type": "address" },
+        {
+          "internalType": "address",
+          "name": "_mintReceiver",
+          "type": "address"
+        },
+        { "internalType": "uint256", "name": "_mintAmount", "type": "uint256" }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "initializeV2",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "maxSupply",
+      "outputs": [{ "internalType": "uint224", "name": "", "type": "uint224" }],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "_to", "type": "address" },
+        { "internalType": "uint256", "name": "_amount", "type": "uint256" }
+      ],
+      "name": "mint",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "name",
+      "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "owner", "type": "address" }
+      ],
+      "name": "nonces",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "account", "type": "address" }
+      ],
+      "name": "numCheckpoints",
+      "outputs": [{ "internalType": "uint32", "name": "", "type": "uint32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "owner", "type": "address" },
+        { "internalType": "address", "name": "spender", "type": "address" },
+        { "internalType": "uint256", "name": "value", "type": "uint256" },
+        { "internalType": "uint256", "name": "deadline", "type": "uint256" },
+        { "internalType": "uint8", "name": "v", "type": "uint8" },
+        { "internalType": "bytes32", "name": "r", "type": "bytes32" },
+        { "internalType": "bytes32", "name": "s", "type": "bytes32" }
+      ],
+      "name": "permit",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+        { "internalType": "address", "name": "account", "type": "address" }
+      ],
+      "name": "renounceRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+        { "internalType": "address", "name": "account", "type": "address" }
+      ],
+      "name": "revokeRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes4", "name": "interfaceId", "type": "bytes4" }
+      ],
+      "name": "supportsInterface",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "symbol",
+      "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalSupply",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "to", "type": "address" },
+        { "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "transfer",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "from", "type": "address" },
+        { "internalType": "address", "name": "to", "type": "address" },
+        { "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "transferFrom",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "ProtocolUpgradeHandlerV31": [
+    {
+      "type": "constructor",
+      "inputs": [
+        {
+          "name": "_l2ProtocolGovernor",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "_eraChainTypeManager",
+          "type": "address",
+          "internalType": "contract IChainTypeManager"
+        },
+        {
+          "name": "_zksyncOSChainTypeManager",
+          "type": "address",
+          "internalType": "contract IChainTypeManager"
+        },
+        {
+          "name": "_bridgeHub",
+          "type": "address",
+          "internalType": "contract IBridgeHub"
+        },
+        {
+          "name": "_l1Nullifier",
+          "type": "address",
+          "internalType": "contract IPausable"
+        },
+        {
+          "name": "_l1AssetRouter",
+          "type": "address",
+          "internalType": "contract IPausable"
+        },
+        {
+          "name": "_l1NativeTokenVault",
+          "type": "address",
+          "internalType": "contract IPausable"
+        },
+        {
+          "name": "_chainAssetHandler",
+          "type": "address",
+          "internalType": "contract IChainAssetHandler"
+        },
+        { "name": "_eraChainId", "type": "uint256", "internalType": "uint256" }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    { "type": "receive", "stateMutability": "payable" },
+    {
+      "type": "function",
+      "name": "BRIDGE_HUB",
+      "inputs": [],
+      "outputs": [
+        { "name": "", "type": "address", "internalType": "contract IBridgeHub" }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "CHAIN_ASSET_HANDLER",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "contract IChainAssetHandler"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "CHAIN_TYPE_MANAGER",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "contract IChainTypeManager"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "ERA_CHAIN_ID",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "ERA_CHAIN_TYPE_MANAGER",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "contract IChainTypeManager"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "L1_ASSET_ROUTER",
+      "inputs": [],
+      "outputs": [
+        { "name": "", "type": "address", "internalType": "contract IPausable" }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "L1_NATIVE_TOKEN_VAULT",
+      "inputs": [],
+      "outputs": [
+        { "name": "", "type": "address", "internalType": "contract IPausable" }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "L1_NULLIFIER",
+      "inputs": [],
+      "outputs": [
+        { "name": "", "type": "address", "internalType": "contract IPausable" }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "L2_PROTOCOL_GOVERNOR",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "ZKSYNC_OS_CHAIN_TYPE_MANAGER",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "contract IChainTypeManager"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "approveUpgradeGuardians",
+      "inputs": [
+        { "name": "_id", "type": "bytes32", "internalType": "bytes32" }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "approveUpgradeSecurityCouncil",
+      "inputs": [
+        { "name": "_id", "type": "bytes32", "internalType": "bytes32" }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "emergencyUpgradeBoard",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "execute",
+      "inputs": [
+        {
+          "name": "_proposal",
+          "type": "tuple",
+          "internalType": "struct IProtocolUpgradeHandler.UpgradeProposal",
+          "components": [
+            {
+              "name": "calls",
+              "type": "tuple[]",
+              "internalType": "struct IProtocolUpgradeHandler.Call[]",
+              "components": [
+                {
+                  "name": "target",
+                  "type": "address",
+                  "internalType": "address"
+                },
+                {
+                  "name": "value",
+                  "type": "uint256",
+                  "internalType": "uint256"
+                },
+                { "name": "data", "type": "bytes", "internalType": "bytes" }
+              ]
+            },
+            {
+              "name": "executor",
+              "type": "address",
+              "internalType": "address"
+            },
+            { "name": "salt", "type": "bytes32", "internalType": "bytes32" }
+          ]
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
+      "name": "executeEmergencyUpgrade",
+      "inputs": [
+        {
+          "name": "_proposal",
+          "type": "tuple",
+          "internalType": "struct IProtocolUpgradeHandler.UpgradeProposal",
+          "components": [
+            {
+              "name": "calls",
+              "type": "tuple[]",
+              "internalType": "struct IProtocolUpgradeHandler.Call[]",
+              "components": [
+                {
+                  "name": "target",
+                  "type": "address",
+                  "internalType": "address"
+                },
+                {
+                  "name": "value",
+                  "type": "uint256",
+                  "internalType": "uint256"
+                },
+                { "name": "data", "type": "bytes", "internalType": "bytes" }
+              ]
+            },
+            {
+              "name": "executor",
+              "type": "address",
+              "internalType": "address"
+            },
+            { "name": "salt", "type": "bytes32", "internalType": "bytes32" }
+          ]
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
+      "name": "extendLegalVeto",
+      "inputs": [
+        { "name": "_id", "type": "bytes32", "internalType": "bytes32" }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "guardians",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "hardFreeze",
+      "inputs": [],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "initialize",
+      "inputs": [
+        {
+          "name": "_securityCouncil",
+          "type": "address",
+          "internalType": "address"
+        },
+        { "name": "_guardians", "type": "address", "internalType": "address" },
+        {
+          "name": "_emergencyUpgradeBoard",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "lastFreezeStatusInUpgradeCycle",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint8",
+          "internalType": "enum IProtocolUpgradeHandler.FreezeStatus"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "protocolFrozenUntil",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "reinforceFreeze",
+      "inputs": [],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "reinforceFreezeOneChain",
+      "inputs": [
+        { "name": "_chainId", "type": "uint256", "internalType": "uint256" }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "reinforceUnfreeze",
+      "inputs": [],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "reinforceUnfreezeOneChain",
+      "inputs": [
+        { "name": "_chainId", "type": "uint256", "internalType": "uint256" }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "securityCouncil",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "softFreeze",
+      "inputs": [],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "startUpgrade",
+      "inputs": [
+        {
+          "name": "_l2BatchNumber",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "_l2MessageIndex",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "_l2TxNumberInBatch",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        { "name": "_proof", "type": "bytes32[]", "internalType": "bytes32[]" },
+        {
+          "name": "_proposal",
+          "type": "tuple",
+          "internalType": "struct IProtocolUpgradeHandler.UpgradeProposal",
+          "components": [
+            {
+              "name": "calls",
+              "type": "tuple[]",
+              "internalType": "struct IProtocolUpgradeHandler.Call[]",
+              "components": [
+                {
+                  "name": "target",
+                  "type": "address",
+                  "internalType": "address"
+                },
+                {
+                  "name": "value",
+                  "type": "uint256",
+                  "internalType": "uint256"
+                },
+                { "name": "data", "type": "bytes", "internalType": "bytes" }
+              ]
+            },
+            {
+              "name": "executor",
+              "type": "address",
+              "internalType": "address"
+            },
+            { "name": "salt", "type": "bytes32", "internalType": "bytes32" }
+          ]
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "unfreeze",
+      "inputs": [],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "updateEmergencyUpgradeBoard",
+      "inputs": [
+        {
+          "name": "_newEmergencyUpgradeBoard",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "updateGuardians",
+      "inputs": [
+        {
+          "name": "_newGuardians",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "updateSecurityCouncil",
+      "inputs": [
+        {
+          "name": "_newSecurityCouncil",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "upgradeState",
+      "inputs": [
+        { "name": "_id", "type": "bytes32", "internalType": "bytes32" }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint8",
+          "internalType": "enum IProtocolUpgradeHandler.UpgradeState"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "upgradeStatus",
+      "inputs": [
+        { "name": "upgradeId", "type": "bytes32", "internalType": "bytes32" }
+      ],
+      "outputs": [
+        {
+          "name": "creationTimestamp",
+          "type": "uint48",
+          "internalType": "uint48"
+        },
+        {
+          "name": "securityCouncilApprovalTimestamp",
+          "type": "uint48",
+          "internalType": "uint48"
+        },
+        { "name": "guardiansApproval", "type": "bool", "internalType": "bool" },
+        {
+          "name": "guardiansExtendedLegalVeto",
+          "type": "bool",
+          "internalType": "bool"
+        },
+        { "name": "executed", "type": "bool", "internalType": "bool" }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "event",
+      "name": "ChangeEmergencyUpgradeBoard",
+      "inputs": [
+        {
+          "name": "_emergencyUpgradeBoardBefore",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "_emergencyUpgradeBoardAfter",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "ChangeGuardians",
+      "inputs": [
+        {
+          "name": "_guardiansBefore",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "_guardiansAfter",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "ChangeSecurityCouncil",
+      "inputs": [
+        {
+          "name": "_securityCouncilBefore",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "_securityCouncilAfter",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "EmergencyUpgradeExecuted",
+      "inputs": [
+        {
+          "name": "_id",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "HardFreeze",
+      "inputs": [
+        {
+          "name": "_protocolFrozenUntil",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "Initialized",
+      "inputs": [
+        {
+          "name": "version",
+          "type": "uint64",
+          "indexed": false,
+          "internalType": "uint64"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "ReinforceFreeze",
+      "inputs": [],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "ReinforceFreezeOneChain",
+      "inputs": [
+        {
+          "name": "_chainId",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "ReinforceUnfreeze",
+      "inputs": [],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "ReinforceUnfreezeOneChain",
+      "inputs": [
+        {
+          "name": "_chainId",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "SoftFreeze",
+      "inputs": [
+        {
+          "name": "_protocolFrozenUntil",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    { "type": "event", "name": "Unfreeze", "inputs": [], "anonymous": false },
+    {
+      "type": "event",
+      "name": "UpgradeApprovedByGuardians",
+      "inputs": [
+        {
+          "name": "_id",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "UpgradeApprovedBySecurityCouncil",
+      "inputs": [
+        {
+          "name": "_id",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "UpgradeExecuted",
+      "inputs": [
+        {
+          "name": "_id",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "UpgradeLegalVetoExtended",
+      "inputs": [
+        {
+          "name": "_id",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "UpgradeStarted",
+      "inputs": [
+        {
+          "name": "_id",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "_proposal",
+          "type": "tuple",
+          "indexed": false,
+          "internalType": "struct IProtocolUpgradeHandler.UpgradeProposal",
+          "components": [
+            {
+              "name": "calls",
+              "type": "tuple[]",
+              "internalType": "struct IProtocolUpgradeHandler.Call[]",
+              "components": [
+                {
+                  "name": "target",
+                  "type": "address",
+                  "internalType": "address"
+                },
+                {
+                  "name": "value",
+                  "type": "uint256",
+                  "internalType": "uint256"
+                },
+                { "name": "data", "type": "bytes", "internalType": "bytes" }
+              ]
+            },
+            {
+              "name": "executor",
+              "type": "address",
+              "internalType": "address"
+            },
+            { "name": "salt", "type": "bytes32", "internalType": "bytes32" }
+          ]
+        }
+      ],
+      "anonymous": false
+    },
+    { "type": "error", "name": "InvalidInitialization", "inputs": [] },
+    { "type": "error", "name": "NotInitializing", "inputs": [] }
+  ],
+  "IL1Messenger": [
+    { "inputs": [], "name": "CallerMustBeBootloader", "type": "error" },
+    { "inputs": [], "name": "CallerMustBeSystemContract", "type": "error" },
+    { "inputs": [], "name": "FailedToChargeGas", "type": "error" },
+    { "inputs": [], "name": "Keccak256InvalidReturnData", "type": "error" },
+    {
+      "inputs": [
+        { "internalType": "enum BytecodeError", "name": "", "type": "uint8" }
+      ],
+      "name": "MalformedBytecode",
+      "type": "error"
+    },
+    { "inputs": [], "name": "Overflow", "type": "error" },
+    {
+      "inputs": [
+        { "internalType": "enum PubdataField", "name": "", "type": "uint8" },
+        { "internalType": "bytes32", "name": "expected", "type": "bytes32" },
+        { "internalType": "bytes32", "name": "actual", "type": "bytes32" }
+      ],
+      "name": "ReconstructionMismatch",
+      "type": "error"
+    },
+    { "inputs": [], "name": "ShaInvalidReturnData", "type": "error" },
+    {
+      "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "name": "Unauthorized",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "_bytecodeHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "BytecodeL1PublicationRequested",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "_sender",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "_hash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "_message",
+          "type": "bytes"
+        }
+      ],
+      "name": "L1MessageSent",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "components": [
+            { "internalType": "uint8", "name": "l2ShardId", "type": "uint8" },
+            { "internalType": "bool", "name": "isService", "type": "bool" },
+            {
+              "internalType": "uint16",
+              "name": "txNumberInBlock",
+              "type": "uint16"
+            },
+            { "internalType": "address", "name": "sender", "type": "address" },
+            { "internalType": "bytes32", "name": "key", "type": "bytes32" },
+            { "internalType": "bytes32", "name": "value", "type": "bytes32" }
+          ],
+          "indexed": false,
+          "internalType": "struct L2ToL1Log",
+          "name": "_l2log",
+          "type": "tuple"
+        }
+      ],
+      "name": "L2ToL1LogSent",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "_totalL2ToL1PubdataAndStateDiffs",
+          "type": "bytes"
+        }
+      ],
+      "name": "publishPubdataAndClearState",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "_bytecodeHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "requestBytecodeL1Publication",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bool", "name": "_isService", "type": "bool" },
+        { "internalType": "bytes32", "name": "_key", "type": "bytes32" },
+        { "internalType": "bytes32", "name": "_value", "type": "bytes32" }
+      ],
+      "name": "sendL2ToL1Log",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "logIdInMerkleTree",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes", "name": "_message", "type": "bytes" }
+      ],
+      "name": "sendToL1",
+      "outputs": [
+        { "internalType": "bytes32", "name": "hash", "type": "bytes32" }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "IZkSyncHyperchain": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "batchNumber",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "batchHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "commitment",
+          "type": "bytes32"
+        }
+      ],
+      "name": "BlockCommit",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "batchNumber",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "batchHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "commitment",
+          "type": "bytes32"
+        }
+      ],
+      "name": "BlockExecution",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "totalBatchesCommitted",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "totalBatchesVerified",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "totalBatchesExecuted",
+          "type": "uint256"
+        }
+      ],
+      "name": "BlocksRevert",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "previousLastVerifiedBatch",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "currentLastVerifiedBatch",
+          "type": "uint256"
+        }
+      ],
+      "name": "BlocksVerification",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "components": [
+            {
+              "components": [
+                {
+                  "internalType": "address",
+                  "name": "facet",
+                  "type": "address"
+                },
+                {
+                  "internalType": "enum Diamond.Action",
+                  "name": "action",
+                  "type": "uint8"
+                },
+                {
+                  "internalType": "bool",
+                  "name": "isFreezable",
+                  "type": "bool"
+                },
+                {
+                  "internalType": "bytes4[]",
+                  "name": "selectors",
+                  "type": "bytes4[]"
+                }
+              ],
+              "internalType": "struct Diamond.FacetCut[]",
+              "name": "facetCuts",
+              "type": "tuple[]"
+            },
+            {
+              "internalType": "address",
+              "name": "initAddress",
+              "type": "address"
+            },
+            { "internalType": "bytes", "name": "initCalldata", "type": "bytes" }
+          ],
+          "indexed": false,
+          "internalType": "struct Diamond.DiamondCutData",
+          "name": "diamondCut",
+          "type": "tuple"
+        }
+      ],
+      "name": "ExecuteUpgrade",
+      "type": "event"
+    },
+    { "anonymous": false, "inputs": [], "name": "Freeze", "type": "event" },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "isPorterAvailable",
+          "type": "bool"
+        }
+      ],
+      "name": "IsPorterAvailableStatusUpdate",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "oldAdmin",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newAdmin",
+          "type": "address"
+        }
+      ],
+      "name": "NewAdmin",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint128",
+          "name": "oldNominator",
+          "type": "uint128"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint128",
+          "name": "oldDenominator",
+          "type": "uint128"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint128",
+          "name": "newNominator",
+          "type": "uint128"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint128",
+          "name": "newDenominator",
+          "type": "uint128"
+        }
+      ],
+      "name": "NewBaseTokenMultiplier",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "enum PubdataPricingMode",
+              "name": "pubdataPricingMode",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint32",
+              "name": "batchOverheadL1Gas",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "maxPubdataPerBatch",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "maxL2GasPerBatch",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "priorityTxMaxPubdata",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "minimalL2GasPrice",
+              "type": "uint64"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct FeeParams",
+          "name": "oldFeeParams",
+          "type": "tuple"
+        },
+        {
+          "components": [
+            {
+              "internalType": "enum PubdataPricingMode",
+              "name": "pubdataPricingMode",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint32",
+              "name": "batchOverheadL1Gas",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "maxPubdataPerBatch",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "maxL2GasPerBatch",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "priorityTxMaxPubdata",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "minimalL2GasPrice",
+              "type": "uint64"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct FeeParams",
+          "name": "newFeeParams",
+          "type": "tuple"
+        }
+      ],
+      "name": "NewFeeParams",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "oldPendingAdmin",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newPendingAdmin",
+          "type": "address"
+        }
+      ],
+      "name": "NewPendingAdmin",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "txId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "txHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "expirationTimestamp",
+          "type": "uint64"
+        },
+        {
+          "components": [
+            { "internalType": "uint256", "name": "txType", "type": "uint256" },
+            { "internalType": "uint256", "name": "from", "type": "uint256" },
+            { "internalType": "uint256", "name": "to", "type": "uint256" },
+            {
+              "internalType": "uint256",
+              "name": "gasLimit",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "gasPerPubdataByteLimit",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxFeePerGas",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxPriorityFeePerGas",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "paymaster",
+              "type": "uint256"
+            },
+            { "internalType": "uint256", "name": "nonce", "type": "uint256" },
+            { "internalType": "uint256", "name": "value", "type": "uint256" },
+            {
+              "internalType": "uint256[4]",
+              "name": "reserved",
+              "type": "uint256[4]"
+            },
+            { "internalType": "bytes", "name": "data", "type": "bytes" },
+            { "internalType": "bytes", "name": "signature", "type": "bytes" },
+            {
+              "internalType": "uint256[]",
+              "name": "factoryDeps",
+              "type": "uint256[]"
+            },
+            {
+              "internalType": "bytes",
+              "name": "paymasterInput",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes",
+              "name": "reservedDynamic",
+              "type": "bytes"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct L2CanonicalTransaction",
+          "name": "transaction",
+          "type": "tuple"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes[]",
+          "name": "factoryDeps",
+          "type": "bytes[]"
+        }
+      ],
+      "name": "NewPriorityRequest",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "oldPriorityTxMaxGasLimit",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newPriorityTxMaxGasLimit",
+          "type": "uint256"
+        }
+      ],
+      "name": "NewPriorityTxMaxGasLimit",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "oldTransactionFilterer",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "newTransactionFilterer",
+          "type": "address"
+        }
+      ],
+      "name": "NewTransactionFilterer",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "components": [
+            {
+              "components": [
+                {
+                  "internalType": "address",
+                  "name": "facet",
+                  "type": "address"
+                },
+                {
+                  "internalType": "enum Diamond.Action",
+                  "name": "action",
+                  "type": "uint8"
+                },
+                {
+                  "internalType": "bool",
+                  "name": "isFreezable",
+                  "type": "bool"
+                },
+                {
+                  "internalType": "bytes4[]",
+                  "name": "selectors",
+                  "type": "bytes4[]"
+                }
+              ],
+              "internalType": "struct Diamond.FacetCut[]",
+              "name": "facetCuts",
+              "type": "tuple[]"
+            },
+            {
+              "internalType": "address",
+              "name": "initAddress",
+              "type": "address"
+            },
+            { "internalType": "bytes", "name": "initCalldata", "type": "bytes" }
+          ],
+          "indexed": false,
+          "internalType": "struct Diamond.DiamondCutData",
+          "name": "diamondCut",
+          "type": "tuple"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "proposalId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "proposalSalt",
+          "type": "bytes32"
+        }
+      ],
+      "name": "ProposeTransparentUpgrade",
+      "type": "event"
+    },
+    { "anonymous": false, "inputs": [], "name": "Unfreeze", "type": "event" },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "validatorAddress",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "isActive",
+          "type": "bool"
+        }
+      ],
+      "name": "ValidatorStatusUpdate",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "enum PubdataPricingMode",
+          "name": "validiumMode",
+          "type": "uint8"
+        }
+      ],
+      "name": "ValidiumModeStatusUpdate",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "acceptAdmin",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "baseTokenGasPriceMultiplierDenominator",
+      "outputs": [{ "internalType": "uint128", "name": "", "type": "uint128" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "baseTokenGasPriceMultiplierNominator",
+      "outputs": [{ "internalType": "uint128", "name": "", "type": "uint128" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            { "internalType": "address", "name": "sender", "type": "address" },
+            {
+              "internalType": "address",
+              "name": "contractL2",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "mintValue",
+              "type": "uint256"
+            },
+            { "internalType": "uint256", "name": "l2Value", "type": "uint256" },
+            { "internalType": "bytes", "name": "l2Calldata", "type": "bytes" },
+            {
+              "internalType": "uint256",
+              "name": "l2GasLimit",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "l2GasPerPubdataByteLimit",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes[]",
+              "name": "factoryDeps",
+              "type": "bytes[]"
+            },
+            {
+              "internalType": "address",
+              "name": "refundRecipient",
+              "type": "address"
+            }
+          ],
+          "internalType": "struct BridgehubL2TransactionRequest",
+          "name": "_request",
+          "type": "tuple"
+        }
+      ],
+      "name": "bridgehubRequestL2Transaction",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "canonicalTxHash",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "enum PubdataPricingMode",
+              "name": "pubdataPricingMode",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint32",
+              "name": "batchOverheadL1Gas",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "maxPubdataPerBatch",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "maxL2GasPerBatch",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "priorityTxMaxPubdata",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "minimalL2GasPrice",
+              "type": "uint64"
+            }
+          ],
+          "internalType": "struct FeeParams",
+          "name": "_newFeeParams",
+          "type": "tuple"
+        }
+      ],
+      "name": "changeFeeParams",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint64",
+              "name": "batchNumber",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "batchHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "indexRepeatedStorageChanges",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint256",
+              "name": "numberOfLayer1Txs",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "priorityOperationsHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "l2LogsTreeRoot",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "commitment",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IExecutor.StoredBatchInfo",
+          "name": "_lastCommittedBatchData",
+          "type": "tuple"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint64",
+              "name": "batchNumber",
+              "type": "uint64"
+            },
+            { "internalType": "uint64", "name": "timestamp", "type": "uint64" },
+            {
+              "internalType": "uint64",
+              "name": "indexRepeatedStorageChanges",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "newStateRoot",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "numberOfLayer1Txs",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "priorityOperationsHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "bootloaderHeapInitialContentsHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "eventsQueueStateHash",
+              "type": "bytes32"
+            },
+            { "internalType": "bytes", "name": "systemLogs", "type": "bytes" },
+            {
+              "internalType": "bytes",
+              "name": "pubdataCommitments",
+              "type": "bytes"
+            }
+          ],
+          "internalType": "struct IExecutor.CommitBatchInfo[]",
+          "name": "_newBatchesData",
+          "type": "tuple[]"
+        }
+      ],
+      "name": "commitBatches",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_chainId", "type": "uint256" },
+        {
+          "components": [
+            {
+              "internalType": "uint64",
+              "name": "batchNumber",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "batchHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "indexRepeatedStorageChanges",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint256",
+              "name": "numberOfLayer1Txs",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "priorityOperationsHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "l2LogsTreeRoot",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "commitment",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IExecutor.StoredBatchInfo",
+          "name": "_lastCommittedBatchData",
+          "type": "tuple"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint64",
+              "name": "batchNumber",
+              "type": "uint64"
+            },
+            { "internalType": "uint64", "name": "timestamp", "type": "uint64" },
+            {
+              "internalType": "uint64",
+              "name": "indexRepeatedStorageChanges",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "newStateRoot",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "numberOfLayer1Txs",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "priorityOperationsHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "bootloaderHeapInitialContentsHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "eventsQueueStateHash",
+              "type": "bytes32"
+            },
+            { "internalType": "bytes", "name": "systemLogs", "type": "bytes" },
+            {
+              "internalType": "bytes",
+              "name": "pubdataCommitments",
+              "type": "bytes"
+            }
+          ],
+          "internalType": "struct IExecutor.CommitBatchInfo[]",
+          "name": "_newBatchesData",
+          "type": "tuple[]"
+        }
+      ],
+      "name": "commitBatchesSharedBridge",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint64",
+              "name": "batchNumber",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "batchHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "indexRepeatedStorageChanges",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint256",
+              "name": "numberOfLayer1Txs",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "priorityOperationsHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "l2LogsTreeRoot",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "commitment",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IExecutor.StoredBatchInfo[]",
+          "name": "_batchesData",
+          "type": "tuple[]"
+        }
+      ],
+      "name": "executeBatches",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_chainId", "type": "uint256" },
+        {
+          "components": [
+            {
+              "internalType": "uint64",
+              "name": "batchNumber",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "batchHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "indexRepeatedStorageChanges",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint256",
+              "name": "numberOfLayer1Txs",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "priorityOperationsHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "l2LogsTreeRoot",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "commitment",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IExecutor.StoredBatchInfo[]",
+          "name": "_batchesData",
+          "type": "tuple[]"
+        }
+      ],
+      "name": "executeBatchesSharedBridge",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "components": [
+                {
+                  "internalType": "address",
+                  "name": "facet",
+                  "type": "address"
+                },
+                {
+                  "internalType": "enum Diamond.Action",
+                  "name": "action",
+                  "type": "uint8"
+                },
+                {
+                  "internalType": "bool",
+                  "name": "isFreezable",
+                  "type": "bool"
+                },
+                {
+                  "internalType": "bytes4[]",
+                  "name": "selectors",
+                  "type": "bytes4[]"
+                }
+              ],
+              "internalType": "struct Diamond.FacetCut[]",
+              "name": "facetCuts",
+              "type": "tuple[]"
+            },
+            {
+              "internalType": "address",
+              "name": "initAddress",
+              "type": "address"
+            },
+            { "internalType": "bytes", "name": "initCalldata", "type": "bytes" }
+          ],
+          "internalType": "struct Diamond.DiamondCutData",
+          "name": "_diamondCut",
+          "type": "tuple"
+        }
+      ],
+      "name": "executeUpgrade",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes4", "name": "_selector", "type": "bytes4" }
+      ],
+      "name": "facetAddress",
+      "outputs": [
+        { "internalType": "address", "name": "facet", "type": "address" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "facetAddresses",
+      "outputs": [
+        { "internalType": "address[]", "name": "facets", "type": "address[]" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "_facet", "type": "address" }
+      ],
+      "name": "facetFunctionSelectors",
+      "outputs": [
+        { "internalType": "bytes4[]", "name": "", "type": "bytes4[]" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "facets",
+      "outputs": [
+        {
+          "components": [
+            { "internalType": "address", "name": "addr", "type": "address" },
+            {
+              "internalType": "bytes4[]",
+              "name": "selectors",
+              "type": "bytes4[]"
+            }
+          ],
+          "internalType": "struct IGetters.Facet[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_l2BatchNumber",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_l2MessageIndex",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint16",
+          "name": "_l2TxNumberInBatch",
+          "type": "uint16"
+        },
+        { "internalType": "bytes", "name": "_message", "type": "bytes" },
+        {
+          "internalType": "bytes32[]",
+          "name": "_merkleProof",
+          "type": "bytes32[]"
+        }
+      ],
+      "name": "finalizeEthWithdrawal",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "freezeDiamond",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getAdmin",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getBaseToken",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getBaseTokenBridge",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getBridgehub",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getFirstUnprocessedPriorityTx",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getL2BootloaderBytecodeHash",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getL2DefaultAccountBytecodeHash",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getL2SystemContractsUpgradeBatchNumber",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getL2SystemContractsUpgradeTxHash",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getName",
+      "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getPendingAdmin",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getPriorityQueueSize",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getPriorityTxMaxGasLimit",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getProtocolVersion",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getPubdataPricingMode",
+      "outputs": [
+        {
+          "internalType": "enum PubdataPricingMode",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getSemverProtocolVersion",
+      "outputs": [
+        { "internalType": "uint32", "name": "", "type": "uint32" },
+        { "internalType": "uint32", "name": "", "type": "uint32" },
+        { "internalType": "uint32", "name": "", "type": "uint32" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getStateTransitionManager",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getTotalBatchesCommitted",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getTotalBatchesExecuted",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getTotalBatchesVerified",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getTotalPriorityTxs",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getVerifier",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getVerifierParams",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32",
+              "name": "recursionNodeLevelVkHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "recursionLeafLevelVkHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "recursionCircuitsSetVksHash",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct VerifierParams",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "isDiamondStorageFrozen",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_l2BatchNumber",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_l2MessageIndex",
+          "type": "uint256"
+        }
+      ],
+      "name": "isEthWithdrawalFinalized",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "_facet", "type": "address" }
+      ],
+      "name": "isFacetFreezable",
+      "outputs": [
+        { "internalType": "bool", "name": "isFreezable", "type": "bool" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes4", "name": "_selector", "type": "bytes4" }
+      ],
+      "name": "isFunctionFreezable",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "_address", "type": "address" }
+      ],
+      "name": "isValidator",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_batchNumber", "type": "uint256" }
+      ],
+      "name": "l2LogsRootHash",
+      "outputs": [
+        { "internalType": "bytes32", "name": "merkleRoot", "type": "bytes32" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_gasPrice", "type": "uint256" },
+        { "internalType": "uint256", "name": "_l2GasLimit", "type": "uint256" },
+        {
+          "internalType": "uint256",
+          "name": "_l2GasPerPubdataByteLimit",
+          "type": "uint256"
+        }
+      ],
+      "name": "l2TransactionBaseCost",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "priorityQueueFrontOperation",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32",
+              "name": "canonicalTxHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "expirationTimestamp",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint192",
+              "name": "layer2Tip",
+              "type": "uint192"
+            }
+          ],
+          "internalType": "struct PriorityOperation",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint64",
+              "name": "batchNumber",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "batchHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "indexRepeatedStorageChanges",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint256",
+              "name": "numberOfLayer1Txs",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "priorityOperationsHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "l2LogsTreeRoot",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "commitment",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IExecutor.StoredBatchInfo",
+          "name": "_prevBatch",
+          "type": "tuple"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint64",
+              "name": "batchNumber",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "batchHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "indexRepeatedStorageChanges",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint256",
+              "name": "numberOfLayer1Txs",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "priorityOperationsHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "l2LogsTreeRoot",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "commitment",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IExecutor.StoredBatchInfo[]",
+          "name": "_committedBatches",
+          "type": "tuple[]"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint256[]",
+              "name": "recursiveAggregationInput",
+              "type": "uint256[]"
+            },
+            {
+              "internalType": "uint256[]",
+              "name": "serializedProof",
+              "type": "uint256[]"
+            }
+          ],
+          "internalType": "struct IExecutor.ProofInput",
+          "name": "_proof",
+          "type": "tuple"
+        }
+      ],
+      "name": "proveBatches",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_chainId", "type": "uint256" },
+        {
+          "components": [
+            {
+              "internalType": "uint64",
+              "name": "batchNumber",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "batchHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "indexRepeatedStorageChanges",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint256",
+              "name": "numberOfLayer1Txs",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "priorityOperationsHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "l2LogsTreeRoot",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "commitment",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IExecutor.StoredBatchInfo",
+          "name": "_prevBatch",
+          "type": "tuple"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint64",
+              "name": "batchNumber",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "batchHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "indexRepeatedStorageChanges",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint256",
+              "name": "numberOfLayer1Txs",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "priorityOperationsHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "l2LogsTreeRoot",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "commitment",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IExecutor.StoredBatchInfo[]",
+          "name": "_committedBatches",
+          "type": "tuple[]"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint256[]",
+              "name": "recursiveAggregationInput",
+              "type": "uint256[]"
+            },
+            {
+              "internalType": "uint256[]",
+              "name": "serializedProof",
+              "type": "uint256[]"
+            }
+          ],
+          "internalType": "struct IExecutor.ProofInput",
+          "name": "_proof",
+          "type": "tuple"
+        }
+      ],
+      "name": "proveBatchesSharedBridge",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes32", "name": "_l2TxHash", "type": "bytes32" },
+        {
+          "internalType": "uint256",
+          "name": "_l2BatchNumber",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_l2MessageIndex",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint16",
+          "name": "_l2TxNumberInBatch",
+          "type": "uint16"
+        },
+        {
+          "internalType": "bytes32[]",
+          "name": "_merkleProof",
+          "type": "bytes32[]"
+        },
+        { "internalType": "enum TxStatus", "name": "_status", "type": "uint8" }
+      ],
+      "name": "proveL1ToL2TransactionStatus",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_batchNumber",
+          "type": "uint256"
+        },
+        { "internalType": "uint256", "name": "_index", "type": "uint256" },
+        {
+          "components": [
+            { "internalType": "uint8", "name": "l2ShardId", "type": "uint8" },
+            { "internalType": "bool", "name": "isService", "type": "bool" },
+            {
+              "internalType": "uint16",
+              "name": "txNumberInBatch",
+              "type": "uint16"
+            },
+            { "internalType": "address", "name": "sender", "type": "address" },
+            { "internalType": "bytes32", "name": "key", "type": "bytes32" },
+            { "internalType": "bytes32", "name": "value", "type": "bytes32" }
+          ],
+          "internalType": "struct L2Log",
+          "name": "_log",
+          "type": "tuple"
+        },
+        { "internalType": "bytes32[]", "name": "_proof", "type": "bytes32[]" }
+      ],
+      "name": "proveL2LogInclusion",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_batchNumber",
+          "type": "uint256"
+        },
+        { "internalType": "uint256", "name": "_index", "type": "uint256" },
+        {
+          "components": [
+            {
+              "internalType": "uint16",
+              "name": "txNumberInBatch",
+              "type": "uint16"
+            },
+            { "internalType": "address", "name": "sender", "type": "address" },
+            { "internalType": "bytes", "name": "data", "type": "bytes" }
+          ],
+          "internalType": "struct L2Message",
+          "name": "_message",
+          "type": "tuple"
+        },
+        { "internalType": "bytes32[]", "name": "_proof", "type": "bytes32[]" }
+      ],
+      "name": "proveL2MessageInclusion",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "_contractL2", "type": "address" },
+        { "internalType": "uint256", "name": "_l2Value", "type": "uint256" },
+        { "internalType": "bytes", "name": "_calldata", "type": "bytes" },
+        { "internalType": "uint256", "name": "_l2GasLimit", "type": "uint256" },
+        {
+          "internalType": "uint256",
+          "name": "_l2GasPerPubdataByteLimit",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes[]",
+          "name": "_factoryDeps",
+          "type": "bytes[]"
+        },
+        {
+          "internalType": "address",
+          "name": "_refundRecipient",
+          "type": "address"
+        }
+      ],
+      "name": "requestL2Transaction",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "canonicalTxHash",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_newLastBatch",
+          "type": "uint256"
+        }
+      ],
+      "name": "revertBatches",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_chainId", "type": "uint256" },
+        {
+          "internalType": "uint256",
+          "name": "_newLastBatch",
+          "type": "uint256"
+        }
+      ],
+      "name": "revertBatchesSharedBridge",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_newPendingAdmin",
+          "type": "address"
+        }
+      ],
+      "name": "setPendingAdmin",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "allowEvmEmulation",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bool",
+          "name": "_zkPorterIsAvailable",
+          "type": "bool"
+        }
+      ],
+      "name": "setPorterAvailability",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_newPriorityTxMaxGasLimit",
+          "type": "uint256"
+        }
+      ],
+      "name": "setPriorityTxMaxGasLimit",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum PubdataPricingMode",
+          "name": "_pricingMode",
+          "type": "uint8"
+        }
+      ],
+      "name": "setPubdataPricingMode",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint128", "name": "_nominator", "type": "uint128" },
+        { "internalType": "uint128", "name": "_denominator", "type": "uint128" }
+      ],
+      "name": "setTokenMultiplier",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_transactionFilterer",
+          "type": "address"
+        }
+      ],
+      "name": "setTransactionFilterer",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "address", "name": "_validator", "type": "address" },
+        { "internalType": "bool", "name": "_active", "type": "bool" }
+      ],
+      "name": "setValidator",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_batchNumber", "type": "uint256" }
+      ],
+      "name": "storedBatchHash",
+      "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "transferEthToSharedBridge",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "unfreezeDiamond",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_protocolVersion",
+          "type": "uint256"
+        },
+        {
+          "components": [
+            {
+              "components": [
+                {
+                  "internalType": "address",
+                  "name": "facet",
+                  "type": "address"
+                },
+                {
+                  "internalType": "enum Diamond.Action",
+                  "name": "action",
+                  "type": "uint8"
+                },
+                {
+                  "internalType": "bool",
+                  "name": "isFreezable",
+                  "type": "bool"
+                },
+                {
+                  "internalType": "bytes4[]",
+                  "name": "selectors",
+                  "type": "bytes4[]"
+                }
+              ],
+              "internalType": "struct Diamond.FacetCut[]",
+              "name": "facetCuts",
+              "type": "tuple[]"
+            },
+            {
+              "internalType": "address",
+              "name": "initAddress",
+              "type": "address"
+            },
+            { "internalType": "bytes", "name": "initCalldata", "type": "bytes" }
+          ],
+          "internalType": "struct Diamond.DiamondCutData",
+          "name": "_cutData",
+          "type": "tuple"
+        }
+      ],
+      "name": "upgradeChainFromVersion",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_l1DAValidator",
+          "type": "address"
+        },
+        {
+          "internalType": "enum L2DACommitmentScheme",
+          "name": "_l2DACommitmentScheme",
+          "type": "uint8"
+        }
+      ],
+      "name": "setDAValidatorPair",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum PubdataContent",
+          "name": "_pubdataContent",
+          "type": "uint8"
+        }
+      ],
+      "name": "setPubdataContent",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ]
+}

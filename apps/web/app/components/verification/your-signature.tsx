@@ -39,6 +39,7 @@ import { setStanding } from "./freshness";
 import { SignButton, useSignReason } from "./sign-button";
 import { SafeHashes } from "./safe-hashes";
 import { useAccount } from "wagmi";
+import { SafeOwnerApprovals } from "./safe-owner-approvals";
 
 type Serialized<T> = SerializeFrom<T>;
 type Member = Serialized<MemberResult>;
@@ -65,6 +66,21 @@ export function YourSignature({
   actions,
   hint,
   caution,
+}: {
+  actions: SignAction[];
+  hint: string;
+}) {
+  return (
+    <>
+      <SafeOwnerApprovals actions={actions} />
+      <SignatureActions actions={actions} hint={hint} />
+    </>
+  );
+}
+
+function SignatureActions({
+  actions,
+  hint,
 }: {
   actions: SignAction[];
   /** What to check on the page before signing. */
@@ -192,7 +208,7 @@ function Who({
   /** The viewer's Safe in a group here whose signing is not open now. */
   member?: Member;
 }) {
-  const { connect: openConnectModal } = useConnectWallet();
+  const { connectWalletConnect: openConnectModal } = useConnectWallet();
   const groups = [...new Set(open.map((a) => GROUP_NAME[a.set.signerGroup] ?? a.title))];
   if (!you)
     return (

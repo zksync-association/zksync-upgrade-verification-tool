@@ -58,6 +58,7 @@ export { useStatus } from "@/components/governance-context";
 const NAV: { to: string; label: string; name: string }[] = [
   { to: "/", label: "Overview", name: "Overview" },
   { to: $path("/app/proposals"), label: "Upgrades", name: "Protocol upgrades" },
+  { to: "/app/chain-upgrade", label: "Chain upgrade", name: "Chain upgrade" },
   { to: $path("/app/emergency"), label: "Emergency", name: "Emergency upgrades" },
   { to: $path("/app/freeze"), label: "Freeze", name: "Freeze requests" },
   { to: $path("/app/l2-cancellations"), label: "Veto", name: "Guardian veto" },
@@ -178,12 +179,11 @@ function Main({ children }: { children: ReactNode }) {
   );
 }
 
-// One bar, as Tally's: logo, menu, then the network and the actions at the right (from xl up, on
-// one line). Narrower, the menu takes a line of its own below; on a phone the actions stay beside
-// the logo and the network goes on a line between.
+// Keep the governance menu on its own row so the chain upgrade link and wallet controls
+// fit together. On a phone the network moves onto a line between the logo and menu.
 function HeaderRow({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2 px-4 pt-2.5 pb-1.5 sm:px-6 xl:h-16 xl:flex-nowrap xl:gap-x-3 xl:py-0">
+    <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2 px-4 pt-2.5 pb-1.5 sm:px-6">
       {children}
     </div>
   );
@@ -191,7 +191,7 @@ function HeaderRow({ children }: { children: ReactNode }) {
 
 function HeaderStatus({ children }: { children: ReactNode }) {
   return (
-    <div className="order-3 flex w-full min-w-0 flex-wrap items-center gap-1 md:order-2 md:ml-auto md:w-auto md:justify-end xl:order-3 xl:ml-0 xl:shrink-0 xl:flex-nowrap">
+    <div className="order-3 flex w-full min-w-0 flex-wrap items-center gap-1 md:order-2 md:ml-auto md:w-auto md:justify-end">
       {children}
     </div>
   );
@@ -199,7 +199,7 @@ function HeaderStatus({ children }: { children: ReactNode }) {
 
 function HeaderActions({ children }: { children: ReactNode }) {
   return (
-    <div className="order-2 ml-auto flex shrink-0 items-center gap-2 md:order-3 md:ml-0 xl:order-4">
+    <div className="order-2 ml-auto flex shrink-0 items-center gap-2 md:order-3 md:ml-0">
       {children}
     </div>
   );
@@ -216,11 +216,13 @@ function HomeLink() {
   );
 }
 
+declare const __TX_SIM_COMPANION__: boolean;
+
 function Nav() {
   return (
     <nav
       aria-label="Governance navigation"
-      className="-mx-2 order-4 flex w-[calc(100%+1rem)] items-center gap-x-1 overflow-x-auto xl:order-2 xl:mx-0 xl:w-auto xl:flex-1 xl:justify-center xl:overflow-visible"
+      className="-mx-2 order-4 flex w-[calc(100%+1rem)] items-center gap-x-1 overflow-x-auto"
     >
       {NAV.map((item) => (
         <NavLink
@@ -240,6 +242,18 @@ function Nav() {
           {item.label}
         </NavLink>
       ))}
+      {typeof __TX_SIM_COMPANION__ !== "undefined" &&
+        __TX_SIM_COMPANION__ &&
+        typeof window !== "undefined" &&
+        ["http:", "https:"].includes(window.location.protocol) && (
+          <a
+            href="./tx-sim.html"
+            className="px-2.5 py-2 font-medium text-sm"
+            title="Execute reviewed Testnet 3 transaction files"
+          >
+            Tx-sim
+          </a>
+        )}
     </nav>
   );
 }
